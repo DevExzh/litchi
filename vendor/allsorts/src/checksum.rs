@@ -4,8 +4,8 @@
 
 use std::num::Wrapping;
 
-use crate::binary::read::ReadScope;
 use crate::binary::U32Be;
+use crate::binary::read::ReadScope;
 use crate::error::ParseError;
 
 /// Calculate a checksum of `data` according to the OpenType table checksum algorithm

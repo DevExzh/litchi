@@ -1,6 +1,6 @@
+use flate2::Compression;
 use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
-use flate2::Compression;
 use std::io;
 use std::io::prelude::*;
 

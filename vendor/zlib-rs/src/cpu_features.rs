@@ -52,7 +52,7 @@ pub fn is_enabled_avx2_and_bmi2() -> bool {
                         && std::is_x86_feature_detected!("bmi2");
                     CACHE.store(u32::from(detected), Ordering::Relaxed);
                     detected
-                }
+                },
             };
         }
     }

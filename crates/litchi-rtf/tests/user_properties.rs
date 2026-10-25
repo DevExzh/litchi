@@ -9,7 +9,7 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, UserPropertyType, UserPropertyValue};
+use litchi_rtf::{UserPropertyType, UserPropertyValue, write::Writer};
 
 // The fixture value 3.1400 exercises lexical round-tripping; it is not the constant PI.
 #[allow(
@@ -116,9 +116,7 @@ fn parses_libreoffice_user_property_fixtures_when_available() {
     let owned = date.clone().into_owned();
     assert_eq!(owned, *date);
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.user_properties(), document.user_properties());
 }
@@ -137,23 +135,27 @@ fn rejects_noncanonical_malformed_and_active_properties() {
         r"{\rtf1{\*\userprops{\propname A}\proptype30{\staticval \field danger}}}",
         r"{\rtf1{\*\userprops}Body{\*\userprops}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "{source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
     }
 }
 
 #[test]
 fn writer_round_trips_lexical_forms_unicode_links_and_coexisting_metadata() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\*\userprops"#,
-        r#"{\propname A\{B\}\\C}\proptype5{\staticval 3.1400}{\linkval file:///never-opened}"#,
-        r#"{\propname Emoji}\proptype30{\staticval \u-10179?\u-8704?}"#,
-        r#"}{\*\docvar {Name}{Value}}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\*\userprops"#,
+            r#"{\propname A\{B\}\\C}\proptype5{\staticval 3.1400}{\linkval file:///never-opened}"#,
+            r#"{\propname Emoji}\proptype30{\staticval \u-10179?\u-8704?}"#,
+            r#"}{\*\docvar {Name}{Value}}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(output.contains("{\\*\\userprops"));
     assert!(output.contains("\\proptype5{\\staticval 3.1400}"));

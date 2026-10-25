@@ -10,13 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, Shape, ShapeProperty, ShapeType};
+use litchi_rtf::{Shape, ShapeProperty, ShapeType, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -47,7 +45,8 @@ fn parses_and_rewrites_real_producer_background_with_provenance() {
 
 #[test]
 fn typed_api_round_trips_unknown_scalar_properties_and_clears() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::Ellipse);
     shape.geometry.x = 10;
     shape.geometry.y = 20;
@@ -93,7 +92,10 @@ fn rejects_malformed_destination_grammar_and_duplicates() {
         r"{\rtf1{\*\background{\shp}}{\*\background{\shp}}}",
         r"{\rtf1 Body{\*\background{\shp}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }
 

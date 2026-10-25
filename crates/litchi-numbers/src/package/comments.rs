@@ -2959,13 +2959,10 @@ fn prepare_root_clear(
         .as_deref()
         .ok_or(Error::InvalidSource { path })?;
     let limits = crate::cell::wire::limits_for_source(cell_source);
-    let cell = crate::cell::wire::BncCellView::parse(
-        cell_source,
-        &limits,
-    )
-    .map_err(|_| Error::InvalidSource { path })?
-    .clear_comment(key, &limits)
-    .map_err(|_| Error::InvalidSource { path })?;
+    let cell = crate::cell::wire::BncCellView::parse(cell_source, &limits)
+        .map_err(|_| Error::InvalidSource { path })?
+        .clear_comment(key, &limits)
+        .map_err(|_| Error::InvalidSource { path })?;
     let tile_source = message_at_route(source, tile, path)?.data.as_slice();
     let maximum_wire = source.state.options.archive().max_iwa_stream_bytes();
     let tile_change = super::table_cell_edit::tile::TileChange {

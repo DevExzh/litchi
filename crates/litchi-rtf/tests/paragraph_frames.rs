@@ -15,7 +15,7 @@ use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     Cell, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
     ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
-    ParagraphFrameWrap, write::Writer, StyleBlock,
+    ParagraphFrameWrap, StyleBlock, write::Writer,
 };
 
 fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
@@ -67,9 +67,7 @@ fn parses_positioned_paragraph_frame_controls() {
     );
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(block(&reparsed, "Framed").paragraph.frame, Some(frame));
     assert!(String::from_utf8(bytes).unwrap().contains(r"\absw1440"));
@@ -78,7 +76,8 @@ fn parses_positioned_paragraph_frame_controls() {
 #[test]
 fn framed_drop_cap_is_written_before_text_flow_controls() {
     let document = Tree::parse(
-        r#"{\rtf1\dropcapli2\dropcapt1\absw720\phmrg\posxl\pvmrg\posyt\frmtxtbrl Framed}"#, litchi_rtf::read::OpenOptions::default()
+        r#"{\rtf1\dropcapli2\dropcapt1\absw720\phmrg\posxl\pvmrg\posyt\frmtxtbrl Framed}"#,
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     let paragraph = block(&document, "Framed").paragraph;
@@ -86,9 +85,7 @@ fn framed_drop_cap_is_written_before_text_flow_controls() {
     assert!(paragraph.frame.is_some());
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let text = String::from_utf8(bytes.clone()).unwrap();
     assert!(text.find(r"\dropcapli2").unwrap() < text.find(r"\frmtxtbrl").unwrap());
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -100,7 +97,8 @@ fn framed_drop_cap_is_written_before_text_flow_controls() {
 #[test]
 fn frame_state_inherits_scopes_and_pard_resets_it() {
     let document = Tree::parse(
-        r#"{\rtf1\ansi\absw720 Outer\par {\absw1440 Inner\par }Tail\par {\pard Reset\par }}"#, litchi_rtf::read::OpenOptions::default()
+        r#"{\rtf1\ansi\absw720 Outer\par {\absw1440 Inner\par }Tail\par {\pard Reset\par }}"#,
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(
@@ -132,12 +130,15 @@ fn frame_state_inherits_scopes_and_pard_resets_it() {
 
 #[test]
 fn frame_controls_are_retained_in_styles_and_default_paragraphs() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\stylesheet{\s7\absw960\phcol\posxc\pvpara\posyc"#,
-        r#"\wraparound\frmtxlrtb Style;}}"#,
-        r#"{\*\defpap\absw480\phmrg\posxr\pvmrg\posyb\wraptight\frmtxtbrl}"#,
-        r#"\s7 Styled}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\stylesheet{\s7\absw960\phcol\posxc\pvpara\posyc"#,
+            r#"\wraparound\frmtxlrtb Style;}}"#,
+            r#"{\*\defpap\absw480\phmrg\posxr\pvmrg\posyb\wraptight\frmtxtbrl}"#,
+            r#"\s7 Styled}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let style_frame = document
         .stylesheet()
@@ -168,10 +169,13 @@ fn frame_controls_are_retained_in_styles_and_default_paragraphs() {
 
 #[test]
 fn header_and_footer_paragraph_frames_round_trip() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\header\absw720\pvpara\posyt Header\par}"#,
-        r#"{\footer\absw960\phmrg\posyb Footer\par}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\header\absw720\pvpara\posyt Header\par}"#,
+            r#"{\footer\absw960\phmrg\posyb Footer\par}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let header = &document.sections()[0].headers_footers[0].paragraphs[0];
     let footer = &document.sections()[0].headers_footers[1].paragraphs[0];
@@ -187,9 +191,7 @@ fn header_and_footer_paragraph_frames_round_trip() {
     );
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.sections()[0].headers_footers[0].paragraphs[0]
@@ -207,10 +209,13 @@ fn header_and_footer_paragraph_frames_round_trip() {
 
 #[test]
 fn zero_frame_toggle_values_are_retained_in_paragraph_and_style() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\stylesheet{\s9\absw960\abslock0\absnoovrlp0 Style;}}"#,
-        r#"\absw720\abslock0\absnoovrlp0 Paragraph}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\stylesheet{\s9\absw960\abslock0\absnoovrlp0 Style;}}"#,
+            r#"\absw720\abslock0\absnoovrlp0 Paragraph}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let paragraph = block(&document, "Paragraph").paragraph.frame.unwrap();
     assert_eq!(paragraph.anchor_locked, Some(false));
@@ -247,7 +252,10 @@ fn rejects_missing_or_oversized_frame_parameters() {
         r#"{\rtf1{\stylesheet{\s7\absnoovrlp2 Bad;}}Text}"#,
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
@@ -263,9 +271,7 @@ fn table_cell_frames_round_trip_and_preserve_style_frames() {
     assert!(!paragraph.has_paragraph_break());
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.tables()[0].rows()[0].cells()[0].paragraphs()[0]
@@ -290,7 +296,11 @@ fn table_cell_frames_round_trip_and_preserve_style_frames() {
 
 #[test]
 fn table_cell_frames_inherit_controls_before_intbl_and_itap() {
-    let outer = Tree::parse(r#"{\rtf1\absw720\trowd\cellx1000\intbl Cell\cell\row}"#, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let outer = Tree::parse(
+        r#"{\rtf1\absw720\trowd\cellx1000\intbl Cell\cell\row}"#,
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         outer.tables()[0].rows()[0].cells()[0].paragraphs()[0]
             .frame()
@@ -372,8 +382,11 @@ fn table_row_frame_controls_must_be_consistent() {
 #[test]
 fn constructed_implicit_unframed_cells_cannot_join_a_framed_row() {
     for text in ["plain", ""] {
-        let mut document =
-            Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 Framed\cell\row}"#, litchi_rtf::read::OpenOptions::default()).unwrap();
+        let mut document = Tree::parse(
+            r#"{\rtf1\trowd\cellx1000\intbl\absw720 Framed\cell\row}"#,
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap();
         document.tables_mut()[0].rows_mut()[0].add_cell(Cell::new(Cow::Borrowed(text)));
 
         let mut bytes = Vec::new();
@@ -423,9 +436,7 @@ fn table_cell_multiple_paragraph_frames_round_trip() {
     assert_eq!(paragraphs[1].frame().unwrap().width_twips, Some(720));
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_paragraphs = reparsed.tables()[0].rows()[0].cells()[0].paragraphs();
     assert_eq!(reparsed_paragraphs.len(), 2);
@@ -441,17 +452,18 @@ fn table_cell_multiple_paragraph_frames_round_trip() {
 
 #[test]
 fn table_cell_text_edits_remap_frame_spans() {
-    let mut document =
-        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 Cell\cell\row}"#, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r#"{\rtf1\trowd\cellx1000\intbl\absw720 Cell\cell\row}"#,
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     cell.set_text(Cow::Borrowed("Changed")).unwrap();
     assert_eq!(cell.paragraphs()[0].text_range(), 0..7);
     assert_eq!(cell.paragraphs()[0].frame().unwrap().width_twips, Some(720));
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "Changed");
@@ -463,8 +475,11 @@ fn table_cell_text_edits_remap_frame_spans() {
 
 #[test]
 fn table_cell_soft_line_noop_preserves_one_framed_paragraph() {
-    let mut document =
-        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\cell\row}"#, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\cell\row}"#,
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     let before = cell.paragraphs().to_vec();
     let text = cell.text().to_owned();
@@ -472,9 +487,7 @@ fn table_cell_soft_line_noop_preserves_one_framed_paragraph() {
     assert_eq!(cell.paragraphs(), before.as_slice());
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let written = String::from_utf8(bytes.clone()).unwrap();
     assert!(written.contains(r"\line "));
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -485,8 +498,11 @@ fn table_cell_soft_line_noop_preserves_one_framed_paragraph() {
 
 #[test]
 fn table_cell_soft_line_and_paragraph_boundaries_round_trip() {
-    let mut document =
-        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#,
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     assert_eq!(cell.paragraphs().len(), 2);
     assert!(cell.paragraphs()[0].has_paragraph_break());
@@ -495,9 +511,7 @@ fn table_cell_soft_line_and_paragraph_boundaries_round_trip() {
     let text = cell.text().to_owned();
     cell.set_text(Cow::Owned(text)).unwrap();
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "A\nB\nC");
@@ -508,8 +522,11 @@ fn table_cell_soft_line_and_paragraph_boundaries_round_trip() {
 
 #[test]
 fn changed_table_cell_text_remaps_soft_and_paragraph_break_kinds() {
-    let mut document =
-        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#,
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     cell.set_text(Cow::Owned("Changed\nB\nTail".to_string()))
         .unwrap();
@@ -519,9 +536,7 @@ fn changed_table_cell_text_remaps_soft_and_paragraph_break_kinds() {
     assert!(!cell.paragraphs()[1].has_paragraph_break());
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "Changed\nB\nTail");

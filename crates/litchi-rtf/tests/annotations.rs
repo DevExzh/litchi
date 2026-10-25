@@ -57,9 +57,7 @@ fn point_and_range_comments_round_trip_without_visible_text_duplication() {
     let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(!document.annotations()[0].has_reference);
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let output = String::from_utf8(output).unwrap();
     let reparsed = Tree::parse(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
@@ -68,7 +66,11 @@ fn point_and_range_comments_round_trip_without_visible_text_duplication() {
 
 #[test]
 fn typed_mutation_validates_positions_identity_and_coexists_with_navigation_marks() {
-    let mut document = Tree::parse(r"{\rtf1 Body{\tc\v Heading}}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1 Body{\tc\v Heading}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(matches!(
         document.navigation_entries()[0],
         NavigationEntry::TableOfContents(_)
@@ -97,7 +99,10 @@ fn rejects_conflicts_orphans_active_data_and_invalid_metadata() {
         r"{\rtf1\chatn{\*\annotation{\object danger}}}",
         "{\\rtf1\\chatn{\\*\\annotation\\bin4 abcd}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "{source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
     }
 }
 #[test]

@@ -14,15 +14,17 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_unicode_generator_as_inert_provenance_and_round_trips() {
-    let document = Tree::parse(r"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi{\*\generator Acme \u20320? 1.0;}Visible}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "Visible");
     assert_eq!(document.generator().unwrap().value, "Acme 你 1.0");
 
@@ -36,11 +38,13 @@ fn parses_unicode_generator_as_inert_provenance_and_round_trips() {
 
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document
         .set_generator(DocumentGenerator::new(Cow::Borrowed("Litchi 1.0")).unwrap())
         .unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.generator().unwrap().value, "Litchi 1.0");
     assert_eq!(reparsed.text(), "Body");
 
@@ -60,7 +64,10 @@ fn rejects_duplicate_or_active_generator_destinations() {
         r"{\rtf1{\*\generator\bin2 xx}Body}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 
     let oversized = format!(r"{{\rtf1{{\*\generator {};}}}}", "x".repeat(65_537));

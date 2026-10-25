@@ -51,7 +51,11 @@ fn parses_complete_cluster_as_passive_metadata() {
 
 #[test]
 fn omission_is_empty_and_serializes_no_table_policy() {
-    let doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(doc.table_layout_compatibility().is_empty());
     let serialized = write(&doc);
     for name in CONTROLS {
@@ -61,7 +65,11 @@ fn omission_is_empty_and_serializes_no_table_policy() {
 
 #[test]
 fn typed_api_round_trips_in_specification_order_and_clears_inertly() {
-    let mut doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     doc.set_table_layout_compatibility(DocumentTableLayoutCompatibility {
         combine_borders_like_word_5: true,
         do_not_align_rows_independently: true,
@@ -94,7 +102,11 @@ fn typed_api_round_trips_in_specification_order_and_clears_inertly() {
 #[test]
 fn accepts_independent_flags_without_synthesizing_table_layout() {
     for name in CONTROLS {
-        let doc = Tree::parse(&format!(r"{{\rtf1\ansi\{name} Body}}"), litchi_rtf::read::OpenOptions::default()).unwrap();
+        let doc = Tree::parse(
+            &format!(r"{{\rtf1\ansi\{name} Body}}"),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap();
         assert_eq!(doc.text(), "Body");
         assert!(doc.tables().is_empty());
     }
@@ -111,13 +123,19 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1\ansi Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&input, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &input,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted {input}"
             );
         }
     }
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Tree::parse(r"{\rtf1\ansi\otblrul999999999999 Body}", litchi_rtf::read::OpenOptions::default())
+        &Tree::parse(
+            r"{\rtf1\ansi\otblrul999999999999 Body}",
+            litchi_rtf::read::OpenOptions::default()
+        )
     ));
 }
 

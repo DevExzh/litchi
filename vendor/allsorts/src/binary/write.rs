@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 use crate::binary::budget::{self, Budget};
 use crate::binary::read::{ReadArray, ReadArrayCow, ReadScope, ReadUnchecked};
-use crate::binary::{I16Be, I32Be, I64Be, U16Be, U24Be, U32Be, I8, U8};
+use crate::binary::{I8, I16Be, I32Be, I64Be, U8, U16Be, U24Be, U32Be};
 use crate::error::WriteError;
 
 /// An in-memory buffer that implements `WriteContext`.
@@ -159,8 +159,7 @@ pub trait WriteContext {
         T: WriteBinary<HostType> + ReadUnchecked,
     {
         let mut placeholders = Vec::new();
-        budget::reserve_vec(&mut placeholders, count)
-            .map_err(|_| WriteError::LimitExceeded)?;
+        budget::reserve_vec(&mut placeholders, count).map_err(|_| WriteError::LimitExceeded)?;
         for _ in 0..count {
             placeholders.push(self.placeholder::<T, HostType>()?);
         }
@@ -696,7 +695,7 @@ mod tests {
 
         // Check out of range value
         match U24Be::write(&mut ctxt, std::u32::MAX) {
-            Err(WriteError::BadValue) => {}
+            Err(WriteError::BadValue) => {},
             _ => panic!("Expected WriteError::BadValue"),
         }
     }
@@ -736,7 +735,10 @@ mod tests {
         let budget = crate::binary::budget::current().unwrap();
         let mut output = WriteBuffer::output();
 
-        assert_eq!(output.write_bytes(&[1, 2, 3, 4]), Err(WriteError::LimitExceeded));
+        assert_eq!(
+            output.write_bytes(&[1, 2, 3, 4]),
+            Err(WriteError::LimitExceeded)
+        );
         assert_eq!(budget.requested(), 0);
         assert_eq!(budget.output_requested(), 0);
     }

@@ -274,10 +274,7 @@ pub fn validate_read_at(
         .map_err(OpcError::from)
         .map_err(Error::Ingress)?;
     if actual != expected {
-        return Err(Error::Ingress(OpcError::SourceChanged {
-            expected,
-            actual,
-        }));
+        return Err(Error::Ingress(OpcError::SourceChanged { expected, actual }));
     }
     Ok(report)
 }
@@ -545,9 +542,7 @@ fn inspect_main_relationships(
         .map_err(|_| Error::Allocation {
             resource: "main-document relationship traversal",
         })?;
-    let main_part = package
-        .part(main.partname())
-        .map_err(Error::Ingress)?;
+    let main_part = package.part(main.partname()).map_err(Error::Ingress)?;
     pending.push(main_part);
     let mut scheduled = HashSet::new();
     scheduled
@@ -595,11 +590,9 @@ fn inspect_main_relationships(
             // attacker-controlled PackURI into the pending queue.
             let target_identity = std::ptr::from_ref(target_part.partname()) as usize;
             if scheduled.insert(target_identity) {
-                pending
-                    .try_reserve(1)
-                    .map_err(|_| Error::Allocation {
-                        resource: "main-document relationship traversal",
-                    })?;
+                pending.try_reserve(1).map_err(|_| Error::Allocation {
+                    resource: "main-document relationship traversal",
+                })?;
                 pending.push(target_part);
             }
         }

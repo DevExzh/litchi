@@ -10,13 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{PictureShapeProperties, write::Writer, ShapeProperty};
+use litchi_rtf::{PictureShapeProperties, ShapeProperty, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -54,9 +52,11 @@ fn parses_and_round_trips_real_libreoffice_picture_properties() {
 
 #[test]
 fn typed_mutation_moves_metadata_without_cloning_picture_payload() {
-    let mut document =
-        Tree::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}", litchi_rtf::read::OpenOptions::default())
-            .unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let data_ptr = document.pictures()[0].data().as_ptr();
     let properties = PictureShapeProperties {
         shape_id: Some(-7),
@@ -112,7 +112,10 @@ fn rejects_hostile_picture_property_grammar() {
         r"{\rtf1{\pict\pngblip 8950{\*\picprop{\sp{\sn x}{\sv 1}}}",
     ] {
         let source = format!("{prefix}{suffix}");
-        assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 
     for source in [
@@ -121,13 +124,20 @@ fn rejects_hostile_picture_property_grammar() {
         r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv 1}}}{\*\picprop{\sp{\sn y}{\sv 2}}}\pngblip 89504e470d0a1a0a}}",
         r"{\rtf1{\pict{{\*\picprop{\sp{\sn x}{\sv 1}}}}\pngblip 89504e470d0a1a0a}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }
 
 #[test]
 fn enforces_typed_property_bounds() {
-    let mut document = Tree::parse(r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a}}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         document
             .set_picture_shape_properties(0, Some(PictureShapeProperties::default()))

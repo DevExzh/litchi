@@ -7,8 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
 const SPECIAL_CHARACTERS: &[(&str, &str)] = &[
     (r"\emdash", "\u{2014}"),
@@ -25,9 +25,7 @@ const SPECIAL_CHARACTERS: &[(&str, &str)] = &[
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -52,7 +50,8 @@ fn special_character_control_words_round_trip_through_the_writer() {
             serialized.contains(&format!("{control} ")),
             "serialized {control} as {serialized}"
         );
-        let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
+        let reparsed =
+            Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             reparsed.text(),
             format!("A{expected}B"),
@@ -63,13 +62,21 @@ fn special_character_control_words_round_trip_through_the_writer() {
 
 #[test]
 fn dynamic_date_time_stamps_parse_without_extracted_text() {
-    let document = Tree::parse(r"{\rtf1\ansi A\chdate B\chdpl C\chdpa D\chtime E}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi A\chdate B\chdpl C\chdpa D\chtime E}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "ABCDE");
 }
 
 #[test]
 fn special_character_control_words_survive_inside_generated_list_markers() {
-    let document = Tree::parse(r"{\rtf1\ansi{\listtext\pard\plain\bullet\tab}B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi{\listtext\pard\plain\bullet\tab}B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let marker = &document.generated_list_markers()[0];
     assert_eq!(marker.text, "\u{2022}\t");
 

@@ -2,9 +2,9 @@
 
 use flate2::bufread::ZlibDecoder;
 
+use crate::binary::U32Be;
 use crate::binary::budget;
 use crate::binary::read::{ReadArray, ReadBinary, ReadBuf, ReadCtxt, ReadFrom, ReadScope};
-use crate::binary::U32Be;
 use crate::error::ParseError;
 use crate::tables::{FontTableProvider, SfntVersion};
 
@@ -77,8 +77,7 @@ impl WoffFont<'_> {
             if count > remaining {
                 return Err(ParseError::CompressionError);
             }
-            budget::reserve_vec(&mut metadata, count)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut metadata, count).map_err(|_| ParseError::LimitExceeded)?;
             metadata.extend_from_slice(&chunk[..count]);
         }
         let metadata = String::from_utf8(metadata).map_err(|_| ParseError::CompressionError)?;
@@ -179,7 +178,7 @@ impl ReadBinary for WoffHeader {
                     priv_offset,
                     priv_length,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }

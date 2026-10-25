@@ -65,8 +65,7 @@ fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
 
 #[test]
 fn unmatched_move_start_is_ignored_in_the_semantic_model()
--> std::result::Result<(), Box<dyn std::error::Error>>
-{
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf orphan 0100EFCDAB00}}"#;
     let document = Package::parse(source)?;
     assert_eq!(document.smart_tags().len(), 1);
@@ -339,7 +338,10 @@ fn changed_publication_refuses_unmatched_move_end()
 #[test]
 fn raw_canonical_writer_refuses_unmatched_move_source()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let source = litchi_rtf::raw::Tree::parse(r#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}x}"#, litchi_rtf::read::OpenOptions::default())?;
+    let source = litchi_rtf::raw::Tree::parse(
+        r#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}x}"#,
+        litchi_rtf::read::OpenOptions::default(),
+    )?;
     let mut output = Vec::new();
     let error = litchi_rtf::write::Writer::new(&mut output).write_document(&source);
     assert!(matches!(error, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput));

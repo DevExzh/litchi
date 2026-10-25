@@ -119,8 +119,7 @@ fn dde_and_ddeauto_are_both_external_and_active() {
 
 #[test]
 fn xsl_and_mail_merge_metadata_are_external_and_active_surfaces() {
-    let xsl =
-        report_str(r#"{\rtf1{\*\xform transform.xsl}\usexform Body}"#).unwrap();
+    let xsl = report_str(r#"{\rtf1{\*\xform transform.xsl}\usexform Body}"#).unwrap();
     assert_eq!(xsl.external_links().status(), ValidationStatus::Present);
     assert_eq!(xsl.active_content().status(), ValidationStatus::Present);
     assert_eq!(xsl.execution().status(), ValidationStatus::Unsupported);
@@ -344,9 +343,7 @@ fn malformed_root_and_finite_limits_are_errors_not_safe_reports() {
         .expect("source-byte limit is representable")
         .build()
         .expect("source profile is consistent");
-    assert!(
-        validate(raw_bytes(CLEAN), OpenOptions::new().source_limits(limits)).is_err()
-    );
+    assert!(validate(raw_bytes(CLEAN), OpenOptions::new().source_limits(limits)).is_err());
 
     let exact = SourceLimits::builder()
         .max_input_bytes(CLEAN.len())

@@ -10,20 +10,21 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, SectionRendering};
+use litchi_rtf::{SectionRendering, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_section_rendering_and_column_balance_and_round_trips() {
-    let document =
-        Tree::parse(r"{\rtf1\ansi\sectd\vertsect\nocolbal\cols2\pgnstarts6 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\sectd\vertsect\nocolbal\cols2\pgnstarts6 Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "Body");
     let section = &document.sections()[0];
     assert_eq!(
@@ -47,7 +48,11 @@ fn parses_section_rendering_and_column_balance_and_round_trips() {
 
 #[test]
 fn parses_horizontal_rendering_and_balanced_default() {
-    let document = Tree::parse(r"{\rtf1\ansi\sectd\horzsect Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\sectd\horzsect Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let section = &document.sections()[0];
     assert_eq!(
         section.properties.rendering,
@@ -65,15 +70,22 @@ fn parses_horizontal_rendering_and_balanced_default() {
         Some(SectionRendering::Horizontal)
     );
 
-    let implicit = Tree::parse(r"{\rtf1\ansi\sectd Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let implicit = Tree::parse(
+        r"{\rtf1\ansi\sectd Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(implicit.sections()[0].properties.rendering.is_none());
     assert!(implicit.sections()[0].properties.balance_columns);
 }
 
 #[test]
 fn parses_paragraph_suppression_flags_and_round_trips() {
-    let document =
-        Tree::parse(r"{\rtf1\ansi\pard\noline\notabind Suppressed\par\pard Normal\par}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\pard\noline\notabind Suppressed\par\pard Normal\par}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let suppressed = document
         .blocks()
         .iter()
@@ -113,7 +125,10 @@ fn rejects_parameterized_section_and_paragraph_flags() {
         r"{\rtf1\pard\notabind0 Text\par}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                rtf,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {rtf}"
         );
     }

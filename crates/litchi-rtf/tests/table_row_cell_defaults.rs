@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{BorderStyle, write::Writer, TableDistanceUnit, TablePreferredWidthUnit};
+use litchi_rtf::{BorderStyle, TableDistanceUnit, TablePreferredWidthUnit, write::Writer};
 
 #[test]
 fn parses_row_cell_defaults_and_resets_per_row() {
@@ -79,9 +79,7 @@ fn writer_round_trips_deterministically() {
     )
     .unwrap();
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let first = String::from_utf8(first).unwrap();
     assert!(first.contains("\\tsbrdrb\\brdrs\\brdrw30\\brdrcf1\\brsp4"));
     assert!(first.contains("\\tsbrdrv\\brdrdash\\brdrw10"));
@@ -94,9 +92,7 @@ fn writer_round_trips_deterministically() {
         document.tables()[0].rows()[0].cell_defaults()
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, String::from_utf8(second).unwrap());
 }
 
@@ -118,9 +114,18 @@ fn rejects_malformed_default_controls() {
         r"{\rtf1\trowd\tsbrdrt\brdrs\brdrw80 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
-    assert!(Tree::parse(r"{\rtf1{\*\unknown\tscellpaddl-1\tscellwidthfts9 bad}Visible}", litchi_rtf::read::OpenOptions::default()).is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\*\unknown\tscellpaddl-1\tscellwidthfts9 bad}Visible}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }

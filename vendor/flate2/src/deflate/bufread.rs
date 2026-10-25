@@ -257,10 +257,10 @@ impl<W: BufRead + Write> Write for DeflateDecoder<W> {
 
 #[cfg(test)]
 mod test {
+    use crate::Compression;
     use crate::bufread::DeflateDecoder;
     use crate::deflate::write;
     use crate::io::{Read, Write};
-    use crate::Compression;
     use alloc::vec::Vec;
 
     // DeflateDecoder consumes one deflate archive and then returns 0 for subsequent reads, allowing any

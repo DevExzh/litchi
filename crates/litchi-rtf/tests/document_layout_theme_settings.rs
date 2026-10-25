@@ -14,18 +14,19 @@ use litchi_rtf::{DocumentPrintLayoutSettings, DocumentThemeLanguages, LanguageId
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_flags_and_producer_style_theme_languages() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\gutterprl\twoonone\themelang1033"#,
-        r#"\themelangfe2052\themelangcs1025 Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\gutterprl\twoonone\themelang1033"#,
+            r#"\themelangfe2052\themelangcs1025 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(
         *document.print_layout_settings(),
@@ -56,7 +57,11 @@ fn omission_is_distinct_from_explicit_zero_languages() {
     let serialized = String::from_utf8(write(&omitted)).unwrap();
     assert!(!serialized.contains("\\themelang"));
 
-    let explicit = Tree::parse(r"{\rtf1\themelang0\themelangfe0\themelangcs0 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let explicit = Tree::parse(
+        r"{\rtf1\themelang0\themelangfe0\themelangcs0 Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(explicit.theme_languages().primary.unwrap().value(), 0);
     assert_eq!(explicit.theme_languages().east_asian.unwrap().value(), 0);
     assert_eq!(
@@ -71,7 +76,8 @@ fn omission_is_distinct_from_explicit_zero_languages() {
 
 #[test]
 fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document
         .set_print_layout_settings(DocumentPrintLayoutSettings {
             facing_pages: false,
@@ -115,11 +121,14 @@ fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
 
 #[test]
 fn coexists_with_theme_data_grid_and_rendering_metadata() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\themelangfe0\horzdoc\dgmargin\gutterprl"#,
-        r#"{\*\themedata 0102}\themelang1031\jexpand\twoonone"#,
-        r#"\themelangcs0 Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\themelangfe0\horzdoc\dgmargin\gutterprl"#,
+            r#"{\*\themedata 0102}\themelang1031\jexpand\twoonone"#,
+            r#"\themelangcs0 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
     let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -155,7 +164,10 @@ fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
         r"{\rtf1\themelangcs0\themelangcs1025 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }
@@ -175,7 +187,10 @@ fn rejects_every_starred_grouped_and_late_control() {
             format!(r"{{\rtf1{{{control}}}Body}}"),
             format!(r"{{\rtf1 Body{control}}}"),
         ] {
-            assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+            assert!(
+                Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+                "accepted malformed {source}"
+            );
         }
     }
 }

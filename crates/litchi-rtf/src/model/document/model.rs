@@ -6275,7 +6275,8 @@ mod source_tests {
 
         for source in [plain, cp1252, lzfu, mela] {
             let expected = source.clone();
-            let document = Tree::from_owned_bytes(source, crate::read::OpenOptions::default()).expect("parse owned RTF");
+            let document = Tree::from_owned_bytes(source, crate::read::OpenOptions::default())
+                .expect("parse owned RTF");
             assert_eq!(document.preserved_source(), Some(expected.as_slice()));
         }
     }
@@ -6283,7 +6284,8 @@ mod source_tests {
     #[test]
     fn borrowed_byte_parsing_retains_an_independent_source_copy() {
         let mut source = br"{\rtf1\ansi borrowed source}".to_vec();
-        let document = Tree::from_bytes(&source, crate::read::OpenOptions::default()).expect("parse borrowed RTF");
+        let document = Tree::from_bytes(&source, crate::read::OpenOptions::default())
+            .expect("parse borrowed RTF");
         let retained = document
             .preserved_source()
             .expect("borrowed source retained")
@@ -6295,8 +6297,8 @@ mod source_tests {
     #[test]
     fn owned_open_preserves_source_and_decompression_error_boundaries() {
         let raw = br"{\rtf1\ansi bounded compressed source}";
-        let compressed = crate::compress(raw, true, crate::CompressionLimits::default())
-            .expect("compress RTF");
+        let compressed =
+            crate::compress(raw, true, crate::CompressionLimits::default()).expect("compress RTF");
         let source_limit = compressed.len() - 1;
         let source_file = TempRtf::new("source-limit", &compressed);
         assert!(matches!(

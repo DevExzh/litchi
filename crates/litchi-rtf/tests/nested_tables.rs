@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Cell, write::Writer, Table};
+use litchi_rtf::{Cell, Table, write::Writer};
 
 fn nested_count(table: &Table<'_>) -> usize {
     table
@@ -63,9 +63,7 @@ fn parses_ordered_nested_content_empty_cells_and_round_trips() {
     assert_eq!(nested.rows()[0].cells()[0].text(), "Inner");
     assert_eq!(nested.rows()[0].cells()[1].text(), "");
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let first = String::from_utf8(first).unwrap();
     assert!(first.contains("\\itap2 Inner\\nestcell"));
     assert!(first.contains("{\\*\\nesttableprops\\itap2\\trowd"));
@@ -73,9 +71,7 @@ fn parses_ordered_nested_content_empty_cells_and_round_trips() {
     let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_table_eq(outer, &reparsed.tables()[0]);
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, String::from_utf8(second).unwrap());
 }
 
@@ -89,10 +85,12 @@ fn grouped_table_text_keeps_cell_boundaries_and_round_trips() {
     assert_eq!(row.cells()[1].text(), "C");
 
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
-    let reparsed = Tree::parse(&String::from_utf8(bytes).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    Writer::new(&mut bytes).write_document(&document).unwrap();
+    let reparsed = Tree::parse(
+        &String::from_utf8(bytes).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let reparsed_row = &reparsed.tables()[0].rows()[0];
     assert_eq!(
         reparsed_row
@@ -108,7 +106,11 @@ fn grouped_table_text_keeps_cell_boundaries_and_round_trips() {
 fn parses_real_libreoffice_end_defined_nested_table() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf117268.rtf");
-    let document = Tree::parse(&std::fs::read_to_string(path).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        &std::fs::read_to_string(path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         document
             .tables()
@@ -151,7 +153,10 @@ fn rejects_malformed_levels_destinations_and_boundaries() {
         r"{\rtf1\trowd\cellx1\intbl\itap2 X\nestcell{\nesttableprops\trowd\cellx1\cellx2\nestrow}}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }

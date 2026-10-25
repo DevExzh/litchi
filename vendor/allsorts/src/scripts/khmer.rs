@@ -1,12 +1,12 @@
 use tinyvec::tiny_vec;
 
+use crate::DOTTED_CIRCLE;
 use crate::error::{ParseError, ShapingError};
 use crate::gsub::{self, Feature, FeatureMask, GlyphData, GlyphOrigin, RawGlyph, RawGlyphFlags};
-use crate::layout::{FeatureTableSubstitution, GDEFTable, LayoutCache, LayoutTable, GSUB};
+use crate::layout::{FeatureTableSubstitution, GDEFTable, GSUB, LayoutCache, LayoutTable};
 use crate::scripts::syllable::*;
 use crate::tag;
 use crate::unicode::mcc::sort_by_modified_combining_class;
-use crate::DOTTED_CIRCLE;
 
 fn shaping_class(c: char) -> Option<ShapingClass> {
     khmer_character(c).0
@@ -282,7 +282,7 @@ fn decompose_matra(cs: &mut Vec<char>) {
             '\u{17BE}' | '\u{17BF}' | '\u{17C0}' | '\u{17C4}' | '\u{17C5}' => {
                 cs.insert(i, '\u{17C1}');
                 i += 2;
-            }
+            },
             _ => i += 1,
         }
     }
@@ -367,28 +367,28 @@ fn to_khmer_syllables(
                 match syllable_type {
                     Syllable::Valid => {
                         syllable = glyphs[..len].iter().map(to_raw_glyph_khmer).collect();
-                    }
+                    },
                     Syllable::Broken => {
                         // Prepend a dotted circle to a broken syllable, then treat it as valid.
                         syllable = Vec::with_capacity(len + 1);
                         insert_dotted_circle(dotted_circle_index, &mut syllable);
                         syllable.extend(glyphs[..len].iter().map(to_raw_glyph_khmer));
-                    }
+                    },
                 }
                 syllables.push((syllable, Syllable::Valid));
                 glyphs = &glyphs[len..];
-            }
+            },
             None => {
                 let invalid_glyph = to_raw_glyph_khmer(&glyphs[0]);
                 match syllables.last_mut() {
                     // Append invalid glyph to last syllable if syllable is invalid.
                     Some((invalid_syllable, Syllable::Broken)) => {
                         invalid_syllable.push(invalid_glyph)
-                    }
+                    },
                     _ => syllables.push((vec![invalid_glyph], Syllable::Broken)),
                 }
                 glyphs = &glyphs[1..];
-            }
+            },
         }
     }
 
@@ -450,8 +450,8 @@ fn shape_syllable(
                 syllable,
                 max_glyphs,
             )?;
-        }
-        Syllable::Broken => {}
+        },
+        Syllable::Broken => {},
     }
 
     Ok(())

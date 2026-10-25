@@ -5,23 +5,23 @@
 use std::fmt;
 use std::num::Wrapping;
 
-use crate::binary::read::{ReadArrayCow, ReadScope};
 use crate::binary::budget;
+use crate::binary::read::{ReadArrayCow, ReadScope};
 use crate::binary::write::{Placeholder, WriteBinary};
 use crate::binary::write::{WriteBinaryDep, WriteBuffer, WriteContext};
 use crate::binary::{U16Be, U32Be};
-use crate::cff::cff2::{OutputFormat, CFF2};
-use crate::cff::{CFFError, SubsetCFF, CFF};
+use crate::cff::cff2::{CFF2, OutputFormat};
+use crate::cff::{CFF, CFFError, SubsetCFF};
 use crate::error::{ParseError, ReadWriteError, WriteError};
 use crate::post::PostTable;
 use crate::tables::cmap::subset::{CmapStrategy, MappingsToKeep, NewIds, OldIds};
-use crate::tables::cmap::{owned, EncodingId, PlatformId};
+use crate::tables::cmap::{EncodingId, PlatformId, owned};
 use crate::tables::glyf::GlyfTable;
 use crate::tables::loca::{self, LocaTable};
 use crate::tables::os2::Os2;
 use crate::tables::{
-    self, cmap, FontTableProvider, HeadTable, HheaTable, HmtxTable, IndexToLocFormat, MaxpTable,
-    TableRecord,
+    self, FontTableProvider, HeadTable, HheaTable, HmtxTable, IndexToLocFormat, MaxpTable,
+    TableRecord, cmap,
 };
 use crate::{checksum, tag};
 
@@ -344,10 +344,10 @@ fn subset_ttf(
         CmapStrategy::Generate(mappings_to_keep) => {
             let mappings_to_keep = mappings_to_keep.update_to_new_ids(&subset_glyphs);
             Some(create_cmap_table(&mappings_to_keep)?)
-        }
+        },
         CmapStrategy::MacRomanSupplied(cmap) => {
             Some(create_cmap_table_from_cmap_array(glyph_ids, cmap)?)
-        }
+        },
         CmapStrategy::Omit => None,
     };
 
@@ -492,7 +492,7 @@ fn build_otf(
                 let os2 = ReadScope::new(&data).read_dep::<Os2>(data.len())?;
                 let updated_os2 = subset_os2(&os2, &mappings_to_keep);
                 Some(updated_os2)
-            }
+            },
             _ => None,
         }
     } else {
@@ -566,9 +566,7 @@ fn create_cmap_table(
     budget::reserve_vec(&mut encoding_records, 1)
         .map_err(|_| ReadWriteError::Read(ParseError::LimitExceeded))?;
     encoding_records.push(encoding_record);
-    Ok(owned::Cmap {
-        encoding_records,
-    })
+    Ok(owned::Cmap { encoding_records })
 }
 
 fn create_cmap_table_from_cmap_array(
@@ -590,7 +588,7 @@ fn create_cmap_table_from_cmap_array(
         sub_table: CmapSubtable::Format0 {
             language: 0, // the subtable is language independent
             glyph_id_array: cmap,
-            },
+        },
     });
 
     Ok(Cmap { encoding_records })
@@ -621,7 +619,7 @@ pub fn whole_font<F: FontTableProvider>(
                     ReadScope::new(&provider.read_table_data(tag)?),
                     (),
                 )?;
-            }
+            },
         }
     }
     // maxp and head are required for the font to be usable, so they're always added.
@@ -760,7 +758,7 @@ impl FontBuilder {
                     budget::reserve_for_push(&mut self.tables)
                         .map_err(|_| ReadWriteError::Read(ParseError::LimitExceeded))?;
                     self.tables.insert(index, (tag, buffer));
-                }
+                },
             }
         }
 
@@ -858,9 +856,7 @@ impl FontBuilderWithHead {
             .iter()
             .try_fold(0usize, |total, (_, table)| {
                 let padded_length = checked_long_align(table.len()).ok_or(WriteError::BadValue)?;
-                total
-                    .checked_add(padded_length)
-                    .ok_or(WriteError::BadValue)
+                total.checked_add(padded_length).ok_or(WriteError::BadValue)
             })?;
         table_offset
             .checked_add(table_bytes)
@@ -950,10 +946,10 @@ fn checked_long_align(len: usize) -> Option<usize> {
 #[cfg(feature = "prince")]
 pub mod prince {
     use super::{
-        tag, FontTableProvider, MappingsToKeep, ReadScope, SubsetError, WriteBinary, WriteBuffer,
-        WriteCounter, CFF,
+        CFF, FontTableProvider, MappingsToKeep, ReadScope, SubsetError, WriteBinary, WriteBuffer,
+        WriteCounter, tag,
     };
-    use crate::cff::cff2::{OutputFormat, CFF2};
+    use crate::cff::cff2::{CFF2, OutputFormat};
     use crate::subset::{CmapTarget, SubsetProfile};
     use crate::tables::cmap::subset::CmapStrategy;
     use std::ffi::c_int;
@@ -1008,12 +1004,12 @@ pub mod prince {
                     let mappings_to_keep =
                         MappingsToKeep::new(provider, glyph_ids, CmapTarget::Unrestricted)?;
                     CmapStrategy::Generate(mappings_to_keep)
-                }
+                },
                 PrinceCmapTarget::MacRoman => {
                     let mappings_to_keep =
                         MappingsToKeep::new(provider, glyph_ids, CmapTarget::MacRoman)?;
                     CmapStrategy::Generate(mappings_to_keep)
-                }
+                },
                 PrinceCmapTarget::Omit => CmapStrategy::Omit,
                 PrinceCmapTarget::MacRomanCmap(cmap) => CmapStrategy::MacRomanSupplied(cmap),
             };
@@ -1123,6 +1119,7 @@ impl std::error::Error for SubsetError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Font;
     use crate::font_data::FontData;
     use crate::tables::cmap::{Cmap, CmapSubtable};
     use crate::tables::glyf::{
@@ -1132,7 +1129,6 @@ mod tests {
     use crate::tables::{LongHorMetric, OpenTypeData, OpenTypeFont};
     use crate::tag::DisplayTag;
     use crate::tests::read_fixture;
-    use crate::Font;
 
     use std::collections::HashSet;
 
@@ -1587,12 +1583,12 @@ mod tests {
                     // and always write them out as i16 values.
                     // loca differs because glyf differs
                     continue;
-                }
+                },
                 tag => {
                     let new_record = new_font.find_table_record(record.table_tag).unwrap();
                     let tag = DisplayTag(tag);
                     assert_eq!((tag, new_record.checksum), (tag, record.checksum));
-                }
+                },
             }
         }
     }
@@ -1610,7 +1606,7 @@ mod tests {
             &SubsetProfile::Pdf,
             CmapTarget::Unrestricted,
         ) {
-            Err(SubsetError::Parse(ParseError::BadIndex)) => {}
+            Err(SubsetError::Parse(ParseError::BadIndex)) => {},
             err => panic!(
                 "expected SubsetError::Parse(ParseError::BadIndex) got {:?}",
                 err

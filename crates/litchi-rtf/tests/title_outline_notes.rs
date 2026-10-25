@@ -9,14 +9,12 @@
 
 //! Round-trip tests for `\titlepg`, `\endnhere`, and `\outlinelevelN`.
 
-use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -74,7 +72,25 @@ fn outline_level_round_trips() {
 
 #[test]
 fn outline_level_out_of_range_is_rejected() {
-    assert!(Tree::parse(r"{\rtf1\ansi\outlinelevel10 X\par}", litchi_rtf::read::OpenOptions::default()).is_err());
-    assert!(Tree::parse(r"{\rtf1\ansi\outlinelevel-1 X\par}", litchi_rtf::read::OpenOptions::default()).is_err());
-    assert!(Tree::parse(r"{\rtf1\ansi\outlinelevel9 X\par}", litchi_rtf::read::OpenOptions::default()).is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\outlinelevel10 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\outlinelevel-1 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\outlinelevel9 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }

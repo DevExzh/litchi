@@ -13,10 +13,12 @@ use litchi_rtf::{BodyStoryEvent, write::Writer};
 fn round_trip(source: &str) -> Tree<'static> {
     let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
-        .write_document(&document)
-        .unwrap();
-    Tree::parse(&String::from_utf8(bytes).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap()
+    Writer::new(&mut bytes).write_document(&document).unwrap();
+    Tree::parse(
+        &String::from_utf8(bytes).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap()
 }
 
 #[test]

@@ -71,9 +71,7 @@ fn writer_round_trips_list_models_deterministically() {
     assert_eq!(doc.list_override_table(), reparsed.list_override_table());
 
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -98,9 +96,12 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
 
 #[test]
 fn parses_rare_libreoffice_list_fixtures() {
-    let picture = Tree::parse_bytes(include_bytes!(
-        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
-    ), litchi_rtf::read::OpenOptions::default())
+    let picture = Tree::parse_bytes(
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(picture.list_table().picture_bullet_count > 0);
     assert!(
@@ -112,9 +113,12 @@ fn parses_rare_libreoffice_list_fixtures() {
             .any(|level| level.picture_index.is_some())
     );
 
-    let style = Tree::parse_bytes(include_bytes!(
-        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
-    ), litchi_rtf::read::OpenOptions::default())
+    let style = Tree::parse_bytes(
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(
         style
@@ -124,9 +128,12 @@ fn parses_rare_libreoffice_list_fixtures() {
             .any(|list| !list.style_name.is_empty())
     );
 
-    let starts = Tree::parse_bytes(include_bytes!(
-        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
-    ), litchi_rtf::read::OpenOptions::default())
+    let starts = Tree::parse_bytes(
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(starts.list_override_table().overrides().iter().any(
         |entry| entry.levels.len() >= 2 && entry.levels[0].start_at != entry.levels[1].start_at

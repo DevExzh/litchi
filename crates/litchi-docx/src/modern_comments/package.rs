@@ -401,10 +401,16 @@ mod tests {
             parse_comments_extensible(&extensible, &limits()).unwrap(),
             metadata.comments_extensible.unwrap()
         );
-        let people =
-            write_people(metadata.people.as_ref().unwrap(), Conformance::Strict, &limits())
-                .unwrap();
-        assert_eq!(parse_people(&people, &limits()).unwrap(), metadata.people.unwrap());
+        let people = write_people(
+            metadata.people.as_ref().unwrap(),
+            Conformance::Strict,
+            &limits(),
+        )
+        .unwrap();
+        assert_eq!(
+            parse_people(&people, &limits()).unwrap(),
+            metadata.people.unwrap()
+        );
     }
 
     #[test]

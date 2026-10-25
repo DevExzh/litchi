@@ -5,11 +5,11 @@ use unicode_general_category::GeneralCategory;
 
 use crate::error::{ComplexScriptError, ParseError, ShapingError};
 use crate::gsub::{self, Feature, FeatureMask, GlyphData, GlyphOrigin, RawGlyph, RawGlyphFlags};
-use crate::layout::{FeatureTableSubstitution, GDEFTable, LangSys, LayoutCache, LayoutTable, GSUB};
+use crate::layout::{FeatureTableSubstitution, GDEFTable, GSUB, LangSys, LayoutCache, LayoutTable};
 use crate::scripts::syllable::*;
 use crate::tinyvec::tiny_vec;
 use crate::unicode::mcc::sort_by_modified_combining_class;
-use crate::{tag, DOTTED_CIRCLE};
+use crate::{DOTTED_CIRCLE, tag};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum Script {
@@ -695,7 +695,7 @@ fn constrain_vowel(cs: &mut Vec<char>) {
             InsertConstraint::Between => {
                 cs.insert(i + 1, DOTTED_CIRCLE);
                 3
-            }
+            },
             InsertConstraint::MaybeAfter(c3) => {
                 if i + 2 < cs.len() && cs[i + 2] == c3 {
                     cs.insert(i + 2, DOTTED_CIRCLE);
@@ -703,7 +703,7 @@ fn constrain_vowel(cs: &mut Vec<char>) {
                 } else {
                     2
                 }
-            }
+            },
             InsertConstraint::None => 1,
         }
     }
@@ -833,13 +833,13 @@ fn decompose_matra(cs: &mut Vec<char>) {
                 cs[i] = c1;
                 cs.insert(i + 1, c2);
                 2
-            }
+            },
             MatraSplit::Three(c1, c2, c3) => {
                 cs[i] = c1;
                 cs.insert(i + 1, c2);
                 cs.insert(i + 2, c3);
                 3
-            }
+            },
         }
     }
 }
@@ -1131,7 +1131,7 @@ pub fn gsub_apply_indic<'a>(
                         || gc == GeneralCategory::SpacingMark
                         || gc == GeneralCategory::EnclosingMark
                         || gc == GeneralCategory::NonspacingMark)
-                }
+                },
                 GlyphOrigin::Direct => false,
             }
         } else {
@@ -1195,8 +1195,8 @@ fn shape_syllable(
                 syllable,
                 max_glyphs,
             )?;
-        }
-        Some(Syllable::Symbol) | None => {}
+        },
+        Some(Syllable::Symbol) | None => {},
     }
 
     Ok(())
@@ -1284,7 +1284,7 @@ fn to_indic_syllables(mut glyphs: &[RawGlyph<()>]) -> Vec<(Vec<RawGlyphIndic>, O
                 syllables.push((syllable, Some(syllable_type)));
 
                 len
-            }
+            },
             None => {
                 let invalid_glyph = to_raw_glyph_indic(&glyphs[0]);
                 match syllables.last_mut() {
@@ -1296,7 +1296,7 @@ fn to_indic_syllables(mut glyphs: &[RawGlyph<()>]) -> Vec<(Vec<RawGlyphIndic>, O
                 }
 
                 1
-            }
+            },
         };
 
         glyphs = &glyphs[len..];
@@ -1495,7 +1495,7 @@ fn initial_reorder_consonant_syllable_with_base(
                 } else {
                     BasicFeature::Half.feature().mask()
                 }
-            }
+            },
             Some(Pos::BelowbaseConsonant) => BasicFeature::Blwf.feature().mask(),
             Some(Pos::PostbaseConsonant) => BasicFeature::Pstf.feature().mask(),
             _ => FeatureMask::empty(),
@@ -1663,7 +1663,7 @@ fn tag_consonants(
     let base_index = match shaping_data.script.base_consonant_pos() {
         BasePos::Last => {
             tag_postbase_consonants(shaping_data, start_prebase_index, has_reph, glyphs)
-        }
+        },
         BasePos::LastSinhala => tag_postbase_consonants_sinhala(start_prebase_index, glyphs),
     }?;
 
@@ -1881,7 +1881,7 @@ fn matra_pos(c: char, script: Script) -> Option<Pos> {
     match c {
         '\u{0AC9}' => return Some(Pos::AfterPost), // Gujarati "Sign Candra O"
         '\u{0B57}' => return Some(Pos::AfterPost), // Oriya "Au Length Mark"
-        _ => {}
+        _ => {},
     }
 
     match indic_character(c) {
@@ -3783,7 +3783,9 @@ mod tests {
             constrain_vowel(&mut cs);
 
             assert_eq!(
-                vec!['\u{0909}', '\u{25CC}', '\u{0941}', '\u{090F}', '\u{25CC}', '\u{0945}'],
+                vec![
+                    '\u{0909}', '\u{25CC}', '\u{0941}', '\u{090F}', '\u{25CC}', '\u{0945}'
+                ],
                 cs
             );
         }

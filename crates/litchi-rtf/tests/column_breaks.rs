@@ -14,15 +14,17 @@ use litchi_rtf::{BodyStoryEvent, CellStoryEvent, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn body_column_is_zero_width_ordered_and_round_trips_canonically() {
-    let document = Tree::parse(r"{\rtf1\ansi A\column B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi A\column B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "AB");
     assert!(matches!(
         document.body_story_events(),
@@ -75,7 +77,8 @@ fn table_and_nested_table_column_events_round_trip_in_place() {
 
 #[test]
 fn document_column_breaks_can_be_pushed_and_cleared() {
-    let mut document = Tree::parse(r"{\rtf1\ansi AB}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1\ansi AB}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.push_column_break(1).unwrap();
     assert!(matches!(
         document.column_breaks().next(),
@@ -89,7 +92,10 @@ fn document_column_breaks_can_be_pushed_and_cleared() {
 #[test]
 fn rejects_parameters_in_the_body() {
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Tree::parse(r"{\rtf1 A\column1 B}", litchi_rtf::read::OpenOptions::default())
+        &Tree::parse(
+            r"{\rtf1 A\column1 B}",
+            litchi_rtf::read::OpenOptions::default()
+        )
     ));
 }
 

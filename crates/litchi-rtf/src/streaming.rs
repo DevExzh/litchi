@@ -75,11 +75,9 @@ impl Limits {
                 written: 0,
             });
         }
-        usize::try_from(self.max_scratch_bytes).map_err(|_error| {
-            Error::InvalidInput {
-                message: "streaming RTF scratch limit exceeds usize".to_string(),
-                written: 0,
-            }
+        usize::try_from(self.max_scratch_bytes).map_err(|_error| Error::InvalidInput {
+            message: "streaming RTF scratch limit exceeds usize".to_string(),
+            written: 0,
         })?;
         Ok(())
     }
@@ -273,11 +271,7 @@ impl<W: Write> Writer<W> {
     /// The sink only needs [`Write`].  The returned writer is ready for
     /// [`Self::start_paragraph`], and an empty document can be completed with
     /// [`Self::finish`].
-    pub fn new(
-        writer: W,
-        context: ExecutionContext,
-        limits: Limits,
-    ) -> Result<Self, Error> {
+    pub fn new(writer: W, context: ExecutionContext, limits: Limits) -> Result<Self, Error> {
         Self::with_options(writer, context, limits, Options::default())
     }
 
@@ -455,12 +449,7 @@ impl<W: Write> Writer<W> {
         )
     }
 
-    fn fail_limit(
-        &mut self,
-        resource: &'static str,
-        observed: u64,
-        limit: u64,
-    ) -> Error {
+    fn fail_limit(&mut self, resource: &'static str, observed: u64, limit: u64) -> Error {
         self.poison = Some(PoisonReason::Limit {
             resource,
             observed,
@@ -785,11 +774,7 @@ impl<W: Write> Writer<W> {
         result.map(|()| accepted)
     }
 
-    fn process_utf8(
-        &mut self,
-        bytes: &[u8],
-        accepted: &mut usize,
-    ) -> Result<(), Error> {
+    fn process_utf8(&mut self, bytes: &[u8], accepted: &mut usize) -> Result<(), Error> {
         let mut offset = 0usize;
         if self.pending_len != 0 {
             let expected = utf8_sequence_len(self.pending_utf8[0])
@@ -1168,12 +1153,7 @@ mod tests {
     }
 
     fn writer() -> Writer<Vec<u8>> {
-        Writer::new(
-            Vec::new(),
-            context(16 * 1024 * 1024),
-            Limits::default(),
-        )
-        .expect("writer")
+        Writer::new(Vec::new(), context(16 * 1024 * 1024), Limits::default()).expect("writer")
     }
 
     fn finish_one_run<W: Write>(writer: &mut Writer<W>, text: &str) {
@@ -1249,8 +1229,8 @@ mod tests {
                 16,
                 input_bytes.saturating_add(64),
             );
-            let mut value = Writer::new(InstrumentedSink::default(), context, limits)
-                .expect("writer");
+            let mut value =
+                Writer::new(InstrumentedSink::default(), context, limits).expect("writer");
             finish_one_run(&mut value, &text);
             let sink = value.finish().expect("finish");
             let legacy_calls = legacy_write_calls(&text);
@@ -1309,8 +1289,8 @@ mod tests {
                 16,
                 input_bytes.saturating_add(64),
             );
-            let mut value = Writer::new(InstrumentedSink::default(), context, limits)
-                .expect("writer");
+            let mut value =
+                Writer::new(InstrumentedSink::default(), context, limits).expect("writer");
             finish_one_run(&mut value, text);
             let sink = value.finish().expect("finish");
             assert_eq!(sink.bytes, expected);
@@ -1486,8 +1466,7 @@ mod tests {
             max_paragraphs: 1,
             ..Limits::default()
         };
-        let mut value =
-            Writer::new(Vec::new(), context(4096), paragraph_limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), paragraph_limits).expect("writer");
         value.start_paragraph().expect("exact paragraph");
         value.finish_paragraph().expect("paragraph");
         assert!(value.start_paragraph().is_err());
@@ -1496,8 +1475,7 @@ mod tests {
             max_runs: 1,
             ..Limits::default()
         };
-        let mut value =
-            Writer::new(Vec::new(), context(4096), run_limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), run_limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("exact run");
         value.finish_run().expect("run");
@@ -1519,8 +1497,7 @@ mod tests {
         ));
 
         let exact = configured_context(FIXED_SCRATCH_BYTES, 4096, 4096, 16, 16);
-        Writer::new(Vec::new(), exact, Limits::default())
-            .expect("exact fixed scratch");
+        Writer::new(Vec::new(), exact, Limits::default()).expect("exact fixed scratch");
 
         let baseline = writer();
         let header_bytes = baseline.output_bytes();
@@ -1572,8 +1549,7 @@ mod tests {
             max_input_bytes: 1,
             ..Limits::default()
         };
-        let mut value =
-            Writer::new(Vec::new(), context(4096), input_limits).expect("writer");
+        let mut value = Writer::new(Vec::new(), context(4096), input_limits).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         assert_eq!(value.write(b"x").expect("exact input"), 1);
@@ -1611,8 +1587,7 @@ mod tests {
             max_input_bytes: 2_000_000,
             ..Limits::default()
         };
-        Writer::new(CountingSink::default(), context(2_000_000), limits)
-            .expect("writer")
+        Writer::new(CountingSink::default(), context(2_000_000), limits).expect("writer")
     }
 
     fn write_counted_run(repetitions: usize) -> CountingSink {
@@ -1645,10 +1620,7 @@ mod tests {
             large_state.write_all(b"x").expect("large text");
         }
         assert_eq!(size_of_val(&small_state), size_of_val(&large_state));
-        assert_eq!(
-            size_of_val(&small_state),
-            size_of::<Writer<CountingSink>>()
-        );
+        assert_eq!(size_of_val(&small_state), size_of::<Writer<CountingSink>>());
         assert_eq!(
             small_state.pending_utf8.len(),
             large_state.pending_utf8.len()
@@ -1677,9 +1649,8 @@ mod tests {
             max_input_bytes: 1_000_000,
             ..Limits::default()
         };
-        let mut value =
-            Writer::new(NonSeek(CountingSink::default()), context(2_000_000), limits)
-                .expect("writer");
+        let mut value = Writer::new(NonSeek(CountingSink::default()), context(2_000_000), limits)
+            .expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         for _ in 0..100_000 {
@@ -1993,8 +1964,7 @@ mod tests {
             zero_after: false,
             flush_error: false,
         };
-        let mut value =
-            Writer::new(sink, batched_context(), batched_limits()).expect("writer");
+        let mut value = Writer::new(sink, batched_context(), batched_limits()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let error = value
@@ -2029,8 +1999,7 @@ mod tests {
             zero_after: true,
             flush_error: false,
         };
-        let mut value =
-            Writer::new(sink, batched_context(), batched_limits()).expect("writer");
+        let mut value = Writer::new(sink, batched_context(), batched_limits()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let error = value
@@ -2174,8 +2143,7 @@ mod tests {
             zero_after: false,
             flush_error: false,
         };
-        let mut value = Writer::new(sink, context(4096), Limits::default())
-            .expect("writer");
+        let mut value = Writer::new(sink, context(4096), Limits::default()).expect("writer");
         finish_one_run(&mut value, "short");
         let sink = value.finish().expect("finish");
         assert!(sink.accepted > 0);
@@ -2191,8 +2159,7 @@ mod tests {
             zero_after: true,
             flush_error: false,
         };
-        let mut value = Writer::new(sink, context(4096), Limits::default())
-            .expect("writer");
+        let mut value = Writer::new(sink, context(4096), Limits::default()).expect("writer");
         value.start_paragraph().expect("paragraph");
         value.start_run().expect("run");
         let error = value.write(&[b'x'; 128]).expect_err("write zero");
@@ -2264,8 +2231,7 @@ mod tests {
         )
         .expect("valid limits");
         let context = ExecutionContext::new(budget, token, execution);
-        let mut value = Writer::new(Vec::new(), context, Limits::default())
-            .expect("writer");
+        let mut value = Writer::new(Vec::new(), context, Limits::default()).expect("writer");
         source.cancel();
         let error = value.start_paragraph().expect_err("cancelled");
         assert!(matches!(error, Error::Cancelled { .. }));
@@ -2283,9 +2249,7 @@ mod tests {
         )
         .expect("valid limits");
         let context = ExecutionContext::new(budget, token, execution);
-        let mut flush_value =
-            Writer::new(Vec::new(), context, Limits::default())
-                .expect("writer");
+        let mut flush_value = Writer::new(Vec::new(), context, Limits::default()).expect("writer");
         source.cancel();
         let flush_error = flush_value.flush().expect_err("cancelled flush");
         assert_eq!(flush_error.kind(), io::ErrorKind::Interrupted);

@@ -7,8 +7,8 @@
 //! mutable counter. A scope and its [`Budget`] retain the first refusal as an
 //! immutable [`BudgetFailure`] snapshot for typed error mapping.
 
-use std::mem::size_of;
 use std::cell::RefCell;
+use std::mem::size_of;
 use std::rc::Rc;
 
 /// The independent counter that rejected a budget request.
@@ -172,7 +172,7 @@ impl Budget {
             None => {
                 state.failure = Some(candidate);
                 candidate
-            }
+            },
         };
         BudgetExceeded {
             domain: failure.domain,
@@ -213,7 +213,7 @@ impl Budget {
                         requested: usize::MAX,
                     },
                 ));
-            }
+            },
         };
         if requested > state.working_limit {
             let limit = state.working_limit;
@@ -248,7 +248,7 @@ impl Budget {
                         requested: usize::MAX,
                     },
                 ));
-            }
+            },
         };
         if requested > state.output_limit {
             let limit = state.output_limit;
@@ -283,9 +283,7 @@ impl Budget {
     /// Return the uncharged portion of the working-byte maximum.
     pub fn remaining_working(&self) -> usize {
         let state = self.0.borrow();
-        state
-            .working_limit
-            .saturating_sub(state.working_requested)
+        state.working_limit.saturating_sub(state.working_requested)
     }
 
     /// Return the cumulative retained output bytes charged so far.
@@ -301,9 +299,7 @@ impl Budget {
     /// Return the uncharged portion of the retained-output maximum.
     pub fn remaining_output(&self) -> usize {
         let state = self.0.borrow();
-        state
-            .output_limit
-            .saturating_sub(state.output_requested)
+        state.output_limit.saturating_sub(state.output_requested)
     }
 
     /// Charge one unit of bounded parser/traversal work.
@@ -324,7 +320,7 @@ impl Budget {
                         requested: usize::MAX,
                     },
                 ));
-            }
+            },
         };
         if work > state.working_limit {
             let limit = state.working_limit;
@@ -380,11 +376,12 @@ pub fn reserve_vec<T>(vec: &mut Vec<T>, additional: usize) -> Result<(), BudgetE
     if let Some(budget) = &budget {
         budget.charge(bytes)?;
     }
-    vec.try_reserve_exact(additional).map_err(|_| BudgetExceeded {
-        domain: BudgetDomain::WorkingBytes,
-        limit,
-        requested: budget.as_ref().map_or(bytes, |budget| budget.requested()),
-    })
+    vec.try_reserve_exact(additional)
+        .map_err(|_| BudgetExceeded {
+            domain: BudgetDomain::WorkingBytes,
+            limit,
+            requested: budget.as_ref().map_or(bytes, |budget| budget.requested()),
+        })
 }
 
 /// Reserve the next amortized growth step for a vector before pushing one item.
@@ -422,9 +419,7 @@ pub fn reserve_string(string: &mut String, additional: usize) -> Result<(), Budg
         .map_err(|_| BudgetExceeded {
             domain: BudgetDomain::WorkingBytes,
             limit,
-            requested: budget
-                .as_ref()
-                .map_or(new_len, |budget| budget.requested()),
+            requested: budget.as_ref().map_or(new_len, |budget| budget.requested()),
         })
 }
 

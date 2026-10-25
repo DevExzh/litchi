@@ -2435,9 +2435,8 @@ impl Package {
                 relationship.target_mode(),
             )?;
         }
-        let limits = crate::mail_merge::mce_limits_for_source(
-            &self.physical_package()?.read_limits(),
-        );
+        let limits =
+            crate::mail_merge::mce_limits_for_source(&self.physical_package()?.read_limits());
         let settings = DocumentSettings::extract_from_part_with_mce_limits(&staged, &limits)?;
         if settings.is_protected() || settings.is_write_protected() {
             return Err(Error::refused(

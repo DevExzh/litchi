@@ -1,13 +1,13 @@
 //! Binary reading of the `morx` table.
 use std::convert::TryInto;
 
+use crate::SafeFrom;
 use crate::binary::read::{
     ReadArray, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFrom, ReadUnchecked,
 };
-use crate::binary::{U16Be, U32Be, U64Be, U8};
+use crate::binary::{U8, U16Be, U32Be, U64Be};
 use crate::error::ParseError;
 use crate::size;
-use crate::SafeFrom;
 
 use super::aat::VecTable;
 
@@ -227,7 +227,7 @@ impl ReadBinaryDep for Subtable<'_> {
             // The insertion subtable is not yet supported.
             5 => {
                 SubtableType::Insertion(subtable_scope.read_dep::<InsertionSubtable<'a>>(n_glyphs)?)
-            }
+            },
             _ => return Err(ParseError::BadValue),
         };
 
@@ -1038,12 +1038,12 @@ impl<'a> LookupTableFormat10<'a> {
             match &self.lookup_values {
                 UnitSize::OneByte(one_byte_values) => {
                     one_byte_values.get_item(usize::from(index)).map(u16::from)
-                }
+                },
                 UnitSize::TwoByte(two_byte_values) => two_byte_values.get_item(usize::from(index)),
                 // Note: ignore 4-byte and 8-byte lookup values for now
                 UnitSize::FourByte { .. } | UnitSize::EightByte { .. } => {
                     todo!("handle 4 and 8-bit lookup values")
-                }
+                },
             }
         } else {
             None
@@ -1171,7 +1171,7 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                 let lookup_table = LookupTable::Format0(lookup_values);
 
                 Ok(ClassLookupTable { lookup_table })
-            }
+            },
             (2, Some(b_sch_header)) => {
                 // FIXME: 6 is a minimum
                 // The units for this binary search are of type LookupSegment, and always have a minimum length of 6.
@@ -1184,7 +1184,7 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                 let lookup_table = LookupTable::Format2(lookup_segments);
 
                 Ok(ClassLookupTable { lookup_table })
-            }
+            },
             (4, Some(b_sch_header)) => {
                 // FIXME: 6 is a minimum
                 // The units for this binary search are of type LookupSegment and always have a minimum length of 6.
@@ -1229,7 +1229,7 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                 let lookup_table = LookupTable::Format4(lookup_segments);
 
                 Ok(ClassLookupTable { lookup_table })
-            }
+            },
             (6, Some(b_sch_header)) => {
                 // FIXME: 4 is a minimum
                 // The units for this binary search are of type LookupSingle and always have a minimum length of 4.
@@ -1243,7 +1243,7 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                 let lookup_table = LookupTable::Format6(lookup_entries);
 
                 Ok(ClassLookupTable { lookup_table })
-            }
+            },
             (8, None) => {
                 let first_glyph = ctxt.read_u16be()?;
                 let glyph_count = ctxt.read_u16be()?;
@@ -1254,7 +1254,7 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                 Ok(ClassLookupTable {
                     lookup_table: LookupTable::Format8(lookup_table),
                 })
-            }
+            },
             (10, None) => {
                 // Size of a lookup unit for this lookup table in bytes. Allowed values are 1, 2, 4, and 8.
                 let unit_size = ctxt.read_u16be()?;
@@ -1265,19 +1265,19 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                     1 => {
                         let lookup_values = ctxt.read_array::<U8>(glyph_count)?;
                         UnitSize::OneByte(lookup_values)
-                    }
+                    },
                     2 => {
                         let lookup_values = ctxt.read_array::<U16Be>(glyph_count)?;
                         UnitSize::TwoByte(lookup_values)
-                    }
+                    },
                     4 => {
                         let lookup_values = ctxt.read_array::<U32Be>(glyph_count)?;
                         UnitSize::FourByte(lookup_values)
-                    }
+                    },
                     8 => {
                         let lookup_values = ctxt.read_array::<U64Be>(glyph_count)?;
                         UnitSize::EightByte(lookup_values)
-                    }
+                    },
                     _ => return Err(ParseError::BadValue),
                 };
 
@@ -1287,7 +1287,7 @@ impl ReadBinaryDep for ClassLookupTable<'_> {
                 Ok(ClassLookupTable {
                     lookup_table: LookupTable::Format10(lookup_table),
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }

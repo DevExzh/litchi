@@ -9,8 +9,8 @@ use crate::binary::read::{
 };
 use crate::binary::{U16Be, U32Be};
 use crate::error::ParseError;
-use crate::tables::variable_fonts::avar::AvarTable;
 use crate::tables::variable_fonts::UserTuple;
+use crate::tables::variable_fonts::avar::AvarTable;
 use crate::tables::{F2Dot14, Fixed};
 use tinyvec::TinyVec;
 

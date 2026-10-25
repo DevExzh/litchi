@@ -61,7 +61,11 @@ fn parses_complete_word_2003_matrix_as_passive_metadata() {
         joined.push_str(name);
         joined
     });
-    let doc = Tree::parse(&format!(r"{{\rtf1\ansi{controls} Body}}"), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        &format!(r"{{\rtf1\ansi{controls} Body}}"),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(*doc.word_2003_compatibility(), all_enabled());
     assert_eq!(doc.text(), "Body");
     assert!(doc.tables().is_empty());
@@ -71,7 +75,11 @@ fn parses_complete_word_2003_matrix_as_passive_metadata() {
 
 #[test]
 fn omission_is_empty_and_serializes_no_matrix_flags() {
-    let doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(doc.word_2003_compatibility().is_empty());
     let serialized = write(&doc);
     for name in CONTROLS {
@@ -81,7 +89,11 @@ fn omission_is_empty_and_serializes_no_matrix_flags() {
 
 #[test]
 fn typed_api_round_trips_in_specification_order_and_clears_inertly() {
-    let mut doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     doc.set_word_2003_compatibility(all_enabled());
     let serialized = write(&doc);
     let positions: Vec<_> = CONTROLS
@@ -101,7 +113,11 @@ fn typed_api_round_trips_in_specification_order_and_clears_inertly() {
 #[test]
 fn accepts_every_flag_independently_without_layout_side_effects() {
     for name in CONTROLS {
-        let doc = Tree::parse(&format!(r"{{\rtf1\ansi\{name} Body}}"), litchi_rtf::read::OpenOptions::default()).unwrap();
+        let doc = Tree::parse(
+            &format!(r"{{\rtf1\ansi\{name} Body}}"),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap();
         assert_eq!(doc.text(), "Body");
         assert!(doc.tables().is_empty());
         assert!(doc.shapes().is_empty());
@@ -119,13 +135,19 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1\ansi Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&input, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &input,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted {input}"
             );
         }
     }
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Tree::parse(r"{\rtf1\ansi\krnprsnet999999999999 Body}", litchi_rtf::read::OpenOptions::default())
+        &Tree::parse(
+            r"{\rtf1\ansi\krnprsnet999999999999 Body}",
+            litchi_rtf::read::OpenOptions::default()
+        )
     ));
 }
 
@@ -135,7 +157,11 @@ fn parses_bundled_word_2003_producer_matrix_in_arbitrary_source_order() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/hidden-linebreaks.rtf"
     );
-    let doc = Tree::parse_bytes(&std::fs::read(path).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse_bytes(
+        &std::fs::read(path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(*doc.word_2003_compatibility(), all_enabled());
     let serialized = write(&doc);
     let positions: Vec<_> = CONTROLS

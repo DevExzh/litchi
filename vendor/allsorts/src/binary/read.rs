@@ -7,15 +7,15 @@
 //! [The next 700 data description languages](https://collaborate.princeton.edu/en/publications/the-next-700-data-description-languages) by Kathleen Fisher, Yitzhak Mandelbaum, David P. Walker.
 
 use crate::binary::budget;
-use crate::binary::{I16Be, I32Be, I64Be, U16Be, U24Be, U32Be, U64Be, I8, U8};
+use crate::binary::{I8, I16Be, I32Be, I64Be, U8, U16Be, U24Be, U32Be, U64Be};
 use crate::error::ParseError;
 use crate::layout::{LayoutCache, LayoutTableType};
-use crate::{size, SafeFrom};
+use crate::{SafeFrom, size};
 use std::borrow::Cow;
 use std::cmp;
 use std::cmp::Ordering;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -315,7 +315,7 @@ impl<'a> ReadScope<'a> {
             Entry::Vacant(entry) => {
                 let t = Arc::new(self.read::<T>()?);
                 Ok(Arc::clone(entry.insert(t)))
-            }
+            },
             Entry::Occupied(entry) => Ok(Arc::clone(entry.get())),
         }
     }
@@ -333,7 +333,7 @@ impl<'a> ReadScope<'a> {
             Entry::Vacant(entry) => {
                 let t = Arc::new(self.read_dep::<T>(state)?);
                 Ok(Arc::clone(entry.insert(t)))
-            }
+            },
             Entry::Occupied(entry) => Ok(Arc::clone(entry.get())),
         }
     }
@@ -729,8 +729,7 @@ impl<'a, T: ReadFixedSizeDep> ReadArray<'a, T> {
 
     pub fn read_to_vec(&self) -> Result<Vec<T::HostType<'a>>, ParseError> {
         let mut vec = Vec::new();
-        budget::reserve_vec(&mut vec, self.length)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut vec, self.length).map_err(|_| ParseError::LimitExceeded)?;
         for res in self.iter_res() {
             let t = res?;
             vec.push(t);

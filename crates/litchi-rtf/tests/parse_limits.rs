@@ -8,7 +8,7 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{OpenOptions, Error, SourceLimitKind, SourceLimits, compress};
+use litchi_rtf::{Error, OpenOptions, SourceLimitKind, SourceLimits, compress};
 
 fn options(limits: SourceLimits) -> OpenOptions {
     OpenOptions::new().source_limits(limits)
@@ -106,8 +106,18 @@ fn bounded_file_open_rejects_metadata_before_reading() {
 #[test]
 fn default_profile_preserves_existing_entry_points() {
     let source = br"{\rtf1\ansi finite defaults}";
-    assert_eq!(Tree::parse_bytes(source, OpenOptions::default()).unwrap().text(), "finite defaults");
-    assert_eq!(Tree::from_bytes(source, OpenOptions::default()).unwrap().text(), "finite defaults");
+    assert_eq!(
+        Tree::parse_bytes(source, OpenOptions::default())
+            .unwrap()
+            .text(),
+        "finite defaults"
+    );
+    assert_eq!(
+        Tree::from_bytes(source, OpenOptions::default())
+            .unwrap()
+            .text(),
+        "finite defaults"
+    );
     assert_eq!(
         Tree::parse_bytes(source, options(SourceLimits::default()))
             .unwrap()

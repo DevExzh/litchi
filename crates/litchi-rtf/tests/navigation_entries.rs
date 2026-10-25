@@ -12,7 +12,11 @@ use litchi_rtf::{IndexPageReference, NavigationEntry, write::Writer};
 
 #[test]
 fn parses_microsoft_grammar_index_controls_and_hidden_text() {
-    let document = Tree::parse(include_str!("fixtures/navigation-index.rtf"), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        include_str!("fixtures/navigation-index.rtf"),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "Before after");
     assert_eq!(document.navigation_entries().len(), 1);
     let NavigationEntry::Index(entry) = &document.navigation_entries()[0] else {
@@ -32,7 +36,11 @@ fn parses_microsoft_grammar_index_controls_and_hidden_text() {
 
 #[test]
 fn parses_toc_defaults_no_page_and_visible_source_text_once() {
-    let document = Tree::parse(include_str!("fixtures/navigation-toc.rtf"), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        include_str!("fixtures/navigation-toc.rtf"),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "ABVisibleC");
     assert_eq!(document.navigation_entries().len(), 2);
     let NavigationEntry::TableOfContents(first) = &document.navigation_entries()[0] else {
@@ -63,9 +71,7 @@ fn round_trips_unicode_safe_text_positions_and_coexisting_markup() {
     assert_eq!(document.navigation_entries()[0].position(), "你".len());
 
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(output.contains("\\xe\\v"));
     assert!(output.contains("\\tc\\v"));
@@ -95,7 +101,10 @@ fn rejects_conflicts_active_content_invalid_parameters_and_bad_structure() {
         r"{\rtf1{\tc\tcl10 bad}}",
         r"{\rtf1{\tc\tcl2\tcl3 bad}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "{source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
     }
 }
 

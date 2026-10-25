@@ -10958,9 +10958,8 @@ fn test_package() -> HostPackage {
     let mut cell = BncCell::minimal();
     cell.set_string(1);
     let mut cells = vec![None; 4];
-    cells[1] = Some(
-        crate::numbers::bnc_encode(&cell, &crate::numbers::bnc::Limits::DEFAULT).unwrap(),
-    );
+    cells[1] =
+        Some(crate::numbers::bnc_encode(&cell, &crate::numbers::bnc::Limits::DEFAULT).unwrap());
     let (storage, offsets, wide) = encode_row(&cells, false).unwrap();
     let tile = Tile {
         max_column: 0,

@@ -175,5 +175,8 @@ pub(crate) const SCRIPTS: &[(u32, &str)] = &[
     (tag!(b"wara"), "Warang Citi"),
     (tag!(b"yezi"), "Yezidi"),
     (tag!(b"yi  "), "Yi"),
-    (tag!(b"zanb"), "Zanabazar Square (Zanabazarin Dörböljin Useg, Xewtee Dörböljin Bicig, Horizontal Square Script)"),
+    (
+        tag!(b"zanb"),
+        "Zanabazar Square (Zanabazarin Dörböljin Useg, Xewtee Dörböljin Bicig, Horizontal Square Script)",
+    ),
 ];

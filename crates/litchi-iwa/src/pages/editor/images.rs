@@ -503,10 +503,7 @@ impl Draft {
     }
 
     /// Remove a body-anchored image, its private graph, and unshared assets.
-    pub fn remove_body_image(
-        &mut self,
-        drawable_object_id: DrawableId,
-    ) -> Result<RemovedImage> {
+    pub fn remove_body_image(&mut self, drawable_object_id: DrawableId) -> Result<RemovedImage> {
         let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;

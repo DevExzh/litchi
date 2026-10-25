@@ -19,7 +19,7 @@ use super::charstring::{
     ArgumentsStack, CharStringVisitor, CharStringVisitorContext, SeacChar,
     VariableCharStringVisitorContext, VisitOp,
 };
-use super::{cff2, CFFError, CFFFont, CFFVariant, CFF};
+use super::{CFF, CFFError, CFFFont, CFFVariant, cff2};
 
 mod charstring;
 
@@ -194,7 +194,7 @@ impl<B: OutlineSink> CharStringVisitor<f32, CFFError> for CharStringParser<'_, B
             | VisitOp::VerticalStemHintMask => {
                 // We are ignoring the hint operators.
                 Ok(())
-            }
+            },
             VisitOp::VerticalMoveTo => self.parse_vertical_move_to(stack),
             VisitOp::LineTo => self.parse_line_to(stack),
             VisitOp::HorizontalLineTo => self.parse_horizontal_line_to(stack),
@@ -208,7 +208,7 @@ impl<B: OutlineSink> CharStringVisitor<f32, CFFError> for CharStringParser<'_, B
                 }
 
                 Ok(())
-            }
+            },
             VisitOp::HintMask | VisitOp::CounterMask => Ok(()),
             VisitOp::MoveTo => self.parse_move_to(stack),
             VisitOp::HorizontalMoveTo => self.parse_horizontal_move_to(stack),
@@ -221,7 +221,7 @@ impl<B: OutlineSink> CharStringVisitor<f32, CFFError> for CharStringParser<'_, B
             VisitOp::VsIndex | VisitOp::Blend => {
                 // Handled by the CharStringVisitor
                 Ok(())
-            }
+            },
             VisitOp::Hflex => self.parse_hflex(stack),
             VisitOp::Flex => self.parse_flex(stack),
             VisitOp::Hflex1 => self.parse_hflex1(stack),
@@ -242,7 +242,7 @@ impl<B: OutlineSink> CharStringVisitor<f32, CFFError> for CharStringParser<'_, B
 mod tests {
     use crate::binary::read::ReadScope;
     use pathfinder_geometry::rect::RectI;
-    use pathfinder_geometry::vector::{vec2i, Vector2F, Vector2I};
+    use pathfinder_geometry::vector::{Vector2F, Vector2I, vec2i};
     use std::fmt::Write;
     use std::marker::PhantomData;
 

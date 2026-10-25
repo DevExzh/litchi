@@ -8,13 +8,11 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{MAX_SECTION_COLUMNS, write::Writer, Section, SectionColumn, SectionColumns};
+use litchi_rtf::{MAX_SECTION_COLUMNS, Section, SectionColumn, SectionColumns, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -77,10 +75,13 @@ fn parses_bundled_libreoffice_equal_and_variable_column_fixtures() {
 
 #[test]
 fn sectd_resets_columns_and_ignorable_destinations_are_inert() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\*\unknown\cols3\linebetcol\colno1\colw100}"#,
-        r#"\cols2\colsx200\linebetcol\sectd Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\*\unknown\cols3\linebetcol\colno1\colw100}"#,
+            r#"\cols2\colsx200\linebetcol\sectd Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(
         document.sections()[0].properties.columns,
@@ -129,6 +130,9 @@ fn rejects_malformed_or_incomplete_explicit_column_sequences() {
         r"{\rtf1\cols2\colno1\colw100 X}",
         r"{\rtf1\cols2\colno1{\colno2}\colw100\colno2\colw200 X}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }

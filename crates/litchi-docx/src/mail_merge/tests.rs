@@ -33,7 +33,10 @@ fn parses_and_deterministically_writes_complete_strict_metadata() {
         .unwrap()
         .unwrap();
     assert_eq!(reparsed, value);
-    assert_eq!(reparsed.to_xml(Conformance::Strict, &limits()).unwrap(), fragment);
+    assert_eq!(
+        reparsed.to_xml(Conformance::Strict, &limits()).unwrap(),
+        fragment
+    );
 }
 
 #[test]
@@ -41,7 +44,9 @@ fn applies_defaults_and_mce_fallback_and_preservation() {
     let xml = format!(
         r#"<w:settings xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><w:mailMerge mc:Ignorable="x" mc:PreserveAttributes="x:*" x:future="kept"><mc:AlternateContent><mc:Choice Requires="x"><x:dataType/></mc:Choice><mc:Fallback><w:viewMergedData/></mc:Fallback></mc:AlternateContent></w:mailMerge></w:settings>"#
     );
-    let value = parse_settings_mail_merge(xml.as_bytes(), &limits()).unwrap().unwrap();
+    let value = parse_settings_mail_merge(xml.as_bytes(), &limits())
+        .unwrap()
+        .unwrap();
     assert_eq!(value.main_document_type(), MainDocumentType::FormLetters);
     assert_eq!(value.destination(), Destination::NewDocument);
     assert_eq!(value.active_record(), 1);
@@ -128,7 +133,10 @@ fn round_trips_strict_recipient_data_with_canonical_base64() {
     let xml = recipients.to_xml(Conformance::Strict, &limits()).unwrap();
     assert!(xml.contains(STRICT_W));
     assert!(xml.contains("AQID"));
-    assert_eq!(Recipients::parse_xml(xml.as_bytes(), &limits()).unwrap(), recipients);
+    assert_eq!(
+        Recipients::parse_xml(xml.as_bytes(), &limits()).unwrap(),
+        recipients
+    );
 }
 
 #[test]

@@ -12,7 +12,7 @@ mod support;
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Paragraph, write::Writer, Shading, StyleBlock};
+use litchi_rtf::{Paragraph, Shading, StyleBlock, write::Writer};
 
 fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
     document
@@ -24,20 +24,21 @@ fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     String::from_utf8(output).unwrap()
 }
 
 #[test]
 fn parses_inherits_restores_and_pard_resets_exact_values() {
-    let document = Tree::parse(concat!(
-        r"{\rtf1\pard\cbpat3\shading1234\cfpat2 Outer\par ",
-        r"{\shading0\cfpat0\cbpat0 Inner\par }Tail\par ",
-        r"{\pard Reset\par }{\*\unknown\shading9999\cfpat8\cbpat9 Ignored}",
-        r"Visible\par}"
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r"{\rtf1\pard\cbpat3\shading1234\cfpat2 Outer\par ",
+            r"{\shading0\cfpat0\cbpat0 Inner\par }Tail\par ",
+            r"{\pard Reset\par }{\*\unknown\shading9999\cfpat8\cbpat9 Ignored}",
+            r"Visible\par}"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
 
     let outer = block(&document, "Outer").paragraph.shading;
@@ -108,13 +109,19 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
         r"{\rtf1\cbpat65536 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "{source}"
         );
     }
 
-    let inert =
-        Tree::parse(r"{\rtf1{\*\unknown\shading10001\cfpat65536\cbpat-1 hidden}Visible}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let inert = Tree::parse(
+        r"{\rtf1{\*\unknown\shading10001\cfpat65536\cbpat-1 hidden}Visible}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         block(&inert, "Visible").paragraph.shading,
         Shading::default()
@@ -123,10 +130,13 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
 
 #[test]
 fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
-    let explicit_zero = Tree::parse(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf"
-    )), litchi_rtf::read::OpenOptions::default())
+    let explicit_zero = Tree::parse(
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf"
+        )),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(
         explicit_zero
@@ -157,7 +167,8 @@ fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
     );
     let prefix = support::first_balanced_rtf_root_prefix(style_and_body)
         .expect("tdf108955.rtf should have a balanced first root group");
-    let style_and_body = Tree::parse_bytes(prefix, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let style_and_body =
+        Tree::parse_bytes(prefix, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         style_and_body
             .stylesheet()

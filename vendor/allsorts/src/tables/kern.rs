@@ -8,8 +8,8 @@ use tinyvec::TinyVec;
 
 use crate::{
     binary::{
+        I16Be, U8, U16Be,
         read::{ReadArray, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFrom, ReadScope},
-        I16Be, U16Be, U8,
     },
     context::Glyph,
     error::ParseError,
@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::aat::{
-    VecTable, CLASS_CODE_DELETED, CLASS_CODE_EOT, CLASS_CODE_OOB, DELETED_GLYPH, MAX_OPS,
+    CLASS_CODE_DELETED, CLASS_CODE_EOT, CLASS_CODE_OOB, DELETED_GLYPH, MAX_OPS, VecTable,
 };
 
 /// `kern` Kerning Table.
@@ -135,7 +135,7 @@ impl ReadBinary for KernTable<'_> {
             1 => {
                 let _padding = ctxt.read_u16be()?;
                 KernTableVersion::KernTableVersion1
-            }
+            },
             _ => return Err(ParseError::BadVersion),
         };
         let table_count = match version {
@@ -183,7 +183,7 @@ impl<'a> KernTable<'a> {
                         coverage: KernCoverage::KernCoverageVersion0(coverage),
                         data,
                     })
-                }
+                },
                 KernTableVersion::KernTableVersion1 => {
                     let length = usize::try_from(ctxt.read_u32be()?)?;
                     let coverage = ctxt.read_u16be()?;
@@ -201,7 +201,7 @@ impl<'a> KernTable<'a> {
                         coverage: KernCoverage::KernCoverageVersion1(coverage),
                         data,
                     })
-                }
+                },
             }
         })
     }
@@ -546,7 +546,7 @@ impl<'a> ContextualContext<'a> {
                             .map(u16::from)
                             .unwrap_or(CLASS_CODE_OOB)
                     }
-                }
+                },
                 None => CLASS_CODE_EOT,
             };
 
@@ -643,7 +643,7 @@ impl KernData<'_> {
                     .ok()
                     .and_then(|index| x.kern_pairs.get_item(index))
                     .map(|pair| pair.value)
-            }
+            },
             KernData::Format1(_) => None,
             KernData::Format2(x) => {
                 // Get the class of the left/right glyphs, then lookup the kerning value
@@ -659,7 +659,7 @@ impl KernData<'_> {
                     .offset(usize::from(left_class) + usize::from(right_class))
                     .read::<I16Be>()
                     .ok()
-            }
+            },
             KernData::Format3(x) => {
                 // Suppose you have two glyphs, L and R, and you wish to determine the kerning
                 // value. You can do so using this pseudo-expression:
@@ -670,7 +670,7 @@ impl KernData<'_> {
                     usize::from(left_class) * x.right_class_count + usize::from(right_class),
                 )?;
                 x.kern_value_table.get_item(usize::from(kern_index))
-            }
+            },
         }
     }
 
@@ -680,7 +680,7 @@ impl KernData<'_> {
             KernData::Format1(x) => {
                 let mut context = ContextualContext::new(infos, x.state_array.offset);
                 context.process(is_cross_stream, x)
-            }
+            },
             _ => Ok(()),
         }
     }

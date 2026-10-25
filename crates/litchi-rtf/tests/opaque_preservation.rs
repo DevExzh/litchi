@@ -11,7 +11,7 @@ use litchi_rtf::opaque::{Anchor, Context, Kind};
 use litchi_rtf::raw::Tree;
 use litchi_rtf::write::{Options, Writer};
 use litchi_rtf::{
-    DefaultTabWidthPolicy, OpenOptions, Package, Error, SourceLimitKind, SourceLimits,
+    DefaultTabWidthPolicy, Error, OpenOptions, Package, SourceLimitKind, SourceLimits,
 };
 use std::io::{self, Write};
 
@@ -50,15 +50,18 @@ fn canonical_writer_reinserts_inert_nodes_at_their_body_anchor() {
     let source = br"{\rtf1\ansi A\future42 {\*\vendor opaque}B}";
     let document = Tree::parse_bytes(source, OpenOptions::default()).unwrap();
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let serialized = String::from_utf8(output.clone()).unwrap();
     let control = serialized.find("\\future42 ").unwrap();
     let destination = serialized.find("{\\*\\vendor opaque}").unwrap();
     assert!(control < destination);
-    assert_eq!(Tree::parse_bytes(&output, OpenOptions::default()).unwrap().text(), "AB");
+    assert_eq!(
+        Tree::parse_bytes(&output, OpenOptions::default())
+            .unwrap()
+            .text(),
+        "AB"
+    );
 }
 
 #[test]
@@ -173,11 +176,7 @@ fn nested_table_syntax_keeps_table_context_and_refuses_reparenting() {
 
     let document = Tree::parse_bytes(source, OpenOptions::default()).unwrap();
     let mut output = Vec::new();
-    assert!(
-        Writer::new(&mut output)
-            .write_document(&document)
-            .is_err()
-    );
+    assert!(Writer::new(&mut output).write_document(&document).is_err());
     assert!(output.is_empty());
 }
 
@@ -207,11 +206,7 @@ fn field_and_note_syntax_retain_their_structural_contexts() {
 
         let document = Tree::parse_bytes(source, OpenOptions::default()).unwrap();
         let mut output = Vec::new();
-        assert!(
-            Writer::new(&mut output)
-                .write_document(&document)
-                .is_err()
-        );
+        assert!(Writer::new(&mut output).write_document(&document).is_err());
         assert!(output.is_empty());
     }
 }

@@ -240,11 +240,7 @@ impl WmfRecord {
     ///
     /// # Returns
     /// A tuple of (parsed record, bytes consumed)
-    pub fn parse(
-        data: &Bytes,
-        offset: usize,
-        limits: &crate::Limits,
-    ) -> Result<(Self, usize)> {
+    pub fn parse(data: &Bytes, offset: usize, limits: &crate::Limits) -> Result<(Self, usize)> {
         if limits.max_uncompressed_bytes == 0 || limits.max_records == 0 {
             return Err(Error::ParseError(
                 "WMF record parser limits must be greater than zero".into(),
@@ -601,11 +597,8 @@ mod tests {
         assert!(standard.placeable.is_none());
         assert_eq!(standard.records.len(), 2);
 
-        let placeable = WmfParser::from_owned(
-            with_placeable(valid_wmf()),
-            &crate::Limits::default(),
-        )
-        .unwrap();
+        let placeable =
+            WmfParser::from_owned(with_placeable(valid_wmf()), &crate::Limits::default()).unwrap();
         assert_eq!(placeable.width(), 110);
         assert_eq!(placeable.height(), 220);
     }
@@ -620,13 +613,19 @@ mod tests {
         for (offset, value) in u16_cases {
             let mut data = valid_wmf();
             put_u16(&mut data, offset, value);
-            assert!(WmfParser::new(&data, &crate::Limits::default()).is_err(), "offset {offset}");
+            assert!(
+                WmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "offset {offset}"
+            );
         }
 
         for (offset, value) in [(6, 15), (12, 2), (12, 5)] {
             let mut data = valid_wmf();
             put_u32(&mut data, offset, value);
-            assert!(WmfParser::new(&data, &crate::Limits::default()).is_err(), "offset {offset}");
+            assert!(
+                WmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "offset {offset}"
+            );
         }
 
         let mut objects = valid_wmf();
@@ -639,7 +638,10 @@ mod tests {
         for size in [2, u32::MAX] {
             let mut data = valid_wmf();
             put_u32(&mut data, 18, size);
-            assert!(WmfParser::new(&data, &crate::Limits::default()).is_err(), "size {size}");
+            assert!(
+                WmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "size {size}"
+            );
         }
 
         let mut understated = valid_wmf();
@@ -681,7 +683,10 @@ mod tests {
         for (offset, value) in [(4, 1u16), (14, 0), (20, 0)] {
             let mut data = base.clone();
             put_u16(&mut data, offset, value);
-            assert!(WmfParser::new(&data, &crate::Limits::default()).is_err(), "offset {offset}");
+            assert!(
+                WmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "offset {offset}"
+            );
         }
 
         let mut reserved = base.clone();
@@ -761,10 +766,13 @@ mod tests {
         // The legacy sample has a nine-byte WMFC trailer after the declared
         // metafile. Strict parsing intentionally rejects that trailing data.
         assert!(
-            WmfParser::new(include_bytes!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../test-data/libreoffice-core/vcl/qa/cppunit/data/roundtrip.wmf"
-            )), &crate::Limits::default())
+            WmfParser::new(
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../test-data/libreoffice-core/vcl/qa/cppunit/data/roundtrip.wmf"
+                )),
+                &crate::Limits::default()
+            )
             .is_err()
         );
     }

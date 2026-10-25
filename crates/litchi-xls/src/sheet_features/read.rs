@@ -6,8 +6,8 @@ use super::stream::{
     Sheet, VERTICAL_PAGE_BREAKS, u16_at, u32_at,
 };
 use super::{Area, FeatureSet, PageBreak};
-use crate::{Result, SourceLimits};
 use crate::formula::FormulaContext;
+use crate::{Result, SourceLimits};
 
 /// The features of one worksheet a [`FeatureSet`] selected.
 #[derive(Debug, Clone, Default)]

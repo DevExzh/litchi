@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::mem::MaybeUninit;
 
-use crate::ffi::{self, Backend, Deflate, DeflateBackend, ErrorMessage, Inflate, InflateBackend};
 use crate::Compression;
+use crate::ffi::{self, Backend, Deflate, DeflateBackend, ErrorMessage, Inflate, InflateBackend};
 
 /// Raw in-memory compression stream for blocks of data.
 ///

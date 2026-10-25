@@ -13,16 +13,15 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn preserves_ordered_revision_save_table_and_root_round_trip() {
     let document = Tree::parse(
-        r"{\rtf1\ansi{\*\rsidtbl \rsid7564464\rsid8398352\rsid9049968}\rsidroot9049968 Body}", litchi_rtf::read::OpenOptions::default()
+        r"{\rtf1\ansi{\*\rsidtbl \rsid7564464\rsid8398352\rsid9049968}\rsidroot9049968 Body}",
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(document.text(), "Body");
@@ -30,20 +29,26 @@ fn preserves_ordered_revision_save_table_and_root_round_trip() {
     assert_eq!(metadata.ids(), [7_564_464, 8_398_352, 9_049_968]);
     assert_eq!(metadata.root(), Some(9_049_968));
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.revision_save_metadata(), Some(metadata));
 }
 
 #[test]
 fn preserves_valid_empty_revision_save_table() {
-    let document = Tree::parse(r"{\rtf1{\*\rsidtbl}\rsidroot7 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\*\rsidtbl}\rsidroot7 Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let metadata = document.revision_save_metadata().unwrap();
     assert!(metadata.ids().is_empty());
     assert_eq!(metadata.root(), Some(7));
     assert_eq!(document.text(), "Body");
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.revision_save_metadata(), Some(metadata));
     assert_eq!(reparsed.text(), "Body");
     assert!(RevisionSaveMetadata::new(Vec::new(), None).is_ok());
@@ -58,11 +63,13 @@ fn mutation_validates_membership_uniqueness_and_preserves_body() {
     assert!(metadata.push_id(22).is_err());
     assert!(metadata.set_root(Some(44)).is_err());
 
-    let mut document = Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document
         .set_revision_save_metadata(metadata.clone())
         .unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Text");
     assert_eq!(reparsed.revision_save_metadata(), Some(&metadata));
 
@@ -87,7 +94,10 @@ fn rejects_malformed_revision_save_metadata() {
         r"{\rtf1{\*\rsidtbl \b\rsid1}}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 

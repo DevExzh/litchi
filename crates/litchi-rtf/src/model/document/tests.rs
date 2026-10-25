@@ -54,9 +54,11 @@ fn text_concatenates_fragmented_blocks_without_changing_separators() {
 
 #[test]
 fn paragraph_properties_after_a_break_attach_to_the_following_paragraph() {
-    let doc =
-        Tree::parse(r"{\rtf1\ansi\qc\sb40\li80\keepn First\par\sb120\li240\keep\pagebb\qr Second}", OpenOptions::default())
-            .unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\ansi\qc\sb40\li80\keepn First\par\sb120\li240\keep\pagebb\qr Second}",
+        OpenOptions::default(),
+    )
+    .unwrap();
 
     assert_eq!(doc.text(), "First\nSecond");
     assert_eq!(doc.blocks().len(), 3);
@@ -270,15 +272,16 @@ fn rejects_excessively_nested_shape_groups() {
 
 #[test]
 fn ignores_and_records_content_after_the_root_group() {
-    let document =
-        Tree::parse("{\\rtf1 padded} \r\n\0\0", OpenOptions::default()).expect("whitespace and NUL transport padding");
+    let document = Tree::parse("{\\rtf1 padded} \r\n\0\0", OpenOptions::default())
+        .expect("whitespace and NUL transport padding");
     assert_eq!(document.text(), "padded");
 
     assert!(document.tolerance_report().is_clean());
 
     // Visible content after the root group is ignored, as Word and
     // LibreOffice stop at the root's closing brace, and recorded.
-    let document = Tree::parse("{\\rtf1 padded} trailing", OpenOptions::default()).expect("trailing content");
+    let document =
+        Tree::parse("{\\rtf1 padded} trailing", OpenOptions::default()).expect("trailing content");
     assert_eq!(document.text(), "padded");
     assert_eq!(
         document.tolerance_report().defects(),
@@ -397,7 +400,8 @@ fn extracts_embedded_object_metadata_and_native_bytes_without_activation() {
 
 #[test]
 fn rejects_invalid_embedded_object_hex() {
-    let Err(error) = Tree::parse(r"{\rtf1{\object{\*\objdata 0xz}}}", OpenOptions::default()) else {
+    let Err(error) = Tree::parse(r"{\rtf1{\object{\*\objdata 0xz}}}", OpenOptions::default())
+    else {
         panic!("invalid object hex should fail")
     };
     assert!(
@@ -583,7 +587,11 @@ fn parses_list_and_override_tables_without_leaking_labels() {
 
 #[test]
 fn preserves_paragraph_list_instance_and_level() {
-    let doc = Tree::parse(r"{\rtf1\pard\ls4\ilvl2 Listed text}", OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\pard\ls4\ilvl2 Listed text}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(doc.text(), "Listed text");
     let paragraph = doc.blocks().last().unwrap().paragraph;
     assert_eq!(paragraph.list_override, Some(4));
@@ -657,7 +665,8 @@ fn text_flush_preserves_common_formatting_and_revision_metadata() {
 #[test]
 fn revision_toggle_boundaries_flush_preceding_text() {
     let doc = Tree::parse(
-        r"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0\revdttm1 changed\revised0 plain}", OpenOptions::default()
+        r"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0\revdttm1 changed\revised0 plain}",
+        OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(doc.text(), "plain changedplain");
@@ -762,10 +771,18 @@ fn preserves_parsed_headers_and_footers_in_owned_document() {
 
 #[test]
 fn decodes_hex_escapes_after_declared_codepage() {
-    let cyrillic = Tree::parse(r"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}", OpenOptions::default()).unwrap();
+    let cyrillic = Tree::parse(
+        r"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(cyrillic.text(), "Привет");
 
-    let japanese = Tree::parse(r"{\rtf1\ansi\ansicpg932 \'82\'a0\'82\'a2}", OpenOptions::default()).unwrap();
+    let japanese = Tree::parse(
+        r"{\rtf1\ansi\ansicpg932 \'82\'a0\'82\'a2}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(japanese.text(), "あい");
 }
 
@@ -790,7 +807,8 @@ fn font_switches_select_exact_explicit_and_charset_codepages() {
     assert_eq!(inherited.text(), "Привет");
 
     let override_page = Tree::parse(
-        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78\cpg932 Japanese;}}\f0\'82\'a0}", OpenOptions::default()
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78\cpg932 Japanese;}}\f0\'82\'a0}",
+        OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(override_page.text(), "あ");
@@ -798,7 +816,8 @@ fn font_switches_select_exact_explicit_and_charset_codepages() {
     // A charset without a code-page mapping (Mac Shift-JIS) takes the
     // document code page, as LibreOffice does, and its first use is recorded.
     let unmapped = Tree::parse(
-        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 Japanese;}}\f0\'82\'a0}", OpenOptions::default()
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 Japanese;}}\f0\'82\'a0}",
+        OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(unmapped.text(), "\u{201a}\u{a0}");
@@ -815,7 +834,10 @@ fn font_switches_select_exact_explicit_and_charset_codepages() {
 fn rejects_unsupported_or_wide_ansi_codepages() {
     for page in [-1, 1200, 65000, 99_999] {
         let source = format!(r"{{\rtf1\ansi\ansicpg{page} text}}");
-        assert!(Tree::parse(&source, OpenOptions::default()).is_err(), "page {page}");
+        assert!(
+            Tree::parse(&source, OpenOptions::default()).is_err(),
+            "page {page}"
+        );
     }
 }
 
@@ -828,7 +850,8 @@ fn decodes_macintosh_and_exact_dos_character_sets() {
     assert_eq!(cp437.text(), "¢");
     let cp850 = Tree::parse(r"{\rtf1\pca \'9b}", OpenOptions::default()).unwrap();
     assert_eq!(cp850.text(), "ø");
-    let explicit_cp437 = Tree::parse(r"{\rtf1\ansi\ansicpg437 \'9b}", OpenOptions::default()).unwrap();
+    let explicit_cp437 =
+        Tree::parse(r"{\rtf1\ansi\ansicpg437 \'9b}", OpenOptions::default()).unwrap();
     assert_eq!(explicit_cp437.text(), "¢");
 }
 
@@ -837,7 +860,12 @@ fn decodes_unescaped_legacy_bytes_and_semantic_control_symbols() {
     let mut bytes = br"{\rtf1\ansi\ansicpg1252 ".to_vec();
     bytes.push(0xE9);
     bytes.push(b'}');
-    assert_eq!(Tree::parse_bytes(&bytes, OpenOptions::default()).unwrap().text(), "é");
+    assert_eq!(
+        Tree::parse_bytes(&bytes, OpenOptions::default())
+            .unwrap()
+            .text(),
+        "é"
+    );
 
     let symbols = Tree::parse(r"{\rtf1\pc A\~B\-C\_D}", OpenOptions::default()).unwrap();
     assert_eq!(symbols.text(), "A\u{00A0}B\u{00AD}C\u{2011}D");

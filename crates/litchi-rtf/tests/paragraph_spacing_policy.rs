@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{ParagraphSpacingPolicy, write::Writer, StyleBlock};
+use litchi_rtf::{ParagraphSpacingPolicy, StyleBlock, write::Writer};
 fn block<'a>(d: &'a Tree<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
 }
@@ -67,9 +67,7 @@ fn stylesheet_and_deterministic_writer_round_trip() {
         expected
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -134,7 +132,10 @@ fn rejects_missing_out_of_range_and_selector_parameters() {
         r"{\rtf1\contextualspace1 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(s, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                s,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {s}"
         );
     }

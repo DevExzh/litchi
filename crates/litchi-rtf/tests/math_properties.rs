@@ -16,19 +16,20 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_libreoffice_defaults_as_inert_metadata_and_round_trips() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\*\mmathPr\mmathFont34\mbrkBin0\mbrkBinSub0"#,
-        r#"\msmallFrac0\mdispDef1\mlMargin0\mrMargin0\mdefJc1"#,
-        r#"\mwrapIndent1440\mintLim0\mnaryLim1}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\*\mmathPr\mmathFont34\mbrkBin0\mbrkBinSub0"#,
+            r#"\msmallFrac0\mdispDef1\mlMargin0\mrMargin0\mdefJc1"#,
+            r#"\mwrapIndent1440\mintLim0\mnaryLim1}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "Body");
     let properties = document.math_properties().unwrap();
@@ -47,15 +48,19 @@ fn parses_libreoffice_defaults_as_inert_metadata_and_round_trips() {
         Some(MathLimitPlacement::UnderOver)
     );
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.math_properties(), Some(properties));
     assert_eq!(reparsed.text(), "Body");
 }
 
 #[test]
 fn accepts_unstarred_math_properties_destination() {
-    let document =
-        Tree::parse(r"{\rtf1{\mmathPr\mmathFont34\mdefJc1\mwrapIndent1440}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\mmathPr\mmathFont34\mdefJc1\mwrapIndent1440}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let properties = document.math_properties().unwrap();
     assert_eq!(properties.math_font, Some(34));
     assert_eq!(
@@ -68,12 +73,15 @@ fn accepts_unstarred_math_properties_destination() {
 
 #[test]
 fn preserves_complete_group_and_unknown_finite_values() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\*\mmathPr\mbrkBin17\mbrkBinSub-3\mdefJc99\mdispDef8"#,
-        r#"\minterSp20\mintLim7\mintraSp30\mlMargin40\mmathFont5"#,
-        r#"\mnaryLim6\mpostSp50\mpreSp60\mrMargin70\msmallFrac4"#,
-        r#"\mwrapIndent80\mwrapRight9}X}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\*\mmathPr\mbrkBin17\mbrkBinSub-3\mdefJc99\mdispDef8"#,
+            r#"\minterSp20\mintLim7\mintraSp30\mlMargin40\mmathFont5"#,
+            r#"\mnaryLim6\mpostSp50\mpreSp60\mrMargin70\msmallFrac4"#,
+            r#"\mwrapIndent80\mwrapRight9}X}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let properties = document.math_properties().unwrap();
     assert_eq!(
@@ -120,9 +128,11 @@ fn mutation_and_clear_preserve_body() {
     properties.small_fractions = Some(MathFlag::Off);
     properties.wrap_right = Some(MathFlag::On);
 
-    let mut document = Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_math_properties(properties.clone()).unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.math_properties(), Some(&properties));
     assert_eq!(reparsed.text(), "Text");
 
@@ -148,7 +158,10 @@ fn rejects_malformed_or_active_math_properties() {
         r"{\rtf1{\*\mmathPr\mmathFont-1}}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 

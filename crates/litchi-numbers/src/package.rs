@@ -2848,11 +2848,10 @@ mod tests {
                 tile_row_index: 0,
                 cell_count: 1,
                 storage_version: Some(5),
-                cell_storage_buffer: Some(crate::cell::wire::encode(
-                    &formula_cell,
-                    &crate::cell::wire::Limits::DEFAULT,
-                )
-                .expect("formula BNC cell encodes under default limits")),
+                cell_storage_buffer: Some(
+                    crate::cell::wire::encode(&formula_cell, &crate::cell::wire::Limits::DEFAULT)
+                        .expect("formula BNC cell encodes under default limits"),
+                ),
                 cell_offsets: Some(vec![0, 0]),
                 ..Default::default()
             }],
@@ -3980,10 +3979,8 @@ mod tests {
             .max_materialized_cells(1)
             .and_then(|builder| builder.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let package = Package::from_bytes_with_options(
-            &bytes,
-            OpenOptions::new().semantic_limits(semantic),
-        )?;
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
         let raw = package.numbers_wire_limits()?;
         assert_eq!(raw.max_items(), litchi_numbers_wire::Limits::MAX_ITEMS);
         Ok(())

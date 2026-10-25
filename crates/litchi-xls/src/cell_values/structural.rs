@@ -2,8 +2,8 @@ use super::{
     BLANK, BOOL_ERR, Error, FORMULA, LABEL_SST, MUL_RK, NUMBER, RK, Reference, Result, Storage,
     StructuralChange, StyleIndex, Value,
 };
-use crate::writer::row_blocks::{RowBlockLayoutPlan, RowBlockLayoutRow};
 use crate::SourceLimits;
+use crate::writer::row_blocks::{RowBlockLayoutPlan, RowBlockLayoutRow};
 use litchi_biff::Records;
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;

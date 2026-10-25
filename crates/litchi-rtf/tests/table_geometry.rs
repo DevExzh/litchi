@@ -11,8 +11,8 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    write::Writer, TableCellMergeRole, TableIndentUnit, TablePreferredWidthUnit, TableRowGeometry,
-    TableRowHeight,
+    TableCellMergeRole, TableIndentUnit, TablePreferredWidthUnit, TableRowGeometry, TableRowHeight,
+    write::Writer,
 };
 
 fn write(document: &Tree<'_>) -> String {
@@ -106,7 +106,8 @@ fn applies_geometry_to_end_defined_nested_rows() {
         row.cells()[1].preferred_width().unwrap().unit(),
         TablePreferredWidthUnit::Percent
     );
-    let reparsed = Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
             .table
@@ -146,7 +147,10 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
     for controls in controls {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
@@ -164,11 +168,18 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
     for controls in cell_controls {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
-    let defaulted = Tree::parse(r"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let defaulted = Tree::parse(
+        r"{\rtf1\trowd\tblind\cellx1000\intbl X\cell\row}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let indent = defaulted.tables()[0].rows()[0].geometry().indent().unwrap();
     assert_eq!(indent.unit(), TableIndentUnit::Twips);
     assert_eq!(indent.value(), 0);
@@ -179,7 +190,11 @@ fn rejects_missing_invalid_unpaired_and_out_of_range_controls() {
 fn parses_real_libreoffice_geometry_fixture() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf");
-    let document = Tree::parse(&std::fs::read_to_string(path).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        &std::fs::read_to_string(path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let rows = document
         .tables()
         .iter()

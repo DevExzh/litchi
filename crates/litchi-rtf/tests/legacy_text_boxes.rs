@@ -8,7 +8,9 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{LegacyHorizontalAnchor, LegacyTextDirection, LegacyVerticalAnchor, write::Writer};
+use litchi_rtf::{
+    LegacyHorizontalAnchor, LegacyTextDirection, LegacyVerticalAnchor, write::Writer,
+};
 
 const SYNTHETIC: &str = concat!(
     r#"{\rtf1\ansi\uc1 A"#,
@@ -43,16 +45,12 @@ fn parses_typed_legacy_text_box_and_round_trips_canonically() {
     );
 
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.legacy_text_boxes(), document.legacy_text_boxes());
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -98,7 +96,13 @@ fn rejects_misplaced_malformed_active_and_binary_legacy_text_boxes() {
 
 #[test]
 fn rejects_malformed_non_text_legacy_drawings() {
-    assert!(Tree::parse(r"{\rtf1 A{\*\do\dpline\dpx1}B}", litchi_rtf::read::OpenOptions::default()).is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1 A{\*\do\dpline\dpx1}B}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
 }
 
 fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {
@@ -133,7 +137,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     let hollow = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dplinehollow.rtf"
     );
-    let document = Tree::parse_bytes(&isolated_drawing(hollow), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(hollow),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "AB");
     let text_box = &document.legacy_text_boxes()[0];
     assert_eq!(text_box.text, "textbox without border\n");
@@ -153,7 +161,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
     let relation = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dptxbx-relation.rtf"
     );
-    let document = Tree::parse_bytes(&isolated_drawing(relation), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(relation),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let text_box = &document.legacy_text_boxes()[0];
     assert_eq!(text_box.text, "To:\n");
     assert_eq!((text_box.x, text_box.y), (Some(941), Some(2114)));
@@ -161,7 +173,11 @@ fn parses_named_libreoffice_legacy_text_box_fixtures() {
 
     let nested_geometry =
         include_bytes!("../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf");
-    let document = Tree::parse_bytes(&isolated_drawing(nested_geometry), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(nested_geometry),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let text_box = &document.legacy_text_boxes()[0];
     assert!(text_box.text.contains("hello"));
     assert_eq!((text_box.x, text_box.y), (Some(227), Some(227)));

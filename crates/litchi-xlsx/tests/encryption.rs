@@ -208,13 +208,9 @@ fn password_aware_ingress_accepts_plain_zip_without_provenance() {
 #[test]
 fn restrictive_inner_opc_limits_reject_valid_encrypted_xlsx() {
     let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
-    let encrypted = litchi_xlsx::encryption::encrypt(
-        plaintext,
-        PASSWORD,
-        Mode::Standard,
-        &Limits::default(),
-    )
-    .unwrap();
+    let encrypted =
+        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard, &Limits::default())
+            .unwrap();
     let opc_limits = SourceLimits::builder()
         .max_input_bytes(4)
         .unwrap()
@@ -255,13 +251,9 @@ fn decrypted_wrong_family_package_is_rejected() {
         )
         .unwrap();
     let plaintext = PackageWriter::to_bytes(&presentation).unwrap();
-    let encrypted = litchi_xlsx::encryption::encrypt(
-        plaintext,
-        PASSWORD,
-        Mode::Standard,
-        &Limits::default(),
-    )
-    .unwrap();
+    let encrypted =
+        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard, &Limits::default())
+            .unwrap();
 
     assert!(matches!(
         Package::from_bytes_with_password(&encrypted, PASSWORD),
@@ -385,13 +377,9 @@ fn signed_inner_opc_survives_encryption_and_reencryption_unchanged() {
 #[test]
 fn encrypted_source_raw_declassification_is_explicit() {
     let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
-    let encrypted = litchi_xlsx::encryption::encrypt(
-        plaintext,
-        PASSWORD,
-        Mode::Standard,
-        &Limits::default(),
-    )
-    .unwrap();
+    let encrypted =
+        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard, &Limits::default())
+            .unwrap();
     let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
     assert_eq!(package.encryption(), Some(Mode::Standard));
 

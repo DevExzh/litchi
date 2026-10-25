@@ -9,8 +9,8 @@
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    EndnoteRestart, FootnoteRestart, NoteNumberingStyle, write::Writer, SectionFootnotePlacement,
-    SectionNoteOptions,
+    EndnoteRestart, FootnoteRestart, NoteNumberingStyle, SectionFootnotePlacement,
+    SectionNoteOptions, write::Writer,
 };
 
 #[test]
@@ -37,9 +37,7 @@ fn parses_last_wins_section_note_options_and_round_trips_stably() {
     );
 
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
@@ -47,9 +45,7 @@ fn parses_last_wins_section_note_options_and_round_trips_stably() {
         document.sections()[0].properties.note_options
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -127,9 +123,7 @@ fn supports_all_42_section_numbering_control_spellings() {
         assert_eq!(options.endnote_numbering, Some(style));
 
         let mut output = Vec::new();
-        Writer::new(&mut output)
-            .write_document(&document)
-            .unwrap();
+        Writer::new(&mut output).write_document(&document).unwrap();
         let output = String::from_utf8(output).unwrap();
         assert!(output.contains(&format!(r"\{footnote}")));
         assert!(output.contains(&format!(r"\{endnote}")));
@@ -138,8 +132,11 @@ fn supports_all_42_section_numbering_control_spellings() {
 
 #[test]
 fn preserves_inheritance_and_sectd_reset() {
-    let inherited =
-        Tree::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let inherited = Tree::parse(
+        r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(inherited.sections().len(), 2);
     let first = inherited.sections()[0].properties.note_options;
     let second = inherited.sections()[1].properties.note_options;
@@ -147,7 +144,11 @@ fn preserves_inheritance_and_sectd_reset() {
     assert_eq!(second.footnote_numbering, first.footnote_numbering);
     assert_eq!(second.footnote_start, Some(2));
 
-    let reset = Tree::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reset = Tree::parse(
+        r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(reset.sections().len(), 2);
     assert!(reset.sections()[1].properties.note_options.is_empty());
 }
@@ -194,7 +195,11 @@ fn rejects_invalid_values_and_non_root_or_late_section_note_options() {
 
 #[test]
 fn document_note_options_do_not_materialize_section_overrides() {
-    let document = Tree::parse(r"{\rtf1\ftnnar\aftnnruc\sectd Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ftnnar\aftnnruc\sectd Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(document.sections()[0].properties.note_options.is_empty());
 }
 
@@ -234,8 +239,11 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
 
 #[test]
 fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
-    let document =
-        Tree::parse(r"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "BeforesnapshotAfter");
 
     for source in [
@@ -253,11 +261,14 @@ fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
 
 #[test]
 fn permits_section_note_controls_in_explicit_root_section_format_runs() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\sectd Before\sectd\ltrsect\psz9\linex0\headery0"#,
-        r#"\footery454\colsx708\endnhere\sectlinegrid360\sectdefaultcl"#,
-        r#"\sftnbj After}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\sectd Before\sectd\ltrsect\psz9\linex0\headery0"#,
+            r#"\footery454\colsx708\endnhere\sectlinegrid360\sectdefaultcl"#,
+            r#"\sftnbj After}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "BeforeAfter");
     assert_eq!(
@@ -282,12 +293,15 @@ fn permits_section_note_controls_in_explicit_root_section_format_runs() {
 
 #[test]
 fn permits_inert_section_format_runs_at_direct_header_footer_level() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\sectd\sftntj"#,
-        r#"{\headerr Header{\field{\*\fldinst PAGE}{\fldrslt 2}}"#,
-        r#"\sectd\ltrsect\linex0\endnhere\sectdefaultcl\sftnbj{\b -}}"#,
-        r#"{\footerl Footer\sectd\ltrsect\sftnbj{\i -}}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\sectd\sftntj"#,
+            r#"{\headerr Header{\field{\*\fldinst PAGE}{\fldrslt 2}}"#,
+            r#"\sectd\ltrsect\linex0\endnhere\sectdefaultcl\sftnbj{\b -}}"#,
+            r#"{\footerl Footer\sectd\ltrsect\sftnbj{\i -}}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "Body");
     assert_eq!(
@@ -301,11 +315,14 @@ fn permits_inert_section_format_runs_at_direct_header_footer_level() {
 
 #[test]
 fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\field{\*\fldinst IF {\b nested}"#,
-        r#"\sectd\ltrsect\psz9\linex0\sectdefaultcl\sftnbj "x"}"#,
-        r#"{\fldrslt value}}}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\field{\*\fldinst IF {\b nested}"#,
+            r#"\sectd\ltrsect\psz9\linex0\sectdefaultcl\sftnbj "x"}"#,
+            r#"{\fldrslt value}}}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.fields().len(), 1);
     assert!(
@@ -323,7 +340,11 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
 fn rejects_section_note_controls_after_the_parsed_document_group() {
     // Controls after the root group are ignored (and recorded), so they
     // cannot set the document's note options.
-    let trailing = Tree::parse(r"{\rtf1 Body}\sectd\sftnbj", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let trailing = Tree::parse(
+        r"{\rtf1 Body}\sectd\sftnbj",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(trailing.text(), "Body");
     assert!(
         trailing
@@ -333,7 +354,11 @@ fn rejects_section_note_controls_after_the_parsed_document_group() {
     );
     assert_eq!(trailing.tolerance_report().total(), 1);
 
-    let document = Tree::parse(r"{\rtf1\sectd\sftnbj Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\sectd\sftnbj Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "Body");
     assert_eq!(
         document.sections()[0]

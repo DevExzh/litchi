@@ -16,9 +16,7 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -63,12 +61,13 @@ fn mixed_unicode_revisions_preserve_visible_and_deleted_semantics() {
     );
 
     let output = write(&document);
-    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| {
-        panic!(
-            "failed to parse writer output: {error}\n{}",
-            String::from_utf8_lossy(&output)
-        )
-    });
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default())
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to parse writer output: {error}\n{}",
+                String::from_utf8_lossy(&output)
+            )
+        });
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.revision_authors(), document.revision_authors());
     assert_eq!(reparsed.revisions(), document.revisions());
@@ -76,7 +75,11 @@ fn mixed_unicode_revisions_preserve_visible_and_deleted_semantics() {
 
 #[test]
 fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
-    let mut document = Tree::parse(r"{\rtf1\ansi A\u20320?B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1\ansi A\u20320?B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     document
         .push_revision_author(RevisionAuthor::new(Cow::Borrowed("Ada")).unwrap())
         .unwrap();
@@ -118,7 +121,8 @@ fn mutation_uses_utf8_boundaries_and_explicit_author_table() {
     );
     assert!(document.clear_revision_authors().is_err());
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "A你B");
     assert_eq!(reparsed.revisions(), document.revisions());
 }
@@ -137,7 +141,10 @@ fn malformed_revision_grammar_is_rejected() {
         r"{\rtf1{\revised\revauth0\revdttm1 x}}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 

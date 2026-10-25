@@ -54,10 +54,9 @@ fn parses_decodes_and_round_trips_note_separators() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    Writer::new(&mut first_bytes)
-        .write_document(&doc)
-        .unwrap();
-    let reparsed = Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
+    Writer::new(&mut first_bytes).write_document(&doc).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(table, reparsed.note_separators());
     let mut second_bytes = Vec::new();
     Writer::new(&mut second_bytes)
@@ -132,7 +131,11 @@ fn parses_real_libreoffice_note_separator_fixture() {
 
 #[test]
 fn starred_note_separator_font_controls_are_inert_and_do_not_leak_into_body() {
-    let document = Tree::parse(FONT_SCOPED_SEPARATOR, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        FONT_SCOPED_SEPARATOR,
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let separator = document
         .note_separators()
         .get(NoteSeparatorKind::FootnoteSeparator)

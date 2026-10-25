@@ -4223,9 +4223,11 @@ fn document_discovers_bibliography_fields_without_loading_sources() {
 
 #[test]
 fn document_discovers_eq_fields_without_calculating_them() {
-    let document =
-        crate::Tree::parse(r"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}", OpenOptions::default())
-            .unwrap();
+    let document = crate::Tree::parse(
+        r"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}",
+        OpenOptions::default(),
+    )
+    .unwrap();
 
     let equations = document.equations();
     assert_eq!(document.equation_count(), 1);
@@ -4580,8 +4582,11 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         ("fdo86750.rtf", "anchor"),
         ("tdf134614_toc_indent.rtf", "_Toc1"),
     ] {
-        let document =
-            crate::Tree::from_bytes(&std::fs::read(fixture_root.join(fixture)).unwrap(), OpenOptions::default()).unwrap();
+        let document = crate::Tree::from_bytes(
+            &std::fs::read(fixture_root.join(fixture)).unwrap(),
+            OpenOptions::default(),
+        )
+        .unwrap();
         assert!(
             document.fields().iter().any(|field| {
                 field.extract_bookmark().as_deref() == Some(expected)
@@ -4592,9 +4597,11 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         );
     }
 
-    let formatted =
-        crate::Tree::from_bytes(&std::fs::read(fixture_root.join("fdo82071.rtf")).unwrap(), OpenOptions::default())
-            .unwrap();
+    let formatted = crate::Tree::from_bytes(
+        &std::fs::read(fixture_root.join("fdo82071.rtf")).unwrap(),
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert!(formatted.fields().iter().any(|field| matches!(
         field.parsed_code(),
         ParsedFieldCode::PageReference(ReferenceCode { ref bookmark, hyperlink: true, .. })
@@ -4602,7 +4609,8 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
     )));
 
     let backslashes = crate::Tree::from_bytes(
-        &std::fs::read(fixture_root.join("hyperlink-with-backslashes.rtf")).unwrap(), OpenOptions::default()
+        &std::fs::read(fixture_root.join("hyperlink-with-backslashes.rtf")).unwrap(),
+        OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(
@@ -4610,9 +4618,11 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         Some(r"c:\temp\doc1.doc")
     );
 
-    let target =
-        crate::Tree::from_bytes(&std::fs::read(fixture_root.join("hyperlink-target.rtf")).unwrap(), OpenOptions::default())
-            .unwrap();
+    let target = crate::Tree::from_bytes(
+        &std::fs::read(fixture_root.join("hyperlink-target.rtf")).unwrap(),
+        OpenOptions::default(),
+    )
+    .unwrap();
     let ParsedFieldCode::Hyperlink(code) = target.fields()[0].parsed_code() else {
         panic!("expected target-frame hyperlink");
     };

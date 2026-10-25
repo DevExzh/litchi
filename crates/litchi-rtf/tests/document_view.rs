@@ -14,16 +14,17 @@ use litchi_rtf::{DocumentView, DocumentViewKind, DocumentZoomKind, write::Writer
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_view_and_zoom_metadata_and_round_trips_in_stable_order() {
-    let document =
-        Tree::parse(r"{\rtf1\viewkind4\viewscale135\viewzk3\viewbksp1\viewnobound Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\viewkind4\viewscale135\viewzk3\viewbksp1\viewnobound Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         *document.document_view(),
         DocumentView {
@@ -47,7 +48,8 @@ fn parses_view_and_zoom_metadata_and_round_trips_in_stable_order() {
 
 #[test]
 fn typed_api_preserves_absence_and_clear() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.document_view().is_empty());
     document
         .set_document_view(DocumentView {
@@ -58,7 +60,8 @@ fn typed_api_preserves_absence_and_clear() {
             hide_page_boundaries: false,
         })
         .unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.document_view(), document.document_view());
     document.clear_document_view();
     assert!(document.document_view().is_empty());
@@ -88,7 +91,10 @@ fn rejects_invalid_values_duplicates_and_bad_placement_or_group_shape() {
         r"{\rtf1{{\*\viewkind1}}Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }

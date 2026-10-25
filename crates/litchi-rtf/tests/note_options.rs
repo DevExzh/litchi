@@ -40,16 +40,12 @@ fn parses_last_wins_note_options_and_round_trips_stably() {
     );
 
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.note_options(), document.note_options());
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -110,9 +106,7 @@ fn supports_all_42_note_numbering_control_spellings() {
         assert_eq!(document.note_options().endnote_numbering, Some(style));
 
         let mut output = Vec::new();
-        Writer::new(&mut output)
-            .write_document(&document)
-            .unwrap();
+        Writer::new(&mut output).write_document(&document).unwrap();
         let output = String::from_utf8(output).unwrap();
         assert!(output.contains(&format!(r"\{footnote}")));
         assert!(output.contains(&format!(r"\{endnote}")));
@@ -163,12 +157,14 @@ fn rejects_invalid_values_and_non_root_or_late_note_options() {
 
 #[test]
 fn omission_stays_empty_and_note_bodies_do_not_infer_options() {
-    let document = Tree::parse(r"{\rtf1 A{\footnote Note}B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1 A{\footnote Note}B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(document.note_options().is_empty());
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     assert!(!String::from_utf8(output).unwrap().contains(r"\fet"));
 }
 
@@ -177,7 +173,8 @@ fn handles_named_libreoffice_note_option_fixtures() {
     let section_end = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf"
     );
-    let document = Tree::parse_bytes(section_end, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document =
+        Tree::parse_bytes(section_end, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document.note_options().present_kinds,
         Some(PresentNoteKinds::EndnotesOnly)

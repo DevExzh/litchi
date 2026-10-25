@@ -47,8 +47,7 @@ impl<'a> GlyfTable<'a> {
                 };
                 add_glyph(&mut selected_glyph_ids, composite)?;
             }
-            budget::reserve_vec(&mut records, 1)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut records, 1).map_err(|_| ParseError::LimitExceeded)?;
             records.push(SubsetGlyph {
                 old_id: glyph_id,
                 record,
@@ -104,10 +103,7 @@ impl<'a> SubsetGlyf<'a> {
 /// Add each of the child glyphs contained within a composite glyph to the subset font.
 ///
 /// Updates the composite glyph indexes to point at the new child indexes.
-fn add_glyph(
-    glyph_ids: &mut Vec<u16>,
-    composite: &mut CompositeGlyph,
-) -> Result<(), ParseError> {
+fn add_glyph(glyph_ids: &mut Vec<u16>, composite: &mut CompositeGlyph) -> Result<(), ParseError> {
     for composite_glyph in composite.glyphs.iter_mut() {
         let new_id = match glyph_ids
             .iter()
@@ -117,11 +113,10 @@ fn add_glyph(
             None => {
                 // Add this glyph to the list of ids to include in the subset font
                 let new_id = glyph_ids.len();
-                budget::reserve_vec(glyph_ids, 1)
-                    .map_err(|_| ParseError::LimitExceeded)?;
+                budget::reserve_vec(glyph_ids, 1).map_err(|_| ParseError::LimitExceeded)?;
                 glyph_ids.push(composite_glyph.glyph_index);
                 new_id
-            }
+            },
         };
         composite_glyph.glyph_index = new_id as u16;
     }

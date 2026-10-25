@@ -10,7 +10,7 @@
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     BodyStoryEvent, Cell, CellStoryEvent, FieldOwner, NoteSeparatorElement, NoteSeparatorKind,
-    write::Writer, Shape, ShapeGroup, ShapeType, StoryDrawing, StoryEvent, StoryField,
+    Shape, ShapeGroup, ShapeType, StoryDrawing, StoryEvent, StoryField, write::Writer,
 };
 use std::borrow::Cow;
 
@@ -23,9 +23,7 @@ const ROOT_SHAPE: &str = r"{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}}";
 
 fn write_document(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     String::from_utf8(output).unwrap()
 }
 
@@ -90,7 +88,11 @@ fn owns_and_round_trips_equal_offset_drawings_in_supported_substreams() {
     assert_eq!(cell.text(), "CD");
     assert_group_then_shape(cell.shapes(), cell.shape_groups(), cell.drawing_order(), 1);
 
-    let reparsed = Tree::parse(&write_document(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse(
+        &write_document(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let reparsed_separator = reparsed
         .note_separators()
         .get(NoteSeparatorKind::FootnoteSeparator)
@@ -121,9 +123,7 @@ fn field_result_drawings_round_trip_through_the_field_api() {
     assert_group_then_shape(&field.shapes, &field.shape_groups, &field.drawing_order, 1);
 
     let mut field_output = Vec::new();
-    Writer::new(&mut field_output)
-        .write_field(field)
-        .unwrap();
+    Writer::new(&mut field_output).write_field(field).unwrap();
     let wrapped = format!("{{\\rtf1{}}}", String::from_utf8(field_output).unwrap());
     let reparsed = Tree::parse(&wrapped, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_field = &reparsed.fields()[0];
@@ -199,7 +199,11 @@ fn cell_story_events_preserve_nested_table_drawing_ties() {
         ]
     );
 
-    let reparsed = Tree::parse(&write_document(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse(
+        &write_document(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(cell.text(), "CD");
     assert_eq!(
@@ -223,7 +227,11 @@ fn nested_table_cells_own_their_drawing_story() {
     assert_eq!(cell.text(), "XY");
     assert_group_then_shape(cell.shapes(), cell.shape_groups(), cell.drawing_order(), 1);
 
-    let reparsed = Tree::parse(&write_document(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse(
+        &write_document(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let nested = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0].table;
     let cell = &nested.rows()[0].cells()[0];
     assert_eq!(cell.text(), "XY");
@@ -321,7 +329,11 @@ fn header_footer_and_note_fields_preserve_equal_offset_drawing_order() {
     );
     assert_eq!(document.fields()[endnote_index].owner, FieldOwner::Endnote);
 
-    let reparsed = Tree::parse(&write_document(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse(
+        &write_document(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let header = &reparsed.sections()[0].headers_footers[0];
     let footer = &reparsed.sections()[0].headers_footers[1];
     assert!(matches!(
@@ -394,7 +406,11 @@ fn outer_and_nested_cells_preserve_generic_fields_among_equal_offset_events() {
         FieldOwner::TableCell(2)
     );
 
-    let reparsed = Tree::parse(&write_document(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse(
+        &write_document(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let outer = &reparsed.tables()[0].rows()[0].cells()[0];
     assert!(matches!(
         outer.story_events(),
@@ -443,7 +459,11 @@ fn nested_generic_fields_round_trip_in_parent_result_event_order() {
         ]
     );
 
-    let reparsed = Tree::parse(&write_document(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse(
+        &write_document(&document),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let parent_index = field_index(&reparsed, "PARENT");
     let parent = &reparsed.fields()[parent_index];
     assert_eq!(parent.result, "RS");

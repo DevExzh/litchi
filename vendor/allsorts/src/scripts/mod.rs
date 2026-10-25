@@ -73,7 +73,7 @@ pub fn preprocess_text(cs: &mut Vec<char>, script_tag: u32) {
         ScriptType::Indic => indic::preprocess_indic(cs, script_tag),
         ScriptType::Khmer => khmer::preprocess_khmer(cs),
         ScriptType::Mongolian => sort_by_modified_combining_class(cs),
-        ScriptType::Myanmar => {}
+        ScriptType::Myanmar => {},
         ScriptType::Syriac => arabic::reorder_marks(cs),
         ScriptType::ThaiLao => thai_lao::reorder_marks(cs),
         ScriptType::Tibetan => tibetan::preprocess_tibetan(cs),

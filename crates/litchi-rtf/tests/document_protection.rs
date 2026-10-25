@@ -11,9 +11,7 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::write::Writer;
-use litchi_rtf::{
-    MAX_PASSWORD_HASH_BYTES, Package, PasswordHash, ProtectionLevel, ProtectionType,
-};
+use litchi_rtf::{MAX_PASSWORD_HASH_BYTES, Package, PasswordHash, ProtectionLevel, ProtectionType};
 use std::borrow::Cow;
 use std::fs;
 
@@ -33,9 +31,7 @@ fn decode_hex(value: &str) -> Vec<u8> {
 
 fn round_trip(document: &Tree<'_>) -> Tree<'static> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap()
 }
 
@@ -97,7 +93,10 @@ fn rejects_malformed_duplicate_or_misplaced_protection() {
         ),
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
@@ -243,7 +242,10 @@ fn rejects_passwordhash_after_structural_body_events() {
         let source = format!(
             r"{{\rtf1\ansi{prefix}{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}"
         );
-        assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
@@ -263,7 +265,10 @@ fn rejects_passwordhash_after_zero_width_body_structures() {
             "invalid control fixture {valid}"
         );
         let source = format!(r"{prefix}{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}}} Body}}");
-        assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
@@ -277,7 +282,10 @@ fn rejects_nested_known_passwordhash_before_opaque_or_specialized_parsing() {
     let header =
         format!(r"{{\rtf1\ansi{{\header{{\*\passwordhash {MODERN_PASSWORD_HASH_SAMPLE}Z}}}}}}");
     for source in [unknown, field, header] {
-        assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 

@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{ParagraphLogicalIndentation, write::Writer, StyleBlock};
+use litchi_rtf::{ParagraphLogicalIndentation, StyleBlock, write::Writer};
 fn block<'a>(d: &'a Tree<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
 }
@@ -39,7 +39,8 @@ fn parses_inherits_resets_destinations() {
 #[test]
 fn stylesheet_writer_round_trip() {
     let d = Tree::parse(
-        r"{\rtf1{\stylesheet{\s9\lin120\rin240\cufi-10\culi20\curi30\indmirror Logical;}}Body}", litchi_rtf::read::OpenOptions::default()
+        r"{\rtf1{\stylesheet{\s9\lin120\rin240\cufi-10\culi20\curi30\indmirror Logical;}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     let x = d

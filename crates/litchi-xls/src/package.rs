@@ -478,8 +478,7 @@ impl Package {
         match self.inner.policy {
             RetainedPolicy::Eager { source_limits, .. } => Ok(source_limits),
             RetainedPolicy::Source { limits, .. } => {
-                SourceLimits::from_physical_profile(limits.max_input_bytes)
-                    .map_err(Error::Reader)
+                SourceLimits::from_physical_profile(limits.max_input_bytes).map_err(Error::Reader)
             },
         }
     }

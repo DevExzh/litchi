@@ -3,15 +3,15 @@
 //! The functions in this module should only be executed on aarch64 machines with the Neon
 //! extension.
 use core::arch::aarch64::{
-    uint16x8_t, uint16x8x2_t, uint16x8x4_t, uint8x16_t, vaddq_u32, vaddw_high_u8, vaddw_u8,
-    vdupq_n_u16, vdupq_n_u32, vextq_u8, vget_high_u32, vget_lane_u32, vget_low_u16, vget_low_u32,
-    vget_low_u8, vld1q_u8_x4, vmlal_high_u16, vmlal_u16, vpadalq_u16, vpadalq_u8, vpadd_u32,
+    uint8x16_t, uint16x8_t, uint16x8x2_t, uint16x8x4_t, vaddq_u32, vaddw_high_u8, vaddw_u8,
+    vdupq_n_u16, vdupq_n_u32, vextq_u8, vget_high_u32, vget_lane_u32, vget_low_u8, vget_low_u16,
+    vget_low_u32, vld1q_u8_x4, vmlal_high_u16, vmlal_u16, vpadalq_u8, vpadalq_u16, vpadd_u32,
     vpaddlq_u8, vsetq_lane_u32, vshlq_n_u32,
 };
 
 use crate::adler32::{
-    generic::{adler32_len_1, adler32_len_16},
     BASE, NMAX,
+    generic::{adler32_len_1, adler32_len_16},
 };
 
 const TAPS: [uint16x8x4_t; 2] = unsafe {

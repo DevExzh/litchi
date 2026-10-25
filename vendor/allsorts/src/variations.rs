@@ -12,14 +12,15 @@ use pathfinder_geometry::vector::vec2i;
 use rustc_hash::FxHashSet;
 
 use crate::binary::read::{ReadArrayCow, ReadScope};
-use crate::cff::cff2::CFF2;
 use crate::cff::CFFError;
+use crate::cff::cff2::CFF2;
 use crate::error::{ParseError, ReadWriteError, WriteError};
 use crate::post::PostTable;
 use crate::subset::{FontBuilder, TableFilter};
 use crate::tables::glyf::{BoundingBox, GlyfRecord, GlyfTable, Glyph};
 use crate::tables::loca::LocaTable;
 use crate::tables::os2::{FsSelectionFlag, Os2};
+use crate::tables::variable_fonts::OwnedTuple;
 use crate::tables::variable_fonts::avar::AvarTable;
 use crate::tables::variable_fonts::cvar::CvarTable;
 use crate::tables::variable_fonts::fvar::FvarTable;
@@ -27,10 +28,9 @@ use crate::tables::variable_fonts::gvar::GvarTable;
 use crate::tables::variable_fonts::hvar::HvarTable;
 use crate::tables::variable_fonts::mvar::MvarTable;
 use crate::tables::variable_fonts::stat::{ElidableName, StatTable};
-use crate::tables::variable_fonts::OwnedTuple;
 use crate::tables::{
-    owned, CvtTable, Fixed, FontTableProvider, HeadTable, HheaTable, HmtxTable, IndexToLocFormat,
-    LongHorMetric, MacStyleFlag, MaxpTable, NameTable, CFF_MAGIC, TRUE_MAGIC,
+    CFF_MAGIC, CvtTable, Fixed, FontTableProvider, HeadTable, HheaTable, HmtxTable,
+    IndexToLocFormat, LongHorMetric, MacStyleFlag, MaxpTable, NameTable, TRUE_MAGIC, owned,
 };
 use crate::tag;
 use crate::tag::DisplayTag;
@@ -158,11 +158,11 @@ pub fn instance(
         (Some(loca), Some(glyf_data), _) => {
             let glyf = ReadScope::new(glyf_data).read_dep::<GlyfTable<'_>>(loca)?;
             GlyphData::Glyf(glyf)
-        }
+        },
         (_, _, Some(cff2_data)) => {
             let cff2 = ReadScope::new(cff2_data).read::<CFF2<'_>>()?;
             GlyphData::Cff2(cff2)
-        }
+        },
         _ => return Err(ParseError::MissingValue.into()),
     };
     let mut hhea = ReadScope::new(&provider.read_table_data(tag::HHEA)?).read::<HheaTable>()?;
@@ -255,12 +255,12 @@ pub fn instance(
             // Update head
             let mut bbox = RectI::default();
             glyf.records().iter().for_each(|glyph| match glyph {
-                GlyfRecord::Present { .. } => {}
+                GlyfRecord::Present { .. } => {},
                 GlyfRecord::Parsed(glyph) => {
                     if let Some(bounding_box) = glyph.bounding_box() {
                         bbox = union_rect(bbox, bounding_box.into())
                     }
-                }
+                },
             });
             head.x_min = bbox.min_x().try_into().ok().unwrap_or(i16::MIN);
             head.y_min = bbox.min_y().try_into().ok().unwrap_or(i16::MIN);
@@ -270,7 +270,7 @@ pub fn instance(
             // Build new hmtx table
             let hmtx = create_hmtx_table(&hmtx, hvar.as_ref(), &glyf, &instance, maxp.num_glyphs)?;
             (GlyphData::Glyf(glyf), hmtx)
-        }
+        },
         (GlyphData::Cff2(mut cff2), _) => {
             cff2.instance_char_strings(&instance)?;
             cff2.vstore = None; // No need for the variation store now
@@ -280,11 +280,11 @@ pub fn instance(
                 Some(hvar) => {
                     let hmtx = apply_hvar(&hmtx, hvar, None, &instance, maxp.num_glyphs)?;
                     (GlyphData::Cff2(cff2), hmtx)
-                }
+                },
                 // Pass through original hmtx unchanged
                 None => (GlyphData::Cff2(cff2), hmtx),
             }
-        }
+        },
         // It is possible for a TrueType variable font to exist without gvar or CFF2 tables.
         // The most likely place this would be encountered would be a COLRv1 font that varies the
         // colour information but not the glyph contours. We don't currently support COLRv1. There
@@ -330,15 +330,15 @@ pub fn instance(
                 head.mac_style
                     .set(MacStyleFlag::BOLD, os2.us_weight_class >= 600);
                 os2.fs_selection.set(FsSelectionFlag::BOLD, head.is_bold());
-            }
+            },
             tag::WDTH => {
                 os2.us_width_class = Os2::value_to_width_class(value);
                 head.mac_style
                     .set(MacStyleFlag::CONDENSED, os2.us_width_class < 4);
                 head.mac_style
                     .set(MacStyleFlag::EXTENDED, os2.us_width_class > 6);
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
     os2.fs_selection.set(
@@ -410,7 +410,7 @@ pub fn instance(
         GlyphData::Cff2(cff2) => {
             builder.add_table::<_, CFF2<'_>>(tag::CFF2, cff2, ())?;
             None
-        }
+        },
         GlyphData::Glyf(glyf) => Some(glyf),
     };
 
@@ -603,141 +603,141 @@ fn process_mvar(
                 if let Some(v0) = &mut os2.version0 {
                     v0.s_typo_ascender = add_delta_i16(v0.s_typo_ascender, delta);
                 }
-            }
+            },
             // horizontal descender 	OS/2.sTypoDescender
             tag::HDSC => {
                 if let Some(v0) = &mut os2.version0 {
                     v0.s_typo_descender = add_delta_i16(v0.s_typo_descender, delta);
                 }
-            }
+            },
             // horizontal line gap 	OS/2.sTypoLineGap
             tag::HLGP => {
                 if let Some(v0) = &mut os2.version0 {
                     v0.s_typo_line_gap = add_delta_i16(v0.s_typo_line_gap, delta);
                 }
-            }
+            },
             // horizontal clipping ascent 	OS/2.usWinAscent
             tag::HCLA => {
                 if let Some(v0) = &mut os2.version0 {
                     v0.us_win_ascent = add_delta_u16(v0.us_win_ascent, delta);
                 }
-            }
+            },
             // horizontal clipping descent 	OS/2.usWinDescent
             tag::HCLD => {
                 if let Some(v0) = &mut os2.version0 {
                     v0.us_win_descent = add_delta_u16(v0.us_win_descent, delta);
                 }
-            }
+            },
             // vertical ascender 	vhea.ascent
             tag::VASC => {
                 if let Some(vhea) = vhea {
                     vhea.ascender = add_delta_i16(vhea.ascender, delta);
                 }
-            }
+            },
             // vertical descender 	vhea.descent
             tag::VDSC => {
                 if let Some(vhea) = vhea {
                     vhea.descender = add_delta_i16(vhea.descender, delta);
                 }
-            }
+            },
             // vertical line gap 	vhea.lineGap
             tag::VLGP => {
                 if let Some(vhea) = vhea {
                     vhea.line_gap = add_delta_i16(vhea.line_gap, delta);
                 }
-            }
+            },
             // horizontal caret rise 	hhea.caretSlopeRise
             tag::HCRS => {
                 hhea.caret_slope_rise = add_delta_i16(hhea.caret_slope_rise, delta);
-            }
+            },
             // horizontal caret run 	hhea.caretSlopeRun
             tag::HCRN => {
                 hhea.caret_slope_run = add_delta_i16(hhea.caret_slope_run, delta);
-            }
+            },
             // horizontal caret offset 	hhea.caretOffset
             tag::HCOF => {
                 hhea.caret_offset = add_delta_i16(hhea.caret_offset, delta);
-            }
+            },
             // vertical caret rise 	vhea.caretSlopeRise
             tag::VCRS => {
                 if let Some(vhea) = vhea {
                     vhea.caret_slope_rise = add_delta_i16(vhea.caret_slope_rise, delta);
                 }
-            }
+            },
             // vertical caret run 	vhea.caretSlopeRun
             tag::VCRN => {
                 if let Some(vhea) = vhea {
                     vhea.caret_slope_run = add_delta_i16(vhea.caret_slope_run, delta);
                 }
-            }
+            },
             // vertical caret offset 	vhea.caretOffset
             tag::VCOF => {
                 if let Some(vhea) = vhea {
                     vhea.caret_offset = add_delta_i16(vhea.caret_offset, delta);
                 }
-            }
+            },
             // x height 	OS/2.sxHeight
             tag::XHGT => {
                 if let Some(version) = &mut os2.version2to4 {
                     version.s_x_height = add_delta_i16(version.s_x_height, delta);
                 }
-            }
+            },
             // cap height 	OS/2.sCapHeight
             tag::CPHT => {
                 if let Some(version) = &mut os2.version2to4 {
                     version.s_cap_height = add_delta_i16(version.s_cap_height, delta);
                 }
-            }
+            },
             // subscript em x size 	OS/2.ySubscriptXSize
             tag::SBXS => {
                 os2.y_subscript_x_size = add_delta_i16(os2.y_subscript_x_size, delta);
-            }
+            },
             // subscript em y size 	OS/2.ySubscriptYSize
             tag::SBYS => {
                 os2.y_subscript_y_size = add_delta_i16(os2.y_subscript_y_size, delta);
-            }
+            },
             // subscript em x offset 	OS/2.ySubscriptXOffset
             tag::SBXO => {
                 os2.y_subscript_x_offset = add_delta_i16(os2.y_subscript_x_offset, delta);
-            }
+            },
             // subscript em y offset 	OS/2.ySubscriptYOffset
             tag::SBYO => {
                 os2.y_subscript_y_offset = add_delta_i16(os2.y_subscript_y_offset, delta);
-            }
+            },
             // superscript em x size 	OS/2.ySuperscriptXSize
             tag::SPXS => {
                 os2.y_superscript_x_size = add_delta_i16(os2.y_superscript_x_size, delta);
-            }
+            },
             // superscript em y size 	OS/2.ySuperscriptYSize
             tag::SPYS => {
                 os2.y_superscript_y_size = add_delta_i16(os2.y_superscript_y_size, delta);
-            }
+            },
             // superscript em x offset 	OS/2.ySuperscriptXOffset
             tag::SPXO => {
                 os2.y_superscript_x_offset = add_delta_i16(os2.y_superscript_x_offset, delta);
-            }
+            },
             // superscript em y offset 	OS/2.ySuperscriptYOffset
             tag::SPYO => {
                 os2.y_superscript_y_offset = add_delta_i16(os2.y_superscript_y_offset, delta);
-            }
+            },
             // strikeout size 	OS/2.yStrikeoutSize
             tag::STRS => {
                 os2.y_strikeout_size = add_delta_i16(os2.y_strikeout_size, delta);
-            }
+            },
             // strikeout offset 	OS/2.yStrikeoutPosition
             tag::STRO => {
                 os2.y_strikeout_position = add_delta_i16(os2.y_strikeout_position, delta);
-            }
+            },
             // underline size 	post.underlineThickness
             tag::UNDS => {
                 post.header.underline_thickness =
                     add_delta_i16(post.header.underline_thickness, delta);
-            }
+            },
             // underline offset 	post.underlinePosition
             tag::UNDO => {
                 post.header.underline_position =
                     add_delta_i16(post.header.underline_position, delta);
-            }
+            },
             // gaspRange[0] 	gasp.gaspRange[0..9].rangeMaxPPEM
             // We know about these but ignore them since the gasp table doesn't make it into subset
             // fonts.
@@ -877,7 +877,7 @@ fn htmx_from_phantom_points<'a>(
                 let lsb = bounding_box.x_min - pp1;
                 let advance_width = u16::try_from(pp2 - pp1).unwrap_or(0);
                 LongHorMetric { advance_width, lsb }
-            }
+            },
             _ => unreachable!("glyph should be parsed with phantom points present"),
         };
         h_metrics.push(metric);
@@ -912,7 +912,7 @@ fn apply_gvar<'a>(
         match glyph_record {
             GlyfRecord::Parsed(glyph) => {
                 glyph.apply_variations(glyph_id, instance, gvar, hmtx, vmtx, os2, hhea)?;
-            }
+            },
             GlyfRecord::Present { .. } => unreachable!("glyph should be parsed"),
         }
     }
@@ -1029,9 +1029,15 @@ impl fmt::Display for VariationError {
             VariationError::NotVariableFont => write!(f, "variation: not a variable font"),
             VariationError::NotImplemented => {
                 write!(f, "variation: unsupported variable font format")
-            }
-            VariationError::NameError => write!(f, "font did not contain a `name` table entry for the family name in a usable encoding"),
-            VariationError::TagError => write!(f, "the list of table tags was unable to be retrieved from the font"),
+            },
+            VariationError::NameError => write!(
+                f,
+                "font did not contain a `name` table entry for the family name in a usable encoding"
+            ),
+            VariationError::TagError => write!(
+                f,
+                "the list of table tags was unable to be retrieved from the font"
+            ),
         }
     }
 }
@@ -1061,7 +1067,7 @@ mod tests {
     use super::*;
     use crate::assert_close;
     use crate::cff::charstring::{ArgumentsStack, CharStringVisitorContext};
-    use crate::cff::{cff2, CFFFont};
+    use crate::cff::{CFFFont, cff2};
     use crate::font_data::FontData;
     use crate::tables::{OpenTypeData, OpenTypeFont};
     use crate::tests::read_fixture;
@@ -1287,12 +1293,14 @@ mod tests {
         let hhea =
             ReadScope::new(&table_provider.read_table_data(tag::HHEA)?).read::<HheaTable>()?;
         let hmtx_data = table_provider.read_table_data(tag::HMTX)?;
-        assert!(ReadScope::new(&hmtx_data)
-            .read_dep::<HmtxTable<'_>>((
-                usize::from(maxp.num_glyphs),
-                usize::from(hhea.num_h_metrics),
-            ))
-            .is_ok());
+        assert!(
+            ReadScope::new(&hmtx_data)
+                .read_dep::<HmtxTable<'_>>((
+                    usize::from(maxp.num_glyphs),
+                    usize::from(hhea.num_h_metrics),
+                ))
+                .is_ok()
+        );
         Ok(())
     }
 

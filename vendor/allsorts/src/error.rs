@@ -90,7 +90,7 @@ impl fmt::Display for ParseError {
             ParseError::MissingValue => write!(f, "an expected data value was missing"),
             ParseError::MissingTable(tag) => {
                 write!(f, "font is missing '{}' table", DisplayTag(*tag))
-            }
+            },
             ParseError::CompressionError => write!(f, "compression error"),
             ParseError::UnsuitableCmap => write!(f, "no suitable cmap subtable"),
             ParseError::NotImplemented => write!(f, "feature not implemented"),
@@ -138,7 +138,7 @@ impl fmt::Display for WriteError {
             WriteError::NotImplemented => write!(f, "writing in this format is not implemented"),
             WriteError::PlaceholderMismatch => {
                 write!(f, "data written to placeholder did not match expected size")
-            }
+            },
         }
     }
 }

@@ -89,7 +89,7 @@ impl InflateBackend for Inflate {
                 MZStatus::StreamEnd => Ok(Status::StreamEnd),
                 MZStatus::NeedDict => {
                     mem::decompress_need_dict(self.inner.decompressor().adler32().unwrap_or(0))
-                }
+                },
             },
             Err(status) => match status {
                 MZError::Buf => Ok(Status::BufError),

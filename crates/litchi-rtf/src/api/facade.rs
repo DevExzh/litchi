@@ -151,8 +151,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_owned_bytes_with_options(input: Vec<u8>, options: OpenOptions) -> RtfResult<Self> {
-        Tree::from_owned_bytes(input, options)
-            .map(|model| Self::from_model(model, options))
+        Tree::from_owned_bytes(input, options).map(|model| Self::from_model(model, options))
     }
 
     /// Open an RTF file with the production-safe resource profile.

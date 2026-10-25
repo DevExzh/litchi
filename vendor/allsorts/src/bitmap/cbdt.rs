@@ -7,17 +7,17 @@ use std::fmt;
 use bitreader::{BitReader, BitReaderError};
 
 use super::BitDepth;
+use crate::SafeFrom;
 use crate::binary::read::{
     ReadArray, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFixedSizeDep, ReadFrom, ReadScope,
 };
-use crate::binary::{U16Be, U32Be, I8, U8};
+use crate::binary::{I8, U8, U16Be, U32Be};
 use crate::bitmap::{
     Bitmap, BitmapGlyph, BitmapMetrics, EmbeddedBitmap, EmbeddedMetrics, EncapsulatedBitmap,
     EncapsulatedFormat, Metrics,
 };
 use crate::error::ParseError;
 use crate::size;
-use crate::SafeFrom;
 
 /// Flag in `BitmapInfo` `flags` indicating the direction of small glyph metrics is horizontal.
 ///
@@ -380,7 +380,7 @@ impl MatchingStrike<'_, '_> {
                 let mut ctxt = cbdt.data.offset_length(offset, length)?.ctxt();
                 let bitmap = ctxt.read_dep::<ImageFormat>((*image_format, None))?;
                 Ok(Some(bitmap))
-            }
+            },
             IndexSubTable::Format2 {
                 image_format,
                 image_data_offset,
@@ -395,7 +395,7 @@ impl MatchingStrike<'_, '_> {
                     .ctxt();
                 let bitmap = ctxt.read_dep::<ImageFormat>((*image_format, Some(*big_metrics)))?;
                 Ok(Some(bitmap))
-            }
+            },
             IndexSubTable::Format3 {
                 image_format,
                 image_data_offset,
@@ -422,7 +422,7 @@ impl MatchingStrike<'_, '_> {
                 let mut ctxt = cbdt.data.offset_length(offset, length)?.ctxt();
                 let bitmap = ctxt.read_dep::<ImageFormat>((*image_format, None))?;
                 Ok(Some(bitmap))
-            }
+            },
             IndexSubTable::Format4 {
                 image_format,
                 image_data_offset,
@@ -450,7 +450,7 @@ impl MatchingStrike<'_, '_> {
                 }
 
                 Ok(None)
-            }
+            },
             IndexSubTable::Format5 {
                 image_format,
                 image_data_offset,
@@ -480,7 +480,7 @@ impl MatchingStrike<'_, '_> {
                 }
 
                 Ok(None)
-            }
+            },
         }
     }
 }
@@ -502,7 +502,7 @@ impl ReadBinaryDep for ImageFormat {
                     small_metrics,
                     data,
                 })
-            }
+            },
             ImageFormat::Format2 => {
                 let small_metrics = ctxt.read::<SmallGlyphMetrics>()?;
                 let data = ctxt.scope().data();
@@ -511,7 +511,7 @@ impl ReadBinaryDep for ImageFormat {
                     small_metrics,
                     data,
                 })
-            }
+            },
             ImageFormat::Format5 => Ok(GlyphBitmapData::Format5 {
                 big_metrics: metrics.ok_or(ParseError::MissingValue)?,
                 data: ctxt.scope().data(),
@@ -521,13 +521,13 @@ impl ReadBinaryDep for ImageFormat {
                 let data = ctxt.scope().data();
 
                 Ok(GlyphBitmapData::Format6 { big_metrics, data })
-            }
+            },
             ImageFormat::Format7 => {
                 let big_metrics = ctxt.read::<BigGlyphMetrics>()?;
                 let data = ctxt.scope().data();
 
                 Ok(GlyphBitmapData::Format7 { big_metrics, data })
-            }
+            },
             ImageFormat::Format8 => {
                 let small_metrics = ctxt.read::<SmallGlyphMetrics>()?;
                 let _pad = ctxt.read_u8()?;
@@ -538,7 +538,7 @@ impl ReadBinaryDep for ImageFormat {
                     small_metrics,
                     components,
                 })
-            }
+            },
             ImageFormat::Format9 => {
                 let big_metrics = ctxt.read::<BigGlyphMetrics>()?;
                 let num_components = usize::from(ctxt.read_u16be()?);
@@ -548,7 +548,7 @@ impl ReadBinaryDep for ImageFormat {
                     big_metrics,
                     components,
                 })
-            }
+            },
             ImageFormat::Format17 => {
                 let small_metrics = ctxt.read::<SmallGlyphMetrics>()?;
                 let data_len = usize::try_from(ctxt.read_u32be()?)?;
@@ -558,14 +558,14 @@ impl ReadBinaryDep for ImageFormat {
                     small_metrics,
                     data,
                 })
-            }
+            },
             ImageFormat::Format18 => {
                 let big_metrics = ctxt.read::<BigGlyphMetrics>()?;
                 let data_len = usize::try_from(ctxt.read_u32be()?)?;
                 let data = ctxt.read_slice(data_len)?;
 
                 Ok(GlyphBitmapData::Format18 { big_metrics, data })
-            }
+            },
             ImageFormat::Format19 => {
                 let data_len = usize::try_from(ctxt.read_u32be()?)?;
                 let data = ctxt.read_slice(data_len)?;
@@ -574,7 +574,7 @@ impl ReadBinaryDep for ImageFormat {
                     big_metrics: metrics.ok_or(ParseError::MissingValue)?,
                     data,
                 })
-            }
+            },
         }
     }
 }
@@ -623,12 +623,12 @@ impl<'a> CBLCTable<'a> {
                     ) =>
                 {
                     best = Some((difference, bitmap_size, index))
-                }
+                },
                 Some((current_best_difference, _, _))
                     if super::bigger_or_closer_to_zero(difference, current_best_difference) =>
                 {
                     best = Some((difference, bitmap_size, index))
-                }
+                },
                 None => best = Some((difference, bitmap_size, index)),
                 _ => (),
             }
@@ -906,7 +906,7 @@ impl ReadBinaryDep for IndexSubTable<'_> {
                     image_data_offset,
                     offsets,
                 })
-            }
+            },
             2 => {
                 let image_size = ctxt.read_u32be()?;
                 let big_metrics = ctxt.read::<BigGlyphMetrics>()?;
@@ -916,7 +916,7 @@ impl ReadBinaryDep for IndexSubTable<'_> {
                     image_size,
                     big_metrics,
                 })
-            }
+            },
             3 => {
                 // +1 for last_glyph_index being inclusive,
                 // +1 for there being an extra record at the end
@@ -928,7 +928,7 @@ impl ReadBinaryDep for IndexSubTable<'_> {
                     image_data_offset,
                     offsets,
                 })
-            }
+            },
             4 => {
                 let num_glyphs = ctxt.read_u32be()?;
                 let glyph_array =
@@ -938,7 +938,7 @@ impl ReadBinaryDep for IndexSubTable<'_> {
                     image_data_offset,
                     glyph_array,
                 })
-            }
+            },
             5 => {
                 let image_size = ctxt.read_u32be()?;
                 let big_metrics = ctxt.read::<BigGlyphMetrics>()?;
@@ -951,7 +951,7 @@ impl ReadBinaryDep for IndexSubTable<'_> {
                     big_metrics,
                     glyph_id_array,
                 })
-            }
+            },
             _ => Err(ParseError::BadValue),
         }
     }
@@ -1073,7 +1073,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
             // Format 2: small metrics, bit-aligned data.
             GlyphBitmapData::Format2 {
                 small_metrics,
@@ -1101,7 +1101,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
             // Format 5: metrics in EBLC, bit-aligned image data only.
             GlyphBitmapData::Format5 { big_metrics, data } => {
                 let metrics = EmbeddedMetrics::try_from((info, &big_metrics))?;
@@ -1126,7 +1126,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
             // Format 6: big metrics, byte-aligned data.
             GlyphBitmapData::Format6 { big_metrics, data } => {
                 let data = bgra_to_rgba(info.bit_depth, data.to_vec())?;
@@ -1144,7 +1144,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
             // Format7: big metrics, bit-aligned data.
             GlyphBitmapData::Format7 { big_metrics, data } => {
                 let metrics = EmbeddedMetrics::try_from((info, &big_metrics))?;
@@ -1169,7 +1169,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
             // Format 8: small metrics, component data.
             GlyphBitmapData::Format8 { .. } => return Err(ParseError::NotImplemented),
             // Format 9: big metrics, component data.
@@ -1192,7 +1192,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
             // Format 18: big metrics, PNG image data.
             // Format 19: metrics in CBLC table, PNG image data.
             GlyphBitmapData::Format18 { big_metrics, data }
@@ -1210,7 +1210,7 @@ impl<'a> TryFrom<(&BitmapInfo, GlyphBitmapData<'a>, u16)> for BitmapGlyph {
                     ppem_y: Some(u16::from(info.ppem_y)),
                     should_flip_hori: false,
                 }
-            }
+            },
         };
 
         Ok(res)
@@ -1490,7 +1490,7 @@ fn parse_error_from_bitreader_error(err: BitReaderError) -> ParseError {
             // This should only happen as a result of programmer error as we only call bitreader
             // with values <= 8.
             unreachable!("{}", err)
-        }
+        },
     }
 }
 
@@ -1503,7 +1503,7 @@ fn bgra_to_rgba(bit_depth: BitDepth, mut data: Vec<u8>) -> Result<Vec<u8>, Parse
             }
             data.chunks_exact_mut(4).for_each(|chunk| chunk.swap(0, 2));
             Ok(data)
-        }
+        },
     }
 }
 
@@ -1611,7 +1611,7 @@ mod tests {
             }) => {
                 assert_eq!((width, height), (136, 128));
                 assert_eq!(&data[1..4], b"PNG");
-            }
+            },
             _ => panic!("expected PNG data got something else"),
         }
 

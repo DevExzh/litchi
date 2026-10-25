@@ -3,8 +3,8 @@ use crate::io::{Read, Write};
 
 use super::bufread;
 use super::{GzBuilder, GzHeader};
-use crate::bufreader::BufReader;
 use crate::Compression;
+use crate::bufreader::BufReader;
 
 /// A gzip streaming encoder
 ///
@@ -363,12 +363,12 @@ mod tests {
                     if err.kind() == ErrorKind::UnexpectedEof {
                         return Err(ErrorKind::WouldBlock.into());
                     }
-                }
+                },
                 Ok(0) => {
                     //regular EOF turned into blocking error
                     return Err(ErrorKind::WouldBlock.into());
-                }
-                Ok(_n) => {}
+                },
+                Ok(_n) => {},
             }
             r
         }
@@ -381,10 +381,10 @@ mod tests {
         let data = vec![1, 2, 3];
 
         match r.write_all(&data) {
-            Ok(()) => {}
+            Ok(()) => {},
             _ => {
                 panic!("Unexpected result for write_all");
-            }
+            },
         }
         r.set_position(0);
 
@@ -394,16 +394,16 @@ mod tests {
         match decoder.read(&mut out) {
             Err(e) => {
                 assert_eq!(e.kind(), ErrorKind::WouldBlock);
-            }
+            },
             _ => {
                 panic!("Unexpected result for decoder.read");
-            }
+            },
         }
     }
 
     fn compress_data(data: &[u8]) -> Vec<u8> {
-        use crate::write::GzEncoder;
         use crate::Compression;
+        use crate::write::GzEncoder;
 
         let mut e = GzEncoder::new(Vec::new(), Compression::default());
         e.write_all(data).unwrap();

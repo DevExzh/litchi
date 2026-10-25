@@ -128,8 +128,10 @@ fn set_dictionary_with_zlib_header() {
     let required_adler = decompress_error.needs_dictionary()
         .expect("the first call to decompress should indicate a dictionary is required along with the required Adler-32 checksum");
 
-    assert_eq!(required_adler, dictionary_adler,
-               "the Adler-32 checksum should match the value when the dictionary was set on the compressor");
+    assert_eq!(
+        required_adler, dictionary_adler,
+        "the Adler-32 checksum should match the value when the dictionary was set on the compressor"
+    );
 
     let actual_adler = decoder.set_dictionary(dictionary).unwrap();
 

@@ -1,5 +1,5 @@
-use flate2::read::DeflateEncoder;
 use flate2::Compression;
+use flate2::read::DeflateEncoder;
 use std::io;
 use std::io::prelude::*;
 

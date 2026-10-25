@@ -44,11 +44,11 @@ impl ReadBinaryDep for LocaTable<'_> {
             IndexToLocFormat::Short => {
                 // The actual local offset divided by 2 is stored. The value of n is numGlyphs + 1.
                 LocaOffsets::Short(ctxt.read_array::<U16Be>(num_glyphs + 1)?)
-            }
+            },
             IndexToLocFormat::Long => {
                 // The actual local offset is stored. The value of n is numGlyphs + 1.
                 LocaOffsets::Long(ctxt.read_array::<U32Be>(num_glyphs + 1)?)
-            }
+            },
         };
 
         Ok(LocaTable { offsets })
@@ -137,9 +137,9 @@ pub mod owned {
                 IndexToLocFormat::Short => {
                     match loca.offsets.last() {
                         Some(&last) if (last / 2) > u32::from(u16::MAX) => {
-                            return Err(WriteError::BadValue)
-                        }
-                        _ => {}
+                            return Err(WriteError::BadValue);
+                        },
+                        _ => {},
                     }
 
                     // The actual loca offset divided by 2 is stored.
@@ -154,7 +154,7 @@ pub mod owned {
                     }
 
                     Ok(())
-                }
+                },
                 IndexToLocFormat::Long => ctxt.write_vec::<U32Be, _>(loca.offsets),
             }
         }

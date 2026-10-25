@@ -4,8 +4,8 @@
 //! - Hyperlinks
 //! - Track Changes (Revisions)
 
-use litchi::rtf::*;
 use litchi::rtf::write::Writer;
+use litchi::rtf::*;
 use std::borrow::Cow;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {

@@ -17,20 +17,20 @@ use byteorder::{BigEndian, ByteOrder};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use num_traits as num;
-use tinyvec::{array_vec, tiny_vec, TinyVec};
+use tinyvec::{TinyVec, array_vec, tiny_vec};
 
+use crate::GlyphId;
+use crate::TryNumFrom;
 use crate::binary::budget;
 use crate::binary::read::{
     ReadArray, ReadArrayCow, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFrom, ReadScope,
     ReadUnchecked,
 };
 use crate::binary::write::{WriteBinary, WriteBinaryDep, WriteBuffer, WriteContext, WriteCounter};
-use crate::binary::{I16Be, I32Be, U16Be, U24Be, U32Be, U8};
+use crate::binary::{I16Be, I32Be, U8, U16Be, U24Be, U32Be};
 use crate::error::{ParseError, WriteError};
 use crate::tables::variable_fonts::{ItemVariationStore, OwnedTuple};
 use crate::variations::VariationError;
-use crate::GlyphId;
-use crate::TryNumFrom;
 use cff2::BlendOperand;
 use charstring::ArgumentsStack;
 pub use subset::SubsetCFF;
@@ -169,8 +169,8 @@ pub enum CFFError {
 }
 
 mod owned {
+    use super::{U8, U16Be, U32Be, WriteBinary, WriteContext, WriteError};
     use crate::binary::budget;
-    use super::{U16Be, U32Be, WriteBinary, WriteContext, WriteError, U8};
 
     pub(super) struct IndexU16;
     pub(super) struct IndexU32;
@@ -211,9 +211,7 @@ mod owned {
             .map_err(|_| WriteError::LimitExceeded)?;
         for data in &index.data {
             offsets.push(offset);
-            offset = offset
-                .checked_add(data.len())
-                .ok_or(WriteError::BadValue)?;
+            offset = offset.checked_add(data.len()).ok_or(WriteError::BadValue)?;
         }
         offsets.push(offset);
         let (off_size, offset_array) = super::serialise_offset_array(offsets)?;
@@ -483,8 +481,7 @@ impl ReadBinary for CFF<'_> {
         let global_subr_index = ctxt.read::<IndexU16>().map(MaybeOwnedIndex::Borrowed)?;
 
         let mut fonts = Vec::new();
-        budget::reserve_vec(&mut fonts, name_index.count)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut fonts, name_index.count).map_err(|_| ParseError::LimitExceeded)?;
         for font_index in 0..name_index.count {
             let top_dict = top_dict_index.read::<TopDict>(font_index, MAX_OPERANDS)?;
 
@@ -501,10 +498,10 @@ impl ReadBinary for CFF<'_> {
                 Some(Operator::ROS) => {
                     let cid_data = read_cid_data(&scope, &top_dict, char_strings_index.count)?;
                     CFFVariant::CID(cid_data)
-                }
+                },
                 Some(Operator::SyntheticBase) => {
                     return Err(ParseError::NotImplemented);
-                }
+                },
                 Some(_) => {
                     let (private_dict, private_dict_offset) =
                         top_dict.read_private_dict::<PrivateDict>(&scope, MAX_OPERANDS)?;
@@ -521,7 +518,7 @@ impl ReadBinary for CFF<'_> {
                         private_dict,
                         local_subr_index,
                     })
-                }
+                },
                 None => return Err(ParseError::MissingValue),
             };
 
@@ -578,14 +575,14 @@ impl<'a> WriteBinary<&Self> for CFF<'a> {
                 Charset::Expert => top_dict_delta.push_offset_budgeted(Operator::Charset, 1)?,
                 Charset::ExpertSubset => {
                     top_dict_delta.push_offset_budgeted(Operator::Charset, 2)?
-                }
+                },
                 Charset::Custom(custom) => {
                     top_dict_delta.push_offset_budgeted(
                         Operator::Charset,
                         i32::try_from(ctxt.bytes_written())?,
                     )?;
                     CustomCharset::write(ctxt, custom)?;
-                }
+                },
             }
             write_cff_variant(ctxt, &font.data, top_dict_delta)?;
         }
@@ -647,12 +644,9 @@ fn charge_operand_clone(operand: &Operand) -> Result<(), ParseError> {
     Ok(())
 }
 
-pub(crate) fn clone_operands_with_budget(
-    operands: &[Operand],
-) -> Result<Vec<Operand>, ParseError> {
+pub(crate) fn clone_operands_with_budget(operands: &[Operand]) -> Result<Vec<Operand>, ParseError> {
     let mut cloned = Vec::new();
-    budget::reserve_vec(&mut cloned, operands.len())
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_vec(&mut cloned, operands.len()).map_err(|_| ParseError::LimitExceeded)?;
     for operand in operands {
         charge_operand_clone(operand)?;
         cloned.push(operand.clone());
@@ -731,10 +725,7 @@ pub(crate) fn clone_index_with_budget<'a>(
 pub(crate) fn clone_optional_index_with_budget<'a>(
     index: &Option<MaybeOwnedIndex<'a>>,
 ) -> Result<Option<MaybeOwnedIndex<'a>>, ParseError> {
-    index
-        .as_ref()
-        .map(clone_index_with_budget)
-        .transpose()
+    index.as_ref().map(clone_index_with_budget).transpose()
 }
 
 fn charge_array_clone<T>(array: &ReadArrayCow<'_, T>) -> Result<(), ParseError>
@@ -791,14 +782,14 @@ fn charge_variant_clone(variant: &CFFVariant<'_>) -> Result<(), ParseError> {
                 charge_index_clone(index)?;
             }
             charge_fd_select_clone(&cid.fd_select)?;
-        }
+        },
         CFFVariant::Type1(type1) => {
             charge_encoding_clone(&type1.encoding)?;
             charge_dict_clone(&type1.private_dict)?;
             if let Some(index) = &type1.local_subr_index {
                 charge_index_clone(index)?;
             }
-        }
+        },
     }
     Ok(())
 }
@@ -980,11 +971,10 @@ where
                         charge_operand_clone(operand)?;
                         copied_operands.push(operand.clone());
                     }
-                    budget::reserve_for_push(&mut dict)
-                        .map_err(|_| ParseError::LimitExceeded)?;
+                    budget::reserve_for_push(&mut dict).map_err(|_| ParseError::LimitExceeded)?;
                     dict.push((operator, copied_operands));
                     operands.clear();
-                }
+                },
                 Op::Operand(operand) => {
                     budget::reserve_for_push(&mut operands)
                         .map_err(|_| ParseError::LimitExceeded)?;
@@ -992,7 +982,7 @@ where
                     if operands.len() > max_operands {
                         return Err(ParseError::LimitExceeded);
                     }
-                }
+                },
             }
         }
 
@@ -1020,7 +1010,7 @@ fn integer_to_offset(operator: Operator, operands: &mut [Operand]) {
         // Encodings 0..=1 indicate predefined encodings and are not offsets
         (Operator::Encoding, [Operand::Integer(offset)]) if *offset > 1 => {
             operands[0] = Operand::Offset(*offset);
-        }
+        },
         (Operator::Charset, [Operand::Integer(offset)])
         | (Operator::CharStrings, [Operand::Integer(offset)])
         | (Operator::Subrs, [Operand::Integer(offset)])
@@ -1028,13 +1018,13 @@ fn integer_to_offset(operator: Operator, operands: &mut [Operand]) {
         | (Operator::FDSelect, [Operand::Integer(offset)])
         | (Operator::VStore, [Operand::Integer(offset)]) => {
             operands[0] = Operand::Offset(*offset);
-        }
+        },
         (Operator::Private, [Operand::Integer(length), Operand::Integer(offset)]) => {
             let offset = *offset; // This is a work around an ownership issue
             operands[0] = Operand::Offset(*length);
             operands[1] = Operand::Offset(offset);
-        }
-        _ => {}
+        },
+        _ => {},
     }
 }
 
@@ -1091,18 +1081,18 @@ impl ReadBinary for Op {
             28 => {
                 let num = ctxt.read_i16be()?;
                 Ok(Op::Operand(Operand::Integer(i32::from(num))))
-            }
+            },
             29 => ok_int(ctxt.read_i32be()?),
             30 => ok_real(ctxt.read_until_nibble(END_OF_FLOAT_FLAG)?),
             32..=246 => ok_int(i32::from(b0) - 139),
             247..=250 => {
                 let b1 = ctxt.read_u8()?;
                 ok_int((i32::from(b0) - 247) * 256 + i32::from(b1) + 108)
-            }
+            },
             251..=254 => {
                 let b1 = ctxt.read_u8()?;
                 ok_int(-(i32::from(b0) - 251) * 256 - i32::from(b1) - 108)
-            }
+            },
             // reserved
             25..=27 | 31 | 255 => Err(ParseError::BadValue),
         }
@@ -1135,36 +1125,36 @@ impl WriteBinary<&Self> for Operand {
                 // NOTE: Casts are safe due to patterns limiting range
                 -107..=107 => {
                     U8::write(ctxt, (val + 139) as u8)?;
-                }
+                },
                 108..=1131 => {
                     let val = *val - 108;
                     U8::write(ctxt, ((val >> 8) + 247) as u8)?;
                     U8::write(ctxt, val as u8)?;
-                }
+                },
                 -1131..=-108 => {
                     let val = -*val - 108;
                     U8::write(ctxt, ((val >> 8) + 251) as u8)?;
                     U8::write(ctxt, val as u8)?;
-                }
+                },
                 -32768..=32767 => {
                     U8::write(ctxt, 28)?;
                     I16Be::write(ctxt, *val as i16)?
-                }
+                },
                 _ => {
                     U8::write(ctxt, 29)?;
                     I32Be::write(ctxt, *val)?
-                }
+                },
             },
             Operand::Offset(val) => {
                 U8::write(ctxt, 29)?;
                 // Offsets are always encoded using the i32 representation to make their size
                 // predictable.
                 I32Be::write(ctxt, *val)?;
-            }
+            },
             Operand::Real(Real(val)) => {
                 U8::write(ctxt, 30)?;
                 ctxt.write_bytes(val)?;
-            }
+            },
         }
 
         Ok(())
@@ -1228,13 +1218,13 @@ fn parse_float_nibble(nibble: u8, idx: &mut usize, data: &mut [u8]) -> Result<()
     match nibble {
         0..=9 => {
             data[*idx] = b'0' + nibble;
-        }
+        },
         10 => {
             data[*idx] = b'.';
-        }
+        },
         11 => {
             data[*idx] = b'E';
-        }
+        },
         12 => {
             if *idx + 1 == FLOAT_BUF_LEN {
                 return Err(ParseError::LimitExceeded);
@@ -1243,11 +1233,11 @@ fn parse_float_nibble(nibble: u8, idx: &mut usize, data: &mut [u8]) -> Result<()
             data[*idx] = b'E';
             *idx += 1;
             data[*idx] = b'-';
-        }
+        },
         13 => return Err(ParseError::BadValue),
         14 => {
             data[*idx] = b'-';
-        }
+        },
         _ => return Err(ParseError::BadValue),
     }
 
@@ -1345,12 +1335,12 @@ impl ReadBinary for CustomEncoding<'_> {
                 let ncodes = ctxt.read::<U8>()?;
                 let codes = ctxt.read_array::<U8>(usize::from(ncodes))?;
                 Ok(CustomEncoding::Format0 { codes })
-            }
+            },
             1 => {
                 let nranges = ctxt.read::<U8>()?;
                 let ranges = ctxt.read_array::<Range<u8, u8>>(usize::from(nranges))?;
                 Ok(CustomEncoding::Format1 { ranges })
-            }
+            },
             // The CFF spec notes:
             // A few fonts have multiply-encoded glyphs which are not supported directly by any of
             // the above formats. This situation is indicated by setting the high-order bit in the
@@ -1373,12 +1363,12 @@ impl WriteBinary<&Self> for CustomEncoding<'_> {
                 U8::write(ctxt, 0)?; // format
                 U8::write(ctxt, u8::try_from(codes.len())?)?;
                 <&ReadArray<'_, _>>::write(ctxt, codes)?;
-            }
+            },
             CustomEncoding::Format1 { ranges } => {
                 U8::write(ctxt, 1)?; // format
                 U8::write(ctxt, u8::try_from(ranges.len())?)?;
                 <&ReadArray<'_, _>>::write(ctxt, ranges)?;
-            }
+            },
         }
 
         Ok(())
@@ -1396,7 +1386,7 @@ impl Charset<'_> {
                 } else {
                     None
                 }
-            }
+            },
             Charset::Expert => EXPERT_CHARSET.get(usize::from(glyph_id)).copied(),
             Charset::ExpertSubset => EXPERT_SUBSET_CHARSET.get(usize::from(glyph_id)).copied(),
             Charset::Custom(custom) => custom.id_for_glyph(glyph_id),
@@ -1434,19 +1424,19 @@ impl ReadBinaryDep for CustomCharset<'_> {
                 Ok(CustomCharset::Format0 {
                     glyphs: ReadArrayCow::Borrowed(glyphs),
                 })
-            }
+            },
             1 => {
                 let ranges = read_range_array(ctxt, n_glyphs)?;
                 Ok(CustomCharset::Format1 {
                     ranges: ReadArrayCow::Borrowed(ranges),
                 })
-            }
+            },
             2 => {
                 let ranges = read_range_array(ctxt, n_glyphs)?;
                 Ok(CustomCharset::Format2 {
                     ranges: ReadArrayCow::Borrowed(ranges),
                 })
-            }
+            },
             _ => Err(ParseError::BadValue),
         }
     }
@@ -1460,15 +1450,15 @@ impl WriteBinary<&Self> for CustomCharset<'_> {
             CustomCharset::Format0 { glyphs } => {
                 U8::write(ctxt, 0)?; // format
                 ReadArrayCow::write(ctxt, glyphs)?;
-            }
+            },
             CustomCharset::Format1 { ranges } => {
                 U8::write(ctxt, 1)?; // format
                 ReadArrayCow::write(ctxt, ranges)?;
-            }
+            },
             CustomCharset::Format2 { ranges } => {
                 U8::write(ctxt, 2)?; // format
                 ReadArrayCow::write(ctxt, ranges)?;
-            }
+            },
         }
 
         Ok(())
@@ -1482,10 +1472,10 @@ impl<'a> CustomCharset<'a> {
             CustomCharset::Format0 { glyphs } => Box::new(notdef.chain(glyphs.iter())),
             CustomCharset::Format1 { ranges } => {
                 Box::new(notdef.chain(ranges.iter().flat_map(|range| range.iter())))
-            }
+            },
             CustomCharset::Format2 { ranges } => {
                 Box::new(notdef.chain(ranges.iter().flat_map(|range| range.iter())))
-            }
+            },
         }
     }
 
@@ -1504,7 +1494,7 @@ impl<'a> CustomCharset<'a> {
             CustomCharset::Format0 { glyphs } => {
                 let index = usize::from(glyph_id - 1);
                 glyphs.get_item(index)
-            }
+            },
             CustomCharset::Format1 { ranges } => Self::id_for_glyph_in_ranges(ranges, glyph_id),
             CustomCharset::Format2 { ranges } => Self::id_for_glyph_in_ranges(ranges, glyph_id),
         }
@@ -1518,7 +1508,7 @@ impl<'a> CustomCharset<'a> {
                     .into_iter()
                     .position(|n| n == sid)
                     .and_then(|n| u16::try_from(n + 1).ok())
-            }
+            },
             CustomCharset::Format1 { ranges } => Self::glyph_id_for_sid_in_ranges(ranges, sid),
             CustomCharset::Format2 { ranges } => Self::glyph_id_for_sid_in_ranges(ranges, sid),
         }
@@ -1591,7 +1581,7 @@ impl ReadBinaryDep for FDSelect<'_> {
                 Ok(FDSelect::Format0 {
                     glyph_font_dict_indices: ReadArrayCow::Borrowed(glyph_font_dict_indices),
                 })
-            }
+            },
             3 => {
                 let nranges = usize::from(ctxt.read::<U16Be>()?);
                 let ranges = ctxt.read_array(nranges)?;
@@ -1600,7 +1590,7 @@ impl ReadBinaryDep for FDSelect<'_> {
                     ranges: ReadArrayCow::Borrowed(ranges),
                     sentinel,
                 })
-            }
+            },
             // Format4 was added in CFF2, it allows GIDs greater than u16::MAX but the
             // rest of the OpenType format does not accommodate this yet, so it's not
             // implemented.
@@ -1620,13 +1610,13 @@ impl WriteBinary<&Self> for FDSelect<'_> {
             } => {
                 U8::write(ctxt, 0)?; // format
                 ReadArrayCow::write(ctxt, glyph_font_dict_indices)?;
-            }
+            },
             FDSelect::Format3 { ranges, sentinel } => {
                 U8::write(ctxt, 3)?; // format
                 U16Be::write(ctxt, u16::try_from(ranges.len())?)?;
                 ReadArrayCow::write(ctxt, ranges)?;
                 U16Be::write(ctxt, *sentinel)?;
-            }
+            },
         }
 
         Ok(())
@@ -1649,7 +1639,7 @@ impl PartialEq for FDSelect<'_> {
                         .iter()
                         .zip(other_glyph_font_dict_indices.iter())
                         .all(|(left, right)| left == right)
-            }
+            },
             (
                 FDSelect::Format3 {
                     ranges: self_ranges,
@@ -1666,7 +1656,7 @@ impl PartialEq for FDSelect<'_> {
                         .iter()
                         .zip(other_ranges.iter())
                         .all(|(left, right)| left == right)
-            }
+            },
             _ => false,
         }
     }
@@ -1695,7 +1685,7 @@ impl FDSelect<'_> {
                 }
 
                 None
-            }
+            },
         }
     }
 }
@@ -1800,8 +1790,7 @@ impl<'a> MaybeOwnedIndex<'a> {
     /// before constructing the owned object.
     pub(crate) fn push_bytes(&mut self, object: &[u8]) -> Result<usize, ParseError> {
         let mut owned = Vec::new();
-        budget::reserve_vec(&mut owned, object.len())
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut owned, object.len()).map_err(|_| ParseError::LimitExceeded)?;
         owned.extend_from_slice(object);
         self.push_owned(owned)
     }
@@ -1811,12 +1800,11 @@ impl<'a> MaybeOwnedIndex<'a> {
             MaybeOwnedIndex::Borrowed(_) => {
                 self.to_owned()?;
                 self.push_owned(object)?;
-            }
+            },
             MaybeOwnedIndex::Owned(index) => {
-                budget::reserve_for_push(&mut index.data)
-                    .map_err(|_| ParseError::LimitExceeded)?;
+                budget::reserve_for_push(&mut index.data).map_err(|_| ParseError::LimitExceeded)?;
                 index.data.push(object);
-            }
+            },
         }
 
         Ok(self.len() - 1)
@@ -1845,11 +1833,11 @@ impl<'a> MaybeOwnedIndex<'a> {
             MaybeOwnedIndex::Borrowed(_) => {
                 self.to_owned()?;
                 self.replace_owned(idx, object)?;
-            }
+            },
             MaybeOwnedIndex::Owned(index) => {
                 let slot = index.data.get_mut(idx).ok_or(ParseError::BadIndex)?;
                 *slot = object;
-            }
+            },
         }
         Ok(())
     }
@@ -1869,8 +1857,8 @@ impl<'a> MaybeOwnedIndex<'a> {
                     owned_data.push(owned_obj);
                 }
                 *self = MaybeOwnedIndex::Owned(owned::Index { data: owned_data })
-            }
-            MaybeOwnedIndex::Owned(_) => {}
+            },
+            MaybeOwnedIndex::Owned(_) => {},
         }
         Ok(())
     }
@@ -2025,7 +2013,7 @@ where
             match self.get_with_default(Operator::Private) {
                 Some([Operand::Offset(length), Operand::Offset(offset)]) => {
                     Ok((usize::try_from(*offset)?, usize::try_from(*length)?))
-                }
+                },
                 Some(_) => Err(ParseError::BadValue),
                 None => Err(ParseError::MissingValue),
             }?;
@@ -2094,7 +2082,7 @@ where
                     )?;
 
                     cff2::blend(&scalars, &mut stack)?;
-                }
+                },
                 _ if !stack.is_empty() => {
                     // The operator needs to operate on any blended operands on the stack in
                     // addition to any that were supplied to it. All operators except `blend` clear
@@ -2119,10 +2107,9 @@ where
                         charge_operand_clone(operand)?;
                         new_operands.push(operand.clone());
                     }
-                    budget::reserve_for_push(&mut dict)
-                        .map_err(|_| ParseError::LimitExceeded)?;
+                    budget::reserve_for_push(&mut dict).map_err(|_| ParseError::LimitExceeded)?;
                     dict.push((*op, new_operands));
-                }
+                },
                 _ => {
                     let mut copied_operands = Vec::new();
                     budget::reserve_vec(&mut copied_operands, operands.len())
@@ -2131,10 +2118,9 @@ where
                         charge_operand_clone(operand)?;
                         copied_operands.push(operand.clone());
                     }
-                    budget::reserve_for_push(&mut dict)
-                        .map_err(|_| ParseError::LimitExceeded)?;
+                    budget::reserve_for_push(&mut dict).map_err(|_| ParseError::LimitExceeded)?;
                     dict.push((*op, copied_operands));
-                }
+                },
             }
         }
 
@@ -2329,8 +2315,7 @@ impl Operand {
     }
 
     fn bcd_encode(buf: &mut TinyVec<[u8; 32]>, val: f32) -> Operand {
-        Self::bcd_encode_checked(buf, val, |_| Ok(()))
-            .expect("unbudgeted BCD encoding cannot fail")
+        Self::bcd_encode_checked(buf, val, |_| Ok(())).expect("unbudgeted BCD encoding cannot fail")
     }
 
     pub(crate) fn from_f32_with_budget(val: f32) -> Result<Self, ParseError> {
@@ -2379,7 +2364,7 @@ impl Operand {
                     b'E' if chars.peek() == Some(&&b'-') => {
                         let _ = chars.next(); // discard '-'
                         0xC
-                    }
+                    },
                     b'E' => 0xB,
                     b'-' => 0xE,
                     _ => unreachable!(),
@@ -2463,7 +2448,7 @@ impl Font<'_> {
                 } else {
                     None
                 }
-            }
+            },
             Charset::Expert | Charset::ExpertSubset => None,
             Charset::Custom(_) => self.charset.sid_to_gid(u16::from(sid)),
         }
@@ -2510,15 +2495,11 @@ fn write_cff_variant<C: WriteContext>(
     match variant {
         CFFVariant::CID(cid_data) => {
             let offsets = CIDData::write(ctxt, cid_data)?;
-            top_dict_delta.push_offset_budgeted(
-                Operator::FDArray,
-                i32::try_from(offsets.font_dict_index)?,
-            )?;
-            top_dict_delta.push_offset_budgeted(
-                Operator::FDSelect,
-                i32::try_from(offsets.fd_select)?,
-            )?;
-        }
+            top_dict_delta
+                .push_offset_budgeted(Operator::FDArray, i32::try_from(offsets.font_dict_index)?)?;
+            top_dict_delta
+                .push_offset_budgeted(Operator::FDSelect, i32::try_from(offsets.fd_select)?)?;
+        },
         CFFVariant::Type1(type1_data) => {
             let offsets = Type1Data::write(ctxt, type1_data)?;
             if let Some(custom_encoding_offset) = offsets.custom_encoding {
@@ -2534,7 +2515,7 @@ fn write_cff_variant<C: WriteContext>(
                     Operand::Offset(i32::try_from(offsets.private_dict)?),
                 ],
             )?;
-        }
+        },
     }
 
     Ok(())
@@ -2709,10 +2690,8 @@ fn write_private_dict_and_local_subr_index<C: WriteContext>(
     let mut private_dict_delta = DictDelta::new();
     if local_subr_index.is_some() {
         // This offset is relative to the start of the Private DICT
-        private_dict_delta.push_offset_budgeted(
-            Operator::Subrs,
-            i32::try_from(private_dict_length)?,
-        )?;
+        private_dict_delta
+            .push_offset_budgeted(Operator::Subrs, i32::try_from(private_dict_length)?)?;
     }
     let written_length = PrivateDict::write_dep(ctxt, private_dict, private_dict_delta)?;
     assert_eq!(written_length, private_dict_length);
@@ -2803,15 +2782,15 @@ fn serialise_offset_array(offsets: Vec<usize>) -> Result<(u8, Vec<u8>), WriteErr
 
         2 => {
             offset_array.write_iter::<U16Be, _>(offsets.into_iter().map(|offset| offset as u16))?
-        }
+        },
 
         3 => {
             offset_array.write_iter::<U24Be, _>(offsets.into_iter().map(|offset| offset as u32))?
-        }
+        },
 
         4 => {
             offset_array.write_iter::<U32Be, _>(offsets.into_iter().map(|offset| offset as u32))?
-        }
+        },
 
         _ => unreachable!(), // offset_size only returns 1..=4
     }
@@ -3963,7 +3942,7 @@ mod tests {
     fn test_read_top_dict_operand_limit() {
         let mut ctxt = ReadScope::new(&[0x8c; 2]).ctxt();
         match TopDict::read_dep(&mut ctxt, 1) {
-            Err(ParseError::LimitExceeded) => {}
+            Err(ParseError::LimitExceeded) => {},
             _ => panic!("expected Err(ParseError::LimitExceeded) got something else"),
         }
     }
@@ -3984,7 +3963,7 @@ mod tests {
         match format0_encoding {
             CustomEncoding::Format0 { codes } => {
                 assert_eq!(codes.iter().collect_vec(), vec![4, 5, 6])
-            }
+            },
             _ => panic!("expected CustomEncoding::Format0 got something else"),
         }
     }
@@ -4021,7 +4000,7 @@ mod tests {
         match format0_charset {
             CustomCharset::Format0 { glyphs } => {
                 assert_eq!(glyphs.iter().collect_vec(), vec![0xAABB])
-            }
+            },
             _ => panic!("expected CustomCharset::Format0 got something else"),
         }
     }

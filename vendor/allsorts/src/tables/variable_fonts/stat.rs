@@ -20,7 +20,7 @@ use crate::binary::{U16Be, U32Be};
 use crate::error::ParseError;
 use crate::tables::Fixed;
 use crate::tag::DisplayTag;
-use crate::{size, SafeFrom};
+use crate::{SafeFrom, size};
 
 /// `STAT` Style Attributes Table
 ///
@@ -276,7 +276,7 @@ impl<'a> StatTable<'a> {
                             value,
                         )
                     }
-                }
+                },
                 AxisValueTable::Format3(t) if t.axis_index == axis_index => consider(
                     &mut best,
                     t.value,
@@ -300,10 +300,10 @@ impl<'a> StatTable<'a> {
                         table.is_elidable(),
                         value,
                     )
-                }
+                },
                 AxisValueTable::Format1(_)
                 | AxisValueTable::Format2(_)
-                | AxisValueTable::Format3(_) => {}
+                | AxisValueTable::Format3(_) => {},
             }
         }
 
@@ -327,7 +327,7 @@ fn consider(
             if (candidate_value - value).abs() < (*best_val - value).abs() {
                 *best = Some((candidate_value, candidate_name_id, is_elidable));
             }
-        }
+        },
         None => *best = Some((candidate_value, candidate_name_id, is_elidable)),
     }
 }
@@ -420,7 +420,7 @@ impl AxisValueTable<'_> {
             | AxisValueTable::Format3(AxisValueTableFormat3 { value_name_id, .. })
             | AxisValueTable::Format4(AxisValueTableFormat4 { value_name_id, .. }) => {
                 *value_name_id
-            }
+            },
         }
     }
 
@@ -454,7 +454,7 @@ impl ReadBinaryDep for AxisValueTable<'_> {
                     value_name_id,
                     value,
                 }))
-            }
+            },
             2 => {
                 let axis_index = ctxt.read_u16be()?;
                 ctxt.check_index(axis_index < design_axis_count)?;
@@ -471,7 +471,7 @@ impl ReadBinaryDep for AxisValueTable<'_> {
                     range_min_value,
                     range_max_value,
                 }))
-            }
+            },
             3 => {
                 let axis_index = ctxt.read_u16be()?;
                 ctxt.check_index(axis_index < design_axis_count)?;
@@ -486,7 +486,7 @@ impl ReadBinaryDep for AxisValueTable<'_> {
                     value,
                     linked_value,
                 }))
-            }
+            },
             4 => {
                 let axis_count = ctxt.read_u16be()?;
                 let flags = ctxt.read::<AxisValueTableFlags>()?;
@@ -498,7 +498,7 @@ impl ReadBinaryDep for AxisValueTable<'_> {
                     value_name_id,
                     axis_values,
                 }))
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }

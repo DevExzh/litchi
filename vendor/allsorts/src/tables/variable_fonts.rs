@@ -6,19 +6,19 @@ use std::borrow::Cow;
 use std::fmt;
 use std::marker::PhantomData;
 
-use tinyvec::{tiny_vec, TinyVec};
+use tinyvec::{TinyVec, tiny_vec};
 
+use crate::SafeFrom;
 use crate::binary::read::{
     DebugData, ReadArray, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFixedSizeDep, ReadFrom,
     ReadScope, ReadUnchecked,
 };
 use crate::binary::write::{WriteBinary, WriteContext};
-use crate::binary::{I16Be, I32Be, U16Be, U32Be, I8, U8};
+use crate::binary::{I8, I16Be, I32Be, U8, U16Be, U32Be};
 use crate::error::{ParseError, WriteError};
 use crate::tables::variable_fonts::cvar::CvarTable;
 use crate::tables::variable_fonts::gvar::{GvarTable, NumPoints};
 use crate::tables::{F2Dot14, Fixed};
-use crate::SafeFrom;
 
 pub mod avar;
 pub mod cvar;
@@ -400,19 +400,19 @@ impl<'data, T> TupleVariationStore<'data, T> {
                             -1 => {
                                 start_coords.push(peak);
                                 end_coords.push(F2Dot14::from(0));
-                            }
+                            },
                             // When a delta is provided for a region defined by n-tuples that have
                             // a peak value of 0 for some axis, then that axis does not factor into
                             // scalar calculations.
                             0 => {
                                 start_coords.push(peak);
                                 end_coords.push(peak);
-                            }
+                            },
                             // region is from zero to peak
                             1 => {
                                 start_coords.push(F2Dot14::from(0));
                                 end_coords.push(peak);
-                            }
+                            },
                             _ => unreachable!("unknown value from signum"),
                         }
                     }
@@ -420,7 +420,7 @@ impl<'data, T> TupleVariationStore<'data, T> {
                         Coordinates::Array(start_coords),
                         Coordinates::Array(end_coords),
                     )
-                }
+                },
             };
 
             // Now determine the scalar:
@@ -525,7 +525,7 @@ impl PointNumbers {
                 // NOTE(unwrap): Safe as index is bounded by `len`
                 PointNumbers::Specific(numbers) => {
                     numbers.get(index).copied().map(u32::from).unwrap()
-                }
+                },
             }
         })
     }
@@ -596,17 +596,17 @@ fn read_count(ctxt: &mut ReadCtxt<'_>) -> Result<u16, ParseError> {
         128.. => {
             let count2 = ctxt.read_u8()?;
             ((count1 & 0x7F) << 8) | u16::from(count2)
-        }
+        },
     };
     Ok(count)
 }
 
 mod packed_deltas {
 
-    use crate::binary::read::ReadCtxt;
-    use crate::binary::{I16Be, I8};
-    use crate::error::ParseError;
     use crate::SafeFrom;
+    use crate::binary::read::ReadCtxt;
+    use crate::binary::{I8, I16Be};
+    use crate::error::ParseError;
 
     /// Flag indicating that this run contains no data (no explicit delta values
     /// are stored), and that the deltas for this run are all zero.
@@ -735,7 +735,7 @@ impl<'data> TupleVariationHeader<'data, Gvar> {
             None => {
                 let shared_index = self.tuple_flags_and_index & Self::TUPLE_INDEX_MASK;
                 gvar.shared_tuple(shared_index)
-            }
+            },
         }
     }
 }

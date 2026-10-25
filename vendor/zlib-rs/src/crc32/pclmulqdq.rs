@@ -226,11 +226,7 @@ impl Accumulator {
             self.fold[i + (4 - N)] = unsafe { _mm_xor_si128(self.fold[i + (4 - N)], input[i]) };
         }
 
-        if COPY {
-            N * 16
-        } else {
-            0
-        }
+        if COPY { N * 16 } else { 0 }
     }
 
     #[target_feature(enable = "pclmulqdq", enable = "sse2", enable = "sse4.1")]

@@ -1,8 +1,8 @@
 use flate2::bufread;
 use std::env::args;
 use std::fs::File;
-use std::io::copy;
 use std::io::BufReader;
+use std::io::copy;
 use std::time::Instant;
 
 fn main() {

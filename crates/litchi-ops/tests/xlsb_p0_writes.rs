@@ -494,14 +494,13 @@ fn unsigned_metadata_snapshot_charge_is_enforced() {
 #[test]
 fn encrypted_xlsb_stays_locked_and_is_never_republished_as_plaintext() {
     let plain = fixture();
-    let encrypted =
-        litchi_crypto::ooxml::encrypt(
-            plain.clone(),
-            "xlsb",
-            litchi_crypto::ooxml::Mode::Agile,
-            &litchi_crypto::ooxml::Limits::default(),
-        )
-        .expect("encrypt");
+    let encrypted = litchi_crypto::ooxml::encrypt(
+        plain.clone(),
+        "xlsb",
+        litchi_crypto::ooxml::Mode::Agile,
+        &litchi_crypto::ooxml::Limits::default(),
+    )
+    .expect("encrypt");
     let locked = litchi_ops::open_bytes(encrypted.clone()).expect("open encrypted");
     let error = locked
         .set("/Data/A1", props! { "font.bold" => true })

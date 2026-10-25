@@ -11,8 +11,8 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    write::Writer, TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment, TableRowAlignment,
-    TableRowLayout, TextDirection,
+    TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment, TableRowAlignment,
+    TableRowLayout, TextDirection, write::Writer,
 };
 
 fn write(document: &Tree<'_>) -> String {
@@ -101,7 +101,12 @@ fn applies_end_defined_nested_layout_without_leaking_outer_state() {
     );
     assert!(nested.cells()[0].layout().no_wrap);
     assert_eq!(
-        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0].cells()[0].nested_tables()[0]
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .tables()[0]
+            .rows()[0]
+            .cells()[0]
+            .nested_tables()[0]
             .table
             .rows()[0]
             .layout(),
@@ -114,12 +119,14 @@ fn parses_real_libreoffice_row_and_text_flow_fixtures() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa");
     let header = Tree::parse(
-        &std::fs::read_to_string(base.join("extras/rtfimport/data/tblrepeat.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default()
+        &std::fs::read_to_string(base.join("extras/rtfimport/data/tblrepeat.rtf")).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert!(header.tables()[0].rows()[0].layout().header);
     let flow = Tree::parse(
-        &std::fs::read_to_string(base.join("extras/rtfexport/data/btlr-cell.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default()
+        &std::fs::read_to_string(base.join("extras/rtfexport/data/btlr-cell.rtf")).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     let cells = flow.tables()[0].rows()[0].cells();
@@ -159,7 +166,10 @@ fn rejects_parameters_and_enforces_existing_cell_cap() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {word}"
         );
     }

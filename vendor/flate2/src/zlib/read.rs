@@ -3,8 +3,8 @@ use crate::io::{Read, Write};
 use alloc::vec::Vec;
 
 use super::bufread;
-use crate::bufreader::BufReader;
 use crate::Decompress;
+use crate::bufreader::BufReader;
 
 /// A ZLIB encoder, or compressor.
 ///

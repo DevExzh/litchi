@@ -6,7 +6,7 @@
 
 use crate::error::ShapingError;
 use crate::gsub::{self, Feature, FeatureMask, RawGlyph};
-use crate::layout::{FeatureTableSubstitution, GDEFTable, LayoutCache, LayoutTable, GSUB};
+use crate::layout::{FeatureTableSubstitution, GDEFTable, GSUB, LayoutCache, LayoutTable};
 use crate::unicode::mcc::sort_by_modified_combining_class;
 
 /// Decompose deprecated Tibetan compound vowels, then sort marks by modified combining class.
@@ -27,13 +27,13 @@ fn decompose_tibetan(cs: &mut Vec<char>) {
                 cs[i] = '\u{0F71}';
                 i += 1;
                 cs.insert(i, '\u{0F72}');
-            }
+            },
             // U+0F75 TIBETAN VOWEL SIGN UU → U+0F71 + U+0F74
             '\u{0F75}' => {
                 cs[i] = '\u{0F71}';
                 i += 1;
                 cs.insert(i, '\u{0F74}');
-            }
+            },
             // U+0F77 TIBETAN VOWEL SIGN VOCALIC RR → U+0FB2 + U+0F71 + U+0F80
             '\u{0F77}' => {
                 cs[i] = '\u{0FB2}';
@@ -41,7 +41,7 @@ fn decompose_tibetan(cs: &mut Vec<char>) {
                 cs.insert(i, '\u{0F71}');
                 i += 1;
                 cs.insert(i, '\u{0F80}');
-            }
+            },
             // U+0F79 TIBETAN VOWEL SIGN VOCALIC LL → U+0FB3 + U+0F71 + U+0F80
             '\u{0F79}' => {
                 cs[i] = '\u{0FB3}';
@@ -49,14 +49,14 @@ fn decompose_tibetan(cs: &mut Vec<char>) {
                 cs.insert(i, '\u{0F71}');
                 i += 1;
                 cs.insert(i, '\u{0F80}');
-            }
+            },
             // U+0F81 TIBETAN VOWEL SIGN REVERSED II → U+0F71 + U+0F80
             '\u{0F81}' => {
                 cs[i] = '\u{0F71}';
                 i += 1;
                 cs.insert(i, '\u{0F80}');
-            }
-            _ => {}
+            },
+            _ => {},
         }
         i += 1;
     }
@@ -194,7 +194,9 @@ mod tests {
         decompose_tibetan(&mut cs);
         assert_eq!(
             cs,
-            vec!['\u{0F40}', '\u{0F71}', '\u{0F72}', '\u{0F51}', '\u{0F71}', '\u{0F74}']
+            vec![
+                '\u{0F40}', '\u{0F71}', '\u{0F72}', '\u{0F51}', '\u{0F71}', '\u{0F74}'
+            ]
         );
     }
 }

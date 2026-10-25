@@ -174,11 +174,7 @@ fn normalized_html(source: &str) -> String {
         .replace("<tbody></tbody>", "")
 }
 
-fn read_with_policy(
-    source: &str,
-    dialect: Dialect,
-    limits: ReadLimits,
-) -> Result<Snapshot, Error> {
+fn read_with_policy(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
     Snapshot::read_with_options(
         source,
         OpenOptions::default().dialect(dialect).read_limits(limits),

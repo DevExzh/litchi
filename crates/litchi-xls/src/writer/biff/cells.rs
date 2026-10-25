@@ -457,11 +457,7 @@ mod tests {
             &bytes[shared_offset..shared_offset + 4],
             &[0xBC, 0x04, 13, 0]
         );
-        let parsed = parse(
-            &bytes[shared_offset + 4..],
-            &SourceLimits::default(),
-        )
-        .unwrap();
+        let parsed = parse(&bytes[shared_offset + 4..], &SourceLimits::default()).unwrap();
         assert_eq!(parsed.range, Range::try_new(0, 0, 1, 1).unwrap());
         assert_eq!(parsed.count, 2);
         assert_eq!(parsed.tokens, [0x1E, 99, 0]);

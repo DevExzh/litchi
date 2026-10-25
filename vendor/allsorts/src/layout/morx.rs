@@ -1,7 +1,7 @@
 //! `morx` layout transformations.
 
 use std::cmp;
-use tinyvec::{tiny_vec, TinyVec};
+use tinyvec::{TinyVec, tiny_vec};
 
 use crate::error::ParseError;
 use crate::glyph_position::TextDirection;
@@ -27,7 +27,7 @@ fn lookup(glyph: u16, lookup_table: &ClassLookupTable<'_>) -> Option<u16> {
                     .contains(glyph)
                     .then_some(lookup_segment.lookup_value)
             })
-        }
+        },
         LookupTable::Format4(lookup_segments) => {
             for lookup_segment in lookup_segments {
                 // The segments are meant to be non-overlapping so if a segment contains the glyph
@@ -38,7 +38,7 @@ fn lookup(glyph: u16, lookup_table: &ClassLookupTable<'_>) -> Option<u16> {
                 }
             }
             None
-        }
+        },
         LookupTable::Format6(lookup_entries) => lookup_entries.iter().find_map(|lookup_entry| {
             (lookup_entry.glyph == glyph).then_some(lookup_entry.lookup_value)
         }),
@@ -59,7 +59,7 @@ where
             } else {
                 lookup(g.glyph_index, class_table).unwrap_or(CLASS_CODE_OOB)
             }
-        }
+        },
         None => CLASS_CODE_EOT,
     }
 }
@@ -153,51 +153,51 @@ fn rearrange_glyphs<T>(verb: RearrangementVerb, seq: &mut [T]) {
         Verb5 if len > 1 => {
             seq.swap(0, 1);
             seq.rotate_left(2);
-        }
+        },
         Verb6 if len > 2 => seq.rotate_right(2),
         Verb7 if len > 1 => {
             seq.rotate_right(2);
             seq.swap(0, 1);
-        }
+        },
         Verb8 if len > 2 => {
             seq.rotate_right(2);
             seq[2..].rotate_left(1);
-        }
+        },
         Verb9 if len > 2 => {
             seq.rotate_right(2);
             seq.swap(0, 1);
             seq[2..].rotate_left(1);
-        }
+        },
         Verb10 if len > 2 => {
             seq.rotate_right(1);
             seq[1..].rotate_left(2);
-        }
+        },
         Verb11 if len > 2 => {
             seq.swap(0, 1);
             seq.rotate_right(1);
             seq[1..].rotate_left(2);
-        }
+        },
         Verb12 if len > 3 => {
             seq.rotate_right(2);
             seq[2..].rotate_left(2);
-        }
+        },
         Verb13 if len > 3 => {
             seq.swap(0, 1);
             seq.rotate_right(2);
             seq[2..].rotate_left(2);
-        }
+        },
         Verb14 if len > 3 => {
             seq.rotate_right(2);
             seq.swap(0, 1);
             seq[2..].rotate_left(2);
-        }
+        },
         Verb15 if len > 3 => {
             seq.swap(0, 1);
             seq.rotate_right(2);
             seq.swap(0, 1);
             seq[2..].rotate_left(2);
-        }
-        _ => {}
+        },
+        _ => {},
     }
 }
 
@@ -411,7 +411,7 @@ fn noncontextual_substitution(
             Some(subst) if subst != glyph.glyph_index => {
                 glyph.glyph_index = subst;
                 glyph.glyph_origin = GlyphOrigin::Direct;
-            }
+            },
             Some(_) | None => (),
         }
     }
@@ -580,22 +580,22 @@ fn apply_subtable(
         SubtableType::Rearrangement(rearrangement_subtable) => {
             let mut rearrangement_trans = RearrangementTransformation::new(glyphs);
             rearrangement_trans.process_glyphs(rearrangement_subtable)?;
-        }
+        },
         SubtableType::Contextual(contextual_subtable) => {
             let mut contextual_subst = ContextualSubstitution::new(glyphs);
             contextual_subst.process_glyphs(contextual_subtable)?;
-        }
+        },
         SubtableType::Ligature(ligature_subtable) => {
             let mut liga_subst = LigatureSubstitution::new(glyphs);
             liga_subst.process_glyphs(ligature_subtable)?;
-        }
+        },
         SubtableType::NonContextual(noncontextual_subtable) => {
             noncontextual_substitution(glyphs, noncontextual_subtable)?
-        }
+        },
         SubtableType::Insertion(insertion_subtable) => {
             let mut insertion = Insertion::new(glyphs);
             insertion.process_glyphs(insertion_subtable)?
-        }
+        },
     }
 
     if reverse_glyphs {
@@ -704,13 +704,13 @@ fn should_apply_feature(entry: morx::Feature, mask: FeatureMask) -> bool {
         (FRACTION_TYPE, FRACTIONS_STACKED) => mask.contains(Feature::AFRC),
         (FRACTION_TYPE, NO_FRACTIONS) => {
             !mask.contains(Feature::FRAC) && !mask.contains(Feature::AFRC)
-        }
+        },
         (VERTICAL_POSITION_TYPE, ORDINALS) => mask.contains(Feature::ORDN),
         (TYPOGRAPHIC_EXTRAS_TYPE, SLASHED_ZERO_ON) => mask.contains(Feature::ZERO),
         (TYPOGRAPHIC_EXTRAS_TYPE, SLASHED_ZERO_OFF) => !mask.contains(Feature::ZERO),
         (LOWERCASE_TYPE, LOWERCASE_SMALL_CAPS) => {
             mask.contains(Feature::SMCP) || mask.contains(Feature::C2SC)
-        }
+        },
         (UPPERCASE_TYPE, UPPERCASE_SMALL_CAPS) => mask.contains(Feature::C2SC),
         (LIGATURE_TYPE, COMMON_LIGATURES_ON) => mask.contains(Feature::LIGA),
         (LIGATURE_TYPE, COMMON_LIGATURES_OFF) => !mask.contains(Feature::LIGA),
@@ -729,7 +729,7 @@ mod tests {
     use crate::gsub::FeatureMaskExt;
     use crate::tables::{FontTableProvider, MaxpTable, OpenTypeFont};
     use crate::tests::read_fixture;
-    use crate::{binary::read::ReadScope, tag, Font};
+    use crate::{Font, binary::read::ReadScope, tag};
 
     mod rearrangement {
         use super::*;

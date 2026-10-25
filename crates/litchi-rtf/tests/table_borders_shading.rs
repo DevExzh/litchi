@@ -10,13 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{BorderStyle, write::Writer, ShadingPattern};
+use litchi_rtf::{BorderStyle, ShadingPattern, write::Writer};
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     String::from_utf8(output).unwrap()
 }
 
@@ -106,7 +104,12 @@ fn applies_end_defined_nested_decorations_without_outer_leakage() {
         Some(ShadingPattern::Vertical)
     );
     assert_eq!(
-        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0].cells()[0].nested_tables()[0]
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .tables()[0]
+            .rows()[0]
+            .cells()[0]
+            .nested_tables()[0]
             .table
             .rows()[0]
             .borders(),
@@ -148,7 +151,10 @@ fn rejects_malformed_parameters_order_duplicates_bounds_and_caps() {
         r"{\rtf1\trowd\clcbpat65536\cellx1}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }

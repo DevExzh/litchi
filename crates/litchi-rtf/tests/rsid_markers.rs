@@ -10,14 +10,12 @@
 //! Round-trip tests for in-content RSID markers:
 //! `\insrsid`, `\delrsid`, `\charrsid`, `\pararsid`, `\sectrsid`, `\tblrsid`.
 
-use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 

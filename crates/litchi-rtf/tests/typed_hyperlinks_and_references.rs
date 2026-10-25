@@ -17,9 +17,7 @@ const FIXTURE: &str = include_str!(concat!(
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -100,7 +98,8 @@ fn inspects_hyperlink_and_cross_reference_metadata_without_resolving_targets() {
 #[test]
 fn typed_hyperlink_and_cross_reference_metadata_round_trips() {
     let document = Tree::parse(FIXTURE, litchi_rtf::read::OpenOptions::default()).unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.hyperlink_count(), document.hyperlink_count());

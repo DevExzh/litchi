@@ -12,11 +12,11 @@
 //! comments, notes, and root shape text frames while refusing unknown
 //! destinations and dependent positioned content.
 
+use crate::write::Writer;
 use crate::{
     Alignment, CharacterBaseline, CharacterExpansion, HeaderFooterType, Package, ParagraphFrame,
     RtfError, TableCellPath, UnderlineStyle,
 };
-use crate::write::Writer;
 use bumpalo::Bump;
 use litchi_core::Position;
 use serde_json::Value;
@@ -7672,8 +7672,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         ));
     }
 
-    let mut model =
-        crate::document::Tree::parse_bytes(source_bytes, edit.source.options())?;
+    let mut model = crate::document::Tree::parse_bytes(source_bytes, edit.source.options())?;
     for operation in &edit.operations {
         match operation {
             Operation::TableCellText { path, after, .. } => {

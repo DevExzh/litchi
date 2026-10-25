@@ -31,9 +31,7 @@ fn parses_inert_markers_and_round_trips_without_visible_duplication() {
     assert_eq!(legacy.position, 2);
 
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
@@ -41,9 +39,7 @@ fn parses_inert_markers_and_round_trips_without_visible_duplication() {
         document.generated_list_markers()
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 

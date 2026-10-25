@@ -14,17 +14,17 @@ use litchi_rtf::{DocumentStylePolicies, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_all_four_passive_flags_without_applying_styles() {
-    let document =
-        Tree::parse(r"{\rtf1\linkstyles\stylelocktheme\stylelockqfset\usenormstyforlist Body}", litchi_rtf::read::OpenOptions::default())
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\linkstyles\stylelocktheme\stylelockqfset\usenormstyforlist Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         *document.style_policies(),
         DocumentStylePolicies {
@@ -39,7 +39,11 @@ fn parses_all_four_passive_flags_without_applying_styles() {
 
 #[test]
 fn parses_common_producer_flag_independently() {
-    let document = Tree::parse(r"{\rtf1\usenormstyforlist Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\usenormstyforlist Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(!document.style_policies().update_styles_from_template);
     assert!(!document.style_policies().lock_theme);
     assert!(!document.style_policies().lock_quick_format_set);
@@ -59,7 +63,8 @@ fn omission_remains_empty_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_style_changes() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_style_policies(DocumentStylePolicies {
         update_styles_from_template: true,
         lock_theme: true,
@@ -88,11 +93,14 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_style_changes() {
 
 #[test]
 fn coexists_with_theme_data_filter_sort_and_language_metadata() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\stylelockqfset\themelang1033{\*\themedata 0102}"#,
-        r#"{\*\wgrffmtfilter 0002}\stylesortmethod3"#,
-        r#"\usenormstyforlist\stylelocktheme Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\stylelockqfset\themelang1033{\*\themedata 0102}"#,
+            r#"{\*\wgrffmtfilter 0002}\stylesortmethod3"#,
+            r#"\usenormstyforlist\stylelocktheme Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
     let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -133,7 +141,10 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         for suffix in ["0", "1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }
@@ -144,7 +155,10 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }

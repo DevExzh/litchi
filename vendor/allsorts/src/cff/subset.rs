@@ -1,9 +1,9 @@
 use std::mem;
 
 use super::{
-    owned, CFFFont, CFFVariant, CIDData, Charset, CustomCharset, DictDelta, FDSelect, Font,
-    FontDict, MaybeOwnedIndex, Operand, Operator, ParseError, Range, ADOBE, CFF, IDENTITY,
-    ISO_ADOBE_LAST_SID, OFFSET_ZERO, STANDARD_STRINGS,
+    ADOBE, CFF, CFFFont, CFFVariant, CIDData, Charset, CustomCharset, DictDelta, FDSelect, Font,
+    FontDict, IDENTITY, ISO_ADOBE_LAST_SID, MaybeOwnedIndex, OFFSET_ZERO, Operand, Operator,
+    ParseError, Range, STANDARD_STRINGS, owned,
 };
 use crate::binary::budget;
 use crate::binary::read::ReadArrayCow;
@@ -18,11 +18,7 @@ pub struct SubsetCFF<'a> {
 }
 
 impl<'a> SubsetCFF<'a> {
-    pub(crate) fn new(
-        table: CFF<'a>,
-        new_to_old_id: Vec<u16>,
-        old_to_new_id: Vec<u16>,
-    ) -> Self {
+    pub(crate) fn new(table: CFF<'a>, new_to_old_id: Vec<u16>, old_to_new_id: Vec<u16>) -> Self {
         SubsetCFF {
             table,
             new_to_old_id,
@@ -153,8 +149,8 @@ impl<'a> CFF<'a> {
                         .font_dict_index(glyph_id)
                         .ok_or(ParseError::BadIndex)?;
                     fd_select.push(fd_index);
-                }
-                CFFVariant::Type1(_type1) => {}
+                },
+                CFFVariant::Type1(_type1) => {},
             }
         }
 
@@ -175,7 +171,7 @@ impl<'a> CFF<'a> {
                 cid.fd_select = FDSelect::Format0 {
                     glyph_font_dict_indices: ReadArrayCow::Owned(fd_select),
                 };
-            }
+            },
             CFFVariant::Type1(type1) => {
                 // Build new local_subr_index
                 type1.local_subr_index = rebuild_type_1_local_subr_index(
@@ -190,7 +186,7 @@ impl<'a> CFF<'a> {
                         .dict
                         .retain(|(op, _)| *op != Operator::Subrs);
                 }
-            }
+            },
         }
 
         // Update the charset
@@ -299,14 +295,13 @@ pub(crate) fn rebuild_local_subr_indices(
                 budget::reserve_vec(&mut local_subrs, src_local_subrs_index.len())
                     .map_err(|_| ParseError::LimitExceeded)?;
                 local_subrs.resize_with(src_local_subrs_index.len(), Vec::new);
-                *local_subr_index = Some(MaybeOwnedIndex::Owned(owned::Index {
-                    data: local_subrs,
-                }));
+                *local_subr_index =
+                    Some(MaybeOwnedIndex::Owned(owned::Index { data: local_subrs }));
                 match local_subr_index.as_mut() {
                     Some(MaybeOwnedIndex::Owned(index)) => index,
                     _ => unreachable!("just-created local subroutine index is owned"),
                 }
-            }
+            },
         };
 
         copy_used_subrs(
@@ -443,7 +438,10 @@ fn convert_type1_to_cid<'a>(
 
     let mut fd_ranges = Vec::new();
     budget::reserve_vec(&mut fd_ranges, 1).map_err(|_| ParseError::LimitExceeded)?;
-    fd_ranges.push(Range { first: 0, n_left: 0 });
+    fd_ranges.push(Range {
+        first: 0,
+        n_left: 0,
+    });
     let fd_select = FDSelect::Format3 {
         ranges: ReadArrayCow::Owned(fd_ranges),
         sentinel: n_glyphs,
@@ -451,8 +449,7 @@ fn convert_type1_to_cid<'a>(
     let mut private_dicts = Vec::new();
     budget::reserve_vec(&mut private_dicts, 1).map_err(|_| ParseError::LimitExceeded)?;
     let mut local_subr_indices = Vec::new();
-    budget::reserve_vec(&mut local_subr_indices, 1)
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_vec(&mut local_subr_indices, 1).map_err(|_| ParseError::LimitExceeded)?;
     let cid_data = CFFVariant::CID(CIDData {
         font_dict_index,
         private_dicts,
@@ -470,7 +467,7 @@ fn convert_type1_to_cid<'a>(
         CFFVariant::CID(cid) => {
             cid.private_dicts.push(type1_data.private_dict);
             cid.local_subr_indices.push(type1_data.local_subr_index);
-        }
+        },
     };
 
     // Update the Top DICT

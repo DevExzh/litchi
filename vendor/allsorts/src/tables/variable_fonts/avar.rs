@@ -150,8 +150,8 @@ impl ReadFrom for AxisValueMap {
 #[cfg(test)]
 mod tests {
     use super::{AvarTable, AxisValueMap, F2Dot14, ReadScope};
-    use crate::binary::write::{WriteBinary, WriteBuffer};
     use crate::binary::U16Be;
+    use crate::binary::write::{WriteBinary, WriteBuffer};
     use crate::error::ReadWriteError;
     use crate::font_data::FontData;
     use crate::tables::variable_fonts::avar::SegmentMap;

@@ -162,11 +162,11 @@ use std::cmp::Ordering;
 
 use pathfinder_geometry::vector::Vector2F;
 use pathfinder_geometry::{line_segment::LineSegment2F, rect::RectF};
-use tinyvec::{array_vec, ArrayVec};
+use tinyvec::{ArrayVec, array_vec};
 
+use crate::TryNumFrom;
 use crate::tables::glyf::{BoundingBox, Point as GlyfPoint};
 use crate::tables::variable_fonts::OwnedTuple;
-use crate::TryNumFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct BBox {
@@ -441,17 +441,17 @@ fn solve_quadratic(a: f32, b: f32, c: f32) -> ArrayVec<[f32; 2]> {
                 Ordering::Less => {
                     let q = -0.5 * (b - sqrt_d);
                     ArrayVec::from([q / a, c / q])
-                }
+                },
                 Ordering::Equal => {
                     let root = -0.5 * sqrt_d / a;
                     ArrayVec::from([root, -root])
-                }
+                },
                 Ordering::Greater => {
                     let q = -0.5 * (b + sqrt_d);
                     ArrayVec::from([q / a, c / q])
-                }
+                },
             }
-        }
+        },
     }
 }
 

@@ -10,13 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{BodyStoryEvent, CellStoryEvent, write::Writer, StoryEvent};
+use litchi_rtf::{BodyStoryEvent, CellStoryEvent, StoryEvent, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -28,7 +26,11 @@ fn has_page(events: &[StoryEvent], position: usize) -> bool {
 
 #[test]
 fn body_page_is_zero_width_ordered_and_round_trips_canonically() {
-    let document = Tree::parse(r"{\rtf1\ansi A\page B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi A\page B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "AB");
     assert!(matches!(
         document.body_story_events(),
@@ -124,12 +126,19 @@ fn rejects_parameters_and_non_story_destinations_but_skips_unknown_groups() {
         r"{\rtf1{\*\defchp\page}x}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
 
-    let document = Tree::parse(r"{\rtf1 A{\*\unknown\page1 ignored}B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1 A{\*\unknown\page1 ignored}B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "AB");
     assert!(document.page_breaks().next().is_none());
 }

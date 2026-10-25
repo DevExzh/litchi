@@ -7,7 +7,7 @@ use crate::binary::budget;
 use crate::binary::read::{ReadBinary, ReadCtxt};
 use crate::error::{ParseError, ReadWriteError};
 use crate::tables::{
-    FontTableProvider, OffsetTableFontProvider, OpenTypeFont, SfntVersion, CFF_MAGIC, TRUE_MAGIC,
+    CFF_MAGIC, FontTableProvider, OffsetTableFontProvider, OpenTypeFont, SfntVersion, TRUE_MAGIC,
     TTCF_MAGIC, TTF_MAGIC,
 };
 use crate::woff::{self, WoffFont};
@@ -83,7 +83,7 @@ impl<'a> FontData<'a> {
                     sfnt_version: provider.sfnt_version(),
                     provider: Box::new(provider),
                 })
-            }
+            },
             FontData::Woff(font) => {
                 // This clone is relatively cheap as WoffFile is mostly holding borrowed data
                 budget::charge_allocation(size_of::<WoffFont<'a>>())
@@ -92,7 +92,7 @@ impl<'a> FontData<'a> {
                     sfnt_version: font.sfnt_version(),
                     provider: Box::new(font.clone()),
                 })
-            }
+            },
             FontData::Woff2(font) => {
                 let provider = font.table_provider(index)?;
                 budget::charge_allocation(size_of::<Woff2TableProvider>())
@@ -101,7 +101,7 @@ impl<'a> FontData<'a> {
                     sfnt_version: provider.sfnt_version(),
                     provider: Box::new(provider),
                 })
-            }
+            },
         }
     }
 }

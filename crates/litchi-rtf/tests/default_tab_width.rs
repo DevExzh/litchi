@@ -11,9 +11,7 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::write::{Options, Writer};
-use litchi_rtf::{
-    DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-};
+use litchi_rtf::{DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS};
 
 fn write(doc: &Tree<'_>, default_tab_width: DefaultTabWidthPolicy) -> std::io::Result<String> {
     let mut bytes = Vec::new();
@@ -27,7 +25,11 @@ fn write(doc: &Tree<'_>, default_tab_width: DefaultTabWidthPolicy) -> std::io::R
 
 #[test]
 fn omission_and_explicit_producer_values_remain_distinct() {
-    let omitted = Tree::parse(r"{\rtf1\ansi body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let omitted = Tree::parse(
+        r"{\rtf1\ansi body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(omitted.default_tab_width_twips(), None);
     assert_eq!(
         omitted.effective_default_tab_width_twips(),
@@ -35,7 +37,11 @@ fn omission_and_explicit_producer_values_remain_distinct() {
     );
 
     for width in [0, 14, 284, 420, 480, 708, 709, 720, 840, 1298, i32::MAX] {
-        let doc = Tree::parse(&format!(r"{{\rtf1\ansi\deftab{width} body}}"), litchi_rtf::read::OpenOptions::default()).unwrap();
+        let doc = Tree::parse(
+            &format!(r"{{\rtf1\ansi\deftab{width} body}}"),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap();
         assert_eq!(doc.default_tab_width_twips(), Some(width.cast_unsigned()));
         assert_eq!(
             doc.effective_default_tab_width_twips(),
@@ -46,15 +52,25 @@ fn omission_and_explicit_producer_values_remain_distinct() {
 
 #[test]
 fn preserve_policy_roundtrips_presence_and_value() {
-    let omitted = Tree::parse(r"{\rtf1\ansi body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let omitted = Tree::parse(
+        r"{\rtf1\ansi body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let omitted_rtf = write(&omitted, DefaultTabWidthPolicy::PreserveDocument).unwrap();
     assert!(!omitted_rtf.contains("\\deftab"));
     assert_eq!(
-        Tree::parse(&omitted_rtf, litchi_rtf::read::OpenOptions::default()).unwrap().default_tab_width_twips(),
+        Tree::parse(&omitted_rtf, litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .default_tab_width_twips(),
         None
     );
 
-    let explicit = Tree::parse(r"{\rtf1\ansi\deftab708 body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let explicit = Tree::parse(
+        r"{\rtf1\ansi\deftab708 body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let explicit_rtf = write(&explicit, DefaultTabWidthPolicy::PreserveDocument).unwrap();
     assert!(explicit_rtf.contains("\\deftab708"));
     assert_eq!(
@@ -67,12 +83,20 @@ fn preserve_policy_roundtrips_presence_and_value() {
 
 #[test]
 fn override_policy_is_the_only_writer_precedence_over_document_metadata() {
-    let source = Tree::parse(r"{\rtf1\ansi\deftab708 body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let source = Tree::parse(
+        r"{\rtf1\ansi\deftab708 body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let overridden = write(&source, DefaultTabWidthPolicy::Override(480)).unwrap();
     assert!(overridden.contains("\\deftab480"));
     assert!(!overridden.contains("\\deftab708"));
 
-    let omitted = Tree::parse(r"{\rtf1\ansi body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let omitted = Tree::parse(
+        r"{\rtf1\ansi body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         write(&omitted, DefaultTabWidthPolicy::Override(720))
             .unwrap()
@@ -87,7 +111,11 @@ fn override_policy_is_the_only_writer_precedence_over_document_metadata() {
 
 #[test]
 fn typed_mutation_preserves_passivity_and_can_restore_omission() {
-    let mut doc = Tree::parse(r"{\rtf1\ansi body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut doc = Tree::parse(
+        r"{\rtf1\ansi body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     doc.set_default_tab_width_twips(840).unwrap();
     let serialized = write(&doc, DefaultTabWidthPolicy::PreserveDocument).unwrap();
     assert!(serialized.contains("\\deftab840"));
@@ -119,12 +147,19 @@ fn malformed_domain_duplicates_and_placement_are_rejected() {
         r"{\rtf1\ansi body\deftab720}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(hostile, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                hostile,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {hostile}"
         );
     }
 
-    let doc = Tree::parse(r"{\rtf1\ansi body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\ansi body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         write(
             &doc,
@@ -150,15 +185,21 @@ fn identical_repeated_declarations_are_idempotent() {
     // LibreOffice restates `\deftab` once per paragraph-properties reset, so an
     // identical redeclaration carries no new information and must not discard
     // the document.
-    let doc = Tree::parse(r"{\rtf1\ansi\deftab720\deftab720\deftab720 body}", litchi_rtf::read::OpenOptions::default())
-        .expect("repeated identical deftab rejected");
+    let doc = Tree::parse(
+        r"{\rtf1\ansi\deftab720\deftab720\deftab720 body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .expect("repeated identical deftab rejected");
     assert_eq!(doc.default_tab_width_twips(), Some(720));
     assert_eq!(doc.text().trim(), "body");
 }
 
 #[test]
 fn conflicting_repeated_declarations_are_still_rejected() {
-    let Err(error) = Tree::parse(r"{\rtf1\ansi\deftab720\deftab480 body}", litchi_rtf::read::OpenOptions::default()) else {
+    let Err(error) = Tree::parse(
+        r"{\rtf1\ansi\deftab720\deftab480 body}",
+        litchi_rtf::read::OpenOptions::default(),
+    ) else {
         panic!("conflicting deftab accepted");
     };
     assert!(

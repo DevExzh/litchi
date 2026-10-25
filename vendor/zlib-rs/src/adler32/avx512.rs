@@ -1,9 +1,10 @@
 use core::arch::x86_64::{
-    __m512i, _mm256_add_epi32, _mm256_castsi256_si128, _mm256_extracti128_si256, _mm512_add_epi32,
-    _mm512_castsi512_si256, _mm512_extracti64x4_epi64, _mm512_loadu_si512, _mm512_madd_epi16,
-    _mm512_maddubs_epi16, _mm512_permutexvar_epi32, _mm512_sad_epu8, _mm512_set1_epi16,
-    _mm512_setr_epi32, _mm512_setzero_si512, _mm512_slli_epi32, _mm512_zextsi128_si512,
-    _mm_add_epi32, _mm_cvtsi128_si32, _mm_cvtsi32_si128, _mm_shuffle_epi32, _mm_unpackhi_epi64,
+    __m512i, _mm_add_epi32, _mm_cvtsi32_si128, _mm_cvtsi128_si32, _mm_shuffle_epi32,
+    _mm_unpackhi_epi64, _mm256_add_epi32, _mm256_castsi256_si128, _mm256_extracti128_si256,
+    _mm512_add_epi32, _mm512_castsi512_si256, _mm512_extracti64x4_epi64, _mm512_loadu_si512,
+    _mm512_madd_epi16, _mm512_maddubs_epi16, _mm512_permutexvar_epi32, _mm512_sad_epu8,
+    _mm512_set1_epi16, _mm512_setr_epi32, _mm512_setzero_si512, _mm512_slli_epi32,
+    _mm512_zextsi128_si512,
 };
 
 use crate::adler32::{BASE, NMAX};

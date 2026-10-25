@@ -658,14 +658,13 @@ fn replay_preserves_origin_for_both_endpoints() {
 #[cfg(feature = "encryption")]
 #[test]
 fn locked_input_refuses_before_closure_execution() {
-    let encrypted =
-        litchi_crypto::ooxml::encrypt(
-            bytes(),
-            "transaction",
-            litchi_crypto::ooxml::Mode::Agile,
-            &litchi_crypto::ooxml::Limits::default(),
-        )
-        .unwrap();
+    let encrypted = litchi_crypto::ooxml::encrypt(
+        bytes(),
+        "transaction",
+        litchi_crypto::ooxml::Mode::Agile,
+        &litchi_crypto::ooxml::Limits::default(),
+    )
+    .unwrap();
     let locked = litchi_ops::open_bytes(encrypted).unwrap();
     let error = locked
         .edit::<()>(|_| panic!("locked closure ran"))
@@ -683,14 +682,13 @@ fn locked_input_refuses_before_closure_execution() {
 #[cfg(feature = "encryption")]
 #[test]
 fn unlocked_encrypted_input_refuses_without_dropping_publication_protection() {
-    let encrypted =
-        litchi_crypto::ooxml::encrypt(
-            bytes(),
-            "transaction",
-            litchi_crypto::ooxml::Mode::Agile,
-            &litchi_crypto::ooxml::Limits::default(),
-        )
-        .unwrap();
+    let encrypted = litchi_crypto::ooxml::encrypt(
+        bytes(),
+        "transaction",
+        litchi_crypto::ooxml::Mode::Agile,
+        &litchi_crypto::ooxml::Limits::default(),
+    )
+    .unwrap();
     let File::Locked(locked) = litchi_ops::open_bytes(encrypted).unwrap() else {
         panic!("locked fixture")
     };

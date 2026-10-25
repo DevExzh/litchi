@@ -56,8 +56,7 @@ fn conformant_input_reports_clean_through_every_entry_point() {
     let raw = Tree::parse_bytes(CONFORMANT.as_bytes(), strict).unwrap();
     assert_clean(raw.tolerance_report());
 
-    let compressed =
-        compress(CONFORMANT.as_bytes(), true, CompressionLimits::default()).unwrap();
+    let compressed = compress(CONFORMANT.as_bytes(), true, CompressionLimits::default()).unwrap();
     let document = Package::from_bytes_with_options(&compressed, strict).unwrap();
     assert_clean(document.tolerance_report());
 }

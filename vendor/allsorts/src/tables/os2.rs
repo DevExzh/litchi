@@ -160,7 +160,7 @@ impl Os2 {
                 } else {
                     clsa
                 }
-            }
+            },
         }
     }
 }

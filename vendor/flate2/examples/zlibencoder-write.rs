@@ -1,5 +1,5 @@
-use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use flate2::write::ZlibEncoder;
 use std::io::prelude::*;
 
 // Vec<u8> implements Write to print the compressed bytes of sample string

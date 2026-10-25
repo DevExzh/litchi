@@ -425,8 +425,7 @@ fn declared_main_size_is_rejected_before_payload_read() {
     let report = validate_read_at(
         Arc::new(source.clone()),
         litchi_opc::SourceLimits::default(),
-        Limits::default()
-            .with_max_main_document_bytes(u64::try_from(main_xml.len() - 1).unwrap()),
+        Limits::default().with_max_main_document_bytes(u64::try_from(main_xml.len() - 1).unwrap()),
         ValidationLimits::default(),
     )
     .unwrap();

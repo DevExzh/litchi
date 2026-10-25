@@ -16,7 +16,7 @@ use crate::bitmap::sbix::Sbix as SbixTable;
 use crate::bitmap::{BitDepth, BitmapGlyph};
 use crate::cff::cff2::CFF2;
 use crate::cff::outline::{CFF2Outlines, CFFOutlines};
-use crate::cff::{CFFError, CFF};
+use crate::cff::{CFF, CFFError};
 use crate::context::Glyph;
 use crate::error::{ParseError, ShapingError};
 use crate::font::tables::ColrCpalTryBuilder;
@@ -24,7 +24,7 @@ use crate::glyph_info::GlyphNames;
 use crate::gpos::Info;
 use crate::gsub::{FeatureInfo, FeatureMask, GlyphOrigin, RawGlyph, RawGlyphFlags};
 use crate::layout::morx;
-use crate::layout::{new_layout_cache, GDEFTable, LayoutCache, LayoutTable, GPOS, GSUB};
+use crate::layout::{GDEFTable, GPOS, GSUB, LayoutCache, LayoutTable, new_layout_cache};
 use crate::macroman::char_to_macroman;
 use crate::outline::{BoundingBoxSink, OutlineBuilder, OutlineSink};
 use crate::scripts::preprocess_text;
@@ -34,19 +34,19 @@ use crate::tables::colr::{ColrTable, Painter};
 use crate::tables::cpal::CpalTable;
 use crate::tables::glyf::{BoundingBox, GlyfVisitorContext, LocaGlyf};
 use crate::tables::kern::owned::KernTable;
-use crate::tables::loca::{owned, LocaTable};
+use crate::tables::loca::{LocaTable, owned};
 use crate::tables::morx::MorxTable;
 use crate::tables::os2::Os2;
 use crate::tables::svg::SvgTable;
 use crate::tables::variable_fonts::fvar::{FvarAxisCount, FvarTable, Tuple, VariationAxisRecord};
 use crate::tables::{
-    kern, read_and_box_optional_table, read_and_box_table, FontTableProvider, HeadTable, HheaTable,
-    MaxpTable,
+    FontTableProvider, HeadTable, HheaTable, MaxpTable, kern, read_and_box_optional_table,
+    read_and_box_table,
 };
 use crate::unicode::{self, VariationSelector};
 use crate::variations::{AxisNamesError, NamedAxis};
-use crate::{cff, glyph_info, tag, variations, GlyphId, SafeFrom};
-use crate::{gpos, gsub, DOTTED_CIRCLE};
+use crate::{DOTTED_CIRCLE, gpos, gsub};
+use crate::{GlyphId, SafeFrom, cff, glyph_info, tag, variations};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Encoding {
@@ -127,8 +127,8 @@ mod tables {
 
     use crate::bitmap::cbdt::{CBDTTable, CBLCTable};
     use crate::bitmap::sbix::Sbix as SbixTable;
-    use crate::cff::cff2::CFF2 as CFF2Table;
     use crate::cff::CFF as CFFTable;
+    use crate::cff::cff2::CFF2 as CFF2Table;
     use crate::tables::colr::ColrTable;
     use crate::tables::cpal::CpalTable;
     use crate::tables::morx::MorxTable;
@@ -294,7 +294,7 @@ impl<T: FontTableProvider> Font<T> {
                     embedded_images: LazyLoad::NotLoaded,
                     axis_count: fvar_axis_count,
                 })
-            }
+            },
             None => Err(ParseError::UnsuitableCmap),
         }
     }
@@ -527,7 +527,7 @@ impl<T: FontTableProvider> Font<T> {
         let mut chars_iter = chars.into_iter().peekable();
         while let Some(ch) = chars_iter.next() {
             match VariationSelector::try_from(ch) {
-                Ok(_) => {} // filter out variation selectors
+                Ok(_) => {}, // filter out variation selectors
                 Err(()) => {
                     let vs = chars_iter
                         .peek()
@@ -544,7 +544,7 @@ impl<T: FontTableProvider> Font<T> {
                         variation: Some(used_variation),
                     };
                     glyphs.push(glyph);
-                }
+                },
             }
         }
         glyphs.shrink_to_fit();
@@ -593,11 +593,11 @@ impl<T: FontTableProvider> Font<T> {
         let glyph_index = match self.cmap_subtable_encoding {
             Encoding::Unicode => {
                 self.lookup_glyph_index_with_variation(ch as u32, match_presentation, used_selector)
-            }
+            },
             Encoding::Symbol => {
                 let char_code = self.legacy_symbol_char_code(ch);
                 self.lookup_glyph_index_with_variation(char_code, match_presentation, used_selector)
-            }
+            },
             Encoding::AppleRoman => match char_to_macroman(ch) {
                 Some(char_code) => self.lookup_glyph_index_with_variation(
                     u32::from(char_code),
@@ -611,7 +611,7 @@ impl<T: FontTableProvider> Font<T> {
                         match_presentation,
                         used_selector,
                     )
-                }
+                },
             },
             Encoding::Big5 => match unicode_to_big5(ch) {
                 Some(char_code) => self.lookup_glyph_index_with_variation(
@@ -741,7 +741,7 @@ impl<T: FontTableProvider> Font<T> {
                                 glyph_index,
                             ))
                         })
-                    }
+                    },
                     None => None,
                 };
                 bitmap.transpose()
@@ -915,7 +915,7 @@ impl<T: FontTableProvider> Font<T> {
                                     max_bit_depth,
                                 )
                             }
-                        }
+                        },
                         Some(ref glyph) if glyph.graphic_type == tag::FLIP => {
                             // The special graphicType of 'flip' indicates that the bitmap data
                             // for a glyph should be flipped horizontally. This feature is
@@ -936,13 +936,13 @@ impl<T: FontTableProvider> Font<T> {
                                     max_bit_depth,
                                 )
                             }
-                        }
+                        },
                         Some(glyph) => {
                             Ok(Some(BitmapGlyph::from((strike, &glyph, glyph_index, flip))))
-                        }
+                        },
                         None => Ok(None),
                     }
-                }
+                },
                 None => Ok(None),
             }
         })
@@ -1233,7 +1233,7 @@ impl<T> LazyLoad<T> {
                 let data = do_load()?;
                 *self = LazyLoad::Loaded(data.clone());
                 Ok(data)
-            }
+            },
         }
     }
 }
@@ -1244,11 +1244,7 @@ impl GlyphCache {
     }
 
     fn get(&self, ch: char) -> Option<(u16, VariationSelector)> {
-        if ch == DOTTED_CIRCLE {
-            self.0
-        } else {
-            None
-        }
+        if ch == DOTTED_CIRCLE { self.0 } else { None }
     }
 
     fn put(&mut self, ch: char, glyph_index: GlyphId, variation_selector: VariationSelector) {
@@ -1414,7 +1410,7 @@ where
                 *err = Some(e.into())
             }
             T::default()
-        }
+        },
     }
 }
 
@@ -1497,7 +1493,7 @@ mod tests {
                 ..
             })) => {
                 assert_eq!(data.len(), 224);
-            }
+            },
             _ => panic!("Expected encapsulated bitmap, got something else."),
         }
 
@@ -1509,14 +1505,14 @@ mod tests {
                 ..
             })) => {
                 assert_eq!(data.len(), 224);
-            }
+            },
             _ => panic!("Expected encapsulated bitmap, got something else."),
         }
 
         // Handle recursive `dupe` record. Should return Ok(None) as recursion is stopped at one
         // level.
         match font.lookup_glyph_image(3, 100, BitDepth::ThirtyTwo) {
-            Ok(None) => {}
+            Ok(None) => {},
             _ => panic!("Expected Ok(None) got something else"),
         }
     }

@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{DocumentEastAsianCompatibility, write::Writer, UnderlineStyle};
+use litchi_rtf::{DocumentEastAsianCompatibility, UnderlineStyle, write::Writer};
 
 const CONTROLS: [&str; 6] = [
     "dntblnsbdb",
@@ -47,7 +47,11 @@ fn parses_complete_cluster_as_passive_metadata() {
 
 #[test]
 fn omission_is_empty_and_serializes_no_compatibility_flags() {
-    let doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(doc.east_asian_compatibility().is_empty());
     let serialized = write(&doc);
     for name in CONTROLS {
@@ -57,7 +61,11 @@ fn omission_is_empty_and_serializes_no_compatibility_flags() {
 
 #[test]
 fn typed_api_round_trips_in_specification_order_and_clears_passively() {
-    let mut doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     doc.set_east_asian_compatibility(DocumentEastAsianCompatibility {
         do_not_balance_sbcs_dbcs: true,
         expand_spacing_at_shift_return: true,
@@ -97,13 +105,19 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         ];
         for input in hostile {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&input, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &input,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted {input}"
             );
         }
     }
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Tree::parse(r"{\rtf1\ansi\dntblnsbdb999999999999 Body}", litchi_rtf::read::OpenOptions::default())
+        &Tree::parse(
+            r"{\rtf1\ansi\dntblnsbdb999999999999 Body}",
+            litchi_rtf::read::OpenOptions::default()
+        )
     ));
 }
 

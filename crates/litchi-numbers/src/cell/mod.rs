@@ -61,10 +61,7 @@ pub(crate) mod wire {
 
     /// Encode one owned native cell under the package adapter's bounded raw
     /// profile. Callers still handle the native error at their own boundary.
-    pub(crate) fn encode(
-        cell: &native::BncCell,
-        limits: &Limits,
-    ) -> Result<Vec<u8>, Error> {
+    pub(crate) fn encode(cell: &native::BncCell, limits: &Limits) -> Result<Vec<u8>, Error> {
         cell.encode(limits)
     }
 
@@ -217,8 +214,7 @@ pub(crate) mod wire {
             value: ScalarValue,
             limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .rewrite_scalar(value.into_native(), limits)
+            self.0.rewrite_scalar(value.into_native(), limits)
         }
 
         pub(crate) fn clear_value(&self, limits: &Limits) -> Result<ClearValue, Error> {
@@ -230,8 +226,7 @@ pub(crate) mod wire {
             expected_identifier: u32,
             limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .clear_comment(expected_identifier, limits)
+            self.0.clear_comment(expected_identifier, limits)
         }
 
         pub(crate) fn formula_cache_equals(&self, value: CachedScalar) -> bool {
@@ -261,8 +256,7 @@ pub(crate) mod wire {
             identifier: u32,
             limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .rewrite_formula_without_cache(identifier, limits)
+            self.0.rewrite_formula_without_cache(identifier, limits)
         }
 
         pub(crate) fn rewrite_formula_cache(
@@ -270,8 +264,7 @@ pub(crate) mod wire {
             cache: CachedScalar,
             limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
-            self.0
-                .rewrite_formula_cache(cache.into_native(), limits)
+            self.0.rewrite_formula_cache(cache.into_native(), limits)
         }
 
         #[must_use]

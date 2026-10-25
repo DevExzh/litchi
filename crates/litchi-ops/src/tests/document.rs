@@ -1307,13 +1307,12 @@ mod rtf {
 
     #[test]
     fn unified_rtf_malformed_compressed_frame_is_a_typed_error() {
-        let mut compressed =
-            litchi_rtf::transport::compress(
-                br#"{\rtf1\ansi malformed compressed frame}"#,
-                true,
-                litchi_rtf::transport::CompressionLimits::default(),
-            )
-            .unwrap();
+        let mut compressed = litchi_rtf::transport::compress(
+            br#"{\rtf1\ansi malformed compressed frame}"#,
+            true,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .unwrap();
         compressed.truncate(15);
         let error = crate::open_bytes(compressed).expect_err("a truncated frame fails");
         assert_eq!(error.code(), Code::CorruptFile);

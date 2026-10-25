@@ -2462,11 +2462,8 @@ fn prepare_borrowed_row<'source>(
                 kind,
             });
         }
-        let output_len = plan_cell_mutation(
-            previous,
-            change.change,
-            counters.limits.max_output_bytes,
-        )?;
+        let output_len =
+            plan_cell_mutation(previous, change.change, counters.limits.max_output_bytes)?;
         counters.charge(
             u64_from_usize(previous.map_or(0, <[u8]>::len))?
                 .checked_mul(2)
@@ -3041,14 +3038,8 @@ fn mutate_cell(
                 let view = BncCellView::parse(&MINIMAL_BNC_CELL, &limits)
                     .map_err(|_| TileError::InvalidSource)?;
                 match cache {
-                    Some(cache) => view.rewrite_formula(
-                        identifier,
-                        cache.as_wire(),
-                        &limits,
-                    ),
-                    None => {
-                        view.rewrite_formula_without_cache(identifier, &limits)
-                    },
+                    Some(cache) => view.rewrite_formula(identifier, cache.as_wire(), &limits),
+                    None => view.rewrite_formula_without_cache(identifier, &limits),
                 }
                 .map(CellMutation::Replace)
                 .map_err(map_bnc_error)
@@ -3072,9 +3063,7 @@ fn mutate_cell(
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::FormulaSet { identifier, cache } => match cache {
-            Some(cache) => {
-                view.rewrite_formula(identifier, cache.as_wire(), &limits)
-            },
+            Some(cache) => view.rewrite_formula(identifier, cache.as_wire(), &limits),
             None => view.rewrite_formula_without_cache(identifier, &limits),
         }
         .map(CellMutation::Replace)

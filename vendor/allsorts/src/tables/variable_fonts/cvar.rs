@@ -4,11 +4,11 @@
 //!
 //! <https://learn.microsoft.com/en-us/typography/opentype/spec/cvar>
 
+use crate::SafeFrom;
 use crate::binary::read::{ReadArrayCow, ReadBinaryDep, ReadCtxt};
 use crate::error::ParseError;
-use crate::tables::variable_fonts::{OwnedTuple, TupleVariationStore};
 use crate::tables::CvtTable;
-use crate::SafeFrom;
+use crate::tables::variable_fonts::{OwnedTuple, TupleVariationStore};
 
 /// `cvar` CVT Variations Table
 ///

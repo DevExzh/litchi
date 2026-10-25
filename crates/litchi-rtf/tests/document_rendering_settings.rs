@@ -11,20 +11,23 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    DocumentJustificationMode, DocumentRenderingOrientation, DocumentRenderingSettings, write::Writer,
+    DocumentJustificationMode, DocumentRenderingOrientation, DocumentRenderingSettings,
+    write::Writer,
 };
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_producer_style_horizontal_compressed_grid_flags() {
-    let document = Tree::parse(r"{\rtf1\horzdoc\jcompress\lnongrid Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\horzdoc\jcompress\lnongrid Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         *document.rendering_settings(),
         DocumentRenderingSettings {
@@ -38,7 +41,11 @@ fn parses_producer_style_horizontal_compressed_grid_flags() {
 
 #[test]
 fn parses_vertical_and_expanding_alternatives() {
-    let document = Tree::parse(r"{\rtf1\vertdoc\jexpand Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\vertdoc\jexpand Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         document.rendering_settings().orientation,
         Some(DocumentRenderingOrientation::Vertical)
@@ -63,7 +70,8 @@ fn omission_is_distinct_from_the_effective_compression_default() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_rendering_effects() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_rendering_settings(DocumentRenderingSettings {
         orientation: Some(DocumentRenderingOrientation::Vertical),
         justification_mode: Some(DocumentJustificationMode::Expand),
@@ -85,10 +93,13 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_rendering_effects() 
 
 #[test]
 fn coexists_with_adjacent_output_and_file_properties_in_canonical_order() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\jexpand\psover\makebackup\lnongrid"#,
-        r#"\horzdoc\muser Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\jexpand\psover\makebackup\lnongrid"#,
+            r#"\horzdoc\muser Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
@@ -138,7 +149,10 @@ fn rejects_numeric_starred_grouped_late_duplicate_and_conflicting_forms() {
         r"{\rtf1 Body\lnongrid}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }

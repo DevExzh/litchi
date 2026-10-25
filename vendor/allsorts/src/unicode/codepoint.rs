@@ -35,7 +35,7 @@ pub fn is_upright_char(ch: char) -> bool {
                 0x3030 => false,
                 _ => true,
             }
-        }
+        },
         // Vertical Forms
         0xFE10..=0xFE1F => true,
         // CJK Compatibility Forms
@@ -47,7 +47,7 @@ pub fn is_upright_char(ch: char) -> bool {
                 0xFE59..=0xFE5E => false,
                 _ => true,
             }
-        }
+        },
         // Halfwidth and Fullwidth Forms
         0xFF00..=0xFFEF => {
             // but not brackets or wave dashes
@@ -56,7 +56,7 @@ pub fn is_upright_char(ch: char) -> bool {
                 | 0xFF62 | 0xFF63 => false,
                 _ => true,
             }
-        }
+        },
         // Emoji
         _ if bool_prop_emoji_presentation(ch) => true,
         _ => false,

@@ -10,11 +10,11 @@
 use super::{
     BitDepth, Bitmap, BitmapGlyph, EncapsulatedBitmap, EncapsulatedFormat, Metrics, OriginOffset,
 };
-use crate::binary::read::{ReadArray, ReadBinaryDep, ReadCtxt, ReadScope};
+use crate::SafeFrom;
 use crate::binary::U32Be;
+use crate::binary::read::{ReadArray, ReadBinaryDep, ReadCtxt, ReadScope};
 use crate::error::ParseError;
 use crate::tag;
-use crate::SafeFrom;
 
 /// `sbix` table containing bitmaps.
 pub struct Sbix<'a> {
@@ -173,7 +173,7 @@ impl<'a> Sbix<'a> {
                     if super::bigger_or_closer_to_zero(strike_ppem, current_best_difference) {
                         best = Some((difference, strike))
                     }
-                }
+                },
                 None => best = Some((difference, strike)),
             }
         }
@@ -191,11 +191,11 @@ impl<'a> SbixStrike<'a> {
                 // If this is zero, there is no bitmap data for that glyph in this strike.
                 // — https://docs.microsoft.com/en-us/typography/opentype/spec/sbix#strikes
                 Ok(None)
-            }
+            },
             Some(length) => {
                 let data = self.scope.offset_length(offset, length)?;
                 data.read_dep::<SbixGlyph<'_>>(length).map(Some)
-            }
+            },
             None => Err(ParseError::BadOffset),
         }
     }

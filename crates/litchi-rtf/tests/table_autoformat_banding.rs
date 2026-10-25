@@ -11,7 +11,7 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    write::Writer, TableAutoformatFlag, TableAutoformatFlags, TableRowBandIndex, TableRowBanding,
+    TableAutoformatFlag, TableAutoformatFlags, TableRowBandIndex, TableRowBanding, write::Writer,
 };
 
 fn write(document: &Tree<'_>) -> String {
@@ -79,7 +79,8 @@ fn restores_groups_resets_trowd_and_preserves_owned_rows() {
         expected_banding = rows[1].banding();
         expected_flags = rows[1].autoformat_flags();
     }
-    let owned = Tree::parse_bytes(source.as_bytes(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let owned =
+        Tree::parse_bytes(source.as_bytes(), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(owned.tables()[0].rows()[1].banding(), expected_banding);
     assert_eq!(
         owned.tables()[0].rows()[1].autoformat_flags(),
@@ -108,7 +109,8 @@ fn snapshots_end_defined_nested_rows() {
     );
     let expected_banding = row.banding();
     let expected_flags = row.autoformat_flags();
-    let reparsed = Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     let round_trip = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
         .rows()[0];
@@ -134,12 +136,19 @@ fn rejects_missing_parameters_parameters_on_flags_duplicates_and_out_of_range_va
     ] {
         let source = format!(r"{{\rtf1\trowd\{controls}\cellx1000\intbl X\cell\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
     assert!(
-        Tree::parse(r"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}", litchi_rtf::read::OpenOptions::default()).is_ok()
+        Tree::parse(
+            r"{\rtf1\trowd\irow65535\irowband65535\cellx1000\intbl X\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
     );
 }
 

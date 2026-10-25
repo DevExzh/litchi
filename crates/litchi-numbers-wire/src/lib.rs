@@ -1783,9 +1783,8 @@ impl BncCell {
     pub fn encode(&self, limits: &Limits) -> Result<Vec<u8>> {
         limits.check_fields(self.fields.len())?;
         for (flag, value) in &self.fields {
-            let Some((_, expected_width)) = FIELD_LAYOUT
-                .iter()
-                .find(|(candidate, _)| candidate == flag)
+            let Some((_, expected_width)) =
+                FIELD_LAYOUT.iter().find(|(candidate, _)| candidate == flag)
             else {
                 return Err(Error::ParseError(
                     "Numbers BNC encoded field flag is unknown".to_owned(),
@@ -2400,11 +2399,7 @@ impl<'a> BncCellView<'a> {
     /// Returns an error when a format-aware number conversion or decimal128
     /// encoding fails, the exact output exceeds `limits.max_output_bytes()`, encoded
     /// length arithmetic overflows, or the output allocation fails.
-    pub fn rewrite_scalar(
-        &self,
-        value: ScalarValue,
-        limits: &Limits,
-    ) -> Result<Vec<u8>> {
+    pub fn rewrite_scalar(&self, value: ScalarValue, limits: &Limits) -> Result<Vec<u8>> {
         let encoded = self.encode_scalar(value)?;
         self.rewrite_value_fields(
             encoded.cell_type,
@@ -2443,11 +2438,7 @@ impl<'a> BncCellView<'a> {
     /// The exact output length is checked before one fallible allocation. A
     /// missing or different comment identifier is rejected so callers cannot
     /// accidentally authorize a stale graph deletion.
-    pub fn clear_comment(
-        &self,
-        expected_identifier: u32,
-        limits: &Limits,
-    ) -> Result<Vec<u8>> {
+    pub fn clear_comment(&self, expected_identifier: u32, limits: &Limits) -> Result<Vec<u8>> {
         if expected_identifier == 0 || self.comment_identifier() != Some(expected_identifier) {
             return Err(Error::InvalidFormat(
                 "Numbers comment clear targeted a different cell comment".to_owned(),
@@ -2499,11 +2490,7 @@ impl<'a> BncCellView<'a> {
     /// Returns an error when the target is not a formula cell, the requested
     /// cache is not numeric or Boolean, encoding fails, the exact output
     /// exceeds `limits.max_output_bytes()`, or allocation fails.
-    pub fn rewrite_formula_cache(
-        &self,
-        value: CachedScalar,
-        limits: &Limits,
-    ) -> Result<Vec<u8>> {
+    pub fn rewrite_formula_cache(&self, value: CachedScalar, limits: &Limits) -> Result<Vec<u8>> {
         if !matches!(self.stored_value(), StoredValue::Formula(_)) {
             return Err(Error::InvalidFormat(
                 "Numbers formula cache update targeted a cell without a formula".to_owned(),
@@ -2771,15 +2758,10 @@ impl<'a> BncCellView<'a> {
         limits: &Limits,
     ) -> Result<Vec<u8>> {
         match replacement {
-            Some(replacement) => self.rewrite_selected_fields_many(
-                cell_type,
-                removed_flags,
-                &[replacement],
-                limits,
-            ),
-            None => {
-                self.rewrite_selected_fields_many(cell_type, removed_flags, &[], limits)
+            Some(replacement) => {
+                self.rewrite_selected_fields_many(cell_type, removed_flags, &[replacement], limits)
             },
+            None => self.rewrite_selected_fields_many(cell_type, removed_flags, &[], limits),
         }
     }
 
@@ -3442,7 +3424,7 @@ mod tests {
                 ScalarValue::RichText(17),
                 &TEST_LIMITS.with_output_bytes(expected.len()).unwrap(),
             )
-                .unwrap(),
+            .unwrap(),
             expected
         );
         assert!(matches!(
@@ -3598,9 +3580,7 @@ mod tests {
 
         let plan = view.plan_formula_cache_rewrite(expected).unwrap();
 
-        let rewritten = view
-            .rewrite_formula_cache(expected, &TEST_LIMITS)
-            .unwrap();
+        let rewritten = view.rewrite_formula_cache(expected, &TEST_LIMITS).unwrap();
         assert_eq!(plan.output_len(), Some(rewritten.len()));
         let reparsed = BncCellView::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert!(reparsed.formula_cache_equals(expected));
@@ -3818,10 +3798,7 @@ mod tests {
         assert_eq!(candidate.tail, b"opaque-tail");
         assert_eq!(output.len(), source.len() - 4);
         assert!(matches!(
-            view.clear_comment(
-                9,
-                &TEST_LIMITS.with_output_bytes(output.len() - 1).unwrap(),
-            ),
+            view.clear_comment(9, &TEST_LIMITS.with_output_bytes(output.len() - 1).unwrap(),),
             Err(Error::LimitExceeded { .. })
         ));
         assert!(view.clear_comment(8, &TEST_LIMITS).is_err());
@@ -4641,7 +4618,7 @@ mod tests {
         assert!(!wrong_family_view.has_only_duration_format_metadata());
         assert!(
             wrong_family_view
-            .rewrite_duration_format_identifier(Some(191), &TEST_LIMITS)
+                .rewrite_duration_format_identifier(Some(191), &TEST_LIMITS)
                 .is_err()
         );
 

@@ -35,8 +35,11 @@ fn accepts_nesting_within_the_supported_depth() {
     // The deepest nesting seen anywhere in the real-world compatibility corpus
     // is 15 levels, so documents of that shape must keep parsing.
     for depth in [1, 8, 15, MAX_GROUP_NESTING_DEPTH - 3] {
-        let document = Tree::parse(&nested(depth, "content"), litchi_rtf::read::OpenOptions::default())
-            .unwrap_or_else(|error| panic!("depth {depth} rejected: {error}"));
+        let document = Tree::parse(
+            &nested(depth, "content"),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap_or_else(|error| panic!("depth {depth} rejected: {error}"));
         assert_eq!(document.text(), "content", "depth {depth} lost its text");
     }
 }
@@ -44,7 +47,10 @@ fn accepts_nesting_within_the_supported_depth() {
 #[test]
 fn rejects_nesting_beyond_the_supported_depth() {
     for depth in [MAX_GROUP_NESTING_DEPTH + 1, 512, 20_000] {
-        let Err(error) = Tree::parse(&nested(depth, "content"), litchi_rtf::read::OpenOptions::default()) else {
+        let Err(error) = Tree::parse(
+            &nested(depth, "content"),
+            litchi_rtf::read::OpenOptions::default(),
+        ) else {
             panic!("depth {depth} was accepted");
         };
         assert!(

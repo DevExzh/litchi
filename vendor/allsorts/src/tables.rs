@@ -26,7 +26,7 @@ use crate::binary::write::{Placeholder, WriteBinary, WriteContext};
 use crate::binary::{I16Be, I32Be, I64Be, U16Be, U32Be};
 use crate::error::{ParseError, WriteError};
 use crate::tag;
-use crate::{size, SafeFrom};
+use crate::{SafeFrom, size};
 
 /// Magic value identifying a CFF font (`OTTO`)
 pub const CFF_MAGIC: u32 = tag::OTTO;
@@ -335,7 +335,7 @@ impl<'a> OpenTypeFont<'a> {
                     .ok_or(ParseError::BadIndex)?;
                 let offset_table = self.scope.offset(offset).read::<OffsetTable<'_>>()?;
                 Ok(Cow::Owned(offset_table))
-            }
+            },
         }
     }
 }
@@ -352,12 +352,12 @@ impl ReadBinary for OpenTypeFont<'_> {
                 let offset_table = ctxt.read::<OffsetTable<'_>>()?;
                 let font = OpenTypeData::Single(offset_table);
                 Ok(OpenTypeFont { scope, data: font })
-            }
+            },
             TTCF_MAGIC => {
                 let ttc_header = ctxt.read::<TTCHeader<'_>>()?;
                 let font = OpenTypeData::Collection(ttc_header);
                 Ok(OpenTypeFont { scope, data: font })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -381,7 +381,7 @@ impl ReadBinary for TTCHeader<'_> {
                     minor_version,
                     offset_tables,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -406,7 +406,7 @@ impl ReadBinary for OffsetTable<'_> {
                     range_shift,
                     table_records,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -901,10 +901,7 @@ impl NameTable<'_> {
 
     /// Return a name string while charging its decoded storage to the active
     /// subset budget.
-    pub fn string_for_id_with_budget(
-        &self,
-        name_id: u16,
-    ) -> Result<Option<String>, ParseError> {
+    pub fn string_for_id_with_budget(&self, name_id: u16) -> Result<Option<String>, ParseError> {
         self.string_data_for_id(name_id)
             .map(|(encoding, name_data)| decode_with_budget(encoding, name_data))
             .transpose()
@@ -963,10 +960,7 @@ pub(crate) fn decode(encoding: &'static Encoding, data: &[u8]) -> String {
     s
 }
 
-fn decode_with_budget(
-    encoding: &'static Encoding,
-    data: &[u8],
-) -> Result<String, ParseError> {
+fn decode_with_budget(encoding: &'static Encoding, data: &[u8]) -> Result<String, ParseError> {
     let mut decoder = encoding.new_decoder();
     let size = decoder
         .max_utf8_buffer_length(data.len())
@@ -1436,8 +1430,8 @@ pub mod owned {
     use std::borrow::Cow;
 
     use super::utf16be_encode;
-    use crate::binary::write::{Placeholder, WriteBinary, WriteContext};
     use crate::binary::U16Be;
+    use crate::binary::write::{Placeholder, WriteBinary, WriteContext};
     use crate::error::{ParseError, WriteError};
 
     /// An owned `name` table.
@@ -1599,7 +1593,7 @@ pub mod owned {
 #[cfg(test)]
 mod tests {
     use super::{
-        owned, F2Dot14, Fixed, HeadTable, HmtxTable, NameTable, OpenTypeData, OpenTypeFont,
+        F2Dot14, Fixed, HeadTable, HmtxTable, NameTable, OpenTypeData, OpenTypeFont, owned,
     };
     use crate::assert_close;
     use crate::binary::read::ReadScope;

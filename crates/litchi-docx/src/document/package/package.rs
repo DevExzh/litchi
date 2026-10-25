@@ -458,8 +458,7 @@ impl Document {
             Ok(rel) => {
                 let target = rel.target_partname()?;
                 let part = self.opc.get_part(&target)?;
-                let limits =
-                    mce_limits_for_source(&self.opc.read_limits());
+                let limits = mce_limits_for_source(&self.opc.read_limits());
                 crate::modern_comments::parse_comments_extended(part.blob(), &limits)
             },
             Err(_) => Ok(Vec::new()),

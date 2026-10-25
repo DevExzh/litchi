@@ -5,7 +5,7 @@ use std::str;
 use crate::binary::budget;
 use crate::binary::read::{ReadArray, ReadBinary, ReadCtxt};
 use crate::binary::write::{WriteBinary, WriteContext};
-use crate::binary::{I16Be, I32Be, U16Be, U32Be, U8};
+use crate::binary::{I16Be, I32Be, U8, U16Be, U32Be};
 use crate::error::{ParseError, WriteError};
 
 pub struct PostTable<'a> {
@@ -111,7 +111,7 @@ impl ReadBinary for PostTable<'_> {
                     glyph_name_index,
                     names,
                 })
-            }
+            },
             // TODO Handle post version 1.0, 2.5, 3.0
             0x00010000 | 0x00025000 | 0x00030000 => None,
             _ => return Err(ParseError::BadVersion),
@@ -193,9 +193,9 @@ impl<'a> PostTable<'a> {
                             // in glyph_name_index.
                             let pascal_string = &sub_table.names[index];
                             pascal_string.to_str().map(Some).ok_or(ParseError::BadValue)
-                        }
+                        },
                     }
-                }
+                },
                 // If the table is version 2, the sub-table should exist
                 None => Err(ParseError::BadValue),
             },

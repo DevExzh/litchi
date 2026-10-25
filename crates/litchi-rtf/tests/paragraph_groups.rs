@@ -42,9 +42,7 @@ fn parses_resolves_and_round_trips_paragraph_group_table() {
         reparsed.paragraph_group_table()
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 

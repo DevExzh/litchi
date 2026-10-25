@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, TableDistanceUnit};
+use litchi_rtf::{TableDistanceUnit, write::Writer};
 
 #[test]
 fn parses_row_cell_units_resets_groups_and_destinations() {
@@ -30,9 +30,7 @@ fn parses_row_cell_units_resets_groups_and_destinations() {
 fn writer_round_trips_deterministically() {
     let document=Tree::parse(r"{\rtf1\trowd\trpaddl70\trpaddfl3\trspdr21\trspdfr3\clpadt57\clpadft3\cellx1200\intbl Cell\cell\row}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let first = String::from_utf8(first).unwrap();
     assert!(first.contains("\\trpaddl70\\trpaddfl3"));
     assert!(first.contains("\\clpadt57\\clpadft3"));
@@ -46,9 +44,7 @@ fn writer_round_trips_deterministically() {
         document.tables()[0].rows()[0].cells()[0].padding()
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, String::from_utf8(second).unwrap());
 }
 
@@ -65,9 +61,7 @@ fn spec_cell_spacing_controls_parse_and_write_canonically() {
     assert_eq!(spacing.bottom.value, Some(14));
 
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(output.contains(r"\clspl11\clspfl3\clspr12\clspfr3\clspt13\clspft3\clspb14\clspfb3"));
     assert!(!output.contains(r"\clspd"));
@@ -112,9 +106,18 @@ fn rejects_malformed_values_and_units() {
         r"{\rtf1\trowd\clspdfb4 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
-    assert!(Tree::parse(r"{\rtf1{\*\unknown\trpaddl-1\trpaddfl9 bad}Visible}", litchi_rtf::read::OpenOptions::default()).is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\*\unknown\trpaddl-1\trpaddfl9 bad}Visible}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }

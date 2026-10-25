@@ -10,24 +10,25 @@
 mod support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, XmlNamespace};
+use litchi_rtf::{XmlNamespace, write::Writer};
 use std::borrow::Cow;
 use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_ordered_unicode_namespaces_as_inert_metadata_and_round_trips() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\*\xmlnstbl "#,
-        r#"{\xmlns2 urn:example:\u20320?}{\xmlns1 http://schemas.example.test/word}}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\*\xmlnstbl "#,
+            r#"{\xmlns2 urn:example:\u20320?}{\xmlns1 http://schemas.example.test/word}}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "Body");
     let namespaces = document.xml_namespaces().unwrap();
@@ -36,17 +37,20 @@ fn parses_ordered_unicode_namespaces_as_inert_metadata_and_round_trips() {
     assert_eq!(namespaces[0].namespace, "urn:example:你");
     assert_eq!(namespaces[1].id, 1);
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.xml_namespaces(), Some(namespaces));
 }
 
 #[test]
 fn mutation_and_empty_table_presence_round_trip() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_xml_namespaces(Vec::new()).unwrap();
     assert_eq!(document.xml_namespaces(), Some([].as_slice()));
-    let empty = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let empty =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(empty.xml_namespaces(), Some([].as_slice()));
 
     document
@@ -59,7 +63,8 @@ fn mutation_and_empty_table_presence_round_trip() {
             .push_xml_namespace(XmlNamespace::new(4, Cow::Borrowed("urn:duplicate")).unwrap())
             .is_err()
     );
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.xml_namespaces(), document.xml_namespaces());
     assert_eq!(reparsed.text(), "Body");
 
@@ -83,7 +88,10 @@ fn rejects_malformed_or_active_namespace_tables() {
         r"{\rtf1\xmlns1 Body}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
     assert!(XmlNamespace::new(0, Cow::Borrowed("urn:x")).is_err());
     assert!(XmlNamespace::new(1, Cow::Borrowed(" ")).is_err());
