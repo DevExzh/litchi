@@ -700,7 +700,7 @@ mod tests {
             graph.incoming(three).map(Iterator::collect),
             Some(vec![one, two])
         );
-        assert_eq!(graph.incoming(one), None);
+        assert!(graph.incoming(one).is_none());
     }
 
     #[test]
