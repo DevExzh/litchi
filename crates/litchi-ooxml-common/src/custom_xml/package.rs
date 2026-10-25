@@ -372,18 +372,18 @@ pub(crate) fn apply_items(
 fn reject_part_aliases(items: &[Item]) -> Result<()> {
     for item in items {
         if item.source() == item.part() {
-            return unsupported_target(
+            return Err(unsupported_target(
                 "custom_xml.apply",
                 "the Custom XML source cannot also be its data part",
-            );
+            ));
         }
         if let Some(props_part) = item.props_part()
             && (props_part == item.part() || props_part == item.source())
         {
-            return unsupported_target(
+            return Err(unsupported_target(
                 "custom_xml.apply",
                 "the Custom XML properties part aliases an owning part",
-            );
+            ));
         }
     }
     Ok(())
