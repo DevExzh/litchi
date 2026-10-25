@@ -11,6 +11,7 @@ use super::model::{
 use crate::leniency::{Defect, MarkupDefect, ToleranceReport, ViewDefect};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::SourceLimits;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -23,11 +24,142 @@ const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const MAX: usize = 8 * 1024 * 1024;
-const MAX_DEPTH: usize = 128;
-const MAX_NODES: usize = 100_000;
-const MAX_GUIDES: usize = 4096;
-const MAX_SLIDES: usize = 100_000;
+/// Caller-selected bounds for one view-properties XML operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_input_bytes: usize,
+    max_output_bytes: usize,
+    max_depth: usize,
+    max_nodes: usize,
+    max_guides: usize,
+    max_slides: usize,
+    max_string_bytes: usize,
+    max_attribute_bytes: usize,
+}
+
+impl Limits {
+    /// The historical view-properties safety profile.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: 8 * 1024 * 1024,
+        max_output_bytes: 8 * 1024 * 1024,
+        max_depth: 128,
+        max_nodes: 100_000,
+        max_guides: 4096,
+        max_slides: 100_000,
+        max_string_bytes: 1024 * 1024,
+        max_attribute_bytes: 1024 * 1024,
+    };
+
+    /// Derive the view-properties policy from the retained OPC source profile.
+    #[must_use]
+    pub fn from_source_limits(source: SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part_bytes = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let events = source.max_events();
+        let depth = source.max_depth();
+        let strings = source.max_xml_attribute_bytes();
+        Self {
+            max_input_bytes: default.max_input_bytes.min(part_bytes),
+            max_output_bytes: default.max_output_bytes.min(part_bytes),
+            max_depth: default.max_depth.min(depth),
+            max_nodes: default.max_nodes.min(events),
+            max_guides: default.max_guides.min(events),
+            max_slides: default.max_slides.min(events),
+            max_string_bytes: default.max_string_bytes.min(strings),
+            max_attribute_bytes: default.max_attribute_bytes.min(strings),
+        }
+    }
+
+    /// Construct a tighter policy without widening the historical ceilings.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: usize,
+        max_output_bytes: usize,
+        max_depth: usize,
+        max_nodes: usize,
+        max_guides: usize,
+        max_slides: usize,
+        max_string_bytes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_input_bytes == 0
+            || max_input_bytes > default.max_input_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+            || max_guides == 0
+            || max_guides > default.max_guides
+            || max_slides == 0
+            || max_slides > default.max_slides
+            || max_string_bytes == 0
+            || max_string_bytes > default.max_string_bytes
+        {
+            return None;
+        }
+        Some(Self {
+            max_input_bytes,
+            max_output_bytes,
+            max_depth,
+            max_nodes,
+            max_guides,
+            max_slides,
+            max_string_bytes,
+            max_attribute_bytes: max_string_bytes,
+        })
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_guides(self) -> usize {
+        self.max_guides
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_slides(self) -> usize {
+        self.max_slides
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_string_bytes(self) -> usize {
+        self.max_string_bytes
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 impl ViewProperties {
     /// Parse a view-properties part (`p:viewPr`), applying the repairs of
@@ -40,8 +172,8 @@ impl ViewProperties {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        Self::parse_with_tolerance(xml, &mut ToleranceReport::default())
+    pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
+        Self::parse_with_tolerance(xml, &mut ToleranceReport::default(), limits)
     }
 
     /// [`Self::parse`], appending each repair to `tolerance` (no part is
@@ -50,11 +182,16 @@ impl ViewProperties {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_tolerance(xml: &[u8], tolerance: &mut ToleranceReport) -> Result<Self> {
+    pub fn parse_with_tolerance(
+        xml: &[u8],
+        tolerance: &mut ToleranceReport,
+        limits: Limits,
+    ) -> Result<Self> {
         Self::parse_inner(
             xml,
             &mut Tol {
                 report: Some(tolerance),
+                limits,
             },
         )
     }
@@ -67,13 +204,23 @@ impl ViewProperties {
     ///
     /// Returns an error if the input cannot be read, is malformed, or would
     /// need a [`ViewDefect`] repair.
-    pub fn parse_strict(xml: &[u8]) -> Result<Self> {
-        Self::parse_inner(xml, &mut Tol { report: None })
+    pub fn parse_strict(xml: &[u8], limits: Limits) -> Result<Self> {
+        Self::parse_inner(
+            xml,
+            &mut Tol {
+                report: None,
+                limits,
+            },
+        )
     }
 
     fn parse_inner(xml: &[u8], tol: &mut Tol<'_>) -> Result<Self> {
-        if xml.len() > MAX {
-            return Err(invalid("view properties exceed 8 MiB"));
+        let limits = tol.limits;
+        if xml.len() > limits.max_input_bytes() {
+            return Err(limit(
+                "view properties input bytes",
+                limits.max_input_bytes(),
+            ));
         }
         // Processing instructions are inert (audit finding 6.3): skipped
         // from the semantic input, recorded once for the part.
@@ -85,16 +232,20 @@ impl ViewProperties {
             )?;
         }
         let x = litchi_ooxml_common::mce::process_ooxml(&xml)?;
-        if x.len() > MAX {
-            return Err(invalid("processed view properties exceed 8 MiB"));
+        if x.len() > limits.max_input_bytes() {
+            return Err(limit(
+                "processed view properties bytes",
+                limits.max_input_bytes(),
+            ));
         }
-        project(&parse_dom(x.as_ref())?, tol)
+        project(&parse_dom(x.as_ref(), limits)?, tol)
     }
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
-        validate(self)?;
+    pub fn to_xml(&self, strict: bool, limits: Limits) -> Result<Vec<u8>> {
+        preflight_output(self, limits)?;
+        validate(self, limits)?;
         let p = if strict { PS } else { P };
         let a = if strict { AS } else { A };
         let r = if strict { RS } else { R };
@@ -107,32 +258,35 @@ impl ViewProperties {
         bool_attr(&mut x, "showComments", self.show_comments);
         x.push('>');
         if let Some(v) = &self.normal {
-            write_normal(&mut x, v, strict)?;
+            write_normal(&mut x, v, strict, limits)?;
         }
         if let Some(v) = &self.slide {
-            write_slide_like(&mut x, "slideViewPr", v, strict)?;
+            write_slide_like(&mut x, "slideViewPr", v, strict, limits)?;
         }
         if let Some(v) = &self.outline {
-            write_outline(&mut x, v, strict)?;
+            write_outline(&mut x, v, strict, limits)?;
         }
         if let Some(v) = &self.notes_text {
-            write_simple(&mut x, "notesTextViewPr", v, strict)?;
+            write_simple(&mut x, "notesTextViewPr", v, strict, limits)?;
         }
         if let Some(v) = &self.sorter {
-            write_sorter(&mut x, v, strict)?;
+            write_sorter(&mut x, v, strict, limits)?;
         }
         if let Some(v) = &self.notes {
-            write_slide_like(&mut x, "notesViewPr", v, strict)?;
+            write_slide_like(&mut x, "notesViewPr", v, strict, limits)?;
         }
         if let Some(v) = &self.grid_spacing {
             x.push_str(&format!("<p:gridSpacing cx=\"{}\" cy=\"{}\"/>", v.cx, v.cy));
         }
         if let Some(v) = &self.extension_xml {
-            opaque(&mut x, v, strict)?;
+            opaque(&mut x, v, strict, limits)?;
         }
         x.push_str("</p:viewPr>");
-        if x.len() > MAX {
-            return Err(invalid("serialized view properties exceed 8 MiB"));
+        if x.len() > limits.max_output_bytes() {
+            return Err(limit(
+                "serialized view properties bytes",
+                limits.max_output_bytes(),
+            ));
         }
         Ok(x.into_bytes())
     }
@@ -161,7 +315,10 @@ struct Node {
     bindings: Vec<(String, String)>,
     content: Vec<Content>,
 }
-fn parse_dom(xml: &[u8]) -> Result<Node> {
+fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
+    if xml.len() > limits.max_input_bytes() {
+        return Err(limit("view-properties XML bytes", limits.max_input_bytes()));
+    }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut rd = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
@@ -172,17 +329,23 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
         match rd.read_event() {
             Ok(Event::Start(e)) => {
                 count += 1;
-                if count > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("view-properties XML resource limit exceeded"));
+                if count > limits.max_nodes() {
+                    return Err(limit("view-properties XML nodes", limits.max_nodes()));
                 }
-                stack.push(make(&e, d, &stack)?);
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit("view-properties XML depth", limits.max_depth()));
+                }
+                stack.push(make(&e, d, &stack, limits)?);
             },
             Ok(Event::Empty(e)) => {
                 count += 1;
-                if count > MAX_NODES {
-                    return Err(invalid("view-properties node limit exceeded"));
+                if count > limits.max_nodes() {
+                    return Err(limit("view-properties XML nodes", limits.max_nodes()));
                 }
-                let n = make(&e, d, &stack)?;
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit("view-properties XML depth", limits.max_depth()));
+                }
+                let n = make(&e, d, &stack, limits)?;
                 attach(&mut stack, &mut root, n)?;
             },
             Ok(Event::End(_)) => {
@@ -193,6 +356,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             },
             Ok(Event::Text(t)) => {
                 let v = t.decode().map_err(xml_error)?.into_owned();
+                bounded_string(&v, limits)?;
                 if let Some(n) = stack.last_mut() {
                     n.content.push(Content::Text(v));
                 } else if !v.trim().is_empty() {
@@ -200,25 +364,26 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::CData(t)) => {
+                let v = t.decode().map_err(xml_error)?.into_owned();
+                bounded_string(&v, limits)?;
                 if let Some(n) = stack.last_mut() {
-                    n.content
-                        .push(Content::CData(t.decode().map_err(xml_error)?.into_owned()));
+                    n.content.push(Content::CData(v));
                 } else {
                     return Err(invalid("CDATA outside viewPr"));
                 }
             },
             Ok(Event::Comment(t)) => {
+                let v = t.decode().map_err(xml_error)?.into_owned();
+                bounded_string(&v, limits)?;
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Comment(
-                        t.decode().map_err(xml_error)?.into_owned(),
-                    ));
+                    n.content.push(Content::Comment(v));
                 }
             },
             Ok(Event::GeneralRef(t)) => {
+                let v = litchi_ooxml_common::xml::decode_xml_reference(&t)?;
+                bounded_string(&v, limits)?;
                 if let Some(n) = stack.last_mut() {
-                    n.content.push(Content::Text(
-                        litchi_ooxml_common::xml::decode_xml_reference(&t)?,
-                    ));
+                    n.content.push(Content::Text(v));
                 } else {
                     return Err(invalid("entity outside viewPr"));
                 }
@@ -236,7 +401,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
     }
     root.ok_or_else(|| invalid("missing viewPr root"))
 }
-fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
+fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node], limits: Limits) -> Result<Node> {
     let q = std::str::from_utf8(e.name().as_ref())
         .map_err(xml_error)?
         .to_string();
@@ -244,13 +409,16 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
     let mut raw = Vec::new();
     for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
+        let value = a
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
+            .map_err(xml_error)?
+            .into_owned();
+        bounded_attribute(&value, limits)?;
         raw.push((
             std::str::from_utf8(a.key.as_ref())
                 .map_err(xml_error)?
                 .to_string(),
-            a.decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
-                .map_err(xml_error)?
-                .into_owned(),
+            value,
         ));
     }
     for (k, v) in &raw {
@@ -308,6 +476,7 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, n: Node) -> Result<()> {
 /// refuses any markup that would need a repair.
 struct Tol<'r> {
     report: Option<&'r mut ToleranceReport>,
+    limits: Limits,
 }
 
 impl Tol<'_> {
@@ -427,8 +596,8 @@ fn project(n: &Node, tol: &mut Tol<'_>) -> Result<ViewProperties> {
             })
         })
         .transpose()?;
-    v.extension_xml = ext.map(|c| node_xml(c, false)).transpose()?;
-    validate(&v)?;
+    v.extension_xml = ext.map(|c| node_xml(c, false, tol.limits)).transpose()?;
+    validate(&v, tol.limits)?;
     Ok(v)
 }
 fn parse_normal(n: &Node, tol: &mut Tol<'_>) -> Result<NormalView> {
@@ -451,7 +620,7 @@ fn parse_normal(n: &Node, tol: &mut Tol<'_>) -> Result<NormalView> {
     let [left, top, ext] = slots(n, ["restoredLeft", "restoredTop", "extLst"], PNS, tol)?;
     let restored_left = parse_pane(required(left, "normalViewPr restoredLeft")?, tol)?;
     let restored_top = parse_pane(required(top, "normalViewPr restoredTop")?, tol)?;
-    let extension_xml = ext.map(|c| node_xml(c, false)).transpose()?;
+    let extension_xml = ext.map(|c| node_xml(c, false, tol.limits)).transpose()?;
     Ok(NormalView {
         show_outline_icons,
         snap_vertical_splitter,
@@ -525,8 +694,8 @@ fn parse_common_slide(n: &Node, tol: &mut Tol<'_>) -> Result<CommonSlideView> {
     if let Some(guide_list) = guide_list {
         only(guide_list, &[], tol)?;
         for g in items(guide_list, "guide", tol)? {
-            if guides.len() >= MAX_GUIDES {
-                return Err(invalid("invalid guide list or limit"));
+            if guides.len() >= tol.limits.max_guides() {
+                return Err(limit("view-properties guides", tol.limits.max_guides()));
             }
             let orientation = aopt(g, "orient")?
                 .map(|x| match x.as_str() {
@@ -558,7 +727,7 @@ fn parse_slide_like(n: &Node, tol: &mut Tol<'_>) -> Result<SlideLikeView> {
     let common = parse_common_slide(required(common, "slide-like view cSldViewPr")?, tol)?;
     Ok(SlideLikeView {
         common,
-        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
+        extension_xml: ext.map(|c| node_xml(c, false, tol.limits)).transpose()?,
     })
 }
 fn parse_simple(n: &Node, tol: &mut Tol<'_>) -> Result<SimpleView> {
@@ -566,7 +735,7 @@ fn parse_simple(n: &Node, tol: &mut Tol<'_>) -> Result<SimpleView> {
     let [view, ext] = slots(n, ["cViewPr", "extLst"], PNS, tol)?;
     Ok(SimpleView {
         view: parse_common(required(view, "view cViewPr")?, tol)?,
-        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
+        extension_xml: ext.map(|c| node_xml(c, false, tol.limits)).transpose()?,
     })
 }
 fn parse_sorter(n: &Node, tol: &mut Tol<'_>) -> Result<SorterView> {
@@ -576,7 +745,7 @@ fn parse_sorter(n: &Node, tol: &mut Tol<'_>) -> Result<SorterView> {
     Ok(SorterView {
         show_formatting,
         view: parse_common(required(view, "sorterViewPr cViewPr")?, tol)?,
-        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
+        extension_xml: ext.map(|c| node_xml(c, false, tol.limits)).transpose()?,
     })
 }
 fn parse_outline(n: &Node, tol: &mut Tol<'_>) -> Result<OutlineView> {
@@ -587,8 +756,11 @@ fn parse_outline(n: &Node, tol: &mut Tol<'_>) -> Result<OutlineView> {
     if let Some(slide_list) = slide_list {
         only(slide_list, &[], tol)?;
         for s in items(slide_list, "sld", tol)? {
-            if slides.len() >= MAX_SLIDES {
-                return Err(invalid("outline slide limit exceeded"));
+            if slides.len() >= tol.limits.max_slides() {
+                return Err(limit(
+                    "view-properties outline slides",
+                    tol.limits.max_slides(),
+                ));
             }
             let id = arel(s, "id")?;
             let collapse = bopt(s, "collapse")?;
@@ -604,11 +776,11 @@ fn parse_outline(n: &Node, tol: &mut Tol<'_>) -> Result<OutlineView> {
     Ok(OutlineView {
         view,
         slides,
-        extension_xml: ext.map(|c| node_xml(c, false)).transpose()?,
+        extension_xml: ext.map(|c| node_xml(c, false, tol.limits)).transpose()?,
     })
 }
 
-fn write_normal(x: &mut String, v: &NormalView, s: bool) -> Result<()> {
+fn write_normal(x: &mut String, v: &NormalView, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:normalViewPr");
     for (n, b) in [
         ("showOutlineIcons", v.show_outline_icons),
@@ -627,7 +799,7 @@ fn write_normal(x: &mut String, v: &NormalView, s: bool) -> Result<()> {
     pane(x, "restoredLeft", &v.restored_left);
     pane(x, "restoredTop", &v.restored_top);
     if let Some(e) = &v.extension_xml {
-        opaque(x, e, s)?;
+        opaque(x, e, s, limits)?;
     }
     x.push_str("</p:normalViewPr>");
     Ok(())
@@ -689,36 +861,42 @@ fn write_common_slide(x: &mut String, v: &CommonSlideView) {
     }
     x.push_str("</p:cSldViewPr>");
 }
-fn write_slide_like(x: &mut String, n: &str, v: &SlideLikeView, s: bool) -> Result<()> {
+fn write_slide_like(
+    x: &mut String,
+    n: &str,
+    v: &SlideLikeView,
+    s: bool,
+    limits: Limits,
+) -> Result<()> {
     x.push_str(&format!("<p:{n}>"));
     write_common_slide(x, &v.common);
     if let Some(e) = &v.extension_xml {
-        opaque(x, e, s)?;
+        opaque(x, e, s, limits)?;
     }
     x.push_str(&format!("</p:{n}>"));
     Ok(())
 }
-fn write_simple(x: &mut String, n: &str, v: &SimpleView, s: bool) -> Result<()> {
+fn write_simple(x: &mut String, n: &str, v: &SimpleView, s: bool, limits: Limits) -> Result<()> {
     x.push_str(&format!("<p:{n}>"));
     write_common(x, &v.view);
     if let Some(e) = &v.extension_xml {
-        opaque(x, e, s)?;
+        opaque(x, e, s, limits)?;
     }
     x.push_str(&format!("</p:{n}>"));
     Ok(())
 }
-fn write_sorter(x: &mut String, v: &SorterView, s: bool) -> Result<()> {
+fn write_sorter(x: &mut String, v: &SorterView, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:sorterViewPr");
     bool_attr(x, "showFormatting", v.show_formatting);
     x.push('>');
     write_common(x, &v.view);
     if let Some(e) = &v.extension_xml {
-        opaque(x, e, s)?;
+        opaque(x, e, s, limits)?;
     }
     x.push_str("</p:sorterViewPr>");
     Ok(())
 }
-fn write_outline(x: &mut String, v: &OutlineView, s: bool) -> Result<()> {
+fn write_outline(x: &mut String, v: &OutlineView, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:outlineViewPr>");
     write_common(x, &v.view);
     if !v.slides.is_empty() {
@@ -733,13 +911,13 @@ fn write_outline(x: &mut String, v: &OutlineView, s: bool) -> Result<()> {
         x.push_str("</p:sldLst>");
     }
     if let Some(e) = &v.extension_xml {
-        opaque(x, e, s)?;
+        opaque(x, e, s, limits)?;
     }
     x.push_str("</p:outlineViewPr>");
     Ok(())
 }
 
-fn validate(v: &ViewProperties) -> Result<()> {
+fn validate(v: &ViewProperties, limits: Limits) -> Result<()> {
     for ext in [
         v.extension_xml.as_deref(),
         v.normal.as_ref().and_then(|x| x.extension_xml.as_deref()),
@@ -754,7 +932,7 @@ fn validate(v: &ViewProperties) -> Result<()> {
     .into_iter()
     .flatten()
     {
-        parse_dom(ext)?;
+        parse_dom(ext, limits)?;
     }
     for common in v
         .slide
@@ -762,32 +940,102 @@ fn validate(v: &ViewProperties) -> Result<()> {
         .map(|x| &x.common)
         .chain(v.notes.iter().map(|x| &x.common))
     {
-        if common.guides.len() > MAX_GUIDES {
-            return Err(invalid("guide limit exceeded"));
+        if common.guides.len() > limits.max_guides() {
+            return Err(limit("view-properties guides", limits.max_guides()));
         }
     }
     if v.outline
         .as_ref()
-        .is_some_and(|x| x.slides.len() > MAX_SLIDES)
+        .is_some_and(|x| x.slides.len() > limits.max_slides())
     {
-        return Err(invalid("outline slide limit exceeded"));
+        return Err(limit("view-properties outline slides", limits.max_slides()));
     }
     Ok(())
 }
-fn opaque(x: &mut String, b: &[u8], strict: bool) -> Result<()> {
-    parse_dom(b)?;
+
+fn preflight_output(v: &ViewProperties, limits: Limits) -> Result<()> {
+    let mut retained = 0usize;
+    let mut strings = 0usize;
+    let mut guides = 0usize;
+    let mut slides = 0usize;
+    for extension in [
+        v.extension_xml.as_deref(),
+        v.normal.as_ref().and_then(|x| x.extension_xml.as_deref()),
+        v.slide.as_ref().and_then(|x| x.extension_xml.as_deref()),
+        v.outline.as_ref().and_then(|x| x.extension_xml.as_deref()),
+        v.notes_text
+            .as_ref()
+            .and_then(|x| x.extension_xml.as_deref()),
+        v.sorter.as_ref().and_then(|x| x.extension_xml.as_deref()),
+        v.notes.as_ref().and_then(|x| x.extension_xml.as_deref()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        retained = retained.saturating_add(extension.len());
+    }
+    if let Some(outline) = &v.outline {
+        slides = outline.slides.len();
+        strings = outline
+            .slides
+            .iter()
+            .map(|slide| slide.relationship_id.len())
+            .sum();
+    }
+    for common in v
+        .slide
+        .iter()
+        .map(|value| &value.common)
+        .chain(v.notes.iter().map(|value| &value.common))
+    {
+        guides = guides.saturating_add(common.guides.len());
+    }
+    let bound = 2048usize
+        .saturating_add(retained.saturating_mul(2))
+        .saturating_add(strings.saturating_mul(8))
+        .saturating_add(guides.saturating_mul(96))
+        .saturating_add(slides.saturating_mul(128));
+    if bound > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized view properties bytes",
+            limits.max_output_bytes(),
+        ));
+    }
+    Ok(())
+}
+
+fn opaque(x: &mut String, b: &[u8], strict: bool, limits: Limits) -> Result<()> {
+    if x.len().saturating_add(b.len()) > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized view properties bytes",
+            limits.max_output_bytes(),
+        ));
+    }
+    parse_dom(b, limits)?;
     let mut s = std::str::from_utf8(b).map_err(xml_error)?.to_string();
     if strict {
         s = s.replace(P, PS).replace(A, AS).replace(R, RS);
     } else {
         s = s.replace(PS, P).replace(AS, A).replace(RS, R);
     }
+    if x.len().saturating_add(s.len()) > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized view properties bytes",
+            limits.max_output_bytes(),
+        ));
+    }
     x.push_str(&s);
     Ok(())
 }
-fn node_xml(n: &Node, strict: bool) -> Result<Vec<u8>> {
+fn node_xml(n: &Node, strict: bool, limits: Limits) -> Result<Vec<u8>> {
     let mut x = String::new();
     node_write(&mut x, n, strict)?;
+    if x.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized view-properties fragment bytes",
+            limits.max_output_bytes(),
+        ));
+    }
     Ok(x.into_bytes())
 }
 fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
@@ -1023,6 +1271,33 @@ fn xml_error(e: impl std::fmt::Display) -> Error {
     Error::Xml(e.to_string())
 }
 
+fn bounded_string(value: &str, limits: Limits) -> Result<()> {
+    if value.len() > limits.max_string_bytes() {
+        return Err(limit(
+            "view-properties string bytes",
+            limits.max_string_bytes(),
+        ));
+    }
+    Ok(())
+}
+
+fn bounded_attribute(value: &str, limits: Limits) -> Result<()> {
+    if value.len() > limits.max_attribute_bytes {
+        return Err(limit(
+            "view-properties attribute bytes",
+            limits.max_attribute_bytes,
+        ));
+    }
+    Ok(())
+}
+
+fn limit(resource: &'static str, maximum: usize) -> Error {
+    Error::Limit {
+        resource,
+        limit: maximum,
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -1035,7 +1310,7 @@ mod tests {
     use litchi_opc::OpcPackage;
     fn f(b: &[u8]) -> ViewProperties {
         let p = OpcPackage::from_bytes(b, litchi_opc::SourceLimits::default()).unwrap();
-        load_from_package(&p).unwrap().unwrap()
+        load_from_package(&p, Limits::default()).unwrap().unwrap()
     }
     #[test]
     fn poi_prprops_guides_grid_and_strict_roundtrip() {
@@ -1050,8 +1325,8 @@ mod tests {
                 cy: 72008
             })
         );
-        let x = v.to_xml(true).unwrap();
-        let r = ViewProperties::parse(&x).unwrap();
+        let x = v.to_xml(true, Limits::default()).unwrap();
+        let r = ViewProperties::parse(&x, Limits::default()).unwrap();
         assert_eq!(
             r.slide.unwrap().common.view.scale_x,
             Ratio {
@@ -1091,7 +1366,9 @@ mod tests {
             r#"<p:viewPr xmlns:p="{PS}" xmlns:a="{AS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:u" mc:Ignorable="u"><mc:AlternateContent><mc:Choice Requires="u"><u:x/></mc:Choice><mc:Fallback><p:gridSpacing cx="10" cy="20"/></mc:Fallback></mc:AlternateContent></p:viewPr>"#
         );
         assert_eq!(
-            ViewProperties::parse(x.as_bytes()).unwrap().grid_spacing,
+            ViewProperties::parse(x.as_bytes(), Limits::default())
+                .unwrap()
+                .grid_spacing,
             Some(GridSpacing { cx: 10, cy: 20 })
         );
         for bad in [
@@ -1102,9 +1379,23 @@ mod tests {
             format!(r#"<!DOCTYPE x><p:viewPr xmlns:p="{P}"/>"#),
         ] {
             assert!(
-                ViewProperties::parse(bad.as_bytes()).is_err(),
+                ViewProperties::parse(bad.as_bytes(), Limits::default()).is_err(),
                 "accepted {bad}"
             );
         }
+    }
+
+    #[test]
+    fn explicit_limits_bound_parse_and_serialize() {
+        let limits = Limits::new(1, 1, 1, 1, 1, 1, 1).expect("narrow view policy");
+        let xml = format!(r#"<p:viewPr xmlns:p="{P}"/>"#);
+        assert!(matches!(
+            ViewProperties::parse(xml.as_bytes(), limits),
+            Err(Error::Limit { limit: 1, .. })
+        ));
+        assert!(matches!(
+            ViewProperties::default().to_xml(false, limits),
+            Err(Error::Limit { limit: 1, .. })
+        ));
     }
 }

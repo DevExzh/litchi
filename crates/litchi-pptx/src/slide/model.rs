@@ -337,7 +337,12 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn model3ds(&self) -> Result<Vec<crate::model3d::Model>> {
-        crate::model3d::package::load_all(self.package, self.part.part().partname())
+        let limits = crate::model3d::codec::Limits::from_source_limits(
+            self.package
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        crate::model3d::package::load_all(self.package, self.part.part().partname(), limits)
     }
 
     /// Read the model3d owner attached to one semantic shape, if present.
@@ -349,7 +354,17 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
-        crate::model3d::package::load(self.package, self.part.part().partname(), shape.into())
+        let limits = crate::model3d::codec::Limits::from_source_limits(
+            self.package
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        crate::model3d::package::load(
+            self.package,
+            self.part.part().partname(),
+            shape.into(),
+            limits,
+        )
     }
 
     /// Inspect all tag relationships on this slide in stable relationship-ID

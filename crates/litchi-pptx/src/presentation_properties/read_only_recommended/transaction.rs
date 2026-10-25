@@ -5,6 +5,7 @@ use std::sync::Arc;
 use litchi_opc::OpcPackage;
 
 use super::codec;
+use crate::presentation_properties::Limits;
 use crate::{Error, Result};
 
 /// Stable fingerprint of the exact presentation-properties XML source.
@@ -17,6 +18,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) located: codec::Located,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl Snapshot {
@@ -35,15 +37,15 @@ impl Snapshot {
     ///
     /// Returns an error if the source is malformed, ambiguous, or exceeds the
     /// bounded presentation-properties policy.
-    pub fn from_xml(source: impl AsRef<[u8]>) -> Result<Self> {
+    pub fn from_xml(source: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let source = source.as_ref();
-        if source.len() > codec::MAX_BYTES {
+        if source.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
                 resource: "presentation-properties readonlyRecommended",
-                limit: codec::MAX_BYTES,
+                limit: limits.max_input_bytes(),
             });
         }
-        Self::from_xml_owned(source.to_vec())
+        Self::from_xml_owned(source.to_vec(), limits)
     }
 
     /// Parse owned presentation-properties XML without another source copy.
@@ -52,21 +54,36 @@ impl Snapshot {
     ///
     /// Returns an error if the source is malformed, ambiguous, or exceeds the
     /// bounded presentation-properties policy.
-    pub fn from_xml_owned(source: Vec<u8>) -> Result<Self> {
+    pub fn from_xml_owned(source: Vec<u8>, limits: Limits) -> Result<Self> {
         let source_xml = Arc::new(source);
-        let located = codec::locate(source_xml.as_slice())?;
-        Ok(Self::from_located(String::new(), source_xml, located))
+        let located = codec::locate(source_xml.as_slice(), limits)?;
+        Ok(Self::from_located(
+            String::new(),
+            source_xml,
+            located,
+            limits,
+        ))
     }
 
-    pub(crate) fn from_part(source_part_name: String, source_xml: Arc<Vec<u8>>) -> Result<Self> {
-        let located = codec::locate(source_xml.as_slice())?;
-        Ok(Self::from_located(source_part_name, source_xml, located))
+    pub(crate) fn from_part(
+        source_part_name: String,
+        source_xml: Arc<Vec<u8>>,
+        limits: Limits,
+    ) -> Result<Self> {
+        let located = codec::locate(source_xml.as_slice(), limits)?;
+        Ok(Self::from_located(
+            source_part_name,
+            source_xml,
+            located,
+            limits,
+        ))
     }
 
     fn from_located(
         source_part_name: String,
         source_xml: Arc<Vec<u8>>,
         located: codec::Located,
+        limits: Limits,
     ) -> Self {
         let revision = fingerprint(source_xml.as_slice());
         Self {
@@ -74,6 +91,7 @@ impl Snapshot {
             source_xml,
             located,
             revision,
+            limits,
         }
     }
 
@@ -179,9 +197,10 @@ impl Draft {
             self.original.source_xml.as_slice(),
             &self.original.located,
             self.working,
+            self.original.limits,
         )?;
         let updated = Arc::new(updated);
-        let located = codec::locate(updated.as_slice())?;
+        let located = codec::locate(updated.as_slice(), self.original.limits)?;
         if located.value != self.working {
             return Err(invalid(
                 "readonlyRecommended serialization did not round-trip",
@@ -191,6 +210,7 @@ impl Draft {
             self.original.source_part_name.clone(),
             Arc::clone(&updated),
             located,
+            self.original.limits,
         );
         let patch = Change::new(self.original, snapshot.clone());
         Ok(Prepared {
@@ -310,7 +330,7 @@ impl Change {
         if self.is_noop() {
             return Ok(self.before.clone());
         }
-        let located = codec::locate(self.after.source_xml.as_slice())?;
+        let located = codec::locate(self.after.source_xml.as_slice(), self.after.limits)?;
         if located.value != self.after.value() {
             return Err(invalid(
                 "published readonlyRecommended source differs from the patch",
@@ -320,6 +340,7 @@ impl Change {
             self.after.source_part_name.clone(),
             Arc::clone(&self.after.source_xml),
             located,
+            self.after.limits,
         );
         if !result.same_source(&self.after) {
             return Err(invalid(

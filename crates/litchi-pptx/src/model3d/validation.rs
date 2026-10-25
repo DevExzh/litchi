@@ -4,11 +4,9 @@ use litchi_drawingml::model3d as drawing;
 use litchi_opc::constants::relationship_type::{IMAGE, STRICT_IMAGE};
 use litchi_opc::{OpcPackage, Part};
 
+use super::codec::Limits;
 use super::model::{Asset, Data, Model, Preview, Relation};
-use super::{
-    MAX_LINK_BYTES, MAX_MODEL_BYTES, MAX_PREVIEW_BYTES, MAX_TOTAL_PAYLOAD_BYTES,
-    MODEL_CONTENT_TYPE, MODEL_RELATIONSHIP,
-};
+use super::{MODEL_CONTENT_TYPE, MODEL_RELATIONSHIP};
 use crate::{Error, Result};
 
 /// Validate the detached semantic owner before package publication.
@@ -16,11 +14,11 @@ use crate::{Error, Result};
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn validate(model: &Model) -> Result<()> {
+pub fn validate(model: &Model, limits: Limits) -> Result<()> {
     drawing::validate(&model.scene.wire).map_err(|error| invalid(error.to_string()))?;
-    validate_asset(&model.asset)?;
+    validate_asset(&model.asset, limits)?;
     if let Some(preview) = &model.preview {
-        validate_preview(preview)?;
+        validate_preview(preview, limits)?;
         if !model.scene.has_raster() {
             return Err(invalid("preview requires a raster child"));
         }
@@ -36,10 +34,10 @@ pub fn validate(model: &Model) -> Result<()> {
                 .and_then(Preview::data)
                 .map_or(0, Data::len),
         );
-    if total > MAX_TOTAL_PAYLOAD_BYTES {
+    if total > limits.max_total_payload_bytes() {
         return Err(limit(
             "model3d total payload bytes",
-            MAX_TOTAL_PAYLOAD_BYTES,
+            limits.max_total_payload_bytes(),
         ));
     }
     Ok(())
@@ -49,8 +47,9 @@ pub(crate) fn validate_loaded_graph(
     package: &OpcPackage,
     source: &dyn Part,
     model: &Model,
+    limits: Limits,
 ) -> Result<()> {
-    validate(model)?;
+    validate(model, limits)?;
     let resolver = Resolver { source };
     drawing::validate_relationships(&model.scene.wire, &resolver)
         .map_err(|error| invalid(error.to_string()))?;
@@ -64,6 +63,7 @@ pub(crate) fn validate_loaded_graph(
         "model",
         MODEL_RELATIONSHIP,
         &mut referenced,
+        limits,
     )?;
     validate_reference(
         package,
@@ -73,6 +73,7 @@ pub(crate) fn validate_loaded_graph(
         "model",
         MODEL_RELATIONSHIP,
         &mut referenced,
+        limits,
     )?;
     if let Some(raster) = model.scene.wire.raster() {
         for child in &raster.children {
@@ -87,6 +88,7 @@ pub(crate) fn validate_loaded_graph(
                 "raster.blip",
                 image_relationship(source, false),
                 &mut referenced,
+                limits,
             )?;
             validate_reference(
                 package,
@@ -96,6 +98,7 @@ pub(crate) fn validate_loaded_graph(
                 "raster.blip",
                 image_relationship(source, true),
                 &mut referenced,
+                limits,
             )?;
         }
     }
@@ -109,6 +112,7 @@ pub(crate) fn validate_loaded_graph(
 pub(crate) fn validate_model_relationship_inventory(
     source: &dyn Part,
     models: &[Model],
+    _limits: Limits,
 ) -> Result<()> {
     let mut referenced = Vec::new();
     for model in models {
@@ -149,24 +153,24 @@ fn collect_reference(reference: &drawing::Reference, referenced: &mut Vec<String
     }
 }
 
-fn validate_asset(asset: &Asset) -> Result<()> {
+fn validate_asset(asset: &Asset, limits: Limits) -> Result<()> {
     if let Some(data) = asset.embedded_data()
-        && data.len() > MAX_MODEL_BYTES
+        && data.len() > limits.max_model_bytes()
     {
-        return Err(limit("model3d model bytes", MAX_MODEL_BYTES));
+        return Err(limit("model3d model bytes", limits.max_model_bytes()));
     }
     if let Some(link) = asset.linked_target()
-        && (link.as_str().is_empty() || link.as_str().len() > MAX_LINK_BYTES)
+        && (link.as_str().is_empty() || link.as_str().len() > limits.max_link_bytes())
     {
         return Err(invalid("external model3d target exceeds its bound"));
     }
     Ok(())
 }
 
-fn validate_preview(preview: &Preview) -> Result<()> {
+fn validate_preview(preview: &Preview, limits: Limits) -> Result<()> {
     if let Some(data) = preview.data() {
-        if data.len() > MAX_PREVIEW_BYTES {
-            return Err(limit("model3d preview bytes", MAX_PREVIEW_BYTES));
+        if data.len() > limits.max_preview_bytes() {
+            return Err(limit("model3d preview bytes", limits.max_preview_bytes()));
         }
         let content_type = preview
             .content_type()
@@ -178,7 +182,7 @@ fn validate_preview(preview: &Preview) -> Result<()> {
         }
     }
     if let Some(link) = preview.linked_target()
-        && (link.as_str().is_empty() || link.as_str().len() > MAX_LINK_BYTES)
+        && (link.as_str().is_empty() || link.as_str().len() > limits.max_link_bytes())
     {
         return Err(invalid("external model3d preview target exceeds its bound"));
     }
@@ -193,6 +197,7 @@ fn validate_reference(
     field: &'static str,
     expected_type: &str,
     referenced: &mut Vec<String>,
+    limits: Limits,
 ) -> Result<()> {
     let Some(id) = id else {
         return Ok(());
@@ -217,7 +222,8 @@ fn validate_reference(
         )));
     }
     if external {
-        if relationship.target_ref().is_empty() || relationship.target_ref().len() > MAX_LINK_BYTES
+        if relationship.target_ref().is_empty()
+            || relationship.target_ref().len() > limits.max_link_bytes()
         {
             return Err(invalid(format!(
                 "{field} relationship '{id}' has an invalid target"
@@ -243,9 +249,9 @@ fn validate_reference(
     }
     if part.blob().len()
         > if field == "model" {
-            MAX_MODEL_BYTES
+            limits.max_model_bytes()
         } else {
-            MAX_PREVIEW_BYTES
+            limits.max_preview_bytes()
         }
     {
         return Err(limit(
@@ -255,9 +261,9 @@ fn validate_reference(
                 "model3d preview bytes"
             },
             if field == "model" {
-                MAX_MODEL_BYTES
+                limits.max_model_bytes()
             } else {
-                MAX_PREVIEW_BYTES
+                limits.max_preview_bytes()
             },
         ));
     }

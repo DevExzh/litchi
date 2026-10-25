@@ -314,8 +314,16 @@ impl Package {
         // `Package::math_properties`, a lazy read that re-reads them without
         // a report; their repairs are recorded here, advisorily, like the
         // metadata above.
+        let presentation_limits = crate::presentation_properties::Limits::from_source_limits(
+            opc.source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
         let _deferred_presentation_properties_error =
-            crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
+            crate::presentation_properties::load_from_package_with_tolerance(
+                &opc,
+                &mut tolerance,
+                presentation_limits,
+            );
         Ok(Self {
             opc: std::sync::Arc::new(opc),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),

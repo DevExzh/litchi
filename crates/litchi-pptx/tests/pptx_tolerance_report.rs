@@ -1279,10 +1279,13 @@ const VIEW_PROPS: &str = "/ppt/viewProps.xml";
 fn view_properties_ignore_unknown_markup_and_accept_any_order() {
     let package = Package::from_bytes(SHAPES).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
-    let conformant =
-        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
-            .unwrap()
-            .unwrap();
+    let conformant = view_properties::load_from_package_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+        view_properties::Limits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert_clean(&report);
 
     let deck = shapes_with_member("ppt/viewProps.xml", |xml| {
@@ -1301,10 +1304,13 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
     });
     let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
-    let repaired =
-        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
-            .unwrap()
-            .unwrap();
+    let repaired = view_properties::load_from_package_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+        view_properties::Limits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(repaired, conformant);
     let at = |defect| (Defect::View(defect), 0, Some(VIEW_PROPS));
     assert_eq!(
@@ -1318,7 +1324,11 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
         ]
     );
     assert_eq!(
-        view_properties::load_from_package(package.opc().unwrap()).unwrap(),
+        view_properties::load_from_package(
+            package.opc().unwrap(),
+            view_properties::Limits::default(),
+        )
+        .unwrap(),
         Some(conformant)
     );
 
@@ -1331,11 +1341,11 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
         .unwrap()
         .blob()
         .to_vec();
-    assert!(ViewProperties::parse_strict(&blob).is_err());
+    assert!(ViewProperties::parse_strict(&blob, view_properties::Limits::default()).is_err());
     let invalid = String::from_utf8(blob)
         .unwrap()
         .replace(r#"sz="34615""#, r#"sz="wide""#);
-    assert!(ViewProperties::parse(invalid.as_bytes()).is_err());
+    assert!(ViewProperties::parse(invalid.as_bytes(), view_properties::Limits::default()).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -1364,10 +1374,13 @@ fn feature_readers_skip_and_record_processing_instructions() {
     let deck = shapes_with_member("ppt/viewProps.xml", with_instruction);
     let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
-    let view =
-        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
-            .unwrap()
-            .unwrap();
+    let view = view_properties::load_from_package_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+        view_properties::Limits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert!(view.normal.is_some());
     assert_eq!(located(&report), [instruction_at(VIEW_PROPS)]);
     let blob = package
@@ -1377,7 +1390,7 @@ fn feature_readers_skip_and_record_processing_instructions() {
         .unwrap()
         .blob()
         .to_vec();
-    assert!(ViewProperties::parse_strict(&blob).is_err());
+    assert!(ViewProperties::parse_strict(&blob, view_properties::Limits::default()).is_err());
 
     // Presentation properties.
     let deck = shapes_with_member("ppt/presProps.xml", with_instruction);
@@ -1387,6 +1400,7 @@ fn feature_readers_skip_and_record_processing_instructions() {
         litchi_pptx::presentation_properties::load_from_package_with_tolerance(
             package.opc().unwrap(),
             &mut report,
+            litchi_pptx::presentation_properties::Limits::default(),
         )
         .unwrap()
         .is_some()
@@ -1434,5 +1448,5 @@ fn feature_readers_skip_and_record_processing_instructions() {
         String::from_utf8(blob)
             .unwrap()
             .replacen("<p:viewPr", "<!DOCTYPE p:viewPr><p:viewPr", 1);
-    assert!(ViewProperties::parse(doctype.as_bytes()).is_err());
+    assert!(ViewProperties::parse(doctype.as_bytes(), view_properties::Limits::default()).is_err());
 }

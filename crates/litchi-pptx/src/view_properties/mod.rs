@@ -7,6 +7,7 @@ mod codec;
 mod model;
 mod package;
 
+pub use codec::Limits;
 pub use model::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,

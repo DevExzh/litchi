@@ -59,8 +59,15 @@ impl Edit<'_> {
     ///
     /// Returns an error for a malformed presentation-properties part, or a changed edit of a signed package.
     pub fn set(&mut self, value: Properties) -> Result<Option<Properties>> {
-        self.staged
-            .update(move |opc| crate::presentation_properties::put_math_to_package(opc, value))
+        let limits = crate::presentation_properties::Limits::from_source_limits(
+            self.staged
+                .opc()
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        self.staged.update(move |opc| {
+            crate::presentation_properties::put_math_to_package(opc, value, limits)
+        })
     }
 
     /// Remove the document-level math defaults. Returns the removed value.
@@ -69,8 +76,15 @@ impl Edit<'_> {
     ///
     /// Returns an error for a malformed presentation-properties part, or a changed edit of a signed package.
     pub fn remove(&mut self) -> Result<Option<Properties>> {
-        self.staged
-            .update(crate::presentation_properties::remove_math_from_package)
+        let limits = crate::presentation_properties::Limits::from_source_limits(
+            self.staged
+                .opc()
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        self.staged.update(move |opc| {
+            crate::presentation_properties::remove_math_from_package(opc, limits)
+        })
     }
 
     /// Discard every staged change.

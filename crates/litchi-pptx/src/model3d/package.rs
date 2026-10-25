@@ -5,21 +5,25 @@ use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
 
-use super::codec::{self, Inventory, Location};
+use super::codec::{self, Inventory, Limits, Location};
 use super::model::{
     Asset, Data, Link, Model, Origin, Preview, Relation, Scene, Shape, relationship_id,
 };
 use super::validation;
-use super::{MAX_TOTAL_PAYLOAD_BYTES, MODEL_CONTENT_TYPE, MODEL_RELATIONSHIP};
+use super::{MODEL_CONTENT_TYPE, MODEL_RELATIONSHIP};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::shape::Key;
 use crate::{Error, Result};
 
 /// Load every model3d frame owned by one slide in source order.
-pub(crate) fn load_all(package: &OpcPackage, slide_name: &PackURI) -> Result<Vec<Model>> {
+pub(crate) fn load_all(
+    package: &OpcPackage,
+    slide_name: &PackURI,
+    limits: Limits,
+) -> Result<Vec<Model>> {
     let source = slide_part(package, slide_name)?;
-    let inventory = codec::locate(source.blob())?;
-    load_inventory(package, slide_name, source, &inventory)
+    let inventory = codec::locate_with_limits(source.blob(), limits)?;
+    load_inventory(package, slide_name, source, &inventory, limits)
 }
 
 /// Load one model3d frame selected by its semantic shape anchor.
@@ -27,13 +31,14 @@ pub(crate) fn load(
     package: &OpcPackage,
     slide_name: &PackURI,
     key: Key<'_>,
+    limits: Limits,
 ) -> Result<Option<Model>> {
     let source = slide_part(package, slide_name)?;
-    let inventory = codec::locate(source.blob())?;
+    let inventory = codec::locate_with_limits(source.blob(), limits)?;
     let Some(location) = select_location(&inventory, key)? else {
         return Ok(None);
     };
-    let models = load_inventory(package, slide_name, source, &inventory)?;
+    let models = load_inventory(package, slide_name, source, &inventory, limits)?;
     Ok(models.into_iter().find(|model| {
         model.shape.index() == location.shape_index
             && model
@@ -50,19 +55,20 @@ pub(crate) fn put(
     slide_name: &PackURI,
     key: Key<'_>,
     value: Model,
+    limits: Limits,
 ) -> Result<Option<Model>> {
-    validation::validate(&value)?;
+    validation::validate(&value, limits)?;
     let source = slide_part(package, slide_name)?;
     if value.base_xml.as_slice() != source.blob() {
         return Err(invalid("model3d edit is based on a stale slide snapshot"));
     }
-    let inventory = codec::locate(source.blob())?;
+    let inventory = codec::locate_with_limits(source.blob(), limits)?;
     let Some(location) = select_location(&inventory, key)? else {
         return Err(invalid(
             "model3d put requires an existing graphic-frame owner",
         ));
     };
-    let models = load_inventory(package, slide_name, source, &inventory)?;
+    let models = load_inventory(package, slide_name, source, &inventory, limits)?;
     let previous = models
         .into_iter()
         .find(|model| model.shape.index() == location.shape_index)
@@ -107,8 +113,13 @@ pub(crate) fn put(
         previous.origin.preview_embedded.as_ref(),
         previous.origin.preview_linked.as_ref(),
     )?;
-    let fragment = codec::write(&Scene::from_wire(scene), codec::Limits::DEFAULT)?;
-    let updated = codec::replace(old_xml.as_slice(), location.range.clone(), &fragment)?;
+    let fragment = codec::write(&Scene::from_wire(scene), limits)?;
+    let updated = codec::replace(
+        old_xml.as_slice(),
+        location.range.clone(),
+        &fragment,
+        limits,
+    )?;
     package.get_part_mut(slide_name)?.set_blob(updated.clone());
 
     let old_relationships = old_model_relationships(&previous.origin);
@@ -124,18 +135,19 @@ pub(crate) fn remove(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     key: Key<'_>,
+    limits: Limits,
 ) -> Result<Option<Model>> {
     let source = slide_part(package, slide_name)?;
-    let inventory = codec::locate(source.blob())?;
+    let inventory = codec::locate_with_limits(source.blob(), limits)?;
     let Some(location) = select_location(&inventory, key)? else {
         return Ok(None);
     };
-    let models = load_inventory(package, slide_name, source, &inventory)?;
+    let models = load_inventory(package, slide_name, source, &inventory, limits)?;
     let previous = models
         .into_iter()
         .find(|model| model.shape.index() == location.shape_index)
         .ok_or_else(|| invalid("model3d shape anchor disappeared during preflight"))?;
-    let updated = codec::replace(source.blob(), location.range.clone(), &[])?;
+    let updated = codec::replace(source.blob(), location.range.clone(), &[], limits)?;
     refuse_signed_change(package)?;
     package.get_part_mut(slide_name)?.set_blob(updated.clone());
     for relationship_id in old_model_relationships(&previous.origin) {
@@ -150,11 +162,12 @@ fn load_inventory(
     slide_name: &PackURI,
     source: &dyn Part,
     inventory: &Inventory,
+    limits: Limits,
 ) -> Result<Vec<Model>> {
     let mut models = Vec::new();
     let mut total_payload = 0usize;
     for location in &inventory.locations {
-        let model = load_location(package, slide_name, source, location)?;
+        let model = load_location(package, slide_name, source, location, limits)?;
         total_payload = total_payload
             .saturating_add(model.asset.embedded_data().map_or(0, Data::len))
             .saturating_add(
@@ -164,15 +177,15 @@ fn load_inventory(
                     .and_then(Preview::data)
                     .map_or(0, Data::len),
             );
-        if total_payload > MAX_TOTAL_PAYLOAD_BYTES {
+        if total_payload > limits.max_total_payload_bytes() {
             return Err(limit(
                 "model3d slide payload bytes",
-                MAX_TOTAL_PAYLOAD_BYTES,
+                limits.max_total_payload_bytes(),
             ));
         }
         models.push(model);
     }
-    validation::validate_model_relationship_inventory(source, &models)?;
+    validation::validate_model_relationship_inventory(source, &models, limits)?;
     Ok(models)
 }
 
@@ -181,18 +194,25 @@ fn load_location(
     _slide_name: &PackURI,
     source: &dyn Part,
     location: &Location,
+    limits: Limits,
 ) -> Result<Model> {
     let xml = source
         .blob()
         .get(location.range.clone())
         .ok_or_else(|| invalid("model3d location is outside its slide snapshot"))?;
-    let scene = codec::read(xml, codec::Limits::DEFAULT)?;
+    let scene = codec::read(xml, limits)?;
     let mut asset = Asset::default();
     let mut origin = Origin::default();
 
     if let Some(id) = scene.wire.reference.embedded.as_ref() {
         let relation = validation::relation_from_part(source, id)?;
-        let data = load_internal_data(package, source, id)?;
+        let data = load_internal_data(
+            package,
+            source,
+            id,
+            limits.max_model_bytes(),
+            "model3d model bytes",
+        )?;
         asset.set_embedded(Some(data));
         origin.model_embedded = Some(relation);
     }
@@ -202,7 +222,7 @@ fn load_location(
         origin.model_linked = Some(relation);
     }
 
-    let preview = load_preview(package, source, &scene, &mut origin)?;
+    let preview = load_preview(package, source, &scene, &mut origin, limits)?;
     origin.asset = asset.clone();
     origin.preview.clone_from(&preview);
     let model = Model {
@@ -213,7 +233,7 @@ fn load_location(
         base_xml: source.blob_arc(),
         origin,
     };
-    validation::validate_loaded_graph(package, source, &model)?;
+    validation::validate_loaded_graph(package, source, &model, limits)?;
     Ok(model)
 }
 
@@ -222,6 +242,7 @@ fn load_preview(
     source: &dyn Part,
     scene: &Scene,
     origin: &mut Origin,
+    limits: Limits,
 ) -> Result<Option<Preview>> {
     let Some(raster) = scene.wire.raster() else {
         return Ok(None);
@@ -236,7 +257,13 @@ fn load_preview(
     let mut preview = None;
     if let Some(id) = blip.reference.embedded.as_ref() {
         let relation = validation::relation_from_part(source, id)?;
-        let data = load_internal_data(package, source, id)?;
+        let data = load_internal_data(
+            package,
+            source,
+            id,
+            limits.max_preview_bytes(),
+            "model3d preview bytes",
+        )?;
         let target = source
             .rels()
             .get(id.as_str())
@@ -259,7 +286,13 @@ fn load_preview(
     Ok(preview)
 }
 
-fn load_internal_data(package: &OpcPackage, source: &dyn Part, id: &drawing::Id) -> Result<Data> {
+fn load_internal_data(
+    package: &OpcPackage,
+    source: &dyn Part,
+    id: &drawing::Id,
+    payload_limit: usize,
+    resource: &'static str,
+) -> Result<Data> {
     let relationship = source
         .rels()
         .get(id.as_str())
@@ -271,7 +304,11 @@ fn load_internal_data(package: &OpcPackage, source: &dyn Part, id: &drawing::Id)
     }
     let target = relationship.target_partname()?;
     let part = package.get_part(&target)?;
-    Data::from_shared(part.blob_arc())
+    let data = part.blob_arc();
+    if data.len() > payload_limit {
+        return Err(limit(resource, payload_limit));
+    }
+    Data::from_shared(data)
 }
 
 fn slide_part<'a>(package: &'a OpcPackage, slide_name: &PackURI) -> Result<&'a dyn Part> {

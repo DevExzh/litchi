@@ -670,7 +670,12 @@ impl Package {
     pub fn math_properties(
         &self,
     ) -> Result<Option<crate::presentation_properties::math::Properties>> {
-        crate::presentation_properties::load_math_from_package(&self.opc)
+        let limits = crate::presentation_properties::Limits::from_source_limits(
+            self.opc
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        crate::presentation_properties::load_math_from_package(&self.opc, limits)
     }
 
     /// Read the inert `p1710:readonlyRecommended` presentation hint.
@@ -805,7 +810,12 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Vec<crate::model3d::Model>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        crate::model3d::package::load_all(&self.opc, &slide_name)
+        let limits = crate::model3d::codec::Limits::from_source_limits(
+            self.opc
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        crate::model3d::package::load_all(&self.opc, &slide_name, limits)
     }
 
     /// Read the model3d owner attached to one semantic shape, if present.
@@ -819,7 +829,12 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        crate::model3d::package::load(&self.opc, &slide_name, shape.into())
+        let limits = crate::model3d::codec::Limits::from_source_limits(
+            self.opc
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
+        crate::model3d::package::load(&self.opc, &slide_name, shape.into(), limits)
     }
 
     /// Load the presentation's optional `DrawingML` table-style catalog.

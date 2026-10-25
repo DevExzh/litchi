@@ -67,8 +67,14 @@ impl Edit<'_> {
     ) -> Result<Option<Model>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let limits = super::codec::Limits::from_source_limits(
+            self.staged
+                .opc()
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
         self.staged
-            .update(move |opc| super::package::put(opc, &slide, shape, model))
+            .update(move |opc| super::package::put(opc, &slide, shape, model, limits))
     }
 
     /// Remove the 3D model of the selected shape. Returns the removed model.
@@ -84,8 +90,14 @@ impl Edit<'_> {
     ) -> Result<Option<Model>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let limits = super::codec::Limits::from_source_limits(
+            self.staged
+                .opc()
+                .source_read_limits()
+                .unwrap_or_else(litchi_opc::SourceLimits::default),
+        );
         self.staged
-            .update(move |opc| super::package::remove(opc, &slide, shape))
+            .update(move |opc| super::package::remove(opc, &slide, shape, limits))
     }
 
     /// Discard every staged change.
