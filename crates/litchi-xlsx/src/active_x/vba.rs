@@ -5,11 +5,10 @@
 
 use crate::error::Result;
 use crate::part_edit::{Staged, family};
-use litchi_ooxml_common::vba::{Edit as VbaEdit, Host, read_project_part};
+use litchi_ooxml_common::vba::{Edit as VbaEdit, EditOptions, Host, read_project_part};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use litchi_vba::{Limits, Payload, project::Project as ParsedProject};
-use std::sync::Arc;
 
 /// Relationship metadata for the VBA project attached to an Excel workbook.
 ///
@@ -124,9 +123,9 @@ pub(crate) fn store(
     source: &PackURI,
     payload: Payload,
 ) -> Result<Project> {
-    let payload = Arc::new(payload.into_bytes());
-    let mut edit =
-        VbaEdit::new(package, Host::Excel).map_err(crate::signature_policy::from_shared)?;
+    let payload = payload.into_bytes();
+    let mut edit = VbaEdit::new(package, Host::Excel, EditOptions::new())
+        .map_err(crate::signature_policy::from_shared)?;
     edit.store(payload, None)
         .map_err(crate::signature_policy::from_shared)?;
     *package = edit
@@ -150,8 +149,8 @@ pub(crate) fn store(
 /// Returns [`crate::Error::Signed`] for a change to a signed package, and an
 /// error when the graph is invalid or the package cannot be changed.
 pub(crate) fn remove(package: &mut OpcPackage, _source: &PackURI) -> Result<bool> {
-    let mut edit =
-        VbaEdit::new(package, Host::Excel).map_err(crate::signature_policy::from_shared)?;
+    let mut edit = VbaEdit::new(package, Host::Excel, EditOptions::new())
+        .map_err(crate::signature_policy::from_shared)?;
     let changed = edit
         .remove()
         .map_err(crate::signature_policy::from_shared)?;

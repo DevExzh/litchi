@@ -40,6 +40,10 @@ pub enum Error {
     #[error("invalid OOXML relationship: {0}")]
     Relationship(String),
 
+    /// A semantic patch was built from a different selected graph base.
+    #[error("VBA patch base does not match recipient")]
+    PatchConflict,
+
     /// Parsed data violates a structural, cardinality, or value constraint.
     #[error("invalid OOXML data: {0}")]
     Invalid(String),
@@ -125,6 +129,9 @@ pub enum LimitKind {
     Web(crate::web::LimitKind),
     /// A Ribbon (customUI) budget ([`crate::ribbon::LimitKind`]).
     Ribbon(crate::ribbon::LimitKind),
+    /// A VBA graph publication budget ([`crate::vba::LimitKind`]).
+    #[cfg(feature = "vba-inspection")]
+    Vba(crate::vba::LimitKind),
     /// Core keyword items.
     CoreKeywordItems,
     /// Core-properties part-name candidates.
@@ -219,6 +226,8 @@ impl LimitKind {
             Self::CustomXml(kind) => kind.as_str(),
             Self::Web(kind) => kind.as_str(),
             Self::Ribbon(kind) => kind.as_str(),
+            #[cfg(feature = "vba-inspection")]
+            Self::Vba(kind) => kind.as_str(),
             Self::CoreKeywordItems => "core keyword items",
             Self::CorePropertiesPartNameCandidates => "core-properties part-name candidates",
             Self::CorePropertiesXmlBytes => "core-properties XML bytes",
