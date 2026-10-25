@@ -5111,3 +5111,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   Metadata returns 81–82 and the remaining PPTX replay/aggregate fixes remain
   active. No full gate, final census or native/performance acceptance is
   claimed; nothing is pushed.
+
+- Coordinator verified tooling and XLDM checkpoint (2026-10-25):
+  The complete 39-module tooling row passes on the independently verified
+  detached source `11048ed3cb`: 1,752 tests. Root verifies the saved state,
+  child log, empty Cargo trace, exact runner and locks, unchanged detached
+  source and terminal ownership. Overall state is correctly `partial-passed`
+  because only row 48 of 53 was selected. Record 0362ul80a preserves the
+  earlier setup and mutable-source failures separately; this is a tooling-row
+  pass, not a complete gate pass.
+
+  XLDM final source `c5424e23e4` passes independent review. Root verifies ten
+  accepted guarded rows across the `87e241633e` and `c5424e23e4` captures,
+  including XLDM/XLSX/XLSB tests and affected format/ops/facade checks and
+  strict Clippy. All log and trace digests, approved locks, source fences and
+  terminal ownership match. Peak target usage is 3,957,146,335 bytes. The
+  earlier failed rows remain preserved; an atomic integration proposal and
+  precise decimal-unit receipt correction are being prepared.
+
+  Formula's final source review is ready, but root has found only child logs
+  and target traces in its stated capture directory. Saved row receipts must
+  be located or the affected rows recaptured before acceptance. PPTX returns
+  61e and 62b are active alongside metadata 81–82; combined source review and
+  guarded validation remain required. Numbers wire continues its scoped
+  validation. Cleanup wave 60 reclaimed 7,873,409,024 allocated bytes after
+  final quarantine overhead; wave 61 is read-only preflight for the merged
+  ODF, VBA and RTF leaves. Integration has no hold. Nothing is pushed.
