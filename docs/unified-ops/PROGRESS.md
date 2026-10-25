@@ -5783,3 +5783,22 @@ See [0063](0063-source-pptx-modern-comments.md).
   patches replayed and verified. The measured allocation ledger reaches
   730,280,955,904 bytes under the recorded exclusions. Three active repair
   branches remain for composition; final qualification and cleanup stay open.
+
+  Further a8 diagnostics pass twelve common/OPC/DOCX groups, then return one
+  DOCX durable tamper assertion. Follow-up123a uses typed errors throughout
+  that test while preserving atomic publication checks. Three more DOCX
+  groups pass; the PPTX helper passes 1,396 library tests (one ignored) and
+  five integration chunks before a signed-policy consumer rejects typed
+  VBA `Signed`. Reviewed124a corrects that consumer and its documentation.
+  Ribbon121c passes replay, fidelity and ordering review after two further
+  returns. Five reviewed repair leaves await composition; later diagnostics
+  and all repaired-source acceptance remain open (125).
+
+  Cleanup96 removes six archived DML/RTF diagnostic checkouts after actual
+  payload restoration and patch replay. Canonical before controls remain.
+  Root verifies 253 total worktree removals and 422 ref deletions, preserving
+  prior evidence limitations and disclosing process visibility limits. The
+  conservative allocated ledger reaches 737,962,319,872 bytes; this is not a
+  filesystem free-space delta. Final API census requires fresh 84-profile
+  captures and the 68-package inventory with the approved current lock.
+  Root remains on `feat/unified-ops-api`; no push or final acceptance.
