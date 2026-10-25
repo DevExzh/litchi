@@ -64,3 +64,20 @@ the existing module diagnostics re-exports, and implements the intersections
 with const-safe `min_usize` and saturating `as_usize` helpers. The next F5
 freeze must use the new repair commit and a fresh empty target; this failed
 receipt remains bound to the pre-repair source and is not overwritten.
+
+The repairs were committed as `c429e4fdd7024042a4a3d79e5095764d8801a0c0`.
+The next serialized F5 run reached the common-crate integration tests and
+found one stale consumer assertion before any later row ran:
+
+* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-c429e4fdd7/result.json`
+  (SHA-256 `4fd668a9e8afe2793b07fa11f222b8ceb5077a4c9111f0eae7b7cf17cb6b89b5`);
+* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-c429e4fdd7/01-check-common-attempt-actual-f5-01.log`
+  (SHA-256 `f597bc14dbeb308e52dbef1a9e486c8f16a1b321de392a2f6b6586d377e6df91`);
+* row 1 exited `101` after 35.27 seconds with a 162,579,023-byte target;
+  the exact error was the integration test's private `Panes::panes` field
+  access at `web_extension_packages.rs:84`.
+
+This follow-up changes only that consumer to the existing public
+`Panes::len()` accessor. No public field or compatibility alias is added;
+the remaining `.panes` accesses are crate-internal implementation or unit
+tests within the owning common crate.

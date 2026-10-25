@@ -81,7 +81,7 @@ fn conformance_profile_is_part_of_web_edit_intent() {
     let strict_xml = web::load(&package, &web::Limits::standard())
         .unwrap()
         .unwrap();
-    assert_eq!(strict_xml.panes.len(), 1);
+    assert_eq!(strict_xml.len(), 1);
     let task_panes_name = package
         .rels()
         .iter()
