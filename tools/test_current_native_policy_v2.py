@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from native_qualification import current_native_policy_v2 as policy  # noqa: E402
+from native_qualification import materialize_current_native_adapters as adapters  # noqa: E402
 from native_qualification import prepare_current_native_inputs_v2 as preparer  # noqa: E402
 from native_qualification import validate_current_native_v2 as validator  # noqa: E402
 
@@ -513,6 +514,32 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     return {"returncode": 0, "binary_identities": identities}
                 route = step.get("route", step.get("name", "build"))
                 role = step.get("abba_role", "build")
+                if route == "ppt-scoped-correctness":
+                    fixture = Path(str(step["fixture"]))
+                    source = fixture.read_bytes()
+                    payload = {
+                        "mode": "scoped_patch_correctness",
+                        "fixture": str(fixture),
+                        "media_id": 1,
+                        "requested_external_media_path": "clip-0000.avi",
+                        "before_external_media_path": None,
+                        "external_media_path": "clip-0000.avi",
+                        "source_len": len(source),
+                        "target_len": len(source) + 1,
+                        "source_sha256": hashlib.sha256(source).hexdigest(),
+                        "target_sha256": "a" * 64,
+                        "inverse_source_sha256": hashlib.sha256(source).hexdigest(),
+                        "inverse_matches_source": True,
+                    }
+                    return {"returncode": 0, "output_bytes": json.dumps(payload, sort_keys=True).encode() + b"\n"}
+                if route == "ppt-scoped-correctness-validate":
+                    payload = {
+                        "route": route,
+                        "status": "passed",
+                        "external_media_path": "clip-0000.avi",
+                        "inverse_matches_source": True,
+                    }
+                    return {"returncode": 0, "output_bytes": json.dumps(payload, sort_keys=True).encode() + b"\n"}
                 return {
                     "returncode": 0,
                     "output_bytes": json.dumps({"route": route, "role": role}, sort_keys=True).encode() + b"\n",
@@ -642,6 +669,114 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 Path("/tmp"),
             )
 
+    def test_reviewed_f2_adapter_sources_are_fixed_and_external(self) -> None:
+        baseline = policy.TRUSTED_POLICY.baseline
+        self.assertEqual(
+            {item.relative_path for item in baseline.adapter_overlays},
+            {
+                "tools/perf-baseline/Cargo.toml",
+                policy.LEGACY_PROBE_PATH,
+                policy.PPT_CORRECTNESS_PATH,
+            },
+        )
+        for item in baseline.adapter_overlays:
+            identity = policy._validate_adapter_source(item, f"test adapter {item.relative_path}")
+            self.assertEqual(identity["sha256"], item.sha256)
+            self.assertEqual(identity["bytes"], item.bytes)
+            self.assertIn("tools/native_qualification/adapters/", identity["source_path"])
+        correctness = baseline.adapter_for(policy.PPT_CORRECTNESS_PATH)
+        self.assertIsNotNone(correctness)
+        self.assertEqual(correctness.sha256, "032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a")
+
+    def test_f2_correctness_receipt_is_typed_and_replay_optional(self) -> None:
+        route = policy.PPT_ROUTES[2]
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            fixture = parent / "video.ppt"
+            fixture.write_bytes(b"f2 correctness fixture")
+            source_hash = hashlib.sha256(fixture.read_bytes()).hexdigest()
+            payload = {
+                "mode": "scoped_patch_correctness",
+                "fixture": str(fixture),
+                "media_id": 1,
+                "requested_external_media_path": "clip-0000.avi",
+                "before_external_media_path": None,
+                "external_media_path": "clip-0000.avi",
+                "source_len": fixture.stat().st_size,
+                "target_len": fixture.stat().st_size + 1,
+                "source_sha256": source_hash,
+                "target_sha256": "a" * 64,
+                "inverse_source_sha256": source_hash,
+                "inverse_matches_source": True,
+            }
+            bound = policy._v2_result_payload(
+                {"output_bytes": json.dumps(payload).encode()},
+                route,
+                parent,
+                expected_fixture=fixture,
+            )
+            self.assertEqual(json.loads(bound), payload)
+            for field, value in (("media_id", 2), ("external_media_path", "wrong")):
+                tampered = dict(payload)
+                tampered[field] = value
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy._v2_result_payload(
+                        {"output_bytes": json.dumps(tampered).encode()},
+                        route,
+                        parent,
+                        expected_fixture=fixture,
+                    )
+            partial_replay = dict(payload)
+            partial_replay["replay_matches_target"] = True
+            with self.assertRaises(policy.PolicyMismatch):
+                policy._v2_result_payload(
+                    {"output_bytes": json.dumps(partial_replay).encode()},
+                    route,
+                    parent,
+                    expected_fixture=fixture,
+                )
+
+    def test_f2_correctness_validator_accepts_reviewed_receipt_without_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            fixture = parent / "video.ppt"
+            fixture.write_bytes(b"reviewed f2 fixture")
+            source_hash = hashlib.sha256(fixture.read_bytes()).hexdigest()
+            receipt = parent / "correctness.json"
+            receipt.write_bytes(
+                json.dumps(
+                    {
+                        "mode": "scoped_patch_correctness",
+                        "fixture": str(fixture),
+                        "media_id": 1,
+                        "requested_external_media_path": "clip-0000.avi",
+                        "before_external_media_path": None,
+                        "external_media_path": "clip-0000.avi",
+                        "source_len": fixture.stat().st_size,
+                        "target_len": fixture.stat().st_size + 1,
+                        "source_sha256": source_hash,
+                        "target_sha256": "b" * 64,
+                        "inverse_source_sha256": source_hash,
+                        "inverse_matches_source": True,
+                    }
+                ).encode()
+            )
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"), str(receipt), str(fixture)],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn('"status": "passed"', completed.stdout)
+
+    def test_adapter_materializer_rejects_non_f2_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = self._fake_source(Path(directory) / "not-f2", "not-f2")
+            with self.assertRaises(adapters.MaterializationError):
+                adapters.materialize_baseline_adapters(source)
+
     def test_execution_rejects_disallowed_qualification_overlap_before_child(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
@@ -732,6 +867,7 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             "rust-toolchain.toml": "[toolchain]\nchannel = \"stable\"\n",
             ".cargo/config.toml": "[build]\ntarget-dir = \"target\"\n",
             "crates/litchi-ppt/examples/scoped_patch_probe.rs": f"fn main() {{ println!(\"{marker}\"); }}\n",
+            "crates/litchi-ppt/examples/scoped_patch_correctness.rs": f"fn main() {{ println!(\"correctness-{marker}\"); }}\n",
             "tools/perf-baseline/examples/refusal_contract_bench.rs": f"fn main() {{ println!(\"legacy-{marker}\"); }}\n",
             "test-data/unified-ops/0294/video.ppt": f"fixture-{marker}\n",
         }
@@ -791,7 +927,11 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 source_manifests=tuple(artifact(path) for path in policy.SOURCE_MANIFEST_PATHS),
                 toolchain=artifact("rust-toolchain.toml"),
                 cargo_config=artifact(".cargo/config.toml"),
-                probes=(artifact(policy.PPT_PROBE_PATH), artifact(policy.LEGACY_PROBE_PATH)),
+                probes=(
+                    artifact(policy.PPT_PROBE_PATH),
+                    artifact(policy.LEGACY_PROBE_PATH),
+                    artifact(policy.PPT_CORRECTNESS_PATH),
+                ),
                 fixtures=(artifact("test-data/unified-ops/0294/video.ppt"),),
                 archive=policy.ArtifactPin(archive.name, hashlib.sha256(archive_payload).hexdigest(), len(archive_payload)),
                 target=policy.TARGET,

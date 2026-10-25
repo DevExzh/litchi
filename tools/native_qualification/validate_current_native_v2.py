@@ -75,7 +75,7 @@ def _same_observation(expected: Mapping[str, Any], actual: Mapping[str, Any], la
         raise ValidationError(f"{label}.artifacts is malformed")
     for name, recorded in expected_artifacts.items():
         current = actual_artifacts.get(name)
-        if name in {"probes", "source_manifests"}:
+        if name in {"probes", "source_manifests", "adapter_overlays"}:
             if recorded != current:
                 raise ValidationError(f"{label}.{name} changed since preparation")
             continue

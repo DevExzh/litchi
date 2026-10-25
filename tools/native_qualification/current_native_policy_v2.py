@@ -67,7 +67,19 @@ SOURCE_MANIFEST_PATHS = (
     "tools/native-resave/Cargo.toml",
 )
 PPT_PROBE_PATH = "crates/litchi-ppt/examples/scoped_patch_probe.rs"
+PPT_CORRECTNESS_PATH = "crates/litchi-ppt/examples/scoped_patch_correctness.rs"
 LEGACY_PROBE_PATH = "tools/perf-baseline/examples/refusal_contract_bench.rs"
+
+# The frozen f2 source predates both the standalone RTF refusal consumer and
+# the outside-clock PPT correctness companion.  They are reviewed consumer
+# adapters, not production-source overlays.  Their endpoint paths are fixed
+# here so a preparation caller cannot substitute a source file with the same
+# basename from a later candidate checkout.
+ADAPTER_SOURCE_PATHS = MappingProxyType({
+    "tools/perf-baseline/Cargo.toml": "tools/native_qualification/adapters/rtf-baseline-Cargo.toml",
+    LEGACY_PROBE_PATH: "tools/native_qualification/adapters/rtf-refusal_contract_bench.rs",
+    PPT_CORRECTNESS_PATH: "tools/native_qualification/adapters/ppt-scoped_patch_correctness-f2.rs",
+})
 
 # These are intentionally not hashes.  They identify the three source
 # transitions discussed by the current-font candidate work and must not be
@@ -197,6 +209,7 @@ class SourcePin:
     target: str
     profile: str
     features: tuple[str, ...]
+    adapter_overlays: tuple[ArtifactPin, ...] = ()
 
     def complete(self) -> bool:
         return (
@@ -218,7 +231,11 @@ class SourcePin:
             )
             and self.toolchain.complete()
             and self.cargo_config.complete()
-            and bool(self.probes)
+            and {item.relative_path for item in self.probes} >= {
+                PPT_PROBE_PATH,
+                LEGACY_PROBE_PATH,
+                PPT_CORRECTNESS_PATH,
+            }
             and all(item.complete() for item in self.probes)
             and bool(self.fixtures)
             and all(item.complete() for item in self.fixtures)
@@ -226,6 +243,9 @@ class SourcePin:
             and self.target == TARGET
             and self.profile == PROFILE
             and self.features == FEATURES
+            and all(item.complete() for item in self.adapter_overlays)
+            and len({item.relative_path for item in self.adapter_overlays}) == len(self.adapter_overlays)
+            and all(item.relative_path in ADAPTER_SOURCE_PATHS for item in self.adapter_overlays)
         )
 
     def json(self) -> dict[str, Any]:
@@ -246,6 +266,7 @@ class SourcePin:
             "target": self.target,
             "profile": self.profile,
             "features": list(self.features),
+            "adapter_overlays": [item.json() for item in self.adapter_overlays],
         }
 
     def probe_for(self, relative_path: str) -> ArtifactPin:
@@ -263,6 +284,12 @@ class SourcePin:
             return self.role_locks[index]
         except IndexError as error:
             raise PolicyIncomplete(f"{role} lock pin is not present") from error
+
+    def adapter_for(self, relative_path: str) -> ArtifactPin | None:
+        for item in self.adapter_overlays:
+            if item.relative_path == relative_path:
+                return item
+        return None
 
 
 PPT_ROUTES = (
@@ -306,6 +333,8 @@ _BASELINE_PIN = SourcePin(
     cargo_config=_artifact(".cargo/config.toml", CARGO_CONFIG_SHA256, CARGO_CONFIG_BYTES),
     probes=(
         _artifact("crates/litchi-ppt/examples/scoped_patch_probe.rs", "0350fc1696688e576613bc8b2c2ccb3d39c12b4b8ad890c5dcd14e3e7b4138ca", 5_158),
+        _artifact(LEGACY_PROBE_PATH, "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81", 12_782),
+        _artifact(PPT_CORRECTNESS_PATH, "032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a", 3_168),
     ),
     fixtures=(
         _artifact("test-data/unified-ops/0294/video.ppt", "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a", 43_520),
@@ -314,6 +343,11 @@ _BASELINE_PIN = SourcePin(
     target=TARGET,
     profile=PROFILE,
     features=FEATURES,
+    adapter_overlays=(
+        _artifact("tools/perf-baseline/Cargo.toml", "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676", 3_638),
+        _artifact(LEGACY_PROBE_PATH, "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81", 12_782),
+        _artifact(PPT_CORRECTNESS_PATH, "032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a", 3_168),
+    ),
 )
 
 # The candidate is intentionally not represented by a guessed hash.  These
@@ -331,6 +365,7 @@ _CANDIDATE_PIN = SourcePin(
     probes=(
         _artifact(PPT_PROBE_PATH, None, None),
         _artifact(LEGACY_PROBE_PATH, None, None),
+        _artifact(PPT_CORRECTNESS_PATH, None, None),
     ),
     # The path is reviewed even while the payload identity is pending.  This
     # lets manifests and diagnostics name the only admitted fixture without
@@ -435,6 +470,10 @@ class CurrentNativePolicyV2:
                 "tree_sha256": self.candidate.tree_sha256 if self.candidate.complete() else None,
             },
             "source_manifests": list(SOURCE_MANIFEST_PATHS),
+            "source_adapters": {
+                "baseline": [item.json() for item in self.baseline.adapter_overlays],
+                "candidate": [item.json() for item in self.candidate.adapter_overlays],
+            },
             "toolchain": {
                 "features": list(self.candidate.features),
                 "adapter_features": {
@@ -550,6 +589,65 @@ def _git(source: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
+def _git_blob_payload(source: Path, relative: str) -> bytes:
+    """Read one immutable HEAD blob without trusting its worktree copy."""
+
+    path = Path(relative)
+    if path.is_absolute() or ".." in path.parts or not relative:
+        raise PolicyMismatch(f"unsafe Git blob path: {relative}")
+    try:
+        completed = subprocess.run(
+            ["git", "show", f"HEAD:{relative}"], cwd=source, check=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise PolicyMismatch(f"source HEAD lacks required tracked blob: {relative}") from error
+    return completed.stdout
+
+
+def _validate_git_pin(source: Path, pin: ArtifactPin, label: str) -> dict[str, Any]:
+    """Validate the pristine Git blob behind an adapter-modified path."""
+
+    if not pin.complete():
+        raise PolicyIncomplete(f"{label} has no exact original-source pin")
+    payload = _git_blob_payload(source, pin.relative_path)
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != pin.sha256 or len(payload) != pin.bytes:
+        raise PolicyMismatch(
+            f"{label} original Git blob differs from the trusted source: "
+            f"expected {pin.sha256}/{pin.bytes}, observed {digest}/{len(payload)}"
+        )
+    return {
+        "relative_path": pin.relative_path,
+        "sha256": digest,
+        "bytes": len(payload),
+        "git_blob": _git_blob_sha1(payload),
+    }
+
+
+def _validate_adapter_source(adapter: ArtifactPin, label: str) -> dict[str, Any]:
+    """Bind an endpoint overlay to the reviewed protocol adapter source."""
+
+    try:
+        relative = ADAPTER_SOURCE_PATHS[adapter.relative_path]
+    except KeyError as error:
+        raise PolicyMismatch(f"{label} is not an admitted adapter path") from error
+    protocol_root = Path(__file__).resolve().parents[2]
+    source = protocol_root / relative
+    digest, size = _hash_file(source, f"{label} source")
+    if digest != adapter.sha256 or size != adapter.bytes:
+        raise PolicyMismatch(
+            f"{label} protocol adapter differs from its fixed identity: "
+            f"expected {adapter.sha256}/{adapter.bytes}, observed {digest}/{size}"
+        )
+    return {
+        "relative_path": adapter.relative_path,
+        "source_path": str(source.resolve()),
+        "sha256": digest,
+        "bytes": size,
+    }
+
+
 def _git_tree_entries(source: Path) -> tuple[dict[str, str], ...]:
     """Return every tracked blob in HEAD, including sparse/omitted paths."""
 
@@ -597,6 +695,8 @@ def _tracked_materialization(
     source: Path,
     entries: Sequence[Mapping[str, str]],
     allowed_overlays: Sequence[ArtifactPin] = (),
+    *,
+    require_overlays: bool = False,
 ) -> dict[str, Any]:
     """Verify every tracked blob is materialized exactly once.
 
@@ -611,8 +711,10 @@ def _tracked_materialization(
     allowed_by_path = {
         item.relative_path: item
         for item in allowed_overlays
-        if item.relative_path == "Cargo.lock" and item.complete()
+        if item.complete()
     }
+    overlay_paths: set[str] = set()
+    status_rows: list[dict[str, Any]] = []
     if status:
         for line in status.splitlines():
             if len(line) < 4:
@@ -620,12 +722,15 @@ def _tracked_materialization(
             relative = line[3:]
             if relative.startswith('"') and relative.endswith('"'):
                 relative = relative[1:-1]
-            pin = allowed_by_path.get(relative.rstrip("/"))
+            relative = relative.rstrip("/")
+            pin = allowed_by_path.get(relative)
             if pin is None:
                 raise PolicyMismatch(f"source checkout has a dirty, ignored, or untracked overlay: {line}")
-            digest, size = _hash_file(source / relative, "pinned root Cargo.lock")
+            digest, size = _hash_file(source / relative, f"pinned overlay {relative}")
             if digest != pin.sha256 or size != pin.bytes:
-                raise PolicyMismatch("ignored root Cargo.lock differs from its explicit policy pin")
+                raise PolicyMismatch(f"pinned overlay differs from its explicit policy pin: {relative}")
+            overlay_paths.add(relative)
+            status_rows.append({"path": relative, "status": line[:2], "sha256": digest, "bytes": size})
     skip_worktree = _git(source, "ls-files", "-v", "-z")
     # ``git ls-files -v`` marks skip-worktree entries with a lower-case status
     # letter.  The text mode is safe for the repository's UTF-8 tracked paths;
@@ -651,14 +756,36 @@ def _tracked_materialization(
             payload = path.read_bytes()
         except OSError as error:
             raise PolicyMismatch(f"cannot read tracked source blob: {relative}: {error}") from error
-        if _git_blob_sha1(payload) != item["object"]:
+        overlay = allowed_by_path.get(relative)
+        if overlay is not None:
+            observed_digest = hashlib.sha256(payload).hexdigest()
+            if observed_digest != overlay.sha256 or len(payload) != overlay.bytes:
+                raise PolicyMismatch(f"tracked adapter overlay differs on disk: {relative}")
+            overlay_paths.add(relative)
+        elif _git_blob_sha1(payload) != item["object"]:
             raise PolicyMismatch(f"tracked source blob differs on disk: {relative}")
         observed_paths.add(relative)
         total_bytes += len(payload)
         digest.update(f"{item['mode']} {item['object']} {relative}\0".encode("utf-8"))
     if observed_paths != expected_paths:
         raise PolicyMismatch("materialized source path set differs from the complete Git tree")
-    return {"files": len(entries), "bytes": total_bytes, "sha256": digest.hexdigest()}
+    expected_overlays = set(allowed_by_path)
+    # An allowed root Cargo.lock is ignored and may be absent from status when
+    # a caller has not materialized it yet; the later fixed-pin check reports
+    # that missing required input.  Adapter overlays, however, are required
+    # to be present before an execution receipt can be admitted.
+    missing_overlays = sorted(
+        path for path in expected_overlays
+        if path != "Cargo.lock" and not (source / path).is_file()
+    )
+    if missing_overlays and require_overlays:
+        raise PolicyMismatch(f"required adapter overlays are missing: {', '.join(missing_overlays)}")
+    return {
+        "files": len(entries),
+        "bytes": total_bytes,
+        "sha256": digest.hexdigest(),
+        "overlays": status_rows,
+    }
 
 
 def _archive_observation(path: Path, label: str, tree_sha256: str) -> dict[str, Any]:
@@ -782,10 +909,11 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
     entries = _git_tree_entries(root)
     listing = _git_tree_payload(root)
     pin = TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate
-    # Only the ignored workspace lock may be admitted as an overlay, and only
-    # when this side has a complete reviewed identity for that exact path.
+    # The ignored workspace lock and the baseline's reviewed consumer adapters
+    # are the only admitted endpoint overlays.  They are fixed policy objects,
+    # never caller-selected paths or hashes.
     workspace_lock = pin.lock_for_role("workspace")
-    tracked_tree = _tracked_materialization(root, entries, (workspace_lock,))
+    tracked_tree = _tracked_materialization(root, entries, (workspace_lock, *pin.adapter_overlays))
     artifacts: dict[str, Any] = {}
     # The candidate may have no frozen identities.  We still report every
     # reviewed path, but never turn an observation into a trusted pin.
@@ -838,6 +966,16 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
         else:
             probes.append({"relative_path": item.relative_path, "path": str(path), "missing": True})
     artifacts["probes"] = probes
+    artifacts["adapter_overlays"] = [
+        {
+            "relative_path": item.relative_path,
+            "path": str(root / item.relative_path),
+            "sha256": item.sha256,
+            "bytes": item.bytes,
+            "source_path": ADAPTER_SOURCE_PATHS[item.relative_path],
+        }
+        for item in pin.adapter_overlays
+    ]
     # Keep the old singular diagnostic key only as a projection of the first
     # fixed probe.  All admission checks below iterate the complete tuple.
     if probes:
@@ -868,7 +1006,7 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
         "tree_sha256": hashlib.sha256(listing).hexdigest(),
         "tracked_tree": tracked_tree,
         "clean": True,
-        "status": "",
+        "status": "adapter-overlays" if tracked_tree["overlays"] else "",
         "artifacts": artifacts,
         "fixtures": fixtures,
         "archive": archive_identity,
@@ -888,13 +1026,27 @@ def _validate_observed_source(observed: Mapping[str, Any], side: str, policy_pin
     for role in ROLE_NAMES:
         _pin_file(source_root, policy_pin.lock_for_role(role), f"{side} {role} lock")
     for item in policy_pin.source_manifests:
-        _pin_file(source_root, item, f"{side} source manifest {item.relative_path}")
+        overlay = policy_pin.adapter_for(item.relative_path)
+        if overlay is not None:
+            # The worktree manifest is intentionally different, but the
+            # immutable source identity remains the f2 Git blob.  Both sides
+            # of that boundary are checked before a build can use the file.
+            _validate_git_pin(source_root, item, f"{side} original source manifest {item.relative_path}")
+            _pin_file(source_root, overlay, f"{side} adapter source manifest {item.relative_path}")
+        else:
+            _pin_file(source_root, item, f"{side} source manifest {item.relative_path}")
     for name, item in (("toolchain", policy_pin.toolchain), ("cargo_config", policy_pin.cargo_config)):
         _pin_file(source_root, item, f"{side} {name}")
     for item in policy_pin.probes:
-        _pin_file(source_root, item, f"{side} probe {item.relative_path}")
+        overlay = policy_pin.adapter_for(item.relative_path)
+        if overlay is not None:
+            _pin_file(source_root, overlay, f"{side} adapter probe {item.relative_path}")
+        else:
+            _pin_file(source_root, item, f"{side} probe {item.relative_path}")
     for item in policy_pin.fixtures:
         _pin_file(source_root, item, f"{side} fixture {item.relative_path}")
+    for item in policy_pin.adapter_overlays:
+        _validate_adapter_source(item, f"{side} adapter {item.relative_path}")
     return source_root
 
 
@@ -990,6 +1142,17 @@ def _check_plan_paths(root: Path, state_dir: Path, target: Path, source_archive:
                 raise PolicyMismatch(f"PPT v2 source/output/archive paths overlap: {left_label} and {right_label}")
 
 
+def _protocol_tool_path(relative: str) -> Path:
+    """Resolve a fixed protocol helper, never a file inside an endpoint."""
+
+    protocol_root = Path(__file__).resolve().parents[2]
+    path = protocol_root / relative
+    _reject_symlink_components(path, f"protocol helper {relative}")
+    if path.is_symlink() or not path.is_file():
+        raise PolicyMismatch(f"reviewed protocol helper is missing: {path}")
+    return path
+
+
 def _policy_pin(side: str) -> SourcePin:
     if side in {"baseline", "before"}:
         return TRUSTED_POLICY.baseline
@@ -1054,7 +1217,8 @@ def make_ppt_steps_v2(
     policy_side = _policy_side(side)
     validate_source(root, policy_side, source_archive)
     guard = Path(__file__).resolve()
-    host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
+    host_guard = _protocol_tool_path("docs/unified-ops/results/0362g/ppt_host_process_guard.py")
+    ppt_validator = _protocol_tool_path("docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py")
     fixture_pins = _policy_pin(policy_side).fixtures
     if not fixture_pins:
         raise PolicyIncomplete("candidate fixture pins are not complete")
@@ -1097,6 +1261,7 @@ def make_ppt_steps_v2(
             step["produces_binaries"] = True
         if route is not None:
             step.update({"route": route.route, "output": route.output, "status": route.status})
+            step["fixture"] = str(fixture)
         return step
 
     return [
@@ -1108,7 +1273,7 @@ def make_ppt_steps_v2(
         ),
         direct("ppt-scoped-correctness-suite", [*guarded, "sh", "-c", correctness], route=PPT_ROUTES[1], phase="build", env={"RUST_TEST_THREADS": "1"}, artifact_path=suite_receipt),
         direct("ppt-scoped-correctness", [sys.executable, str(host_guard), "--", str(binary), str(fixture), str(receipt)], route=PPT_ROUTES[2], artifact_path=receipt),
-        direct("ppt-scoped-correctness-validate", [sys.executable, str(root / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"), str(receipt), str(fixture)], route=PPT_ROUTES[3], artifact_path=receipt),
+        direct("ppt-scoped-correctness-validate", [sys.executable, str(ppt_validator), str(receipt), str(fixture)], route=PPT_ROUTES[3], artifact_path=receipt),
     ]
 
 
@@ -1139,7 +1304,7 @@ def make_legacy_steps_v2(
     policy_side = _policy_side(side)
     validate_source(root, policy_side, source_archive)
     guard = Path(__file__).resolve()
-    host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
+    host_guard = _protocol_tool_path("docs/unified-ops/results/0362g/ppt_host_process_guard.py")
     binary_paths = [target / TARGET / "release/examples/refusal_contract_bench"]
     binary = binary_paths[0]
     guarded = _guarded_lock(root, "perf", guard, policy_side)
@@ -1223,7 +1388,13 @@ def _default_v2_executor(step: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _v2_result_payload(result: Mapping[str, Any], route: RoutePin, output_root: Path) -> bytes:
+def _v2_result_payload(
+    result: Mapping[str, Any],
+    route: RoutePin,
+    output_root: Path,
+    *,
+    expected_fixture: Path | None = None,
+) -> bytes:
     """Extract one reviewed, typed route stream without accepting raw bytes.
 
     The native RTF child emits a JSON-lines report containing all eight fixed
@@ -1288,20 +1459,68 @@ def _v2_result_payload(result: Mapping[str, Any], route: RoutePin, output_root: 
                 raise PolicyMismatch(f"{route.route} did not produce exactly one fixed scenario record")
             return selected[0]
         selected: list[bytes] = []
+
+        def digest(value: Any, field: str) -> str:
+            if not isinstance(value, str) or SHA256.fullmatch(value) is None:
+                raise PolicyMismatch(f"{route.route} {field} is not a SHA-256 digest")
+            return value
+
+        def correctness(value: Mapping[str, Any]) -> None:
+            required = {
+                "mode", "fixture", "media_id", "requested_external_media_path",
+                "external_media_path", "source_len", "target_len", "source_sha256",
+                "target_sha256", "inverse_source_sha256", "inverse_matches_source",
+            }
+            missing = sorted(required - value.keys())
+            if missing:
+                raise PolicyMismatch(f"{route.route} correctness record misses: {', '.join(missing)}")
+            if value.get("mode") != "scoped_patch_correctness":
+                raise PolicyMismatch(f"{route.route} has the wrong correctness mode")
+            fixture_value = value.get("fixture")
+            if not isinstance(fixture_value, str):
+                raise PolicyMismatch(f"{route.route} correctness fixture is not a path")
+            fixture_path = Path(fixture_value).resolve()
+            if expected_fixture is not None and fixture_path != Path(expected_fixture).resolve():
+                raise PolicyMismatch(f"{route.route} correctness fixture differs from the fixed fixture")
+            if value.get("media_id") != 1 or type(value.get("media_id")) is not int:
+                raise PolicyMismatch(f"{route.route} correctness media ID is not 1")
+            if value.get("requested_external_media_path") != "clip-0000.avi" or value.get("external_media_path") != "clip-0000.avi":
+                raise PolicyMismatch(f"{route.route} correctness path differs from clip-0000.avi")
+            source_len = value.get("source_len")
+            target_len = value.get("target_len")
+            if type(source_len) is not int or type(target_len) is not int or target_len <= 0:
+                raise PolicyMismatch(f"{route.route} correctness extents are invalid")
+            source_hash = digest(value.get("source_sha256"), "source_sha256")
+            target_hash = digest(value.get("target_sha256"), "target_sha256")
+            inverse_hash = digest(value.get("inverse_source_sha256"), "inverse_source_sha256")
+            if source_hash == target_hash or inverse_hash != source_hash or value.get("inverse_matches_source") is not True:
+                raise PolicyMismatch(f"{route.route} correctness replay/inverse relation is invalid")
+            if expected_fixture is not None:
+                fixture_bytes = Path(expected_fixture).read_bytes()
+                if source_len != len(fixture_bytes) or source_hash != hashlib.sha256(fixture_bytes).hexdigest():
+                    raise PolicyMismatch(f"{route.route} correctness source does not match the fixed fixture")
+            replay_fields = {"replay_target_sha256", "replay_matches_target"} & value.keys()
+            if replay_fields:
+                if replay_fields != {"replay_target_sha256", "replay_matches_target"}:
+                    raise PolicyMismatch(f"{route.route} replay fields must be supplied together")
+                if digest(value.get("replay_target_sha256"), "replay_target_sha256") != target_hash or value.get("replay_matches_target") is not True:
+                    raise PolicyMismatch(f"{route.route} forward replay relation is invalid")
+
         for value, raw in rows:
             if value.get("route") == route.route:
+                if route.kind == "validate":
+                    if value.get("status") != "passed" or value.get("external_media_path") != "clip-0000.avi" or value.get("inverse_matches_source") is not True:
+                        raise PolicyMismatch(f"{route.route} validator summary is not the reviewed correctness result")
                 selected.append(raw)
                 continue
             if route.kind == "correctness" and value.get("status") == "ok":
                 selected.append(raw)
             elif route.kind == "probe" and value.get("mode") == "scoped_patch_correctness":
-                required = {
-                    "source_sha256", "target_sha256", "replay_target_sha256",
-                    "replay_matches_target", "inverse_source_sha256", "inverse_matches_source",
-                }
-                if required.issubset(value) and value.get("replay_matches_target") is True and value.get("inverse_matches_source") is True:
-                    selected.append(raw)
+                correctness(value)
+                selected.append(raw)
             elif route.kind == "validate" and value.get("status") == "passed":
+                if value.get("external_media_path") != "clip-0000.avi" or value.get("inverse_matches_source") is not True:
+                    raise PolicyMismatch(f"{route.route} validator summary is not the reviewed correctness result")
                 selected.append(raw)
         if len(selected) != 1:
             raise PolicyMismatch(f"{route.route} did not produce exactly one typed route record")
@@ -1570,7 +1789,12 @@ def execute_v2(
                     payload = _canonical({"route": route.route, "status": "ok", "binary": binary_identity})
                     actual_for_final = Path(binary_identity["path"]).read_bytes() if Path(binary_identity["path"]).is_file() else payload
                 else:
-                    payload = _v2_result_payload(result, route, output_root)
+                    payload = _v2_result_payload(
+                        result,
+                        route,
+                        output_root,
+                        expected_fixture=Path(planned["fixture"]) if isinstance(planned.get("fixture"), str) else None,
+                    )
                     artifact_path = result.get("output_path") or planned.get("artifact_path")
                     actual_for_final = Path(str(artifact_path)).read_bytes() if isinstance(artifact_path, str) and Path(artifact_path).is_file() else payload
                 relative_leg = f".abba/{re.sub(r'[^A-Za-z0-9_.-]+', '_', route.route)}/b{block}-{index}-{side}.stream"
