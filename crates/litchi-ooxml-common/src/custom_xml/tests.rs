@@ -144,12 +144,7 @@ fn package_writer_round_trips_without_interpreting_payload() {
     // Adding an item changes the signed package, so it is refused before any
     // part is inserted until the signature is removed explicitly (ADR 0006).
     let parts = package.part_count();
-    assert!(matches!(
-        add_item(&mut package, item()),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(add_item(&mut package, item()), Err(Error::Signed)));
     assert!(package.is_signed());
     assert_eq!(package.part_count(), parts);
     package.unsign();
@@ -537,7 +532,10 @@ fn transaction_crud_is_source_checked_and_failure_atomic() {
         .unwrap()
         .set_blob(b"<changed/>".to_vec());
     let before_parts = package.part_count();
-    assert!(stale_patch.apply(&package).is_err());
+    assert!(matches!(
+        stale_patch.apply(&package),
+        Err(Error::PatchConflict)
+    ));
     assert_eq!(package.part_count(), before_parts);
     assert_eq!(package.get_part(&source).unwrap().blob(), b"<changed/>");
 }
@@ -633,18 +631,8 @@ fn changed_transactions_and_patches_refuse_a_signed_package() {
     // A changed transaction and a changed patch are refused (ADR 0006).
     let mut edit = Edit::new(&package).unwrap();
     edit.insert(item()).unwrap();
-    assert!(matches!(
-        edit.commit(),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
-    assert!(matches!(
-        patch.apply(&package),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    assert!(matches!(patch.apply(&package), Err(Error::Signed)));
     assert!(package.is_signed());
     assert_eq!(package.part_count(), parts);
 

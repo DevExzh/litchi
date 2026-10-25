@@ -180,5 +180,5 @@ fn push_unique(names: &mut Vec<PackURI>, candidate: &PackURI) {
 }
 
 pub(crate) fn source_mismatch() -> Error {
-    Error::Relationship("custom XML patch source graph changed".into())
+    Error::PatchConflict
 }

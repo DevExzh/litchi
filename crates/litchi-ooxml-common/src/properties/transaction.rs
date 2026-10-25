@@ -202,6 +202,13 @@ pub enum Error {
 impl From<crate::Error> for Error {
     fn from(error: crate::Error) -> Self {
         match error {
+            crate::Error::Refused(refusal) => Self::Refused(refusal),
+            crate::Error::PatchConflict => Self::PatchConflict,
+            crate::Error::Signed => Self::Signed,
+            crate::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            crate::Error::Internal(reason) => Self::Internal(reason),
             crate::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy) => Self::Signed,
             crate::Error::Opc(error) => match source_changed(&error) {
                 Some((expected, observed)) => Self::SourceChanged { expected, observed },

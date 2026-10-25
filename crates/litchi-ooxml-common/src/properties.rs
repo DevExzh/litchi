@@ -518,11 +518,9 @@ impl Slot {
     /// # Errors
     ///
     /// Returns [`crate::Error::Invalid`] for a field core properties cannot
-    /// store, [`crate::Error::Opc`] with
-    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// for a change to a signed package, and an error when input violates
-    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
-    /// package operation fails.
+    /// store, [`crate::Error::Signed`] for a change to a signed package, and
+    /// an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     #[cfg(test)]
     pub(crate) fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;

@@ -912,6 +912,39 @@ fn nested_opc_source_changes_are_promoted() {
 }
 
 #[test]
+fn direct_common_semantic_errors_keep_their_metadata_classification() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    let refusal = Refusal::new(
+        RefusalKind::UnsupportedContent,
+        "set_metadata",
+        "unsupported metadata content cannot be rewritten",
+    );
+    assert!(matches!(
+        Error::from(crate::Error::Refused(refusal)),
+        Error::Refused(value)
+            if value.kind() == RefusalKind::UnsupportedContent
+                && value.reason() == "unsupported metadata content cannot be rewritten"
+    ));
+    assert!(matches!(
+        Error::from(crate::Error::PatchConflict),
+        Error::PatchConflict
+    ));
+    assert!(matches!(Error::from(crate::Error::Signed), Error::Signed));
+    let expected = litchi_core::SourceVersion::new(8, 1);
+    let observed = litchi_core::SourceVersion::new(8, 2);
+    assert!(matches!(
+        Error::from(crate::Error::SourceChanged { expected, observed }),
+        Error::SourceChanged { expected: before, observed: after }
+            if before == expected && after == observed
+    ));
+    assert!(matches!(
+        Error::from(crate::Error::Internal("prepared metadata invariant failed")),
+        Error::Internal("prepared metadata invariant failed")
+    ));
+}
+
+#[test]
 fn malformed_source_property_xml_is_package_corruption() {
     let mut package = full();
     package

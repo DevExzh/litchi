@@ -1209,6 +1209,20 @@ fn common_invalid_limit(error: &litchi_ooxml_common::Error) -> bool {
 }
 
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn classify_common_semantic(error: &litchi_ooxml_common::Error) -> Option<Class> {
+    match error {
+        litchi_ooxml_common::Error::Refused(refusal) => Some(refusal.classify()),
+        litchi_ooxml_common::Error::PatchConflict => Some(Class::of(Code::InvalidInput)),
+        litchi_ooxml_common::Error::Signed => {
+            Some(Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION))
+        },
+        litchi_ooxml_common::Error::SourceChanged { .. } => Some(Class::of(Code::IoError)),
+        litchi_ooxml_common::Error::Internal(_) => Some(Class::of(Code::InternalError)),
+        _ => None,
+    }
+}
+
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 impl Classify for litchi_opc::OpcError {
     fn classify(&self) -> Class {
         match self {
@@ -1293,6 +1307,8 @@ impl Classify for litchi_docx::Error {
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Drawing(error) => error.classify(),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
+            Self::SourceChanged { .. } => Class::of(Code::IoError),
             // A nonempty accepted prefix means the sink observed a partial
             // publication, regardless of whether the producer or OPC layer
             // raised the secondary cause. A zero-prefix stream preserves the
@@ -1326,6 +1342,10 @@ impl Classify for litchi_docx::Error {
             | Self::ExternalHyperlinkRedactionLimit { .. }
             | Self::SectionInventoryLimit { .. } => Class::of(Code::LimitExceeded),
             // The shared OOXML families' typed budgets (record 0360).
+            Self::Common(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
+            Self::Common(error) if classify_common_semantic(error).is_some() => {
+                classify_common_semantic(error).unwrap_or_else(|| Class::of(Code::CorruptFile))
+            },
             Self::Common(error) if common_invalid_limit(error) => Class::of(Code::InvalidArgument),
             Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::Mce(error) if mce_invalid_limit(error) => Class::of(Code::InvalidArgument),
@@ -1427,6 +1447,8 @@ impl Classify for litchi_pptx::Error {
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Drawing(error) => error.classify(),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
+            Self::SourceChanged { .. } => Class::of(Code::IoError),
             // A patch for another base: the caller supplied it (record 0351).
             Self::PatchConflict => Class::of(Code::InvalidInput),
             // Every well-formed refusal is classified by its shared kind;
@@ -1438,6 +1460,9 @@ impl Classify for litchi_pptx::Error {
             // a source change or cancellation during the read, through the
             // shared OOXML error.
             Self::CustomProperties(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
+            Self::CustomProperties(error) if classify_common_semantic(error).is_some() => {
+                classify_common_semantic(error).unwrap_or_else(|| Class::of(Code::CorruptFile))
+            },
             Self::CustomProperties(error) if common_invalid_limit(error) => {
                 Class::of(Code::InvalidArgument)
             },
@@ -1482,6 +1507,12 @@ impl Classify for litchi_xlsx::Error {
                 _ => Class::of(Code::CorruptFile),
             },
             Self::Package(error) => error.classify(),
+            Self::SourceChanged { .. } => Class::of(Code::IoError),
+            Self::Internal(_) => Class::of(Code::InternalError),
+            Self::Common(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
+            Self::Common(error) if classify_common_semantic(error).is_some() => {
+                classify_common_semantic(error).unwrap_or_else(|| Class::of(Code::CorruptFile))
+            },
             Self::Common(error) if common_invalid_limit(error) => {
                 Class::of(Code::InvalidArgument)
             },
@@ -1595,6 +1626,12 @@ impl Classify for litchi_xlsb::package::PackageError {
             Self::Io(error) => error.classify(),
             Self::Opc(error) => error.classify(),
             Self::Common(error) if common_invalid_limit(error) => Class::of(Code::InvalidArgument),
+            Self::SourceChanged { .. } => Class::of(Code::IoError),
+            Self::Internal(_) => Class::of(Code::InternalError),
+            Self::Common(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
+            Self::Common(error) if classify_common_semantic(error).is_some() => {
+                classify_common_semantic(error).unwrap_or_else(|| Class::of(Code::CorruptFile))
+            },
             Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::Wire(error) => error.classify(),
             Self::Execution(error) => error.classify(),

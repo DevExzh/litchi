@@ -187,9 +187,7 @@ fn identical_put_is_a_signature_and_allocation_preserving_noop() {
     };
     assert!(matches!(
         put(&mut package, Version::V2007, changed(), &Limits::standard()),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
+        Err(Error::Signed)
     ));
     assert!(package.is_signed());
     assert!(Arc::ptr_eq(
@@ -526,9 +524,7 @@ fn remove_collects_unreferenced_ribbon_and_image_parts() {
     // is removed, until the signature is removed explicitly (ADR 0006).
     assert!(matches!(
         remove(&mut package, Family::Legacy),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
+        Err(Error::Signed)
     ));
     assert!(package.is_signed());
     assert!(package.get_part(&ribbon).is_ok());

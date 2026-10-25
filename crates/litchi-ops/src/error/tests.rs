@@ -566,6 +566,72 @@ fn shared_ooxml_family_limits_are_limit_exceeded() {
     }
 }
 
+/// Shared semantic publication failures retain their contract when a format
+/// adapter receives them through its common-error wrapper.
+#[test]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn shared_ooxml_semantic_errors_keep_their_wire_classes() {
+    let shared = || {
+        vec![
+            (
+                litchi_ooxml_common::Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "test",
+                    "the operation is not supported",
+                )),
+                Code::UnsupportedCapability,
+            ),
+            (
+                litchi_ooxml_common::Error::PatchConflict,
+                Code::InvalidInput,
+            ),
+            (litchi_ooxml_common::Error::Signed, Code::DocumentProtected),
+            (
+                litchi_ooxml_common::Error::SourceChanged {
+                    expected: SourceVersion::new(7, 1),
+                    observed: SourceVersion::new(7, 2),
+                },
+                Code::IoError,
+            ),
+            (
+                litchi_ooxml_common::Error::Internal("generated invariant"),
+                Code::InternalError,
+            ),
+        ]
+    };
+    let check = |error: Error, expected| assert_eq!(error.code(), expected, "{error:?}");
+    #[cfg(feature = "docx")]
+    for (error, expected) in shared() {
+        check(litchi_docx::Error::Common(error).into(), expected);
+    }
+    #[cfg(feature = "docx")]
+    check(
+        litchi_docx::Error::Common(litchi_ooxml_common::Error::Opc(
+            litchi_opc::OpcError::SourceChanged {
+                expected: SourceVersion::new(8, 1),
+                actual: SourceVersion::new(8, 2),
+            },
+        ))
+        .into(),
+        Code::IoError,
+    );
+    #[cfg(feature = "pptx")]
+    for (error, expected) in shared() {
+        check(litchi_pptx::Error::CustomProperties(error).into(), expected);
+    }
+    #[cfg(feature = "xlsx")]
+    for (error, expected) in shared() {
+        check(litchi_xlsx::Error::Common(error).into(), expected);
+    }
+    #[cfg(feature = "xlsb")]
+    for (error, expected) in shared() {
+        check(
+            litchi_xlsb::package::PackageError::Common(error).into(),
+            expected,
+        );
+    }
+}
+
 /// A shared MCE policy rejects malformed caller bounds before reading input;
 /// hosts must preserve that as an invalid argument rather than an exhausted file
 /// resource (record 0360).

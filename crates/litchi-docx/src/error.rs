@@ -88,7 +88,7 @@ pub enum Error {
 
     /// A shared host-neutral OOXML service failed.
     #[error("shared OOXML error: {0}")]
-    Common(#[from] litchi_ooxml_common::Error),
+    Common(#[source] litchi_ooxml_common::Error),
 
     /// File or stream I/O failed.
     #[error("I/O error: {0}")]
@@ -106,6 +106,19 @@ pub enum Error {
         operation: &'static str,
         /// What did not match.
         reason: &'static str,
+    },
+
+    /// A changed package still carries signature infrastructure.
+    #[error("DOCX signed package requires an explicit signature disposition")]
+    Signed,
+
+    /// A source-backed package changed while the operation was in progress.
+    #[error("DOCX source changed while the operation was in progress")]
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
     },
 
     /// A broken internal invariant: state the crate itself should have
@@ -443,5 +456,22 @@ impl From<std::fmt::Error> for Error {
 impl From<litchi_ooxml_common::XmlError> for Error {
     fn from(error: litchi_ooxml_common::XmlError) -> Self {
         Self::Common(litchi_ooxml_common::Error::Decode(error))
+    }
+}
+
+impl From<litchi_ooxml_common::Error> for Error {
+    fn from(error: litchi_ooxml_common::Error) -> Self {
+        match error {
+            litchi_ooxml_common::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ooxml_common::Error::PatchConflict => {
+                Self::conflict("shared OOXML", "the selected package graph changed")
+            },
+            litchi_ooxml_common::Error::Signed => Self::Signed,
+            litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            litchi_ooxml_common::Error::Internal(reason) => Self::internal("shared OOXML", reason),
+            other => Self::Common(other),
+        }
     }
 }

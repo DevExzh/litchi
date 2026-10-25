@@ -34,9 +34,15 @@ pub(crate) fn ensure_unsigned(package: &OpcPackage) -> Result<()> {
 #[cfg(feature = "vba-inspection")]
 pub(crate) fn from_shared(error: litchi_ooxml_common::Error) -> Error {
     match error {
-        litchi_ooxml_common::Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-        ) => Error::Signed,
+        litchi_ooxml_common::Error::Refused(refusal) => Error::Refused(refusal),
+        litchi_ooxml_common::Error::PatchConflict => Error::PatchConflict {
+            part: "shared OOXML graph".to_owned(),
+        },
+        litchi_ooxml_common::Error::Signed => Error::Signed,
+        litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+            Error::SourceChanged { expected, observed }
+        },
+        litchi_ooxml_common::Error::Internal(reason) => Error::Internal(reason),
         error => Error::Common(error),
     }
 }

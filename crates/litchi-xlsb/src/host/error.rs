@@ -127,6 +127,15 @@ pub enum Error {
         /// Human-readable closure name.
         part: &'static str,
     },
+    /// A source-backed package changed while the operation was in progress.
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+    /// A generated staging or publication invariant was not satisfied.
+    Internal(&'static str),
     /// The package contains a signature/edit policy that forbids this change.
     Signed,
     /// A recognized Custom Data storage still has inbound BIFF12 references.
@@ -396,6 +405,10 @@ impl fmt::Display for Error {
             Error::Opc(error) => write!(f, "OPC source error: {error}"),
             Error::Execution(error) => write!(f, "execution policy error: {error}"),
             Error::PatchConflict { part } => write!(f, "source patch conflict: {part}"),
+            Error::SourceChanged { .. } => {
+                write!(f, "XLSB source changed while the operation was in progress")
+            },
+            Error::Internal(reason) => write!(f, "XLSB internal invariant failed: {reason}"),
             Error::Signed => write!(f, "package signature/edit policy forbids this change"),
             Error::CustomDataReferenced {
                 storage,
@@ -488,9 +501,11 @@ impl std::error::Error for Error {
             | Error::InvalidLimit { .. }
             | Error::Refused(_)
             | Error::UnsupportedOpenPolicy { .. } => None,
-            Error::PatchConflict { .. } | Error::Signed | Error::CustomDataReferenced { .. } => {
-                None
-            },
+            Error::PatchConflict { .. }
+            | Error::SourceChanged { .. }
+            | Error::Internal(_)
+            | Error::Signed
+            | Error::CustomDataReferenced { .. } => None,
         }
     }
 }
@@ -663,7 +678,18 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
 
 impl From<litchi_ooxml_common::Error> for Error {
     fn from(error: litchi_ooxml_common::Error) -> Self {
-        Self::Common(error)
+        match error {
+            litchi_ooxml_common::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ooxml_common::Error::PatchConflict => Self::PatchConflict {
+                part: "shared OOXML graph",
+            },
+            litchi_ooxml_common::Error::Signed => Self::Signed,
+            litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            litchi_ooxml_common::Error::Internal(reason) => Self::Internal(reason),
+            other => Self::Common(other),
+        }
     }
 }
 
@@ -749,7 +775,9 @@ impl From<Error> for litchi_core::sheet::Error {
                 "the XLSB workbook was opened without this capability",
             ),
             Error::Opc(_) | Error::Execution(_) => Self::Io,
-            Error::PatchConflict { .. } => Self::Internal("an XLSB patch conflicts with its base"),
+            Error::SourceChanged { .. } => Self::Io,
+            Error::Internal(reason) => Self::Internal(reason),
+            Error::PatchConflict { .. } => Self::PatchConflict,
             Error::SheetNameDependency(_)
             | Error::Xml(_)
             | Error::Wire(_)
@@ -777,5 +805,17 @@ impl From<Error> for litchi_core::sheet::Error {
             #[cfg(feature = "vba-inspection")]
             Error::Vba(_) => Self::Malformed("the XLSB data is malformed"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sheet_conversion_preserves_patch_conflict() {
+        let error = super::Error::PatchConflict { part: "workbook" };
+        assert!(matches!(
+            litchi_core::sheet::Error::from(error),
+            litchi_core::sheet::Error::PatchConflict
+        ));
     }
 }
