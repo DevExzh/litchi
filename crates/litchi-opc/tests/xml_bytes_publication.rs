@@ -20,6 +20,22 @@ fn source_package() -> OpcPackage {
     OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), limits).unwrap()
 }
 
+fn case_alias_source_package() -> OpcPackage {
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
+    writer
+        .write_stored(
+            "[Content_Types].xml",
+            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+        )
+        .unwrap();
+    writer
+        .write_stored("CUSTOMUI.XML", b"<root>\n  <old/>\n</root>")
+        .unwrap();
+    OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
+}
+
 fn xml_of_size(size: usize) -> Arc<Vec<u8>> {
     let mut xml = b"<root><!--".to_vec();
     xml.resize(size - b"--></root>".len(), b'x');
@@ -210,4 +226,36 @@ fn authored_xml_replacement_is_stale_safe_and_signed_noop_preserving() {
         &package.get_part(&name).unwrap().blob_arc(),
         &original
     ));
+}
+
+#[test]
+fn xml_replacement_provenance_uses_canonical_name_for_case_aliases() {
+    let alias = PackURI::new("/customui.xml").unwrap();
+    let canonical = PackURI::new("/CUSTOMUI.XML").unwrap();
+    let replacement = Arc::new(b"<root>\n  <new/>\n</root>".to_vec());
+
+    let mut authored = case_alias_source_package();
+    let original = authored.get_part(&alias).unwrap().blob_arc();
+    authored
+        .try_replace_authored_xml_part_bytes(
+            &alias,
+            &original,
+            Arc::clone(&replacement),
+            SourceLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        authored.source_xml_part(&canonical).unwrap().bytes(),
+        replacement.as_slice()
+    );
+
+    let mut strict = case_alias_source_package();
+    let original = strict.get_part(&alias).unwrap().blob_arc();
+    strict
+        .try_replace_owned_xml_part_bytes(&alias, &original, Arc::clone(&replacement))
+        .unwrap();
+    assert_eq!(
+        strict.source_xml_part(&canonical).unwrap().bytes(),
+        replacement.as_slice()
+    );
 }
