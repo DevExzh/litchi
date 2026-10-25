@@ -299,7 +299,29 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
 
         if skip_depth > 0 {
             match event {
-                Event::Start(_) => skip_depth = skip_depth.saturating_add(1),
+                Event::Start(element) => {
+                    validate_source_attributes(&reader, &element)?;
+                    skip_depth = skip_depth.saturating_add(1);
+                },
+                Event::Empty(element) => validate_source_attributes(&reader, &element)?,
+                Event::Text(value) => {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    let decoded = quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_source_text(&decoded, "core properties XML text")?;
+                },
+                Event::CData(value) => {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_source_text(&decoded, "core properties XML text")?;
+                },
+                Event::GeneralRef(reference) => {
+                    let decoded = decode_xml_reference(&reference)?;
+                    validate_source_text(&decoded, "core properties XML text")?;
+                },
                 Event::End(_) => skip_depth -= 1,
                 Event::DocType(_) => {
                     return Err(Error::Invalid(
@@ -307,7 +329,32 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(comment) => {
+                    validate_source_bytes(
+                        &reader,
+                        comment.as_ref(),
+                        "core properties XML comment",
+                    )?;
+                },
+                Event::Decl(declaration) => {
+                    validate_source_bytes(
+                        &reader,
+                        declaration.as_ref(),
+                        "core properties XML declaration",
+                    )?;
+                },
+                Event::PI(instruction) => {
+                    validate_source_bytes(
+                        &reader,
+                        instruction.target(),
+                        "core properties XML processing instruction",
+                    )?;
+                    validate_source_bytes(
+                        &reader,
+                        instruction.content(),
+                        "core properties XML processing instruction",
+                    )?;
+                },
             }
             buffer.clear();
             continue;
@@ -334,6 +381,7 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
             Event::Start(element) if !root_closed && active.is_none() => {
                 let Some(property) = admit_property(namespace, &element, &mut seen, recorder)?
                 else {
+                    validate_source_attributes(&reader, &element)?;
                     skip_depth = 1;
                     buffer.clear();
                     continue;
@@ -355,6 +403,7 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
             Event::Empty(element) if !root_closed && active.is_none() => {
                 let Some(property) = admit_property(namespace, &element, &mut seen, recorder)?
                 else {
+                    validate_source_attributes(&reader, &element)?;
                     buffer.clear();
                     continue;
                 };
@@ -401,16 +450,20 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
                     .map_err(|error| Error::Xml(error.to_string()))?;
                 let decoded = quick_xml::escape::unescape(&decoded)
                     .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_source_text(&decoded, "core properties XML text")?;
                 push_property_text(&mut active, &decoded)?;
             },
             Event::CData(value) => {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_source_text(&decoded, "core properties XML text")?;
                 push_property_text(&mut active, &decoded)?;
             },
             Event::GeneralRef(reference) => {
-                push_property_text(&mut active, &decode_xml_reference(&reference)?)?;
+                let decoded = decode_xml_reference(&reference)?;
+                validate_source_text(&decoded, "core properties XML text")?;
+                push_property_text(&mut active, &decoded)?;
             },
             Event::End(element) if active.is_some() => {
                 close_active(
@@ -443,7 +496,26 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
                 ));
             },
             Event::Eof => break,
-            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
+            Event::Comment(comment) => {
+                validate_source_bytes(&reader, comment.as_ref(), "core properties XML comment")?
+            },
+            Event::Decl(declaration) => validate_source_bytes(
+                &reader,
+                declaration.as_ref(),
+                "core properties XML declaration",
+            )?,
+            Event::PI(instruction) => {
+                validate_source_bytes(
+                    &reader,
+                    instruction.target(),
+                    "core properties XML processing instruction",
+                )?;
+                validate_source_bytes(
+                    &reader,
+                    instruction.content(),
+                    "core properties XML processing instruction",
+                )?;
+            },
         }
         buffer.clear();
     }
@@ -570,6 +642,7 @@ fn keyword_lang(
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_text(&value, "core properties XML attribute")?;
         if matches!(raw_key, b"xmlns") || raw_key.starts_with(b"xmlns:") {
             if value.as_bytes() == MARKUP_COMPATIBILITY_NAMESPACE {
                 return Err(Error::Invalid(
@@ -690,6 +763,26 @@ fn close_active(
     }
 }
 
+fn validate_source_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute
+            .map_err(|error| Error::Xml(format!("invalid core property attribute: {error}")))?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_text(&value, "core properties XML attribute")?;
+    }
+    Ok(())
+}
+
+fn validate_source_bytes(reader: &NsReader<&[u8]>, bytes: &[u8], property: &str) -> Result<()> {
+    let value = reader
+        .decoder()
+        .decode(bytes)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    validate_source_text(&value, property)
+}
+
 fn validate_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -714,6 +807,7 @@ fn validate_attributes(
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_text(&value, owner)?;
         if matches!(raw_key, b"xmlns") || raw_key.starts_with(b"xmlns:") {
             if value.as_bytes() == MARKUP_COMPATIBILITY_NAMESPACE {
                 return Err(Error::Invalid(
@@ -812,6 +906,21 @@ fn append_bounded(text: &mut String, value: &str) -> Result<()> {
     }
     text.push_str(value);
     Ok(())
+}
+
+fn validate_source_text(value: &str, property: &str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| !is_xml_10_char(*character)) {
+        return Err(Error::Invalid(format!(
+            "{property} contains XML 1.0-forbidden character U+{:04X}",
+            u32::from(character)
+        )));
+    }
+    Ok(())
+}
+
+fn is_xml_10_char(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || matches!(u32::from(character), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
 fn apply_property(

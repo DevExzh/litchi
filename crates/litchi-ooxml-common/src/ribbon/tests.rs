@@ -306,6 +306,23 @@ fn xml_declarations_characters_namespaces_and_inert_instructions_are_strict() {
         normalized_namespace
     );
 
+    let replacement = br#"<?xml version="1.0"?><customUI xmlns="http://schemas.microsoft.com/office/2006/01/customu&#x69;"><?changed retained?></customUI>"#;
+    put(
+        &mut valid,
+        Version::V2007,
+        replacement.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
+    assert_eq!(
+        load(&valid, &Limits::standard())
+            .unwrap()
+            .legacy()
+            .unwrap()
+            .xml(),
+        replacement
+    );
+
     for invalid in [
         br#"<?xml?><customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"/>"#
             .as_slice(),

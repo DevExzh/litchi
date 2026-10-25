@@ -1918,6 +1918,20 @@
       "package": "litchi-opc",
       "default_features": false,
       "features": [],
+      "required_signatures": [
+        {
+          "method": "litchi_opc::OpcPackage::try_add_authored_xml_part_bytes",
+          "inputs": ["self", "name", "content_type", "bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_opc::OpcPackage::try_replace_authored_xml_part_bytes",
+          "inputs": ["self", "partname", "expected", "replacement", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        }
+      ],
       "banned_names": [
         {
           "name": "ReadLimits",
@@ -2075,6 +2089,20 @@
       "features": [
         "sign",
         "performance-diagnostics"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_opc::OpcPackage::try_add_authored_xml_part_bytes",
+          "inputs": ["self", "name", "content_type", "bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_opc::OpcPackage::try_replace_authored_xml_part_bytes",
+          "inputs": ["self", "partname", "expected", "replacement", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        }
       ],
       "banned_names": [
         {

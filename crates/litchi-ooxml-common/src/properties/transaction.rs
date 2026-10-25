@@ -309,34 +309,17 @@ fn source_local_error(error: Error) -> Error {
     }
 }
 
-fn is_xml_lexical_error(message: &str) -> bool {
-    message.contains("XML 1.0-forbidden character")
-}
-
 fn app_plan_error(error: crate::Error) -> Error {
     match error {
         crate::Error::Limit { .. } => Error::from(error),
-        crate::Error::Invalid(message)
-            if message == "changed application-properties edit became a no-op"
-                || message == "extended-properties encoded size overflow" =>
-        {
-            Error::Internal("application-properties prepared-size invariant failed")
-        },
         crate::Error::Invalid(message) => Error::Package(crate::Error::Invalid(message)),
         other => Error::from(other),
     }
 }
 
-fn generated_codec_error(
-    error: crate::Error,
-    authored_lexical: bool,
-    reason: &'static str,
-) -> Error {
+fn generated_codec_error(error: crate::Error, reason: &'static str) -> Error {
     match error {
         crate::Error::Limit { .. } => Error::from(error),
-        crate::Error::Invalid(message) if authored_lexical && is_xml_lexical_error(&message) => {
-            Error::Invalid(message)
-        },
         crate::Error::Invalid(_)
         | crate::Error::Xml(_)
         | crate::Error::Decode(_)
@@ -345,32 +328,41 @@ fn generated_codec_error(
     }
 }
 
-fn app_generated_error(error: crate::Error) -> Error {
+fn authored_codec_error(error: crate::Error, reason: &'static str) -> Error {
+    match error {
+        crate::Error::Limit { .. } => Error::from(error),
+        crate::Error::Invalid(message) => Error::Invalid(message),
+        crate::Error::Xml(_) | crate::Error::Decode(_) | crate::Error::Allocation { .. } => {
+            Error::Internal(reason)
+        },
+        other => Error::from(other),
+    }
+}
+
+fn app_authored_error(error: crate::Error) -> Error {
+    authored_codec_error(
+        error,
+        "application-properties prepared output invariant failed",
+    )
+}
+
+fn app_prepared_error(error: crate::Error) -> Error {
     generated_codec_error(
         error,
-        true,
         "application-properties prepared output invariant failed",
     )
 }
 
 fn core_generated_error(error: crate::Error) -> Error {
-    generated_codec_error(
-        error,
-        true,
-        "core-properties prepared output invariant failed",
-    )
+    generated_codec_error(error, "core-properties prepared output invariant failed")
 }
 
 fn custom_generated_error(error: crate::Error) -> Error {
-    generated_codec_error(
-        error,
-        true,
-        "custom-properties prepared output invariant failed",
-    )
+    generated_codec_error(error, "custom-properties prepared output invariant failed")
 }
 
 fn patch_output_error(error: crate::Error) -> Error {
-    generated_codec_error(error, false, "metadata patch output failed validation")
+    generated_codec_error(error, "metadata patch output failed validation")
 }
 
 fn source_changed(
@@ -1390,14 +1382,17 @@ impl Plan {
                     },
                     None => (Core::default(), Dialect::Transitional),
                 };
+                super::write::validate_target(&target).map_err(Error::from)?;
                 let merged = Core::merged(base.core.present.as_ref().map(|_| &current), &target)?;
                 (force_core || merged != current)
                     .then(|| {
-                        super::write::encoded_len(&merged, dialect).map(|after_len| PreparedCore {
-                            target: Some(merged),
-                            dialect,
-                            after_len: Some(after_len),
-                        })
+                        super::write::encoded_len(&merged, dialect)
+                            .map_err(core_generated_error)
+                            .map(|after_len| PreparedCore {
+                                target: Some(merged),
+                                dialect,
+                                after_len: Some(after_len),
+                            })
                     })
                     .transpose()?
             },
@@ -1421,10 +1416,13 @@ impl Plan {
                             app::plan_splice(&present.bytes, props).map_err(app_plan_error)?;
                         (plan.as_ref().map(|plan| plan.output_len()), plan)
                     },
-                    (None, Some(props)) => (
-                        Some(app::encode_new_len(props).map_err(app_generated_error)?),
-                        None,
-                    ),
+                    (None, Some(props)) => {
+                        app::validate_target(props).map_err(Error::from)?;
+                        (
+                            Some(app::encode_new_len(props).map_err(app_authored_error)?),
+                            None,
+                        )
+                    },
                     (_, None) => (None, None),
                 };
                 Some(PreparedApp {
@@ -1690,7 +1688,7 @@ impl PreparedPlan {
                             "missing prepared application-properties layout",
                         ))?,
                     )
-                    .map_err(app_generated_error)?,
+                    .map_err(app_prepared_error)?,
                 ),
                 (None, Some(props)) => Some(
                     app::encode_new_preflighted(
@@ -1699,7 +1697,7 @@ impl PreparedPlan {
                             "missing prepared application-properties length",
                         ))?,
                     )
-                    .map_err(app_generated_error)?,
+                    .map_err(app_authored_error)?,
                 ),
                 (_, None) => None,
             };
@@ -2892,8 +2890,8 @@ fn check_change<P: PackageMetadata>(
 #[cfg(test)]
 mod classification_tests {
     use super::{
-        Error, app_generated_error, app_plan_error, core_generated_error, custom_generated_error,
-        patch_output_error,
+        Error, app_authored_error, app_plan_error, app_prepared_error, core_generated_error,
+        custom_generated_error, patch_output_error,
     };
 
     #[test]
@@ -2909,11 +2907,11 @@ mod classification_tests {
                 "extended property Company contains XML 1.0-forbidden character U+0000"
                     .to_owned()
             )),
-            Error::Invalid(message) if message.contains("U+0000")
+            Error::Package(crate::Error::Invalid(message)) if message.contains("U+0000")
         ));
 
         for error in [
-            app_generated_error(crate::Error::Invalid(
+            app_prepared_error(crate::Error::Invalid(
                 "extended-properties edits overlap".to_owned(),
             )),
             core_generated_error(crate::Error::Invalid(
@@ -2929,12 +2927,12 @@ mod classification_tests {
             assert!(matches!(error, Error::Internal(_)));
         }
 
-        let authored = app_generated_error(crate::Error::Invalid(
+        let authored = app_authored_error(crate::Error::Invalid(
             "extended property Company contains XML 1.0-forbidden character U+0000".to_owned(),
         ));
         assert!(matches!(authored, Error::Invalid(message) if message.contains("U+0000")));
 
-        let bounded = app_generated_error(crate::Error::Limit {
+        let bounded = app_authored_error(crate::Error::Limit {
             kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
             maximum: 8 * 1024 * 1024,
             observed: 8 * 1024 * 1024 + 1,

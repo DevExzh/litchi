@@ -978,6 +978,121 @@ fn authored_application_xml_text_remains_an_invalid_value() {
 }
 
 #[test]
+fn source_xml_controls_are_corruption_but_authored_core_controls_are_invalid_values() {
+    let mut package = full();
+    let app = String::from_utf8(bytes(&package, "/docProps/app.xml").unwrap())
+        .unwrap()
+        .replace("<Company>Old</Company>", "<Company>&#x1;</Company>")
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/app.xml").unwrap())
+        .unwrap()
+        .set_blob(app);
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(matches!(
+        snapshot.metadata(),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace("<dc:title>Before</dc:title>", "<dc:title>&#x1;</dc:title>")
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "<cp:coreProperties",
+            "<cp:coreProperties xmlns:opaque=\"urn:opaque&#x1;\"",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><cp:nested>&#x1;</cp:nested></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><!--\u{1}--></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><?keep \u{1}?></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| metadata.title = Some("bad\0value".to_owned()))
+        .unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Invalid(message)) if message.contains("U+0000")
+    ));
+}
+
+#[test]
 fn an_empty_package_gains_canonical_parts() {
     let mut package = OpcPackage::new();
     let mut edit = Edit::new(&package, Host::Excel).unwrap();

@@ -6,6 +6,7 @@ use super::{
 #[cfg(test)]
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+use litchi_core::metadata::Metadata;
 #[cfg(test)]
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 #[cfg(test)]
@@ -214,6 +215,34 @@ pub(super) fn encode_preflighted(
 /// image of a core-properties part.
 pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
     preflight(props, dialect)
+}
+
+/// Validate the core fields supplied by an edit before they are merged with
+/// retained source state. Keeping this boundary separate makes a lexical
+/// failure in an authored value an invalid value, while failures from the
+/// retained source remain package corruption.
+pub(super) fn validate_target(target: &Metadata) -> Result<()> {
+    for (property, value) in [
+        ("dc:title", target.title.as_deref()),
+        ("dc:subject", target.subject.as_deref()),
+        ("dc:creator", target.author.as_deref()),
+        ("dc:description", target.description.as_deref()),
+        ("dc:identifier", target.identifier.as_deref()),
+        ("cp:lastModifiedBy", target.last_modified_by.as_deref()),
+        ("cp:category", target.category.as_deref()),
+        ("cp:contentStatus", target.content_status.as_deref()),
+        ("cp:revision", target.revision.as_deref()),
+        ("cp:version", target.version.as_deref()),
+        ("dc:language", target.language.as_deref()),
+    ] {
+        if let Some(value) = value {
+            validate_text(value, property)?;
+        }
+    }
+    for value in &target.keywords {
+        validate_text(value, "cp:keywords")?;
+    }
+    Ok(())
 }
 
 fn preflight(props: &Core, dialect: Dialect) -> Result<usize> {
@@ -679,7 +708,7 @@ mod tests {
     fn preserves_strict_dialect_and_byte_identical_write_is_a_noop() {
         let props = Core::new().title("Strict");
         let original = format!(
-            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
+            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <!--inert & opaque--><?keep data?>\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
             Dialect::Strict.namespace()
         )
         .into_bytes();

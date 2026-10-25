@@ -148,6 +148,55 @@ fn values_xml_cannot_carry_are_refused() {
     ));
 }
 
+#[test]
+fn source_xml_controls_are_rejected_at_the_decode_boundary() {
+    let sources = [
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" data="&#x1;"/>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:opaque="urn:opaque&#x1;"/>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><Nested>&#x1;</Nested></Unknown></Properties>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>&#x1;</Company></Properties>"#,
+    ];
+    for source in sources {
+        assert!(
+            matches!(decode(source.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+            "source control was not rejected: {source}"
+        );
+    }
+
+    let cdata = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><![CDATA[{}]]></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(decode(cdata.as_bytes()).is_err());
+
+    let comment = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><!--{}--></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(
+        matches!(decode(comment.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+        "source control in a comment was not rejected"
+    );
+
+    let pi = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><?keep {}?></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(
+        matches!(decode(pi.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+        "source control in a processing instruction was not rejected"
+    );
+}
+
+#[test]
+fn splice_preserves_valid_inert_comment_and_processing_instruction_bytes() {
+    let source = r#"<?xml version="1.0" encoding="UTF-8"?><!--inert & opaque--><?keep data?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Old</Company><?tail data?></Properties>"#;
+    let target = Props::new().company("New");
+    let output = splice(source.as_bytes(), &target).unwrap().unwrap();
+    let expected = source.replace("<Company>Old</Company>", "<Company>New</Company>");
+    assert_eq!(String::from_utf8(output).unwrap(), expected);
+}
+
 fn package_with(xml: &[u8]) -> OpcPackage {
     let mut package = OpcPackage::new();
     package.add_part(Box::new(BlobPart::new(
@@ -242,7 +291,10 @@ fn graph_anomalies_are_errors() {
     shared.relate_to("docProps/app.xml", "urn:test:other");
     assert!(matches!(
         publish(&mut shared, None),
-        Err(crate::properties::Error::Package(Error::Relationship(_)))
+        Err(crate::properties::Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+                && refusal.operation() == "remove_metadata"
+                && refusal.reason() == "removing a shared OOXML metadata part is refused"
     ));
     assert_eq!(read(&shared).unwrap(), Some(word()));
 }

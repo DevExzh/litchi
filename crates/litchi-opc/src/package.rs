@@ -2394,6 +2394,7 @@ impl OpcPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let current = self.get_part(&replacement.name)?;
+        let canonical_name = current.partname().clone();
         // A deferred payload reports its own refusal rather than comparing as
         // an empty member (ADR 0030).
         current.ensure_payload()?;
@@ -2410,17 +2411,17 @@ impl OpcPackage {
         // provenance exempts a payload from the writer's publication audit
         // (change 0665). They came from the caller, so audit them now, before
         // any mutation, and hand the part the proof (change 0754).
-        let verified = verified_source_payload(&replacement.name, Arc::clone(&replacement.bytes))?;
+        let verified = verified_source_payload(&canonical_name, Arc::clone(&replacement.bytes))?;
         self.source_xml_parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
                 resource: "owned XML provenance",
                 source,
             })?;
-        let part = self.get_part_mut(&replacement.name)?;
+        let part = self.get_part_mut(&canonical_name)?;
         part.set_blob_verified(verified);
         let payload = part.payload_handle().payload().clone();
-        self.source_xml_parts.insert(replacement.name, payload);
+        self.source_xml_parts.insert(canonical_name, payload);
         Ok(())
     }
 
@@ -2439,9 +2440,11 @@ impl OpcPackage {
         expected: &[u8],
         replacement: Arc<Vec<u8>>,
     ) -> Result<()> {
-        let content_type = self.get_part(partname)?.content_type().to_owned();
+        let current = self.get_part(partname)?;
+        let canonical_name = current.partname().clone();
+        let content_type = current.content_type().to_owned();
         let token = crate::OwnedXmlPart::capture_with_limits(
-            partname.clone(),
+            canonical_name,
             content_type,
             replacement,
             self.read_limits,
@@ -2483,6 +2486,107 @@ impl OpcPackage {
         let source =
             crate::OwnedXmlPart::capture_with_limits(name, content_type, bytes, self.read_limits)?;
         self.try_add_owned_xml_part(source)
+    }
+
+    /// Add caller-authored XML while retaining its exact bytes as publication
+    /// provenance.
+    ///
+    /// This is for format-owned opaque XML whose semantics have already been
+    /// validated by the format codec. It performs the ordinary bounded XML
+    /// publication audit, but does not issue an [`OwnedXmlPart`] source-splice
+    /// token: source-splice tokens require literal namespace declarations so
+    /// expanded-name edits cannot be ambiguous, while a whole-part authored
+    /// replacement preserves the caller's namespace spelling byte-for-byte.
+    /// The shared payload is retained without copying and is published through
+    /// the same source-preserving writer as an exact source part. The retained
+    /// allocation is publication provenance only; this does not create an
+    /// [`crate::OwnedXmlPart`] or [`crate::SourceXmlPart`] range-splice token.
+    pub fn try_add_authored_xml_part_bytes(
+        &mut self,
+        name: PackURI,
+        content_type: String,
+        bytes: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if !xml_minifier::audit::package::is_xml_part(name.as_str(), &content_type) {
+            return Err(OpcError::XmlError(
+                "authored XML part content type is not XML".to_owned(),
+            ));
+        }
+        let limits = self.read_limits.min(limits);
+        let mut part = BlobPart::new_shared(name, content_type, Arc::clone(&bytes));
+        let source_xml = self.preflight_authored_source_part_addition(&part, limits)?;
+        crate::OwnedXmlPart::check_capture_size(part.partname(), bytes.len(), limits)?;
+        let verified = verified_source_payload_with_source_limits(
+            part.partname(),
+            Arc::clone(&bytes),
+            limits,
+        )?;
+        crate::xml_splice::validate_authored_xml_bytes(part.partname(), &bytes, limits)?;
+        part.set_blob_verified(verified);
+        self.install_prevalidated_source_part(Box::new(part), source_xml)
+    }
+
+    /// Replace one exact XML payload with caller-authored bytes while
+    /// retaining those bytes as publication provenance.
+    ///
+    /// The expected payload is an exact stale-source guard. The replacement
+    /// is admitted by the bounded publication audit rather than the stricter
+    /// source-splice namespace proof, because the format owner is replacing
+    /// the whole opaque XML member and does not splice its internals. Equal
+    /// replacement bytes are an audited no-op, including for a signed package;
+    /// non-no-op failures leave package and signature state untouched.
+    pub fn try_replace_authored_xml_part_bytes(
+        &mut self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let current = self.get_part(partname)?;
+        let canonical_name = current.partname().clone();
+        let content_type = current.content_type().to_owned();
+        if !xml_minifier::audit::package::is_xml_part(canonical_name.as_str(), &content_type) {
+            return Err(OpcError::XmlError(
+                "authored XML part content type is not XML".to_owned(),
+            ));
+        }
+        current.ensure_payload()?;
+        if current.blob() != expected {
+            return Err(OpcError::XmlError(
+                "stale authored XML part replacement".to_owned(),
+            ));
+        }
+        let limits = self.read_limits.min(limits);
+        let unchanged = current.blob() == replacement.as_slice();
+        if self.requires_signature_edit_policy() && !unchanged {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        crate::OwnedXmlPart::check_capture_size(&canonical_name, replacement.len(), limits)?;
+        self.check_authored_xml_replacement_limits(&canonical_name, replacement.len(), limits)?;
+        let verified = verified_source_payload_with_source_limits(
+            &canonical_name,
+            Arc::clone(&replacement),
+            limits,
+        )?;
+        crate::xml_splice::validate_authored_xml_bytes(&canonical_name, &replacement, limits)?;
+        if unchanged {
+            return Ok(());
+        }
+        self.source_xml_parts
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "owned authored XML provenance",
+                source,
+            })?;
+        let part = self.get_part_mut(&canonical_name)?;
+        part.set_blob_verified(verified);
+        let payload = part.payload_handle().payload().clone();
+        self.source_xml_parts.insert(canonical_name, payload);
+        Ok(())
     }
 
     /// Get a reference to the main document part.
@@ -3020,31 +3124,151 @@ impl OpcPackage {
     /// the publication audit. Source-backed conversion uses this narrow seam
     /// so unchanged opaque XML remains publishable without reparsing or
     /// normalizing it. The source blob is shared with the inserted part and
-    /// the metadata map grows through a fallible reservation.
+    /// the metadata map grows through a fallible reservation. The retained
+    /// bytes are publication provenance only; this path does not create an
+    /// [`crate::OwnedXmlPart`] or [`crate::SourceXmlPart`] range-splice token.
+    /// Keep this private source-materialization route cheap: its callers have
+    /// already admitted their payloads, so it checks names and reservations
+    /// without rescanning every existing payload for an aggregate total.
     pub(crate) fn try_add_source_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
-        self.revoke_exact_source();
-        self.signature_graph_tracked = true;
-        self.content_types_source_state.reset();
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
+        let source_xml =
+            xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type());
+        self.install_prevalidated_source_part(part, source_xml)
+    }
+
+    fn preflight_authored_source_part_addition(
+        &self,
+        part: &dyn Part,
+        limits: SourceLimits,
+    ) -> Result<bool> {
+        let partname = part.partname();
+        let maximum_parts = u64::try_from(limits.max_parts()).unwrap_or(u64::MAX);
+        limits.check(
+            SourceLimitKind::ArchiveMemberNameBytes,
+            u64::try_from(partname.membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        self.validate_new_part_name(partname)?;
+        let payload_len = part.payload_len()?;
+        let payload_bytes = u64::try_from(payload_len).map_err(|_| OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: u64::MAX,
+            maximum: limits.max_part_bytes(),
+        })?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            payload_bytes,
+            limits.max_part_bytes(),
+        )?;
+        let next_parts = self.parts.len().checked_add(1).ok_or(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: u64::MAX,
+            maximum: maximum_parts,
+        })?;
+        limits.check(
+            SourceLimitKind::Parts,
+            u64::try_from(next_parts).unwrap_or(u64::MAX),
+            maximum_parts,
+        )?;
+        let mut total_bytes = payload_bytes;
+        for existing in self.parts.values() {
+            let bytes = u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+            total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+        Ok(xml_minifier::audit::package::is_xml_part(
+            partname.as_str(),
+            part.content_type(),
+        ))
+    }
+
+    fn check_authored_xml_replacement_limits(
+        &self,
+        partname: &PackURI,
+        replacement_len: usize,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let replacement_bytes = u64::try_from(replacement_len).map_err(|_| OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: u64::MAX,
+            maximum: limits.max_part_bytes(),
+        })?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            replacement_bytes,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::Parts,
+            u64::try_from(self.parts.len()).unwrap_or(u64::MAX),
+            u64::try_from(limits.max_parts()).unwrap_or(u64::MAX),
+        )?;
+        let mut total_bytes = 0u64;
+        for existing in self.parts.values() {
+            let bytes = if existing
+                .partname()
+                .as_str()
+                .eq_ignore_ascii_case(partname.as_str())
+            {
+                replacement_bytes
+            } else {
+                u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
+                    kind: SourceLimitKind::TotalPartBytes,
+                    observed: u64::MAX,
+                    maximum: limits.max_total_part_bytes(),
+                })?
+            };
+            total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_bytes,
+            limits.max_total_part_bytes(),
+        )
+    }
+
+    fn install_prevalidated_source_part(
+        &mut self,
+        part: Box<dyn Part + Send + Sync>,
+        source_xml: bool,
+    ) -> Result<()> {
+        let partname = part.partname().clone();
         self.parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
                 resource: "OPC source-materialized parts",
                 source,
             })?;
-        let source_blob =
-            if xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type()) {
-                self.source_xml_parts
-                    .try_reserve(1)
-                    .map_err(|source| OpcError::Allocation {
-                        resource: "OPC source-preserved XML parts",
-                        source,
-                    })?;
-                Some(part.payload_handle())
-            } else {
-                None
-            };
+        if source_xml {
+            self.source_xml_parts
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC source-preserved XML parts",
+                    source,
+                })?;
+        }
+        let source_blob = source_xml.then(|| part.payload_handle());
+        self.revoke_exact_source();
+        self.signature_graph_tracked = true;
+        self.content_types_source_state.reset();
         self.source_relationships_xml.remove(&partname);
         self.parts.insert(partname.clone(), part);
         if let Some(source_blob) = source_blob {
@@ -4176,6 +4400,37 @@ fn verified_source_payload_with_limits(
             source,
         }
     })
+}
+
+fn verified_source_payload_with_source_limits(
+    name: &PackURI,
+    bytes: Arc<Vec<u8>>,
+    limits: SourceLimits,
+) -> Result<xml_minifier::audit::VerifiedSource> {
+    let audit_limits = xml_minifier::audit::Limits::default()
+        .narrow(
+            xml_minifier::audit::Resource::Bytes,
+            as_usize(limits.max_part_bytes()),
+        )
+        .narrow(xml_minifier::audit::Resource::Depth, limits.max_depth())
+        .narrow(xml_minifier::audit::Resource::Events, limits.max_events())
+        .narrow(
+            xml_minifier::audit::Resource::TokenBytes,
+            as_usize(limits.max_part_bytes()),
+        )
+        .narrow(
+            xml_minifier::audit::Resource::TextBytes,
+            as_usize(limits.max_part_bytes()),
+        );
+    verified_source_payload_with_limits(name, bytes, audit_limits)
+}
+
+const fn as_usize(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
 }
 
 /// Audit a `[Content_Types].xml` or `.rels` token the package is about to

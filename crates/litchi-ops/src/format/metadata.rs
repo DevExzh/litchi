@@ -667,11 +667,19 @@ mod tests {
 
         let error = native_error(
             properties::Error::Package(litchi_ooxml_common::Error::Invalid(
-                "malformed metadata XML".to_owned(),
+                "extended property Company contains XML 1.0-forbidden character U+0001".to_owned(),
             )),
             FileFormat::Xlsx,
         );
         assert_eq!(error.code(), Code::CorruptFile);
+
+        let error = native_error(
+            properties::Error::Invalid(
+                "extended property Company contains XML 1.0-forbidden character U+0000".to_owned(),
+            ),
+            FileFormat::Xlsx,
+        );
+        assert_eq!(error.code(), Code::InvalidValue);
     }
 
     #[test]
