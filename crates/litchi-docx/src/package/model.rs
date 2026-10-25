@@ -565,7 +565,8 @@ fn ensure_word_font_settings(
                     ct::WML_SETTINGS
                 )));
             }
-            DocumentSettings::extract_from_part(part)?;
+            let limits = mail_merge::mce_limits_for_source(&package.read_limits());
+            DocumentSettings::extract_from_part_with_mce_limits(part, &limits)?;
             part.blob().to_vec()
         },
         (true, false) => {
@@ -597,11 +598,13 @@ fn ensure_word_font_settings(
         let part = package.get_part(&target)?;
         let mut checked = part.clone_part();
         checked.set_blob(updated.clone());
-        DocumentSettings::extract_from_part(&*checked)?;
+        let limits = mail_merge::mce_limits_for_source(&package.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&*checked, &limits)?;
         package.get_part_mut(&target)?.set_blob(updated);
     } else {
         let part = BlobPart::new(target.clone(), ct::WML_SETTINGS.to_owned(), updated);
-        DocumentSettings::extract_from_part(&part)?;
+        let limits = mail_merge::mce_limits_for_source(&package.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?;
         package.try_add_part(Box::new(part))?;
         let relationship_type = match conformance {
             font::Conformance::Transitional => litchi_opc::constants::relationship_type::SETTINGS,

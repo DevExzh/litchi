@@ -195,9 +195,6 @@ pub use presentation_properties::{
     load_from_package_with_tolerance as load_presentation_properties_with_tolerance,
 };
 pub use slide::{Slide, SlideLayout, SlideMaster};
-pub use validation::{
-    PptxValidationError, PptxValidationLimits, validate_source, validate_source_backed,
-};
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,

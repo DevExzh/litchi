@@ -1,12 +1,13 @@
 //! Bounded, namespace-aware codecs for Custom XML Data Storage.
 
-use crate::mce::{Capabilities, Limits, Name, process_markup_compatibility};
+use crate::mce::{Capabilities, Limits as MceLimits, Name, process_markup_compatibility};
 use crate::xml::decode_xml_reference;
 use crate::xml_name;
 use crate::{Error, Result};
 
 use super::limit::LimitKind;
 use litchi_opc::ContentType;
+use litchi_opc::SourceLimits;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -25,23 +26,27 @@ use crate::xml::attributes::BytesStartExt as _;
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn read_props(xml: &[u8]) -> Result<Props> {
-    require_at_most(LimitKind::PropertiesBytes, xml.len(), MAX_PROPS_BYTES)?;
+pub fn read_props(xml: &[u8], source_limits: &SourceLimits) -> Result<Props> {
+    let maximum = max_properties_bytes(source_limits);
+    require_at_most(LimitKind::PropertiesBytes, xml.len(), maximum)?;
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities
         .understand_namespace(TRANSITIONAL_NAMESPACE)
         .understand_namespace(STRICT_NAMESPACE);
-    let limits = Limits {
-        max_input_bytes: MAX_PROPS_BYTES,
-        max_output_bytes: MAX_PROPS_BYTES.saturating_mul(2),
-        max_depth: MAX_DEPTH,
+    let mut limits = MceLimits {
+        max_input_bytes: maximum,
+        max_output_bytes: maximum.saturating_mul(2),
+        max_depth: MAX_DEPTH.min(source_limits.max_depth()),
         max_namespace_bindings: 4096,
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
         max_attributes_per_element: crate::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
+    limits.max_output_bytes = limits
+        .max_output_bytes
+        .min(usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX));
     let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
-    parse_props_xml(processed.xml.as_ref())
+    parse_props_xml(processed.xml.as_ref(), limits.max_depth)
 }
 
 /// Serialize properties in stable schema order.
@@ -49,9 +54,18 @@ pub fn read_props(xml: &[u8]) -> Result<Props> {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn write_props(props: &Props, conformance: Conformance) -> Result<Vec<u8>> {
+pub fn write_props(
+    props: &Props,
+    conformance: Conformance,
+    source_limits: &SourceLimits,
+) -> Result<Vec<u8>> {
     validate_props(props)?;
     let output_len = props_output_len(props, conformance)?;
+    require_at_most(
+        LimitKind::SerializedPropertiesBytes,
+        output_len,
+        max_properties_bytes(source_limits),
+    )?;
     let mut out = Vec::with_capacity(output_len);
     out.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     out.extend_from_slice(b"<ds:datastoreItem xmlns:ds=\"");
@@ -72,6 +86,7 @@ pub fn write_props(props: &Props, conformance: Conformance) -> Result<Vec<u8>> {
     if out.len() != output_len {
         return invalid("custom XML properties size calculation disagrees with serialization");
     }
+    debug_assert_eq!(out.len(), output_len);
     Ok(out)
 }
 
@@ -84,11 +99,17 @@ pub(super) fn rewrite_props(
     before: &Props,
     after: &Props,
     conformance: Conformance,
+    source_limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
+    require_at_most(
+        LimitKind::SerializedPropertiesBytes,
+        source.len(),
+        max_properties_bytes(source_limits),
+    )?;
     if before == after {
         return Ok(source.to_vec());
     }
-    if read_props(source)? != *before {
+    if read_props(source, source_limits)? != *before {
         return invalid("custom XML properties source projection is stale");
     }
     if before.schemas == after.schemas
@@ -103,11 +124,17 @@ pub(super) fn rewrite_props(
         output.extend_from_slice(&source[..value_start]);
         push_escaped_attr(&mut output, &after.id);
         output.extend_from_slice(&source[value_end..]);
-        if read_props(&output).is_ok_and(|props| props == *after) {
+        if read_props(&output, source_limits).is_ok_and(|props| props == *after) {
             return Ok(output);
         }
     }
-    write_props(after, conformance)
+    write_props(after, conformance, source_limits)
+}
+
+fn max_properties_bytes(source_limits: &SourceLimits) -> usize {
+    MAX_PROPS_BYTES.min(
+        usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX),
+    )
 }
 
 fn item_id_span(source: &[u8]) -> Result<Option<(usize, usize)>> {
@@ -257,8 +284,11 @@ pub fn valid_guid(value: &str) -> bool {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn validate_payload(xml: &[u8]) -> Result<Name> {
-    require_at_most(LimitKind::PayloadBytes, xml.len(), MAX_PART_BYTES)?;
+pub fn validate_payload(xml: &[u8], source_limits: &SourceLimits) -> Result<Name> {
+    let max_part_bytes = max_payload_bytes(source_limits);
+    let max_depth = MAX_DEPTH.min(source_limits.max_depth());
+    let max_elements = MAX_ELEMENTS.min(source_limits.max_events());
+    require_at_most(LimitKind::PayloadBytes, xml.len(), max_part_bytes)?;
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
@@ -280,8 +310,8 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
                 version = validate_declaration(&declaration)?;
             },
             Event::Start(element) => {
-                require_nested_depth(depth)?;
-                elements = bump_elements(elements)?;
+                require_nested_depth(depth, max_depth)?;
+                elements = bump_elements(elements, max_elements)?;
                 let name = inspect_element(&reader, &element, version, depth == 0)?;
                 if depth == 0 {
                     if closed_root || root.is_some() {
@@ -291,11 +321,11 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
                 }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit(LimitKind::Depth, MAX_DEPTH, usize::MAX))?;
+                    .ok_or_else(|| limit(LimitKind::Depth, max_depth, usize::MAX))?;
             },
             Event::Empty(element) => {
-                require_nested_depth(depth)?;
-                elements = bump_elements(elements)?;
+                require_nested_depth(depth, max_depth)?;
+                elements = bump_elements(elements, max_elements)?;
                 let name = inspect_element(&reader, &element, version, depth == 0)?;
                 if depth == 0 {
                     if closed_root || root.is_some() {
@@ -355,6 +385,10 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
         return invalid("custom XML payload has no complete root element");
     }
     root.ok_or_else(|| Error::Invalid("custom XML payload has no root".into()))
+}
+
+fn max_payload_bytes(source_limits: &SourceLimits) -> usize {
+    MAX_PART_BYTES.min(usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX))
 }
 
 /// Validate that a Custom XML data-part content type is a well-formed XML media type.
@@ -502,7 +536,7 @@ fn resolved_namespace<'a>(result: ResolveResult<'a>, kind: &str) -> Result<&'a [
     }
 }
 
-fn parse_props_xml(xml: &[u8]) -> Result<Props> {
+fn parse_props_xml(xml: &[u8], max_depth: usize) -> Result<Props> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
@@ -526,7 +560,7 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 version = validate_declaration(&declaration)?;
             },
             Event::Start(element) => {
-                require_nested_depth(contexts.len())?;
+                require_nested_depth(contexts.len(), max_depth)?;
                 let element = resolve_props_element(&reader, &element, version)?;
                 let context = props_start(
                     &element,
@@ -539,7 +573,7 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 contexts.push(context);
             },
             Event::Empty(element) => {
-                require_nested_depth(contexts.len())?;
+                require_nested_depth(contexts.len(), max_depth)?;
                 let element = resolve_props_element(&reader, &element, version)?;
                 props_start(
                     &element,
@@ -921,20 +955,20 @@ fn valid_encoding_name(value: &str) -> bool {
         && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
-fn require_nested_depth(depth: usize) -> Result<()> {
-    if depth >= MAX_DEPTH {
+fn require_nested_depth(depth: usize, maximum: usize) -> Result<()> {
+    if depth >= maximum {
         let observed = depth.checked_add(1).unwrap_or(usize::MAX);
-        Err(limit(LimitKind::Depth, MAX_DEPTH, observed))
+        Err(limit(LimitKind::Depth, maximum, observed))
     } else {
         Ok(())
     }
 }
 
-fn bump_elements(elements: usize) -> Result<usize> {
+fn bump_elements(elements: usize, maximum: usize) -> Result<usize> {
     let next = elements
         .checked_add(1)
-        .ok_or_else(|| limit(LimitKind::Elements, MAX_ELEMENTS, usize::MAX))?;
-    require_at_most(LimitKind::Elements, next, MAX_ELEMENTS)?;
+        .ok_or_else(|| limit(LimitKind::Elements, maximum, usize::MAX))?;
+    require_at_most(LimitKind::Elements, next, maximum)?;
     Ok(next)
 }
 

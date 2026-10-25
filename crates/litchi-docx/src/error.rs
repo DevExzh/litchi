@@ -296,6 +296,17 @@ pub enum Error {
         maximum: usize,
     },
 
+    /// A modern Word comments raw-codec budget is exhausted.
+    #[error("DOCX modern comments {kind} limit exceeded: {actual} > {maximum}")]
+    ModernCommentLimit {
+        /// The exceeded budget.
+        kind: crate::modern_comments::LimitKind,
+        /// Observed or requested value.
+        actual: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
     /// A stylesWithEffects budget is exhausted (record 0355a).
     #[error("DOCX stylesWithEffects {kind} limit exceeded: {actual} > {maximum}")]
     StylesWithEffectsLimit {

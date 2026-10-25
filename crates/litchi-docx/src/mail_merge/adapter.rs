@@ -11,6 +11,7 @@
 
 use super::{Recipients, Settings};
 use crate::error::{Error, Result};
+use litchi_ooxml_common::mce::Limits as MceLimits;
 use litchi_opc::Relationships;
 use litchi_opc::part::Part;
 
@@ -18,8 +19,8 @@ pub(crate) fn map_docx_error(error: Error) -> Error {
     error
 }
 
-pub(crate) fn extract_recipients(part: &dyn Part) -> Result<Recipients> {
-    Recipients::extract_from_part(part)
+pub(crate) fn extract_recipients(part: &dyn Part, limits: &MceLimits) -> Result<Recipients> {
+    Recipients::extract_from_part(part, limits)
 }
 
 /// Validate only the host package relationship closure around typed settings.

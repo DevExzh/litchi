@@ -56,7 +56,7 @@ const ACTIVE_X_DESCRIPTOR_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/activeX";
 
 /// Default finite limits for one DOCX semantic validation pass.
-pub const DEFAULT_DOCX_VALIDATION_LIMITS: DocxValidationLimits = DocxValidationLimits {
+pub const DEFAULT_LIMITS: Limits = Limits {
     max_main_document_bytes: 64 * 1024 * 1024,
     max_xml_events: 4_000_000,
     max_xml_depth: 4_096,
@@ -71,7 +71,7 @@ pub const DEFAULT_DOCX_VALIDATION_LIMITS: DocxValidationLimits = DocxValidationL
 /// owned by [`SourceLimits`]. These bounds only govern the materialized main
 /// document and the XML/MCE work performed after OPC ingress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DocxValidationLimits {
+pub struct Limits {
     max_main_document_bytes: u64,
     max_xml_events: usize,
     max_xml_depth: usize,
@@ -80,7 +80,7 @@ pub struct DocxValidationLimits {
     max_mce_choices_per_alternate: usize,
 }
 
-impl DocxValidationLimits {
+impl Limits {
     /// Returns a copy with a new main-document byte ceiling.
     #[must_use]
     pub const fn with_max_main_document_bytes(mut self, maximum: u64) -> Self {
@@ -164,13 +164,13 @@ impl DocxValidationLimits {
     }
 }
 
-impl Default for DocxValidationLimits {
+impl Default for Limits {
     fn default() -> Self {
-        DEFAULT_DOCX_VALIDATION_LIMITS
+        DEFAULT_LIMITS
     }
 }
 
-const fn effective_xml_depth(limits: DocxValidationLimits) -> usize {
+const fn effective_xml_depth(limits: Limits) -> usize {
     if limits.max_xml_depth > MAX_SAFE_XML_DEPTH {
         MAX_SAFE_XML_DEPTH
     } else {
@@ -185,7 +185,7 @@ const fn effective_xml_depth(limits: DocxValidationLimits) -> usize {
 /// instability, bounded allocation, and bounded report-construction failure.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum DocxValidationError {
+pub enum Error {
     /// The immutable OPC source could not be read consistently.
     Ingress(OpcError),
     /// A bounded validator-owned allocation failed.
@@ -197,7 +197,7 @@ pub enum DocxValidationError {
     Report(ValidationReportError),
 }
 
-impl fmt::Display for DocxValidationError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ingress(error) => write!(formatter, "DOCX validation ingress failed: {error}"),
@@ -212,7 +212,7 @@ impl fmt::Display for DocxValidationError {
     }
 }
 
-impl StdError for DocxValidationError {
+impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::Ingress(error) => Some(error),
@@ -222,14 +222,14 @@ impl StdError for DocxValidationError {
     }
 }
 
-impl From<ValidationReportError> for DocxValidationError {
+impl From<ValidationReportError> for Error {
     fn from(error: ValidationReportError) -> Self {
         Self::Report(error)
     }
 }
 
 /// Result returned by the DOCX validation-report API.
-pub type Result<T> = std::result::Result<T, DocxValidationError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Validate an immutable positional DOCX source under explicit finite limits
 /// (`Default::default()` for each gives the standard limits).
@@ -240,13 +240,13 @@ pub type Result<T> = std::result::Result<T, DocxValidationError>;
 pub fn validate_read_at(
     source: Arc<dyn ReadAt>,
     read_limits: SourceLimits,
-    docx_limits: DocxValidationLimits,
+    docx_limits: Limits,
     report_limits: ValidationLimits,
 ) -> Result<ValidateReport> {
     let expected = source
         .version()
         .map_err(OpcError::from)
-        .map_err(DocxValidationError::Ingress)?;
+        .map_err(Error::Ingress)?;
     let tracked = Arc::new(ValidationSource::new(Arc::clone(&source)));
     let ingress_source: Arc<dyn ReadAt> = tracked.clone();
     let report = match open_validation_package(ingress_source, read_limits, docx_limits) {
@@ -255,26 +255,26 @@ pub fn validate_read_at(
         },
         Err(error) => {
             if let Some(io_error) = tracked.take_error() {
-                return Err(DocxValidationError::Ingress(OpcError::IoError(io_error)));
+                return Err(Error::Ingress(OpcError::IoError(io_error)));
             }
             match error {
                 OpcError::Limit { .. } => blocked_ingress_report(report_limits)?,
                 error if is_structural_rejection(&error) => {
                     rejected_ingress_report(&error, report_limits)?
                 },
-                error => return Err(DocxValidationError::Ingress(error)),
+                error => return Err(Error::Ingress(error)),
             }
         },
     };
     if let Some(io_error) = tracked.take_error() {
-        return Err(DocxValidationError::Ingress(OpcError::IoError(io_error)));
+        return Err(Error::Ingress(OpcError::IoError(io_error)));
     }
     let actual = source
         .version()
         .map_err(OpcError::from)
-        .map_err(DocxValidationError::Ingress)?;
+        .map_err(Error::Ingress)?;
     if actual != expected {
-        return Err(DocxValidationError::Ingress(OpcError::SourceChanged {
+        return Err(Error::Ingress(OpcError::SourceChanged {
             expected,
             actual,
         }));
@@ -285,7 +285,7 @@ pub fn validate_read_at(
 fn open_validation_package(
     source: Arc<dyn ReadAt>,
     read_limits: SourceLimits,
-    docx_limits: DocxValidationLimits,
+    docx_limits: Limits,
 ) -> std::result::Result<SourceBackedPackage, OpcError> {
     let (_cancellation_source, cancellation) = CancellationSource::pair();
     let max_memory = docx_limits.max_main_document_bytes();
@@ -315,20 +315,20 @@ fn open_validation_package(
 
 fn validate_package_with_tracker(
     package: &SourceBackedPackage,
-    docx_limits: DocxValidationLimits,
+    docx_limits: Limits,
     report_limits: ValidationLimits,
     tracker: Option<&ValidationSource>,
 ) -> Result<ValidateReport> {
     if let Some(tracker) = tracker {
         if let Some(error) = tracker.take_error() {
-            return Err(DocxValidationError::Ingress(OpcError::IoError(error)));
+            return Err(Error::Ingress(OpcError::IoError(error)));
         }
     }
     let ingress = check(INGRESS, CheckStatus::Complete, report_limits)?;
     let mut issues = Vec::new();
     issues
         .try_reserve_exact(12)
-        .map_err(|_| DocxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "validation issue staging",
         })?;
 
@@ -346,7 +346,7 @@ fn validate_package_with_tracker(
             )?);
             None
         },
-        Err(error) => return Err(DocxValidationError::Ingress(error)),
+        Err(error) => return Err(Error::Ingress(error)),
     };
 
     let mut main_status = CheckStatus::Complete;
@@ -429,13 +429,13 @@ fn validate_package_with_tracker(
                     semantic_status = CheckStatus::Complete;
                 },
                 Err(InspectionFailure::Ingress(error)) => {
-                    return Err(DocxValidationError::Ingress(error));
+                    return Err(Error::Ingress(error));
                 },
                 Err(InspectionFailure::Allocation { resource }) => {
-                    return Err(DocxValidationError::Allocation { resource });
+                    return Err(Error::Allocation { resource });
                 },
                 Err(InspectionFailure::Report(error)) => {
-                    return Err(DocxValidationError::Report(error));
+                    return Err(Error::Report(error));
                 },
             }
         }
@@ -542,17 +542,17 @@ fn inspect_main_relationships(
     let mut pending: Vec<PartView<'_>> = Vec::new();
     pending
         .try_reserve_exact(1)
-        .map_err(|_| DocxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "main-document relationship traversal",
         })?;
     let main_part = package
         .part(main.partname())
-        .map_err(DocxValidationError::Ingress)?;
+        .map_err(Error::Ingress)?;
     pending.push(main_part);
     let mut scheduled = HashSet::new();
     scheduled
         .try_reserve(package.iter_parts().count().saturating_add(1))
-        .map_err(|_| DocxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "main-document relationship traversal",
         })?;
     scheduled.insert(std::ptr::from_ref(main.partname()) as usize);
@@ -579,7 +579,7 @@ fn inspect_main_relationships(
                     missing_targets = missing_targets.saturating_add(1);
                     continue;
                 },
-                Err(error) => return Err(DocxValidationError::Ingress(error)),
+                Err(error) => return Err(Error::Ingress(error)),
             };
             if target_part.content_type().is_empty()
                 || !relationship_target_content_type_matches(
@@ -597,7 +597,7 @@ fn inspect_main_relationships(
             if scheduled.insert(target_identity) {
                 pending
                     .try_reserve(1)
-                    .map_err(|_| DocxValidationError::Allocation {
+                    .map_err(|_| Error::Allocation {
                         resource: "main-document relationship traversal",
                     })?;
                 pending.push(target_part);
@@ -839,7 +839,7 @@ impl ReadAt for ValidationSource {
 fn inspect_main_document(
     main: &PartView<'_>,
     main_path: &str,
-    limits: DocxValidationLimits,
+    limits: Limits,
     report_limits: ValidationLimits,
     tracker: Option<&ValidationSource>,
 ) -> std::result::Result<(MceInspection, Vec<ValidationIssue>), InspectionFailure> {
@@ -1154,7 +1154,7 @@ fn is_legal_xml_character(character: char) -> bool {
 fn inspect_visible_xml(
     xml: &[u8],
     path: &str,
-    limits: DocxValidationLimits,
+    limits: Limits,
     report_limits: ValidationLimits,
 ) -> std::result::Result<Vec<ValidationIssue>, InspectionFailure> {
     let max_xml_depth = effective_xml_depth(limits);

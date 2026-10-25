@@ -47,6 +47,17 @@ const MAX_READER_DEPTH: usize = u16::MAX as usize - 1;
 const MIN_SLIDE_ID: u64 = 256;
 const MAX_SLIDE_ID: u64 = 2_147_483_647;
 
+/// Default finite limits for one PPTX semantic validation pass.
+pub static DEFAULT_LIMITS: std::sync::LazyLock<Limits> = std::sync::LazyLock::new(|| Limits {
+    read_limits: SourceLimits::default(),
+    max_xml_bytes: DEFAULT_XML_BYTES,
+    max_owner_bytes: DEFAULT_OWNER_BYTES,
+    max_slides: DEFAULT_SLIDES,
+    max_graph_nodes: DEFAULT_GRAPH_NODES,
+    max_xml_events: DEFAULT_XML_EVENTS,
+    max_xml_depth: DEFAULT_XML_DEPTH,
+});
+
 /// Finite semantic limits for one PPTX validation pass.
 ///
 /// OPC archive, member, relationship, and ZIP/XML-manifest limits remain
@@ -54,7 +65,7 @@ const MAX_SLIDE_ID: u64 = 2_147_483_647;
 /// materialized by this format-level report, the aggregate validated owner
 /// bytes, and the raw relationship graph walk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PptxValidationLimits {
+pub struct Limits {
     read_limits: SourceLimits,
     max_xml_bytes: usize,
     max_owner_bytes: usize,
@@ -64,7 +75,7 @@ pub struct PptxValidationLimits {
     max_xml_depth: usize,
 }
 
-impl PptxValidationLimits {
+impl Limits {
     /// Returns the OPC ingress policy used when opening a positional source.
     #[must_use]
     pub const fn read_limits(self) -> SourceLimits {
@@ -161,24 +172,16 @@ impl PptxValidationLimits {
     }
 }
 
-impl Default for PptxValidationLimits {
+impl Default for Limits {
     fn default() -> Self {
-        Self {
-            read_limits: SourceLimits::default(),
-            max_xml_bytes: DEFAULT_XML_BYTES,
-            max_owner_bytes: DEFAULT_OWNER_BYTES,
-            max_slides: DEFAULT_SLIDES,
-            max_graph_nodes: DEFAULT_GRAPH_NODES,
-            max_xml_events: DEFAULT_XML_EVENTS,
-            max_xml_depth: DEFAULT_XML_DEPTH,
-        }
+        *DEFAULT_LIMITS
     }
 }
 
 /// Failure to perform or retain a PPTX validation report.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum PptxValidationError {
+pub enum Error {
     /// Source I/O, source instability, or a bounded OPC ingress failure.
     Ingress(OpcError),
     /// The shared bounded report rejected the staged result.
@@ -190,7 +193,7 @@ pub enum PptxValidationError {
     },
 }
 
-impl fmt::Display for PptxValidationError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ingress(error) => write!(formatter, "PPTX validation ingress failed: {error}"),
@@ -205,7 +208,7 @@ impl fmt::Display for PptxValidationError {
     }
 }
 
-impl StdError for PptxValidationError {
+impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::Ingress(error) => Some(error),
@@ -215,7 +218,7 @@ impl StdError for PptxValidationError {
     }
 }
 
-impl From<ValidationReportError> for PptxValidationError {
+impl From<ValidationReportError> for Error {
     fn from(error: ValidationReportError) -> Self {
         Self::Report(error)
     }
@@ -230,12 +233,12 @@ impl From<ValidationReportError> for PptxValidationError {
 /// report can be made for those conditions.
 pub fn validate_source(
     source: Arc<dyn ReadAt>,
-    input_limits: PptxValidationLimits,
+    input_limits: Limits,
     report_limits: ValidationLimits,
-) -> Result<ValidateReport, PptxValidationError> {
+) -> Result<ValidateReport, Error> {
     let expected_version = source
         .version()
-        .map_err(|error| PptxValidationError::Ingress(OpcError::IoError(error)))?;
+        .map_err(|error| Error::Ingress(OpcError::IoError(error)))?;
     let result = match SourceBackedPackage::from_read_at(
         Arc::clone(&source),
         input_limits.read_limits,
@@ -251,13 +254,13 @@ pub fn validate_source(
         Err(error) if is_structural_rejection(&error) => {
             rejected_ingress_report(&error, report_limits)
         },
-        Err(error) => Err(PptxValidationError::Ingress(error)),
+        Err(error) => Err(Error::Ingress(error)),
     };
     let actual_version = source
         .version()
-        .map_err(|error| PptxValidationError::Ingress(OpcError::IoError(error)))?;
+        .map_err(|error| Error::Ingress(OpcError::IoError(error)))?;
     if actual_version != expected_version {
-        return Err(PptxValidationError::Ingress(OpcError::SourceChanged {
+        return Err(Error::Ingress(OpcError::SourceChanged {
             expected: expected_version,
             actual: actual_version,
         }));
@@ -270,12 +273,12 @@ pub fn validate_source(
 /// relationship manifests and content-type catalog.
 pub fn validate_source_backed(
     package: &SourceBackedPackage,
-    input_limits: PptxValidationLimits,
+    input_limits: Limits,
     report_limits: ValidationLimits,
-) -> Result<ValidateReport, PptxValidationError> {
+) -> Result<ValidateReport, Error> {
     let source_version = package
         .source_version()
-        .map_err(PptxValidationError::Ingress)?;
+        .map_err(Error::Ingress)?;
 
     let mut facts = Facts::new(report_limits, source_version)?;
     let (catalog, graph) = inspect_catalog_and_graph(package, input_limits.max_graph_nodes())?;
@@ -289,7 +292,7 @@ pub fn validate_source_backed(
 
     let root = match package.main_document_part() {
         Ok(view) => view,
-        Err(error) if is_transient(&error) => return Err(PptxValidationError::Ingress(error)),
+        Err(error) if is_transient(&error) => return Err(Error::Ingress(error)),
         Err(_error) => {
             facts.root = RootOutcome::Malformed;
             facts.root_issue = true;
@@ -331,7 +334,7 @@ pub fn validate_source_backed(
                 Some(root),
             );
         },
-        Err(error) if is_transient(&error) => return Err(PptxValidationError::Ingress(error)),
+        Err(error) if is_transient(&error) => return Err(Error::Ingress(error)),
         Err(_) => {
             facts.root = RootOutcome::Malformed;
             facts.root_issue = true;
@@ -382,7 +385,7 @@ pub fn validate_source_backed(
             );
         },
         Err(XmlInspectionError::Allocation { resource }) => {
-            return Err(PptxValidationError::Allocation { resource });
+            return Err(Error::Allocation { resource });
         },
         Err(XmlInspectionError::Malformed) => {
             facts.root = RootOutcome::Malformed;
@@ -434,19 +437,19 @@ pub fn validate_source_backed(
     let mut seen_slides = std::collections::HashSet::<String>::new();
     seen_slides
         .try_reserve(presentation.slides.len())
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "ordered slide identity set",
         })?;
     let mut seen_slide_ids = std::collections::HashSet::<u64>::new();
     seen_slide_ids
         .try_reserve(presentation.slides.len())
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "ordered slide numeric identity set",
         })?;
     let mut seen_relationship_ids = std::collections::HashSet::<&str>::new();
     seen_relationship_ids
         .try_reserve(presentation.slides.len())
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "ordered slide relationship identity set",
         })?;
     let mut duplicate_slides = 0_u64;
@@ -491,7 +494,7 @@ pub fn validate_source_backed(
         let slide = match package.part(&target) {
             Ok(slide) => slide,
             Err(error) if is_transient(&error) => {
-                return Err(PptxValidationError::Ingress(error));
+                return Err(Error::Ingress(error));
             },
             Err(_) => {
                 block_mce(&mut facts);
@@ -512,7 +515,7 @@ pub fn validate_source_backed(
                 break;
             },
             Err(error) if is_transient(&error) => {
-                return Err(PptxValidationError::Ingress(error));
+                return Err(Error::Ingress(error));
             },
             Err(_) => {
                 block_mce(&mut facts);
@@ -547,7 +550,7 @@ pub fn validate_source_backed(
                 break;
             },
             Err(XmlInspectionError::Allocation { resource }) => {
-                return Err(PptxValidationError::Allocation { resource });
+            return Err(Error::Allocation { resource });
             },
             Err(XmlInspectionError::Malformed) => {
                 facts.malformed_slides = facts.malformed_slides.saturating_add(1);
@@ -614,7 +617,7 @@ struct XmlAttributeObservation {
 
 fn inspect_xml(
     bytes: &[u8],
-    limits: PptxValidationLimits,
+    limits: Limits,
     owner: XmlOwner,
 ) -> Result<XmlObservation, XmlInspectionError> {
     let mut mce = false;
@@ -937,17 +940,17 @@ fn record_owned_text(
     seen: &mut std::collections::HashSet<String>,
     value: &str,
     resource: &'static str,
-) -> Result<bool, PptxValidationError> {
+) -> Result<bool, Error> {
     if seen.contains(value) {
         return Ok(false);
     }
     let mut owned = String::new();
     owned
         .try_reserve(value.len())
-        .map_err(|_| PptxValidationError::Allocation { resource })?;
+        .map_err(|_| Error::Allocation { resource })?;
     owned.push_str(value);
     seen.try_reserve(1)
-        .map_err(|_| PptxValidationError::Allocation { resource })?;
+        .map_err(|_| Error::Allocation { resource })?;
     seen.insert(owned);
     Ok(true)
 }
@@ -1069,7 +1072,7 @@ struct CatalogFacts {
 fn inspect_catalog_and_graph(
     package: &SourceBackedPackage,
     max_nodes: usize,
-) -> Result<(CatalogFacts, GraphFacts), PptxValidationError> {
+) -> Result<(CatalogFacts, GraphFacts), Error> {
     let mut catalog = CatalogFacts {
         external_targets: 0,
         signatures: 0,
@@ -1077,7 +1080,7 @@ fn inspect_catalog_and_graph(
     };
     let mut seen = std::collections::HashSet::<String>::new();
     seen.try_reserve(1)
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "PPTX relationship graph set",
         })?;
     let mut missing_targets = 0_u64;
@@ -1165,7 +1168,7 @@ fn inspect_graph_relationship(
     max_nodes: usize,
     missing_targets: &mut u64,
     invalid_targets: &mut u64,
-) -> Result<bool, PptxValidationError> {
+) -> Result<bool, Error> {
     let target = match relationship.target_partname() {
         Ok(target) => target,
         Err(_) => {
@@ -1175,7 +1178,7 @@ fn inspect_graph_relationship(
     };
     match package.part(&target) {
         Ok(_) => record_graph_node(seen, target.as_str(), max_nodes),
-        Err(error) if is_transient(&error) => Err(PptxValidationError::Ingress(error)),
+        Err(error) if is_transient(&error) => Err(Error::Ingress(error)),
         Err(_) => {
             *missing_targets = missing_targets.saturating_add(1);
             Ok(false)
@@ -1187,7 +1190,7 @@ fn record_graph_node(
     seen: &mut std::collections::HashSet<String>,
     uri: &str,
     max_nodes: usize,
-) -> Result<bool, PptxValidationError> {
+) -> Result<bool, Error> {
     if seen.contains(uri) {
         return Ok(false);
     }
@@ -1197,12 +1200,12 @@ fn record_graph_node(
     let mut owned = String::new();
     owned
         .try_reserve(uri.len())
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "PPTX relationship graph set",
         })?;
     owned.push_str(uri);
     seen.try_reserve(1)
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "PPTX relationship graph set",
         })?;
     seen.insert(owned);
@@ -1272,7 +1275,7 @@ impl Facts {
     fn new(
         limits: ValidationLimits,
         source_version: SourceVersion,
-    ) -> Result<Self, PptxValidationError> {
+    ) -> Result<Self, Error> {
         Ok(Self {
             source_version,
             root: RootOutcome::Blocked,
@@ -1296,9 +1299,9 @@ impl Facts {
         })
     }
 
-    fn issue_capacity_check(&self, observed: usize) -> Result<(), PptxValidationError> {
+    fn issue_capacity_check(&self, observed: usize) -> Result<(), Error> {
         if observed >= self.issue_capacity {
-            return Err(PptxValidationError::Report(ValidationReportError::Limit {
+            return Err(Error::Report(ValidationReportError::Limit {
                 kind: ValidationLimitKind::Issues,
                 observed: observed.saturating_add(1),
                 limit: self.issue_capacity,
@@ -1310,17 +1313,17 @@ impl Facts {
 
 fn finish(
     package: &SourceBackedPackage,
-    _input_limits: PptxValidationLimits,
+    _input_limits: Limits,
     limits: ValidationLimits,
     facts: Facts,
     catalog: CatalogFacts,
     _root: Option<litchi_opc::PartView<'_>>,
-) -> Result<ValidateReport, PptxValidationError> {
+) -> Result<ValidateReport, Error> {
     let current_version = package
         .source_version()
-        .map_err(PptxValidationError::Ingress)?;
+        .map_err(Error::Ingress)?;
     if current_version != facts.source_version {
-        return Err(PptxValidationError::Ingress(OpcError::SourceChanged {
+        return Err(Error::Ingress(OpcError::SourceChanged {
             expected: facts.source_version,
             actual: current_version,
         }));
@@ -1328,7 +1331,7 @@ fn finish(
     let mut issues = Vec::new();
     issues
         .try_reserve_exact(limits.max_issues().min(16))
-        .map_err(|_| PptxValidationError::Allocation {
+        .map_err(|_| Error::Allocation {
             resource: "PPTX validation issue staging",
         })?;
 
@@ -1530,12 +1533,12 @@ fn finish(
         )?,
     ];
     let report =
-        ValidateReport::try_new(checks, issues, limits).map_err(PptxValidationError::from)?;
+        ValidateReport::try_new(checks, issues, limits).map_err(Error::from)?;
     let current_version = package
         .source_version()
-        .map_err(PptxValidationError::Ingress)?;
+        .map_err(Error::Ingress)?;
     if current_version != facts.source_version {
-        return Err(PptxValidationError::Ingress(OpcError::SourceChanged {
+        return Err(Error::Ingress(OpcError::SourceChanged {
             expected: facts.source_version,
             actual: current_version,
         }));
@@ -1565,7 +1568,7 @@ fn issue(
     evidence: Option<EvidenceValue>,
     compatibility: CompatibilityImpact,
     limits: ValidationLimits,
-) -> Result<ValidationIssue, PptxValidationError> {
+) -> Result<ValidationIssue, Error> {
     let evidence = evidence
         .map(|value| IssueEvidence::try_new("observations", value, limits))
         .transpose()?;
@@ -1594,7 +1597,7 @@ fn issue(
 fn rejected_ingress_report(
     error: &OpcError,
     limits: ValidationLimits,
-) -> Result<ValidateReport, PptxValidationError> {
+) -> Result<ValidateReport, Error> {
     let ingress = id(INGRESS, limits)?;
     let issue = ValidationIssue::try_new(
         ingress.clone(),
@@ -1660,7 +1663,7 @@ fn rejected_ingress_report(
 fn blocked_report(
     reason: &str,
     limits: ValidationLimits,
-) -> Result<ValidateReport, PptxValidationError> {
+) -> Result<ValidateReport, Error> {
     let ingress = id(INGRESS, limits)?;
     let blocked = CheckStatus::blocked(reason, limits)?;
     let dependent = CheckStatus::stopped_by(ingress.clone());
@@ -1775,7 +1778,7 @@ fn is_structural_rejection(error: &OpcError) -> bool {
         )
 }
 
-fn id(value: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, PptxValidationError> {
+fn id(value: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, Error> {
     CheckCapabilityId::try_new(value, limits).map_err(Into::into)
 }
 
@@ -1783,7 +1786,7 @@ fn check(
     value: &str,
     status: CheckStatus,
     limits: ValidationLimits,
-) -> Result<ValidationCheck, PptxValidationError> {
+) -> Result<ValidationCheck, Error> {
     Ok(ValidationCheck::new(id(value, limits)?, status))
 }
 

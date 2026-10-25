@@ -11,7 +11,9 @@ use crate::custom_xml::Part as CustomXmlPart;
 use crate::error::{Error, Result};
 use crate::footnote::Note;
 use crate::header_footer::{Kind, Story};
-use crate::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
+use crate::mail_merge::{
+    Recipients, extract_recipients, is_settings_relationship, mce_limits_for_source,
+};
 use crate::numbering::{Collection, Snapshot, parse_part, parse_snapshot_part};
 use crate::settings::{DocumentSettings, extract_document_variables};
 use crate::theme::Theme;
@@ -456,8 +458,9 @@ impl Document {
             Ok(rel) => {
                 let target = rel.target_partname()?;
                 let part = self.opc.get_part(&target)?;
-                crate::modern_comments::parse_comments_extended(part.blob())
-                    .map_err(|error| Error::InvalidFormat(error.to_string()))
+                let limits =
+                    mce_limits_for_source(&self.opc.read_limits());
+                crate::modern_comments::parse_comments_extended(part.blob(), &limits)
             },
             Err(_) => Ok(Vec::new()),
         }
@@ -660,7 +663,8 @@ impl Document {
         }
         let target = rel.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        let settings = DocumentSettings::extract_from_part(settings_part)?;
+        let limits = mce_limits_for_source(&self.opc.read_limits());
+        let settings = DocumentSettings::extract_from_part_with_mce_limits(settings_part, &limits)?;
         // The settings carry their own repairs; merge them into the
         // document-level aggregation as well (see `crate::leniency`).
         self.merge_tolerance(settings.tolerance_report());
@@ -698,7 +702,8 @@ impl Document {
             ))
         })?;
         let recipient_part = self.opc.get_part(&relationship.target_partname()?)?;
-        Ok(Some(extract_recipients(recipient_part)?))
+        let limits = mce_limits_for_source(&self.opc.read_limits());
+        Ok(Some(extract_recipients(recipient_part, &limits)?))
     }
 
     /// Read the document's typed web-output settings and conformance family.
@@ -758,7 +763,8 @@ impl Document {
         }
         let target = relationship.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        Ok(Some(extract_document_variables(settings_part)?))
+        let limits = mce_limits_for_source(&self.opc.read_limits());
+        Ok(Some(extract_document_variables(settings_part, &limits)?))
     }
 
     /// Get the document theme.

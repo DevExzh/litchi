@@ -15,7 +15,8 @@ use std::{
 use litchi_core::{
     CheckStatus, EvidenceValue, OwnedSource, ReadAt, SourceVersion, ValidationLimits,
 };
-use litchi_docx::{DocxValidationError, DocxValidationLimits, source_backed, validate_read_at};
+use litchi_docx::source_backed;
+use litchi_docx::validation::{Error, Limits, validate_read_at};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -356,7 +357,7 @@ fn semantic_limits_block_without_materializing_an_unbounded_payload() {
     let report = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         litchi_opc::SourceLimits::default(),
-        DocxValidationLimits::default().with_max_main_document_bytes(1),
+        Limits::default().with_max_main_document_bytes(1),
         ValidationLimits::default(),
     )
     .unwrap();
@@ -390,7 +391,7 @@ fn source_io_is_not_reclassified_as_a_structural_zip_finding() {
     .unwrap_err();
     assert!(matches!(
         error,
-        DocxValidationError::Ingress(OpcError::IoError(error))
+        Error::Ingress(OpcError::IoError(error))
             if error.kind() == io::ErrorKind::Other
     ));
 }
@@ -410,7 +411,7 @@ fn main_part_io_is_reported_as_ingress_failure_after_catalog_open() {
     .unwrap_err();
     assert!(matches!(
         error,
-        DocxValidationError::Ingress(OpcError::IoError(error))
+        Error::Ingress(OpcError::IoError(error))
             if error.kind() == io::ErrorKind::Other
     ));
 }
@@ -424,7 +425,7 @@ fn declared_main_size_is_rejected_before_payload_read() {
     let report = validate_read_at(
         Arc::new(source.clone()),
         litchi_opc::SourceLimits::default(),
-        DocxValidationLimits::default()
+        Limits::default()
             .with_max_main_document_bytes(u64::try_from(main_xml.len() - 1).unwrap()),
         ValidationLimits::default(),
     )
@@ -482,7 +483,7 @@ fn visible_xml_rejects_special_events_invalid_references_and_extra_roots() {
 #[test]
 fn xml_depth_is_bounded_before_namespace_reader_and_public_limit_is_safe() {
     assert_eq!(
-        DocxValidationLimits::default()
+        Limits::default()
             .with_max_xml_depth(usize::MAX)
             .max_xml_depth(),
         u16::MAX as usize - 1
@@ -495,7 +496,7 @@ fn xml_depth_is_bounded_before_namespace_reader_and_public_limit_is_safe() {
             false,
         ))),
         litchi_opc::SourceLimits::default(),
-        DocxValidationLimits::default().with_max_xml_depth(1),
+        Limits::default().with_max_xml_depth(1),
         ValidationLimits::default(),
     )
     .unwrap();
@@ -545,7 +546,7 @@ fn mce_preprocessing_obeys_the_xml_event_ceiling() {
             false,
         ))),
         litchi_opc::SourceLimits::default(),
-        DocxValidationLimits::default().with_max_xml_events(2),
+        Limits::default().with_max_xml_events(2),
         ValidationLimits::default(),
     )
     .unwrap();

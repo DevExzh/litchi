@@ -24,9 +24,11 @@ use super::validation;
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
 pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
+    let source_limits = package.read_limits();
     let mut items = Vec::new();
     scan(
         package,
+        &source_limits,
         |source,
          source_relationship,
          part,
@@ -77,8 +79,9 @@ pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
 /// exceeds a configured bound, or an underlying XML or package operation
 /// fails.
 pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
+    let source_limits = package.read_limits();
     validate_content_type(&item.content_type)?;
-    validate_payload(&item.xml)?;
+    validate_payload(&item.xml, &source_limits)?;
     require_rel_id(&item.rel_id, "custom XML relationship")?;
     if item.part.as_str() == "/" {
         return invalid("custom XML data part cannot be the package root");
@@ -110,7 +113,7 @@ pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
     validate_new_names(&item.part, item.props.as_ref().map(|props| &props.part))?;
 
     if let Some(candidate_id) = item.props.as_ref().map(|props| props.value.id.as_str()) {
-        scan(package, |_, _, _, _, _, _, props, _, _| {
+        scan(package, &source_limits, |_, _, _, _, _, _, props, _, _| {
             if props
                 .as_ref()
                 .is_some_and(|existing| candidate_id.eq_ignore_ascii_case(&existing.id))
@@ -136,7 +139,7 @@ pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
         value,
     }) = props
     {
-        let xml = write_props(&value, conformance)?;
+        let xml = write_props(&value, conformance, &source_limits)?;
         Some((part, rel_id, xml))
     } else {
         None
@@ -197,6 +200,7 @@ pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
 
 fn scan(
     package: &OpcPackage,
+    source_limits: &litchi_opc::SourceLimits,
     mut visit: impl FnMut(
         &PackURI,
         Relationship,
@@ -257,7 +261,7 @@ fn scan(
             let root = if let Some(root) = cached_roots.get(&part) {
                 root.clone()
             } else {
-                let root = validate_payload(data.blob())?;
+                let root = validate_payload(data.blob(), source_limits)?;
                 cached_roots.insert(part.clone(), root.clone());
                 root
             };
@@ -268,6 +272,7 @@ fn scan(
                 &mut property_ids,
                 &mut cached_props,
                 &mut props_owners,
+                source_limits,
             )?;
             visit(
                 source.partname(),
@@ -291,6 +296,7 @@ fn resolve_props(
     property_ids: &mut HashMap<String, PackURI>,
     cache: &mut HashMap<PackURI, Props>,
     owners: &mut HashMap<PackURI, PackURI>,
+    source_limits: &litchi_opc::SourceLimits,
 ) -> Result<(Option<PackURI>, Option<Props>, Option<Arc<Vec<u8>>>)> {
     let mut props_relationship = None;
     for relationship in data
@@ -342,7 +348,7 @@ fn resolve_props(
                 actual: part.content_type().into(),
             });
         }
-        let props = read_props(part.blob())?;
+        let props = read_props(part.blob(), source_limits)?;
         let key = props.id.to_ascii_lowercase();
         if let Some(existing) = property_ids.insert(key, part_name.clone())
             && existing != part_name
@@ -396,7 +402,8 @@ pub(crate) fn apply_items(
     before: &Snapshot,
     desired: &[Item],
 ) -> Result<()> {
-    validation::items(desired)?;
+    let source_limits = package.read_limits();
+    validation::items(desired, &source_limits)?;
     reject_part_aliases(desired)?;
 
     let mut staged = Vec::new();

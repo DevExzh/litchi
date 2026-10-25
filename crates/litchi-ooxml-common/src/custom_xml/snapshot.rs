@@ -82,7 +82,8 @@ impl Snapshot {
 
     pub(crate) fn load_scoped(package: &OpcPackage, hints: &[PackURI]) -> Result<Self> {
         let items = package::discover(package)?;
-        validation::items(&items)?;
+        let source_limits = package.read_limits();
+        validation::items(&items, &source_limits)?;
 
         let mut names = Vec::with_capacity(hints.len() + items.len() * 3);
         for name in hints {

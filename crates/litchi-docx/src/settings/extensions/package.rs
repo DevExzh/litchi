@@ -4,12 +4,14 @@ use std::borrow::Cow;
 
 use crate::Result;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+#[cfg(test)]
 use litchi_opc::part::Part;
 
 use super::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
 
 /// Apply the DOCX settings MCE profile while retaining known Word extension
 /// namespaces for the typed settings codec.
+#[cfg(test)]
 pub(crate) fn process_part(part: &dyn Part) -> Result<Cow<'_, [u8]>> {
     process_bytes_with_limits(part.blob(), &MceLimits::default())
 }

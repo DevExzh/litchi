@@ -1,6 +1,7 @@
 //! Layered modern Word comment metadata owner.
 
 mod codec;
+mod limit;
 mod model;
 mod package;
 
@@ -19,6 +20,7 @@ pub use model::{
     ReactionUser, RelationshipIds, STRICT_WORD_NAMESPACE, TRANSITIONAL_WORD_NAMESPACE,
     WORD_2012_NAMESPACE, WORD_2018_NAMESPACE,
 };
+pub use limit::LimitKind;
 pub use package::{
     COMMENTS_EXTENDED_CONTENT_TYPE, COMMENTS_EXTENDED_RELATIONSHIP,
     COMMENTS_EXTENSIBLE_CONTENT_TYPE, COMMENTS_EXTENSIBLE_RELATIONSHIP, COMMENTS_IDS_CONTENT_TYPE,

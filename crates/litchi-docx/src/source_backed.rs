@@ -1009,8 +1009,10 @@ impl Package {
     /// Returns an error when the source changed or the part is malformed.
     pub fn comments_extended(&self) -> Result<Vec<crate::modern_comments::Extended>> {
         match self.related_xml("/commentsExtended")? {
-            Some(xml) => crate::modern_comments::parse_comments_extended(&xml)
-                .map_err(|error| Error::InvalidFormat(error.to_string())),
+            Some(xml) => {
+                let limits = crate::mail_merge::mce_limits_for_source(&self.read_limits());
+                crate::modern_comments::parse_comments_extended(&xml, &limits)
+            },
             None => Ok(Vec::new()),
         }
     }
@@ -2433,7 +2435,10 @@ impl Package {
                 relationship.target_mode(),
             )?;
         }
-        let settings = DocumentSettings::extract_from_part(&staged)?;
+        let limits = crate::mail_merge::mce_limits_for_source(
+            &self.physical_package()?.read_limits(),
+        );
+        let settings = DocumentSettings::extract_from_part_with_mce_limits(&staged, &limits)?;
         if settings.is_protected() || settings.is_write_protected() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::Protected,

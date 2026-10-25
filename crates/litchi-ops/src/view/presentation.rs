@@ -14,7 +14,7 @@ use crate::format::odp::Odp;
 #[cfg(feature = "ppt")]
 use crate::format::ppt::Ppt;
 #[cfg(feature = "pptx")]
-use crate::format::pptx::{Pptx, PptxSlide};
+use crate::format::pptx::Pptx;
 
 /// The presentation view of a [`File`](crate::File): the slides of PPT, PPTX
 /// and ODP presentations.
@@ -50,7 +50,7 @@ pub(crate) enum Inner<'a> {
 }
 
 #[cfg(feature = "pptx")]
-fn pptx_slide(slide: PptxSlide) -> Slide {
+fn pptx_slide(slide: crate::format::pptx::Slide) -> Slide {
     let (text, name) = slide.into_parts();
     Slide::Pptx(SlideData {
         text,
