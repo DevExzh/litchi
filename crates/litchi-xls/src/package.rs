@@ -471,6 +471,19 @@ impl Package {
         }
     }
 
+    /// Raw variable-payload codecs use the package's retained physical
+    /// profile, including when a source-backed package is materialized only
+    /// for a compatibility projection such as worksheet features.
+    pub(crate) fn raw_record_limits(&self) -> Result<SourceLimits> {
+        match self.inner.policy {
+            RetainedPolicy::Eager { source_limits, .. } => Ok(source_limits),
+            RetainedPolicy::Source { limits, .. } => {
+                SourceLimits::from_physical_profile(limits.max_input_bytes)
+                    .map_err(Error::Reader)
+            },
+        }
+    }
+
     /// Positional read policy, when this package adopts a lazy reader.
     #[must_use]
     pub fn source_backed_limits(&self) -> Option<SourceBackedLimits> {

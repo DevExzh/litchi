@@ -1239,19 +1239,37 @@ impl SourceBackedWorkbook {
             execution.check()?;
         }
         owner.ensure_current()?;
-        // This owner was admitted under SourceBackedLimits. Preserve that
-        // policy during materialization instead of introducing the eager
-        // reader's separate default SourceLimits after copying the input.
+        // This owner was admitted under SourceBackedLimits. Preserve its
+        // physical CFB input ceiling during materialization instead of
+        // introducing the eager reader's separate default SourceLimits after
+        // copying the input. The worksheet scan budget is intentionally not
+        // adapted here: it is a logical positional-read policy and must not
+        // become the per-entry CFB stream ceiling used by raw codecs.
         let selected = owner.cfb.limits();
         let cfb_limits = litchi_cfb::OleFileLimits::new(selected.max_input_bytes())?
             .with_max_directory_bytes(selected.max_directory_bytes())?
             .with_max_allocation_table_bytes(selected.max_allocation_table_bytes())?;
+        let source_limits = crate::SourceLimits::from_physical_profile(
+            owner.limits.max_input_bytes,
+        )
+        .map_err(|error| match error {
+            Error::InvalidLimit { value, maximum, .. } => SourceBackedError::ResourceLimit {
+                resource: "raw source input bytes",
+                observed: value,
+                maximum,
+            },
+            _ => SourceBackedError::InvalidData(
+                "source-backed raw physical profile is invalid".into(),
+            ),
+        })?;
         let parsed = litchi_cfb::OleFile::open(Cursor::new(bytes), cfb_limits)
             .map_err(Error::from)
             .and_then(|ole| {
                 Reader::from_admitted_ole_file(
                     ole,
-                    crate::OpenOptions::default().leniency(owner.leniency),
+                    crate::OpenOptions::default()
+                        .source_limits(source_limits)
+                        .leniency(owner.leniency),
                 )
             });
         let workbook = match parsed {

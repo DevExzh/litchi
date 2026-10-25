@@ -376,7 +376,7 @@ mod tests {
     use super::write_formula;
     use crate::formula_metadata::shared::{Cell, Owner, Range, parse};
     use crate::records::{CellRecord, Encoding, FormulaValue};
-    use crate::{Error, FormulaMetadata};
+    use crate::{Error, FormulaMetadata, SourceLimits};
 
     const MEMORY_TOKENS: [u8; 18] = [
         0x46, 0x12, 0x34, 0x56, 0x78, 11, 0, 0x24, 0, 0, 0, 0, 0x24, 1, 0, 1, 0, 0x11,
@@ -457,7 +457,11 @@ mod tests {
             &bytes[shared_offset..shared_offset + 4],
             &[0xBC, 0x04, 13, 0]
         );
-        let parsed = parse(&bytes[shared_offset + 4..]).unwrap();
+        let parsed = parse(
+            &bytes[shared_offset + 4..],
+            &SourceLimits::default(),
+        )
+        .unwrap();
         assert_eq!(parsed.range, Range::try_new(0, 0, 1, 1).unwrap());
         assert_eq!(parsed.count, 2);
         assert_eq!(parsed.tokens, [0x1E, 99, 0]);

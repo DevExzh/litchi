@@ -330,7 +330,15 @@ impl Edit {
     pub fn features(&mut self, sheet: usize, select: FeatureSet) -> Result<Features> {
         self.ensure_ready()?;
         let (globals, layout) = self.sheet(sheet)?;
-        Ok(read::read(&self.stream, &globals, &layout, sheet, select)?)
+        let limits = self.base.raw_record_limits()?;
+        Ok(read::read(
+            &self.stream,
+            &globals,
+            &layout,
+            sheet,
+            select,
+            &limits,
+        )?)
     }
 
     /// Replace records `[first, end)` of the current sheet layout with

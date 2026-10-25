@@ -716,6 +716,18 @@ pub struct Snapshot {
 pub(crate) type History = litchi_core::patch::History<Snapshot>;
 
 impl Snapshot {
+    /// Adapts this editor's retained object and CFB admission profiles for
+    /// variable-length raw BIFF records.  Structural certification and any
+    /// nested record reader must observe the same limits as the snapshot's
+    /// source capture; it must not silently fall back to a broad default.
+    pub(crate) fn raw_record_limits(&self) -> Result<crate::SourceLimits> {
+        crate::SourceLimits::try_from_profile(
+            self.inner.cfb_limits.max_input_bytes(),
+            self.inner.limits.max_stream_size,
+            self.inner.limits.max_total_size,
+        )
+    }
+
     /// Opens an unencrypted XLS package under an explicit object capture
     /// profile before publishing the editable snapshot.
     ///

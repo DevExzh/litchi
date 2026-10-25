@@ -2996,6 +2996,27 @@ are complete-catalog sheet positions.
 | `sheet_features::edit::{Hyperlink, Validation, Style, Format, FormatRule, Threshold, Picture, Shape, ShapeGeometry, Anchor, DrawingChange}` | the authored values; formulas are BIFF8 token streams, colors palette indexes (styles) or RGB (drawings, CF12 visuals) | ✅ 0327 |
 | `sheet_features::edit::compile_formula`, `Package::palette` | formula text to BIFF8 tokens with every built-in worksheet function (not `CALL`, `REGISTER.ID`, `EXEC`); the workbook palette a style's indexes name | ✅ 0327 |
 
+## XLS raw record boundaries (record 0362ul46)
+
+Variable-payload XLS fragment codecs require the selected source profile at
+their public boundary. The shared-formula and hyperlink parsers retain their
+historical decoded models and hard BIFF8 checks while refusing a payload over
+`SourceLimits::max_entry_bytes()` before copying tokens or strings. The
+worksheet/package readers and cell-value structural checks pass the retained
+owner profile; the worksheet hyperlink collector applies the same check to
+`HLinkTooltip` before UTF-16 decoding, and source-backed `reader_ref()` keeps
+the retained physical raw profile when it materializes. The logical
+`SourceBackedLimits` worksheet traversal budget remains on the source-backed
+owner and is not converted into a per-entry CFB ceiling. There is no public
+limit-less twin.
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_xls::formula_metadata::shared::parse(data, &SourceLimits)` | `ShrFmla` token payload; selected `entry_bytes` is checked before retention | ✅ 0362ul46; source migration |
+| `litchi_xls::hyperlinks::parse_hlink_record(data, &SourceLimits)` | variable display/location/frame/moniker payload; selected `entry_bytes` is checked before string decoding | ✅ 0362ul46; source migration |
+| collector-internal `hyperlinks::parse_tooltip(data, &SourceLimits)` | `HLinkTooltip` UTF-16 payload; selected `entry_bytes` is checked before decode | ✅ 0362ul46b/c; owner profile propagation |
+| `litchi_xls::validation::{Limits, Error}` | focused validator names; the former `XlsValidationLimits` and `XlsValidationError` spellings are banned with no aliases | ✅ 0362ul46; all tracked consumers |
+
 ## ODS worksheet feature family (record 0327)
 
 The worksheet features of an ODS sheet (`litchi_ods::advanced::sheet_features`)

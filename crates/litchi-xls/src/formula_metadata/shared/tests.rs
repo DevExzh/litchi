@@ -2,6 +2,7 @@
 
 use super::codec::parse;
 use super::{Cell, Owner, Range};
+use crate::SourceLimits;
 
 #[test]
 fn owner_checks_range_anchor_participants_and_record_order() {
@@ -38,7 +39,7 @@ fn owner_rejects_inconsistent_participants() {
 #[test]
 fn parser_round_trips_refu_reserved_count_and_shared_tokens() {
     let data = [0, 0, 2, 0, 1, 3, 0, 2, 3, 0, 0x1E, 2, 0];
-    let parsed = parse(&data).unwrap();
+    let parsed = parse(&data, &SourceLimits::default()).unwrap();
     assert_eq!(parsed.range, Range::try_new(0, 1, 2, 3).unwrap());
     assert_eq!(parsed.reserved, 0);
     assert_eq!(parsed.count, 2);
@@ -48,12 +49,30 @@ fn parser_round_trips_refu_reserved_count_and_shared_tokens() {
 #[test]
 fn parser_rejects_reserved_bytes_empty_count_and_length_mismatches() {
     let mut data = [0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0x1E];
-    assert!(parse(&data).is_err());
+    assert!(parse(&data, &SourceLimits::default()).is_err());
 
     data[6] = 1;
-    assert!(parse(&data).is_err());
+    assert!(parse(&data, &SourceLimits::default()).is_err());
 
     data[6] = 0;
     data[7] = 0;
-    assert!(parse(&data).is_err());
+    assert!(parse(&data, &SourceLimits::default()).is_err());
+}
+
+#[test]
+fn parser_rejects_payload_above_selected_entry_limit_before_copying_tokens() {
+    let data = [0, 0, 2, 0, 1, 3, 0, 2, 3, 0, 0x1E, 2, 0];
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(data.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        parse(&data, &limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::EntryBytes,
+            observed,
+            maximum,
+        }) if observed == data.len() as u64 && maximum == (data.len() - 1) as u64
+    ));
 }

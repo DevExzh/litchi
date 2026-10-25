@@ -10490,6 +10490,16 @@
           "name": "StagedChangeLimit",
           "scope": "litchi_xls",
           "replacement": "use Error::Limit with LimitKind::Operations (record 0359c)"
+        },
+        {
+          "name": "XlsValidationLimits",
+          "scope": "litchi_xls::validation",
+          "replacement": "use validation::Limits (record 0362ul46)"
+        },
+        {
+          "name": "XlsValidationError",
+          "scope": "litchi_xls::validation",
+          "replacement": "use validation::Error (record 0362ul46)"
         }
       ],
       "families": [
@@ -10515,6 +10525,20 @@
       "shared_types": [
         {"path": "litchi_xls::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_xls::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_xls::formula_metadata::shared::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xls::SourceLimits"
+        },
+        {
+          "method": "litchi_xls::hyperlinks::parse_hlink_record",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xls::SourceLimits"
+        }
       ],
       "family_methods": true,
       "result_methods": [

@@ -34,6 +34,16 @@ fn authored_package() -> Vec<u8> {
     output.into_inner()
 }
 
+fn cfb_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    for (name, bytes) in streams {
+        writer.create_stream(&[*name], bytes).unwrap();
+    }
+    let mut output = Vec::new();
+    writer.write_to(&mut Cursor::new(&mut output)).unwrap();
+    output
+}
+
 fn signed_package() -> Vec<u8> {
     let source = authored_package();
     let mut ole = OleFile::open(Cursor::new(source), OleFileLimits::default()).unwrap();
@@ -242,6 +252,68 @@ fn source_adoption_is_lazy_and_retains_the_original_cfb_identity() {
         Err(PackageError::Source(
             SourceBackedError::SourceChanged { .. }
         ))
+    ));
+}
+
+#[test]
+fn source_reader_ref_separates_physical_and_logical_limits() {
+    let original = fixture("poi/test-data/spreadsheet/WithTwoHyperLinks.xls");
+    let mut ole = OleFile::open(Cursor::new(original), OleFileLimits::default()).unwrap();
+    let workbook_stream = ole.open_stream(&["Workbook"]).unwrap();
+    let unrelated = vec![0x5a; 4 * 1024];
+    let bytes = cfb_with_streams(&[("Workbook", &workbook_stream), ("Unrelated", &unrelated)]);
+    let input_bytes = u64::try_from(bytes.len()).unwrap();
+    let worksheet_bytes = 64_u64;
+    let limits = SourceBackedLimits::default()
+        .with_max_input_bytes(input_bytes)
+        .with_max_worksheet_scan_bytes(worksheet_bytes);
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(CountingReadAt::new(bytes.clone())),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
+    let package = Package::from_source(workbook).unwrap();
+
+    // The logical worksheet budget does not become a physical CFB stream
+    // ceiling: an unrelated 4 KiB stream remains admissible and readable.
+    assert_eq!(
+        package
+            .source()
+            .unwrap()
+            .open_stream(&["Unrelated"])
+            .unwrap()
+            .len(),
+        4 * 1024
+    );
+
+    // The compatibility reader receives the retained physical profile, so a
+    // real variable-length HLink payload is still decoded even though the
+    // source-backed worksheet traversal budget is only 64 bytes.
+    let reader = package.reader_ref().unwrap();
+    let source_limits = reader.source_limits();
+    assert_eq!(source_limits.max_input_bytes(), bytes.len());
+    assert_eq!(
+        source_limits.max_entry_bytes(),
+        SourceLimits::MAX_ENTRY_BYTES
+    );
+    assert_eq!(
+        source_limits.max_aggregate_bytes(),
+        SourceLimits::MAX_AGGREGATE_BYTES
+    );
+    assert_eq!(reader.xls_worksheet(0).unwrap().hyperlinks().len(), 2);
+
+    // The logical policy remains active on the source-backed owner itself;
+    // it is not replaced by the physical profile used above.
+    assert!(matches!(
+        package
+            .source_workbook()
+            .unwrap()
+            .cell_value_by_index(0, 0, 0),
+        Err(SourceBackedError::ResourceLimit {
+            resource: "worksheet scan bytes",
+            maximum: 64,
+            ..
+        })
     ));
 }
 
