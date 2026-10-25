@@ -1193,7 +1193,8 @@ mod tests {
                 Conformance::Transitional,
                 "notes",
             )
-            .expect_err("node ceiling must refuse 100001 nodes");
+            .err()
+            .expect("node ceiling must refuse 100001 nodes");
             assert!(matches!(
                 &expected,
                 Error::Limit {

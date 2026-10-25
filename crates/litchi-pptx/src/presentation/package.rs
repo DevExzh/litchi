@@ -118,7 +118,7 @@ fn capture_slides_inner<'a, 'parent>(
             let (slide_part, name, notes_proof) = match capture.as_deref_mut() {
                 Some(capture) => {
                     let Some(source_limits) = source_limits else {
-                        return Err(crate::Error::Invalid(
+                        return Err(Error::Invalid(
                             "captured slides lack source limits".to_owned(),
                         ));
                     };

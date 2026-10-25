@@ -75,6 +75,7 @@ pub(crate) struct SlideRootProof<'a> {
 }
 
 impl<'a> SlideRootProof<'a> {
+    #[cfg(test)]
     pub(crate) fn new(raw: &'a [u8], conformance: Option<Conformance>) -> Self {
         Self {
             raw,
