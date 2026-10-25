@@ -55,9 +55,15 @@ impl Package {
                     .semantic_limits()
                     .notes()
                     .constrained_by_source(target.read_limits());
+                let mut payload_changed = false;
                 patch.validate_changed_parts(target, |_, part| {
+                    payload_changed = true;
                     super::validate_replay_part(part, limits)
-                })
+                })?;
+                if payload_changed {
+                    super::validate_replay_total(target, limits)?;
+                }
+                Ok(())
             },
         )?;
         Ok(commit_of((package, patch.0.clone())))

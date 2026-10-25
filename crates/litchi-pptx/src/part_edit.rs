@@ -378,16 +378,16 @@ impl PartPatch {
         &self,
         package: &Package,
         operation: &'static str,
-        validate: impl Fn(&Package, &OpcPackage, &Self) -> Result<()>,
+        mut validate: impl FnMut(&Package, &OpcPackage, &Self) -> Result<()>,
     ) -> Result<Package> {
-        self.apply_inner(package, operation, Some(&validate))
+        self.apply_inner(package, operation, Some(&mut validate))
     }
 
     fn apply_inner(
         &self,
         package: &Package,
         operation: &'static str,
-        validate: Option<&dyn Fn(&Package, &OpcPackage, &Self) -> Result<()>>,
+        mut validate: Option<&mut dyn FnMut(&Package, &OpcPackage, &Self) -> Result<()>>,
     ) -> Result<Package> {
         if self.is_noop() {
             return Ok(package.duplicate());

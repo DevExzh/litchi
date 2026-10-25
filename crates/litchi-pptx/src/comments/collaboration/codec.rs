@@ -330,6 +330,49 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     })
 }
 
+/// Validate every typed presence extension in one changed author part under
+/// the recipient's selected policy. The ordinary comment codec accepts the
+/// extension list as opaque; replay must additionally run the typed locator so
+/// string and MCE ceilings apply to the changed collaboration payload.
+pub(crate) fn validate_presence_replay(source: &[u8], limits: Limits) -> Result<()> {
+    let authors = crate::comments::parse_comment_authors(source, limits)?;
+    if !source
+        .windows(PRESENCE_EXTENSION_URI.len())
+        .any(|window| window == PRESENCE_EXTENSION_URI.as_bytes())
+    {
+        return Ok(());
+    }
+    for author in authors {
+        locate(source, Kind::Presence, Owner::Author(author.id), limits)?;
+    }
+    Ok(())
+}
+
+/// Validate every typed threading extension in one changed comment part under
+/// the recipient's selected policy. This retains the generic comment grammar
+/// check while applying the collaboration locator to recognized p15 payloads.
+pub(crate) fn validate_threading_replay(source: &[u8], limits: Limits) -> Result<()> {
+    let comments = crate::comments::parse_slide_comments_strict(source, limits)?;
+    if !source
+        .windows(THREADING_EXTENSION_URI.len())
+        .any(|window| window == THREADING_EXTENSION_URI.as_bytes())
+    {
+        return Ok(());
+    }
+    for comment in comments {
+        locate(
+            source,
+            Kind::Threading,
+            Owner::Comment {
+                author_id: comment.author_id,
+                index: comment.index,
+            },
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
 /// Source-splice a typed value. A `None` value removes every recognized
 /// branch for the selected item so an inactive MCE fallback cannot silently
 /// resurrect the supposedly removed owner.

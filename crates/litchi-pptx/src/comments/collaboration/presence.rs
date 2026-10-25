@@ -53,7 +53,11 @@ impl Package {
                     .comments()
                     .constrained_by_source(target.read_limits());
                 patch.validate_changed_parts(target, |_, part| {
-                    crate::comments::validate_replay_part(part, limits)
+                    if part.content_type() == crate::comments::AUTHORS_CONTENT_TYPE {
+                        super::validate_presence_replay(part.blob(), limits)
+                    } else {
+                        crate::comments::validate_replay_part(part, limits)
+                    }
                 })
             },
         )?;

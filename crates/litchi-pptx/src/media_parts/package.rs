@@ -104,6 +104,43 @@ pub(crate) fn validate_replay_part(
     }
 }
 
+/// Revalidate unchanged slides that reference changed media resources.
+///
+/// A media-only patch can replace a resource while leaving its owning slide
+/// XML byte-identical. In that case [`load_with_limits`] must still see the
+/// recipient's complete referenced resource set so its aggregate payload
+/// ceiling is enforced. The relationship walk avoids reparsing unrelated
+/// slides and skips slides already validated as changed payloads.
+pub(crate) fn validate_replay_references(
+    package: &OpcPackage,
+    changed_resources: &[PackURI],
+    changed_slides: &[PackURI],
+    limits: Limits,
+) -> Result<()> {
+    if changed_resources.is_empty() {
+        return Ok(());
+    }
+    for slide in package
+        .iter_parts()
+        .filter(|part| part.content_type() == ct::PML_SLIDE)
+    {
+        if changed_slides.iter().any(|name| name == slide.partname()) {
+            continue;
+        }
+        let references_changed_resource = slide.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .ok()
+                    .is_some_and(|target| changed_resources.iter().any(|name| name == &target))
+        });
+        if references_changed_resource {
+            load_with_limits(package, slide.partname(), limits).map(drop)?;
+        }
+    }
+    Ok(())
+}
+
 fn relationship_target(part: &dyn Part, id: &str, expected_type: &str) -> Result<PackURI> {
     let relationship = part
         .rels()

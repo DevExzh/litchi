@@ -19,6 +19,24 @@ fn author_source() -> Vec<u8> {
     .into_bytes()
 }
 
+#[test]
+fn replay_presence_validator_applies_recipient_extension_limits() {
+    let mut limits = crate::comments::Limits::DEFAULT;
+    limits.max_string_bytes = 3;
+    assert!(super::validate_presence_replay(&author_source(), limits).is_err());
+}
+
+#[test]
+fn replay_threading_validator_checks_typed_extension_children() {
+    let source = String::from_utf8(comment_source())
+        .unwrap()
+        .replace("p15:parentCm", "p15:unexpected");
+    assert!(
+        super::validate_threading_replay(source.as_bytes(), crate::comments::Limits::DEFAULT,)
+            .is_err()
+    );
+}
+
 fn comment_source() -> Vec<u8> {
     format!(
         r#"<p:cmLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cm authorId="7" idx="2"><p:pos x="1" y="2"/><p:text>hello</p:text><p:extLst><!-- before --><p:ext uri="{uri}"><p15:threadingInfo timeZoneBias="-60"><p15:parentCm authorId="7" idx="1"/></p15:threadingInfo></p:ext><!-- after --></p:extLst></p:cm></p:cmLst>"#,

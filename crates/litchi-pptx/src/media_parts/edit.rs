@@ -57,9 +57,30 @@ impl Package {
                     .semantic_limits()
                     .media_parts()
                     .constrained_by_source(target.read_limits());
+                let mut changed_resources = Vec::new();
+                let mut changed_slides = Vec::new();
                 patch.validate_changed_parts(target, |name, part| {
-                    raw::validate_replay_part(target, name, part, limits)
-                })
+                    raw::validate_replay_part(target, name, part, limits)?;
+                    if part.content_type() == litchi_opc::constants::content_type::PML_SLIDE {
+                        changed_slides.try_reserve(1).map_err(|source| {
+                            crate::Error::Allocation {
+                                resource: "media replay changed slide names",
+                                source,
+                            }
+                        })?;
+                        changed_slides.push(name.clone());
+                    } else if name.as_str().starts_with("/ppt/media/") {
+                        changed_resources.try_reserve(1).map_err(|source| {
+                            crate::Error::Allocation {
+                                resource: "media replay changed resource names",
+                                source,
+                            }
+                        })?;
+                        changed_resources.push(name.clone());
+                    }
+                    Ok(())
+                })?;
+                raw::validate_replay_references(target, &changed_resources, &changed_slides, limits)
             },
         )?;
         Ok(commit_of((package, patch.0.clone())))

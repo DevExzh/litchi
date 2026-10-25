@@ -63,6 +63,41 @@ fn raw_policy_admits_exact_notes_wire_and_refuses_one_byte_under() {
 }
 
 #[test]
+fn replay_notes_aggregate_accepts_exact_and_refuses_one_byte_under() {
+    let (package, _) = synthetic(Conformance::Transitional);
+    let total = [
+        "/ppt/notesMasters/notesMaster1.xml",
+        "/ppt/theme/theme2.xml",
+        "/ppt/notesSlides/notesSlide1.xml",
+    ]
+    .into_iter()
+    .map(|name| {
+        package
+            .get_part(&PackURI::new(name).unwrap())
+            .unwrap()
+            .blob()
+            .len()
+    })
+    .sum();
+    let exact = Limits {
+        max_total_bytes: total,
+        ..Limits::DEFAULT
+    };
+    assert!(super::package::validate_replay_total(&package, exact).is_ok());
+    let under = Limits {
+        max_total_bytes: total.saturating_sub(1),
+        ..exact
+    };
+    assert!(matches!(
+        super::package::validate_replay_total(&package, under),
+        Err(Error::Limit {
+            resource: "notes aggregate bytes",
+            limit,
+        }) if limit == total.saturating_sub(1)
+    ));
+}
+
+#[test]
 fn notes_master_template_is_canonical_and_deterministic() {
     assert!(master_xml().contains("<p:notesMaster"));
     assert_eq!(master_xml().as_ptr(), master_xml().as_ptr());

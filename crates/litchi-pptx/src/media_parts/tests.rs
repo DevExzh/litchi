@@ -338,6 +338,33 @@ fn transitional_package_writer_round_trips_complete_graph() {
 }
 
 #[test]
+fn replay_resource_only_change_checks_unchanged_slide_aggregate() {
+    let (mut package, uri) = test_package(Conformance::Transitional);
+    store(&mut package, &uri, &value(), Conformance::Transitional).unwrap();
+    let changed = PackURI::new("/ppt/media/media1.mp4").unwrap();
+    package.get_part_mut(&changed).unwrap().set_blob(vec![0; 5]);
+    let changed_resources = [changed];
+    let exact = Limits {
+        max_total_payload_bytes: 9,
+        ..Limits::DEFAULT
+    };
+    assert!(
+        super::package::validate_replay_references(&package, &changed_resources, &[], exact,)
+            .is_ok()
+    );
+    let under = Limits {
+        max_total_payload_bytes: 8,
+        ..exact
+    };
+    assert!(matches!(
+        super::package::validate_replay_references(&package, &changed_resources, &[], under),
+        Err(Error::Limit {
+            resource: "total payload bytes"
+        })
+    ));
+}
+
+#[test]
 fn repeated_media_targets_share_one_immutable_payload_allocation() {
     let (mut package, uri) = test_package(Conformance::Transitional);
     let mut expected = value();

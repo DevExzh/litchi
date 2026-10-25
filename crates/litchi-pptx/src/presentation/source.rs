@@ -3119,6 +3119,7 @@ impl SourceBackedSlideEdit {
             text,
             bounds,
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         self.check_execution()?;
         let bytes = Arc::new(xml);
