@@ -100,13 +100,17 @@ impl Snapshot {
 
         let mut parts = Vec::with_capacity(names.len());
         for name in names {
-            let Ok(part) = package.get_part(&name) else {
-                // Hints intentionally include parts that a remove operation
-                // may have detached. Discovered item-owned parts are checked
-                // by `discover` above and therefore cannot be missing here.
-                continue;
-            };
-            parts.push(PartState::capture(part));
+            match package.get_part(&name) {
+                Ok(part) => parts.push(PartState::capture(part)),
+                Err(litchi_opc::OpcError::PartNotFound(_)) => {
+                    // Hints intentionally include parts that a remove operation may have
+                    // detached. Keeping the absence in the source projection lets the caller
+                    // classify a different recipient as PatchConflict. Other failures (for
+                    // example a deferred payload decode or a malformed relationship graph)
+                    // remain corruption and must not be hidden as an absent hint.
+                },
+                Err(error) => return Err(error.into()),
+            }
         }
         let source = SourceState { parts };
         Ok(Self { items, source })

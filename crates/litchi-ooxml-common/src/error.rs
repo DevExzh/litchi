@@ -194,6 +194,9 @@ pub enum LimitKind {
     Web(crate::web::LimitKind),
     /// A Ribbon (customUI) budget ([`crate::ribbon::LimitKind`]).
     Ribbon(crate::ribbon::LimitKind),
+    /// A document-properties transaction budget
+    /// ([`crate::properties::LimitKind`]).
+    Properties(crate::properties::LimitKind),
     /// A VBA graph publication budget ([`crate::vba::LimitKind`]).
     #[cfg(feature = "vba-inspection")]
     Vba(crate::vba::LimitKind),
@@ -291,6 +294,7 @@ impl LimitKind {
             Self::CustomXml(kind) => kind.as_str(),
             Self::Web(kind) => kind.as_str(),
             Self::Ribbon(kind) => kind.as_str(),
+            Self::Properties(kind) => kind.as_str(),
             #[cfg(feature = "vba-inspection")]
             Self::Vba(kind) => kind.as_str(),
             Self::CoreKeywordItems => "core keyword items",
@@ -360,5 +364,11 @@ impl From<crate::web::LimitKind> for LimitKind {
 impl From<crate::ribbon::LimitKind> for LimitKind {
     fn from(kind: crate::ribbon::LimitKind) -> Self {
         Self::Ribbon(kind)
+    }
+}
+
+impl From<crate::properties::LimitKind> for LimitKind {
+    fn from(kind: crate::properties::LimitKind) -> Self {
+        Self::Properties(kind)
     }
 }

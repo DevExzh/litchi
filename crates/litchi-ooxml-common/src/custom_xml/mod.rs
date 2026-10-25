@@ -12,6 +12,7 @@
 
 mod codec;
 mod edit;
+mod errors;
 mod limit;
 mod model;
 mod package;

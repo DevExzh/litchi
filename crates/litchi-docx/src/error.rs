@@ -475,3 +475,39 @@ impl From<litchi_ooxml_common::Error> for Error {
         }
     }
 }
+
+impl From<litchi_ooxml_common::properties::Error> for Error {
+    fn from(error: litchi_ooxml_common::properties::Error) -> Self {
+        match error {
+            litchi_ooxml_common::properties::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ooxml_common::properties::Error::PatchConflict => {
+                Self::conflict("metadata", "the selected property graph changed")
+            },
+            litchi_ooxml_common::properties::Error::Signed => Self::Signed,
+            litchi_ooxml_common::properties::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            litchi_ooxml_common::properties::Error::Internal(reason) => {
+                Self::internal("metadata", reason)
+            },
+            litchi_ooxml_common::properties::Error::Invalid(message) => Self::Invalid(message),
+            litchi_ooxml_common::properties::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::from(litchi_ooxml_common::Error::Limit {
+                kind: properties_limit_kind(kind),
+                observed,
+                maximum,
+            }),
+            litchi_ooxml_common::properties::Error::Package(error) => Self::from(error),
+            other => Self::Other(other.to_string()),
+        }
+    }
+}
+
+fn properties_limit_kind(
+    kind: litchi_ooxml_common::properties::LimitKind,
+) -> litchi_ooxml_common::LimitKind {
+    litchi_ooxml_common::LimitKind::Properties(kind)
+}

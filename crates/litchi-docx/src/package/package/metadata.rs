@@ -146,16 +146,22 @@ impl Package {
         let mut failure = None;
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
             if core {
-                let mut core_edit = families::Edit::new(opc, Host::Word)?;
+                let mut core_edit =
+                    families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
                 match target {
                     Some(props) => {
-                        core_edit.set_core_metadata(props.clone())?;
+                        core_edit
+                            .set_core_metadata(props.clone())
+                            .map_err(crate::Error::from)?;
                     },
                     None => {
                         core_edit.clear_metadata();
                     },
                 }
-                *opc = core_edit.commit()?.into_package();
+                *opc = core_edit
+                    .commit()
+                    .map_err(crate::Error::from)?
+                    .into_package();
             }
             if !parts_noop {
                 if let Err(error) = parts.apply(opc).map(|commit| *opc = commit.into_package()) {

@@ -43,7 +43,7 @@ pub(super) fn items(values: &[Item], source_limits: &SourceLimits) -> Result<()>
     Ok(())
 }
 
-pub(super) fn item(index: usize, value: &Item, source_limits: &SourceLimits) -> Result<()> {
+pub(super) fn item(_index: usize, value: &Item, source_limits: &SourceLimits) -> Result<()> {
     validate_content_type(value.content_type())?;
     validate_payload(value.xml(), source_limits)?;
     require_rel_id(value.rel_id(), "custom XML relationship")?;
@@ -57,20 +57,20 @@ pub(super) fn item(index: usize, value: &Item, source_limits: &SourceLimits) -> 
     if let Some(props) = value.props() {
         validate_props(props)?;
         let Some(props_xml) = value.props_xml() else {
-            return Err(Error::Invalid(format!(
-                "custom XML item {index} has typed properties without source XML"
-            )));
+            return Err(Error::Internal(
+                "custom XML item has typed properties without source XML",
+            ));
         };
         let parsed = super::codec::read_props(props_xml, source_limits)?;
         if &parsed != props {
-            return Err(Error::Invalid(format!(
-                "custom XML item {index} properties projection is stale"
-            )));
+            return Err(Error::Internal(
+                "custom XML item properties projection is stale",
+            ));
         }
     } else if value.props_xml().is_some() {
-        return Err(Error::Invalid(format!(
-            "custom XML item {index} has properties XML without typed properties"
-        )));
+        return Err(Error::Internal(
+            "custom XML item has properties XML without typed properties",
+        ));
     }
     for relationship in value.relationships() {
         require_rel_id(&relationship.id, "custom XML data relationship")?;

@@ -6738,8 +6738,91 @@ fn join_normalization(error: &Error) -> JoinNormalization {
             JoinNormalization::Publication
         },
         Error::UnsupportedSelector | Error::Unsupported { .. } => JoinNormalization::Unsupported,
+        // These are operation-boundary failures rather than malformed source
+        // or an authored edit.  Keep the typed leaf in `JoinError`'s source;
+        // the unified classifier maps the leaf to `io_error` or
+        // `internal_error` respectively.
+        Error::SourceChanged { .. } => JoinNormalization::Other,
+        Error::Internal(_) => JoinNormalization::Other,
         #[cfg(feature = "encryption")]
         Error::Encryption(_) | Error::EncryptionPolicy { .. } => JoinNormalization::Other,
+    }
+}
+
+#[cfg(test)]
+mod error_classification_tests {
+    use super::{Error, JoinError, JoinFailure, JoinNormalization, join_normalization};
+
+    #[test]
+    fn operation_boundary_errors_keep_their_typed_leaf_classification() {
+        let source_changed = Error::SourceChanged {
+            expected: litchi_core::SourceVersion::new(7, 1),
+            observed: litchi_core::SourceVersion::new(7, 2),
+        };
+        assert_eq!(
+            join_normalization(&source_changed),
+            JoinNormalization::Other
+        );
+        assert_eq!(
+            source_changed.to_string(),
+            "XLSX source changed while the operation was in progress"
+        );
+
+        let internal = Error::Internal("generated staging invariant");
+        assert_eq!(join_normalization(&internal), JoinNormalization::Other);
+        assert_eq!(
+            internal.to_string(),
+            "XLSX internal invariant failed: generated staging invariant"
+        );
+    }
+
+    fn boundary_join(source: Error) -> JoinError {
+        let rejected = crate::Package::new()
+            .expect("minimal workbook")
+            .edit()
+            .expect("edit");
+        JoinError {
+            failure: JoinFailure::Normalization(JoinNormalization::Other),
+            rejected: Box::new(rejected),
+            normalization_source: Some(Box::new(source)),
+        }
+    }
+
+    fn assert_boundary_source(source: Error, expected: impl Fn(&Error) -> bool) {
+        let join = boundary_join(source);
+        let retained = join
+            .normalization_source()
+            .expect("normalization source retained");
+        assert!(expected(retained));
+        let source_chain = std::error::Error::source(&join)
+            .expect("join source")
+            .downcast_ref::<Error>()
+            .expect("typed join source");
+        assert!(expected(source_chain));
+
+        let wrapped = Error::from(join);
+        assert!(matches!(&wrapped, Error::Join(_)));
+        let join = std::error::Error::source(&wrapped)
+            .expect("wrapped join source")
+            .downcast_ref::<JoinError>()
+            .expect("typed JoinError");
+        let source_chain = std::error::Error::source(join)
+            .expect("wrapped normalization source")
+            .downcast_ref::<Error>()
+            .expect("typed wrapped normalization source");
+        assert!(expected(source_chain));
+    }
+
+    #[test]
+    fn operation_boundary_join_preserves_both_typed_sources_through_wrapper() {
+        let expected = litchi_core::SourceVersion::new(7, 1);
+        let observed = litchi_core::SourceVersion::new(7, 2);
+        assert_boundary_source(Error::SourceChanged { expected, observed }, |error| {
+            matches!(error, Error::SourceChanged { .. })
+        });
+        assert_boundary_source(Error::Internal("generated staging invariant"), |error| {
+            matches!(error, Error::Internal(_))
+        });
     }
 }
 

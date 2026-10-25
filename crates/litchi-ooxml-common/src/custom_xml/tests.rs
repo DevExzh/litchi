@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::Error;
+use litchi_core::edit::RefusalKind;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
@@ -93,9 +94,43 @@ fn properties_codec_refuses_when_the_retained_part_budget_is_tight() {
         error,
         Error::Limit {
             kind: crate::LimitKind::CustomXml(LimitKind::Depth),
+            observed,
             maximum: 1,
-            ..
-        }
+        } if observed > 1
+    ));
+}
+
+#[test]
+fn properties_source_profile_limits_keep_custom_xml_error_shape() {
+    let xml = write_props(&sample_props(), Conformance::Transitional, &source_limits()).unwrap();
+    let event_limited = litchi_opc::SourceLimits::builder()
+        .max_events(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        read_props(&xml, &event_limited),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::XmlEvents),
+            observed,
+            maximum: 1,
+        }) if observed > 1
+    ));
+
+    let attribute_limited = litchi_opc::SourceLimits::builder()
+        .max_xml_attribute_bytes(37)
+        .unwrap()
+        .max_relationship_target_bytes(37)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        read_props(&xml, &attribute_limited),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::XmlAttributeBytes),
+            observed,
+            maximum: 37,
+        }) if observed > 37
     ));
 }
 
@@ -118,6 +153,57 @@ fn mce_selects_fallback_schema_reference() {
             .schemas,
         ["urn:right"]
     );
+}
+
+#[test]
+fn mce_schema_rewrite_maps_the_selected_source_branch() {
+    let source = format!(
+        r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:unsupported"><mc:Choice Requires="x"><ds:datastoreItem ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs><ds:schemaRef ds:uri="urn:inactive"/></ds:schemaRefs></ds:datastoreItem></mc:Choice><mc:Fallback><ds:datastoreItem ds:itemID="{{22222222-2222-2222-2222-222222222222}}"><ds:schemaRefs><ds:schemaRef ds:uri="urn:active"/></ds:schemaRefs></ds:datastoreItem></mc:Fallback></mc:AlternateContent>"#
+    );
+    let mce_limits = litchi_opc::SourceLimits::builder()
+        .max_part_bytes(source.len() as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let before = codec::read_props(source.as_bytes(), &mce_limits).unwrap();
+    assert_eq!(before.id, "{22222222-2222-2222-2222-222222222222}");
+    assert_eq!(before.schemas, ["urn:active"]);
+    let id_only = Props {
+        id: "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}".into(),
+        ..before.clone()
+    };
+    let id_rewritten = codec::rewrite_props(
+        source.as_bytes(),
+        &before,
+        &id_only,
+        Conformance::Transitional,
+        &mce_limits,
+    )
+    .unwrap();
+    let id_rewritten_text = std::str::from_utf8(&id_rewritten).unwrap();
+    assert!(id_rewritten_text.contains("{11111111-1111-1111-1111-111111111111}"));
+    assert!(id_rewritten_text.contains("{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"));
+    assert_eq!(
+        codec::read_props(&id_rewritten, &mce_limits).unwrap(),
+        id_only
+    );
+    let after = Props {
+        id: "{33333333-3333-3333-3333-333333333333}".into(),
+        schemas: vec!["urn:changed".into(), "urn:added".into()],
+    };
+    let rewritten = codec::rewrite_props(
+        source.as_bytes(),
+        &before,
+        &after,
+        Conformance::Transitional,
+        &mce_limits,
+    )
+    .unwrap();
+    let rewritten_text = std::str::from_utf8(&rewritten).unwrap();
+    assert!(rewritten_text.contains("urn:inactive"));
+    assert!(rewritten_text.contains("{11111111-1111-1111-1111-111111111111}"));
+    assert!(rewritten_text.contains("{33333333-3333-3333-3333-333333333333}"));
+    assert_eq!(codec::read_props(&rewritten, &mce_limits).unwrap(), after);
 }
 
 #[test]
@@ -236,7 +322,7 @@ fn rejects_malformed_properties_payloads_and_package_graphs() {
         true,
     );
     package.add_part(Box::new(source));
-    assert!(discover(&package).is_err());
+    assert!(matches!(discover(&package), Err(Error::Relationship(_))));
 }
 
 #[test]
@@ -303,6 +389,22 @@ fn payload_caps_follow_the_retained_source_profile() {
             kind: crate::LimitKind::CustomXml(LimitKind::Elements),
             ..
         })
+    ));
+
+    let tight_attributes = litchi_opc::SourceLimits::builder()
+        .max_xml_attribute_bytes(8)
+        .unwrap()
+        .max_relationship_target_bytes(8)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        validate_payload(br#"<root marker="123"/>"#, &tight_attributes),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::XmlAttributeBytes),
+            observed,
+            maximum: 8,
+        }) if observed > 8
     ));
 }
 
@@ -477,6 +579,452 @@ fn properties_edits_retain_future_markup() {
 }
 
 #[test]
+fn authored_target_failures_are_typed_refusals() {
+    let package = package_with_source();
+    let mut edit = Edit::new(&package).unwrap();
+    let error = edit.set_xml(0, b"<root/>".to_vec()).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+    ));
+
+    let error = edit.set_properties(0, sample_props()).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+    ));
+
+    let mut missing_source = Edit::new(&OpcPackage::new()).unwrap();
+    let error = missing_source.insert(item_request("/customXml/item1.xml", "rIdData"));
+    assert!(matches!(
+        error,
+        Err(Error::Refused(refusal)) if refusal.kind() == RefusalKind::NotFound
+    ));
+
+    let mut no_props = package_with_source();
+    add_item(
+        &mut no_props,
+        item_request("/customXml/item1.xml", "rIdData"),
+    )
+    .unwrap();
+    let mut edit = Edit::new(&no_props).unwrap();
+    let error = edit.set_properties(0, sample_props()).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedTarget
+    ));
+    let props_xml =
+        write_props(&sample_props(), Conformance::Transitional, &source_limits()).unwrap();
+    let error = edit.set_properties_xml(0, props_xml).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedTarget
+    ));
+
+    let mut occupied = package_with_source();
+    occupied.add_part(Box::new(BlobPart::new(
+        PackURI::new("/customXml/item1.xml").unwrap(),
+        "application/xml".into(),
+        b"<existing/>".to_vec(),
+    )));
+    let mut edit = Edit::new(&occupied).unwrap();
+    let error = edit.insert(item_request("/customXml/item1.xml", "rIdData"));
+    assert!(matches!(
+        error,
+        Err(Error::Refused(refusal)) if refusal.kind() == RefusalKind::UnsupportedTarget
+    ));
+}
+
+#[test]
+fn occupied_source_relationship_is_a_typed_target_refusal() {
+    let mut package = package_with_source();
+    let source = PackURI::new("/word/document.xml").unwrap();
+    package
+        .get_part_mut(&source)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:other:relationship".into(),
+            "/word/other.xml".into(),
+            "rIdData".into(),
+            false,
+        );
+    let mut edit = Edit::new(&package).unwrap();
+    edit.insert(item_request("/customXml/item1.xml", "rIdData"))
+        .unwrap();
+    let error = edit.commit().unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedTarget
+    ));
+}
+
+#[test]
+fn schema_edits_retain_opaque_markup_outside_schema_refs() {
+    let mut package = package_with_source();
+    add_item(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".into(),
+                value: sample_props(),
+            }),
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let props_part = PackURI::new("/customXml/itemProps1.xml").unwrap();
+    let source = format!(
+        r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:future" x:marker="keep" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><x:future>opaque</x:future><ds:schemaRefs><ds:schemaRef ds:uri="urn:customer"/></ds:schemaRefs></ds:datastoreItem>"#
+    );
+    package
+        .get_part_mut(&props_part)
+        .unwrap()
+        .set_blob(source.into_bytes());
+    let before = package.get_part(&props_part).unwrap().blob().to_vec();
+    let mut edit = Edit::new(&package).unwrap();
+    let mut updated = sample_props();
+    updated.schemas = vec!["urn:changed".into()];
+    assert!(edit.set_properties(0, updated).unwrap());
+    let package = edit.commit().unwrap().into_package();
+    let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
+    assert!(xml.contains("x:marker=\"keep\""));
+    assert!(xml.contains("<x:future>opaque</x:future>"));
+    assert!(xml.contains("ds:uri=\"urn:changed\""));
+    assert_ne!(package.get_part(&props_part).unwrap().blob(), before);
+}
+
+#[test]
+fn schema_edits_retain_noncanonical_markup_and_expanded_attribute_identity() {
+    let mut package = package_with_source();
+    add_item(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".into(),
+                value: sample_props(),
+            }),
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let props_part = PackURI::new("/customXml/itemProps1.xml").unwrap();
+    let source = format!(
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n<p:datastoreItem\n  xmlns:p='{TRANSITIONAL_NAMESPACE}'\n  xmlns:x='urn:future' x:itemID='{{foreign}}' x:marker='keep'\n  p:itemID='{{11111111-1111-1111-1111-111111111111}}'>\n  <!-- p:itemID='{{fake}}' -->\n  <p:schemaRefs>\n    <p:schemaRef x:uri='foreign' p:uri='urn:customer'/>\n  </p:schemaRefs>\n</p:datastoreItem>"
+    );
+    package
+        .get_part_mut(&props_part)
+        .unwrap()
+        .set_blob(source.into_bytes());
+
+    let mut edit = Edit::new(&package).unwrap();
+    let mut updated = sample_props();
+    updated.id = "{22222222-2222-2222-2222-222222222222}".into();
+    updated.schemas = vec!["urn:changed".into()];
+    assert!(edit.set_properties(0, updated.clone()).unwrap());
+    let package = edit.commit().unwrap().into_package();
+    let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
+    assert!(xml.contains("<p:datastoreItem"));
+    assert!(xml.contains("xmlns:x='urn:future'"));
+    assert!(xml.contains("x:itemID='foreign'"));
+    assert!(xml.contains("x:marker='keep'"));
+    assert!(xml.contains("<!-- p:itemID='{fake}' -->"));
+    assert!(xml.contains("x:uri='foreign' p:uri='urn:changed'"));
+    assert!(xml.contains("p:itemID='{22222222-2222-2222-2222-222222222222}'"));
+    assert_eq!(discover(&package).unwrap()[0].props().unwrap(), updated);
+}
+
+#[test]
+fn schema_insertion_does_not_clone_foreign_schema_ref_markup() {
+    let before = Props {
+        id: "{11111111-1111-1111-1111-111111111111}".into(),
+        schemas: vec!["urn:old".into()],
+    };
+    let source = format!(
+        r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:future" ds:itemID="{id}"><ds:schemaRefs><ds:schemaRef x:marker="keep" ds:uri="urn:old"/></ds:schemaRefs></ds:datastoreItem>"#,
+        id = before.id
+    );
+    let after = Props {
+        schemas: vec!["urn:old".into(), "urn:new".into()],
+        ..before.clone()
+    };
+    let rewritten = codec::rewrite_props(
+        source.as_bytes(),
+        &before,
+        &after,
+        Conformance::Transitional,
+        &source_limits(),
+    )
+    .unwrap();
+    let rewritten_text = std::str::from_utf8(&rewritten).unwrap();
+    assert_eq!(rewritten_text.matches("x:marker=\"keep\"").count(), 1);
+    assert!(rewritten_text.contains("ds:uri=\"urn:new\""));
+    assert_eq!(
+        codec::read_props(&rewritten, &source_limits()).unwrap(),
+        after
+    );
+}
+
+#[test]
+fn schema_insertion_expands_an_empty_root_with_a_schema_refs_wrapper() {
+    let before = Props {
+        id: "{11111111-1111-1111-1111-111111111111}".into(),
+        schemas: Vec::new(),
+    };
+    let source = format!(
+        r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" ds:itemID="{id}"/>"#,
+        id = before.id
+    );
+    let after = Props {
+        schemas: vec!["urn:new".into()],
+        ..before.clone()
+    };
+    let rewritten = codec::rewrite_props(
+        source.as_bytes(),
+        &before,
+        &after,
+        Conformance::Transitional,
+        &source_limits(),
+    )
+    .unwrap();
+    let rewritten_text = std::str::from_utf8(&rewritten).unwrap();
+    assert!(rewritten_text.contains("<ds:schemaRefs>"));
+    assert_eq!(
+        codec::read_props(&rewritten, &source_limits()).unwrap(),
+        after
+    );
+}
+
+#[test]
+fn schema_edits_preserve_unknown_schema_refs_children_when_shape_changes() {
+    let mut package = package_with_source();
+    add_item(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".into(),
+                value: sample_props(),
+            }),
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let props_part = PackURI::new("/customXml/itemProps1.xml").unwrap();
+    let source = format!(
+        r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:future" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs><ds:schemaRef ds:uri="urn:customer"/><x:future/></ds:schemaRefs></ds:datastoreItem>"#
+    );
+    package
+        .get_part_mut(&props_part)
+        .unwrap()
+        .set_blob(source.into_bytes());
+    let mut edit = Edit::new(&package).unwrap();
+    let mut updated = sample_props();
+    updated.schemas.push("urn:second".into());
+    assert!(edit.set_properties(0, updated.clone()).unwrap());
+    let package = edit.commit().unwrap().into_package();
+    let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
+    assert!(xml.contains("<x:future/>"));
+    assert_eq!(discover(&package).unwrap()[0].props().unwrap(), updated);
+}
+
+#[test]
+fn schema_shape_removal_refuses_an_opaque_removed_reference() {
+    let before = Props {
+        id: "{11111111-1111-1111-1111-111111111111}".into(),
+        schemas: vec!["urn:kept".into(), "urn:opaque".into()],
+    };
+    let source = format!(
+        r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:future" ds:itemID="{id}"><ds:schemaRefs><ds:schemaRef ds:uri="urn:kept"/><ds:schemaRef ds:uri="urn:opaque"><!-- keep this opaque comment --></ds:schemaRef></ds:schemaRefs></ds:datastoreItem>"#,
+        id = before.id
+    );
+    let after = Props {
+        schemas: vec!["urn:kept".into()],
+        ..before.clone()
+    };
+    let error = codec::rewrite_props(
+        source.as_bytes(),
+        &before,
+        &after,
+        Conformance::Transitional,
+        &source_limits(),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedContent
+    ));
+}
+
+#[test]
+fn lexical_schema_rewrite_admits_exact_output_limit_and_rejects_one_under() {
+    let before = sample_props();
+    let source = write_props(&before, Conformance::Transitional, &source_limits()).unwrap();
+    let mut after = before.clone();
+    after.schemas = vec!["urn:longer".into()];
+    let unrestricted = codec::rewrite_props(
+        &source,
+        &before,
+        &after,
+        Conformance::Transitional,
+        &source_limits(),
+    )
+    .unwrap();
+    let exact = litchi_opc::SourceLimits::builder()
+        .max_part_bytes(unrestricted.len() as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let bounded =
+        codec::rewrite_props(&source, &before, &after, Conformance::Transitional, &exact).unwrap();
+    assert_eq!(bounded, unrestricted);
+
+    let one_under = litchi_opc::SourceLimits::builder()
+        .max_part_bytes((unrestricted.len() - 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = codec::rewrite_props(
+        &source,
+        &before,
+        &after,
+        Conformance::Transitional,
+        &one_under,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::SerializedPropertiesBytes),
+            observed,
+            maximum,
+        } if observed == unrestricted.len() && maximum == unrestricted.len() - 1
+    ));
+}
+
+#[test]
+fn shared_data_part_edits_refuse_lossless_publication() {
+    let mut package = package_with_source();
+    add_item(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: None,
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let mut second_source = BlobPart::new(
+        PackURI::new("/word/header1.xml").unwrap(),
+        "application/xml".into(),
+        b"<header/>".to_vec(),
+    );
+    second_source.rels_mut().add_relationship(
+        TRANSITIONAL_RELATIONSHIP.into(),
+        "../customXml/item1.xml".into(),
+        "rIdData2".into(),
+        false,
+    );
+    package.add_part(Box::new(second_source));
+
+    let mut edit = Edit::new(&package).unwrap();
+    assert_eq!(edit.items().len(), 2);
+    edit.set_xml(0, b"<changed/>".to_vec()).unwrap();
+    let error = edit.commit().unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedContent
+    ));
+}
+
+#[test]
+fn captured_host_loss_is_a_patch_conflict() {
+    let mut package = package_with_source();
+    add_item(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: None,
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let source = PackURI::new("/word/document.xml").unwrap();
+    let patch = {
+        let mut edit = Edit::new(&package).unwrap();
+        edit.set_xml(0, b"<changed/>".to_vec()).unwrap();
+        edit.commit().unwrap().patch().clone()
+    };
+
+    let mut missing_host = package.clone();
+    missing_host.remove_part(&source);
+    assert!(matches!(
+        patch.apply(&missing_host),
+        Err(Error::PatchConflict)
+    ));
+    assert!(missing_host.get_part(&source).is_err());
+
+    let mut changed_host = package.clone();
+    changed_host
+        .get_part_mut(&source)
+        .unwrap()
+        .set_blob(b"<different-host/>".to_vec());
+    assert!(matches!(
+        patch.apply(&changed_host),
+        Err(Error::PatchConflict)
+    ));
+    assert_eq!(
+        changed_host.get_part(&source).unwrap().blob(),
+        b"<different-host/>"
+    );
+}
+
+#[test]
+fn generated_projection_mismatch_is_internal() {
+    let props = sample_props();
+    let source = write_props(&props, Conformance::Transitional, &source_limits()).unwrap();
+    let mut stale = props.clone();
+    stale.id = "{22222222-2222-2222-2222-222222222222}".into();
+    let error = codec::rewrite_props(
+        &source,
+        &stale,
+        &props,
+        Conformance::Transitional,
+        &source_limits(),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Internal("custom XML properties source projection is stale")
+    ));
+}
+
+#[test]
 fn transaction_crud_is_source_checked_and_failure_atomic() {
     let original = package_with_source();
     let source = PackURI::new("/word/document.xml").unwrap();
@@ -586,6 +1134,18 @@ fn sample_props() -> Props {
     Props {
         id: "{11111111-1111-1111-1111-111111111111}".into(),
         schemas: vec!["urn:customer".into()],
+    }
+}
+
+fn item_request(part: &str, rel_id: &str) -> NewItem {
+    NewItem {
+        source: PackURI::new("/word/document.xml").unwrap(),
+        rel_id: rel_id.into(),
+        part: PackURI::new(part).unwrap(),
+        content_type: "application/xml".into(),
+        xml: b"<root/>".to_vec(),
+        props: None,
+        conformance: Conformance::Transitional,
     }
 }
 

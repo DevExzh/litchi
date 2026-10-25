@@ -802,7 +802,7 @@ impl Package {
         {
             return Ok(project);
         }
-        let payload = std::sync::Arc::new(payload.into_bytes());
+        let payload = payload.into_bytes();
         self.edit_semantic_opc(operation, move |candidate| {
             let source = candidate.main_document_part()?.partname().clone();
             store_vba_project_in_document(candidate, &source, payload, supplemental_xml)

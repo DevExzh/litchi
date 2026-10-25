@@ -361,13 +361,13 @@ pub(crate) fn admit(props: &Metadata) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::{PackURI, Part as _};
+    use litchi_opc::PackURI;
 
     fn package_with_opaque_app() -> Result<Package> {
         let package = Package::new()?;
         let mut opc = package.opc_package().clone();
         let app = PackURI::new("/docProps/app.xml").expect("static app URI");
-        let part = opc.get_part_mut(&app)?;
+        let part = opc.get_part_mut(&app).map_err(crate::Error::from)?;
         let mut bytes = part.blob().to_vec();
         let close = b"</Properties>";
         let offset = bytes
@@ -456,7 +456,9 @@ mod tests {
     #[test]
     fn clear_then_set_default_creates_core_and_inverse_removes_it() -> Result<()> {
         let package = Package::new()?;
-        let (cleared, clear_patch) = package.edit_metadata().clear().commit()?.into_parts();
+        let mut edit = package.edit_metadata();
+        edit.clear();
+        let (cleared, clear_patch) = edit.commit()?.into_parts();
         assert!(clear_patch.target().is_none());
         assert!(cleared.metadata().is_none());
 
@@ -529,7 +531,7 @@ mod tests {
         assert_eq!(app.template, app_before.template);
         assert!(
             app_bytes(&next)
-                .windows(b"<Opaque keep=\"yes\"/>")
+                .windows(b"<Opaque keep=\"yes\"/>".len())
                 .any(|window| { window == b"<Opaque keep=\"yes\"/>" })
         );
         assert_eq!(

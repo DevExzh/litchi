@@ -413,10 +413,10 @@ impl Package {
                     .rels_mut()
                     .remove(item.rel_id());
             }
-            if !part_is_referenced_in(candidate, &data_part) {
+            if !part_is_referenced_in(candidate, &data_part)? {
                 candidate.remove_part(&data_part);
                 if let Some(props_part) = props_part
-                    && !part_is_referenced_in(candidate, &props_part)
+                    && !part_is_referenced_in(candidate, &props_part)?
                 {
                     candidate.remove_part(&props_part);
                 }
@@ -450,7 +450,11 @@ impl Package {
             })?
             .to_owned();
         let item = self.custom_xml_by_id(&item_id)?.ok_or_else(|| {
-            Error::PartNotFound(format!("bibliography source store item '{item_id}'"))
+            Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "bibliography.lookup",
+                "the requested bibliography source store was not found",
+            )
         })?;
         Ok(Some((item_id, item.xml().to_vec())))
     }
@@ -522,10 +526,24 @@ impl Package {
         source: crate::bibliography::BibliographySourceBuilder,
     ) -> Result<()> {
         let Some((item_id, xml)) = self.bibliography_store_item()? else {
-            return Err(Error::PartNotFound(
-                "no bibliography source store exists".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "bibliography.replace",
+                "the requested bibliography source store was not found",
             ));
         };
+        let store = crate::bibliography::parse_bibliography_source_store(&xml)?;
+        if !store
+            .sources()
+            .iter()
+            .any(|stored| stored.tag() == Some(tag))
+        {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "bibliography.replace",
+                "the requested bibliography source was not found",
+            ));
+        }
         let updated = crate::bibliography::replace_source_xml(&xml, tag, &source)?;
         self.set_custom_xml(&item_id, updated.into_bytes())?;
         // Re-validate the mutated store through the read side.
@@ -701,25 +719,31 @@ impl Package {
         Ok(())
     }
 
-    pub(super) fn part_is_referenced(&self, target: &PackURI) -> bool {
+    pub(super) fn part_is_referenced(&self, target: &PackURI) -> Result<bool> {
         part_is_referenced_in(&self.opc, target)
     }
 }
 
-fn part_is_referenced_in(package: &OpcPackage, target: &PackURI) -> bool {
-    package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship
-                .target_partname()
-                .is_ok_and(|part| &part == target)
-    }) || package.iter_parts().any(|part| {
-        part.rels().iter().any(|relationship| {
-            !relationship.is_external()
-                && relationship
-                    .target_partname()
-                    .is_ok_and(|part| &part == target)
-        })
-    })
+fn part_is_referenced_in(package: &OpcPackage, target: &PackURI) -> Result<bool> {
+    for relationship in package.rels() {
+        if !relationship.is_external() {
+            let part = relationship.target_partname()?;
+            if &part == target {
+                return Ok(true);
+            }
+        }
+    }
+    for part in package.iter_parts() {
+        for relationship in part.rels() {
+            if !relationship.is_external() {
+                let target_part = relationship.target_partname()?;
+                if &target_part == target {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
 }
 
 fn visit_bindings(
@@ -765,15 +789,23 @@ fn unique_store(package: &OpcPackage, id: &str) -> Result<CustomXmlItem> {
         }
         if let Some(current) = &found {
             if current.part() != item.part() {
-                return Err(Error::InvalidFormat(format!(
-                    "Custom XML itemID '{id}' is ambiguous"
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "custom_xml.lookup",
+                    "the Custom XML item ID is ambiguous",
+                ));
             }
         } else {
             found = Some(item);
         }
     }
-    found.ok_or_else(|| Error::PartNotFound(format!("Custom XML itemID '{id}'")))
+    found.ok_or_else(|| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::NotFound,
+            "custom_xml.lookup",
+            "the requested Custom XML data store was not found",
+        )
+    })
 }
 
 fn ensure_store_absent(package: &OpcPackage, id: &str) -> Result<()> {
@@ -781,9 +813,11 @@ fn ensure_store_absent(package: &OpcPackage, id: &str) -> Result<()> {
         item.props()
             .is_some_and(|props| props.id.eq_ignore_ascii_case(id))
     }) {
-        return Err(Error::InvalidFormat(format!(
-            "Custom XML itemID '{id}' already exists"
-        )));
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "custom_xml.insert",
+            "the Custom XML item ID is already occupied",
+        ));
     }
     Ok(())
 }

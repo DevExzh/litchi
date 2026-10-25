@@ -111,6 +111,27 @@ pub enum LimitKind {
     RetainedBytes,
 }
 
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TextBytes => "metadata text bytes",
+            Self::XmlBytes => "metadata XML bytes",
+            Self::XmlEvents => "metadata XML events",
+            Self::CustomProperties => "metadata custom properties",
+            Self::Names => "metadata property names",
+            Self::RetainedBytes => "metadata retained bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 /// Options selected before a document-property edit captures its replacement
 /// families. The retained ceiling covers the exact semantic patch, including
 /// before/after payloads and change descriptors.
@@ -215,6 +236,15 @@ impl From<crate::Error> for Error {
                 None => Self::Package(crate::Error::Opc(error)),
             },
             crate::Error::Invalid(message) => Self::Invalid(message),
+            crate::Error::Limit {
+                kind: crate::LimitKind::Properties(kind),
+                maximum,
+                observed,
+            } => Self::Limit {
+                kind,
+                observed,
+                maximum,
+            },
             crate::Error::Limit {
                 kind: resource,
                 maximum: max,

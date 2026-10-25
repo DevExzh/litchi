@@ -1491,6 +1491,11 @@ impl Classify for litchi_pptx::Error {
 }
 
 #[cfg(feature = "xlsx")]
+fn classify_xlsx_join_source(source: Option<&litchi_xlsx::Error>) -> Class {
+    source.map_or_else(|| Class::of(Code::CorruptFile), |source| source.classify())
+}
+
+#[cfg(feature = "xlsx")]
 impl Classify for litchi_xlsx::Error {
     fn classify(&self) -> Class {
         match self {
@@ -1597,6 +1602,12 @@ impl Classify for litchi_xlsx::Error {
                 | litchi_xlsx::RemoveBlock::IncomingRelationship => Class::of(Code::UnsupportedCapability),
                 _ => Class::of(Code::CorruptFile),
             },
+            // A join keeps the original normalization failure as its typed
+            // source.  Preserve the two operation-boundary classes through
+            // that wrapper; a join with no retained source keeps the
+            // historical malformed-input fallback, while a retained source
+            // keeps its own established classification.
+            Self::Join(error) => classify_xlsx_join_source(error.normalization_source()),
             Self::Allocation { .. } => Class::of(Code::InternalError),
             // A coordinate or range the leaf read from the file. One the
             // caller passed is reclassified where it was received

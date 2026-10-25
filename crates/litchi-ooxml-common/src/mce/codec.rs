@@ -45,6 +45,21 @@ pub fn active_offsets(
     capabilities: &Capabilities,
     limits: &OffsetLimits,
 ) -> R<Vec<u32>> {
+    process_markup_compatibility_with_active_offsets(xml, offsets, capabilities, limits)
+}
+
+// Marker-based legacy selection retained for the public `active_offsets`
+// contract. Custom XML uses the side-table helper below.
+/// # Errors
+///
+/// Returns an error when input violates a configured bound or MCE processing
+/// fails.
+fn process_markup_compatibility_with_active_offsets(
+    xml: &[u8],
+    offsets: &[u32],
+    capabilities: &Capabilities,
+    limits: &OffsetLimits,
+) -> R<Vec<u32>> {
     if xml.len() > limits.max_source_bytes {
         return Err(limit(
             LimitKind::SourceBytes,
@@ -69,7 +84,10 @@ pub fn active_offsets(
         return Ok(Vec::new());
     }
     if !mentions_namespace(xml) {
-        return copy_offsets(offsets);
+        let mut selected_offsets = Vec::new();
+        reserve_exact(&mut selected_offsets, offsets.len(), "active offsets")?;
+        selected_offsets.extend_from_slice(offsets);
+        return Ok(selected_offsets);
     }
 
     let marker = active_marker(xml)?;
@@ -133,14 +151,15 @@ pub fn active_offsets(
     );
 
     let processed = process_markup_compatibility(&marked, capabilities, &limits.processing)?;
-    let processed = processed.xml.as_ref();
+    let processed_xml = processed.xml;
     let mut selected = Vec::new();
     reserve_exact(&mut selected, offsets.len(), "active-offset selection map")?;
     selected.resize(offsets.len(), false);
 
     let mut cursor = 0usize;
     while let Some(relative) = find_bytes(
-        processed
+        processed_xml
+            .as_ref()
             .get(cursor..)
             .ok_or_else(|| bad("active-offset output cursor is invalid"))?,
         &marker,
@@ -151,13 +170,13 @@ pub fn active_offsets(
         let opening_start = marker_start
             .checked_sub(4)
             .ok_or_else(|| bad("active-offset marker lacks a comment opening"))?;
-        if processed.get(opening_start..marker_start) != Some(b"<!--".as_slice()) {
+        if processed_xml.get(opening_start..marker_start) != Some(b"<!--".as_slice()) {
             return Err(bad("active-offset marker lacks a comment opening"));
         }
         let digits_start = marker_start
             .checked_add(marker.len())
             .ok_or_else(|| bad("active-offset marker position overflowed"))?;
-        let tail = processed
+        let tail = processed_xml
             .get(digits_start..)
             .ok_or_else(|| bad("active-offset marker is truncated"))?;
         let digits_end =
@@ -190,11 +209,136 @@ pub fn active_offsets(
     Ok(active)
 }
 
-fn copy_offsets(offsets: &[u32]) -> R<Vec<u32>> {
-    let mut copied = Vec::new();
-    reserve_exact(&mut copied, offsets.len(), "active offsets")?;
-    copied.extend_from_slice(offsets);
-    Ok(copied)
+/// Process MCE while recording which source element offsets remain visible.
+///
+/// Unlike the legacy marker-based active-offset path, this variant keeps the
+/// provenance in a side table owned by the processor.  The processed XML is
+/// therefore not inflated with one comment per tracked offset.
+pub(crate) fn process_markup_compatibility_with_source_offsets(
+    xml: &[u8],
+    offsets: &[u32],
+    capabilities: &Capabilities,
+    limits: &OffsetLimits,
+    retain_processed_xml: bool,
+) -> R<ActiveOffsetOutput> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
+    }
+    if offsets.len() > limits.max_offsets {
+        return Err(limit(
+            LimitKind::OffsetCount,
+            offsets.len(),
+            limits.max_offsets,
+        ));
+    }
+    for &offset in offsets {
+        if usize::try_from(offset).map_or(true, |offset| offset >= xml.len()) {
+            return Err(bad("active offset is outside the source XML"));
+        }
+    }
+
+    if offsets.is_empty() {
+        return Ok(ActiveOffsetOutput {
+            xml: Vec::new(),
+            selected_offsets: Vec::new(),
+        });
+    }
+    if !mentions_namespace(xml) {
+        let mut selected_offsets = Vec::new();
+        reserve_exact(&mut selected_offsets, offsets.len(), "active offsets")?;
+        selected_offsets.extend_from_slice(offsets);
+        let xml = if retain_processed_xml {
+            let mut retained = Vec::new();
+            reserve_exact(&mut retained, xml.len(), "active-offset source XML")?;
+            retained.extend_from_slice(xml);
+            retained
+        } else {
+            Vec::new()
+        };
+        return Ok(ActiveOffsetOutput {
+            xml,
+            selected_offsets,
+        });
+    }
+
+    let mut selected = Vec::new();
+    reserve_exact(&mut selected, offsets.len(), "active-offset selection map")?;
+    selected.resize(offsets.len(), false);
+    let mut observer = OffsetObserver::new(offsets, selected)?;
+    let processed = process_markup_compatibility_inner(
+        xml,
+        capabilities,
+        &limits.processing,
+        Some(&mut observer),
+        retain_processed_xml,
+    )?;
+    let retained = observer
+        .selected
+        .iter()
+        .filter(|&&selected| selected)
+        .count();
+    let mut selected_offsets = Vec::new();
+    reserve_exact(&mut selected_offsets, retained, "active offsets")?;
+    for (&offset, selected) in offsets.iter().zip(observer.selected) {
+        if selected {
+            selected_offsets.push(offset);
+        }
+    }
+    Ok(ActiveOffsetOutput {
+        xml: if retain_processed_xml {
+            processed.xml.into_owned()
+        } else {
+            Vec::new()
+        },
+        selected_offsets,
+    })
+}
+
+struct OffsetObserver {
+    positions: Vec<(usize, usize)>,
+    next: usize,
+    selected: Vec<bool>,
+}
+
+impl OffsetObserver {
+    fn new(offsets: &[u32], selected: Vec<bool>) -> R<Self> {
+        let mut positions = Vec::new();
+        reserve_exact(&mut positions, offsets.len(), "active-offset positions")?;
+        positions.extend(
+            offsets
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, offset)| (usize::try_from(offset).unwrap_or(usize::MAX), index)),
+        );
+        positions.sort_unstable_by_key(|&(offset, index)| (offset, index));
+        Ok(Self {
+            positions,
+            next: 0,
+            selected,
+        })
+    }
+
+    fn observe(&mut self, source_start: usize, active: bool) {
+        while self.next < self.positions.len() && self.positions[self.next].0 < source_start {
+            self.next += 1;
+        }
+        while self.next < self.positions.len() && self.positions[self.next].0 == source_start {
+            let index = self.positions[self.next].1;
+            self.selected[index] = active;
+            self.next += 1;
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ActiveOffsetOutput {
+    pub(crate) xml: Vec<u8>,
+    pub(crate) selected_offsets: Vec<u32>,
 }
 
 pub(crate) fn reserve_exact<T>(
@@ -633,40 +777,54 @@ fn pattern_directive_matches(
 
 struct BoundedOutput {
     bytes: Vec<u8>,
+    length: usize,
     max: usize,
+    retain: bool,
 }
 
 impl BoundedOutput {
-    fn new(hint: usize, max: usize) -> R<Self> {
+    fn new(hint: usize, max: usize, retain: bool) -> R<Self> {
         let mut bytes = Vec::new();
-        reserve_exact(&mut bytes, hint.min(max), "MCE output")?;
-        Ok(Self { bytes, max })
+        if retain {
+            reserve_exact(&mut bytes, hint.min(max), "MCE output")?;
+        }
+        Ok(Self {
+            bytes,
+            length: 0,
+            max,
+            retain,
+        })
     }
 
     #[inline]
     fn extend_from_slice(&mut self, value: &[u8]) -> R<()> {
         self.reserve(value.len())?;
-        self.bytes.extend_from_slice(value);
+        if self.retain {
+            self.bytes.extend_from_slice(value);
+        }
+        self.length += value.len();
         Ok(())
     }
 
     #[inline]
     fn push(&mut self, value: u8) -> R<()> {
         self.reserve(1)?;
-        self.bytes.push(value);
+        if self.retain {
+            self.bytes.push(value);
+        }
+        self.length += 1;
         Ok(())
     }
 
     fn reserve(&mut self, additional: usize) -> R<()> {
         let len = self
-            .bytes
-            .len()
+            .length
             .checked_add(additional)
             .ok_or_else(|| limit_lower_bound(LimitKind::OutputBytes, self.max))?;
         if len > self.max {
             return Err(limit(LimitKind::OutputBytes, len, self.max));
         }
-        if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
+        if self.retain && additional > self.bytes.capacity().saturating_sub(self.length) {
             // Grow geometrically so a document that outgrows the input-sized
             // hint costs a logarithmic number of reallocations instead of one
             // per written run, and clamp the request to the configured output
@@ -678,7 +836,7 @@ impl BoundedOutput {
                 .saturating_mul(2)
                 .min(self.max)
                 .max(len);
-            let grow = target.saturating_sub(self.bytes.len());
+            let grow = target.saturating_sub(self.length);
             self.bytes
                 .try_reserve_exact(grow)
                 // Spare capacity is optional: under allocator pressure, retry
@@ -747,6 +905,16 @@ pub fn process_markup_compatibility<'a>(
     caps: &Capabilities,
     lim: &Limits,
 ) -> R<Output<'a>> {
+    process_markup_compatibility_inner(xml, caps, lim, None, true)
+}
+
+fn process_markup_compatibility_inner<'a>(
+    xml: &'a [u8],
+    caps: &Capabilities,
+    lim: &Limits,
+    mut observer: Option<&mut OffsetObserver>,
+    retain_output: bool,
+) -> R<Output<'a>> {
     if xml.len() > lim.max_input_bytes {
         return Err(limit(LimitKind::InputBytes, xml.len(), lim.max_input_bytes));
     }
@@ -768,20 +936,32 @@ pub fn process_markup_compatibility<'a>(
     let mut r = Reader::from_reader(xml);
     r.config_mut().trim_text(false);
     let mut stack = Vec::new();
-    let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+    let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes, retain_output)?;
     let mut rep = Report::default();
     let mut root = false;
     let mut scope = Scope::new(caps);
     let mut buf = Vec::new();
     loop {
+        let event_start = usize::try_from(r.buffer_position())
+            .map_err(|_| bad("MCE source event offset overflowed"))?;
         let d = r.decoder();
         match r.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => start(
-                &e, d, false, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
-            )?,
-            Ok(Event::Empty(e)) => start(
-                &e, d, true, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
-            )?,
+            Ok(Event::Start(e)) => {
+                let active = start(
+                    &e, d, false, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
+                )?;
+                if let Some(observer) = observer.as_deref_mut() {
+                    observer.observe(event_start, active);
+                }
+            },
+            Ok(Event::Empty(e)) => {
+                let active = start(
+                    &e, d, true, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
+                )?;
+                if let Some(observer) = observer.as_deref_mut() {
+                    observer.observe(event_start, active);
+                }
+            },
             Ok(Event::End(_)) => {
                 let f: Frame = stack.pop().ok_or_else(|| bad("unexpected end"))?;
                 // The frame was at depth `stack.len() + 1`.
@@ -871,7 +1051,7 @@ fn start(
     rep: &mut Report,
     root: &mut bool,
     scope: &mut Scope,
-) -> R<()> {
+) -> R<bool> {
     if st.len() >= lim.max_depth {
         return Err(limit(
             LimitKind::Depth,
@@ -965,7 +1145,8 @@ fn start(
                 hoisted: None,
             }
         };
-        return close(st, frame, empty, out, scope);
+        close(st, frame, empty, out, scope)?;
+        return Ok(parent_active);
     }
 
     let mut directives = Vec::new();
@@ -1119,7 +1300,8 @@ fn start(
                 hoisted: None,
             }
         };
-        return close(st, frame, empty, out, scope);
+        close(st, frame, empty, out, scope)?;
+        return Ok(active);
     }
     let mut active = parent_active;
     let mode = if scope.is_mce(namespace.id) {
@@ -1191,7 +1373,8 @@ fn start(
             hoisted: None,
         }
     };
-    close(st, frame, empty, out, scope)
+    close(st, frame, empty, out, scope)?;
+    Ok(emitted)
 }
 
 /// Apply one element's compatibility directives to its context: the

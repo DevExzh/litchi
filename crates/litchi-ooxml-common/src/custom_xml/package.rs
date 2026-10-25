@@ -13,6 +13,7 @@ use super::codec::{
     invalid, is_data_relationship, is_props_relationship, limit, read_props, require_at_most,
     validate_content_type, validate_payload,
 };
+use super::errors::{unsupported_content, unsupported_target};
 use super::model::{Item, MAX_ITEMS, PROPS_CONTENT_TYPE, Props, Relationship};
 use super::snapshot::{PartState, Snapshot};
 use super::validation;
@@ -114,12 +115,16 @@ fn scan(
                     relationship.r_id()
                 ))
             })?;
-            let data = package.get_part(&requested_name).map_err(|error| {
-                Error::Missing(format!(
-                    "custom XML part '{}': {error}",
-                    requested_name.as_str()
-                ))
-            })?;
+            let data = match package.get_part(&requested_name) {
+                Ok(data) => data,
+                Err(OpcError::PartNotFound(error)) => {
+                    return Err(Error::Missing(format!(
+                        "custom XML part '{}': {error}",
+                        requested_name.as_str()
+                    )));
+                },
+                Err(error) => return Err(error.into()),
+            };
             let part = data.partname().clone();
             validate_content_type(data.content_type())?;
             let root = if let Some(root) = cached_roots.get(&part) {
@@ -186,12 +191,16 @@ fn resolve_props(
     let requested_name = relationship.target_partname().map_err(|error| {
         Error::Relationship(format!("invalid custom XML properties target: {error}"))
     })?;
-    let part = package.get_part(&requested_name).map_err(|error| {
-        Error::Missing(format!(
-            "custom XML properties part '{}': {error}",
-            requested_name.as_str()
-        ))
-    })?;
+    let part = match package.get_part(&requested_name) {
+        Ok(part) => part,
+        Err(OpcError::PartNotFound(error)) => {
+            return Err(Error::Missing(format!(
+                "custom XML properties part '{}': {error}",
+                requested_name.as_str()
+            )));
+        },
+        Err(error) => return Err(error.into()),
+    };
     let part_name = part.partname().clone();
     if let Some(existing_owner) = owners.insert(part_name.clone(), data.partname().clone())
         && existing_owner != *data.partname()
@@ -256,7 +265,11 @@ pub(crate) fn apply_items(
     }
 
     for source_name in &source_names {
-        let current = package.get_part(source_name)?;
+        let current = match package.get_part(source_name) {
+            Ok(part) => part,
+            Err(OpcError::PartNotFound(_)) => return Err(super::snapshot::source_mismatch()),
+            Err(error) => return Err(error.into()),
+        };
         let mut state = PartState::capture(current);
         let removed_ids = before
             .items()
@@ -273,10 +286,9 @@ pub(crate) fn apply_items(
                 .iter()
                 .any(|relationship| relationship.id == item.source_relationship().id)
             {
-                return invalid(format!(
-                    "custom XML relationship '{}' collides on '{}'",
-                    item.rel_id(),
-                    source_name.as_str()
+                return Err(unsupported_target(
+                    "custom_xml.apply",
+                    "the Custom XML relationship target is already occupied",
                 ));
             }
             state.relationships.push(item.source_relationship().clone());
@@ -323,7 +335,13 @@ pub(crate) fn apply_items(
     let parts = staged
         .iter()
         .map(PartState::to_part)
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>>>()
+        .map_err(|error| match error {
+            Error::Opc(OpcError::DuplicateRelationshipId(_)) => {
+                Error::Internal("custom XML prepared part relationships are invalid")
+            },
+            error => error,
+        })?;
     let staged_names = staged
         .iter()
         .map(|part| part.name.clone())
@@ -343,7 +361,7 @@ pub(crate) fn apply_items(
         .collect::<Vec<_>>();
     obsolete.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
     for name in obsolete {
-        if !part_is_referenced(package, &name) {
+        if !part_is_referenced(package, &name)? {
             package.remove_part(&name);
         }
     }
@@ -371,9 +389,9 @@ fn reject_part_aliases(items: &[Item]) -> Result<()> {
 fn staged_state(staged: &mut Vec<PartState>, state: PartState) -> Result<()> {
     if let Some(existing) = staged.iter_mut().find(|part| part.name == state.name) {
         if *existing != state {
-            return invalid(format!(
-                "custom XML graph requires conflicting states for '{}'",
-                state.name.as_str()
+            return Err(unsupported_content(
+                "custom_xml.apply",
+                "the Custom XML graph has a shared part that cannot be edited independently",
             ));
         }
     } else {
@@ -398,9 +416,9 @@ fn validate_destinations(
         match package.get_part(&part.name) {
             Ok(existing) => {
                 if !belongs_to_source && !is_host {
-                    return invalid(format!(
-                        "custom XML destination part '{}' is occupied",
-                        part.name.as_str()
+                    return Err(unsupported_target(
+                        "custom_xml.apply",
+                        "the Custom XML destination part is already occupied",
                     ));
                 }
                 if belongs_to_source
@@ -413,13 +431,10 @@ fn validate_destinations(
                 }
             },
             Err(OpcError::PartNotFound(_)) if !belongs_to_source => {
-                package.validate_new_part_name(&part.name)?;
+                validate_new_part_name(package, &part.name)?;
             },
             Err(OpcError::PartNotFound(_)) => {
-                return Err(Error::Missing(format!(
-                    "custom XML source part '{}' disappeared",
-                    part.name.as_str()
-                )));
+                return Err(super::snapshot::source_mismatch());
             },
             Err(error) => return Err(error.into()),
         }
@@ -427,20 +442,43 @@ fn validate_destinations(
     Ok(())
 }
 
-fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship
-                .target_partname()
-                .is_ok_and(|part| &part == target)
-    }) || package.iter_parts().any(|part| {
-        part.rels().iter().any(|relationship| {
-            !relationship.is_external()
-                && relationship
-                    .target_partname()
-                    .is_ok_and(|part| &part == target)
-        })
-    })
+fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> Result<bool> {
+    for relationship in package
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
+        if relationship.target_partname()? == *target {
+            return Ok(true);
+        }
+    }
+    for part in package.iter_parts() {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
+            if relationship.target_partname()? == *target {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn validate_new_part_name(package: &OpcPackage, name: &PackURI) -> Result<()> {
+    match package.validate_new_part_name(name) {
+        Ok(()) => Ok(()),
+        Err(
+            OpcError::DuplicatePartName(_)
+            | OpcError::EquivalentPartNames { .. }
+            | OpcError::DerivedPartNames { .. },
+        ) => Err(unsupported_target(
+            "custom_xml.apply",
+            "the Custom XML destination part is already occupied",
+        )),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn push_name(names: &mut Vec<PackURI>, name: &PackURI) {

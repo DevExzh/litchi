@@ -653,7 +653,9 @@ fn write_element(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Error as DocxError;
     use crate::bibliography::discover_bibliography_source_stores;
+    use litchi_core::edit::RefusalKind;
     use litchi_ooxml_common::custom_xml::{
         Conformance, Edit, Item, NewItem, NewProps, Props, discover,
     };
@@ -937,6 +939,17 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut empty = Package::new().unwrap();
+        let missing_store = empty
+            .replace_bibliography_source(
+                "Missing",
+                BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing").unwrap(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            missing_store,
+            DocxError::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+        ));
         let mut package = Package::new().unwrap();
         package.add_bibliography_source(built()).unwrap();
         // Duplicate tags are rejected before any mutation.
@@ -951,15 +964,16 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-        assert!(
-            package
-                .replace_bibliography_source(
-                    "Missing",
-                    BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing")
-                        .unwrap(),
-                )
-                .is_err()
-        );
+        let missing_source = package
+            .replace_bibliography_source(
+                "Missing",
+                BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing").unwrap(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            missing_source,
+            DocxError::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+        ));
 
         assert!(package.remove_bibliography_source("Doe2024").unwrap());
         assert!(!package.remove_bibliography_source("Doe2024").unwrap());

@@ -160,6 +160,31 @@ fn generated_add_find_update_replace_reorder_remove_round_trip() {
 }
 
 #[test]
+fn missing_and_occupied_store_ids_are_typed_refusals() {
+    let package = Package::new().unwrap();
+    let mut edit = package.edit_custom_xml();
+    let error = edit.set(ITEM_A, b"<updated/>".to_vec()).unwrap_err();
+    assert!(matches!(
+        error,
+        litchi_docx::Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::NotFound
+    ));
+
+    let package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(ITEM_A, "existing")).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    let mut edit = package.edit_custom_xml();
+    let error = edit.add(store(ITEM_A, "duplicate")).unwrap_err();
+    assert!(matches!(
+        error,
+        litchi_docx::Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedTarget
+    ));
+}
+
+#[test]
 fn binding_integrity_scans_word_containers_without_executing_xpath() {
     let mut package = Package::new().unwrap();
     package = {
