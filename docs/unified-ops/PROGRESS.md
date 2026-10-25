@@ -4525,6 +4525,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   that pinned inactive leaves. No additional worktree has been removed, and
   nothing is pushed.
 
+
 - Coordinator raw-codec integration and cleanup update (2026-10-25):
   Required raw-profile signature enforcement merges at `c51a539757` from
   reviewed `939d401609`. The checker resolves local and external nominal
@@ -5836,24 +5837,116 @@ See [0063](0063-source-pptx-modern-comments.md).
   manifest costs57,864,192 net allocated bytes, reducing the ledger to
   753,286,500,352 bytes under the same exclusions. No push or final acceptance.
 
-  All sixteen remaining diagnostic rows pass on frozen a8 and receive root
-  terminal verification. Eight reviewed repairs (119b,120a,121c,123a,124a,
-  126,128c,129) compose without conflicts at ef5b837b34, retaining coordinator
-  records through130. Root verifies every changed crate file: fourteen exact
-  leaf blobs and two independent combinations, with no extra crate changes.
-  All three locks stay unchanged. Fresh composed-source qualification and
-  the S→C census binding follow; 126 performance acceptance remains open (131).
+  All sixteen final diagnostic rows pass on a8. Eight reviewed repairs,
+  including the completed 128c memory-dimension fix, compose without conflicts
+  in private integration. Root verifies all sixteen changed crate files.
+  Records131/131a and the refreshed census matrix produce frozen candidate
+  C=780cf4c7ee; its matrix check passes with the same three locks. Fresh
+  compiler qualification has started. No old result is relabeled as a C pass.
 
-  Cleanup100 removes the unused DOC toggle candidate after lock restoration
-  and fresh holder checks. Its canonical baseline and staged source remain
-  unchanged. Totals reach258 worktrees and422 refs; the allocated ledger is
-  760,834,469,888 bytes under its recorded exclusions. The eight merged repair
-  leaves await fresh removal guards. Final gates and all fidelity/performance
-  obligations remain open; no push.
+  Cleanup100 removes the obsolete DOC toggle candidate while preserving its
+  lock and canonical comparison baseline. Cleanup99 then removes all eight
+  merged repair worktrees and deletes their exact refs after fresh root
+  guards. Totals are 266 worktrees and 430 refs; the allocated ledger reaches
+  777,580,584,960 bytes under its recorded exclusions and evidence limits
+  (132). Main/office and independent office branches remain untouched.
+  Final qualification, performance and trunk integration stay open; no push.
 
-  Record131a regenerates the 84-profile/68-package census matrix against
-  composed source S=faab79bc38. The profile set is unchanged; current glossary
-  and common manifest identities replace stale pins. The matrix remains
-  incomplete until actual capture and callable review. Its commit C is the
-  next qualification source, with the same three locks. No capture or final
-  acceptance is inferred from matrix preparation.
+  Frozen C passes all eight compiler/consumer rows; root verifies the terminal
+  capture and starts the fresh 34-group runtime suite after preflight (133).
+  Glossary26/full53, final census and fidelity/performance remain open.
+  The reviewed 126 performance adapter and rebound notes packet pass their
+  synthetic checks; actual measurements remain unrun. Census v7 is returned
+  for capturing its binding hash too late; v8 must seal it before execution.
+
+  Cleanup101 removes two archived obsolete ODP duplicates while preserving
+  the canonical comparison endpoint. Root verifies 268 removed worktrees,
+  430 deleted refs and a conservative allocated ledger of 785,182,834,688
+  bytes under the recorded exclusions. A fresh branch census finds only
+  trunk, integration and the active runner in scope. Main/office and their
+  independent siblings are untouched. Final trunk integration is pending;
+  nothing is pushed.
+
+  C runtime passes sixteen common/OPC/DOCX groups, 1,398 PPTX library tests
+  and integration chunks1–30, then returns the readonly no-op consumer (134).
+  Physical event admission now passes; the later test incorrectly applies a
+  pristine-package patch to different content. Return134a preserves strict
+  base matching and corrects the consumer. Remaining runtime coverage is
+  diagnostic; glossary26 runs separately on frozen C. No repaired-source
+  runtime pass is claimed.
+
+  Census v9 passes root/independent source review after binding-seal and
+  recursion returns, but actual captures remain unrun. The 96-script/6,808-row
+  corpus postcheck targets the existing full53 CLI row. Native policies
+  72/74/75 still need executable v2 consumers, not just final identity pins;
+  required engineering proceeds in separate protocol leaves137/136/135.
+  Final gates, measurements, reviewed composition and trunk integration
+  remain open. Nothing is pushed.
+
+  C glossary passes nine rows, then returns fifteen DOCX minimal-profile
+  MCE limits identity checks (138). Source signatures use the required public
+  type; return138a investigates nominal/reexport proof without weakening the
+  gate. Root verifies the failed capture and starts the separate 26-row PPTX
+  full-feature runtime tail. Readonly134a is source-reviewed and ready; C
+  stays frozen during diagnostics. Final qualification remains open.
+
+  All 26 full-feature PPTX tail rows pass, including chunks32–53, six examples
+  and doctests; root verifies the terminal capture (139). The minimal profile
+  runs separately. Return138's explicit public-to-defining MCE type mapping
+  passes independent review and 75 checker tests; it and134a await composition.
+  Native135b/136a must repair actual execution/receipt paths;137a is under
+  independent review after 43 focused tests. Final gates, measurements,
+  trunk integration and leaf cleanup remain open. Nothing is pushed.
+
+  The minimal PPTX diagnostic reproduces the known134 consumer failure after
+  1,395 library tests and chunks1–30 pass. Root verifies it, then merges134a
+  and138a without conflicts at private integration e7841dd222 (140). All five
+  reviewed files and three locks match; 75 integrated checker tests pass.
+  Final qualification uses full53 plus six compiler and five runtime profile
+  supplements, preserving isolated wsdoc and complete glossary coverage.
+  Native135c/136b/137c still need actual execution-path repairs before final
+  composition; no native pass is claimed. Trunk and cleanup work continue.
+
+  Cleanup103 removes both merged repair worktrees without force and deletes
+  their exact refs after fresh root checks (141). Cumulative totals reach 270
+  worktrees and 432 refs; the conservative allocated ledger is 800,318,455,808
+  bytes under its existing exclusions, not a free-space measurement. All
+  source blobs, three locks and the protected root probe are preserved.
+  The 68 independent office refs stay outside scope; the 126 a8 baseline stays
+  available. Three protocol leaves remain active. No push or final acceptance.
+
+  Reviewed DrawingML137e composes at 2197a6c7f2; all 44 integrated tests pass
+  (142). Separate protocol paths, ten imported tools and eight probe inputs
+  are bound; final outer source pins and native execution remain pending.
+  Cleanup104 retires its merged sparse leaf and exact ref, reaching 271
+  removed worktrees and 433 refs. The allocated ledger is 800,323,493,888
+  bytes under the existing exclusions. Final tooling coverage adds two new
+  test modules to the existing forty. Native135d/136c and final qualification
+  remain open; nothing is pushed.
+
+  Reviewed current-native135e composes at bc5162cc97 without conflicts (143).
+  The combined protocol/no-3rdparty suite passes 77 tests. Genuine baseline
+  consumers, separate source builds and strict replay/output checks are in
+  place; actual guarded builds and measurements remain pending. Integration's
+  generated overlays are cleared after external preservation, with all three
+  locks unchanged. The conservative allocated ledger reaches 800,926,519,296
+  bytes under prior exclusions. Signed136d remains under repair; final source
+  binding, qualification and trunk integration are still open. No push.
+
+  The final format audit returns one PPT adapter import; 135f fixes it and
+  migrates exact pins, with 33 focused tests passing (144). Final coverage is
+  full53 plus seven compiler and five runtime supplements. Cleanup105 retires
+  the merged current-native leaf, reaching 272 removed worktrees and 434 refs;
+  the conservative ledger is 801,001,271,296 bytes under prior exclusions.
+  The overwritten worker preflight failure is disclosed without attributing
+  its unknown cause. Signed136d is reviewed; its identity label is being
+  normalized. Final qualification and trunk integration remain open. No push.
+
+  Signed136e is independently reviewed and merged at ee1bec60ec; the combined
+  focused suite passes 67 tests (145). Candidate identity, all three lock
+  graphs and generated consumer lock validation are bound; actual native
+  execution still awaits final pins. Cleanup106 retires the last implementation
+  leaf, reaching 273 worktrees and 435 refs removed. All 73 remaining heads
+  are accounted for: three unified controls, main/office and 68 independent
+  office refs. Required detached baselines remain. Final binding, qualification
+  and trunk integration are open; nothing is pushed.
