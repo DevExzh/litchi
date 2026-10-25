@@ -5680,3 +5680,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   quarantine. Root verifies preserved payloads, source/registry proofs and the
   unchanged protected constructor probe. Remaining worktrees are still being
   audited; 68 independent office siblings remain outside scope. No push.
+
+
+  Four reviewed runtime repairs compose at 3c291 (106). Its first runtime
+  row exposes missing Result wrappers in Custom XML 104a before tests compile;
+  root verifies the failed capture and fixes both at e130 (104aa), with
+  independent review. The next common suite compiles: 528 pass, three VBA
+  fixtures/oracle assertions still fail and are returned as 104d. Fresh full
+  qualification remains required; no runtime/performance acceptance.
+
+  Cleanup77–79 removes 34 more worktrees and deletes 23 refs after exact-tip,
+  source/payload/registry checks. Totals are 81 worktrees and 341 refs; the
+  measured allocation ledger is 120,572,608,512 bytes, with the same wave75
+  allocation and small adapter-archive caveats. The DrawingML deletion-only
+  checkout's signed invalid-target coverage is now preserved by composed102a.
+  Remaining validation worktrees receive explicit disposition review; the
+  protected probe is unchanged. Completed changes are committed; no push.

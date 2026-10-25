@@ -250,3 +250,63 @@ cleanup75's unmeasured allocation and the small extra adapter archive, totals
 118,948,712,448 bytes. The protected constructor probe remains unchanged.
 The remaining registered worktree census continues; active qualification
 sources and baselines remain protected until their work is complete.
+
+
+## Repair composition and compiler correction
+
+Reviewed 104c, 104a, 102a and 105 compose at `3c291e3b62` (record 106).
+The two coordinator-document conflicts retain root's exact-prefix supersets;
+all four owned source blobs match their reviewed leaves. Its runtime packet
+stops before tests compile: 104a omitted `Err(...)` around both alias refusal
+values. Root verifies the capture and corrects both wrappers at `e130751fc5`
+(record 104aa), independently reviewed. This was missed in source review.
+
+The e130 common suite compiles, with 528 tests passing and three failing.
+Custom XML alias classification and VBA metadata-only part-limit precedence
+now pass. Two VBA fixture limit combinations remain inconsistent, and the
+independent lexical manifest expectation puts a preserved recipient comment
+after the inserted overrides instead of before them. These findings are
+returned as 104d; no production behavior or performance loss is accepted.
+The complete 34-row packet remains required after repair.
+
+Root verifies e130's terminal capture and inner helper log. External packet
+`.coord/ooxml-pptx-joint-e130751fc5-f5-runtime` retains `rows.json`
+(4,333 bytes, SHA-256
+`a6d67c39223cb374f70a7cd0130d08b230322358308b40f3da2114ab9a8738ec`),
+`result.json` (5,072 bytes, SHA-256
+`031c660784cc16cf900cc65092f0dc45c2888a42fd61b8df2ba63613c3ea0c5c`)
+and inner `common-tests/0000.log` (220,277 bytes, SHA-256
+`08316d62904616356cd6edb2fe6637fee3c383d16f3a964ae33d1e3a91202a61`).
+The outer row takes 84.627 seconds; target ends at 387,960,757 bytes.
+
+## Cleanup77–79
+
+Root verifies another 34 removed worktrees and deletes their 23 named refs
+with exact-tip guards. Totals for cleanup72–79 are 81 worktrees and 341 local
+refs. Wave77 removes twelve clean source worktrees and eleven detached
+compile/driver snapshots; 69 restored blobs are verified. Wave78 removes
+nine clean composed leaves and discards only two ordinary bytecode files in
+the released signed predecessor; 27 restored blobs are verified. Wave79
+removes that clean predecessor and the DrawingML checkout containing exactly
+6,848 tracked deletions, with no staged, untracked or ignored changes.
+Root verifies all 6,848 old-blob identities against its source tree and six
+additional restoration blobs. Its useful signed invalid-target coverage is
+preserved by composed 102a; obsolete error expectations are not imported.
+
+| Wave | Net allocated bytes | Cleanup receipt SHA-256 | Ref-deletion receipt SHA-256 |
+|---|---:|---|---|
+| 77 | 673,243,136 | `074ce113943e32ceae5b745c4dde4de41e055096e733388c44a8f7fc04f15578` | `cf9765e6c64ceb8e1b9fd86b362cc4f828e7cb20c58beec029e394916cd7ef18` |
+| 78 | 857,747,456 | `bb64fd12252be473f4e59b2c2351da838d7ea4b23e6fae5ed969d08b61060e7b` | `18ca070cc9961248582f1eabf40a8ebe4e6798d0f2ecd8223b7b4ad3c59fdb51` |
+| 79 | 92,905,472 | `b716ad173b3c7f9edadbdfedeaadbbc9e87d0378fbeaf6581aaae4aea2f00735` | `48157c341c0774cce8bd08e37c56289a8b9b69cf56323abc9ec6ddcda3091656` |
+
+Cleanup receipts are under external `quarantine/wave77-ancestor-leaves/`,
+`quarantine/wave78-coord-small/` and `quarantine/wave79-signed102-drawingml/`.
+Ref receipts are `trunk-consolidation/wave77-twelve-ref-delete-receipt.json`,
+`wave78-nine-ref-delete-receipt.json` and `wave79-two-ref-delete-receipt.json`.
+The measured allocation ledger reaches 120,572,608,512 bytes, excluding
+wave75's unmeasured allocation and the small extra adapter archive. All
+preserved inventories, current source and the protected probe remain intact.
+Remaining detached validation payloads and older qualification baselines are
+under explicit supersession review; merely being a validation tree does not
+justify permanent retention. Main and independent office siblings stay out
+of scope. Nothing is pushed, and final acceptance remains open.
