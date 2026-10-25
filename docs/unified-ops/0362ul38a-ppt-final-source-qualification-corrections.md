@@ -19,7 +19,7 @@ tree:   ebc1cee05f124c0c63977aff07a23288c19e7d00
 probe:  crates/litchi-ppt/examples/scoped_patch_probe.rs
 probe SHA-256: 0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549
 correctness companion: crates/litchi-ppt/examples/scoped_patch_correctness.rs
-correctness companion SHA-256: 032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a
+correctness companion SHA-256: e787342ed25842dae3743d474d3589c2d24bbad2ccb561b3dda5860791c07f60
 fixture: test-data/unified-ops/0294/video.ppt
 fixture bytes/SHA-256: 43520 / f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a
 ~~~
@@ -52,7 +52,7 @@ bytes/SHA-256: 17630 / 1bc982f4495a16c30ac4ca2779351aec1e420781a6d6cb7c2b1f33ccf
 host-process adapter: docs/unified-ops/results/0362g/ppt_host_process_guard.py
 adapter SHA-256: 08c73174304061beeaf778df763be3507befd8200db72a8617a5d8ddc42e12b8
 correctness receipt validator: docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py
-validator SHA-256: cb635bc911998915da71c0dc69c97e6d31a2a7a8e68f0c52c94ec4596cf3aed7
+validator SHA-256: db0ac0f330db5c15334f318efb8e4152d7752ac0731d7cf83f8b4d5e1ddfa95e
 candidate lock guard: docs/unified-ops/results/0362g/validate_ppt_candidate_lock.py
 candidate lock guard SHA-256: 5ed31f6bf3377b1936b58e214fe2ea04c796b9b9f9508079a7b02a06820ab714
 final-source supervisor/wrapper hashes: must be freshly rebound after
@@ -237,10 +237,12 @@ unchanged for timing comparability. The separate
 `edit_external_media().set_path(1, Some("clip-0000.avi"))` operation outside
 the timed workload. It parses the committed target through
 `slide_order::Snapshot`, rejects unchanged target bytes or an unexpected path,
-replays the patch and inverse, and writes source/target/inverse hashes to an
+replays the patch and inverse, compares the forward replay bytes to the
+committed target bytes, and writes source/target/replay/inverse hashes to an
 outside-clock receipt. The validator binds that receipt to the selected
 fixture, rejects equal source/target hashes and any path other than
-`clip-0000.avi`, and requires the inverse hash to equal the source hash.
+`clip-0000.avi`, requires the forward replay hash and boolean to match the
+committed target, and requires the inverse hash to equal the source hash.
 The companion and validator are separate gate steps, so no checksum or extra
 serialization is added to the historical timed loop:
 

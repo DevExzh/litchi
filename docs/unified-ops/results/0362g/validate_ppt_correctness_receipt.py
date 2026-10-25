@@ -22,6 +22,8 @@ REQUIRED = {
     "target_len",
     "source_sha256",
     "target_sha256",
+    "replay_target_sha256",
+    "replay_matches_target",
     "inverse_source_sha256",
     "inverse_matches_source",
 }
@@ -66,11 +68,20 @@ def main(argv: list[str]) -> int:
         fail("receipt source hash does not match the fixture")
     if row["source_sha256"] == row["target_sha256"]:
         fail("correctness target bytes are unchanged")
+    if row["replay_target_sha256"] != row["target_sha256"]:
+        fail("forward replay bytes do not match the committed target")
+    if row["replay_matches_target"] is not True:
+        fail("forward replay did not reproduce the committed target")
     if row["inverse_source_sha256"] != row["source_sha256"]:
         fail("inverse source hash does not match the source")
     if row["inverse_matches_source"] is not True:
         fail("inverse did not restore the source")
-    for field in ("source_sha256", "target_sha256", "inverse_source_sha256"):
+    for field in (
+        "source_sha256",
+        "target_sha256",
+        "replay_target_sha256",
+        "inverse_source_sha256",
+    ):
         value = row[field]
         if not isinstance(value, str) or len(value) != 64:
             fail(f"{field} is not a SHA-256 hex digest")
@@ -82,6 +93,8 @@ def main(argv: list[str]) -> int:
         "status": "passed",
         "source_sha256": row["source_sha256"],
         "target_sha256": row["target_sha256"],
+        "replay_target_sha256": row["replay_target_sha256"],
+        "replay_matches_target": row["replay_matches_target"],
         "external_media_path": row["external_media_path"],
         "inverse_matches_source": row["inverse_matches_source"],
     }, sort_keys=True))

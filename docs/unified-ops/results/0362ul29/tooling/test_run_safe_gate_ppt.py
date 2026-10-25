@@ -181,6 +181,8 @@ class PptGateWiringTests(unittest.TestCase):
                         "target_len": fixture.stat().st_size + 1,
                         "source_sha256": source_hash,
                         "target_sha256": "b" * 64,
+                        "replay_target_sha256": "b" * 64,
+                        "replay_matches_target": True,
                         "inverse_source_sha256": source_hash,
                         "inverse_matches_source": True,
                     }
@@ -194,6 +196,19 @@ class PptGateWiringTests(unittest.TestCase):
 
             row = json.loads(receipt.read_text(encoding="utf-8"))
             row["target_sha256"] = source_hash
+            receipt.write_text(json.dumps(row), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                VALIDATOR.main(["validator", str(receipt), str(fixture)])
+
+            row["target_sha256"] = "b" * 64
+            row["replay_target_sha256"] = "c" * 64
+            row["replay_matches_target"] = True
+            receipt.write_text(json.dumps(row), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                VALIDATOR.main(["validator", str(receipt), str(fixture)])
+
+            row["replay_target_sha256"] = "b" * 64
+            row["replay_matches_target"] = False
             receipt.write_text(json.dumps(row), encoding="utf-8")
             with self.assertRaises(SystemExit):
                 VALIDATOR.main(["validator", str(receipt), str(fixture)])
