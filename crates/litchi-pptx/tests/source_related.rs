@@ -354,12 +354,19 @@ fn source_related_snapshots_match_eager_values_and_raw_identity() {
 
     let notes = slide.notes().unwrap().unwrap();
     let eager_notes = eager_presentation.notes().unwrap().unwrap();
-    let eager_note_text = eager_notes.slides()[0].text().unwrap();
+    let eager_note_text = eager_notes.slides()[0]
+        .text(litchi_pptx::notes::Limits::DEFAULT)
+        .unwrap();
     assert_eq!(notes.text(), eager_note_text.as_deref());
     assert!(!notes.scene().is_empty());
 
     let comments = slide.comments().unwrap().unwrap();
-    let eager_comments = eager_slide.comments().unwrap().unwrap().comments().unwrap();
+    let eager_comments = eager_slide
+        .comments()
+        .unwrap()
+        .unwrap()
+        .comments(litchi_pptx::comments::Limits::DEFAULT)
+        .unwrap();
     assert_eq!(comments.entries().len(), eager_comments.len());
     let entry = &comments.entries()[0];
     let eager_entry = &eager_comments[0];

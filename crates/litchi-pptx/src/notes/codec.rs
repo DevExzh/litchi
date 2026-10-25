@@ -6,7 +6,7 @@ use super::{
     limit, resolved, xml_error,
 };
 #[cfg(test)]
-use super::{MAX_ATTRIBUTE_BYTES, MAX_DEPTH, MAX_NOTES_XML};
+use super::{MAX_ATTRIBUTE_BYTES, MAX_DEPTH};
 use crate::{Error, Result};
 #[cfg(test)]
 use litchi_ooxml_common::mce::process_ooxml;
@@ -1152,9 +1152,9 @@ mod tests {
                     kind: crate::error::LimitKind::Codec(
                         crate::error::CodecLimitKind::XmlAttributes
                     ),
-                    observed: MAX_ATTRIBUTES + 1,
+                    observed,
                     maximum: MAX_ATTRIBUTES,
-                })
+                }) if observed == MAX_ATTRIBUTES + 1
             ));
             assert_eq!(attributes, MAX_ATTRIBUTES + 1);
             assert_eq!(attribute_bytes, 0);

@@ -1125,7 +1125,7 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let powerpoint = OpcPackage::open(
             root.join("test-data/poi/test-data/slideshow/bug65551.pptx"),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap();
         let loaded = load(&powerpoint, Limits::DEFAULT).unwrap().unwrap();
@@ -1136,7 +1136,7 @@ mod tests {
 
         let libreoffice = OpcPackage::open(
             root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx"),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap();
         let loaded = load(&libreoffice, Limits::DEFAULT).unwrap().unwrap();

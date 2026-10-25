@@ -129,7 +129,4 @@ pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 #[cfg(test)]
-pub(crate) use package::{
-    add_presentation_comment, add_presentation_comment_author, remove_presentation_comment,
-    store_presentation_comments, update_presentation_comment,
-};
+pub(crate) use package::store_presentation_comments;

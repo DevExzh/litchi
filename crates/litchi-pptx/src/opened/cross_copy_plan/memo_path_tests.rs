@@ -364,8 +364,9 @@ fn an_exact_source_seals_its_bound_digest_and_keeps_the_bound() -> Result<()> {
             refused,
             Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed,
                 maximum,
-            }) if maximum == source_bytes.len() - 1
+            }) if observed == source_bytes.len() && maximum == source_bytes.len() - 1
         ),
         "{refused:?}"
     );

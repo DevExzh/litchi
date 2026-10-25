@@ -2023,8 +2023,7 @@ mod tests {
         let limits = Limits::DEFAULT.with_depth(1).expect("depth limit");
         let exact = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
         Guides::from_xml(exact, limits).expect("depth-one empty root");
-        Guides::rewrite_source(exact, &Guides::default(), limits)
-            .expect("depth-one empty source root");
+        rewrite_source(exact, &Guides::default(), limits).expect("depth-one empty source root");
 
         let one_over = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:holder/></p:presentation>"#;
         assert_xml_depth_limit(
@@ -2033,7 +2032,7 @@ mod tests {
             1,
         );
         assert_xml_depth_limit(
-            Guides::rewrite_source(one_over, &Guides::default(), limits)
+            rewrite_source(one_over, &Guides::default(), limits)
                 .expect_err("depth-two source element"),
             2,
             1,

@@ -90,19 +90,19 @@ mod comment_tests {
             List::from_processed(&oversized),
             Err(Error::Limit {
                 kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
-                observed: oversized.len(),
+                observed,
                 maximum: MAX_BYTES,
                 ..
-            })
+            }) if observed == oversized.len()
         ));
         assert!(matches!(
             Authors::from_processed(&oversized),
             Err(Error::Limit {
                 kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
-                observed: oversized.len(),
+                observed,
                 maximum: MAX_BYTES,
                 ..
-            })
+            }) if observed == oversized.len()
         ));
     }
 
@@ -115,9 +115,7 @@ mod comment_tests {
         assert!(matches!(
             store_modern_comment(&mut package, &value),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(
-                    crate::opened::CodecLimitKind::StringBytes
-                ),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
                 observed,
                 maximum: MAX_STRING_BYTES,
                 ..
@@ -137,9 +135,7 @@ mod comment_tests {
         assert!(matches!(
             store_modern_comment_authors(&mut package, &value),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(
-                    crate::opened::CodecLimitKind::StringBytes
-                ),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
                 observed,
                 maximum: MAX_STRING_BYTES,
                 ..

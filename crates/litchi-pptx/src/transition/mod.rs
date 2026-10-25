@@ -186,6 +186,7 @@ mod tests {
                 r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"/>"#,
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap()
         .unwrap();
@@ -194,6 +195,7 @@ mod tests {
                 r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap()
         .unwrap();
@@ -408,6 +410,7 @@ mod tests {
                 r#"<p14:prism xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" dir="r" isContent="true" future="keep"/>"#,
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap()
         .unwrap();

@@ -40,7 +40,7 @@ fn source_owner_retains_custom_shape_profile() {
     let mut edit = package.edit().unwrap();
     assert!(matches!(
         edit.add_text_box(0, "bounded", (0, 0, 914_400, 914_400)),
-        Err(crate::Error::Limit {
+        Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
             observed: 2,
             maximum: 1,
@@ -63,7 +63,7 @@ fn source_owner_retains_custom_transition_profile() {
         crate::transition::Transition::new(crate::transition::Kind::Fade { black: None });
     assert!(matches!(
         edit.set_slide_transition(0, Some(&transition)),
-        Err(crate::Error::Limit {
+        Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed,
                 maximum: 1,
@@ -256,7 +256,7 @@ fn removal_dependent_then_insertion_respects_exact_selected_part_limit() {
     let mut rejected = reopened.edit().unwrap();
     assert!(matches!(
         rejected.insert_slide(Position::new(2), &layout_name),
-        Err(crate::Error::Limit {
+        Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
             observed,
             maximum,

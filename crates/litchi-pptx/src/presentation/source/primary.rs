@@ -2965,7 +2965,7 @@ mod deferred_policy_tests {
         assert!(
             default_edit
                 .add_text_box(0, "default policy", (0, 0, 914_400, 914_400))
-                .unwrap()
+                .is_ok()
         );
     }
 }

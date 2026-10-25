@@ -159,8 +159,8 @@ mod tests {
         let points = [point(), point()];
         assert!(matches!(
             edit.set(0_usize, &points),
-            Err(crate::Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
                 observed: 2,
                 maximum: 1,
             })
@@ -187,9 +187,10 @@ mod tests {
         let before = recipient.to_bytes().unwrap();
         assert!(matches!(
             recipient.apply_laser_traces(&patch),
-            Err(crate::Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 maximum: 1,
+                ..
             })
         ));
         assert_eq!(recipient.to_bytes().unwrap(), before);
@@ -252,8 +253,8 @@ mod tests {
         let expected_observed = one_slide_bytes.checked_add(one_slide_bytes).unwrap();
         assert!(matches!(
             error,
-            crate::Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 observed,
                 maximum,
             } if observed == expected_observed && maximum == one_slide_bytes

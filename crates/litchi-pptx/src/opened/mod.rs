@@ -97,6 +97,8 @@ pub(crate) use enclosed_removal::{
     stage_enclosed_shape_removal_with_limits, validate_enclosed_removal_pair_with_limits,
 };
 pub(crate) use geometry::geometry_skeleton_with_limits;
+#[cfg(test)]
+pub(crate) use model::fingerprint_log;
 pub(crate) use model::{
     PartDigests, capture_with_parent_digests_and_semantic_limits,
     capture_with_provenance_and_semantic_limits, package_fingerprint,

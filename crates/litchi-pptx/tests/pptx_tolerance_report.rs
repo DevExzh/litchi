@@ -66,7 +66,7 @@ fn lazy_slide_access_leaves_the_open_report_clean() {
 // ---------------------------------------------------------------------------
 
 use litchi_opc::PackURI;
-use litchi_pptx::animations::{Sequence, parse_package_slide_with_tolerance};
+use litchi_pptx::animations::{Limits, Sequence, parse_package_slide_with_tolerance};
 use litchi_pptx::{Defect, TimingDefect};
 
 const SLIDE1: &str = "/ppt/slides/slide1.xml";

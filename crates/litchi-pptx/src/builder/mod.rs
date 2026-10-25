@@ -138,9 +138,8 @@ impl std::fmt::Debug for Builder {
 mod tests {
     use super::*;
     use litchi_opc::PackURI;
-    use litchi_opc::part::Part;
 
-    fn media_value(data: Vec<u8>) -> crate::Result<crate::media_parts::List> {
+    fn media_value(data: Vec<u8>) -> Result<crate::media_parts::List> {
         Ok(crate::media_parts::List {
             pictures: vec![crate::media_parts::Picture {
                 shape_id: 4,

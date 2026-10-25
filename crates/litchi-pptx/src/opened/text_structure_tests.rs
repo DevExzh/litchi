@@ -358,10 +358,7 @@ fn notes_bodies_take_paragraphs() -> Result<()> {
         .expect("slide")
         .notes()?
         .expect("notes page");
-    assert_eq!(
-        notes.text(crate::notes::Limits::DEFAULT)?,
-        Some("note one\nnote two".to_owned())
-    );
+    assert_eq!(notes.text(), Some("note one\nnote two"));
     Ok(())
 }
 

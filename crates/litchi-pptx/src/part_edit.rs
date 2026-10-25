@@ -1012,7 +1012,6 @@ pub(crate) use family;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use litchi_opc::{BlobPart, PackURI};
 
     #[test]
@@ -1054,12 +1053,12 @@ mod tests {
 
         let bytes = base.to_bytes().expect("serialize base");
         let equal = crate::Package::from_bytes(&bytes).expect("independent equal package");
-        let _ = crate::opened::model::fingerprint_log::take();
+        let _ = crate::opened::fingerprint_log::take();
         assert!(equal.apply_opc(&patch).is_ok());
         assert!(patch.0.base_revision.get().is_some());
-        assert!(!crate::opened::model::fingerprint_log::take().is_empty());
+        assert!(!crate::opened::fingerprint_log::take().is_empty());
         assert!(equal.apply_opc(&patch).is_ok());
-        assert!(crate::opened::model::fingerprint_log::take().is_empty());
+        assert!(crate::opened::fingerprint_log::take().is_empty());
 
         let mut edit = base.edit_opc().expect("raw edit");
         edit.update(|opc| {

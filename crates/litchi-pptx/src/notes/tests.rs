@@ -6,15 +6,16 @@
 
 use super::package::is_notes_slide_rel;
 use super::*;
+use crate::package::replay_index::ReplayIndex;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
 
-fn write_text(text: &str) -> Result<Vec<u8>> {
+fn write_text(text: &str) -> crate::Result<Vec<u8>> {
     super::write_text(text, Limits::DEFAULT)
 }
 
-fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
+fn write_text_with(conformance: Conformance, text: &str) -> crate::Result<Vec<u8>> {
     super::write_text_with(conformance, text, Limits::DEFAULT)
 }
 
@@ -83,16 +84,16 @@ fn replay_notes_aggregate_accepts_exact_and_refuses_one_byte_under() {
         max_total_bytes: total,
         ..Limits::DEFAULT
     };
-    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
-    assert!(super::package::validate_replay_total(&index, exact).is_ok());
+    let index = ReplayIndex::from_package(&package).unwrap();
+    assert!(validate_replay_total(&index, exact).is_ok());
     let under = Limits {
         max_total_bytes: total.saturating_sub(1),
         ..exact
     };
     assert!(matches!(
-        super::package::validate_replay_total(&index, under),
+        validate_replay_total(&index, under),
         Err(Error::Limit {
-            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            kind: LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
             observed,
             maximum,
         }) if observed == total && maximum == total.saturating_sub(1)
@@ -109,7 +110,7 @@ fn replay_notes_index_applies_changed_slide_delta() {
         .get_part_mut(&name)
         .unwrap()
         .set_blob(vec![0; old_len + 1]);
-    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    let index = ReplayIndex::from_package(&package).unwrap();
     let updated = index
         .update(&package, &target, std::slice::from_ref(&name))
         .unwrap();
@@ -117,15 +118,15 @@ fn replay_notes_index_applies_changed_slide_delta() {
         max_total_bytes: usize::try_from(updated.notes_total_bytes()).unwrap(),
         ..Limits::DEFAULT
     };
-    assert!(super::package::validate_replay_total(&updated, exact).is_ok());
+    assert!(validate_replay_total(&updated, exact).is_ok());
     let under = Limits {
         max_total_bytes: exact.max_total_bytes - 1,
         ..exact
     };
     assert!(matches!(
-        super::package::validate_replay_total(&updated, under),
+        validate_replay_total(&updated, under),
         Err(Error::Limit {
-            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            kind: LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
             ..
         })
     ));
@@ -189,9 +190,9 @@ fn replay_notes_index_counts_all_theme_edges_and_refuses_missing_targets() {
         base.update(&package, &missing, std::slice::from_ref(&master_name))
             .is_err()
     );
-    let missing_index = crate::package::replay_index::ReplayIndex::from_package(&missing).unwrap();
+    let missing_index = ReplayIndex::from_package(&missing).unwrap();
     assert!(matches!(
-        super::package::validate_replay_total(&missing_index, Limits::DEFAULT),
+        validate_replay_total(&missing_index, Limits::DEFAULT),
         Err(Error::Opc(litchi_opc::OpcError::PartNotFound(_)))
     ));
     assert!(!missing.contains_part(&missing_theme));
@@ -206,7 +207,7 @@ fn replay_notes_index_counts_all_theme_edges_and_refuses_missing_targets() {
         .update(&missing, &cleared, std::slice::from_ref(&master_name))
         .unwrap();
     assert!(cleared_index.missing_theme_name().unwrap().is_none());
-    assert!(super::package::validate_replay_total(&cleared_index, Limits::DEFAULT).is_ok());
+    assert!(validate_replay_total(&cleared_index, Limits::DEFAULT).is_ok());
 
     let master_bytes = package.get_part(&master_name).unwrap().blob().len() as u64;
     let canonical_theme = PackURI::new("/ppt/theme/theme2.xml").unwrap();

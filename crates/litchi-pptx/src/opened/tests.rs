@@ -447,6 +447,7 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
     let first_raw = package.opc.get_part(&first_slide)?.blob();
     let second_raw = package.opc.get_part(&second_slide)?.blob();
     assert_eq!(first_raw.len(), second_raw.len());
+    let notes_limits = crate::notes::Limits::from_source(package.opc.read_limits());
 
     // Reordering equal-length invalid proofs must fall back to the current
     // raw source rather than reusing the wrong cached refusal.
@@ -454,11 +455,12 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
         crate::notes::SlideRootProof::new(second_raw, None),
         crate::notes::SlideRootProof::new(first_raw, None),
     ];
-    let snapshot = crate::notes::load_snapshot_with_slide_root_proofs(
+    let snapshot = crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
         &package.opc,
         &presentation,
         2,
         &swapped,
+        notes_limits,
     )?;
     assert!(
         snapshot.is_some(),
@@ -471,9 +473,14 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
         crate::notes::SlideRootProof::new(first_raw, None),
         crate::notes::SlideRootProof::new(second_raw, None),
     ];
-    let error =
-        crate::notes::load_snapshot_with_slide_root_proofs(&package.opc, &presentation, 2, &exact)
-            .expect_err("exact invalid proofs must refuse the notes graph");
+    let error = crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
+        &package.opc,
+        &presentation,
+        2,
+        &exact,
+        notes_limits,
+    )
+    .expect_err("exact invalid proofs must refuse the notes graph");
     assert!(matches!(
         error,
         Error::Invalid(message) if message == "invalid sld root or namespace"
@@ -550,9 +557,10 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
         error,
         Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
-            observed: crate::notes::MAX_SLIDE_XML + 1,
-            maximum: crate::notes::MAX_SLIDE_XML,
-        }
+            observed,
+            maximum,
+        } if observed == crate::notes::MAX_SLIDE_XML + 1
+            && maximum == crate::notes::MAX_SLIDE_XML
     ));
     assert_capture_matches_legacy(&notes_limited)?;
 
@@ -572,9 +580,10 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
         error,
         Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
-            observed: crate::parts::MAX_PART_XML_BYTES + 1,
-            maximum: crate::parts::MAX_PART_XML_BYTES,
-        }
+            observed,
+            maximum,
+        } if observed == crate::parts::MAX_PART_XML_BYTES + 1
+            && maximum == crate::parts::MAX_PART_XML_BYTES
     ));
     assert_capture_matches_legacy(&part_limited)?;
     Ok(())

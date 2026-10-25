@@ -190,7 +190,7 @@ fn parsing_rejects_canonical_escape_expansion_past_the_wire_budget() {
     assert!(matches!(
         parse(xml.as_bytes()),
         Err(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             ..
         })
     ));
@@ -288,7 +288,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.replace("small", replacement),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
                 ..
             })
         ));
@@ -299,7 +299,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.set("small", quotes.clone()),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
                 ..
             })
         ));
@@ -311,7 +311,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.add(Tag::new("large", quotes.clone()).unwrap()),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
                 ..
             })
         ));
@@ -322,7 +322,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.insert(0, Tag::new("large", quotes.clone()).unwrap()),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
                 ..
             })
         ));

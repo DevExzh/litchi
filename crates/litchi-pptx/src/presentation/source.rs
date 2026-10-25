@@ -6223,12 +6223,12 @@ mod tests {
     use std::fs;
     use std::io;
     use std::num::{NonZeroU64, NonZeroUsize};
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+    use std::sync::{Arc, OnceLock};
 
     use litchi_core::{
-        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
-        SourceVersion,
+        Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
+        ReadAt, Resource, SourceVersion,
     };
     use litchi_opc::{
         PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits,

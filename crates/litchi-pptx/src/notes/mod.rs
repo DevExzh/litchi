@@ -12,8 +12,6 @@ pub(crate) use codec::{
     rewrite_text, root_conformance_from_processed, root_conformance_with_limits,
     scan_xml_with_limits, validate_resource_xml_with_limits,
 };
-#[cfg(test)]
-pub(crate) use codec::{root_conformance, scan_xml, validate_resource_xml};
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
@@ -24,9 +22,7 @@ pub(crate) use package::{
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
 #[cfg(test)]
-pub(crate) use package::{
-    clear_with_limits, load, load_snapshot, remove_checked, remove_with_limits,
-};
+pub(crate) use package::{load, load_snapshot, remove_checked};
 pub(crate) use transaction::Draft;
 pub use transaction::{Revision, Snapshot};
 pub(crate) use validation::validate_id;

@@ -11,7 +11,7 @@ fn shape(name: &str) -> String {
 fn selection_preserves_absence_ambiguity_and_redaction() {
     let scene = Scene::read(
         tree(&format!("{}{}", shape("secret"), shape("secret"))),
-        crate::shape::Limits::DEFAULT,
+        Limits::DEFAULT,
     )
     .unwrap();
     let error = scene.shape("secret").unwrap_err();
@@ -29,7 +29,7 @@ fn selection_preserves_absence_ambiguity_and_redaction() {
 }
 #[test]
 fn handles_and_iterators_outlive_the_scene_and_preserve_group_axes() {
-    let scene = Scene::read(tree(&format!(r#"<p:grpSp><p:nvGrpSpPr><p:cNvPr id="1" name="group"/></p:nvGrpSpPr>{}<p:grpSp><p:nvGrpSpPr><p:cNvPr id="2" name="nested"/></p:nvGrpSpPr>{}</p:grpSp></p:grpSp>{}"#, shape("first"), shape("deep"), shape("last"))), crate::shape::Limits::DEFAULT).unwrap();
+    let scene = Scene::read(tree(&format!(r#"<p:grpSp><p:nvGrpSpPr><p:cNvPr id="1" name="group"/></p:nvGrpSpPr>{}<p:grpSp><p:nvGrpSpPr><p:cNvPr id="2" name="nested"/></p:nvGrpSpPr>{}</p:grpSp></p:grpSp>{}"#, shape("first"), shape("deep"), shape("last"))), Limits::DEFAULT).unwrap();
     let group = scene.shape("group").unwrap().unwrap();
     let roots = scene.roots();
     let mut all = scene.iter();
@@ -66,7 +66,7 @@ fn unchanged_input_is_shared_including_bom_and_spans() {
     let mut bytes = vec![0xef, 0xbb, 0xbf];
     bytes.extend(tree(&shape("Title")));
     let input = Arc::new(bytes);
-    let scene = Scene::read(Arc::clone(&input), crate::shape::Limits::DEFAULT).unwrap();
+    let scene = Scene::read(Arc::clone(&input), Limits::DEFAULT).unwrap();
     assert_eq!(raw::xml(&scene).as_ptr(), input.as_ptr());
     assert!(!scene.is_rewritten());
     let clone = scene.clone();
@@ -84,14 +84,13 @@ fn unchanged_input_is_shared_including_bom_and_spans() {
 #[test]
 fn mce_owns_processed_xml_and_releases_original_allocation() {
     let input = Arc::new(format!(r#"<p:spTree xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x">{}</mc:Choice><mc:Fallback>{}</mc:Fallback></mc:AlternateContent></p:spTree>"#, shape("discard"), shape("keep")).into_bytes());
-    let scene = Scene::read(Arc::clone(&input), crate::shape::Limits::DEFAULT).unwrap();
+    let scene = Scene::read(Arc::clone(&input), Limits::DEFAULT).unwrap();
     assert!(scene.is_rewritten());
     assert_eq!(Arc::strong_count(&input), 1);
     assert_eq!(scene.len(), 1);
     assert!(scene.shape("discard").unwrap().is_none());
     let retained = scene.shape("keep").unwrap().unwrap();
-    let borrowed =
-        super::super::Scene::read(input.as_slice(), crate::shape::Limits::DEFAULT).unwrap();
+    let borrowed = super::super::Scene::read(input.as_slice(), Limits::DEFAULT).unwrap();
     assert_eq!(raw::xml(&scene), borrowed.xml());
     assert_eq!(
         retained.view().xml().unwrap(),
@@ -104,8 +103,8 @@ fn parsing_and_limits_match_the_borrowed_reader() {
     let limits = Limits::new(1, 1, 1, 1, 1, 1).unwrap();
     assert!(Scene::read(bytes.clone(), limits).is_err());
     assert!(super::super::Scene::read(&bytes, limits).is_err());
-    assert!(Scene::read(b"<p:spTree>".to_vec(), crate::shape::Limits::DEFAULT).is_err());
-    let empty = Scene::read(tree(""), crate::shape::Limits::DEFAULT).unwrap();
+    assert!(Scene::read(b"<p:spTree>".to_vec(), Limits::DEFAULT).is_err());
+    let empty = Scene::read(tree(""), Limits::DEFAULT).unwrap();
     assert!(empty.is_empty());
     assert!(empty.iter().next().is_none());
     assert!(empty.roots().next().is_none());
@@ -125,7 +124,7 @@ fn table_projection_keeps_inherited_namespace_aliases() {
             </q:graphicFrame>
         </q:spTree>"#
     );
-    let scene = Scene::read(xml.into_bytes(), crate::shape::Limits::DEFAULT).unwrap();
+    let scene = Scene::read(xml.into_bytes(), Limits::DEFAULT).unwrap();
     let handle = scene.shape("Grid").unwrap().unwrap();
     let table = handle.table().unwrap();
     assert_eq!(table.row_count().unwrap(), 1);
@@ -154,7 +153,7 @@ fn table_projection_does_not_treat_unbound_or_rebound_prefixes_as_drawingml() {
         ),
     ];
     for xml in cases {
-        let scene = Scene::read(xml.into_bytes(), crate::shape::Limits::DEFAULT).unwrap();
+        let scene = Scene::read(xml.into_bytes(), Limits::DEFAULT).unwrap();
         let handle = scene.shape("Grid").unwrap().unwrap();
         assert!(handle.table().is_err());
     }

@@ -151,27 +151,34 @@ fn package_operations_are_selector_first_and_atomic() {
     ));
 
     assert_eq!(
-        package::load(&package, &owner, "Box")
+        package::load_with_limits(&package, &owner, "Box", crate::shape::Limits::DEFAULT)
             .expect("load")
             .and_then(|snapshot| snapshot.value()),
         Some(true)
     );
-    let previous = package::put(&mut package, &owner, 0_usize, false)
-        .expect("put")
-        .expect("previous");
+    let previous = package::put_with_limits(
+        &mut package,
+        &owner,
+        0_usize,
+        false,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("put")
+    .expect("previous");
     assert_eq!(previous.value(), Some(true));
     assert_eq!(
-        package::load(&package, &owner, "Box")
+        package::load_with_limits(&package, &owner, "Box", crate::shape::Limits::DEFAULT)
             .expect("load")
             .and_then(|snapshot| snapshot.value()),
         Some(false)
     );
-    let removed = package::remove(&mut package, &owner, "Box")
-        .expect("remove")
-        .expect("removed");
+    let removed =
+        package::remove_with_limits(&mut package, &owner, "Box", crate::shape::Limits::DEFAULT)
+            .expect("remove")
+            .expect("removed");
     assert_eq!(removed.value(), Some(false));
     assert!(
-        package::load(&package, &owner, 0_usize)
+        package::load_with_limits(&package, &owner, 0_usize, crate::shape::Limits::DEFAULT)
             .expect("load after remove")
             .is_none()
     );

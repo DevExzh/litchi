@@ -1832,7 +1832,7 @@ mod slide_root_proof_tests {
     #[test]
     fn root_proof_requires_exact_source_identity_and_falls_back_safely() {
         let invalid_proof = SlideRootProof::new(VALID_ROOT, None);
-        let cached_error = resolve_slide_root(VALID_ROOT, Some(&invalid_proof))
+        let cached_error = resolve_slide_root(VALID_ROOT, Some(&invalid_proof), Limits::DEFAULT)
             .expect_err("an exact invalid proof must retain its generic refusal");
         assert_eq!(
             cached_error.to_string(),
@@ -1841,13 +1841,13 @@ mod slide_root_proof_tests {
 
         let equal_bytes = VALID_ROOT.to_vec();
         assert_eq!(
-            resolve_slide_root(&equal_bytes, Some(&invalid_proof))
+            resolve_slide_root(&equal_bytes, Some(&invalid_proof), Limits::DEFAULT)
                 .expect("equal bytes in a different allocation must use the raw fallback"),
             Conformance::Transitional
         );
 
         assert_eq!(
-            resolve_slide_root(STRICT_ROOT, Some(&invalid_proof))
+            resolve_slide_root(STRICT_ROOT, Some(&invalid_proof), Limits::DEFAULT)
                 .expect("changed valid source must use the raw fallback"),
             Conformance::Strict
         );
@@ -1855,7 +1855,7 @@ mod slide_root_proof_tests {
         let shortened = &VALID_ROOT_WITH_TRAILING_SPACE[..VALID_ROOT.len()];
         let length_mismatch_proof = SlideRootProof::new(VALID_ROOT_WITH_TRAILING_SPACE, None);
         assert_eq!(
-            resolve_slide_root(shortened, Some(&length_mismatch_proof))
+            resolve_slide_root(shortened, Some(&length_mismatch_proof), Limits::DEFAULT)
                 .expect("same pointer with a different length must use the raw fallback"),
             Conformance::Transitional
         );

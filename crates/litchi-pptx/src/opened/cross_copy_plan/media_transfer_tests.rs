@@ -1140,8 +1140,9 @@ fn captures_that_do_not_fit_record_the_recompressing_route() -> Result<()> {
             plan_under(source, without - 1),
             Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed,
                 maximum,
-            }) if maximum == without - 1
+            }) if observed == without && maximum == without - 1
         ));
     }
 
