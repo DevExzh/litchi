@@ -48,8 +48,11 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "fixtures": [
                 {
                     "name": "synthetic",
+                    "format": "DOCX",
+                    "origin": "Opc",
                     "relative_path": fixture_relative,
                     "input_sha256": hashlib.sha256(fixture_payload).hexdigest(),
+                    "signed_sha256": hashlib.sha256(fixture_payload).hexdigest(),
                 }
             ],
         }
@@ -178,6 +181,8 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "schema": consumer.BUILD_SCHEMA,
             "status": "built",
             "preparation_receipt": state["receipt_artifact"],
+            "api_branch": "current_api",
+            "api_feature": None,
             "source_identity": consumer._concrete_source_identity(state),
             "source_identity_receipt": state["receipt"]["source_identity"],
             "source": state["receipt"]["source"],
@@ -198,16 +203,82 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
     def _capabilities(self, prepared: Path, build_path: Path, build: dict[str, object]) -> Path:
         state = consumer._revalidate_preparation(prepared)
         statuses = {route: "available" for route in policy.ROUTES}
+        statuses.update({route: "expected_refusal" for route in policy.CORRECTNESS_ONLY})
+        build_artifact = consumer._artifact(build_path, "build receipt")
+        fixture_manifest = json.loads(Path(state["fixture"]["manifest"]["path"]).read_text())
+        fixture_rows = fixture_manifest["fixtures"]
+        evidence = {}
+        for index, route in enumerate(policy.ROUTES):
+            results = []
+            for fixture_index, fixture in enumerate(fixture_rows):
+                source_digest = fixture.get("signed_sha256") or (f"{fixture_index + 1:064x}")
+                result = {
+                    "name": fixture["name"],
+                    "format": fixture["format"],
+                    "origin": fixture["origin"],
+                    "signature_presence": "detected",
+                    "cryptographic_verification": "not_performed",
+                    "status": "expected_refusal" if route in policy.CORRECTNESS_ONLY else "ok",
+                    "source_sha256": source_digest,
+                }
+                if route.endswith("/noop_commit"):
+                    result.update({"diagnostics_changed": False, "patch_noop": True, "signed_after": True, "output_equals_source": True, "source_after_sha256": source_digest})
+                elif route.endswith("/noop_write"):
+                    result.update({"diagnostics_changed": False, "patch_noop": True, "signed_after": True, "output_equals_source": True, "source_after_sha256": source_digest, "stream_bounded": True, "writes": 1, "max_write_bytes": 1})
+                elif route.endswith("/noop_replay"):
+                    result.update({"patch_noop": True, "replay_base_match": True, "signed_after": True, "output_equals_source": True})
+                elif route.endswith("/refusal"):
+                    result.update({"refusal_kind": "ProtectedDocument", "code": "document_protected", "source_before_sha256": source_digest, "source_after_sha256": source_digest, "publication_attempts": 0, "output_published": False})
+                elif route.endswith("/unsign_write"):
+                    result.update({"signed_after": False, "signature_parts_absent": True, "semantic_changed": True, "stream_bounded": True, "output_equals_source": False, "signed_clone_still_refuses": True, "writes": 1, "max_write_bytes": 1})
+                elif route.endswith("/unsigned_negative"):
+                    result.update({"refusal_kind": "PatchConflict", "code": "invalid_input", "re_marked_signed": False, "publication_attempts": 0, "output_published": False})
+                elif route.endswith("/source_freshness"):
+                    result.update({"refusal_kind": "SourceChanged", "code": "io_error", "source_before_sha256": source_digest, "source_mutated_sha256": "b" * 64, "source_after_sha256": "b" * 64, "publication_attempts": 0, "output_published": False})
+                elif route.endswith("/budget"):
+                    result.update({"refusal_kind": "LimitExceeded", "code": "limit_exceeded", "limit_kind": "operations", "source_before_sha256": source_digest, "source_after_sha256": source_digest, "publication_attempts": 0, "output_published": False})
+                results.append(result)
+            result = {"fixtures": results}
+            child = {
+                "schema": "litchi.signed-native.child.v2",
+                "probe_schema": "litchi.signed-native.probe.v2",
+                "mode": "validate",
+                "route": route,
+                "status": statuses[route],
+                "api_branch": build["api_branch"],
+                "preparation_receipt": state["receipt_artifact"],
+                "build_receipt": build_artifact,
+                "source_identity": consumer._concrete_source_identity(state),
+                "source_archive": state["receipt"]["source"]["archive"],
+                "lock": state["receipt"]["source"]["locks"],
+                "adapter": state["adapter"],
+                "binary": build["binary"],
+                "fixture": state["receipt"]["fixture"],
+                "timeout_seconds": consumer.CHILD_TIMEOUT_SECONDS,
+                "exit_code": 0,
+                "timed_out": False,
+                "guard_error": None,
+                "after_guard_error": None,
+                "result": result,
+            }
+            child_path = prepared.parent / f"child-{index}.json"
+            child_path.write_bytes(canonical(child))
+            evidence[route] = consumer._artifact(child_path, f"child {route}")
+        before = prepared.parent / "batch-before.bin"
+        after = prepared.parent / "batch-after.bin"
+        before.write_bytes(b"signed source bytes")
+        after.write_bytes(b"signed source bytes")
         value = {
             "schema": consumer.CAPABILITIES_SCHEMA,
             "preparation_receipt": state["receipt_artifact"],
-            "build_receipt": consumer._artifact(build_path, "build receipt"),
+            "build_receipt": build_artifact,
             "source_identity": consumer._concrete_source_identity(state),
             "source_identity_receipt": state["receipt"]["source_identity"],
             "source": state["receipt"]["source"],
             "source_archive": state["receipt"]["source"]["archive"],
             "lock": state["receipt"]["source"]["locks"],
             "binary": build["binary"],
+            "api_branch": build["api_branch"],
             "build_receipt_binding": {
                 "preparation_receipt": state["receipt_artifact"],
                 "build_receipt": consumer._artifact(build_path, "build receipt"),
@@ -215,11 +286,18 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "adapter": state["adapter"],
             "fixture": state["receipt"]["fixture"],
             "routes": statuses,
+            "evidence": evidence,
             "signed_batch": {
+                "schema": "litchi.signed-native.batch-proof.v2",
                 "selection": "immediate_refusal",
                 "status": "expected_refusal",
+                "error": {"kind": "DocumentProtected", "code": "document_protected", "item": None},
+                "item": None,
                 "iterator_reads": 0,
                 "publication_attempts": 0,
+                "source_before": consumer._artifact(before, "batch source before"),
+                "source_after": consumer._artifact(after, "batch source after"),
+                "source_bytes_equal": True,
             },
         }
         path = prepared.parent / "capabilities.json"
@@ -230,8 +308,13 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         prepared, _binding, _unused = self._prepared()
         build_path, build = self._build_receipt(prepared)
         capabilities = self._capabilities(prepared, build_path, build)
-        result = consumer.execute(prepared, capabilities)
+        executor_calls = []
+        result = consumer.execute(
+            prepared,
+            executor=lambda state: (executor_calls.append(state["receipt_artifact"]) or capabilities),
+        )
         self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(executor_calls), 1)
         execution = json.loads((prepared / "execution-receipt.json").read_text())
         self.assertEqual(tuple(execution["routes"]), policy.ROUTES)
         self.assertEqual(execution["signed_batch"]["iterator_reads"], 0)
@@ -264,11 +347,79 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         capabilities.write_bytes(canonical(value))
         with self.assertRaisesRegex(consumer.ConsumerError, "capability route status is invalid"):
             consumer.execute(prepared, capabilities)
-        value["routes"][policy.ROUTES[-1]] = "available"
+        value["routes"][policy.ROUTES[-1]] = "expected_refusal"
         value["signed_batch"]["iterator_reads"] = 1
         capabilities.write_bytes(canonical(value))
         with self.assertRaisesRegex(consumer.ConsumerError, "touched the iterator"):
             consumer.execute(prepared, capabilities)
+
+    def test_every_route_requires_typed_evidence_and_expected_disposition(self) -> None:
+        prepared, _binding, _unused = self._prepared()
+        build_path, build = self._build_receipt(prepared)
+        capabilities = self._capabilities(prepared, build_path, build)
+        value = json.loads(capabilities.read_text())
+        del value["evidence"][policy.ROUTES[0]]
+        capabilities.write_bytes(canonical(value))
+        with self.assertRaisesRegex(consumer.ConsumerError, "evidence set differs"):
+            consumer.execute(prepared, capabilities)
+        value = json.loads(self._capabilities(prepared, build_path, build).read_text())
+        value["routes"][policy.ROUTES[0]] = "capability_missing"
+        capabilities.write_bytes(canonical(value))
+        with self.assertRaisesRegex(consumer.ConsumerError, "status is invalid"):
+            consumer.execute(prepared, capabilities)
+
+        capabilities = self._capabilities(prepared, build_path, build)
+        value = json.loads(capabilities.read_text())
+        first = policy.ROUTES[0]
+        child_artifact = value["evidence"][first]
+        child_path = Path(child_artifact["path"])
+        child = json.loads(child_path.read_text())
+        child["result"]["fixtures"][0]["source_sha256"] = "a" * 64
+        child_path.write_bytes(canonical(child))
+        value["evidence"][first] = consumer._artifact(child_path, "tampered fixture source")
+        capabilities.write_bytes(canonical(value))
+        with self.assertRaisesRegex(consumer.ConsumerError, "fixture source bytes differ"):
+            consumer.execute(prepared, capabilities)
+
+    def test_v1_child_and_unproven_batch_are_rejected(self) -> None:
+        prepared, _binding, _unused = self._prepared()
+        build_path, build = self._build_receipt(prepared)
+        capabilities = self._capabilities(prepared, build_path, build)
+        value = json.loads(capabilities.read_text())
+        first = policy.ROUTES[0]
+        child_path = Path(value["evidence"][first]["path"])
+        child = json.loads(child_path.read_text())
+        child["schema"] = "litchi_signed_native_child.v1"
+        child_path.write_bytes(canonical(child))
+        value["evidence"][first] = consumer._artifact(child_path, "tampered v1 child")
+        capabilities.write_bytes(canonical(value))
+        with self.assertRaisesRegex(consumer.ConsumerError, "historical v1"):
+            consumer.execute(prepared, capabilities)
+        capabilities = self._capabilities(prepared, build_path, build)
+        value = json.loads(capabilities.read_text())
+        del value["signed_batch"]["source_before"]
+        capabilities.write_bytes(canonical(value))
+        with self.assertRaisesRegex(consumer.ConsumerError, "source before"):
+            consumer.execute(prepared, capabilities)
+
+    def test_preparation_recomputes_identity_and_generated_probe(self) -> None:
+        prepared, _binding, _unused = self._prepared()
+        source_identity = json.loads((prepared / "source-identity.json").read_text())
+        source = Path(source_identity["source_root"])
+        changed = copy.deepcopy(source_identity)
+        changed["commit"] = "9" * 40
+        with self.assertRaisesRegex(consumer.ConsumerError, "caller-supplied source identity"):
+            consumer.prepare(source, prepared.parent / "second", identity=changed)
+        (prepared / "consumer/src/main.rs").write_text("mod api_compat;\nfn main() {}\n")
+        with self.assertRaisesRegex(consumer.ConsumerError, "generated signed probe"):
+            consumer._revalidate_preparation(prepared)
+
+    def test_api_branches_are_explicit_build_inputs(self) -> None:
+        project = consumer._project_toml(Path("/reviewed/source"), ["docx", "pptx", "xlsx", "xlsb", "doc", "ppt", "xls"])
+        self.assertIn("default = []", project)
+        self.assertIn("legacy_api = []", project)
+        self.assertIn('features = ["docx", "pptx", "xlsx", "xlsb", "doc", "ppt", "xls"]', project)
+        self.assertEqual(consumer.API_BRANCHES, ("current_api", "legacy_api"))
 
 
 if __name__ == "__main__":

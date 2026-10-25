@@ -21,17 +21,25 @@ The preparation receipt binds the complete closure, the 16 ordered routes,
 the correctness-only and baseline dispositions, and the owner-confirmed
 `signed_batch.selection=immediate_refusal` choice.  Fixture bytes and probe
 inputs are staged outside the checkout with canonical, hash-bound receipts.
+The historical v1 probe is recorded as a driver input only; execution admits
+only typed `litchi.signed-native.child.v2` evidence and never wraps a v1
+receipt.
 The generated project uses the legacy `legacy_api` feature branch and the
 current Commit-accessor, EditOptions, and XLSB `resolve()` branches in the
 same adapter.
 
-`build` revalidates the preparation receipt before invoking the caller's
-pinned Cargo shim with offline/locked/jobs=1/incremental=0 and fresh 20-GB
-target/TMPDIR boundaries.  `execute` consumes only a canonical v2
+`build --api-branch current_api|legacy_api` revalidates the preparation receipt
+before invoking the caller's pinned Cargo shim with
+offline/locked/jobs=1/incremental=0 and fresh 20-GB target/TMPDIR boundaries;
+the selected branch is recorded in the build receipt, so an uncompiled cfg
+branch is never counted as coverage.  `execute` consumes only a canonical v2
 capabilities receipt bound to the preparation, build, source closure, adapter,
-and fixture receipt.  It requires all 16 routes and typed child evidence when
-present, and requires the signed-batch refusal to report zero iterator reads
-and zero publication attempts.
+and fixture receipt.  Each route must carry one typed result for every staged
+fixture, bound to its manifest name, format, origin, and producer-signed
+source digest where available.  It requires all 16 routes with route-specific
+semantic evidence, and requires a signed-batch `DocumentProtected` proof with
+`item=null`, unchanged before/after source artifacts, zero iterator reads, and
+zero publication attempts.
 
 The source-only tests cover a positive prepare/receipt/execute pipeline,
 candidate identity and role-lock drift, route-set/status drift, immediate
@@ -44,5 +52,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \
   tools.test_signed_native_v2_consumer
 ```
 
-No Cargo, native process, profiler, timing, or metadata command was run for
-this record.
+This command runs 21 source-only tests.  No Cargo, native process, profiler,
+timing, or metadata command was run for this record; the positive execution
+test injects a typed protocol executor and exercises the same receipt
+consumer used by the future native runner.

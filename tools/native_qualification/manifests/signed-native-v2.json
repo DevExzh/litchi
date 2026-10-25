@@ -85,6 +85,14 @@
   "execution": {
     "capabilities_schema": "litchi.signed-native.capabilities.v2",
     "execution_schema": "litchi.signed-native.execution.v2",
+    "child_schema": "litchi.signed-native.child.v2",
+    "probe_schema": "litchi.signed-native.probe.v2",
+    "batch_proof_schema": "litchi.signed-native.batch-proof.v2",
+    "route_evidence_required": true,
+    "api_branches": [
+      "current_api",
+      "legacy_api"
+    ],
     "build_receipt_required": true,
     "child_timeout_seconds": 300.0,
     "child_output_limit_bytes": 4194304,
