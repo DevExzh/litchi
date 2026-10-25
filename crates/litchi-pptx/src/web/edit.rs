@@ -67,7 +67,10 @@ impl Edit<'_> {
                 conformance,
                 &litchi_ooxml_common::web::Limits::standard(),
             )?;
-            Ok(patch.apply(opc)?)
+            let commit = patch.apply(opc)?;
+            let changed = commit.diagnostics().changed();
+            *opc = commit.into_package();
+            Ok(changed)
         })
     }
 
@@ -84,7 +87,10 @@ impl Edit<'_> {
                 opc,
                 &litchi_ooxml_common::web::Limits::standard(),
             )?;
-            Ok(patch.apply(opc)?)
+            let commit = patch.apply(opc)?;
+            let changed = commit.diagnostics().changed();
+            *opc = commit.into_package();
+            Ok(changed)
         })
     }
 

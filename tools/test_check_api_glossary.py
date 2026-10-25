@@ -71,6 +71,9 @@ pub fn parse_external(data: &[u8], limits: &litchi_core::limits::Limits) {
 pub fn parse_external_reexport(data: &[u8], limits: &PublicExternalLimits) {
     let _ = (data, limits);
 }
+pub fn parse_external_root_reexport(data: &[u8], limits: &litchi_opc::SourceLimits) {
+    let _ = (data, limits);
+}
 pub struct Limits;
 pub fn parse_unrelated(data: &[u8], limits: &Limits) {
     let _ = (data, limits);
@@ -104,7 +107,14 @@ pub mod strict {
     pub struct Edit;
     impl Edit { pub fn commit(self) -> Result<Commit, Error> { Ok(Commit) } pub fn set(&mut self) {} }
     pub struct Patch;
-    impl Patch { pub fn is_noop(&self) -> bool { true } pub fn inverse(&self) -> Self { Patch } }
+    impl Patch {
+        pub fn is_noop(&self) -> bool { true }
+        pub fn inverse(&self) -> Self { Patch }
+        pub fn apply(&self, package: &Package) -> Result<Commit, Error> {
+            let _ = package;
+            Ok(Commit)
+        }
+    }
     pub struct Commit;
     impl Commit {
         pub fn package(&self) -> &Package { &Package }
@@ -264,6 +274,11 @@ pub mod unrelated { pub struct Commit<P, T>(pub P, pub T); }
 pub mod limits { pub struct Limits; }
 '''
 
+OPC_DEPENDENCY_SOURCE = r'''
+pub mod limits { pub struct SourceLimits; }
+pub use limits::SourceLimits;
+'''
+
 
 def profile(**changes):
     value = {
@@ -390,12 +405,19 @@ class RustdocTests(unittest.TestCase):
         library = cls.directory / "liblitchi_core.rlib"
         subprocess.run(["rustc", "--edition=2024", "--crate-type=rlib", "--crate-name=litchi_core",
                         str(dependency), "-o", str(library)], check=True, capture_output=True, text=True)
+        opc_dependency = cls.directory / "opc_dependency.rs"
+        opc_dependency.write_text(OPC_DEPENDENCY_SOURCE, encoding="utf-8")
+        opc_library = cls.directory / "liblitchi_opc.rlib"
+        subprocess.run(["rustc", "--edition=2024", "--crate-type=rlib", "--crate-name=litchi_opc",
+                        str(opc_dependency), "-o", str(opc_library)], check=True,
+                       capture_output=True, text=True)
         source = cls.directory / "lib.rs"
         source.write_text(SOURCE, encoding="utf-8")
         subprocess.run(
             ["rustdoc", "--edition=2024", "--crate-type=lib", "--crate-name=fixture",
              "-Zunstable-options", "--output-format=json", "--document-hidden-items",
-             "--extern", f"litchi_core={library}", "-o", str(cls.directory), str(source)],
+             "--extern", f"litchi_core={library}", "--extern", f"litchi_opc={opc_library}",
+             "-o", str(cls.directory), str(source)],
             env={**os.environ, "RUSTC_BOOTSTRAP": "1"}, check=True,
             capture_output=True, text=True,
         )
@@ -443,7 +465,14 @@ class RustdocTests(unittest.TestCase):
             "limits_argument": "limits",
             "limits_type": "fixture::PublicExternalLimits",
         }
-        rows = [associated, receiver, free, external, external_reexport]
+        external_root_reexport = {
+            "method": "fixture::parse_external_root_reexport",
+            "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "litchi_opc::SourceLimits",
+        }
+        rows = [associated, receiver, free, external, external_reexport,
+                external_root_reexport]
         self.assertTrue(gate.checked_policy({
             "version": 1,
             "profiles": [profile(required_signatures=rows)],
@@ -472,6 +501,26 @@ class RustdocTests(unittest.TestCase):
             "kind": "struct",
         }
         failures = gate.violations(ambiguous, profile(required_signatures=[external]))
+        self.assertEqual(len(failures), 1, failures)
+
+        wrong_middle = copy.deepcopy(self.document)
+        for entry in wrong_middle["paths"].values():
+            if entry.get("path") == ["litchi_opc", "limits", "SourceLimits"]:
+                entry["path"] = ["litchi_opc", "unrelated", "SourceLimits"]
+        failures = gate.violations(
+            wrong_middle, profile(required_signatures=[external_root_reexport])
+        )
+        self.assertEqual(len(failures), 1, failures)
+
+        ambiguous_root = copy.deepcopy(self.document)
+        ambiguous_root["paths"]["duplicate-external-source-limits"] = {
+            "crate_id": 89,
+            "path": ["litchi_opc", "limits", "SourceLimits"],
+            "kind": "struct",
+        }
+        failures = gate.violations(
+            ambiguous_root, profile(required_signatures=[external_root_reexport])
+        )
         self.assertEqual(len(failures), 1, failures)
 
     def _namespace_collision_document(self, *, macro_first=False, conflict=False):
@@ -675,6 +724,12 @@ class RustdocTests(unittest.TestCase):
         self.assertEqual(gate.violations(self.document, profile(result_methods=[{
             "method": "fixture::returns::Package::apply_other_patch",
             "ok": "fixture::returns::Commit",
+        }])), [])
+
+    def test_registered_patch_replay_publishes_the_package_argument(self):
+        self.assertEqual(gate.violations(self.document, profile(result_methods=[{
+            "method": "fixture::strict::Patch::apply",
+            "ok": "fixture::strict::Commit",
         }])), [])
 
     def test_replay_rule_proposals_prove_owner_and_commit_identity(self):

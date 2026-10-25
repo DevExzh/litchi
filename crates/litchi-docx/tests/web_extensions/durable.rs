@@ -308,7 +308,7 @@ fn durable_transitional_custom_edit_ignores_unrelated_strict_namespace_text() {
     let ordinary = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!ordinary.is_empty());
+    assert!(!ordinary.is_noop());
     let durable = durable_patch(&ordinary);
     assert!(apply_durable(&mut package, &durable).unwrap());
 
@@ -363,7 +363,7 @@ fn durable_noop_is_deterministic_and_preserves_signed_source() {
     let patch = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(patch.is_empty());
+    assert!(patch.is_noop());
     let durable = durable_patch(&patch);
     let wire = durable.to_deterministic_json().unwrap();
     assert_eq!(wire, decode_wire(&wire).to_deterministic_json().unwrap());
@@ -385,7 +385,7 @@ fn durable_exact_noop_exports_with_zero_blob_allowance() {
     let ordinary = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(ordinary.is_empty());
+    assert!(ordinary.is_noop());
     let limits = zero_blob_noop_limits();
     let durable = ordinary.to_durable(limits).unwrap();
     let wire = durable.to_deterministic_json().unwrap();

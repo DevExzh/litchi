@@ -11,7 +11,7 @@ mod validation;
 pub use discovery::*;
 pub use durable::{GraphMode, OwnerSelector, WebIntent, apply_durable, plan_durable};
 pub use planning::*;
-pub use transaction::Patch;
+pub use transaction::{Commit, Diagnostics, Patch};
 
 pub(in crate::web) use discovery::load_with_index_budget;
 pub(in crate::web) use graph::*;

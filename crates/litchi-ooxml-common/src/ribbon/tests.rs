@@ -1,8 +1,8 @@
 //! Focused regression coverage for the Ribbon model, codec, and package graph.
 
 use super::model::{Family, LEGACY_RELATIONSHIP, Limits, Version};
-use super::package::{CONTENT_TYPE, load, put, remove};
-use crate::Error;
+use super::package::{CONTENT_TYPE, Edit, load};
+use crate::{Error, Result};
 use litchi_opc::BlobPart;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
@@ -14,6 +14,21 @@ const XML_2010: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui"/>"#;
 const XML_UI2: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2007/10/customui"/>"#;
+
+fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>, limits: &Limits) -> Result<()> {
+    let mut edit =
+        Edit::new_with_options(package, super::package::EditOptions { limits: *limits })?;
+    edit.put(version, xml)?;
+    *package = edit.commit()?.into_package();
+    Ok(())
+}
+
+fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
+    let mut edit = Edit::new(package)?;
+    let changed = edit.remove(family)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
+}
 
 #[test]
 fn fixed_slots_borrow_package_bytes_and_prefer_modern() {

@@ -5,11 +5,30 @@
 )]
 
 use litchi_ooxml_common::Error as CommonError;
-use litchi_ooxml_common::ribbon::{Family, Limits, Version, load, put, remove};
+use litchi_ooxml_common::ribbon::{Edit, EditOptions, Family, Limits, Version, load};
 use litchi_opc::OpcPackage;
 
 const OFFICE_2007_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2007.xml");
 const OFFICE_2010_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2010.xml");
+
+fn put(
+    package: &mut OpcPackage,
+    version: Version,
+    xml: Vec<u8>,
+    limits: &Limits,
+) -> litchi_ooxml_common::Result<()> {
+    let mut edit = Edit::new_with_options(package, EditOptions { limits: *limits })?;
+    edit.put(version, xml)?;
+    *package = edit.commit()?.into_package();
+    Ok(())
+}
+
+fn remove(package: &mut OpcPackage, family: Family) -> litchi_ooxml_common::Result<bool> {
+    let mut edit = Edit::new(package)?;
+    let changed = edit.remove(family)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
+}
 
 #[test]
 fn ribbon_storage_exposes_fixed_slots_and_effective_precedence() {

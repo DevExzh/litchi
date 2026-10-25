@@ -48,7 +48,7 @@ impl std::fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Patch")
-            .field("empty", &self.is_empty())
+            .field("empty", &self.is_noop())
             .field(
                 "affected_parts",
                 &self
@@ -160,9 +160,9 @@ impl Patch {
         Ok(patch)
     }
 
-    /// Return whether this patch makes no changes.
+    /// Return whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         !self.has_changes()
     }
 
@@ -193,19 +193,24 @@ impl Patch {
 
     /// Apply this patch after checking its exact source graph.
     ///
-    /// Returns `true` when the package changed. Source checks, destination-name
-    /// checks, and relationship staging all finish before the first mutation.
+    /// The source package is unchanged; the returned commit owns the new
+    /// package. Source checks, destination-name checks, and relationship
+    /// staging all finish before publication.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
-        if self.is_empty() {
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
+        if self.is_noop() {
             if self.is_source_bound() {
                 self.validate_source(package)?;
                 self.validate_protection(package)?;
             }
-            return Ok(false);
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                Diagnostics::UNCHANGED,
+            ));
         }
         self.validate_source(package)?;
         self.validate_protection(package)?;
@@ -218,8 +223,7 @@ impl Patch {
         // including a late lexical replacement, is atomic.
         let mut candidate = package.clone();
         self.apply_to_candidate(&mut candidate)?;
-        *package = candidate;
-        Ok(true)
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
 
     pub(in crate::web) fn has_changes(&self) -> bool {
@@ -430,6 +434,12 @@ impl Patch {
         Ok(())
     }
 }
+
+/// A published Web Extensions graph change.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
+
+/// Minimal content-free diagnostics for a Web Extensions commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[derive(Clone)]
 pub(in crate::web::package) struct LexicalChange {

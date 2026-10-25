@@ -99,12 +99,11 @@ impl Edit {
         {
             return Ok(false);
         }
-        // The shared Ribbon owner removes signatures itself, so a change to
-        // a signed workbook is refused here, before it is reached.
-        crate::signature_policy::ensure_unsigned(self.staged.opc())?;
         self.staged.update(|candidate| {
-            common_ribbon::put(candidate, version, xml, &common_ribbon::Limits::standard())?;
-            Ok(true)
+            let mut edit = common_ribbon::Edit::new(candidate)?;
+            let changed = edit.put(version, xml)?;
+            *candidate = edit.commit()?.into_package();
+            Ok(changed)
         })
     }
 
@@ -120,9 +119,12 @@ impl Edit {
         if slot(set, family).is_none() {
             return Ok(false);
         }
-        crate::signature_policy::ensure_unsigned(self.staged.opc())?;
-        self.staged
-            .update(|candidate| Ok(common_ribbon::remove(candidate, family)?))
+        self.staged.update(|candidate| {
+            let mut edit = common_ribbon::Edit::new(candidate)?;
+            let changed = edit.remove(family)?;
+            *candidate = edit.commit()?.into_package();
+            Ok(changed)
+        })
     }
 
     /// Discard every staged change.

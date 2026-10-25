@@ -14,6 +14,7 @@ mod package;
 #[cfg(test)]
 mod tests;
 
+pub use crate::Error;
 pub use limit::LimitKind;
 pub use model::{Family, Limits, Set, Ui, Version};
-pub use package::{load, put, remove};
+pub use package::{Commit, Diagnostics, Edit, EditOptions, Patch, load};

@@ -7,6 +7,7 @@ use super::super::{
     STANDARD_XML_BYTES, STRICT_IMAGE_RELATIONSHIP_TYPE, STRICT_RELATIONSHIPS_NAMESPACE,
     TRANSITIONAL_RELATIONSHIPS_NAMESPACE,
 };
+use litchi_opc::SourceLimits;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// Maximum bytes in one source or authored XML part.
@@ -56,6 +57,55 @@ impl Limits {
             part_allocations: STANDARD_PART_ALLOCATIONS,
             part_deletions: STANDARD_PART_DELETIONS,
         }
+    }
+
+    /// Intersect this semantic policy with the retained OPC admission policy.
+    ///
+    /// A format edit must not widen the limits under which its source package
+    /// was admitted.  Keeping this conversion here makes the package editor's
+    /// default and caller-selected options obey that rule without an eager
+    /// package scan.
+    #[must_use]
+    pub(crate) const fn bounded_by_source(self, source: SourceLimits) -> Self {
+        Self {
+            xml_bytes: min_usize(self.xml_bytes, as_usize(source.max_part_bytes())),
+            total_xml_bytes: min_usize(
+                self.total_xml_bytes,
+                as_usize(source.max_total_part_bytes()),
+            ),
+            depth: min_usize(self.depth, source.max_depth()),
+            nodes: min_usize(self.nodes, source.max_events()),
+            items: min_usize(self.items, source.max_parts()),
+            string_bytes: min_usize(self.string_bytes, as_usize(source.max_total_part_bytes())),
+            total_string_bytes: min_usize(
+                self.total_string_bytes,
+                as_usize(source.max_total_part_bytes()),
+            ),
+            image_bytes: min_usize(self.image_bytes, as_usize(source.max_part_bytes())),
+            total_image_bytes: min_usize(
+                self.total_image_bytes,
+                as_usize(source.max_total_part_bytes()),
+            ),
+            package_parts: min_usize(self.package_parts, source.max_parts()),
+            package_relationships: min_usize(
+                self.package_relationships,
+                source.max_total_relationships(),
+            ),
+            part_allocations: min_usize(self.part_allocations, source.max_parts()),
+            part_deletions: min_usize(self.part_deletions, source.max_parts()),
+        }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn as_usize(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
     }
 }
 
