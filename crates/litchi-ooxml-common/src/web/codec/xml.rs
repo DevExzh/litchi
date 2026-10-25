@@ -204,6 +204,7 @@ pub(in crate::web) struct NodeFrame {
 #[derive(Debug, Default)]
 pub(in crate::web) struct XmlBuildState {
     pub(in crate::web) root: Option<Node>,
+    pub(in crate::web) root_namespaces: Option<Arc<NamespaceScope>>,
     pub(in crate::web) stack: Vec<NodeFrame>,
     pub(in crate::web) string_bytes: usize,
     pub(in crate::web) nodes: usize,
@@ -212,6 +213,7 @@ pub(in crate::web) struct XmlBuildState {
 #[derive(Debug)]
 pub(in crate::web) struct XmlDocument {
     pub(in crate::web) root: Option<Node>,
+    root_namespaces: Option<Arc<NamespaceScope>>,
     pub(in crate::web) xml: Vec<u8>,
     pub(in crate::web) string_bytes: usize,
 }
@@ -221,6 +223,15 @@ impl XmlDocument {
         self.root
             .as_ref()
             .ok_or_else(|| Error::Invalid("missing XML root".into()))
+    }
+
+    pub(in crate::web) fn root_declares_namespace(&self, namespace: &str) -> bool {
+        self.root_namespaces.as_ref().is_some_and(|scope| {
+            scope
+                .local
+                .values()
+                .any(|value| value.as_str() == namespace)
+        })
     }
 
     #[cfg(test)]
@@ -494,6 +505,7 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
     drop(reader);
     Ok(XmlDocument {
         root: state.root,
+        root_namespaces: state.root_namespaces,
         xml,
         string_bytes: state.string_bytes,
     })
@@ -637,6 +649,9 @@ pub(in crate::web) fn push_element(
             binding_count,
         })
     };
+    if state.root.is_none() && state.stack.is_empty() {
+        state.root_namespaces = Some(Arc::clone(&namespaces));
+    }
     let element_name = element.name();
     let raw_name = std::str::from_utf8(element_name.as_ref())
         .map_err(|error| Error::Xml(error.to_string()))?;
