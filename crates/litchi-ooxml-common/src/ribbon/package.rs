@@ -290,10 +290,6 @@ struct GraphState {
     retained_root: Option<(Arc<Vec<u8>>, bool)>,
     content_types: OwnedContentTypes,
     retained_content_types: Option<Arc<Vec<u8>>>,
-    /// The selected closure is captured below; the total count also proves
-    /// that replay did not silently accept a package with an added or removed
-    /// unrelated part.
-    part_count: usize,
     parts: Box<[PartState]>,
 }
 
@@ -564,7 +560,6 @@ fn capture_state(package: &OpcPackage, limits: &Limits, hints: &[PackURI]) -> Re
         retained_root,
         content_types,
         retained_content_types,
-        part_count: package.part_count(),
         parts: parts.into_boxed_slice(),
     })
 }
@@ -608,7 +603,6 @@ fn destination_matches(actual: &GraphState, expected: &GraphState) -> bool {
             &expected.retained_content_types,
             &expected.content_types,
         )
-        || actual.part_count != expected.part_count
         || actual.parts.len() != expected.parts.len()
     {
         return false;

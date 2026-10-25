@@ -131,17 +131,36 @@ fn ribbon_edit_replay_inverse_save_reopen_preserve_authored_namespace_bytes() {
     let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
     assert_eq!(ribbon_xml(&reopened), ESCAPED_REPLACEMENT_XML);
 
-    let mut stale = source.clone();
-    stale.add_part(Box::new(BlobPart::new(
+    let mut unrelated = source.clone();
+    unrelated.add_part(Box::new(BlobPart::new(
         PackURI::new("/unrelated.xml").unwrap(),
         "application/xml".into(),
         b"<unrelated/>".to_vec(),
     )));
+    let replayed_with_unrelated = commit.patch().apply(&unrelated).unwrap();
+    assert_eq!(
+        ribbon_xml(replayed_with_unrelated.package()),
+        ESCAPED_REPLACEMENT_XML
+    );
+    assert_eq!(
+        replayed_with_unrelated
+            .package()
+            .get_part(&PackURI::new("/unrelated.xml").unwrap())
+            .unwrap()
+            .blob(),
+        b"<unrelated/>"
+    );
+
+    let mut stale = source.clone();
+    stale
+        .get_part_mut(&PackURI::new("/customUI/customUI.xml").unwrap())
+        .unwrap()
+        .set_blob(ESCAPED_REPLACEMENT_XML.to_vec());
     assert!(matches!(
         commit.patch().apply(&stale),
         Err(ribbon::Error::PatchConflict)
     ));
-    assert_eq!(ribbon_xml(&stale), ESCAPED_NAMESPACE_XML);
+    assert_eq!(ribbon_xml(&stale), ESCAPED_REPLACEMENT_XML);
 
     let mut limited = ribbon::Edit::new_with_options(
         &source,
@@ -248,6 +267,29 @@ fn ribbon_remove_inverse_restores_unshared_binary_image() {
     assert!(edit.remove(Family::Legacy).unwrap());
     let removed = edit.commit().unwrap();
     assert!(removed.package().get_part(&image).is_err());
+    let removed_content_types = removed
+        .package()
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let replayed_remove = removed.patch().apply(&source).unwrap();
+    assert!(replayed_remove.package().get_part(&image).is_err());
+    assert_eq!(
+        replayed_remove
+            .package()
+            .source_content_types(SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        removed_content_types.bytes()
+    );
+    assert_eq!(
+        replayed_remove
+            .package()
+            .retained_content_types_xml()
+            .unwrap()
+            .unwrap()
+            .as_slice(),
+        removed_content_types.bytes()
+    );
 
     let restored = removed.patch().inverse().apply(removed.package()).unwrap();
     assert_eq!(
@@ -261,6 +303,28 @@ fn ribbon_remove_inverse_restores_unshared_binary_image() {
             .unwrap()
             .xml(),
         OFFICE_2007_XML
+    );
+    let original_content_types = source
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let restored_content_types = restored
+        .package()
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    assert_eq!(
+        restored_content_types.bytes(),
+        original_content_types.bytes()
+    );
+    // The inverse may re-admit an authored destination manifest through the
+    // checked OPC token API, but its retained bytes must remain exact.
+    assert_eq!(
+        restored
+            .package()
+            .retained_content_types_xml()
+            .unwrap()
+            .unwrap()
+            .as_slice(),
+        original_content_types.bytes()
     );
 }
 
