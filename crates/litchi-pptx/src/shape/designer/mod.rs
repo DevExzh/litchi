@@ -40,9 +40,6 @@ pub(crate) use properties::apply_properties;
 pub(crate) use properties::{
     load_properties_with_limits_and_shape_limits, load_properties_with_shape_limits,
 };
-pub(crate) use properties::{
-    put_properties_with_shape_limits, remove_properties_with_shape_limits,
-};
 
 /// URI assigned to the design-element extension by [MS-PPTX] 2.2.17.
 pub const EXTENSION_URI: &str = "{386F3935-93C4-4BCD-93E2-E3B085C9AB24}";

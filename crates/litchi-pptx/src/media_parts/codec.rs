@@ -1,9 +1,11 @@
+#[cfg(test)]
+use super::MAX_STRING_BYTES;
 use super::{
     Arc, BTreeMap, BTreeSet, Bookmark, BytesStart, Conformance, Coordinate, Error, Event,
     Extension, ExtensionList, Extent, Fade, Kind, Limits, List, MAX_MEDIA_EXTENSION_XML_BYTES,
-    MAX_STRING_BYTES, MEDIA_EXTENSION_URI, Namespace, NsReader, P14, PML, Picture, Poster,
-    PrefixDeclaration, REL, ResolveResult, Result, STRICT_PML, Transform, Trim, XmlVersion,
-    coordinate_error, invalid, limit, output_limit, parse_time, validate_value_with_limits,
+    MEDIA_EXTENSION_URI, Namespace, NsReader, P14, PML, Picture, Poster, PrefixDeclaration, REL,
+    ResolveResult, Result, STRICT_PML, Transform, Trim, XmlVersion, coordinate_error, invalid,
+    limit, output_limit, parse_time, validate_value_with_limits,
 };
 use litchi_ooxml_common::mce::{
     Capabilities, Limits as MceLimits, NAMESPACE, Name, process_markup_compatibility,
