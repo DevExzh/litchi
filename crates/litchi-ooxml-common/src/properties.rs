@@ -401,6 +401,7 @@ pub fn read_prepared_with_report(
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct Slot {
+    #[cfg(test)]
     source: Option<Core>,
     metadata: Option<Metadata>,
     dirty: bool,
@@ -447,6 +448,7 @@ impl Slot {
         let source = read_core_with_report(package, &mut report)?;
         let metadata = source.as_ref().map(Core::metadata);
         Ok(Self {
+            #[cfg(test)]
             source,
             metadata,
             dirty: false,
