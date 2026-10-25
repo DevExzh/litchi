@@ -5,13 +5,14 @@
 //! - Track Changes (Revisions)
 
 use litchi::rtf::*;
+use litchi::rtf::write::Writer;
 use std::borrow::Cow;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("Creating RTF document with new features using public writer API...\n");
 
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
 
     // Write document header
     writer.write_document_header()?;

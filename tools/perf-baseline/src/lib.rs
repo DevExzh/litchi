@@ -60999,14 +60999,14 @@ fn write_streaming_rtf<W: Write>(
         objects,
         work,
     )?;
-    let limits = litchi_rtf::write::StreamingRtfLimits::new(
+    let limits = litchi_rtf::streaming::Limits::new(
         input_bytes,
         max_output_bytes,
         paragraphs,
         runs,
         RTF_STREAMING_SCRATCH_BYTES,
     );
-    let mut writer = litchi_rtf::write::StreamingRtfWriter::new(sink, context, limits)?;
+    let mut writer = litchi_rtf::streaming::Writer::new(sink, context, limits)?;
     for paragraph in 0..shape.streaming_units() {
         let text = streaming_rtf_text(paragraph);
         writer.start_paragraph()?;

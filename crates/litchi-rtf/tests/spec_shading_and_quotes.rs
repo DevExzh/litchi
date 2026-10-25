@@ -10,11 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, ShadingPattern};
+use litchi_rtf::{write::Writer, ShadingPattern};
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     String::from_utf8(output).unwrap()
@@ -22,7 +22,7 @@ fn write(document: &Tree<'_>) -> String {
 
 #[test]
 fn smart_quote_symbols_have_exact_unicode_semantics_and_canonical_output() {
-    let document = Tree::parse(r"{\rtf1\lquote left\rquote  \ldblquote double\rdblquote}").unwrap();
+    let document = Tree::parse(r"{\rtf1\lquote left\rquote  \ldblquote double\rdblquote}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "‘left’ “double”");
 
     let output = write(&document);
@@ -32,13 +32,13 @@ fn smart_quote_symbols_have_exact_unicode_semantics_and_canonical_output() {
             "canonical output omitted {control}: {output}"
         );
     }
-    assert_eq!(Tree::parse(&output).unwrap().text(), document.text());
+    assert_eq!(Tree::parse(&output, litchi_rtf::read::OpenOptions::default()).unwrap().text(), document.text());
 }
 
 #[test]
 fn paragraph_and_character_pattern_shading_round_trip_typed() {
     let document = Tree::parse(
-        r"{\rtf1\bgdkhoriz\cfpat2\cbpat3 Paragraph {\chbgdkdcross\chcfpat4\chcbpat5 Character}}",
+        r"{\rtf1\bgdkhoriz\cfpat2\cbpat3 Paragraph {\chbgdkdcross\chcfpat4\chcbpat5 Character}}", litchi_rtf::read::OpenOptions::default()
     )
     .unwrap();
     let paragraph = document
@@ -66,7 +66,7 @@ fn paragraph_and_character_pattern_shading_round_trip_typed() {
     let output = write(&document);
     assert!(output.contains(r"\bgdkhoriz\cfpat2\cbpat3"));
     assert!(output.contains(r"\chbgdkdcross\chcfpat4\chcbpat5"));
-    let reparsed = Tree::parse(&output).unwrap();
+    let reparsed = Tree::parse(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(write(&reparsed), output);
 }
 
@@ -74,7 +74,7 @@ fn paragraph_and_character_pattern_shading_round_trip_typed() {
 fn shading_pattern_controls_reject_numeric_parameters() {
     for source in [r"{\rtf1\bghoriz1 invalid}", r"{\rtf1\chbgvert0 invalid}"] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "accepted {source}"
         );
     }
@@ -83,7 +83,7 @@ fn shading_pattern_controls_reject_numeric_parameters() {
 #[test]
 fn html_conversion_controls_are_typed_but_inert_for_rtf_display() {
     let source = r"{\rtf1\htmlrtf Conversion-only\htmlrtf0 Visible{\*\htmltag7 <b>}}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(document.text(), "Conversion-onlyVisible");
     assert_eq!(document.opaque_nodes().len(), 3);
@@ -98,6 +98,6 @@ fn html_tag_requires_a_parameter_and_starred_destination() {
         r"{\rtf1{\*\htmltag missing}}",
         r"{\rtf1\htmltag7 misplaced}",
     ] {
-        assert!(Tree::parse(source).is_err(), "accepted {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
     }
 }

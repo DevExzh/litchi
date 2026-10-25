@@ -106,7 +106,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn parse_with_options(input: &str, options: OpenOptions) -> RtfResult<Self> {
-        Tree::parse_with_options(input, options).map(|model| Self::from_model(model, options))
+        Tree::parse(input, options).map(|model| Self::from_model(model, options))
     }
 
     /// Parse original RTF transport bytes with the production-safe resource
@@ -128,7 +128,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_bytes_with_options(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
-        Tree::parse_bytes_with_options(input, options).map(|model| Self::from_model(model, options))
+        Tree::parse_bytes(input, options).map(|model| Self::from_model(model, options))
     }
 
     /// Parse an owned RTF transport allocation and retain it without copying.
@@ -151,7 +151,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_owned_bytes_with_options(input: Vec<u8>, options: OpenOptions) -> RtfResult<Self> {
-        Tree::from_owned_bytes_with_options(input, options)
+        Tree::from_owned_bytes(input, options)
             .map(|model| Self::from_model(model, options))
     }
 
@@ -169,7 +169,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> RtfResult<Self> {
-        Tree::open_with_options(path, options).map(|model| Self::from_model(model, options))
+        Tree::open(path, options).map(|model| Self::from_model(model, options))
     }
 
     fn from_model(model: Tree<'static>, options: OpenOptions) -> Self {
@@ -489,7 +489,7 @@ impl Package {
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
     pub fn write_to(&self, output: impl Write) -> io::Result<()> {
-        let mut writer = crate::writer::RtfWriter::new(output);
+        let mut writer = crate::write::Writer::new(output);
         writer.write(self)?;
         writer.flush()
     }
@@ -548,7 +548,7 @@ impl Package {
 
     /// Starts a bounded preservation-first append before the exact root close.
     ///
-    /// This transaction is distinct from [`crate::streaming::StreamingRtfWriter`]:
+    /// This transaction is distinct from [`crate::streaming::Writer`]:
     /// it is rooted at this immutable existing snapshot and publishes a new
     /// artifact only after a complete source-proof, byte splice, reopen, and
     /// semantic readback.

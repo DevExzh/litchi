@@ -2403,7 +2403,7 @@ pub(super) fn style_reference_field_parts(
 }
 
 #[must_use]
-pub fn parse_field_code(instruction: &str) -> ParsedFieldCode<'_> {
+pub(crate) fn parse_field_code(instruction: &str) -> ParsedFieldCode<'_> {
     match parse_field_code_inner(instruction) {
         Ok(parsed) => parsed,
         Err(error) => ParsedFieldCode::Malformed(error),

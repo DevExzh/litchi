@@ -10,11 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{DocumentXmlPolicies, RtfWriter};
+use litchi_rtf::{DocumentXmlPolicies, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -25,7 +25,7 @@ fn parses_common_producer_policy_sequence() {
     let document = Tree::parse(concat!(
         r#"{\rtf1\relyonvml0\validatexml1\showplaceholdtext0"#,
         r#"\ignoremixedcontent0\saveinvalidxml0\showxmlerrors1 Body}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(
         *document.xml_policies(),
@@ -43,7 +43,7 @@ fn parses_common_producer_policy_sequence() {
 
 #[test]
 fn omission_is_preserved_with_each_normative_effective_default() {
-    let document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let policies = document.xml_policies();
     assert!(policies.is_empty());
     assert!(!policies.effective_rely_on_vml());
@@ -67,7 +67,7 @@ fn omission_is_preserved_with_each_normative_effective_default() {
 
 #[test]
 fn typed_api_round_trips_explicit_values_in_stable_order_and_clears() {
-    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_xml_policies(DocumentXmlPolicies {
         rely_on_vml: Some(true),
         validate_custom_xml: Some(false),
@@ -89,7 +89,7 @@ fn typed_api_round_trips_explicit_values_in_stable_order_and_clears() {
     for pair in controls.windows(2) {
         assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
     }
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.xml_policies(), document.xml_policies());
     assert_eq!(reparsed.text(), "Body");
 
@@ -104,10 +104,10 @@ fn coexists_with_theme_languages_and_inert_transform_metadata() {
         r#"{\rtf1\showxmlerrors1\themelang1033"#,
         r#"{\*\xform transforms\\safe.xsl}\validatexml0"#,
         r#"\usexform\saveinvalidxml1\relyonvml0 Body}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     let output = write(&document);
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.xml_policies(), document.xml_policies());
     assert_eq!(reparsed.theme_languages(), document.theme_languages());
     assert_eq!(reparsed.xsl_transform(), document.xsl_transform());
@@ -127,13 +127,13 @@ fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
         for suffix in ["", "-1", "2", "32767", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
                 "accepted malformed {source}"
             );
         }
         let source = format!(r"{{\rtf1\{name}0\{name}1 Body}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
             "accepted duplicate {source}"
         );
     }
@@ -154,7 +154,7 @@ fn rejects_every_starred_grouped_and_late_policy() {
             format!(r"{{\rtf1{{{control}}}Body}}"),
             format!(r"{{\rtf1 Body{control}}}"),
         ] {
-            assert!(Tree::parse(&source).is_err(), "accepted malformed {source}");
+            assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
         }
     }
 }

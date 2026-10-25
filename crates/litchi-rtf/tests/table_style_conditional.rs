@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, StyleType};
+use litchi_rtf::{write::Writer, StyleType};
 
 const TABLE_STYLE_SOURCE: &str = concat!(
     r#"{\rtf1\ansi{\stylesheet{\ql Normal;}"#,
@@ -20,7 +20,7 @@ const TABLE_STYLE_SOURCE: &str = concat!(
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -28,7 +28,7 @@ fn write(document: &Tree<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_table_style_conditional_formatting_and_round_trips() {
-    let document = Tree::parse(TABLE_STYLE_SOURCE).unwrap();
+    let document = Tree::parse(TABLE_STYLE_SOURCE, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "Body");
     let style = document
         .stylesheet()
@@ -68,7 +68,7 @@ fn parses_table_style_conditional_formatting_and_round_trips() {
         );
     }
 
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_style = reparsed
         .stylesheet()
         .styles()
@@ -81,7 +81,7 @@ fn parses_table_style_conditional_formatting_and_round_trips() {
 #[test]
 fn table_style_without_conditional_metadata_stays_empty() {
     let document =
-        Tree::parse(r"{\rtf1\ansi{\stylesheet{\ql Normal;}{\*\ts16\b Table List;}}Body}").unwrap();
+        Tree::parse(r"{\rtf1\ansi{\stylesheet{\ql Normal;}{\*\ts16\b Table List;}}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let style = document
         .stylesheet()
         .styles()
@@ -90,7 +90,7 @@ fn table_style_without_conditional_metadata_stays_empty() {
         .unwrap();
     assert!(style.table_conditional.is_empty());
 
-    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         reparsed.stylesheet().styles()[1]
             .table_conditional
@@ -121,7 +121,7 @@ fn rejects_misplaced_or_duplicate_table_style_controls() {
     ];
     for rtf in cases {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf, litchi_rtf::read::OpenOptions::default())),
             "accepted malformed {rtf}"
         );
     }

@@ -718,7 +718,7 @@ Prefixes: `R/` = `crates/litchi-rtf/src/`.
   (`R/edit.rs:4719-4725`).
 - **Save**: `write_to(W)`/`to_bytes()` (`R/api/facade.rs:434-448`), byte-exact for retained source; no path
   save (deliberately left to facade, `:428-430`).
-- **Create**: ❌ semantic builder; only low-level `write::Writer` / `StreamingRtfWriter` (plain runs).
+- **Create**: ❌ semantic builder; only low-level `write::Writer` / `streaming::Writer` (plain runs).
 - **Gap class**: (a) owner + atomic save + limits wiring, selector→`TextSpan` mapping; (b) swap, font face/
   colour/style setters, non-ASCII/compressed edits; (c) create builder, section/table/comment/hyperlink/
   metadata structure CRUD.

@@ -10,11 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, Shape, ShapeProperty, ShapeType};
+use litchi_rtf::{write::Writer, Shape, ShapeProperty, ShapeType};
 
 fn write_document(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     String::from_utf8(output).unwrap()
@@ -33,7 +33,7 @@ fn parses_root_shape_producers_at_start_and_after_visible_body() {
     ];
     let documents: Vec<_> = producers
         .iter()
-        .map(|source| Tree::parse(source).unwrap())
+        .map(|source| Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap())
         .collect();
     assert!(
         documents
@@ -58,7 +58,7 @@ fn parses_root_shape_producers_at_start_and_after_visible_body() {
 
 #[test]
 fn typed_api_inserts_at_utf8_boundary_and_clears_without_touching_background() {
-    let mut document = Tree::parse(r"{\rtf1 A\u20320?B}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 A\u20320?B}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::Rectangle);
     shape.position = "A你".len();
     shape.properties.push(ShapeProperty::new(
@@ -68,7 +68,7 @@ fn typed_api_inserts_at_utf8_boundary_and_clears_without_touching_background() {
     document.push_shape(shape).unwrap();
     let serialized = write_document(&document);
     assert!(serialized.contains("{\\shp{\\*\\shpinst"));
-    let reparsed = Tree::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.shapes()[0].position, "A你".len());
     assert_eq!(reparsed.text(), "A你B");
     document.clear_shapes();
@@ -89,10 +89,10 @@ fn rejects_hostile_root_shape_grammar_and_resource_abuse() {
         "{\\rtf1{\\shp{\\*\\shpinst\\bin1 x}}}",
     ];
     for source in malformed {
-        assert!(Tree::parse(source).is_err(), "accepted {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
     }
 
-    let mut document = Tree::parse(r"{\rtf1 x}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 x}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut split = Shape::new(ShapeType::Rectangle);
     split.position = 2;
     assert!(document.push_shape(split).is_err());

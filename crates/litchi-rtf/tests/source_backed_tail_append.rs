@@ -12,9 +12,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, ReadAt,
 };
-use litchi_rtf::Package as Document;
 use litchi_rtf::source_backed::{OpenOptions, Package, tail_append};
 use litchi_rtf::tail_append::{TailAppendPublicationError, TailAppendPublicationLimits};
+use litchi_rtf::{Package as Document, SourceLimits};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 
@@ -100,6 +100,35 @@ fn edits_chain_on_a_committed_package() {
     let second = second.commit().unwrap();
     assert_eq!(text_of(&bytes_of(second.package())), "A\nB\nC\nD\n");
     assert_eq!(text_of(&bytes_of(first.package())), "A\nB\nC\n");
+}
+
+#[test]
+fn chained_edit_reuses_the_document_open_profile() {
+    let source_bytes = br#"{\rtf1\ansi A\par B}"#;
+    let paragraphs = ["C"; 8];
+    let baseline = open(source_bytes);
+    let mut baseline_edit = baseline.edit_tail_append().unwrap();
+    baseline_edit.append_text_paragraphs(&paragraphs).unwrap();
+    let baseline_first = baseline_edit.commit().unwrap();
+    let first_output = bytes_of(baseline_first.package());
+    let limits = SourceLimits::builder()
+        .max_input_bytes(first_output.len())
+        .unwrap()
+        .build()
+        .unwrap();
+    let document_options = litchi_rtf::read::OpenOptions::new().source_limits(limits);
+    let document = Document::from_bytes_with_options(source_bytes, document_options).unwrap();
+    let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(source_bytes.to_vec()));
+    let source =
+        Package::open_with_options(&document, source, context(), OpenOptions::default()).unwrap();
+
+    let mut first = source.edit_tail_append().unwrap();
+    first.append_text_paragraphs(&paragraphs).unwrap();
+    let first = first.commit().unwrap();
+    assert_eq!(bytes_of(first.package()), first_output);
+    let mut second = first.package().edit_tail_append().unwrap();
+    second.append_text_paragraphs(&paragraphs).unwrap();
+    assert!(second.commit().is_err());
 }
 
 #[test]

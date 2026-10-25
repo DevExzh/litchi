@@ -15,7 +15,7 @@ fn parser_classification_failures_use_the_typed_error_channel() {
 fn accepts_only_nul_padding_and_unicode_whitespace_after_the_root() {
     let mut source = br"{\rtf1\ansi body}".to_vec();
     source.extend_from_slice(b"\0 \t\r\n\xa0\n\0");
-    let error = Tree::parse_bytes(&source).err();
+    let error = Tree::parse_bytes(&source, crate::read::OpenOptions::default()).err();
     assert!(
         error.is_none(),
         "rejected permitted trailing padding: {error:?}"
@@ -23,7 +23,7 @@ fn accepts_only_nul_padding_and_unicode_whitespace_after_the_root() {
 
     let mut source = String::from(r"{\rtf1\ansi body}");
     source.push('\0');
-    let error = Tree::parse(&source).err();
+    let error = Tree::parse(&source, crate::read::OpenOptions::default()).err();
     assert!(
         error.is_none(),
         "rejected permitted trailing NUL padding: {error:?}"
@@ -45,7 +45,7 @@ fn ignores_visible_trailing_data_and_rejects_non_rtf_roots() {
         let mut source = br"{\rtf1\ansi body}".to_vec();
         let root_len = source.len();
         source.extend_from_slice(suffix);
-        let document = Tree::parse_bytes(&source)
+        let document = Tree::parse_bytes(&source, crate::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("rejected trailing data {suffix:?}: {error}"));
         assert_eq!(document.text(), "body");
         assert_eq!(
@@ -62,7 +62,7 @@ fn ignores_visible_trailing_data_and_rejects_non_rtf_roots() {
     for source in [r"{\rtf}", r"{\rtf }", r"{\rtf\ansi}", r"{\rtf text}"] {
         assert!(
             matches!(
-                Tree::parse(source).err(),
+                Tree::parse(source, crate::read::OpenOptions::default()).err(),
                 Some(RtfError::MalformedDocument(message)) if message == MISSING_VERSION_ERROR
             ),
             "accepted bare \\rtf root {source:?}"
@@ -73,7 +73,7 @@ fn ignores_visible_trailing_data_and_rejects_non_rtf_roots() {
     for source in [r"{\rtf0 body}", r"{\rtf2 body}", r"{\ansi body}"] {
         assert!(
             matches!(
-                Tree::parse(source).err(),
+                Tree::parse(source, crate::read::OpenOptions::default()).err(),
                 Some(RtfError::MalformedDocument(message)) if message == ROOT_ERROR
             ),
             "accepted invalid RTF root {source:?}"

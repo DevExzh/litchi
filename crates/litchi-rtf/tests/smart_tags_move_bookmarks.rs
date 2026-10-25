@@ -1,10 +1,10 @@
 mod repair_support;
 
-use litchi_rtf::{Package, RtfResult, SmartTagAttribute};
+use litchi_rtf::{Package, Result, SmartTagAttribute};
 use std::borrow::Cow;
 
 #[test]
-fn parses_smart_tag_and_move_bookmark_metadata() -> RtfResult<()> {
+fn parses_smart_tag_and_move_bookmark_metadata() -> Result<()> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrname Month}{\xmlattrvalue 4}}}4/11{\*\xmlclose}{\*\mvfmf tag 3412D4C3B2A1}m{\*\mvfml tag}{\*\mvtof tag 7856D4C3B2A1}n{\*\mvtol tag}}"#;
     let document = Package::parse(source)?;
     assert_eq!(document.text(), "4/11mn");
@@ -30,7 +30,7 @@ fn parses_smart_tag_and_move_bookmark_metadata() -> RtfResult<()> {
 }
 
 #[test]
-fn smart_tag_accepts_zero_xml_namespace_reference() -> RtfResult<()> {
+fn smart_tag_accepts_zero_xml_namespace_reference() -> Result<()> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns0{\factoidname date}}x{\*\xmlclose}}"#;
     let document = Package::parse(source)?;
     assert_eq!(document.smart_tags().len(), 1);
@@ -42,7 +42,7 @@ fn smart_tag_accepts_zero_xml_namespace_reference() -> RtfResult<()> {
 
 #[test]
 fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
--> Result<(), Box<dyn std::error::Error>> {
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0\xmlattrname Month\xmlattrvalue 4}}4/11{\*\xmlclose}}"#;
     let document = Package::parse(source)?;
     assert_eq!(document.smart_tags()[0].attributes[0].namespace, Some(0));
@@ -64,7 +64,8 @@ fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
 }
 
 #[test]
-fn unmatched_move_start_is_ignored_in_the_semantic_model() -> Result<(), Box<dyn std::error::Error>>
+fn unmatched_move_start_is_ignored_in_the_semantic_model()
+-> std::result::Result<(), Box<dyn std::error::Error>>
 {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf orphan 0100EFCDAB00}}"#;
     let document = Package::parse(source)?;
@@ -187,7 +188,7 @@ fn smart_tag_attribute_count_is_checked_before_parsing_the_next_attribute() {
 }
 
 #[test]
-fn smart_tag_and_move_aggregate_limits_are_checked_at_the_boundary() -> RtfResult<()> {
+fn smart_tag_and_move_aggregate_limits_are_checked_at_the_boundary() -> Result<()> {
     const LIMIT: usize = 16 * 1_048_576;
 
     let mut smart_source = String::from(r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}"#);
@@ -209,7 +210,7 @@ fn smart_tag_and_move_aggregate_limits_are_checked_at_the_boundary() -> RtfResul
 }
 
 #[test]
-fn canonical_writer_emits_metadata_and_reopens() -> RtfResult<()> {
+fn canonical_writer_emits_metadata_and_reopens() -> Result<()> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf tag 3412D4C3B2A1}m{\*\mvfml tag}}"#;
     let document = Package::parse(source)?;
     let mut output = Vec::new();
@@ -232,7 +233,7 @@ fn canonical_writer_emits_metadata_and_reopens() -> RtfResult<()> {
 
 #[test]
 fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
--> Result<(), Box<dyn std::error::Error>> {
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = Package::parse(
         r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf tag 3412D4C3B2A1}m{\*\mvfml tag}}"#,
     )?;
@@ -293,7 +294,8 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
 }
 
 #[test]
-fn changed_publication_refuses_unmatched_move_source() -> Result<(), Box<dyn std::error::Error>> {
+fn changed_publication_refuses_unmatched_move_source()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source_bytes = br#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}}"#;
     let source = Package::parse(std::str::from_utf8(source_bytes)?)?;
     let mut noop = source.edit();
@@ -317,7 +319,8 @@ fn changed_publication_refuses_unmatched_move_source() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn changed_publication_refuses_unmatched_move_end() -> Result<(), Box<dyn std::error::Error>> {
+fn changed_publication_refuses_unmatched_move_end()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source_bytes =
         br#"{\rtf1\ansi{\*\mvfml orphan}{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}}"#;
     let source = Package::parse(std::str::from_utf8(source_bytes)?)?;
@@ -334,8 +337,9 @@ fn changed_publication_refuses_unmatched_move_end() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn raw_canonical_writer_refuses_unmatched_move_source() -> Result<(), Box<dyn std::error::Error>> {
-    let source = litchi_rtf::raw::Tree::parse(r#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}x}"#)?;
+fn raw_canonical_writer_refuses_unmatched_move_source()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let source = litchi_rtf::raw::Tree::parse(r#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}x}"#, litchi_rtf::read::OpenOptions::default())?;
     let mut output = Vec::new();
     let error = litchi_rtf::write::Writer::new(&mut output).write_document(&source);
     assert!(matches!(error, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput));

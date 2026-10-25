@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Formatting, RtfWriter, StyleBlock};
+use litchi_rtf::{Formatting, write::Writer, StyleBlock};
 
 fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
     document
@@ -22,7 +22,7 @@ fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     String::from_utf8(output).unwrap()
@@ -33,7 +33,7 @@ fn parses_group_inheritance_restoration_plain_and_last_wins() {
     let document = Tree::parse(concat!(
         r"{\rtf1\cb0 Zero {\cb2 Inner} Tail ",
         r"\cb1\cb3 Last{\plain Reset} {\*\unknown\cb4 Hidden}Visible}"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
 
     assert_eq!(
@@ -65,7 +65,7 @@ fn character_style_and_body_round_trip_in_canonical_color_order() {
         r"{\rtf1{\stylesheet{\*\cs9\additive\cb2 Back;}}",
         r"\highlight3\cb2\cf1 Body}"
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document
             .stylesheet()
@@ -78,7 +78,7 @@ fn character_style_and_body_round_trip_in_canonical_color_order() {
 
     let once = write(&document);
     assert!(once.contains(r"\cf1\cb2\highlight3"));
-    let reparsed = Tree::parse(&once).unwrap();
+    let reparsed = Tree::parse(&once, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&reparsed, "Body").formatting.background_color,
         Some(2)
@@ -105,7 +105,7 @@ fn rejects_missing_negative_overflow_and_unrepresentable_shape_runs() {
         concat!(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 one", r"\cb2 two}}}}"),
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "{source}"
         );
     }
@@ -113,7 +113,7 @@ fn rejects_missing_negative_overflow_and_unrepresentable_shape_runs() {
     let inert = Tree::parse(concat!(
         r"{\rtf1{\*\unknown\cb65536 hidden}",
         r"{\field{\*\fldinst TEST \cb65536}{\fldrslt cached}}Visible}"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(block(&inert, "Visible").formatting.background_color, None);
 }
@@ -127,7 +127,7 @@ fn parses_libreoffice_producer_fragment_and_round_trips_uniform_shape_text() {
     let start = fixture.find(r"{\pard\cb1 ").unwrap();
     let producer = &fixture[start..];
     let end = producer.find('}').unwrap() + 1;
-    let document = Tree::parse(&format!(r"{{\rtf1{}}}", &producer[..end])).unwrap();
+    let document = Tree::parse(&format!(r"{{\rtf1{}}}", &producer[..end]), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&document, "ARL STATISTICS")
             .formatting
@@ -135,14 +135,14 @@ fn parses_libreoffice_producer_fragment_and_round_trips_uniform_shape_text() {
         Some(1)
     );
 
-    let shape = Tree::parse(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 uniform}}}}").unwrap();
+    let shape = Tree::parse(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 uniform}}}}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         shape.shapes()[0].text_formatting.unwrap().background_color,
         Some(1)
     );
     let serialized = write(&shape);
     assert!(serialized.contains(r"{\shptxt \cb1"));
-    let reparsed = Tree::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(reparsed.shapes().iter().any(|shape| {
         shape
             .text_formatting

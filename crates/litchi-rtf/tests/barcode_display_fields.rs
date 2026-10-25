@@ -8,7 +8,7 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{BarcodeDisplayFieldKind, Field, FieldOwner, FieldStatus, RtfWriter};
+use litchi_rtf::{BarcodeDisplayFieldKind, Field, FieldOwner, FieldStatus, write::Writer};
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -17,7 +17,7 @@ const FIXTURE: &str = include_str!(concat!(
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -25,7 +25,7 @@ fn write(document: &Tree<'_>) -> Vec<u8> {
 
 #[test]
 fn inspects_barcode_display_metadata_without_validating_or_generating_barcodes() {
-    let document = Tree::parse(FIXTURE).unwrap();
+    let document = Tree::parse(FIXTURE, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(document.text(), "BeforeAfter");
     assert_eq!(document.barcode_field_count(), 0);
@@ -93,8 +93,8 @@ fn inspects_barcode_display_metadata_without_validating_or_generating_barcodes()
 
 #[test]
 fn barcode_display_metadata_round_trips_deterministically() {
-    let document = Tree::parse(FIXTURE).unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
+    let document = Tree::parse(FIXTURE, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(

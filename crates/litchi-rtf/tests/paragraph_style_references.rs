@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Alignment, Paragraph, RtfWriter, StyleType};
+use litchi_rtf::{Alignment, Paragraph, write::Writer, StyleType};
 
 fn paragraph_for<'a>(document: &'a Tree<'a>, text: &str) -> Paragraph {
     document
@@ -29,7 +29,7 @@ fn retains_scoped_references_without_materializing_style_properties() {
         r#"{\s6\qc Independent Style;}"#,
         r#"}{\s5\ql A{\s6\qc B}C\par}{\pard D}}"#,
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     let independent = document
         .stylesheet()
@@ -59,7 +59,7 @@ fn retains_scoped_references_without_materializing_style_properties() {
 #[test]
 fn defaults_mutation_and_writer_preserve_zero_maximum_and_omission() {
     let document =
-        Tree::parse(r"{\rtf1{\*\defpap\s0\qc}{\s65535\qr Maximum\par}{\pard Reset}}").unwrap();
+        Tree::parse(r"{\rtf1{\*\defpap\s0\qc}{\s65535\qr Maximum\par}{\pard Reset}}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document
             .default_formatting()
@@ -82,13 +82,13 @@ fn defaults_mutation_and_writer_preserve_zero_maximum_and_omission() {
     assert_eq!(paragraph, Paragraph::default());
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
     let serialized = String::from_utf8(first.clone()).unwrap();
     assert!(serialized.contains(r"{\*\defpap\s0"));
     assert!(serialized.contains(r"\s65535\qr"));
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.default_formatting().paragraph(),
         document.default_formatting().paragraph()
@@ -98,7 +98,7 @@ fn defaults_mutation_and_writer_preserve_zero_maximum_and_omission() {
         paragraph_for(&document, "Maximum")
     );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -118,13 +118,13 @@ fn rejects_missing_out_of_range_duplicate_and_misplaced_references() {
         r"{\rtf1{\*\defpap\s}X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "accepted {source}"
         );
     }
 
     let inert =
-        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \s65536}{\fldrslt Result}}Body}").unwrap();
+        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \s65536}{\fldrslt Result}}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(inert.fields().len(), 1);
     assert!(
         inert
@@ -142,12 +142,12 @@ fn stable_round_trip_covers_body_style_and_default_owners() {
         r#"{\s4\ql Independent;}"#,
         r#"}{\s3\qc Styled\par}}"#,
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.stylesheet(), document.stylesheet());
     assert_eq!(
         reparsed.default_formatting().paragraph(),
@@ -158,7 +158,7 @@ fn stable_round_trip_covers_body_style_and_default_owners() {
         paragraph_for(&document, "Styled")
     );
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -169,7 +169,7 @@ fn parses_libreoffice_paragraph_style_producer() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/fdo82071.rtf"
     );
-    let document = Tree::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         document
             .stylesheet()

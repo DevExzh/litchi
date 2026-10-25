@@ -14,8 +14,9 @@
 
 use crate::{
     Alignment, CharacterBaseline, CharacterExpansion, HeaderFooterType, Package, ParagraphFrame,
-    RtfError, RtfWriter, TableCellPath, UnderlineStyle,
+    RtfError, TableCellPath, UnderlineStyle,
 };
+use crate::write::Writer;
 use bumpalo::Bump;
 use litchi_core::Position;
 use serde_json::Value;
@@ -7672,7 +7673,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
     }
 
     let mut model =
-        crate::document::Tree::parse_bytes_with_options(source_bytes, edit.source.options())?;
+        crate::document::Tree::parse_bytes(source_bytes, edit.source.options())?;
     for operation in &edit.operations {
         match operation {
             Operation::TableCellText { path, after, .. } => {
@@ -7734,7 +7735,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
     }
 
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes)
+    Writer::new(&mut bytes)
         .write_document(&model)
         .map_err(|error| Error::Write(error.to_string()))?;
     let limit = edit.source.limits().max_input_bytes();
@@ -12383,7 +12384,7 @@ fn validate_opaque_preservation(
 
 fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
     let mut output = BoundedVec::new(limits.max_input_bytes());
-    match RtfWriter::new(&mut output).write_text(text) {
+    match Writer::new(&mut output).write_text(text) {
         Ok(()) => Ok(output.into_inner()),
         Err(error) => Err(output.map_io_error(error)),
     }
@@ -12481,7 +12482,7 @@ fn encoded_body_with_properties(
                 "paragraph-structure and property changes cannot compose safely",
             ))?;
         output.append(br"\plain ")?;
-        let result = RtfWriter::new(&mut output).write_formatting(&baseline);
+        let result = Writer::new(&mut output).write_formatting(&baseline);
         if let Err(error) = result {
             return Err(output.map_io_error(error));
         }
@@ -12777,7 +12778,7 @@ fn encoded_body_with_paragraph_properties(
         if runs.peek().is_none() {
             write_bounded(&mut output, br"\plain\pard ")?;
             let result = {
-                let mut writer = RtfWriter::new(&mut output);
+                let mut writer = Writer::new(&mut output);
                 writer.write_paragraph_properties(properties)
             };
             if let Err(error) = result {
@@ -12813,7 +12814,7 @@ fn encoded_body_with_paragraph_properties(
                 }
                 write_bounded(&mut output, br"\plain\pard ")?;
                 let result = {
-                    let mut writer = RtfWriter::new(&mut output);
+                    let mut writer = Writer::new(&mut output);
                     writer
                         .write_formatting(run.format().raw())
                         .and_then(|()| writer.write_paragraph_properties(properties))
@@ -13080,7 +13081,7 @@ fn write_text_with_body_opaque(
                             .ok_or(Error::unsupported_source(
                                 "bookmark metadata references a missing bookmark",
                             ))?;
-                    let mut writer = RtfWriter::new(&mut *output);
+                    let mut writer = Writer::new(&mut *output);
                     writer.write_bookmark_start(bookmark)
                 },
                 BodyLayoutEventKind::BookmarkEnd(index) => {
@@ -13091,19 +13092,19 @@ fn write_text_with_body_opaque(
                             .ok_or(Error::unsupported_source(
                                 "bookmark metadata references a missing bookmark",
                             ))?;
-                    let mut writer = RtfWriter::new(&mut *output);
+                    let mut writer = Writer::new(&mut *output);
                     writer.write_bookmark_end(bookmark.name.as_ref())
                 },
                 BodyLayoutEventKind::PageBreak => {
-                    let mut writer = RtfWriter::new(&mut *output);
+                    let mut writer = Writer::new(&mut *output);
                     writer.write_str("\\page ")
                 },
                 BodyLayoutEventKind::ColumnBreak => {
-                    let mut writer = RtfWriter::new(&mut *output);
+                    let mut writer = Writer::new(&mut *output);
                     writer.write_str("\\column ")
                 },
                 BodyLayoutEventKind::SoftBreak(soft_break) => {
-                    let mut writer = RtfWriter::new(&mut *output);
+                    let mut writer = Writer::new(&mut *output);
                     match soft_break.kind {
                         crate::SoftBreakKind::Page => writer.write_str("\\softpage "),
                         crate::SoftBreakKind::Column => writer.write_str("\\softcol "),
@@ -13207,7 +13208,7 @@ fn write_encoded_fragment(
     let fragment = text.get(range).ok_or(Error::unsupported_source(
         "property span is not a UTF-8 text boundary",
     ))?;
-    match RtfWriter::new(&mut *output).write_text(fragment) {
+    match Writer::new(&mut *output).write_text(fragment) {
         Ok(()) => Ok(()),
         Err(error) => Err(output.map_io_error(error)),
     }

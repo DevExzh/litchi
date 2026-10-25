@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{DefaultFormattingDestination, ParagraphWrapping, RtfWriter};
+use litchi_rtf::{DefaultFormattingDestination, ParagraphWrapping, write::Writer};
 
 const PRODUCER: &str = r"{\rtf1\ansi\adeff7\deff2\stshfdbch31505\stshfloch31506\stshfhich31507\stshfbi31508
 {\fonttbl{\f2 Arial;}}
@@ -20,7 +20,7 @@ Body}";
 
 #[test]
 fn parses_preserves_order_and_round_trips_defaults_inertly() {
-    let document = Tree::parse(PRODUCER).unwrap();
+    let document = Tree::parse(PRODUCER, litchi_rtf::read::OpenOptions::default()).unwrap();
     let defaults = document.default_formatting();
     assert_eq!(defaults.fonts.primary, Some(2));
     assert_eq!(defaults.fonts.associated, Some(7));
@@ -53,15 +53,15 @@ fn parses_preserves_order_and_round_trips_defaults_inertly() {
     assert_eq!(body.formatting.font_size.get(), 24);
     assert_eq!(body.paragraph.indentation.left, 0);
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
     let text = String::from_utf8_lossy(&first);
     assert!(text.find("defpap").unwrap() < text.find("defchp").unwrap());
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(defaults, reparsed.default_formatting());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -71,13 +71,13 @@ fn parses_preserves_order_and_round_trips_defaults_inertly() {
 fn parses_real_producer_default_destinations() {
     let first = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(first.default_formatting().character().is_some());
     assert!(first.default_formatting().paragraph().is_some());
     let cjk = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/cjklist24.rtf"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(
         cjk.default_formatting()
@@ -111,7 +111,7 @@ fn rejects_malformed_default_formatting() {
     ];
     for source in malformed {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "accepted malformed RTF: {source}"
         );
     }

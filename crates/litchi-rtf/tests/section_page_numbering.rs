@@ -11,17 +11,17 @@
 //! `\pgn*` format family, `\pgnrestart`/`\pgncont`, and `\pgnxN`/`\pgnyN`.
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{PageNumberFormat, PageNumberRestart, RtfWriter};
+use litchi_rtf::{PageNumberFormat, PageNumberRestart, write::Writer};
 
 fn write(document: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes).write_document(document).unwrap();
+    Writer::new(&mut bytes).write_document(document).unwrap();
     String::from_utf8(bytes).unwrap()
 }
 
 fn round_trip(format: PageNumberFormat) {
     let source = format!(r"{{\rtf1\ansi\sectd\{} Body\par}}", format.control_word());
-    let document = Tree::parse(&source).unwrap();
+    let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.sections()[0].properties.page_number_format, format);
 
     let first = write(&document);
@@ -30,7 +30,7 @@ fn round_trip(format: PageNumberFormat) {
         "missing {} in {first}",
         format.control_word()
     );
-    let reparsed = Tree::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.sections()[0].properties.page_number_format, format);
     assert_eq!(first, write(&reparsed));
 }
@@ -84,7 +84,7 @@ fn cjk_and_indic_page_number_formats_round_trip() {
 #[test]
 fn page_number_restart_and_offsets_round_trip() {
     let source = r"{\rtf1\ansi\sectd\pgnstarts7\pgnrestart\pgnx120\pgny-240 Body\par}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let properties = &document.sections()[0].properties;
     assert_eq!(properties.page_number_start, 7);
     assert_eq!(
@@ -98,7 +98,7 @@ fn page_number_restart_and_offsets_round_trip() {
     for expected in ["\\pgnstarts7", "\\pgnrestart", "\\pgnx120", "\\pgny-240"] {
         assert!(first.contains(expected), "missing {expected} in {first}");
     }
-    let reparsed = Tree::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     let properties = &reparsed.sections()[0].properties;
     assert_eq!(
         properties.page_number_restart,
@@ -112,7 +112,7 @@ fn page_number_restart_and_offsets_round_trip() {
 #[test]
 fn page_number_continue_round_trips() {
     let source = r"{\rtf1\ansi\sectd\pgncont Body\par}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         document.sections()[0].properties.page_number_restart,
         Some(PageNumberRestart::Continuous)
@@ -120,7 +120,7 @@ fn page_number_continue_round_trips() {
 
     let first = write(&document);
     assert!(first.contains("\\pgncont"), "missing pgncont in {first}");
-    let reparsed = Tree::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.sections()[0].properties.page_number_restart,
         Some(PageNumberRestart::Continuous)
@@ -130,7 +130,7 @@ fn page_number_continue_round_trips() {
 #[test]
 fn omitted_page_number_controls_stay_omitted() {
     let source = r"{\rtf1\ansi\sectd Body\par}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let properties = &document.sections()[0].properties;
     assert_eq!(properties.page_number_restart, None);
     assert_eq!(properties.page_number_offset_x, None);

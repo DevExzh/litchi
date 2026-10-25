@@ -443,7 +443,7 @@ Edition Manager Publisher objects (implemented as `ObjectKind::Publisher`).
 
 ### Key partial (🟡) boundaries
 
-Fresh authoring is limited to `streaming::StreamingRtfWriter`/`write::Writer`
+Fresh authoring is limited to `streaming::Writer`/`write::Writer`
 (paragraph/run/basic `Format` plus hyperlink/note/revision helpers) and `tail_append`;
 tables, lists, shapes, math, and fields have no typed from-scratch builders (full
 model-internal write-back of parsed documents is ✅). `Document::edit()` bounded

@@ -100,7 +100,7 @@ pub struct EmbeddedObject<'a> {
     /// Optional name of the linked document section (`objsect`)
     pub section: Option<Cow<'a, str>>,
     /// Optional time the object was last updated (`objtime`)
-    pub time: Option<crate::RtfTimestamp>,
+    pub time: Option<crate::metadata::Timestamp>,
     /// Optional original CLSID from the `oleclsid` destination
     pub class_id: Cow<'a, str>,
     /// Object width in twips

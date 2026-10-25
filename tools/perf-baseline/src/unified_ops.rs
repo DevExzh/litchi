@@ -3057,6 +3057,10 @@ fn run_rtf(
     };
     let expected_text = native.text().to_owned();
     drop(native);
+    // Match the raw leaf's required profile argument without charging its
+    // construction to the timed parse.  OpenOptions is Copy, so each sample
+    // receives the same checked profile value.
+    let leaf_options = litchi_rtf::read::OpenOptions::default();
 
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup, samples)? {
@@ -3081,7 +3085,7 @@ fn run_rtf(
             },
             Leg::Leaf => {
                 let started = Instant::now();
-                let document = litchi_rtf::raw::Tree::from_owned_bytes(owned)?;
+                let document = litchi_rtf::raw::Tree::from_owned_bytes(owned, leaf_options)?;
                 let text = lifecycle.then(|| document.text());
                 let duration = started.elapsed();
                 let observed = TextProjection {
@@ -3107,8 +3111,8 @@ fn run_rtf(
     let timed_calls = match (entry.leg, lifecycle) {
         (Leg::Unified, false) => "litchi::open_bytes(Vec<u8>) -> File::Rtf",
         (Leg::Unified, true) => "litchi::open_bytes(Vec<u8>) + File::text()",
-        (Leg::Leaf, false) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>)",
-        (Leg::Leaf, true) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>) + Tree::text()",
+        (Leg::Leaf, false) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>, litchi_rtf::read::OpenOptions::default()) [options prepared outside timer]",
+        (Leg::Leaf, true) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>, litchi_rtf::read::OpenOptions::default()) [options prepared outside timer] + Tree::text()",
     };
     let summary = RouteSummary::for_case(entry.case, timed_calls)?.verified(&expected, samples)?;
     Ok(finish(entry, corpus, elapsed, summary))

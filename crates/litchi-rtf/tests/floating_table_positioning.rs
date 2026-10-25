@@ -11,14 +11,14 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    RtfWriter, TableHorizontalPosition, TableHorizontalReference, TableVerticalPosition,
+    write::Writer, TableHorizontalPosition, TableHorizontalReference, TableVerticalPosition,
     TableVerticalReference,
 };
 
 #[test]
 fn parses_full_family_and_round_trips_deterministically() {
     let source = r"{\rtf1\trowd\tphmrg\tposxc\tpvpg\tposnegy-16\tdfrmtxtLeft187\tdfrmtxtRight188\tdfrmtxtTop189\tdfrmtxtBottom190\tabsnoovrlp1\cellx1000\intbl A\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let position = document.tables()[0].rows()[0].positioning();
     assert_eq!(
         position.horizontal_reference,
@@ -47,15 +47,15 @@ fn parses_full_family_and_round_trips_deterministically() {
     );
     assert!(position.no_overlap);
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
     let first = String::from_utf8(first).unwrap();
     assert!(first.contains("\\tphmrg\\tposxc\\tpvpg\\tposnegy-16\\tdfrmtxtLeft187\\tdfrmtxtRight188\\tdfrmtxtTop189\\tdfrmtxtBottom190\\tabsnoovrlp"));
-    let reparsed = Tree::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.tables()[0].rows()[0].positioning(), position);
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, String::from_utf8(second).unwrap());
@@ -72,7 +72,7 @@ fn parses_all_symbolic_positions_and_references() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1\\intbl X\\cell\\row}}");
         assert_eq!(
-            Tree::parse(&source).unwrap().tables()[0].rows()[0]
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0]
                 .positioning()
                 .horizontal_position,
             Some(expected)
@@ -88,7 +88,7 @@ fn parses_all_symbolic_positions_and_references() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1\\intbl X\\cell\\row}}");
         assert_eq!(
-            Tree::parse(&source).unwrap().tables()[0].rows()[0]
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0]
                 .positioning()
                 .vertical_position,
             Some(expected)
@@ -101,7 +101,7 @@ fn parses_all_symbolic_positions_and_references() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1\\intbl X\\cell\\row}}");
         assert_eq!(
-            Tree::parse(&source).unwrap().tables()[0].rows()[0]
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0]
                 .positioning()
                 .horizontal_reference,
             Some(expected)
@@ -114,7 +114,7 @@ fn parses_all_symbolic_positions_and_references() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1\\intbl X\\cell\\row}}");
         assert_eq!(
-            Tree::parse(&source).unwrap().tables()[0].rows()[0]
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0]
                 .positioning()
                 .vertical_reference,
             Some(expected)
@@ -125,7 +125,7 @@ fn parses_all_symbolic_positions_and_references() {
 #[test]
 fn resets_groups_and_inert_destinations() {
     let source = r"{\rtf1\trowd\tphpg\tposxr{\tphmrg\tposxl}\trowd{\*\unknown\tphpg\tposx999\tdfrmtxtLeft999\tabsnoovrlp1 ignored}\cellx1000\intbl A\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.tables()[0].rows()[0].positioning().is_empty());
 }
 
@@ -134,7 +134,7 @@ fn parses_real_libreoffice_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data");
     let floating =
-        Tree::parse(&std::fs::read_to_string(root.join("floating-table.rtf")).unwrap()).unwrap();
+        Tree::parse(&std::fs::read_to_string(root.join("floating-table.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         floating
             .tables()
@@ -151,7 +151,7 @@ fn parses_real_libreoffice_fixtures() {
             })
     );
     let overlap =
-        Tree::parse(&std::fs::read_to_string(root.join("floattable-tbl-overlap.rtf")).unwrap())
+        Tree::parse(&std::fs::read_to_string(root.join("floattable-tbl-overlap.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default())
             .unwrap();
     assert!(
         overlap
@@ -178,12 +178,12 @@ fn rejects_malformed_parameters_and_caps() {
         r"{\rtf1\trowd\tabsnoovrlp2 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "accepted {source}"
         );
     }
     assert!(
-        Tree::parse(r"{\rtf1\trowd\tabsnoovrlp0\cellx1\intbl X\cell\row}")
+        Tree::parse(r"{\rtf1\trowd\tabsnoovrlp0\cellx1\intbl X\cell\row}", litchi_rtf::read::OpenOptions::default())
             .unwrap()
             .tables()[0]
             .rows()[0]

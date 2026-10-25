@@ -12,7 +12,7 @@ mod support;
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Paragraph, RtfWriter, Shading, StyleBlock};
+use litchi_rtf::{Paragraph, write::Writer, Shading, StyleBlock};
 
 fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
     document
@@ -24,7 +24,7 @@ fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     String::from_utf8(output).unwrap()
@@ -37,7 +37,7 @@ fn parses_inherits_restores_and_pard_resets_exact_values() {
         r"{\shading0\cfpat0\cbpat0 Inner\par }Tail\par ",
         r"{\pard Reset\par }{\*\unknown\shading9999\cfpat8\cbpat9 Ignored}",
         r"Visible\par}"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
 
     let outer = block(&document, "Outer").paragraph.shading;
@@ -63,7 +63,7 @@ fn stylesheet_and_body_round_trip_in_canonical_order() {
         r"{\rtf1{\stylesheet{\s9\cbpat3\shading6250\cfpat2 Shade;}}",
         r"\pard\s9\cbpat3\shading6250\cfpat2 Body\par}"
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let style = document.stylesheet().get(9).unwrap().paragraph.unwrap();
     assert_eq!(style.shading.amount, Some(6250));
     assert_eq!(style.shading.foreground_color, Some(2));
@@ -71,7 +71,7 @@ fn stylesheet_and_body_round_trip_in_canonical_order() {
 
     let once = write(&document);
     assert!(once.contains(r"\shading6250\cfpat2\cbpat3"));
-    let reparsed = Tree::parse(&once).unwrap();
+    let reparsed = Tree::parse(&once, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(block(&reparsed, "Body").paragraph.shading, style.shading);
     assert_eq!(write(&reparsed), once);
 }
@@ -108,13 +108,13 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
         r"{\rtf1\cbpat65536 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "{source}"
         );
     }
 
     let inert =
-        Tree::parse(r"{\rtf1{\*\unknown\shading10001\cfpat65536\cbpat-1 hidden}Visible}").unwrap();
+        Tree::parse(r"{\rtf1{\*\unknown\shading10001\cfpat65536\cbpat-1 hidden}Visible}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&inert, "Visible").paragraph.shading,
         Shading::default()
@@ -126,7 +126,7 @@ fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
     let explicit_zero = Tree::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf"
-    )))
+    )), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(
         explicit_zero
@@ -143,7 +143,7 @@ fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
     // root group. Keep the vendored bytes untouched.
     // Word and LibreOffice stop reading at the root group's closing brace,
     // so the trailing content is ignored and recorded.
-    let full = Tree::parse_bytes(style_and_body)
+    let full = Tree::parse_bytes(style_and_body, litchi_rtf::read::OpenOptions::default())
         .unwrap_or_else(|error| panic!("failed to parse tdf108955.rtf: {error}"));
     assert_eq!(
         full.tolerance_report()
@@ -157,7 +157,7 @@ fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
     );
     let prefix = support::first_balanced_rtf_root_prefix(style_and_body)
         .expect("tdf108955.rtf should have a balanced first root group");
-    let style_and_body = Tree::parse_bytes(prefix).unwrap();
+    let style_and_body = Tree::parse_bytes(prefix, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         style_and_body
             .stylesheet()

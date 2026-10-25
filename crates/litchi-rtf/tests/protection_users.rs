@@ -8,12 +8,12 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{ProtectionUser, ProtectionUserTable, RtfWriter};
+use litchi_rtf::{ProtectionUser, ProtectionUserTable, write::Writer};
 use std::borrow::Cow;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -22,7 +22,7 @@ fn write(document: &Tree<'_>) -> Vec<u8> {
 #[test]
 fn parses_spec_grammar_as_ordered_inert_metadata_and_round_trips() {
     let document = Tree::parse(
-        r"{\rtf1\ansi{\*\protusertbl{DOMAIN\'5cuserone}{\u30740?\u21457?\u92?\u20320?}}Body}",
+        r"{\rtf1\ansi{\*\protusertbl{DOMAIN\'5cuserone}{\u30740?\u21457?\u92?\u20320?}}Body}", litchi_rtf::read::OpenOptions::default()
     )
     .unwrap();
     assert_eq!(document.text(), "Body");
@@ -32,7 +32,7 @@ fn parses_spec_grammar_as_ordered_inert_metadata_and_round_trips() {
     assert_eq!(users[1].name, "研发\\你");
 
     let output = write(&document);
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
         reparsed.protection_user_table(),
@@ -42,7 +42,7 @@ fn parses_spec_grammar_as_ordered_inert_metadata_and_round_trips() {
 
 #[test]
 fn typed_document_api_mutates_validated_inert_table() {
-    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut table = ProtectionUserTable::new(vec![
         ProtectionUser::new(Cow::Borrowed("DOMAIN\\alice")).unwrap(),
     ])
@@ -52,7 +52,7 @@ fn typed_document_api_mutates_validated_inert_table() {
         .unwrap();
     document.set_protection_user_table(table).unwrap();
 
-    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.protection_user_table(),
         document.protection_user_table()
@@ -76,11 +76,11 @@ fn rejects_malformed_active_or_oversized_tables() {
         r"{\rtf1\protusertbl Body}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
     }
 
     let oversized = format!(r"{{\rtf1{{\*\protusertbl{{{}}}}}}}", "x".repeat(65_537));
-    assert!(Tree::parse(&oversized).is_err());
+    assert!(Tree::parse(&oversized, litchi_rtf::read::OpenOptions::default()).is_err());
     assert!(ProtectionUser::new(Cow::Borrowed("\n")).is_err());
     assert!(ProtectionUserTable::new(Vec::new()).is_err());
 }

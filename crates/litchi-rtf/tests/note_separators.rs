@@ -8,7 +8,7 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{NoteSeparatorElement, NoteSeparatorKind, RtfWriter};
+use litchi_rtf::{NoteSeparatorElement, NoteSeparatorKind, write::Writer};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 {\*\ftnsep \'8a\chftnsep A\par B}
@@ -25,7 +25,7 @@ const FONT_SCOPED_SEPARATOR: &str = r"{\rtf1\ansi\ansicpg1252
 
 #[test]
 fn parses_decodes_and_round_trips_note_separators() {
-    let doc = Tree::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let table = doc.note_separators();
     assert_eq!(table.entries().len(), 6);
     let first = table.get(NoteSeparatorKind::FootnoteSeparator).unwrap();
@@ -54,13 +54,13 @@ fn parses_decodes_and_round_trips_note_separators() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    RtfWriter::new(&mut first_bytes)
+    Writer::new(&mut first_bytes)
         .write_document(&doc)
         .unwrap();
-    let reparsed = Tree::parse_bytes(&first_bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(table, reparsed.note_separators());
     let mut second_bytes = Vec::new();
-    RtfWriter::new(&mut second_bytes)
+    Writer::new(&mut second_bytes)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first_bytes, second_bytes);
@@ -79,7 +79,7 @@ fn rejects_malformed_note_separators() {
     ];
     for source in malformed {
         assert!(
-            Tree::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -113,7 +113,7 @@ fn parses_real_libreoffice_note_separator_fixture() {
     let mut isolated = br"{\rtf1\ansi\ansicpg1252".to_vec();
     isolated.extend_from_slice(&fixture[start..end.unwrap()]);
     isolated.push(b'}');
-    let doc = Tree::parse_bytes(&isolated).unwrap();
+    let doc = Tree::parse_bytes(&isolated, litchi_rtf::read::OpenOptions::default()).unwrap();
     let separator = doc
         .note_separators()
         .get(NoteSeparatorKind::FootnoteSeparator)
@@ -132,7 +132,7 @@ fn parses_real_libreoffice_note_separator_fixture() {
 
 #[test]
 fn starred_note_separator_font_controls_are_inert_and_do_not_leak_into_body() {
-    let document = Tree::parse(FONT_SCOPED_SEPARATOR).unwrap();
+    let document = Tree::parse(FONT_SCOPED_SEPARATOR, litchi_rtf::read::OpenOptions::default()).unwrap();
     let separator = document
         .note_separators()
         .get(NoteSeparatorKind::FootnoteSeparator)

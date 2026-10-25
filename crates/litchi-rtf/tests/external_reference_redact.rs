@@ -430,7 +430,7 @@ fn forged_oversized_operation_batch_is_rejected_before_selection_allocation() {
     .unwrap();
     assert!(matches!(
         source.apply_external_reference_redaction(&forged),
-        Err(EditError::Rtf(litchi_rtf::RtfError::LimitExceeded {
+        Err(EditError::Rtf(litchi_rtf::Error::LimitExceeded {
             resource: "external-reference patch operations",
             observed: 3,
             limit: 2,

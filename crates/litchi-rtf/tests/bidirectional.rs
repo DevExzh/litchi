@@ -8,12 +8,12 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, StyleBlock, TextDirection};
+use litchi_rtf::{write::Writer, StyleBlock, TextDirection};
 use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -30,7 +30,7 @@ fn block<'rtf>(document: &'rtf Tree<'rtf>, text: &str) -> StyleBlock<'rtf> {
 
 #[test]
 fn preserves_group_scoped_run_direction_and_boundaries() {
-    let document = Tree::parse(r"{\rtf1\ltrch Left {\rtlch Right} LeftAgain}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ltrch Left {\rtlch Right} LeftAgain}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&document, "Left").formatting.direction,
         Some(TextDirection::LeftToRight)
@@ -44,7 +44,7 @@ fn preserves_group_scoped_run_direction_and_boundaries() {
         Some(TextDirection::LeftToRight)
     );
 
-    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
         block(&reparsed, "Right").formatting.direction,
@@ -57,7 +57,7 @@ fn plain_and_pard_reset_character_and_paragraph_direction() {
     let document = Tree::parse(concat!(
         r#"{\rtf1\rtlpar\rtlch RTL\par "#,
         r#"\pard\plain LTR\par}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     let rtl = block(&document, "RTL");
     assert_eq!(rtl.formatting.direction, Some(TextDirection::RightToLeft));
@@ -70,14 +70,14 @@ fn plain_and_pard_reset_character_and_paragraph_direction() {
 
 #[test]
 fn writer_preserves_explicit_ltr_and_rtl_directions() {
-    let document = Tree::parse(r"{\rtf1\rtlpar{\rtlch rtl}{\ltrch ltr}\par}").unwrap();
+    let document = Tree::parse(r"{\rtf1\rtlpar{\rtlch rtl}{\ltrch ltr}\par}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"\rtlpar"));
     assert!(serialized.contains(r"\rtlch"));
     assert!(serialized.contains(r"\ltrch"));
 
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&reparsed, "rtl").formatting.direction,
         Some(TextDirection::RightToLeft)
@@ -105,7 +105,7 @@ fn parses_bundled_libreoffice_bidirectional_fixtures() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = Tree::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(
             document.blocks().iter().any(|block| {
@@ -122,7 +122,7 @@ fn round_trips_document_section_table_and_row_direction() {
         r#"{\rtf1\rtldoc\rtlgutter\sectd\rtlsect "#,
         r#"\trowd\taprtl\rtlrow\cellx2000\cellx4000\pard\intbl A\cell B\cell\row "#,
         r#"\trowd\ltrrow\cellx2000\cellx4000\pard\intbl C\cell D\cell\row}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(
         document.document_direction(),
@@ -156,7 +156,7 @@ fn round_trips_document_section_table_and_row_direction() {
     ] {
         assert!(serialized.contains(&format!(r"\{control}")));
     }
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         !reparsed.tables().is_empty(),
         "writer emitted no reparsable table: {serialized}"
@@ -184,7 +184,7 @@ fn explicit_ltr_and_reset_controls_are_typed() {
         r#"{\rtf1\ltrdoc\sectd\rtlsect\sectd\ltrsect "#,
         r#"\trowd\taprtl0\rtlrow\cellx1000\pard\intbl A\cell\row "#,
         r#"\trowd\cellx1000\pard\intbl B\cell\row}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(
         document.document_direction(),
@@ -212,6 +212,7 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
 
     let gutter = Tree::parse_bytes(
         &fs::read(format!("{root}/sw/qa/extras/rtfexport/data/rtl-gutter.rtf")).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert!(gutter.gutter_on_right());
@@ -221,6 +222,7 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
             "{root}/sw/qa/extras/rtfexport/data/dplinehollow.rtf"
         ))
         .unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(
@@ -230,6 +232,7 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
 
     let row_rtl = Tree::parse_bytes(
         &fs::read(format!("{root}/sw/qa/extras/rtfexport/data/table-rtl.rtf")).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(
@@ -239,6 +242,7 @@ fn parses_bundled_libreoffice_scope_direction_fixtures() {
 
     let section_ltr = Tree::parse_bytes(
         &fs::read(format!("{root}/sw/qa/core/data/rtf/pass/tdf116851.rtf")).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert!(

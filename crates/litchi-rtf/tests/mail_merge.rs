@@ -10,7 +10,7 @@
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     MAX_MAIL_MERGE_STRING_BYTES, MailMerge, MailMergeColumnIndex, MailMergeDataSourceObject,
-    MailMergeDataSourceType, MailMergeFieldMapping, RtfWriter,
+    MailMergeDataSourceType, MailMergeFieldMapping, write::Writer,
 };
 use std::borrow::Cow;
 
@@ -33,7 +33,7 @@ fn parses_and_round_trips_complete_inert_mail_merge_metadata() {
         r#"{\*\mmodsomappedname ZIP}}{\*\mmodsorecipdata 1,1,0}}}Body}"#,
     );
 
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "Body");
     let merge = document.mail_merge().unwrap();
     assert!(merge.link_to_query);
@@ -53,17 +53,17 @@ fn parses_and_round_trips_complete_inert_mail_merge_metadata() {
     assert_eq!(object.recipient_data, ["1,1,0"]);
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(&document)
         .unwrap();
-    let reparsed = Tree::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Body");
     assert_eq!(reparsed.mail_merge(), document.mail_merge());
 }
 
 #[test]
 fn ergonomic_api_round_trips_without_interpreting_values() {
-    let mut document = Tree::parse(r"{\rtf1 Safe body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Safe body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut object = MailMergeDataSourceObject {
         source_type: Some(MailMergeDataSourceType::from_rtf(99)),
         ..MailMergeDataSourceObject::default()
@@ -81,10 +81,10 @@ fn ergonomic_api_round_trips_without_interpreting_values() {
     document.set_mail_merge(merge).unwrap();
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(&document)
         .unwrap();
-    let reparsed = Tree::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Safe body");
     assert_eq!(reparsed.mail_merge(), document.mail_merge());
 }
@@ -98,10 +98,10 @@ fn rejects_duplicate_nonstarred_nested_and_oversized_metadata() {
         r"{\rtf1{\*\mailmerge{\*\mmquery before{nested}after}}}",
         r"{\rtf1{\*\mailmerge{\*\mmodso{\*\mmodsofldmpdata{\*\mmodsoname MissingColumn}}}}}",
     ] {
-        assert!(Tree::parse(malformed).is_err(), "accepted {malformed}");
+        assert!(Tree::parse(malformed, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {malformed}");
     }
 
     let oversized = "x".repeat(MAX_MAIL_MERGE_STRING_BYTES + 1);
     let malformed = [r"{\rtf1{\*\mailmerge{\*\mmquery ", &oversized, "}}}}"].concat();
-    assert!(Tree::parse(&malformed).is_err());
+    assert!(Tree::parse(&malformed, litchi_rtf::read::OpenOptions::default()).is_err());
 }
