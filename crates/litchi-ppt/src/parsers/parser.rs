@@ -180,11 +180,11 @@ impl RecordParser {
 
     /// Get all records recursively as owned clones.
     ///
-    /// This explicitly copying view preserves the complete record tree for
+    /// This explicit copying view preserves the complete record tree for
     /// callers that need ownership. Use [`Self::find_records_ref`] when a
     /// zero-copy borrowed view is sufficient.
     #[must_use]
-    pub fn find_records_owned(&self, _record_type: RecordType) -> Vec<Record> {
+    pub fn find_records_owned(&self) -> Vec<Record> {
         // Collect all records recursively
         let mut all_records = Vec::new();
         Self::collect_records_recursive(&self.records, &mut all_records);
@@ -319,15 +319,56 @@ mod tests {
 
     #[test]
     fn owned_record_view_preserves_the_complete_clone_traversal() {
-        let data = [0u8; 8];
-        let mut parser = RecordParser::new();
-        parser
-            .parse_document(&data, &SourceLimits::default())
-            .expect("one empty record");
+        fn record(
+            record_type: RecordType,
+            version: u16,
+            instance: u16,
+            data: &[u8],
+            children: Vec<Record>,
+        ) -> Record {
+            Record {
+                record_type,
+                record_type_raw: record_type.as_u16(),
+                version,
+                instance,
+                data_length: u32::try_from(data.len()).expect("small test payload"),
+                data: data.into(),
+                children,
+            }
+        }
 
-        let owned = parser.find_records_owned(RecordType::Unknown);
-        let borrowed = parser.find_records_ref();
-        assert_eq!(owned, borrowed.into_iter().cloned().collect::<Vec<_>>());
+        let text = record(RecordType::TextCharsAtom, 0, 0, &[0x41, 0x00], Vec::new());
+        let slide = record(RecordType::Slide, 0x0f, 2, &[], vec![text.clone()]);
+        let metadata = record(
+            RecordType::TextHeaderAtom,
+            0,
+            0,
+            &[0x09, 0x00, 0x00, 0x00],
+            Vec::new(),
+        );
+        let document = record(
+            RecordType::Document,
+            0x0f,
+            1,
+            &[],
+            vec![slide.clone(), metadata.clone()],
+        );
+        let expected = vec![document.clone(), slide, text, metadata];
+        let parser = RecordParser {
+            records: vec![document],
+            slide_atoms_sets: OnceLock::new(),
+        };
+
+        let owned = parser.find_records_owned();
+        drop(parser);
+
+        assert_eq!(owned, expected);
+        assert_eq!(owned[0].record_type, RecordType::Document);
+        assert_eq!(owned[0].children[0].record_type, RecordType::Slide);
+        assert_eq!(owned[2].record_type, RecordType::TextCharsAtom);
+        assert_eq!(owned[2].data.as_slice(), &[0x41, 0x00]);
+        assert_eq!(owned[3].record_type, RecordType::TextHeaderAtom);
+        assert_eq!(owned[3].data.as_slice(), &[0x09, 0x00, 0x00, 0x00]);
     }
 
     #[test]

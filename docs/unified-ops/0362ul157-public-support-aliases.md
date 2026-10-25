@@ -5,7 +5,7 @@
 - Base: `f8cd398a770f7363f628be40edb3ce4219566c16`.
 
 This leaf closes the public support-name residue without retaining deprecated
-forwarders. `litchi_ppt::RecordParser::find_records_owned` keeps the original
+forwarders. `litchi_ppt::RecordParser::find_records_owned()` keeps the original
 recursive owned-clone capability under a name that states its allocation
 behavior; all in-tree consumers already use the borrowed `find_records_ref`
 view, and the old `find_records` spelling is deleted.

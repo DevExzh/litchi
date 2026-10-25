@@ -3487,6 +3487,6 @@ mutable state.
 
 | Name | Status |
 |---|---|
-| `litchi_ppt::RecordParser::find_records_owned` | adopted (0362ul157); preserves the complete owned-clone traversal, while `find_records_ref` remains the borrowed zero-copy view; the deprecated `find_records` spelling is deleted |
+| `litchi_ppt::RecordParser::find_records_owned()` | adopted (0362ul157; corrected 0362ul157a); preserves the complete owned-clone traversal without a misleading unused filter argument, while `find_records_ref` remains the borrowed zero-copy view; the deprecated `find_records` spelling is deleted |
 | `litchi_iwa_graph::ReferenceGraph::{add_object_reference, incoming, outgoing, all_object_ids, has_cycle, reachable, statistics}` | adopted (0362ul157); all public identities are `ObjectId`, `ObjectId::try_from(0)` is rejected, and the former raw-`u64` wrappers are deleted |
 | `litchi_iwa_index::ObjectIndex::reference_snapshot` | adopted (0362ul157); borrows the complete immutable `ReferenceGraphSnapshot`, retaining its typed `Clone` capability; the deprecated `reference_graph` spelling is deleted |
