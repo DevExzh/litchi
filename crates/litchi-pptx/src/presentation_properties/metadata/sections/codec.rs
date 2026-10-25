@@ -1,15 +1,13 @@
 //! Typed, bounded support for `PowerPoint` 2010 presentation sections.
 
-use super::super::{Limits, process_ooxml};
+use super::super::{BoundedString, Limits, process_ooxml};
 use super::model::{List, Section};
-use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use std::collections::HashSet;
-use std::fmt::Write as FmtWrite;
 
 const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -23,33 +21,33 @@ impl Section {
     /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
         validate_section(self, limits)?;
-        let mut xml = String::with_capacity(256);
-        xml.push_str("<p14:section");
+        let mut xml = BoundedString::new(limits, "presentation section output");
+        self.write_xml(&mut xml)?;
+        Ok(xml.finish())
+    }
+
+    fn write_xml(&self, xml: &mut BoundedString) -> Result<()> {
+        xml.push_str("<p14:section")?;
         if let Some(name) = &self.name {
-            write!(xml, " name=\"{}\"", escape_xml(name))
-                .map_err(|error| Error::Xml(error.to_string()))?;
+            xml.push_str(" name=\"")?;
+            xml.push_escaped_xml(name)?;
+            xml.push_str("\"")?;
         }
         if let Some(id) = &self.id {
-            write!(xml, " id=\"{}\"", escape_xml(id))
-                .map_err(|error| Error::Xml(error.to_string()))?;
+            xml.push_str(" id=\"")?;
+            xml.push_escaped_xml(id)?;
+            xml.push_str("\"")?;
         }
-        xml.push_str("><p14:sldIdLst>");
+        xml.push_str("><p14:sldIdLst>")?;
         for slide_id in &self.slide_ids {
-            write!(xml, "<p14:sldId id=\"{slide_id}\"/>")
-                .map_err(|error| Error::Xml(error.to_string()))?;
+            xml.write_fmt(format_args!("<p14:sldId id=\"{slide_id}\"/>"))?;
         }
-        xml.push_str("</p14:sldIdLst>");
+        xml.push_str("</p14:sldIdLst>")?;
         if let Some(extension) = &self.extension_xml {
-            xml.push_str(std::str::from_utf8(extension).map_err(xml_error)?);
+            xml.push_str(std::str::from_utf8(extension).map_err(xml_error)?)?;
         }
-        xml.push_str("</p14:section>");
-        if xml.len() > limits.max_output_bytes() {
-            return Err(limit(
-                "presentation section output",
-                limits.max_output_bytes(),
-            ));
-        }
-        Ok(xml)
+        xml.push_str("</p14:section>")?;
+        Ok(())
     }
 }
 
@@ -123,23 +121,17 @@ impl List {
             return Ok(String::new());
         }
         validate_list(self, limits)?;
-        let mut xml = String::with_capacity(1024);
-        xml.push_str("<p:extLst><p:ext uri=\"");
-        xml.push_str(SECTION_URI);
-        xml.push_str("\"><p14:sectionLst xmlns:p14=\"");
-        xml.push_str(P14);
-        xml.push_str("\">");
+        let mut xml = BoundedString::new(limits, "serialized presentation sections");
+        xml.push_str("<p:extLst><p:ext uri=\"")?;
+        xml.push_str(SECTION_URI)?;
+        xml.push_str("\"><p14:sectionLst xmlns:p14=\"")?;
+        xml.push_str(P14)?;
+        xml.push_str("\">")?;
         for section in &self.sections {
-            xml.push_str(&section.to_xml(limits)?);
+            section.write_xml(&mut xml)?;
         }
-        xml.push_str("</p14:sectionLst></p:ext></p:extLst>");
-        if xml.len() > limits.max_output_bytes() {
-            return Err(limit(
-                "serialized presentation sections",
-                limits.max_output_bytes(),
-            ));
-        }
-        Ok(xml)
+        xml.push_str("</p14:sectionLst></p:ext></p:extLst>")?;
+        Ok(xml.finish())
     }
 }
 
@@ -210,13 +202,20 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
                 attach(&mut stack, &mut root, node)?;
             },
             Ok(Event::Text(text)) => {
-                let text = text.decode().map_err(xml_error)?.into_owned();
+                if text.as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-section XML text",
+                        limits.max_string_bytes(),
+                    ));
+                }
+                let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
                         "presentation-section XML text",
                         limits.max_string_bytes(),
                     ));
                 }
+                let text = text.into_owned();
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::Text(text));
                 } else if !text.trim().is_empty() {
@@ -224,13 +223,20 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
                 }
             },
             Ok(Event::CData(text)) => {
-                let text = text.decode().map_err(xml_error)?.into_owned();
+                if text.as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-section XML CDATA",
+                        limits.max_string_bytes(),
+                    ));
+                }
+                let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
                         "presentation-section XML CDATA",
                         limits.max_string_bytes(),
                     ));
                 }
+                let text = text.into_owned();
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::CData(text));
                 } else {
@@ -238,18 +244,31 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
                 }
             },
             Ok(Event::Comment(text)) => {
-                let text = text.decode().map_err(xml_error)?.into_owned();
+                if text.as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-section XML comment",
+                        limits.max_string_bytes(),
+                    ));
+                }
+                let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
                         "presentation-section XML comment",
                         limits.max_string_bytes(),
                     ));
                 }
+                let text = text.into_owned();
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::Comment(text));
                 }
             },
             Ok(Event::GeneralRef(reference)) => {
+                if reference.as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-section XML reference",
+                        limits.max_string_bytes(),
+                    ));
+                }
                 let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
@@ -283,9 +302,9 @@ fn make_node(
     stack: &[Node],
     limits: Limits,
 ) -> Result<Node> {
-    let qname = std::str::from_utf8(element.name().as_ref())
-        .map_err(xml_error)?
-        .to_owned();
+    let qname = std::str::from_utf8(element.name().as_ref()).map_err(xml_error)?;
+    bounded_string(qname, limits)?;
+    let qname = qname.to_owned();
     let mut bindings = stack
         .last()
         .map(|node| node.bindings.clone())
@@ -299,22 +318,24 @@ fn make_node(
                 limits.max_attributes(),
             ));
         }
+        let name = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
+        bounded_string(name, limits)?;
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(limit(
+                "presentation-section XML attribute",
+                limits.max_string_bytes(),
+            ));
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-            .map_err(xml_error)?
-            .into_owned();
+            .map_err(xml_error)?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
                 "presentation-section XML attribute",
                 limits.max_string_bytes(),
             ));
         }
-        raw.push((
-            std::str::from_utf8(attribute.key.as_ref())
-                .map_err(xml_error)?
-                .to_owned(),
-            value,
-        ));
+        raw.push((name.to_owned(), value.into_owned()));
     }
     for (name, value) in &raw {
         if name == "xmlns" || name.starts_with("xmlns:") {
@@ -654,68 +675,59 @@ fn bounded_string(value: &str, limits: Limits) -> Result<()> {
 }
 
 fn node_xml(node: &Node) -> Result<Vec<u8>> {
-    let mut xml = String::new();
+    let mut xml = BoundedString::with_limit(
+        node.limits.max_string_bytes(),
+        "presentation section node XML",
+    );
     write_node(&mut xml, node)?;
-    if xml.len() > node.limits.max_string_bytes() {
-        return Err(limit(
-            "presentation section node XML",
-            node.limits.max_string_bytes(),
-        ));
-    }
-    Ok(xml.into_bytes())
+    Ok(xml.finish().into_bytes())
 }
 
-fn write_node(xml: &mut String, node: &Node) -> Result<()> {
-    xml.push('<');
-    xml.push_str(&node.qname);
+fn write_node(xml: &mut BoundedString, node: &Node) -> Result<()> {
+    xml.push('<')?;
+    xml.push_str(&node.qname)?;
     for (prefix, uri) in &node.bindings {
         if prefix.is_empty() {
-            xml.push_str(" xmlns=\"");
+            xml.push_str(" xmlns=\"")?;
         } else {
-            xml.push_str(" xmlns:");
-            xml.push_str(prefix);
-            xml.push_str("=\"");
+            xml.push_str(" xmlns:")?;
+            xml.push_str(prefix)?;
+            xml.push_str("=\"")?;
         }
-        escape_attribute(xml, uri);
-        xml.push('"');
+        escape_attribute(xml, uri)?;
+        xml.push('"')?;
     }
     for attribute in &node.attributes {
-        xml.push(' ');
-        xml.push_str(&attribute.qname);
-        xml.push_str("=\"");
-        escape_attribute(xml, &attribute.value);
-        xml.push('"');
+        xml.push(' ')?;
+        xml.push_str(&attribute.qname)?;
+        xml.push_str("=\"")?;
+        escape_attribute(xml, &attribute.value)?;
+        xml.push('"')?;
     }
     if node.content.is_empty() {
-        xml.push_str("/>");
+        xml.push_str("/>")?;
         return Ok(());
     }
-    xml.push('>');
+    xml.push('>')?;
     for content in &node.content {
         match content {
             Content::Node(node) => write_node(xml, node)?,
-            Content::Text(text) => escape_text(xml, text),
+            Content::Text(text) => escape_text(xml, text)?,
             Content::CData(text) => {
-                xml.push_str("<![CDATA[");
-                xml.push_str(text);
-                xml.push_str("]]>");
+                xml.push_str("<![CDATA[")?;
+                xml.push_str(text)?;
+                xml.push_str("]]>")?;
             },
             Content::Comment(text) => {
-                xml.push_str("<!--");
-                xml.push_str(text);
-                xml.push_str("-->");
+                xml.push_str("<!--")?;
+                xml.push_str(text)?;
+                xml.push_str("-->")?;
             },
         }
     }
-    xml.push_str("</");
-    xml.push_str(&node.qname);
-    xml.push('>');
-    if xml.len() > node.limits.max_string_bytes() {
-        return Err(limit(
-            "presentation section node XML",
-            node.limits.max_string_bytes(),
-        ));
-    }
+    xml.push_str("</")?;
+    xml.push_str(&node.qname)?;
+    xml.push('>')?;
     Ok(())
 }
 
@@ -739,29 +751,31 @@ fn resolve(bindings: &[(String, String)], prefix: &str) -> Result<String> {
         .ok_or_else(|| invalid(format!("unbound namespace prefix '{prefix}'")))
 }
 
-fn escape_attribute(output: &mut String, value: &str) {
+fn escape_attribute(output: &mut BoundedString, value: &str) -> Result<()> {
     for character in value.chars() {
         match character {
-            '&' => output.push_str("&amp;"),
-            '<' => output.push_str("&lt;"),
-            '"' => output.push_str("&quot;"),
-            '\r' => output.push_str("&#xD;"),
-            '\n' => output.push_str("&#xA;"),
-            '\t' => output.push_str("&#x9;"),
-            _ => output.push(character),
+            '&' => output.push_str("&amp;")?,
+            '<' => output.push_str("&lt;")?,
+            '"' => output.push_str("&quot;")?,
+            '\r' => output.push_str("&#xD;")?,
+            '\n' => output.push_str("&#xA;")?,
+            '\t' => output.push_str("&#x9;")?,
+            _ => output.push(character)?,
         }
     }
+    Ok(())
 }
 
-fn escape_text(output: &mut String, value: &str) {
+fn escape_text(output: &mut BoundedString, value: &str) -> Result<()> {
     for character in value.chars() {
         match character {
-            '&' => output.push_str("&amp;"),
-            '<' => output.push_str("&lt;"),
-            '>' => output.push_str("&gt;"),
-            _ => output.push(character),
+            '&' => output.push_str("&amp;")?,
+            '<' => output.push_str("&lt;")?,
+            '>' => output.push_str("&gt;")?,
+            _ => output.push(character)?,
         }
     }
+    Ok(())
 }
 
 fn invalid(message: impl Into<String>) -> Error {

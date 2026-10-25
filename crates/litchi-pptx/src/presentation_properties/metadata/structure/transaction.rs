@@ -1,7 +1,7 @@
 //! Detached, source-checked edits for the validated presentation structure.
 //!
 //! The presentation slide relationship graph is captured as immutable source
-//! context. Transactions edit only the semantic custom-show and section
+//! context. Detached edits only the semantic custom-show and section
 //! layers, while publication replaces one presentation XML blob atomically.
 //! Every candidate is parsed and validated again before it becomes a commit.
 
@@ -64,15 +64,6 @@ impl Snapshot {
         super::package::load_snapshot(package, limits)
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage, limits: Limits) -> Result<Self> {
-        Self::load(package, limits)
-    }
-
     pub(crate) fn from_wire(
         presentation_part_name: String,
         presentation_content_type: String,
@@ -104,13 +95,6 @@ impl Snapshot {
     #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.graph
-    }
-
-    /// Contextual alias for [`Self::graph`].
-    #[inline]
-    #[must_use]
-    pub fn structure(&self) -> &Graph {
-        self.graph()
     }
 
     /// Borrow the resolved, ordered presentation slide references.
@@ -215,13 +199,6 @@ impl Draft {
     #[must_use]
     pub fn graph(&self) -> &Graph {
         &self.working
-    }
-
-    /// Contextual alias for [`Self::graph`].
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Graph {
-        self.graph()
     }
 
     /// Borrow the staged custom-show catalog.

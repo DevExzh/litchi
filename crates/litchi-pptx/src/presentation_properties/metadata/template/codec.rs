@@ -4,9 +4,8 @@
 //! These templates contain the bare minimum structure required for a valid .pptx file.
 //! Generate valid presentation.xml content (based on python-pptx template).
 
-use super::super::escape_xml;
-use super::Limits;
-use crate::{Error, Result};
+use super::super::{BoundedString, Limits, check_string};
+use crate::Result;
 
 /// Creates an empty presentation with no slides but complete text styling.
 #[must_use]
@@ -132,23 +131,16 @@ pub fn default_pres_props_xml() -> &'static str {
 /// The `prn_what` parameter should be a valid `ST_PrintWhat` value like "handouts1", "handouts6", etc.
 #[must_use]
 pub fn pres_props_xml_with_handout(prn_what: &str, limits: Limits) -> Result<String> {
-    if prn_what.len() > limits.max_string_bytes() {
-        return Err(Error::Limit {
-            resource: "template handout print mode",
-            limit: limits.max_string_bytes(),
-        });
-    }
-    let xml = format!(
-        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:prnPr prnWhat="{}"/><p:extLst><p:ext uri="{{E76CE94A-603C-4142-B9EB-6D1370010A27}}"><p14:discardImageEditData xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext><p:ext uri="{{D31A062A-798A-4329-ABDD-BBA856620510}}"><p14:defaultImageDpi xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext></p:extLst></p:presentationPr>"#,
-        escape_xml(prn_what)
-    );
-    if xml.len() > limits.max_output_bytes() {
-        return Err(Error::Limit {
-            resource: "serialized presentation template",
-            limit: limits.max_output_bytes(),
-        });
-    }
-    Ok(xml)
+    check_string(prn_what, limits, "template handout print mode")?;
+    let mut xml = BoundedString::new(limits, "serialized presentation template");
+    xml.push_str(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:prnPr prnWhat=""#,
+    )?;
+    xml.push_escaped_xml(prn_what)?;
+    xml.push_str(
+        r#""/><p:extLst><p:ext uri="{E76CE94A-603C-4142-B9EB-6D1370010A27}"><p14:discardImageEditData xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext><p:ext uri="{D31A062A-798A-4329-ABDD-BBA856620510}"><p14:defaultImageDpi xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext></p:extLst></p:presentationPr>"#,
+    )?;
+    Ok(xml.finish())
 }
 
 /// Generate a minimal valid core.xml (core properties) content.

@@ -34,15 +34,6 @@ impl Snapshot {
         package::load_snapshot(package, limits)
     }
 
-    /// Alias emphasizing that the result is bound to exact source bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage, limits: Limits) -> Result<Self> {
-        Self::load(package, limits)
-    }
-
     pub(crate) fn from_located(
         presentation_part_name: String,
         presentation_content_type: String,
@@ -79,13 +70,6 @@ impl Snapshot {
     #[must_use]
     pub fn list(&self) -> &List {
         &self.list
-    }
-
-    /// Alias for callers using the domain name rather than the wire list name.
-    #[inline]
-    #[must_use]
-    pub fn custom_shows(&self) -> &List {
-        self.list()
     }
 
     /// Return the owning `PresentationML` part name.
@@ -154,13 +138,6 @@ impl Draft {
         &self.working
     }
 
-    /// Alias for list.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &List {
-        self.list()
-    }
-
     fn has_changes(&self) -> bool {
         self.original.list.shows != self.working.shows
     }
@@ -205,15 +182,6 @@ impl Draft {
     /// Returns an error if the operation fails.
     pub fn add(&mut self, show: Show) -> Result<()> {
         self.insert(self.working.shows.len(), show)
-    }
-
-    /// Alias for add.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn push(&mut self, show: Show) -> Result<()> {
-        self.add(show)
     }
 
     /// Create a show using the list's next available ID and return that ID.

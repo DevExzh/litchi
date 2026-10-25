@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use super::super::{Limits, process_ooxml};
+use super::super::{Limits, checked_output_len, process_ooxml};
 use super::model::{Map, Override, Role, Slot, Value};
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
@@ -239,6 +239,12 @@ pub(crate) fn rewrite(
 ) -> Result<Vec<u8>> {
     check_input(source, limits)?;
     if located.value == desired {
+        if source.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "serialized color-map XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
         return Ok(source.to_vec());
     }
     let before = mapped_value(&located.value).ok_or_else(|| {
@@ -251,6 +257,34 @@ pub(crate) fn rewrite(
         Error::Invalid("color-map source has no editable mapping attributes".to_string())
     })?;
 
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for (index, slot) in Slot::ALL.into_iter().enumerate() {
+        let old = before.color(slot);
+        let new = after.color(slot);
+        if old != new {
+            let range = &attributes[index];
+            removed =
+                removed
+                    .checked_add(range.end - range.start)
+                    .ok_or(Error::CapacityOverflow {
+                        resource: "serialized color-map XML",
+                    })?;
+            added = added
+                .checked_add(new.as_str().len())
+                .ok_or(Error::CapacityOverflow {
+                    resource: "serialized color-map XML",
+                })?;
+        }
+    }
+    checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "serialized color-map XML",
+    )?;
+
     let mut replacements = Vec::new();
     for (index, slot) in Slot::ALL.into_iter().enumerate() {
         let old = before.color(slot);
@@ -262,14 +296,7 @@ pub(crate) fn rewrite(
             });
         }
     }
-    let output = apply_replacements(source, replacements)?;
-    if output.len() > limits.max_output_bytes() {
-        return Err(Error::Limit {
-            resource: "serialized color-map XML",
-            limit: limits.max_output_bytes(),
-        });
-    }
-    Ok(output)
+    apply_replacements(source, replacements, limits)
 }
 
 fn check_input(xml: &[u8], limits: Limits) -> Result<()> {
@@ -452,11 +479,16 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
+fn apply_replacements(
+    source: &[u8],
+    mut replacements: Vec<Replacement>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
     replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
-    let mut output = source.to_vec();
     let mut upper = source.len();
-    for replacement in replacements {
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for replacement in &replacements {
         if replacement.range.start > replacement.range.end
             || replacement.range.end > source.len()
             || replacement.range.end > upper
@@ -465,9 +497,40 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
                 "color-map patch ranges overlap or escape the source".to_string(),
             ));
         }
-        output.splice(replacement.range.clone(), replacement.value);
+        removed = removed
+            .checked_add(replacement.range.end - replacement.range.start)
+            .ok_or(Error::CapacityOverflow {
+                resource: "serialized color-map XML",
+            })?;
+        added = added
+            .checked_add(replacement.value.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "serialized color-map XML",
+            })?;
         upper = replacement.range.start;
     }
+    let output_len = checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "serialized color-map XML",
+    )?;
+    let mut output = Vec::new();
+    output
+        .try_reserve(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "serialized color-map XML",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for replacement in replacements.into_iter().rev() {
+        output.extend_from_slice(&source[cursor..replacement.range.start]);
+        output.extend_from_slice(&replacement.value);
+        cursor = replacement.range.end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    debug_assert_eq!(output.len(), output_len);
     Ok(output)
 }
 
@@ -783,6 +846,18 @@ fn check_attributes(
             return Err(Error::Limit {
                 resource: "color-map XML attributes",
                 limit: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "color-map XML attribute name",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "color-map XML attribute",
+                limit: limits.max_string_bytes(),
             });
         }
         let value = attribute

@@ -1,6 +1,6 @@
 //! Bounded protection XML codec.
 
-use super::super::{Limits, process_str};
+use super::super::{BoundedString, Limits, process_str};
 use super::model::{Algorithm, Settings, Verifier};
 use crate::{Error, Result};
 use base64::Engine;
@@ -173,40 +173,30 @@ impl Settings {
         let Some(verifier) = &self.modify else {
             return Ok(String::new());
         };
-        let value = format!(
+        let mut value = BoundedString::new(limits, "serialized protection XML");
+        value.write_fmt(format_args!(
             r#"<p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash" cryptAlgorithmType="typeAny" cryptAlgorithmSid="{}" spinCount="{}" saltData="{}" hashData="{}"/>"#,
             verifier.algorithm.sid(),
             verifier.spin_count,
             verifier.salt,
             verifier.hash,
-        );
-        if value.len() > limits.max_output_bytes() {
-            return Err(Error::Limit {
-                resource: "serialized protection XML",
-                limit: limits.max_output_bytes(),
-            });
-        }
-        Ok(value)
+        ))?;
+        Ok(value.finish())
     }
 
     #[must_use]
     pub fn to_pres_props_xml(&self, limits: Limits) -> Result<String> {
-        let value = if self.read_only_recommended {
-            format!(
-                r#"<p:extLst><p:ext uri="{}"><p1710:readonlyRecommended xmlns:p1710="{}" val="1"/></p:ext></p:extLst>"#,
-                crate::presentation_properties::READONLY_RECOMMENDED_URI,
-                crate::presentation_properties::P1710_NS,
-            )
-        } else {
-            String::new()
-        };
-        if value.len() > limits.max_output_bytes() {
-            return Err(Error::Limit {
-                resource: "serialized protection presentation-properties XML",
-                limit: limits.max_output_bytes(),
-            });
+        if !self.read_only_recommended {
+            return Ok(String::new());
         }
-        Ok(value)
+        let mut value =
+            BoundedString::new(limits, "serialized protection presentation-properties XML");
+        value.write_fmt(format_args!(
+            r#"<p:extLst><p:ext uri="{}"><p1710:readonlyRecommended xmlns:p1710="{}" val="1"/></p:ext></p:extLst>"#,
+            crate::presentation_properties::READONLY_RECOMMENDED_URI,
+            crate::presentation_properties::P1710_NS,
+        ))?;
+        Ok(value.finish())
     }
 }
 
@@ -232,16 +222,28 @@ fn parse_verifier(
                 limit: limits.max_attributes(),
             });
         }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML attribute name",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .into_owned();
+            .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(Error::Limit {
                 resource: "protection XML attribute",
                 limit: limits.max_string_bytes(),
             });
         }
+        let value = value.into_owned();
         match attribute.key.as_ref() {
             b"hashValue" | b"hashData" => set_once(&mut hash, value, "hash")?,
             b"saltValue" | b"saltData" => set_once(&mut salt, value, "salt")?,
@@ -322,6 +324,18 @@ fn check_attributes(
             return Err(Error::Limit {
                 resource: "protection XML attributes",
                 limit: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML attribute name",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML attribute",
+                limit: limits.max_string_bytes(),
             });
         }
         let value = attribute

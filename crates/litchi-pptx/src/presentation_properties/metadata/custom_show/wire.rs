@@ -14,9 +14,8 @@ use litchi_opc::{OpcPackage, Part};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
-use super::super::Limits;
+use super::super::{BoundedString, Limits, check_string, checked_output_len};
 use super::model::{List, Show};
-use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -215,11 +214,23 @@ pub(crate) fn rewrite(
     }
     validate_list(after, layout.slide_id_to_relationship.keys(), limits)?;
     if before.shows == after.shows {
+        if source.len() > limits.max_output_bytes() {
+            return Err(limit(
+                "patched custom-show PresentationML source bytes",
+                limits.max_output_bytes(),
+            ));
+        }
         return Ok(source.to_vec());
     }
 
     let Some(custom) = layout.custom_list.as_ref() else {
         if after.is_empty() {
+            if source.len() > limits.max_output_bytes() {
+                return Err(limit(
+                    "patched custom-show PresentationML source bytes",
+                    limits.max_output_bytes(),
+                ));
+            }
             return Ok(source.to_vec());
         }
         let rendered = render_custom_list(layout, after, limits)?;
@@ -285,7 +296,7 @@ pub(crate) fn rewrite(
     }
 
     if after.shows.len() > slots.len() {
-        let mut rendered = String::new();
+        let mut rendered = BoundedString::new(limits, "custom-show XML output");
         for show in &after.shows[slots.len()..] {
             rendered.push_str(&render_show(
                 source,
@@ -294,11 +305,11 @@ pub(crate) fn rewrite(
                 original_values.get(&show.id).copied(),
                 show,
                 limits,
-            )?);
+            )?)?;
         }
         replacements.push(Replacement {
             range: custom.span.close_start..custom.span.close_start,
-            value: rendered.into_bytes(),
+            value: rendered.finish().into_bytes(),
         });
     }
     replace_ranges(source, &replacements, limits)
@@ -503,6 +514,12 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<Layout> {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
                 count_node(&mut nodes, stack.len(), limits)?;
+                if element.name().as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "custom-show XML element name",
+                        limits.max_string_bytes(),
+                    ));
+                }
                 let local = local_name(element.name().as_ref())?;
                 let qualified_name = std::str::from_utf8(element.name().as_ref())
                     .map_err(|error| Error::Xml(error.to_string()))?
@@ -531,6 +548,12 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<Layout> {
             },
             Ok(Event::Empty(element)) => {
                 count_node(&mut nodes, stack.len(), limits)?;
+                if element.name().as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "custom-show XML element name",
+                        limits.max_string_bytes(),
+                    ));
+                }
                 let local = local_name(element.name().as_ref())?;
                 let qualified_name = std::str::from_utf8(element.name().as_ref())
                     .map_err(|error| Error::Xml(error.to_string()))?
@@ -756,18 +779,15 @@ fn attach_frame(
 }
 
 fn parse_show_layout(source: &[u8], span: Span, value: &Frame) -> Result<ShowLayout> {
-    let start_end = source[span.start..]
-        .iter()
-        .position(|byte| *byte == b'>')
-        .map(|offset| span.start + offset + 1)
-        .ok_or_else(|| invalid("custom-show start tag is unterminated"))?;
-    let raw = &source[span.start..start_end];
-    let (qualified_name, parsed) = parse_raw_start_tag(raw)?;
-    let id = find_attribute(&parsed, "id")
+    let raw_end = (value.close_start > span.start)
+        .then_some(value.close_start)
+        .unwrap_or(span.end);
+    let raw = &source[span.start..raw_end];
+    let id = find_attribute(&value.attributes, "id")
         .ok_or_else(|| invalid("custom show is missing its ID"))?
         .parse::<u32>()
         .map_err(|_err| invalid("custom show ID is not a u32"))?;
-    let name = find_attribute(&parsed, "name")
+    let name = find_attribute(&value.attributes, "name")
         .ok_or_else(|| invalid("custom show is missing its name"))?
         .to_owned();
     if name.is_empty() {
@@ -778,7 +798,7 @@ fn parse_show_layout(source: &[u8], span: Span, value: &Frame) -> Result<ShowLay
         .ok_or_else(|| invalid("custom show name attribute is malformed"))?;
     Ok(ShowLayout {
         span,
-        qualified_name,
+        qualified_name: value.qualified_name.clone(),
         id,
         name,
         name_attribute,
@@ -799,94 +819,31 @@ fn attributes(
             return Err(limit("custom-show XML attributes", limits.max_attributes()));
         }
         let name = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .to_owned();
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if name.len() > limits.max_string_bytes()
+            || attribute.value.as_ref().len() > limits.max_string_bytes()
+        {
+            return Err(limit(
+                "custom-show XML attribute name",
+                limits.max_string_bytes(),
+            ));
+        }
+        let name = name.to_owned();
         if !seen.insert(name.clone()) {
             return Err(invalid("duplicate custom-show XML attribute"));
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .into_owned();
+            .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
                 "custom-show XML attribute",
                 limits.max_string_bytes(),
             ));
         }
-        values.push((name, value));
+        values.push((name, value.into_owned()));
     }
     Ok(values)
-}
-
-fn parse_raw_start_tag(raw: &[u8]) -> Result<(String, Vec<(String, String)>)> {
-    let end = raw
-        .iter()
-        .position(|byte| *byte == b'>')
-        .ok_or_else(|| invalid("custom-show XML start tag is missing '>'"))?;
-    let tag = &raw[..=end];
-    let name_start = tag
-        .iter()
-        .position(|byte| *byte == b'<')
-        .map(|offset| offset + 1)
-        .ok_or_else(|| invalid("custom-show XML start tag is malformed"))?;
-    let name_end = tag[name_start..]
-        .iter()
-        .position(|byte| byte.is_ascii_whitespace() || *byte == b'>' || *byte == b'/')
-        .map_or(end, |offset| name_start + offset);
-    let qualified_name = std::str::from_utf8(&tag[name_start..name_end])
-        .map_err(|error| Error::Xml(error.to_string()))?
-        .to_owned();
-    let mut values = Vec::new();
-    let mut cursor = name_end;
-    while cursor < end {
-        while cursor < end && tag[cursor].is_ascii_whitespace() {
-            cursor += 1;
-        }
-        if cursor >= end || tag[cursor] == b'/' {
-            break;
-        }
-        let key_start = cursor;
-        while cursor < end && !tag[cursor].is_ascii_whitespace() && tag[cursor] != b'=' {
-            cursor += 1;
-        }
-        let key = std::str::from_utf8(&tag[key_start..cursor])
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .to_owned();
-        while cursor < end && tag[cursor].is_ascii_whitespace() {
-            cursor += 1;
-        }
-        if cursor >= end || tag[cursor] != b'=' {
-            return Err(invalid("custom-show XML attribute is missing '='"));
-        }
-        cursor += 1;
-        while cursor < end && tag[cursor].is_ascii_whitespace() {
-            cursor += 1;
-        }
-        let quote = *tag
-            .get(cursor)
-            .ok_or_else(|| invalid("custom-show XML attribute value is missing"))?;
-        if quote != b'\'' && quote != b'"' {
-            return Err(invalid("custom-show XML attribute value is not quoted"));
-        }
-        cursor += 1;
-        let value_start = cursor;
-        while cursor < end && tag[cursor] != quote {
-            cursor += 1;
-        }
-        if cursor >= end {
-            return Err(invalid("custom-show XML attribute value is unterminated"));
-        }
-        let value = quick_xml::escape::unescape(
-            std::str::from_utf8(&tag[value_start..cursor])
-                .map_err(|error| Error::Xml(error.to_string()))?,
-        )
-        .map_err(|error| Error::Xml(error.to_string()))?
-        .into_owned();
-        values.push((key, value));
-        cursor += 1;
-    }
-    Ok((qualified_name, values))
 }
 
 fn attribute_range(raw: &[u8], wanted: &str) -> Option<Range<usize>> {
@@ -1017,26 +974,26 @@ fn schema_rank(local: &str) -> Option<usize> {
 }
 
 fn render_custom_list(layout: &Layout, list: &List, limits: Limits) -> Result<String> {
-    let name = qualified(&layout.p_prefix, "custShowLst");
-    let shows = list
-        .shows
-        .iter()
-        .map(|show| render_new_show(layout, show, limits))
-        .collect::<Result<Vec<_>>>()?
-        .join("");
-    let value = format!(
-        "<{name} xmlns:{p}=\"{}\" xmlns:{r}=\"{}\">{shows}</{name}>",
-        escape_xml(&layout.p_namespace),
-        escape_xml(&layout.r_namespace),
-        p = layout.p_prefix,
-        r = layout.r_prefix,
-        name = name,
-        shows = shows,
-    );
-    if value.len() > limits.max_output_bytes() {
-        return Err(limit("custom-show XML output", limits.max_output_bytes()));
+    let name = qualified(&layout.p_prefix, "custShowLst", limits)?;
+    let mut value = BoundedString::new(limits, "custom-show XML output");
+    value.push_str("<")?;
+    value.push_str(&name)?;
+    value.push_str(" xmlns:")?;
+    value.push_str(&layout.p_prefix)?;
+    value.push_str("=\"")?;
+    value.push_escaped_xml(&layout.p_namespace)?;
+    value.push_str("\" xmlns:")?;
+    value.push_str(&layout.r_prefix)?;
+    value.push_str("=\"")?;
+    value.push_escaped_xml(&layout.r_namespace)?;
+    value.push_str("\">")?;
+    for show in &list.shows {
+        value.push_str(&render_new_show(layout, show, limits)?)?;
     }
-    Ok(value)
+    value.push_str("</")?;
+    value.push_str(&name)?;
+    value.push_str(">")?;
+    Ok(value.finish())
 }
 
 fn expand_empty_custom_list(
@@ -1047,6 +1004,9 @@ fn expand_empty_custom_list(
     limits: Limits,
 ) -> Result<String> {
     if list.is_empty() {
+        if custom.span.end.saturating_sub(custom.span.start) > limits.max_output_bytes() {
+            return Err(limit("custom-show XML output", limits.max_output_bytes()));
+        }
         return Ok(
             String::from_utf8_lossy(&source[custom.span.start..custom.span.end]).into_owned(),
         );
@@ -1059,17 +1019,16 @@ fn expand_empty_custom_list(
     let opening = std::str::from_utf8(&source[..close])
         .map_err(|error| Error::Xml(error.to_string()))?
         .trim_end_matches('/');
-    let shows = list
-        .shows
-        .iter()
-        .map(|show| render_new_show(layout, show, limits))
-        .collect::<Result<Vec<_>>>()?
-        .join("");
-    let value = format!("{opening}>{shows}</{}>", custom.qualified_name);
-    if value.len() > limits.max_output_bytes() {
-        return Err(limit("custom-show XML output", limits.max_output_bytes()));
+    let mut value = BoundedString::new(limits, "custom-show XML output");
+    value.push_str(opening)?;
+    value.push_str(">")?;
+    for show in &list.shows {
+        value.push_str(&render_new_show(layout, show, limits)?)?;
     }
-    Ok(value)
+    value.push_str("</")?;
+    value.push_str(&custom.qualified_name)?;
+    value.push_str(">")?;
+    Ok(value.finish())
 }
 
 fn render_show(
@@ -1089,39 +1048,41 @@ fn render_show(
 }
 
 fn render_new_show(layout: &Layout, show: &Show, limits: Limits) -> Result<String> {
-    let show_name = qualified(&layout.p_prefix, "custShow");
-    let list_name = qualified(&layout.p_prefix, "sldLst");
-    let slides = show
-        .slide_ids
-        .iter()
-        .map(|slide_id| render_new_slide(layout, *slide_id))
-        .collect::<Result<Vec<_>>>()?
-        .join("");
-    let value = format!(
-        "<{show_name} name=\"{}\" id=\"{}\"><{list_name}>{slides}</{list_name}></{show_name}>",
-        escape_xml(&show.name),
-        show.id,
-        show_name = show_name,
-        list_name = list_name,
-        slides = slides,
-    );
-    if value.len() > limits.max_output_bytes() {
-        return Err(limit("custom-show XML output", limits.max_output_bytes()));
+    let show_name = qualified(&layout.p_prefix, "custShow", limits)?;
+    let list_name = qualified(&layout.p_prefix, "sldLst", limits)?;
+    check_string(&show.name, limits, "custom-show name")?;
+    let mut value = BoundedString::new(limits, "custom-show XML output");
+    value.push_str("<")?;
+    value.push_str(&show_name)?;
+    value.push_str(" name=\"")?;
+    value.push_escaped_xml(&show.name)?;
+    value.write_fmt(format_args!(r#"" id="{}"><{}>"#, show.id, list_name))?;
+    for slide_id in &show.slide_ids {
+        value.push_str(&render_new_slide(layout, *slide_id, limits)?)?;
     }
-    Ok(value)
+    value.push_str("</")?;
+    value.push_str(&list_name)?;
+    value.push_str("></")?;
+    value.push_str(&show_name)?;
+    value.push_str(">")?;
+    Ok(value.finish())
 }
 
-fn render_new_slide(layout: &Layout, slide_id: u32) -> Result<String> {
+fn render_new_slide(layout: &Layout, slide_id: u32, limits: Limits) -> Result<String> {
     let relationship_id = layout
         .slide_id_to_relationship
         .get(&slide_id)
         .ok_or_else(|| invalid("custom show references an undeclared slide"))?;
-    Ok(format!(
-        "<{} {}:id=\"{}\"/>",
-        qualified(&layout.p_prefix, "sld"),
-        layout.r_prefix,
-        escape_xml(relationship_id),
-    ))
+    check_string(relationship_id, limits, "custom-show relationship ID")?;
+    let mut value = BoundedString::new(limits, "custom-show XML output");
+    value.push_str("<")?;
+    value.push_str(&qualified(&layout.p_prefix, "sld", limits)?)?;
+    value.push_str(" ")?;
+    value.push_str(&layout.r_prefix)?;
+    value.push_str(":id=\"")?;
+    value.push_escaped_xml(relationship_id)?;
+    value.push_str("\"/>")?;
+    Ok(value.finish())
 }
 
 fn render_existing_show(
@@ -1136,10 +1097,13 @@ fn render_existing_show(
     let source_show = &source[offset..original_layout.span.end];
     let mut replacements = Vec::new();
     if original.name != show.name {
+        check_string(&show.name, limits, "custom-show name")?;
+        let mut name = BoundedString::new(limits, "custom-show XML output");
+        name.push_escaped_xml(&show.name)?;
         replacements.push(Replacement {
             range: original_layout.name_attribute.start - offset
                 ..original_layout.name_attribute.end - offset,
-            value: escape_xml(&show.name).into_bytes(),
+            value: name.finish().into_bytes(),
         });
     }
     if original.slide_ids != show.slide_ids {
@@ -1158,6 +1122,9 @@ fn render_existing_show(
         }
     }
     if replacements.is_empty() {
+        if source_show.len() > limits.max_output_bytes() {
+            return Err(limit("custom-show XML output", limits.max_output_bytes()));
+        }
         return Ok(String::from_utf8_lossy(source_show).into_owned());
     }
     String::from_utf8(replace_ranges(source_show, &replacements, limits)?)
@@ -1196,8 +1163,13 @@ fn render_slide_list(
             .get(index)
             .map(|slide_id| {
                 source_by_slide.get(slide_id).map_or_else(
-                    || render_new_slide(layout, *slide_id),
-                    |raw| Ok(String::from_utf8_lossy(raw).into_owned()),
+                    || render_new_slide(layout, *slide_id, limits),
+                    |raw| {
+                        if raw.len() > limits.max_output_bytes() {
+                            return Err(limit("custom-show XML output", limits.max_output_bytes()));
+                        }
+                        Ok(String::from_utf8_lossy(raw).into_owned())
+                    },
                 )
             })
             .transpose()?
@@ -1208,14 +1180,14 @@ fn render_slide_list(
         });
     }
     if slide_ids.len() > slots.len() {
-        let mut rendered = String::new();
+        let mut rendered = BoundedString::new(limits, "custom-show XML output");
         for slide_id in &slide_ids[slots.len()..] {
-            rendered.push_str(&render_new_slide(layout, *slide_id)?);
+            rendered.push_str(&render_new_slide(layout, *slide_id, limits)?)?;
         }
         replacements.push(Replacement {
             range: slide_list.span.close_start - slide_list.span.start
                 ..slide_list.span.close_start - slide_list.span.start,
-            value: rendered.into_bytes(),
+            value: rendered.finish().into_bytes(),
         });
     }
     String::from_utf8(replace_ranges(source_list, &replacements, limits)?)
@@ -1223,48 +1195,99 @@ fn render_slide_list(
 }
 
 fn render_new_slide_list(layout: &Layout, slide_ids: &[u32], limits: Limits) -> Result<String> {
-    let name = qualified(&layout.p_prefix, "sldLst");
-    let slides = slide_ids
-        .iter()
-        .map(|slide_id| render_new_slide(layout, *slide_id))
-        .collect::<Result<Vec<_>>>()?
-        .join("");
-    let value = format!("<{name}>{slides}</{name}>");
-    if value.len() > limits.max_output_bytes() {
-        return Err(limit("custom-show XML output", limits.max_output_bytes()));
+    let name = qualified(&layout.p_prefix, "sldLst", limits)?;
+    let mut value = BoundedString::new(limits, "custom-show XML output");
+    value.push_str("<")?;
+    value.push_str(&name)?;
+    value.push_str(">")?;
+    for slide_id in slide_ids {
+        value.push_str(&render_new_slide(layout, *slide_id, limits)?)?;
     }
-    Ok(value)
+    value.push_str("</")?;
+    value.push_str(&name)?;
+    value.push_str(">")?;
+    Ok(value.finish())
 }
 
-fn qualified(prefix: &str, local: &str) -> String {
+fn qualified(prefix: &str, local: &str, limits: Limits) -> Result<String> {
     if prefix.is_empty() {
-        local.to_owned()
+        check_string(local, limits, "custom-show XML element name")?;
+        Ok(local.to_owned())
     } else {
-        format!("{prefix}:{local}")
+        let length = prefix
+            .len()
+            .checked_add(1)
+            .and_then(|length| length.checked_add(local.len()))
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML element name",
+            })?;
+        if length > limits.max_string_bytes() {
+            return Err(limit(
+                "custom-show XML element name",
+                limits.max_string_bytes(),
+            ));
+        }
+        let mut value = String::new();
+        value
+            .try_reserve(length)
+            .map_err(|source| Error::Allocation {
+                resource: "custom-show XML element name",
+                source,
+            })?;
+        value.push_str(prefix);
+        value.push(':');
+        value.push_str(local);
+        Ok(value)
     }
 }
 
 fn replace_ranges(source: &[u8], replacements: &[Replacement], limits: Limits) -> Result<Vec<u8>> {
     let mut replacements = replacements.iter().collect::<Vec<_>>();
     replacements.sort_by_key(|replacement| (replacement.range.start, replacement.range.end));
+    let mut removed = 0usize;
+    let mut added = 0usize;
     for pair in replacements.windows(2) {
         if pair[0].range.end > pair[1].range.start {
             return Err(invalid("overlapping custom-show XML patch ranges"));
         }
     }
-    let mut output = source.to_vec();
-    for replacement in replacements.into_iter().rev() {
-        if replacement.range.end > output.len() {
+    for replacement in &replacements {
+        if replacement.range.start > replacement.range.end || replacement.range.end > source.len() {
             return Err(invalid("custom-show patch range is outside the source"));
         }
-        output.splice(replacement.range.clone(), replacement.value.iter().copied());
+        removed = removed
+            .checked_add(replacement.range.end - replacement.range.start)
+            .ok_or(Error::CapacityOverflow {
+                resource: "patched custom-show PresentationML source bytes",
+            })?;
+        added = added
+            .checked_add(replacement.value.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "patched custom-show PresentationML source bytes",
+            })?;
     }
-    if output.len() > limits.max_output_bytes() {
-        return Err(limit(
-            "patched custom-show PresentationML source bytes",
-            limits.max_output_bytes(),
-        ));
+    let output_len = checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "patched custom-show PresentationML source bytes",
+    )?;
+    let mut output = Vec::new();
+    output
+        .try_reserve(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "patched custom-show PresentationML source bytes",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&source[cursor..replacement.range.start]);
+        output.extend_from_slice(&replacement.value);
+        cursor = replacement.range.end;
     }
+    output.extend_from_slice(&source[cursor..]);
+    debug_assert_eq!(output.len(), output_len);
     Ok(output)
 }
 

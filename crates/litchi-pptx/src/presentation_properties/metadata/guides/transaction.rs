@@ -33,15 +33,6 @@ impl Snapshot {
         super::package::load_snapshot(package, limits)
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage, limits: Limits) -> Result<Self> {
-        Self::load(package, limits)
-    }
-
     /// Parse an exact presentation XML source into a detached snapshot.
     ///
     /// # Errors
@@ -84,13 +75,6 @@ impl Snapshot {
     #[must_use]
     pub fn guides(&self) -> &Guides {
         &self.guides
-    }
-
-    /// Alias emphasizing the semantic guide catalog.
-    #[inline]
-    #[must_use]
-    pub fn value(&self) -> &Guides {
-        self.guides()
     }
 
     /// Return the owning presentation part name.
@@ -163,13 +147,6 @@ impl Draft {
     #[must_use]
     pub fn guides(&self) -> &Guides {
         &self.working
-    }
-
-    /// Alias for [`Self::guides`].
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Guides {
-        self.guides()
     }
 
     /// Borrow one currently staged owner list.

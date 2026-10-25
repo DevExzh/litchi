@@ -490,6 +490,204 @@ pub(crate) fn escape_xml(value: &str) -> String {
     escaped
 }
 
+/// A formatter that admits every output chunk against the selected metadata
+/// byte budget before asking `String` to grow.  Metadata writers use this for
+/// dynamic XML instead of constructing an unbounded `format!` result and
+/// checking it only after allocation.
+pub(crate) struct BoundedString {
+    value: String,
+    limit: usize,
+    resource: &'static str,
+    failure: Option<crate::Error>,
+}
+
+impl BoundedString {
+    pub(crate) fn new(limits: Limits, resource: &'static str) -> Self {
+        Self::with_limit(limits.max_output_bytes(), resource)
+    }
+
+    pub(crate) fn with_limit(limit: usize, resource: &'static str) -> Self {
+        Self {
+            value: String::new(),
+            limit,
+            resource,
+            failure: None,
+        }
+    }
+
+    pub(crate) fn with_capacity(
+        capacity: usize,
+        limits: Limits,
+        resource: &'static str,
+    ) -> crate::Result<Self> {
+        if capacity > limits.max_output_bytes() {
+            return Err(crate::Error::Limit {
+                resource,
+                limit: limits.max_output_bytes(),
+            });
+        }
+        let mut output = Self::new(limits, resource);
+        output
+            .value
+            .try_reserve(capacity)
+            .map_err(|source| crate::Error::Allocation { resource, source })?;
+        Ok(output)
+    }
+
+    fn reserve_for(&mut self, additional: usize) -> crate::Result<()> {
+        let required =
+            self.value
+                .len()
+                .checked_add(additional)
+                .ok_or(crate::Error::CapacityOverflow {
+                    resource: self.resource,
+                })?;
+        if required > self.limit {
+            return Err(crate::Error::Limit {
+                resource: self.resource,
+                limit: self.limit,
+            });
+        }
+        self.value
+            .try_reserve(additional)
+            .map_err(|source| crate::Error::Allocation {
+                resource: self.resource,
+                source,
+            })?;
+        Ok(())
+    }
+
+    pub(crate) fn push_str(&mut self, value: &str) -> crate::Result<()> {
+        self.reserve_for(value.len())?;
+        self.value.push_str(value);
+        Ok(())
+    }
+
+    pub(crate) fn push(&mut self, value: char) -> crate::Result<()> {
+        let mut encoded = [0_u8; 4];
+        let encoded = value.encode_utf8(&mut encoded);
+        self.push_str(encoded)
+    }
+
+    pub(crate) fn push_escaped_xml(&mut self, value: &str) -> crate::Result<()> {
+        let escaped_length = escaped_xml_len(value)?;
+        self.reserve_for(escaped_length)?;
+        for character in value.chars() {
+            match character {
+                '&' => self.push_str("&amp;")?,
+                '<' => self.push_str("&lt;")?,
+                '>' => self.push_str("&gt;")?,
+                '"' => self.push_str("&quot;")?,
+                '\'' => self.push_str("&apos;")?,
+                _ => self.push(character)?,
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_fmt(&mut self, arguments: std::fmt::Arguments<'_>) -> crate::Result<()> {
+        std::fmt::write(self, arguments).map_err(|_| {
+            self.failure.take().unwrap_or(crate::Error::Invalid(
+                "metadata output formatting failed".to_owned(),
+            ))
+        })
+    }
+
+    pub(crate) fn finish(self) -> String {
+        self.value
+    }
+}
+
+impl std::fmt::Write for BoundedString {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        match self.push_str(value) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.failure = Some(error);
+                Err(std::fmt::Error)
+            },
+        }
+    }
+}
+
+/// Return the escaped XML length without allocating the escaped value.
+pub(crate) fn escaped_xml_len(value: &str) -> crate::Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let additional = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length
+            .checked_add(additional)
+            .ok_or(crate::Error::CapacityOverflow {
+                resource: "metadata escaped XML",
+            })
+    })
+}
+
+/// Check a semantic string before a writer allocates or escapes it.
+pub(crate) fn check_string(
+    value: &str,
+    limits: Limits,
+    resource: &'static str,
+) -> crate::Result<()> {
+    if value.len() > limits.max_string_bytes() {
+        return Err(crate::Error::Limit {
+            resource,
+            limit: limits.max_string_bytes(),
+        });
+    }
+    Ok(())
+}
+
+/// Check a complete output size before allocating a replacement buffer.
+pub(crate) fn checked_output_len(
+    source_len: usize,
+    removed_len: usize,
+    replacement_len: usize,
+    limits: Limits,
+    resource: &'static str,
+) -> crate::Result<usize> {
+    let retained = source_len
+        .checked_sub(removed_len)
+        .ok_or(crate::Error::CapacityOverflow { resource })?;
+    let output_len = retained
+        .checked_add(replacement_len)
+        .ok_or(crate::Error::CapacityOverflow { resource })?;
+    if output_len > limits.max_output_bytes() {
+        return Err(crate::Error::Limit {
+            resource,
+            limit: limits.max_output_bytes(),
+        });
+    }
+    Ok(output_len)
+}
+
+#[cfg(test)]
+mod bounded_output_tests {
+    use super::*;
+
+    #[test]
+    fn escaped_chunks_are_preflighted_before_growth() {
+        let limits = Limits::DEFAULT.with_output_bytes(4).unwrap();
+        let mut output = BoundedString::new(limits, "test output");
+        assert!(output.push_escaped_xml("&").is_err());
+        assert!(output.finish().is_empty());
+    }
+
+    #[test]
+    fn replacement_size_is_checked_before_reservation() {
+        let limits = Limits::DEFAULT.with_output_bytes(4).unwrap();
+        assert!(checked_output_len(4, 0, 1, limits, "test output").is_err());
+        assert_eq!(
+            checked_output_len(4, 1, 1, limits, "test output").unwrap(),
+            4
+        );
+    }
+}
+
 pub(crate) fn new_guid() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};

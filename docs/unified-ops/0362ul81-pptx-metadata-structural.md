@@ -17,10 +17,12 @@ explicitly.  There are no default-only twins, deprecated aliases or public
 The shared policy bounds input and output bytes, XML depth and nodes, decoded
 strings and attributes, extension and family counts, slide references and
 relationships.  MCE processing is bound to the selected policy.  Writers and
-source splices check the exact final size before publication, and existing
-opaque XML, strict/transitional namespaces, relationship mappings, custom-show
-IDs, section GUIDs, handout fields and protection verifier fidelity remain
-intact.
+source splices check the exact final size before publication.  Source-preserving
+families retain opaque XML, strict/transitional namespaces, relationship
+mappings, custom-show IDs and section GUIDs.  Detached handout and protection
+models intentionally emit their documented canonical typed forms; unknown
+markup is outside those detached models and is not claimed as opaque round-trip
+fidelity.
 
 The package edit families keep the `Edit` → `commit` shared triad with
 `litchi_core::edit::{Commit, Diagnostics}` and typed `LimitKind`.  Dropping an
@@ -35,6 +37,9 @@ including package structure readers, handout/protection examples, and raw
 color-map, guide, section and custom-show fixtures.  The minimal and full
 PPTX glossary profiles register the required-limit signatures, and the living
 API glossary records the eight-family contract.
+
+The common 61 physical source scan and no-op base check remain separate
+integration returns; this slice does not claim that composition closed.
 
 Source-only checks for this record are `rustfmt --check`, `git diff --check`,
 glossary JSON parsing and focused source/API sweeps.  Cargo tests, rustdoc,

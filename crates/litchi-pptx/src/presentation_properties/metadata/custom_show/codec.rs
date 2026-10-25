@@ -2,9 +2,8 @@
 //!
 //! Custom slide shows allow defining named subsets of slides that can be
 //! presented independently of the full presentation.
-use super::super::{Limits, process_str};
+use super::super::{BoundedString, Limits, check_string, process_str};
 use super::model::{List, Show};
-use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
@@ -174,6 +173,7 @@ impl List {
     /// actual slide relationship map.
     #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
+        validate(self, limits)?;
         if self.is_empty() {
             return Ok(String::new());
         }
@@ -181,6 +181,18 @@ impl List {
         let mut fallback_map = HashMap::new();
         for show in &self.shows {
             for slide_id in &show.slide_ids {
+                let relationship_bytes =
+                    3usize
+                        .checked_add(decimal_len(*slide_id))
+                        .ok_or(Error::CapacityOverflow {
+                            resource: "custom-show relationship ID",
+                        })?;
+                if relationship_bytes > limits.max_string_bytes() {
+                    return Err(Error::Limit {
+                        resource: "custom-show relationship ID",
+                        limit: limits.max_string_bytes(),
+                    });
+                }
                 fallback_map
                     .entry(*slide_id)
                     .or_insert_with(|| format!("rId{slide_id}"));
@@ -205,36 +217,30 @@ impl List {
             return Ok(String::new());
         }
 
-        let mut xml = String::with_capacity(1024);
+        let mut xml = BoundedString::new(limits, "serialized custom-show XML");
 
-        xml.push_str("<p:custShowLst>");
+        xml.push_str("<p:custShowLst>")?;
 
         for show in &self.shows {
-            xml.push_str(&format!(
-                r#"<p:custShow name="{}" id="{}">"#,
-                escape_xml(&show.name),
-                show.id
-            ));
-            xml.push_str("<p:sldLst>");
+            xml.push_str(r#"<p:custShow name="#)?;
+            xml.push_escaped_xml(&show.name)?;
+            xml.write_fmt(format_args!(r#"" id="{}">"#, show.id))?;
+            xml.push_str("<p:sldLst>")?;
             for slide_id in &show.slide_ids {
                 // Look up the relationship ID for this slide ID
                 if let Some(rel_id) = slide_id_to_rel_id.get(slide_id) {
-                    xml.push_str(&format!(r#"<p:sld r:id="{}"/>"#, escape_xml(rel_id)));
+                    check_string(rel_id, limits, "custom-show relationship ID")?;
+                    xml.push_str(r#"<p:sld r:id="#)?;
+                    xml.push_escaped_xml(rel_id)?;
+                    xml.push_str(r#""/>"#)?;
                 }
             }
-            xml.push_str("</p:sldLst>");
-            xml.push_str("</p:custShow>");
+            xml.push_str("</p:sldLst>")?;
+            xml.push_str("</p:custShow>")?;
         }
 
-        xml.push_str("</p:custShowLst>");
-
-        if xml.len() > limits.max_output_bytes() {
-            return Err(Error::Limit {
-                resource: "serialized custom-show XML",
-                limit: limits.max_output_bytes(),
-            });
-        }
-        Ok(xml)
+        xml.push_str("</p:custShowLst>")?;
+        Ok(xml.finish())
     }
 }
 
@@ -262,6 +268,15 @@ fn validate(value: &List, limits: Limits) -> Result<()> {
     Ok(())
 }
 
+fn decimal_len(mut value: u32) -> usize {
+    let mut length = 1;
+    while value >= 10 {
+        value /= 10;
+        length += 1;
+    }
+    length
+}
+
 fn check_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
@@ -270,11 +285,22 @@ fn check_attributes(
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count += 1;
+        count = count.checked_add(1).ok_or(Error::Limit {
+            resource: "custom-show XML attributes",
+            limit: limits.max_attributes(),
+        })?;
         if count > limits.max_attributes() {
             return Err(Error::Limit {
                 resource: "custom-show XML attributes",
                 limit: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes()
+            || attribute.value.as_ref().len() > limits.max_string_bytes()
+        {
+            return Err(Error::Limit {
+                resource: "custom-show XML attribute",
+                limit: limits.max_string_bytes(),
             });
         }
         let value = attribute

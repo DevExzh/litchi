@@ -3,7 +3,7 @@
 //! Handout masters define the layout for printed handouts that show
 //! multiple slides per page.
 
-use super::super::{Limits, process_str};
+use super::super::{BoundedString, Limits, process_str};
 use super::model::Master;
 use crate::presentation_properties::metadata::new_guid;
 use crate::{Error, Result};
@@ -79,57 +79,50 @@ impl Master {
     /// Structure matches Apache POI PowerPoint-created files.
     #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
-        let mut xml = String::with_capacity(8192);
+        let mut xml = BoundedString::new(limits, "serialized handout-master XML");
 
-        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<p:handoutMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#);
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
+        xml.push_str(r#"<p:handoutMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#)?;
 
         // Common slide data
-        xml.push_str("<p:cSld>");
+        xml.push_str("<p:cSld>")?;
 
         // Background - use bgPr with solidFill like PowerPoint
-        xml.push_str(r#"<p:bg><p:bgPr><a:solidFill><a:schemeClr val="bg1"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>"#);
+        xml.push_str(r#"<p:bg><p:bgPr><a:solidFill><a:schemeClr val="bg1"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>"#)?;
 
         // Shape tree with ALL 4 placeholders
-        xml.push_str("<p:spTree>");
+        xml.push_str("<p:spTree>")?;
         xml.push_str(
             r#"<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>"#,
-        );
-        xml.push_str(r#"<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>"#);
+        )?;
+        xml.push_str(r#"<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>"#)?;
 
         // Header placeholder (top left)
-        xml.push_str(r#"<p:sp><p:nvSpPr><p:cNvPr id="2" name="Header Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="hdr" sz="quarter"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#);
+        xml.push_str(r#"<p:sp><p:nvSpPr><p:cNvPr id="2" name="Header Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="hdr" sz="quarter"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#)?;
 
         // Date placeholder (top right) - with field for auto date
-        xml.push_str(&format!(
+        xml.write_fmt(format_args!(
             r#"<p:sp><p:nvSpPr><p:cNvPr id="3" name="Date Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="dt" sz="quarter" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="3884613" y="0"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0"/><a:lstStyle><a:lvl1pPr algn="r"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:fld id="{}" type="datetime1"><a:rPr lang="en-US"/><a:pPr/><a:t>1/1/2000</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#,
             new_guid()
-        ));
+        ))?;
 
         // Footer placeholder (bottom left)
-        xml.push_str(r#"<p:sp><p:nvSpPr><p:cNvPr id="4" name="Footer Placeholder 3"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="ftr" sz="quarter" idx="2"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="8685213"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#);
+        xml.push_str(r#"<p:sp><p:nvSpPr><p:cNvPr id="4" name="Footer Placeholder 3"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="ftr" sz="quarter" idx="2"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="8685213"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"/><a:lstStyle><a:lvl1pPr algn="l"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#)?;
 
         // Slide number placeholder (bottom right) - with field
-        xml.push_str(&format!(
+        xml.write_fmt(format_args!(
             r#"<p:sp><p:nvSpPr><p:cNvPr id="5" name="Slide Number Placeholder 4"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldNum" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="3884613" y="8685213"/><a:ext cx="2971800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="b"/><a:lstStyle><a:lvl1pPr algn="r"><a:defRPr sz="1200"/></a:lvl1pPr></a:lstStyle><a:p><a:fld id="{}" type="slidenum"><a:rPr lang="en-US"/><a:pPr/><a:t>‹#›</a:t></a:fld><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>"#,
             new_guid()
-        ));
+        ))?;
 
-        xml.push_str("</p:spTree>");
-        xml.push_str("</p:cSld>");
+        xml.push_str("</p:spTree>")?;
+        xml.push_str("</p:cSld>")?;
 
         // Color map (required element)
-        xml.push_str(r#"<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>"#);
+        xml.push_str(r#"<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>"#)?;
 
-        xml.push_str("</p:handoutMaster>");
-
-        if xml.len() > limits.max_output_bytes() {
-            return Err(Error::Limit {
-                resource: "serialized handout-master XML",
-                limit: limits.max_output_bytes(),
-            });
-        }
-        Ok(xml)
+        xml.push_str("</p:handoutMaster>")?;
+        Ok(xml.finish())
     }
 }
 
@@ -195,6 +188,18 @@ fn check_attributes(
             return Err(Error::Limit {
                 resource: "handout-master XML attributes",
                 limit: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "handout-master XML attribute name",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "handout-master XML attribute",
+                limit: limits.max_string_bytes(),
             });
         }
         let value = attribute
