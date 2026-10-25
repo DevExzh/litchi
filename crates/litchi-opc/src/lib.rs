@@ -76,7 +76,8 @@ pub use package::{
     ContentTypeFragmentEdit, ContentTypeFragmentKey, ContentTypeFragmentPlan, ContentTypeFragments,
     ContentTypesEditPlan, FontEmbedding, OpcPackage, OwnedContentTypes, OwnedRelationships,
     RelationshipEdit, RelationshipFragment, RelationshipFragmentEdit, RelationshipFragmentPlan,
-    RelationshipFragments, RelationshipSourcePlan, RelationshipsEditPlan, SaveOptions,
+    RelationshipFragments, RelationshipSourcePlan, RelationshipsEditPlan, RetainedArchiveMetrics,
+    SaveOptions,
 };
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, PartMetadata, XmlPart};

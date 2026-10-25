@@ -13,7 +13,11 @@ use crate::{
     SourceLimits, TargetMode,
 };
 use litchi_core::xml::ReaderOrigin;
-use quick_xml::{events::Event, reader::NsReader};
+use quick_xml::{
+    events::Event,
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
 use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::Arc;
@@ -478,7 +482,7 @@ impl<'source> RelationshipsEditPlan<'source> {
 impl OwnedRelationships {
     /// Re-admit this source-bound relationship member under a recipient's
     /// limits without exposing the retained XML token to the parent package.
-    pub(super) fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
+    pub fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
         self.xml.preflight_under(limits)
     }
 
@@ -790,14 +794,15 @@ fn scan_relationship_source(
             limits.max_events() as u64,
         )?;
         let start = relationship_offset(&reader, origin)?;
-        let event = reader.read_event()?;
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let is_opc_namespace = is_opc_relationships_namespace(&resolved_namespace);
         let end = relationship_offset(&reader, origin)?;
         if end < start || end > source.len() {
             return Err(invalid("relationship XML event range is invalid"));
         }
         match event {
             Event::Start(element) if depth == 0 => {
-                if element.local_name().as_ref() != b"Relationships" {
+                if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                     return Err(invalid("relationships root must be Relationships"));
                 }
                 root_name = Some(element.name().as_ref().to_vec());
@@ -805,7 +810,7 @@ fn scan_relationship_source(
                 depth = 1;
             },
             Event::Empty(element) if depth == 0 => {
-                if element.local_name().as_ref() != b"Relationships" {
+                if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                     return Err(invalid("relationships root must be Relationships"));
                 }
                 root_name = Some(element.name().as_ref().to_vec());
@@ -813,7 +818,7 @@ fn scan_relationship_source(
                 root_empty = true;
             },
             Event::Start(element) if depth == 1 => {
-                if element.local_name().as_ref() == b"Relationship" {
+                if is_opc_namespace && element.local_name().as_ref() == b"Relationship" {
                     relationship_count = relationship_count
                         .checked_add(1)
                         .ok_or_else(|| invalid("relationship count overflows"))?;
@@ -827,7 +832,7 @@ fn scan_relationship_source(
                     .ok_or_else(|| invalid("relationship XML depth overflows"))?;
             },
             Event::Empty(element) if depth == 1 => {
-                if element.local_name().as_ref() == b"Relationship" {
+                if is_opc_namespace && element.local_name().as_ref() == b"Relationship" {
                     relationship_count = relationship_count
                         .checked_add(1)
                         .ok_or_else(|| invalid("relationship count overflows"))?;
@@ -896,6 +901,23 @@ fn scan_relationship_source(
         relationship_count,
         event_count,
     })
+}
+
+fn is_opc_relationships_namespace(resolved_namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        resolved_namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::constants::namespace::OPC_RELATIONSHIPS.as_bytes()
+    )
+}
+
+fn is_opc_relationships_element(
+    resolved_namespace: &ResolveResult<'_>,
+    element: &quick_xml::events::BytesStart<'_>,
+    local_name: &[u8],
+) -> bool {
+    element.local_name().as_ref() == local_name
+        && is_opc_relationships_namespace(resolved_namespace)
 }
 
 pub(super) fn relationship_id(
@@ -1005,12 +1027,16 @@ impl OwnedRelationships {
         let mut depth = 0usize;
         loop {
             let start = relationship_offset(&reader, origin)?;
-            let event = reader.read_event()?;
+            let (resolved_namespace, event) = reader.read_resolved_event()?;
+            let is_opc_namespace = is_opc_relationships_namespace(&resolved_namespace);
             let end = relationship_offset(&reader, origin)?;
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
-                    if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                    if depth == 1
+                        && is_opc_namespace
+                        && element.local_name().as_ref() == b"Relationship"
+                    {
                         let mut remove = false;
                         for attribute in element.checked_attributes() {
                             let attribute =
@@ -1135,11 +1161,12 @@ impl OwnedRelationships {
         let mut root_empty = false;
         loop {
             let start = relationship_offset(&reader, origin)?;
-            let event = reader.read_event()?;
+            let (resolved_namespace, event) = reader.read_resolved_event()?;
+            let is_opc_namespace = is_opc_relationships_namespace(&resolved_namespace);
             let end = relationship_offset(&reader, origin)?;
             match event {
                 Event::Start(element) if depth == 0 => {
-                    if element.local_name().as_ref() != b"Relationships" {
+                    if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                         return Err(invalid("relationships root must be Relationships"));
                     }
                     root_tag = Some(start..end);
@@ -1147,7 +1174,7 @@ impl OwnedRelationships {
                     depth = 1;
                 },
                 Event::Empty(element) if depth == 0 => {
-                    if element.local_name().as_ref() != b"Relationships" {
+                    if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                         return Err(invalid("relationships root must be Relationships"));
                     }
                     root_tag = Some(start..end);
@@ -1286,7 +1313,9 @@ impl OpcPackage {
         let (owner_ref, relationships) = if owner.as_str() == "/" {
             (owner, self.rels())
         } else {
-            let part = self.get_part(owner)?;
+            let part = self
+                .part_metadata(owner)
+                .ok_or_else(|| OpcError::PartNotFound(owner.to_string()))?;
             (part.partname(), part.rels())
         };
         OwnedXmlPart::check_derived_capture_member_name(owner_ref, limits)?;
@@ -1423,7 +1452,9 @@ impl OpcPackage {
         let (owner_ref, relationships) = if owner.as_str() == "/" {
             (owner, self.rels())
         } else {
-            let part = self.get_part(owner)?;
+            let part = self
+                .part_metadata(owner)
+                .ok_or_else(|| OpcError::PartNotFound(owner.to_string()))?;
             (part.partname(), part.rels())
         };
         OwnedXmlPart::check_derived_capture_member_name(owner_ref, limits)?;
@@ -1824,10 +1855,10 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
             limits.max_events() as u64,
         )?;
         let decoder = reader.decoder();
-        match reader
-            .read_event()
-            .map_err(|error| invalid(error.to_string()))?
-        {
+        let (resolved_namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(error.to_string()))?;
+        match event {
             Event::Start(element) => {
                 let next_depth = depth
                     .checked_add(1)
@@ -1837,7 +1868,9 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
                     next_depth as u64,
                     limits.max_depth() as u64,
                 )?;
-                if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                if depth == 1
+                    && is_opc_relationships_element(&resolved_namespace, &element, b"Relationship")
+                {
                     check_relationship_attributes(&element, decoder, limits)?;
                     relationships = relationships
                         .checked_add(1)
@@ -1846,7 +1879,9 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
                 depth = next_depth;
             },
             Event::Empty(element) => {
-                if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                if depth == 1
+                    && is_opc_relationships_element(&resolved_namespace, &element, b"Relationship")
+                {
                     check_relationship_attributes(&element, decoder, limits)?;
                     relationships = relationships
                         .checked_add(1)
@@ -2475,6 +2510,48 @@ mod tests {
                 assert_eq!(archive.read("custom/item.bin").unwrap(), b"opaque");
             }
         }
+    }
+
+    #[test]
+    fn foreign_relationship_namespace_is_opaque_to_source_removal() {
+        let xml = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships" xmlns:x="urn:vendor"><x:Relationship Id="rId1" Type="urn:vendor" Target="https://example.test/vendor" TargetMode="External"/><Relationship Id="rId1" Type="urn:visible" Target="https://example.test/visible" TargetMode="External"/></Relationships>"#;
+        let package = OpcPackage::from_vec(source(xml), SourceLimits::default()).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let before = package
+            .source_relationships(&owner, SourceLimits::default())
+            .unwrap();
+        let after = before
+            .without_relationship("rId1", before.bytes().len())
+            .unwrap();
+        let output = std::str::from_utf8(after.bytes()).unwrap();
+        assert!(output.contains("<x:Relationship Id=\"rId1\""));
+        assert!(!output.contains("Type=\"urn:visible\""));
+    }
+
+    #[test]
+    fn retained_archive_metrics_include_untyped_opaque_payloads() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#,
+            )
+            .unwrap();
+        writer.write_deflated("_rels/.rels", XML).unwrap();
+        writer.write_deflated("custom/item.bin", b"part").unwrap();
+        writer
+            .write_deflated("opaque.unknown", b"opaque-payload")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let package = OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap();
+        let metrics = package
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(metrics.opaque_members(), 1);
+        assert_eq!(metrics.opaque_bytes(), b"opaque-payload".len() as u64);
     }
 
     #[test]

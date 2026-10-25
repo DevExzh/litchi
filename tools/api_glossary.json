@@ -2601,6 +2601,18 @@
       ],
       "banned_names": [
         {
+          "scope": "litchi_ooxml_common::vba",
+          "name": "store_project_graph",
+          "match": "exact",
+          "replacement": "stage through vba::Edit::store and publish its Commit"
+        },
+        {
+          "scope": "litchi_ooxml_common::vba",
+          "name": "remove_project_graph",
+          "match": "exact",
+          "replacement": "stage through vba::Edit::remove and publish its Commit"
+        },
+        {
           "name": "ReadLimits",
           "scope": "litchi_ooxml_common",
           "replacement": "use SourceLimits"
@@ -2854,6 +2866,7 @@
         }
       ],
       "families": [
+        "litchi_ooxml_common::vba",
         "litchi_ooxml_common::custom_xml",
         "litchi_ooxml_common::properties",
         "litchi_ooxml_common::web",
