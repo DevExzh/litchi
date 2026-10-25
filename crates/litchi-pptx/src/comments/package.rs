@@ -357,20 +357,6 @@ pub fn find_presentation_comment_author(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn add_presentation_comment_author(
-    package: &mut OpcPackage,
-    author: Author,
-    conformance: Conformance,
-) -> Result<()> {
-    add_presentation_comment_author_with_limits(
-        package,
-        author,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn add_presentation_comment_author_with_limits(
     package: &mut OpcPackage,
     author: Author,
@@ -412,22 +398,6 @@ pub(crate) fn add_presentation_comment_author_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn update_presentation_comment_author(
-    package: &mut OpcPackage,
-    author_id: u32,
-    author: Author,
-    conformance: Conformance,
-) -> Result<()> {
-    update_presentation_comment_author_with_limits(
-        package,
-        author_id,
-        author,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn update_presentation_comment_author_with_limits(
     package: &mut OpcPackage,
     author_id: u32,
@@ -459,20 +429,6 @@ pub(crate) fn update_presentation_comment_author_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn remove_presentation_comment_author(
-    package: &mut OpcPackage,
-    author_id: u32,
-    conformance: Conformance,
-) -> Result<bool> {
-    remove_presentation_comment_author_with_limits(
-        package,
-        author_id,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn remove_presentation_comment_author_with_limits(
     package: &mut OpcPackage,
     author_id: u32,
@@ -512,20 +468,6 @@ pub(crate) fn remove_presentation_comment_author_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn reorder_presentation_comment_authors(
-    package: &mut OpcPackage,
-    ordered_ids: &[u32],
-    conformance: Conformance,
-) -> Result<()> {
-    reorder_presentation_comment_authors_with_limits(
-        package,
-        ordered_ids,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn reorder_presentation_comment_authors_with_limits(
     package: &mut OpcPackage,
     ordered_ids: &[u32],
@@ -594,22 +536,6 @@ pub fn find_presentation_comment(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn add_presentation_comment(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    comment: Comment,
-    conformance: Conformance,
-) -> Result<()> {
-    add_presentation_comment_with_limits(
-        package,
-        slide_part_name,
-        comment,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn add_presentation_comment_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -689,26 +615,6 @@ pub(crate) fn add_presentation_comment_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn update_presentation_comment(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    author_id: u32,
-    index: u32,
-    replacement: Comment,
-    conformance: Conformance,
-) -> Result<()> {
-    update_presentation_comment_with_limits(
-        package,
-        slide_part_name,
-        author_id,
-        index,
-        replacement,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn update_presentation_comment_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -747,24 +653,6 @@ pub(crate) fn update_presentation_comment_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn remove_presentation_comment(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    author_id: u32,
-    index: u32,
-    conformance: Conformance,
-) -> Result<bool> {
-    remove_presentation_comment_with_limits(
-        package,
-        slide_part_name,
-        author_id,
-        index,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn remove_presentation_comment_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -819,22 +707,6 @@ pub(crate) fn remove_presentation_comment_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-#[cfg(test)]
-pub(crate) fn reorder_presentation_comments(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    ordered_keys: &[(u32, u32)],
-    conformance: Conformance,
-) -> Result<()> {
-    reorder_presentation_comments_with_limits(
-        package,
-        slide_part_name,
-        ordered_keys,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn reorder_presentation_comments_with_limits(
     package: &mut OpcPackage,
     slide_part_name: &str,

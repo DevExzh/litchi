@@ -468,23 +468,6 @@ pub(crate) struct XmlScan {
     pub(crate) slide_ids: Vec<String>,
 }
 
-#[cfg(test)]
-pub(crate) fn validate_resource_xml(
-    xml: &[u8],
-    max: usize,
-    conformance: Conformance,
-    root: &str,
-    label: &str,
-) -> Result<()> {
-    let scan = scan_xml(xml, max, conformance, root)?;
-    if !scan.relationship_attributes.is_empty() {
-        return Err(invalid(format!(
-            "{label} contains unsupported outbound relationship references"
-        )));
-    }
-    Ok(())
-}
-
 pub(crate) fn validate_resource_xml_with_limits(
     xml: &[u8],
     max: usize,
@@ -527,7 +510,8 @@ pub(crate) fn root_conformance_with_limits(
 /// Transitional-then-Strict retry as [`root_conformance`]. Malformed roots
 /// return `Ok(None)`, while typed resource failures remain errors so callers
 /// cannot turn a bounded refusal into a cacheable negative proof. `raw_len` is
-/// checked separately because the raw notes limit is part of `scan_xml`'s
+/// checked separately because the raw notes limit is part of
+/// `scan_xml_with_limits`'s
 /// contract even when the processed bytes are borrowed from a capture-local
 /// reader.
 pub(crate) fn root_conformance_from_processed(
@@ -566,16 +550,6 @@ fn node_policy(expected_root: &str) -> (crate::error::CodecLimitKind, usize) {
     } else {
         (crate::error::CodecLimitKind::XmlNodes, MAX_NODES)
     }
-}
-
-#[cfg(test)]
-pub(crate) fn scan_xml(
-    xml: &[u8],
-    max: usize,
-    conformance: Conformance,
-    expected_root: &str,
-) -> Result<XmlScan> {
-    scan_xml_with_limits(xml, max, conformance, expected_root, Limits::DEFAULT)
 }
 
 pub(crate) fn scan_xml_with_limits(

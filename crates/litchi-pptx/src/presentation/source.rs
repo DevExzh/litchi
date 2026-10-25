@@ -2081,14 +2081,6 @@ impl SourceBackedPresentationEditor {
 
     /// Build an owning editor from a validated deferred OPC package.
     #[cfg(test)]
-    fn from_source_backed_package(
-        package: SourceBackedPackage,
-        limits: SourceLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_semantic_limits(package, limits, None)
-    }
-
-    #[cfg(test)]
     fn from_source_backed_package_with_semantic_limits(
         package: SourceBackedPackage,
         limits: SourceLimits,
