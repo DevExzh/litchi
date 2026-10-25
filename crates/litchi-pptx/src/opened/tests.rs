@@ -1823,6 +1823,30 @@ fn add_unknown_member(data: &[u8], name: &str) -> Result<Vec<u8>> {
         .map_err(|error| Error::Invalid(format!("cannot finish test ZIP: {error}")))
 }
 
+fn reverse_archive_member_order(data: &[u8]) -> Result<Vec<u8>> {
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        data,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index test ZIP: {error}")))?;
+    let mut names: Vec<_> = archive.file_names().collect();
+    names.reverse();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
+    for name in names {
+        let bytes = archive.read(name).map_err(|error| {
+            Error::Invalid(format!("cannot read test ZIP member {name}: {error}"))
+        })?;
+        writer.write_stored(name, &bytes).map_err(|error| {
+            Error::Invalid(format!("cannot rewrite test ZIP member {name}: {error}"))
+        })?;
+    }
+    writer
+        .finish_to_bytes()
+        .map_err(|error| Error::Invalid(format!("cannot finish test ZIP: {error}")))
+}
+
 fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Result<Vec<u8>> {
     let comment_len = u16::try_from(comment.len())
         .map_err(|_| Error::Invalid("test ZIP comment exceeds u16".into()))?;
@@ -4794,6 +4818,20 @@ fn packages_equal_tracks_every_fingerprint_input() -> Result<()> {
         super::model::package_fingerprint(&base)?,
         super::model::package_fingerprint(&rewritten)?
     );
+    Ok(())
+}
+
+#[test]
+fn package_identity_ignores_opaque_member_insertion_order() -> Result<()> {
+    let base = opened_plain_slide_package()?.to_bytes()?;
+    let with_first = add_unknown_member(&base, "scratch-first.bin")?;
+    let with_both = add_unknown_member(&with_first, "scratch-second.bin")?;
+    let reordered = reverse_archive_member_order(&with_both)?;
+    let left = Package::from_reader(std::io::Cursor::new(with_both))?;
+    let right = Package::from_reader(std::io::Cursor::new(reordered))?;
+
+    assert!(super::model::packages_equal(&left.opc, &right.opc));
+    assert!(left.same_content(&right)?);
     Ok(())
 }
 

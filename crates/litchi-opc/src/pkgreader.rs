@@ -425,6 +425,20 @@ pub(crate) struct RelationshipXmlMetrics {
 pub(crate) struct SourceCatalog {
     pub(crate) pkg_srels: SmallVec<[SerializedRelationship; 8]>,
     pub(crate) parts: Vec<DeferredPart>,
+    /// Sum of the admitted ordinary-part payload lengths.  The deferred
+    /// classifier computes this while it already walks the central
+    /// directory, so later source-backed materialization and projections do
+    /// not need another package-wide metadata pass.
+    pub(crate) declared_part_bytes: u64,
+    /// Sum of every physical member's declared uncompressed bytes. The
+    /// deferred classifier computes this alongside the central-directory
+    /// admission walk so source-backed publication need not rescan the ZIP.
+    pub(crate) declared_archive_bytes: u64,
+    /// Aggregate declared bytes of admitted relationship XML members,
+    /// retained from the relationship parser's existing admission counters.
+    pub(crate) declared_relationship_xml_bytes: u64,
+    /// Aggregate XML event count retained from that same relationship pass.
+    pub(crate) declared_relationship_xml_events: u64,
     /// The parsed source manifest is retained with the admitted catalog so a
     /// later owning conversion can transfer its source binding without
     /// reparsing the manifest or reopening the archive.
@@ -565,6 +579,8 @@ pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
 struct AdmittedParts {
     relationships: HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
     typed_parts: Vec<(PackURI, String)>,
+    declared_part_bytes: u64,
+    declared_archive_bytes: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -582,6 +598,10 @@ impl PartClassificationMode {
     }
 
     const fn checks_declared_part_bytes(self) -> bool {
+        matches!(self, Self::Deferred)
+    }
+
+    const fn checks_declared_archive_bytes(self) -> bool {
         matches!(self, Self::Deferred)
     }
 }
@@ -1397,6 +1417,8 @@ impl PackageReader {
         let AdmittedParts {
             mut relationships,
             typed_parts,
+            declared_part_bytes: _,
+            declared_archive_bytes: _,
         } = Self::classify_part_members(
             archive,
             content_types_member,
@@ -1515,6 +1537,8 @@ impl PackageReader {
         let AdmittedParts {
             mut relationships,
             typed_parts,
+            declared_part_bytes: _,
+            declared_archive_bytes: _,
         } = Self::classify_part_members(
             archive,
             content_types_member,
@@ -1574,11 +1598,13 @@ impl PackageReader {
         non_part_members: &mut Vec<NonPartMember>,
         limits: SourceLimits,
         ledger: &mut RelationshipLedger,
-    ) -> Result<Vec<DeferredPart>> {
+    ) -> Result<(Vec<DeferredPart>, u64, u64)> {
         let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
         let AdmittedParts {
             mut relationships,
             typed_parts,
+            declared_part_bytes,
+            declared_archive_bytes,
         } = Self::classify_part_members(
             archive,
             content_types_member,
@@ -1605,7 +1631,7 @@ impl PackageReader {
                 srels,
             });
         }
-        Ok(parts)
+        Ok((parts, declared_part_bytes, declared_archive_bytes))
     }
 
     /// Classify every physical member and enforce the OPC part-name rules.
@@ -1629,8 +1655,17 @@ impl PackageReader {
             .try_reserve(archive.len())
             .map_err(|source| allocation(mode.allocation_resource(), source))?;
         let mut declared_part_bytes = 0u64;
+        let mut declared_archive_bytes = 0u64;
 
         for member_name in archive.file_names() {
+            if mode.checks_declared_archive_bytes() {
+                declared_archive_bytes = checked_add(
+                    declared_archive_bytes,
+                    archive.metadata(member_name)?.uncompressed_size(),
+                    SourceLimitKind::AggregateBytes,
+                    limits.max_aggregate_bytes(),
+                )?;
+            }
             if member_name.is_empty()
                 || member_name.ends_with('/')
                 || member_name == content_types_member
@@ -1701,6 +1736,8 @@ impl PackageReader {
         Ok(AdmittedParts {
             relationships,
             typed_parts,
+            declared_part_bytes,
+            declared_archive_bytes,
         })
     }
 
@@ -1756,13 +1793,15 @@ impl PackageReader {
         non_part_members: &mut Vec<NonPartMember>,
         limits: SourceLimits,
         ledger: &mut RelationshipLedger,
-    ) -> std::result::Result<Vec<DeferredPart>, ValidationCatalogError> {
+    ) -> std::result::Result<(Vec<DeferredPart>, u64, u64), ValidationCatalogError> {
         let phase = |phase, error| ValidationCatalogError { phase, error };
         let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)
             .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
         let AdmittedParts {
             mut relationships,
             typed_parts,
+            declared_part_bytes,
+            declared_archive_bytes,
         } = Self::classify_part_members(
             archive,
             content_types_member,
@@ -1792,7 +1831,7 @@ impl PackageReader {
                 srels,
             });
         }
-        Ok(parts)
+        Ok((parts, declared_part_bytes, declared_archive_bytes))
     }
 
     pub(crate) fn source_catalog<A: ArchiveAccess + ?Sized>(
@@ -1839,7 +1878,7 @@ impl PackageReader {
         non_part_members
             .try_reserve(archive.len())
             .map_err(|source| allocation("OPC non-part members", source))?;
-        let parts = Self::load_part_catalog(
+        let (parts, declared_part_bytes, declared_archive_bytes) = Self::load_part_catalog(
             archive,
             content_types_member,
             &pkg_srels,
@@ -1848,9 +1887,15 @@ impl PackageReader {
             limits,
             &mut ledger,
         )?;
+        let (declared_relationship_xml_bytes, declared_relationship_xml_events) =
+            relationship_xml_totals(&ledger.relationship_xml_metrics, limits)?;
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            declared_part_bytes,
+            declared_archive_bytes,
+            declared_relationship_xml_bytes,
+            declared_relationship_xml_events,
             content_types: Arc::new(content_types),
             relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
@@ -1923,18 +1968,30 @@ impl PackageReader {
             .try_reserve(archive.len())
             .map_err(|source| allocation("OPC non-part members", source))
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let parts = Self::load_part_catalog_for_validation(
-            archive,
-            content_types_member,
-            &pkg_srels,
-            &content_types,
-            &mut non_part_members,
-            limits,
-            &mut ledger,
-        )?;
+        let (parts, declared_part_bytes, declared_archive_bytes) =
+            Self::load_part_catalog_for_validation(
+                archive,
+                content_types_member,
+                &pkg_srels,
+                &content_types,
+                &mut non_part_members,
+                limits,
+                &mut ledger,
+            )?;
+        let (declared_relationship_xml_bytes, declared_relationship_xml_events) =
+            relationship_xml_totals(&ledger.relationship_xml_metrics, limits).map_err(|error| {
+                ValidationCatalogError {
+                    phase: ValidationCatalogPhase::LoadedRelationships,
+                    error,
+                }
+            })?;
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            declared_part_bytes,
+            declared_archive_bytes,
+            declared_relationship_xml_bytes,
+            declared_relationship_xml_events,
             content_types: Arc::new(content_types),
             relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
@@ -2616,6 +2673,34 @@ fn checked_add(
         });
     }
     Ok(actual)
+}
+
+/// Sum the unique relationship-member metrics retained by the admission
+/// ledger.  A relationship owner can be visited more than once while the
+/// graph and part catalog are assembled; the ledger's running parser counters
+/// include those visits, while source-backed topology accounting represents
+/// each physical `.rels` member exactly once.
+fn relationship_xml_totals(
+    metrics: &HashMap<PackURI, RelationshipXmlMetrics>,
+    limits: SourceLimits,
+) -> Result<(u64, u64)> {
+    let mut bytes = 0_u64;
+    let mut events = 0_u64;
+    for metric in metrics.values() {
+        bytes = checked_add(
+            bytes,
+            metric.uncompressed_bytes,
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        events = checked_add(
+            events,
+            metric.event_count,
+            SourceLimitKind::TotalRelationshipXmlEvents,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+    }
+    Ok((bytes, events))
 }
 
 #[cfg(test)]

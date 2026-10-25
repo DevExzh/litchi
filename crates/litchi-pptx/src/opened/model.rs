@@ -416,6 +416,9 @@ pub struct Snapshot {
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
     pub(crate) physical_source_provenance: bool,
+    /// Aggregate ordinary-part payload bytes observed during the same
+    /// capture pass that produced the complete-package revision.
+    pub(crate) part_bytes: u64,
     /// Serialized-archive revision of `package`, memoized with the archive
     /// bound it was taken under.
     ///
@@ -466,6 +469,10 @@ pub struct Snapshot {
 #[derive(Default)]
 pub(crate) struct PartDigests {
     entries: HashMap<(usize, usize), (Arc<Vec<u8>>, [u8; 32])>,
+    /// Aggregate visible payload bytes observed by the same fingerprint pass.
+    /// It is carried with the memo so snapshot publication does not need a
+    /// second package walk merely to retain the physical owner metric.
+    part_bytes: u64,
 }
 
 impl PartDigests {
@@ -477,7 +484,10 @@ impl PartDigests {
                 resource: "opened-presentation part digests",
                 source,
             })?;
-        Ok(Self { entries })
+        Ok(Self {
+            entries,
+            part_bytes: 0,
+        })
     }
 
     /// Digest memoized for exactly this allocation, if any.
@@ -535,6 +545,11 @@ impl PartDigests {
         Ok(())
     }
 
+    #[must_use]
+    pub(crate) const fn part_bytes(&self) -> u64 {
+        self.part_bytes
+    }
+
     /// Number of memoized payloads.
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
@@ -585,9 +600,13 @@ impl PartDigests {
     /// point it keeps a snapshot's memo (change 0751).
     pub(crate) fn project(&self, package: &OpcPackage) -> Result<Self> {
         if self.entries.is_empty() {
-            return Ok(Self::default());
+            return Ok(Self {
+                entries: HashMap::new(),
+                part_bytes: self.part_bytes,
+            });
         }
         let mut projected = Self::with_capacity(package.part_count())?;
+        projected.part_bytes = self.part_bytes;
         for metadata in package.iter_parts() {
             let part = package.get_part(metadata.partname())?;
             let Some((key, blob)) = memo_key(part) else {
@@ -1023,6 +1042,7 @@ fn capture_internal(
         Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
+    let part_bytes = part_digests.part_bytes();
     let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
     // The proofs borrow the input package, so every classified allocation is
     // alive while the memo is built. Each successful classification is kept
@@ -1045,6 +1065,7 @@ fn capture_internal(
         revision,
         limits,
         physical_source_provenance,
+        part_bytes,
         physical_revision: Arc::new(OnceLock::new()),
         part_digests: Arc::new(part_digests),
         retained_mce,
@@ -1065,7 +1086,8 @@ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
 }
 
 /// The `litchi-pptx-opened-v2` complete-package revision, computed over sorted
-/// per-part digests, together with the payload-digest memo it filled.
+/// opaque-member identities and sorted per-part digests, together with the
+/// payload-digest memo it filled.
 ///
 /// The proof is tiered. A payload digest covers exactly one part's payload
 /// bytes; a part digest covers the part name, the content type, that payload
@@ -1109,11 +1131,12 @@ pub(crate) fn package_fingerprint_with_memo(
     root_relationships.extend(package.rels().iter());
     root_relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
     feed_relationships(&mut digest, &root_relationships)?;
-    let non_part_count = u32::try_from(package.non_part_members().len())
+    let non_part_members = sorted_non_part_members(package)?;
+    let non_part_count = u32::try_from(non_part_members.len())
         .map_err(|_error| invalid("opened-presentation non-part member count exceeds u32"))?;
     feed(&mut digest, b"non-part-members");
     feed(&mut digest, &non_part_count.to_le_bytes());
-    for member in package.non_part_members() {
+    for member in non_part_members {
         feed(&mut digest, member.name().as_bytes());
         feed(&mut digest, member.reason().as_str().as_bytes());
     }
@@ -1126,6 +1149,12 @@ pub(crate) fn package_fingerprint_with_memo(
     let (part_total, mut hashed) = (parts.len(), 0usize);
     for metadata in parts {
         let part = package.get_part(metadata.partname())?;
+        let payload_bytes = u64::try_from(part.blob().len())
+            .map_err(|_| invalid("opened-presentation payload length exceeds u64"))?;
+        memo.part_bytes = memo
+            .part_bytes
+            .checked_add(payload_bytes)
+            .ok_or_else(|| invalid("opened-presentation payload aggregate overflows u64"))?;
         let payload = match memo_key(part) {
             Some((key, blob)) => {
                 let payload = match parent.and_then(|parent| parent.get(key)) {
@@ -1272,10 +1301,15 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     {
         return false;
     }
-    if left
-        .non_part_members()
+    let Some(left_non_parts) = sorted_non_part_members(left).ok() else {
+        return false;
+    };
+    let Some(right_non_parts) = sorted_non_part_members(right).ok() else {
+        return false;
+    };
+    if left_non_parts
         .iter()
-        .zip(right.non_part_members())
+        .zip(right_non_parts)
         .any(|(left, right)| left.name() != right.name() || left.reason() != right.reason())
     {
         return false;
@@ -1291,6 +1325,28 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
             })
         })
     })
+}
+
+/// Return opaque ZIP members in their content order rather than central
+/// directory insertion order.  Their original order remains on the owner for
+/// faithful publication; only identity/equality proofs canonicalize it.
+fn sorted_non_part_members<'a>(
+    package: &'a OpcPackage,
+) -> Result<Vec<&'a litchi_opc::NonPartMember>> {
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(package.non_part_members().len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint non-part members",
+            source,
+        })?;
+    members.extend(package.non_part_members());
+    members.sort_unstable_by(|left, right| {
+        left.name()
+            .cmp(right.name())
+            .then_with(|| left.reason().as_str().cmp(right.reason().as_str()))
+    });
+    Ok(members)
 }
 
 pub(super) fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {

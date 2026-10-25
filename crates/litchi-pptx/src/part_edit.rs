@@ -258,13 +258,53 @@ struct Delta {
 }
 
 /// The exact, reversible part-level change of one staged edit.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct PartPatch {
     deltas: Vec<Delta>,
     root: Option<(RelationshipImage, RelationshipImage)>,
     content_types: Option<(ContentTypesImage, ContentTypesImage)>,
     exact_content_types: bool,
+    /// Lazily cached complete-content identity of the recorded no-op base.
+    /// It is empty for a cold no-op commit and is filled by the first
+    /// independent replay, so repeated cross-owner replays do not fingerprint
+    /// the patch owner again. Non-noop patches never consult the cell.
+    base_revision: Arc<std::sync::OnceLock<[u8; 32]>>,
+    /// The immutable graph that supplied an exact no-op's base. Keeping this
+    /// owner preserves a pointer-identity fast path without forcing a cold
+    /// first commit to fingerprint the whole package; independent recipients
+    /// are still checked by content when they do not share this graph.
+    base_owner: Option<Arc<OpcPackage>>,
+    /// Aggregate admitted payload bytes captured while the before/after
+    /// graphs are already being walked. Replay uses these metrics instead of
+    /// rescanning unchanged recipient parts.
+    part_bytes_before: u64,
+    part_bytes_after: u64,
+    /// Payload bytes in the changed-part write set only. These are the
+    /// replay delta; the full before/after totals above are ingress metrics.
+    changed_part_bytes_before: u64,
+    changed_part_bytes_after: u64,
 }
+
+impl PartialEq for PartPatch {
+    fn eq(&self, other: &Self) -> bool {
+        self.deltas == other.deltas
+            && self.root == other.root
+            && self.content_types == other.content_types
+            && self.exact_content_types == other.exact_content_types
+            && self.base_revision.get() == other.base_revision.get()
+            && match (&self.base_owner, &other.base_owner) {
+                (None, None) => true,
+                (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+                _ => false,
+            }
+            && self.part_bytes_before == other.part_bytes_before
+            && self.part_bytes_after == other.part_bytes_after
+            && self.changed_part_bytes_before == other.changed_part_bytes_before
+            && self.changed_part_bytes_after == other.changed_part_bytes_after
+    }
+}
+
+impl Eq for PartPatch {}
 
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
@@ -291,7 +331,49 @@ impl PartPatch {
                 .content_types
                 .as_ref()
                 .map(|(before, after)| (after.clone(), before.clone())),
+            part_bytes_before: self.part_bytes_after,
+            part_bytes_after: self.part_bytes_before,
+            changed_part_bytes_before: self.changed_part_bytes_after,
+            changed_part_bytes_after: self.changed_part_bytes_before,
+            base_revision: Arc::clone(&self.base_revision),
+            base_owner: self.base_owner.clone(),
         }
+    }
+
+    fn base_matches_noop(&self, package: &Package) -> Result<bool> {
+        let Some(owner) = self.base_owner.as_ref() else {
+            return Ok(false);
+        };
+        if Arc::ptr_eq(owner, &package.opc) {
+            return Ok(true);
+        }
+        let base_revision = match self.base_revision.get().copied() {
+            Some(revision) => revision,
+            None => {
+                let revision = crate::opened::package_fingerprint_with_memo(owner, None)?.0;
+                let _ = self.base_revision.set(revision);
+                revision
+            },
+        };
+        Ok(package.content_revision()? == base_revision)
+    }
+
+    /// Bind an exact no-op to the visible content it was captured from.
+    ///
+    /// This is deliberately done only once the patch is known to be a no-op;
+    /// ordinary changed patches retain their O(affected) replay path.
+    pub(crate) fn bind_noop_identity(&mut self, package: &Package) -> Result<()> {
+        debug_assert!(self.is_noop());
+        self.base_revision = Arc::new(std::sync::OnceLock::new());
+        if let Some(revision) = package.cached_content_revision() {
+            let _ = self.base_revision.set(revision);
+        }
+        self.base_owner = Some(Arc::clone(&package.opc));
+        self.part_bytes_before = package.part_bytes;
+        self.part_bytes_after = package.part_bytes;
+        self.changed_part_bytes_before = 0;
+        self.changed_part_bytes_after = 0;
+        Ok(())
     }
 
     /// Capture every part that differs between `before` and `after`.
@@ -304,6 +386,8 @@ impl PartPatch {
         // limits admit.
         let maximum = before.read_limits().max_parts();
         let mut deltas = Vec::new();
+        let mut part_bytes_before = 0_u64;
+        let mut part_bytes_after = 0_u64;
         let mut push = |delta: Delta| -> Result<()> {
             if delta.before == delta.after {
                 return Ok(());
@@ -319,6 +403,20 @@ impl PartPatch {
         };
         for part in before.try_iter_parts() {
             let part = part?;
+            check_source_limit(
+                SourceLimitKind::PartBytes,
+                part.blob().len(),
+                before.read_limits().max_part_bytes(),
+            )?;
+            part_bytes_before = part_bytes_before
+                .checked_add(u64::try_from(part.blob().len()).unwrap_or(u64::MAX))
+                .ok_or_else(|| {
+                    source_limit(
+                        SourceLimitKind::TotalPartBytes,
+                        u64::MAX,
+                        before.read_limits().max_total_part_bytes(),
+                    )
+                })?;
             let name = part.partname();
             match optional_part(after, name)? {
                 Some(other)
@@ -333,6 +431,20 @@ impl PartPatch {
         }
         for part in after.try_iter_parts() {
             let part = part?;
+            check_source_limit(
+                SourceLimitKind::PartBytes,
+                part.blob().len(),
+                after.read_limits().max_part_bytes(),
+            )?;
+            part_bytes_after = part_bytes_after
+                .checked_add(u64::try_from(part.blob().len()).unwrap_or(u64::MAX))
+                .ok_or_else(|| {
+                    source_limit(
+                        SourceLimitKind::TotalPartBytes,
+                        u64::MAX,
+                        after.read_limits().max_total_part_bytes(),
+                    )
+                })?;
             if optional_part(before, part.partname())?.is_none() {
                 push(Delta {
                     name: part.partname().clone(),
@@ -341,7 +453,51 @@ impl PartPatch {
                 })?;
             }
         }
+        check_source_limit(
+            SourceLimitKind::Parts,
+            before.part_count(),
+            before.read_limits().max_parts() as u64,
+        )?;
+        check_source_limit(
+            SourceLimitKind::Parts,
+            after.part_count(),
+            after.read_limits().max_parts() as u64,
+        )?;
+        check_source_limit_u64(
+            SourceLimitKind::TotalPartBytes,
+            part_bytes_before,
+            before.read_limits().max_total_part_bytes(),
+        )?;
+        check_source_limit_u64(
+            SourceLimitKind::TotalPartBytes,
+            part_bytes_after,
+            after.read_limits().max_total_part_bytes(),
+        )?;
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+        let mut changed_part_bytes_before = 0_u64;
+        let mut changed_part_bytes_after = 0_u64;
+        for delta in &deltas {
+            if let Some(before) = &delta.before {
+                changed_part_bytes_before = changed_part_bytes_before
+                    .checked_add(u64::try_from(before.blob.len()).unwrap_or(u64::MAX))
+                    .ok_or_else(|| {
+                        Error::internal(
+                            "PartPatch::capture",
+                            "changed before-part payload aggregate overflows u64",
+                        )
+                    })?;
+            }
+            if let Some(after) = &delta.after {
+                changed_part_bytes_after = changed_part_bytes_after
+                    .checked_add(u64::try_from(after.blob.len()).unwrap_or(u64::MAX))
+                    .ok_or_else(|| {
+                        Error::internal(
+                            "PartPatch::capture",
+                            "changed after-part payload aggregate overflows u64",
+                        )
+                    })?;
+            }
+        }
         let owner = PackURI::new("/").map_err(Error::Uri)?;
         let root = if crate::opened::relationships_equal(before.rels(), after.rels())
             && before.same_retained_relationships(after, &owner)?
@@ -383,6 +539,12 @@ impl PartPatch {
             root,
             content_types,
             exact_content_types,
+            base_revision: Arc::new(std::sync::OnceLock::new()),
+            base_owner: None,
+            part_bytes_before,
+            part_bytes_after,
+            changed_part_bytes_before,
+            changed_part_bytes_after,
         })
     }
 
@@ -414,6 +576,9 @@ impl PartPatch {
         mut validate: Option<&mut dyn FnMut(&Package, &OpcPackage, &Self) -> Result<()>>,
     ) -> Result<Package> {
         if self.is_noop() {
+            if !self.base_matches_noop(package)? {
+                return Err(Error::PatchConflict);
+            }
             return Ok(package.duplicate());
         }
         package.ensure_plain_mutation(operation)?;
@@ -436,7 +601,7 @@ impl PartPatch {
             }
         }
         crate::package::signature::refuse_signed_change(source)?;
-        self.validate_destination_source_limits(source)?;
+        let part_bytes = self.validate_destination_source_limits(package)?;
         let mut target = (**source).clone();
         for delta in &self.deltas {
             if let (Some(before), Some(after)) = (&delta.before, &delta.after)
@@ -500,20 +665,19 @@ impl PartPatch {
             validate(package, &target, self)?;
         }
         crate::package::signature::settle_unsigned_change(&mut target)?;
-        Ok(package.derive(target))
+        Ok(package.derive_with_part_bytes(target, part_bytes))
     }
 
     /// Admit the replay candidate against the recipient's physical part
-    /// policy before cloning or mutating the target graph.  Existing source
-    /// parts were admitted at ingress, so only changed payload sizes need an
-    /// individual check.  The aggregate total is measured only when a
-    /// payload-size delta can change it; relationship-only patches therefore
-    /// retain their O(changed-parts) replay path.
-    fn validate_destination_source_limits(&self, source: &OpcPackage) -> Result<()> {
+    /// policy before cloning or mutating the target graph. Existing source
+    /// parts were admitted at ingress, and the candidate aggregate was
+    /// captured with the patch's already-required before/after walks, so
+    /// replay stays proportional to the write set rather than rescanning the
+    /// recipient.
+    fn validate_destination_source_limits(&self, package: &Package) -> Result<u64> {
+        let source = &package.opc;
         let limits = source.read_limits();
         let mut part_count = source.part_count();
-        let mut total_delta = 0_i128;
-        let mut total_changed = false;
         for delta in &self.deltas {
             match (&delta.before, &delta.after) {
                 (None, Some(after)) => {
@@ -525,52 +689,18 @@ impl PartPatch {
                         after.blob.len(),
                         limits.max_part_bytes(),
                     )?;
-                    total_delta = total_delta
-                        .checked_add(i128::try_from(after.blob.len()).unwrap_or(i128::MAX))
-                        .ok_or_else(|| {
-                            source_limit(
-                                SourceLimitKind::TotalPartBytes,
-                                u64::MAX,
-                                limits.max_total_part_bytes(),
-                            )
-                        })?;
-                    total_changed = true;
                 },
-                (Some(before), Some(after)) => {
+                (Some(_), Some(after)) => {
                     check_source_limit(
                         SourceLimitKind::PartBytes,
                         after.blob.len(),
                         limits.max_part_bytes(),
                     )?;
-                    let before_len = i128::try_from(before.blob.len()).unwrap_or(i128::MAX);
-                    let after_len = i128::try_from(after.blob.len()).unwrap_or(i128::MAX);
-                    if before_len != after_len {
-                        total_delta =
-                            total_delta
-                                .checked_add(after_len - before_len)
-                                .ok_or_else(|| {
-                                    source_limit(
-                                        SourceLimitKind::TotalPartBytes,
-                                        u64::MAX,
-                                        limits.max_total_part_bytes(),
-                                    )
-                                })?;
-                        total_changed = true;
-                    }
                 },
-                (Some(before), None) => {
+                (Some(_), None) => {
                     part_count = part_count.checked_sub(1).ok_or_else(|| {
                         source_limit(SourceLimitKind::Parts, 0, limits.max_parts() as u64)
                     })?;
-                    let before_len = i128::try_from(before.blob.len()).unwrap_or(i128::MAX);
-                    total_delta = total_delta.checked_sub(before_len).ok_or_else(|| {
-                        source_limit(
-                            SourceLimitKind::TotalPartBytes,
-                            0,
-                            limits.max_total_part_bytes(),
-                        )
-                    })?;
-                    total_changed = true;
                 },
                 (None, None) => {},
             }
@@ -580,28 +710,17 @@ impl PartPatch {
             part_count,
             limits.max_parts() as u64,
         )?;
-        if total_changed {
-            let total = source.iter_parts().try_fold(0_u64, |total, part| {
-                let bytes = u64::try_from(part.payload_len()?).map_err(|_| {
-                    source_limit(
-                        SourceLimitKind::TotalPartBytes,
-                        u64::MAX,
-                        limits.max_total_part_bytes(),
-                    )
-                })?;
-                total.checked_add(bytes).ok_or_else(|| {
-                    source_limit(
-                        SourceLimitKind::TotalPartBytes,
-                        u64::MAX,
-                        limits.max_total_part_bytes(),
-                    )
-                })
-            })?;
-            let candidate = if total_delta >= 0 {
-                total.checked_add(u64::try_from(total_delta).unwrap_or(u64::MAX))
-            } else {
-                total.checked_sub(u64::try_from(total_delta.unsigned_abs()).unwrap_or(u64::MAX))
-            }
+        let part_bytes = package
+            .part_bytes
+            .checked_sub(self.changed_part_bytes_before)
+            .ok_or_else(|| {
+                source_limit(
+                    SourceLimitKind::TotalPartBytes,
+                    0,
+                    limits.max_total_part_bytes(),
+                )
+            })?
+            .checked_add(self.changed_part_bytes_after)
             .ok_or_else(|| {
                 source_limit(
                     SourceLimitKind::TotalPartBytes,
@@ -609,13 +728,12 @@ impl PartPatch {
                     limits.max_total_part_bytes(),
                 )
             })?;
-            check_source_limit_u64(
-                SourceLimitKind::TotalPartBytes,
-                candidate,
-                limits.max_total_part_bytes(),
-            )?;
-        }
-        Ok(())
+        check_source_limit_u64(
+            SourceLimitKind::TotalPartBytes,
+            part_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+        Ok(part_bytes)
     }
 
     /// Visit only added or byte-replaced parts in the assembled replay target.
@@ -642,6 +760,29 @@ impl PartPatch {
             validate(&delta.name, target.get_part(&delta.name)?)?;
         }
         Ok(())
+    }
+
+    /// Admit changed PresentationML shape-owner parts under the recipient's
+    /// selected shape profile. The write set is deliberately the only scan:
+    /// unrelated opaque parts remain untouched and are not re-parsed during
+    /// replay.
+    pub(crate) fn validate_changed_shape_parts(
+        &self,
+        target: &OpcPackage,
+        shape_limits: crate::shape::Limits,
+    ) -> Result<()> {
+        self.validate_changed_parts(target, |_, part| {
+            if matches!(
+                part.content_type(),
+                litchi_opc::constants::content_type::PML_SLIDE
+                    | litchi_opc::constants::content_type::PML_SLIDE_LAYOUT
+                    | litchi_opc::constants::content_type::PML_SLIDE_MASTER
+            ) {
+                crate::shape::Scene::read(part.blob(), shape_limits).map(|_| ())
+            } else {
+                Ok(())
+            }
+        })
     }
 }
 
@@ -719,17 +860,26 @@ impl<'a> Staged<'a> {
     /// staging publishes the source package.
     pub(crate) fn commit(self) -> Result<(Package, PartPatch)> {
         if !self.changed {
-            return Ok((self.package.duplicate(), PartPatch::default()));
-        }
-        let Some(staged) = self.staged else {
-            return Ok((self.package.duplicate(), PartPatch::default()));
-        };
-        let staged = Arc::new(staged);
-        let patch = PartPatch::capture(&self.package.opc, &staged)?;
-        if patch.is_noop() {
+            let mut patch = PartPatch::default();
+            patch.bind_noop_identity(self.package)?;
             return Ok((self.package.duplicate(), patch));
         }
-        Ok((self.package.derive(staged), patch))
+        let Some(staged) = self.staged else {
+            let mut patch = PartPatch::default();
+            patch.bind_noop_identity(self.package)?;
+            return Ok((self.package.duplicate(), patch));
+        };
+        let staged = Arc::new(staged);
+        let mut patch = PartPatch::capture(&self.package.opc, &staged)?;
+        if patch.is_noop() {
+            patch.bind_noop_identity(self.package)?;
+            return Ok((self.package.duplicate(), patch));
+        }
+        Ok((
+            self.package
+                .derive_with_part_bytes(staged, patch.part_bytes_after),
+            patch,
+        ))
     }
 }
 
@@ -775,3 +925,72 @@ macro_rules! family {
 }
 
 pub(crate) use family;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::{BlobPart, PackURI};
+
+    #[test]
+    fn replay_updates_the_retained_physical_aggregate_by_the_write_set_delta() {
+        let base = crate::Package::new().expect("fresh package");
+        let name = PackURI::new("/custom/aggregate.bin").expect("part URI");
+        let payload = vec![0xA5; 37];
+        let mut edit = base.edit_opc().expect("raw edit");
+        edit.update(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                name.clone(),
+                "application/octet-stream".to_owned(),
+                payload.clone(),
+            )));
+            Ok(())
+        })
+        .expect("stage part");
+        let (published, patch) = edit.commit().expect("commit").into_parts();
+
+        let replayed = base.apply_opc(&patch).expect("replay").into_package();
+        assert_eq!(replayed.part_bytes, published.part_bytes);
+        assert_eq!(replayed.part_bytes, base.part_bytes + payload.len() as u64);
+    }
+
+    #[test]
+    fn noop_replay_requires_the_recorded_content_base() {
+        let base = crate::Package::new().expect("fresh package");
+        let (_published, patch) = base
+            .edit_opc()
+            .expect("raw edit")
+            .commit()
+            .expect("noop commit")
+            .into_parts();
+
+        // A cold no-op commit keeps only the owner handle.  It must not
+        // fingerprint the whole package merely to record an exact no-op.
+        assert!(base.cached_content_revision().is_none());
+        assert!(patch.0.base_revision.get().is_none());
+
+        let bytes = base.to_bytes().expect("serialize base");
+        let equal = crate::Package::from_bytes(&bytes).expect("independent equal package");
+        let _ = crate::opened::model::fingerprint_log::take();
+        assert!(equal.apply_opc(&patch).is_ok());
+        assert!(patch.0.base_revision.get().is_some());
+        assert!(!crate::opened::model::fingerprint_log::take().is_empty());
+        assert!(equal.apply_opc(&patch).is_ok());
+        assert!(crate::opened::model::fingerprint_log::take().is_empty());
+
+        let mut edit = base.edit_opc().expect("raw edit");
+        edit.update(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                PackURI::new("/custom/noop-conflict.bin").expect("part URI"),
+                "application/octet-stream".to_owned(),
+                vec![0x5A],
+            )));
+            Ok(())
+        })
+        .expect("stage different package");
+        let (different, _) = edit.commit().expect("different commit").into_parts();
+        assert!(matches!(
+            different.apply_opc(&patch),
+            Err(crate::Error::PatchConflict)
+        ));
+    }
+}

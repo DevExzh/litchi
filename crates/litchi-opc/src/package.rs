@@ -455,6 +455,11 @@ pub struct OpcPackage {
     /// Using Box<dyn Part + Send + Sync> for trait objects to allow different part types
     /// `PackURI` keys avoid string allocations compared to String keys
     parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
+    /// Retained aggregate length of ordinary part payloads. A `None` value
+    /// means a mutable escape hatch may have changed a payload without a
+    /// length delta being observable; format owners refresh it at their
+    /// publication seam from the existing capture pass.
+    part_bytes: Option<u64>,
 
     /// Exact XML payloads captured from the opened source package. A
     /// deferred part's entry shares that part's payload cell, so the audit
@@ -591,6 +596,7 @@ impl OpcPackage {
             read_limits: SourceLimits::default(),
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
+            part_bytes: Some(0),
             source_xml_parts: HashMap::new(),
             source_relationships_xml: HashMap::new(),
             source_content_types_xml: None,
@@ -1599,9 +1605,15 @@ impl OpcPackage {
                 source,
             })?;
         let mut source_xml_parts = HashMap::new();
+        let mut part_bytes = 0u64;
 
         // Create all parts - move data instead of cloning
         for spart in sparts {
+            let payload_len = u64::try_from(spart.payload.payload_len()?)
+                .map_err(|_| OpcError::ZipError("OPC part payload length overflows u64".into()))?;
+            part_bytes = part_bytes.checked_add(payload_len).ok_or_else(|| {
+                OpcError::ZipError("OPC aggregate part payload length overflows u64".into())
+            })?;
             let partname = spart.partname.clone(); // Need to clone partname for the HashMap key
             // Donation compares payloads, so it applies only to a reader that
             // already materialized them; a deferred payload is left alone.
@@ -1693,6 +1705,7 @@ impl OpcPackage {
         }
 
         package.parts = parts_map;
+        package.part_bytes = Some(part_bytes);
         package.source_xml_parts = source_xml_parts;
         package.source_ingress = true;
         package.signature_graph_tracked = package.is_signed();
@@ -2025,6 +2038,10 @@ impl OpcPackage {
             Some(part) => part.ensure_payload()?,
             None => return Err(OpcError::PartNotFound(partname.to_string())),
         }
+        // The mutable trait object can replace bytes or relationships through
+        // methods this owner cannot observe. Publication callers refresh the
+        // aggregate from their existing capture walk.
+        self.part_bytes = None;
         self.parts
             .get_mut(&key)
             .map(|b| {
@@ -2107,6 +2124,7 @@ impl OpcPackage {
         }
         self.revoke_exact_source();
         self.signature_graph_tracked = true;
+        self.part_bytes = None;
         for (partname, payload) in prepared {
             // Preflight resolved every key and no map mutation intervenes.
             // Built-in setters cannot change relationships or the part map.
@@ -2154,6 +2172,7 @@ impl OpcPackage {
         let partname = part.partname().clone();
         self.source_xml_parts.remove(&partname);
         self.source_relationships_xml.remove(&partname);
+        self.part_bytes = None;
         self.parts.insert(partname, part);
     }
 
@@ -2181,6 +2200,7 @@ impl OpcPackage {
                 source,
             })?;
         self.source_relationships_xml.remove(&partname);
+        self.part_bytes = None;
         self.parts.insert(partname, part);
         Ok(())
     }
@@ -2379,6 +2399,7 @@ impl OpcPackage {
         self.revoke_exact_source();
         self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
+        self.part_bytes = None;
         for part in parts {
             let name = part.partname().clone();
             let source_blob =
@@ -2451,6 +2472,7 @@ impl OpcPackage {
                 None
             };
         self.source_relationships_xml.remove(&partname);
+        self.part_bytes = None;
         self.parts.insert(partname.clone(), part);
         if let Some(source_blob) = source_blob {
             self.source_xml_parts
@@ -2537,6 +2559,7 @@ impl OpcPackage {
 
         self.revoke_exact_source();
         self.signature_graph_tracked = true;
+        self.part_bytes = None;
         for (part, retain_source) in parts {
             let partname = part.partname().clone();
             let source_blob = if retain_source
@@ -2578,6 +2601,7 @@ impl OpcPackage {
         self.content_types_source_state.reset();
         self.source_xml_parts.remove(partname);
         self.source_relationships_xml.remove(partname);
+        self.part_bytes = None;
         self.parts.remove(partname).is_some()
     }
 
@@ -2657,6 +2681,23 @@ impl OpcPackage {
     #[must_use]
     pub fn part_count(&self) -> usize {
         self.parts.len()
+    }
+
+    /// Return the retained aggregate length of ordinary part payloads.
+    ///
+    /// A package assembled through a mutable escape hatch can temporarily
+    /// report `None`; format owners refresh that value from their existing
+    /// capture pass before publishing a package that needs replay admission.
+    #[must_use]
+    pub const fn admitted_part_bytes(&self) -> Option<u64> {
+        self.part_bytes
+    }
+
+    /// Install an aggregate already proved by an ingress or materialization
+    /// catalog pass. This is crate-private so callers cannot claim a metric
+    /// for bytes they did not admit under the package's source policy.
+    pub(crate) const fn set_admitted_part_bytes(&mut self, bytes: u64) {
+        self.part_bytes = Some(bytes);
     }
 
     /// Parts inflated, and bytes inflated, from the retained source archive.

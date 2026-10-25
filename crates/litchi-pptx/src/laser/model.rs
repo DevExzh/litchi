@@ -286,8 +286,11 @@ impl Default for Limits {
 
 /// Mutable aggregate usage for one or more laser-trace slide reads.
 ///
-/// Pass one value through a slide walk to preserve package-wide byte, trace,
-/// and point ceilings.  A failed read does not commit its staged charges.
+/// Pass one value through the complete scope selected by the caller to
+/// preserve byte, trace, and point ceilings. A package-wide walk passes all
+/// slides; a source-backed batch passes every selected slide, including an
+/// unchanged recipient snapshot whose captured source usage avoids a second
+/// XML scan. A failed read does not commit its staged charges.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[must_use]
 pub struct Usage {
@@ -323,5 +326,19 @@ impl Usage {
     #[must_use]
     pub const fn point_count(self) -> usize {
         self.point_count
+    }
+
+    /// Add one independently captured slide ledger without changing either
+    /// input.  The caller applies its selected policy to the returned total;
+    /// this keeps aggregate scope explicit when a batch preserves unchanged
+    /// slide snapshots without rescanning their XML.
+    pub(crate) const fn checked_add(self, other: Self) -> Option<Self> {
+        Some(Self {
+            total_slide_xml_bytes: self
+                .total_slide_xml_bytes
+                .checked_add(other.total_slide_xml_bytes)?,
+            trace_count: self.trace_count.checked_add(other.trace_count)?,
+            point_count: self.point_count.checked_add(other.point_count)?,
+        })
     }
 }

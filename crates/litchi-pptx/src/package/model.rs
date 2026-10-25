@@ -11,6 +11,18 @@ use crate::{Error, Result};
 /// Main entry point for `PresentationML` package ownership.
 pub struct Package {
     pub(crate) opc: std::sync::Arc<OpcPackage>,
+    /// Aggregate ordinary-part payload bytes retained from ingress or the
+    /// existing publication/capture pass. Replay updates this by the patch's
+    /// changed-part delta instead of rescanning unrelated recipient parts.
+    pub(crate) part_bytes: u64,
+    /// Complete visible-content identity used by exact raw-patch no-ops.
+    ///
+    /// The slot is populated by opened captures or by the first no-op patch
+    /// check. Keeping it separate from the payload-digest memo lets a raw
+    /// patch prove its recorded base in constant time after the normal
+    /// package-open/capture work, without making a no-op replay rewalk the
+    /// recipient graph.
+    pub(crate) content_revision: std::sync::Arc<std::sync::OnceLock<[u8; 32]>>,
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
@@ -97,6 +109,51 @@ impl OpenedOwnerState {
 }
 
 impl Package {
+    pub(crate) fn part_bytes_for(opc: &OpcPackage) -> Result<u64> {
+        if let Some(bytes) = opc.admitted_part_bytes() {
+            return Ok(bytes);
+        }
+        opc.iter_parts().try_fold(0_u64, |total, part| {
+            let bytes = u64::try_from(part.payload_len()?).map_err(|_| {
+                Error::internal(
+                    "part_bytes_for",
+                    "ordinary-part payload length exceeds the owner metric range",
+                )
+            })?;
+            total.checked_add(bytes).ok_or_else(|| {
+                Error::internal(
+                    "part_bytes_for",
+                    "ordinary-part payload aggregate exceeds the owner metric range",
+                )
+            })
+        })
+    }
+
+    /// Complete visible-content identity for raw patch base matching.
+    ///
+    /// A package that has not yet entered the opened facade computes this once
+    /// and retains the result when a replay needs an independent-content
+    /// proof. Subsequent no-op patch replays are O(1), while independent equal
+    /// opens converge on the same content identity.
+    pub(crate) fn content_revision(&self) -> Result<[u8; 32]> {
+        if let Some(revision) = self.content_revision.get() {
+            return Ok(*revision);
+        }
+        let (revision, memo) =
+            crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?;
+        if self.part_digests.get().is_none() {
+            let _ = self.part_digests.set(std::sync::Arc::new(memo));
+        }
+        let _ = self.content_revision.set(revision);
+        Ok(revision)
+    }
+
+    /// Return a previously established complete-content identity without
+    /// starting a cold fingerprint pass.
+    pub(crate) fn cached_content_revision(&self) -> Option<[u8; 32]> {
+        self.content_revision.get().copied()
+    }
+
     pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
         crate::open_options::selected(self.semantic_limits.as_ref())
     }
@@ -391,10 +448,8 @@ impl Package {
     /// Compare exact visible OPC content using the native revision proof.
     /// Pending mutable authoring state is refused; ZIP record encoding is not compared.
     pub fn same_content(&self, other: &Self) -> Result<bool> {
-        let left =
-            crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?.0;
-        let right =
-            crate::opened::package_fingerprint_with_memo(&other.opc, other.part_digest_memo())?.0;
+        let left = self.content_revision()?;
+        let right = other.content_revision()?;
         Ok(left == right)
     }
 
@@ -465,8 +520,9 @@ impl Package {
     /// An equal package sharing this one's graph, payloads and memo: the
     /// package an exact no-op publishes.
     pub(crate) fn duplicate(&self) -> Self {
-        let mut package = self.derive(self.opc.clone());
+        let mut package = self.derive_with_part_bytes(self.opc.clone(), self.part_bytes);
         package.part_digests = self.part_digests.clone();
+        package.content_revision = self.content_revision.clone();
         package
     }
 
@@ -474,8 +530,22 @@ impl Package {
     /// (tolerance report, encryption provenance, physical-source flag). The
     /// payload-digest memo starts empty, because `opc` is another graph.
     pub(crate) fn derive(&self, opc: impl Into<std::sync::Arc<OpcPackage>>) -> Self {
+        let opc = opc.into();
+        let part_bytes = opc.admitted_part_bytes().unwrap_or(self.part_bytes);
+        self.derive_with_part_bytes(opc, part_bytes)
+    }
+
+    /// Derive a package when the caller has already accounted for the
+    /// candidate's ordinary-part payload bytes in the same pass that built it.
+    pub(crate) fn derive_with_part_bytes(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        part_bytes: u64,
+    ) -> Self {
         Self {
             opc: opc.into(),
+            part_bytes,
+            content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: self.physical_source_provenance,
             semantic_limits: self.semantic_limits.clone(),
             tolerance: self.tolerance.clone(),
@@ -485,6 +555,20 @@ impl Package {
             #[cfg(feature = "encryption")]
             encryption_limits: self.encryption_limits,
         }
+    }
+
+    /// Refresh the retained physical and content metrics after native
+    /// authoring has published its graph in place.  Authoring is the one
+    /// package construction path that mutates the initial OPC owner rather
+    /// than deriving a new facade, so both lazy identity cells must be
+    /// replaced together with the byte aggregate.  The identity remains
+    /// lazy: the publication pass already owns the graph construction, while
+    /// an exact digest is only needed if a later raw no-op asks for it.
+    pub(crate) fn refresh_authored_publication(&mut self) -> Result<()> {
+        self.part_bytes = Self::part_bytes_for(&self.opc)?;
+        self.content_revision = std::sync::Arc::new(std::sync::OnceLock::new());
+        self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
+        Ok(())
     }
 
     /// Drop the retained encryption provenance: the package publishes as an
@@ -505,6 +589,12 @@ impl Package {
         let state = &snapshot.owner_state;
         let mut package = Self {
             opc: std::sync::Arc::new(opc),
+            part_bytes: snapshot.part_bytes,
+            content_revision: {
+                let slot = std::sync::OnceLock::new();
+                let _ = slot.set(snapshot.revision);
+                std::sync::Arc::new(slot)
+            },
             physical_source_provenance: snapshot.physical_source_provenance,
             semantic_limits: state.semantic_limits.clone(),
             tolerance: state.tolerance.clone(),
@@ -893,7 +983,8 @@ impl Package {
         self.ensure_plain_mutation("unsign")?;
         let mut opc = (*self.opc).clone();
         opc.unsign();
-        Ok(self.derive(opc))
+        let part_bytes = Self::part_bytes_for(&opc)?;
+        Ok(self.derive_with_part_bytes(opc, part_bytes))
     }
 
     /// Adopt, as this package's memo, `snapshot`'s payload-digest memo
@@ -910,6 +1001,7 @@ impl Package {
     /// cannot allocate leaves the memo empty, which only costs a later hash.
     fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
         self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
+        let _ = self.content_revision.set(snapshot.revision);
         if let Some(memo) = Self::memo_for(&self.opc, snapshot) {
             let _kept = self.part_digests.set(memo);
         }
@@ -929,6 +1021,7 @@ impl Package {
     /// every mutation that publishes no snapshot empties it and every
     /// publication replaces it.
     fn offer_part_digests(&self, snapshot: &crate::opened::Snapshot) {
+        let _ = self.content_revision.set(snapshot.revision);
         if self.part_digests.get().is_none()
             && let Some(memo) = Self::memo_for(&self.opc, snapshot)
         {

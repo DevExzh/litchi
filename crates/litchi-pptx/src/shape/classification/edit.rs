@@ -45,10 +45,14 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_shape_classification(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_shape_classification")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_shape_classification",
+            |package, target, patch| {
+                patch.validate_changed_shape_parts(target, package.semantic_limits().shape())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
