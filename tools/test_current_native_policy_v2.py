@@ -306,10 +306,29 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     "bytes": output.stat().st_size,
                     "relative_path": route.output,
                 }
+                abba = []
+                for index, leg in enumerate(policy.ABBA_ORDER):
+                    relative_leg = f".abba/{route.route.replace('/', '_')}/{index}-{leg}.stream"
+                    leg_path = output_root / relative_leg
+                    leg_path.parent.mkdir(parents=True, exist_ok=True)
+                    leg_path.write_bytes(f"{route.route}/{leg}".encode())
+                    abba.append({
+                        "route": route.route,
+                        "role": leg,
+                        "index": index,
+                        "returncode": 0,
+                        "source_binding": bindings[leg] if leg in bindings else bindings["before"],
+                        "output_artifact": {
+                            "path": str(leg_path.resolve()),
+                            "sha256": hashlib.sha256(leg_path.read_bytes()).hexdigest(),
+                            "bytes": leg_path.stat().st_size,
+                            "relative_path": relative_leg,
+                        },
+                    })
                 rows.append({
                     **route.json(),
                     "status": route.status,
-                    "evidence": {"source_bindings": bindings, "output_artifact": artifact},
+                    "evidence": {"source_bindings": bindings, "output_artifact": artifact, "abba": abba},
                 })
             execution = {
                 "schema": "litchi.current-native-execution.v2",
@@ -321,6 +340,7 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 "routes": routes,
                 "source_artifacts": identities,
                 "tooling": tooling,
+                "abba_order": list(policy.ABBA_ORDER),
                 "runner": validator._file_identity(ROOT / "tools/native_qualification_runner.py", "runner"),
                 "route_receipts": rows,
             }
@@ -437,6 +457,100 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 legacy_steps = policy.make_legacy_steps_v2(after, parent / "legacy-state", parent / "legacy-target", source_archive=after_archive)
                 self.assertEqual(ppt_steps[0]["argv"][2:4], ["guard-role-lock", "workspace"])
                 self.assertEqual(legacy_steps[0]["argv"][2:4], ["guard-role-lock", "perf"])
+
+    def test_injected_executor_writes_and_consumes_v2_abba_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before, before_archive = self._complete_source(parent / "before", "before-exec", "before.tar")
+            after, after_archive = self._complete_source(parent / "after", "after-exec", "after.tar")
+            trusted = self._complete_policy(before, before_archive, after, after_archive)
+            manifest = self._manifest_for_policy(parent / "manifest.json", "ppt-auxiliary", trusted)
+            preparation_path = parent / "preparation.json"
+            output_root = parent / "outputs"
+            qualification_path = parent / "qualification.json"
+            calls = []
+
+            def fake_executor(step: dict[str, object]) -> dict[str, object]:
+                calls.append((step.get("name"), step.get("route"), step.get("abba_role")))
+                route = step.get("route", step.get("name", "build"))
+                role = step.get("abba_role", "build")
+                return {
+                    "returncode": 0,
+                    "output_bytes": json.dumps({"route": route, "role": role}, sort_keys=True).encode() + b"\n",
+                }
+
+            with mock.patch.object(policy, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(preparer, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(validator, "TRUSTED_POLICY", trusted):
+                preparer.prepare(
+                    lane="ppt-auxiliary",
+                    manifest=manifest,
+                    before=before,
+                    after=after,
+                    before_archive=before_archive,
+                    after_archive=after_archive,
+                    output_root=output_root,
+                    output=preparation_path,
+                )
+                result = policy.execute_v2(preparation_path, qualification_path, executor=fake_executor)
+                self.assertEqual(result["schema"], policy.QUALIFICATION_SCHEMA)
+                self.assertEqual(result["lane"], "ppt-auxiliary")
+                self.assertEqual(len(calls), 10)
+                self.assertEqual(calls[0][0:2], ("ppt-scoped-build", "ppt-scoped-build"))
+                value = json.loads(qualification_path.read_text(encoding="utf-8"))
+                self.assertEqual([row["route"] for row in value["results"]], [route.route for route in policy.PPT_ROUTES])
+                self.assertTrue(all(len(row["evidence"]["abba"]) == 4 for row in value["results"]))
+                value["results"][0]["evidence"]["abba"][0]["role"] = "after"
+                qualification_path.write_bytes(policy._canonical(value))
+                with self.assertRaises(validator.ValidationError):
+                    validator.validate_qualification(qualification_path, preparation_path)
+
+    def test_injected_executor_preserves_eight_legacy_route_streams(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before, before_archive = self._complete_source(parent / "before", "before-legacy", "before.tar")
+            after, after_archive = self._complete_source(parent / "after", "after-legacy", "after.tar")
+            trusted = self._complete_policy(before, before_archive, after, after_archive)
+            manifest = self._manifest_for_policy(parent / "manifest.json", "legacy-current", trusted)
+            preparation_path = parent / "preparation.json"
+            output_root = parent / "outputs"
+            qualification_path = parent / "qualification.json"
+            calls: list[dict[str, object]] = []
+
+            def fake_executor(step: dict[str, object]) -> dict[str, object]:
+                calls.append(step)
+                return {
+                    "returncode": 0,
+                    "output_bytes": json.dumps(
+                        {"route": step.get("route"), "role": step.get("abba_role")},
+                        sort_keys=True,
+                    ).encode() + b"\n",
+                }
+
+            with mock.patch.object(policy, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(preparer, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(validator, "TRUSTED_POLICY", trusted):
+                preparer.prepare(
+                    lane="legacy-current",
+                    manifest=manifest,
+                    before=before,
+                    after=after,
+                    before_archive=before_archive,
+                    after_archive=after_archive,
+                    output_root=output_root,
+                    output=preparation_path,
+                )
+                policy.execute_v2(preparation_path, qualification_path, executor=fake_executor)
+                value = json.loads(qualification_path.read_text(encoding="utf-8"))
+                self.assertEqual(len(value["results"]), 8)
+                self.assertEqual(
+                    [row["route"] for row in value["results"]],
+                    [route.route for route in policy.LEGACY_CURRENT_ROUTES],
+                )
+                self.assertTrue(all(len(row["evidence"]["abba"]) == 4 for row in value["results"]))
+                route_calls = [step for step in calls if step.get("route")]
+                self.assertEqual(len(route_calls), 8 * len(policy.ABBA_ORDER))
+                self.assertTrue(all("--check-only" not in step["argv"] for step in route_calls))
 
     def test_ready_pipeline_rejects_wrong_source_lock_archive_and_route(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

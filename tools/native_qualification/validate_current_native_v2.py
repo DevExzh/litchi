@@ -18,12 +18,14 @@ from typing import Any, Mapping, Sequence
 from native_qualification.current_native_policy_v2 import (
     ABBA_ORDER,
     EXECUTION_RECEIPT_RELATIVE,
+    EXECUTION_SCHEMA,
     POLICY_SCHEMA,
     PREPARATION_SCHEMA,
     QUALIFICATION_SCHEMA,
     PolicyError,
     PolicyIncomplete,
     PolicyMismatch,
+    RUNNER_KIND,
     TRUSTED_POLICY,
     validate_routes,
     validate_source,
@@ -216,6 +218,51 @@ def _validate_output_artifact(evidence: Mapping[str, Any], expected: Any, output
         raise ValidationError(f"{label} output artifact changed")
 
 
+def _validate_abba_evidence(
+    evidence: Mapping[str, Any],
+    route: Any,
+    output_root: Path,
+    source_bindings: Mapping[str, str],
+    label: str,
+) -> None:
+    legs = evidence.get("abba")
+    if not isinstance(legs, list) or len(legs) != len(ABBA_ORDER):
+        raise ValidationError(f"{label} ABBA evidence does not contain the fixed four legs")
+    seen: set[str] = set()
+    for index, (leg, record) in enumerate(zip(ABBA_ORDER, legs)):
+        if not isinstance(record, Mapping):
+            raise ValidationError(f"{label} ABBA leg {index} is malformed")
+        if record.get("route") != route.route or record.get("role") != leg or record.get("index") != index:
+            raise ValidationError(f"{label} ABBA leg {index} route/order differs from policy")
+        if record.get("returncode") != 0 or record.get("source_binding") != source_bindings.get(leg):
+            raise ValidationError(f"{label} ABBA leg {index} is not source-bound and successful")
+        artifact = record.get("output_artifact")
+        if not isinstance(artifact, Mapping):
+            raise ValidationError(f"{label} ABBA leg {index} has no output artifact")
+        relative = artifact.get("relative_path")
+        if not isinstance(relative, str) or Path(relative).is_absolute() or ".." in Path(relative).parts or not relative.startswith(".abba/"):
+            raise ValidationError(f"{label} ABBA leg {index} output path is unsafe")
+        path = output_root / relative
+        cursor = output_root
+        for component in Path(relative).parts:
+            cursor /= component
+            if cursor.is_symlink():
+                raise ValidationError(f"{label} ABBA leg {index} output contains a symlink component")
+        try:
+            path.absolute().relative_to(output_root.absolute())
+        except ValueError as error:
+            raise ValidationError(f"{label} ABBA leg {index} output escapes the prepared root") from error
+        if not isinstance(artifact.get("path"), str) or Path(artifact["path"]).absolute() != path.absolute():
+            raise ValidationError(f"{label} ABBA leg {index} output path is not bound")
+        actual = _file_identity(path, f"{label} ABBA leg {index}")
+        expected_identity = {**actual, "relative_path": relative}
+        if dict(artifact) != expected_identity:
+            raise ValidationError(f"{label} ABBA leg {index} output identity changed")
+        if relative in seen:
+            raise ValidationError(f"{label} ABBA output path is reused")
+        seen.add(relative)
+
+
 def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str, Any]) -> None:
     output_root = prepared.get("output_root")
     if not isinstance(output_root, Path):
@@ -235,7 +282,7 @@ def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str,
     }
     if dict(artifact) != actual_identity:
         raise ValidationError("runner execution receipt identity changed")
-    if execution.get("schema") != "litchi.current-native-execution.v2" or execution.get("status") != "completed":
+    if execution.get("schema") != EXECUTION_SCHEMA or execution.get("status") != "completed":
         raise ValidationError("runner execution receipt is not a completed v2 execution")
     for field in ("policy_sha256", "preparation_receipt_sha256", "lane", "output_root", "routes", "source_artifacts", "tooling"):
         expected = value.get("policy_sha256") if field == "policy_sha256" else (
@@ -245,8 +292,14 @@ def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str,
             raise ValidationError(f"runner execution receipt {field} is not bound to qualification")
     runner = execution.get("runner")
     expected_runner = _file_identity(Path(__file__).resolve().parents[1] / "native_qualification_runner.py", "runner")
-    if not isinstance(runner, Mapping) or dict(runner) != expected_runner:
-        raise ValidationError("runner execution receipt is not bound to the reviewed generic runner")
+    current_runner = _file_identity(Path(__file__).with_name("current_native_policy_v2.py"), "current-native v2 runner")
+    if isinstance(runner, Mapping) and dict(runner) == current_runner:
+        if execution.get("runner_kind") != RUNNER_KIND:
+            raise ValidationError("current-native v2 runner kind is missing")
+    elif not isinstance(runner, Mapping) or dict(runner) != expected_runner:
+        raise ValidationError("runner execution receipt is not bound to a reviewed runner")
+    if execution.get("abba_order") != list(ABBA_ORDER):
+        raise ValidationError("runner execution receipt ABBA order differs from the fixed protocol")
     if execution.get("route_receipts") != value.get("results"):
         raise ValidationError("runner execution receipt route evidence differs from qualification")
 
@@ -344,6 +397,13 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         if evidence.get("source_bindings") != expected_bindings:
             raise ValidationError(f"qualification result {index} source bindings differ from preparation")
         _validate_output_artifact(evidence, expected, prepared["output_root"], f"qualification result {index}")
+        _validate_abba_evidence(
+            evidence,
+            expected,
+            prepared["output_root"],
+            expected_bindings,
+            f"qualification result {index}",
+        )
     _validate_execution_receipt(value, prepared)
     return {"schema": QUALIFICATION_SCHEMA, "lane": lane, "policy_sha256": TRUSTED_POLICY.digest(), "sha256": value_sha256}
 
