@@ -8943,6 +8943,194 @@
       "family_methods": true
     },
     {
+      "id": "spreadsheet-drawing-minimal",
+      "package": "litchi-spreadsheet-drawing",
+      "default_features": false,
+      "features": [],
+      "banned_names": [],
+      "families": [],
+      "required_signatures": [
+        {
+          "method": "litchi_spreadsheet_drawing::objects::read",
+          "inputs": ["xml", "relationships", "image", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::chart_frames",
+          "inputs": ["xml", "relationships", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::count",
+          "inputs": ["xml", "kind", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::next_id",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::append",
+          "inputs": ["xml", "fragment", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::check_picture",
+          "inputs": ["spec", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::picture_fragment",
+          "inputs": ["spec", "id", "relationship_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::shape_fragment",
+          "inputs": ["spec", "id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::change",
+          "inputs": ["xml", "kind", "index", "change", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::detach",
+          "inputs": ["xml", "kind", "index", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::shape::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::shape::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::vml::shapes",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::vml::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::shape::writer::Emitter::new",
+          "inputs": ["first_id", "geometry_limits"],
+          "limits_argument": "geometry_limits",
+          "limits_type": "litchi_drawingml::geometry::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::shape::writer::Emitter::for_objects",
+          "inputs": ["first_id", "shapes", "groups", "connections", "geometry_limits"],
+          "limits_argument": "geometry_limits",
+          "limits_type": "litchi_drawingml::geometry::Limits"
+        }
+      ]
+    },
+    {
+      "id": "spreadsheet-drawing-full",
+      "package": "litchi-spreadsheet-drawing",
+      "default_features": false,
+      "features": [],
+      "banned_names": [],
+      "families": [],
+      "required_signatures": [
+        {
+          "method": "litchi_spreadsheet_drawing::objects::read",
+          "inputs": ["xml", "relationships", "image", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::chart_frames",
+          "inputs": ["xml", "relationships", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::count",
+          "inputs": ["xml", "kind", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::next_id",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::append",
+          "inputs": ["xml", "fragment", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::check_picture",
+          "inputs": ["spec", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::picture_fragment",
+          "inputs": ["spec", "id", "relationship_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::shape_fragment",
+          "inputs": ["spec", "id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::change",
+          "inputs": ["xml", "kind", "index", "change", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::objects::detach",
+          "inputs": ["xml", "kind", "index", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::objects::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::shape::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::shape::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::vml::shapes",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_spreadsheet_drawing::vml::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::shape::writer::Emitter::new",
+          "inputs": ["first_id", "geometry_limits"],
+          "limits_argument": "geometry_limits",
+          "limits_type": "litchi_drawingml::geometry::Limits"
+        },
+        {
+          "method": "litchi_spreadsheet_drawing::shape::writer::Emitter::for_objects",
+          "inputs": ["first_id", "shapes", "groups", "connections", "geometry_limits"],
+          "limits_argument": "geometry_limits",
+          "limits_type": "litchi_drawingml::geometry::Limits"
+        }
+      ]
+    },
+    {
       "id": "doc-minimal",
       "package": "litchi-doc",
       "default_features": false,

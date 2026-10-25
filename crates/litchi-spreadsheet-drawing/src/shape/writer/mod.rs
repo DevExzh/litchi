@@ -514,6 +514,27 @@ fn validate_children(
     Ok(())
 }
 
+fn validate_shape_geometry(geometry: &Geometry, limits: GeometryLimits) -> WriteResult<()> {
+    let Geometry::Custom(geometry) = geometry else {
+        return Ok(());
+    };
+    litchi_drawingml::geometry::writer::measure_custom_geometry(geometry, &limits)?;
+    Ok(())
+}
+
+fn validate_group_geometry(group: &GroupSpec, limits: GeometryLimits) -> WriteResult<()> {
+    for child in &group.children {
+        match child {
+            ObjectSpec::Shape(shape) => validate_shape_geometry(&shape.geometry, limits)?,
+            ObjectSpec::Group(group) => validate_group_geometry(group, limits)?,
+            ObjectSpec::Connection(connection) => {
+                validate_shape_geometry(&connection.geometry, limits)?
+            },
+        }
+    }
+    Ok(())
+}
+
 /// Validate anchor markers against worksheet bounds (and ordering for
 /// two-cell anchors), mirroring the checks applied to images and charts.
 fn validate_anchor(anchor: &Anchor) -> Result<(), String> {
@@ -578,6 +599,7 @@ struct State {
     preallocated: bool,
     emitted_names: HashSet<String>,
     geometry_limits: GeometryLimits,
+    top_level_count: usize,
 }
 
 /// Errors raised while emitting a drawing object.
@@ -625,15 +647,52 @@ impl State {
         groups: &[GroupSpec],
         connections: &[ConnectionShapeSpec],
         geometry_limits: GeometryLimits,
-    ) -> Result<Self, String> {
+    ) -> WriteResult<Self> {
+        let geometry_limits = geometry_limits.validate()?;
+        let mut top_level_count = 0usize;
+        let mut object_count = 0usize;
+        for shape in shapes {
+            shape.validate_inner(top_level_count)?;
+            validate_shape_geometry(&shape.geometry, geometry_limits)?;
+            top_level_count = top_level_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing top-level count overflow".to_string())?;
+            object_count = object_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        for group in groups {
+            group.validate_inner(top_level_count)?;
+            validate_group_geometry(group, geometry_limits)?;
+            top_level_count = top_level_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing top-level count overflow".to_string())?;
+            object_count = object_count
+                .checked_add(Self::group_object_count(group)?)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        for connection in connections {
+            connection.validate_inner(top_level_count)?;
+            validate_shape_geometry(&connection.geometry, geometry_limits)?;
+            top_level_count = top_level_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing top-level count overflow".to_string())?;
+            object_count = object_count
+                .checked_add(1)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        if object_count > MAX_OBJECTS_PER_DRAWING {
+            return Err("worksheet drawing object count limit exceeded"
+                .to_string()
+                .into());
+        }
         let mut emitter = Self {
             next_id: first_id,
             names: HashMap::new(),
             preallocated: true,
             emitted_names: HashSet::new(),
-            geometry_limits: geometry_limits
-                .validate()
-                .map_err(|error| error.to_string())?,
+            geometry_limits,
+            top_level_count: 0,
         };
         for shape in shapes {
             emitter.reserve(&shape.name)?;
@@ -645,6 +704,20 @@ impl State {
             emitter.reserve(&connection.name)?;
         }
         Ok(emitter)
+    }
+
+    fn group_object_count(group: &GroupSpec) -> Result<usize, String> {
+        let mut count = 1usize;
+        for child in &group.children {
+            let child_count = match child {
+                ObjectSpec::Shape(_) | ObjectSpec::Connection(_) => 1,
+                ObjectSpec::Group(group) => Self::group_object_count(group)?,
+            };
+            count = count
+                .checked_add(child_count)
+                .ok_or_else(|| "worksheet drawing object count overflow".to_string())?;
+        }
+        Ok(count)
     }
 
     fn reserve_group(&mut self, group: &GroupSpec) -> Result<(), String> {
@@ -998,6 +1071,7 @@ impl Emitter {
                 preallocated: false,
                 emitted_names: HashSet::new(),
                 geometry_limits,
+                top_level_count: 0,
             },
         })
     }
@@ -1012,7 +1086,7 @@ impl Emitter {
     ) -> crate::Result<Self> {
         State::for_objects(first_id, shapes, groups, connections, geometry_limits)
             .map(|inner| Self { inner })
-            .map_err(Error::Invalid)
+            .map_err(Error::from)
     }
 
     /// Write a fresh top-level shape enclosed in its anchor.
@@ -1021,10 +1095,17 @@ impl Emitter {
         xml: &mut String,
         shape: &ShapeSpec,
     ) -> crate::Result<()> {
-        shape.validate(self.inner.names.len())?;
-        self.inner
+        shape.validate(self.inner.top_level_count)?;
+        validate_shape_geometry(&shape.geometry, self.inner.geometry_limits)
+            .map_err(Error::from)?;
+        let result = self
+            .inner
             .write_anchored_shape(xml, shape)
-            .map_err(Error::from)
+            .map_err(Error::from);
+        if result.is_ok() {
+            self.inner.top_level_count += 1;
+        }
+        result
     }
 
     /// Write a fresh top-level group enclosed in its anchor.
@@ -1033,10 +1114,16 @@ impl Emitter {
         xml: &mut String,
         group: &GroupSpec,
     ) -> crate::Result<()> {
-        group.validate(self.inner.names.len())?;
-        self.inner
+        group.validate(self.inner.top_level_count)?;
+        validate_group_geometry(group, self.inner.geometry_limits).map_err(Error::from)?;
+        let result = self
+            .inner
             .write_anchored_group(xml, group)
-            .map_err(Error::from)
+            .map_err(Error::from);
+        if result.is_ok() {
+            self.inner.top_level_count += 1;
+        }
+        result
     }
 
     /// Write a fresh top-level connection shape enclosed in its anchor.
@@ -1045,10 +1132,17 @@ impl Emitter {
         xml: &mut String,
         connection: &ConnectionShapeSpec,
     ) -> crate::Result<()> {
-        connection.validate(self.inner.names.len())?;
-        self.inner
+        connection.validate(self.inner.top_level_count)?;
+        validate_shape_geometry(&connection.geometry, self.inner.geometry_limits)
+            .map_err(Error::from)?;
+        let result = self
+            .inner
             .write_anchored_connection(xml, connection)
-            .map_err(Error::from)
+            .map_err(Error::from);
+        if result.is_ok() {
+            self.inner.top_level_count += 1;
+        }
+        result
     }
 }
 

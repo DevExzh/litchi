@@ -21,10 +21,29 @@ pub fn write_custom_geometry(
     limits: &Limits,
 ) -> crate::Result<()> {
     let limits = limits.validate()?;
+    let output_len = measure_custom_geometry_with_limits(geometry, limits)?;
+
+    xml.try_reserve(output_len)
+        .map_err(|_| crate::Error::Invalid("custom geometry output allocation failed".into()))?;
+    write_custom_geometry_into(xml, geometry).map_err(format_error)?;
+    Ok(())
+}
+
+/// Measure the canonical custom-geometry XML without retaining an output
+/// buffer. The selected structural and output limits are applied exactly as
+/// they are by [`write_custom_geometry`], allowing an owning writer to admit a
+/// geometry before it reserves IDs or starts its surrounding markup.
+pub fn measure_custom_geometry(geometry: &CustomGeometry, limits: &Limits) -> crate::Result<usize> {
+    measure_custom_geometry_with_limits(geometry, limits.validate()?)
+}
+
+fn measure_custom_geometry_with_limits(
+    geometry: &CustomGeometry,
+    limits: Limits,
+) -> crate::Result<usize> {
     validate_geometry_limits(geometry, limits)?;
 
-    // Count the exact canonical output before touching the caller's buffer. This
-    // keeps the operation failure-atomic without building a second complete XML
+    // Count the exact canonical output without building a second complete XML
     // fragment merely to discover that it exceeds the selected budget.
     let mut preflight = LengthWriter::default();
     write_custom_geometry_into(&mut preflight, geometry).map_err(format_error)?;
@@ -40,11 +59,7 @@ pub fn write_custom_geometry(
             limits.max_output_bytes,
         ));
     }
-
-    xml.try_reserve(preflight.len)
-        .map_err(|_| crate::Error::Invalid("custom geometry output allocation failed".into()))?;
-    write_custom_geometry_into(xml, geometry).map_err(format_error)?;
-    Ok(())
+    Ok(preflight.len)
 }
 
 /// Serialize one custom geometry as its `a:custGeom` element.

@@ -39,7 +39,8 @@ use std::ops::Range;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI};
 use litchi_spreadsheet_drawing::vml::{
-    SHAPE_TYPE, contains, new_drawing, next_shape_id, note_shape, rfind, shapes,
+    Limits as VmlLimits, SHAPE_TYPE, contains, new_drawing, next_shape_id, note_shape, rfind,
+    shapes,
 };
 use quick_xml::events::Event;
 
@@ -527,7 +528,8 @@ impl Edit {
         match self.vml(worksheet)? {
             Some((_, name)) => {
                 let xml = self.staged.blob(&name)?;
-                let shapes = shapes(xml)?;
+                let limits = VmlLimits::from_source_limits(self.staged.opc().read_limits());
+                let shapes = shapes(xml, &limits)?;
                 if shapes.iter().any(|shape| shape.note == Some((row, column))) {
                     return Ok(());
                 }
@@ -574,7 +576,8 @@ impl Edit {
             return Ok(());
         };
         let xml = self.staged.blob(&name)?;
-        let shapes = shapes(xml)?;
+        let limits = VmlLimits::from_source_limits(self.staged.opc().read_limits());
+        let shapes = shapes(xml, &limits)?;
         let Some(shape) = shapes
             .iter()
             .find(|shape| shape.note == Some((row, column)))

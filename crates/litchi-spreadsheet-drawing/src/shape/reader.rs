@@ -27,8 +27,7 @@ use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::writer::Writer;
 
-use crate::{Error, Result};
-use litchi_drawingml::geometry::Limits as GeometryLimits;
+use crate::{Error, LimitKind, Result};
 use litchi_drawingml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
 use litchi_drawingml::text::body::reader::{self as text_reader, Builder as TextBuilder};
 use litchi_drawingml::text::parse_bool;
@@ -56,15 +55,24 @@ const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
 /// # Errors
 ///
 /// Returns an error for malformed XML, invalid drawing markup, or configured limits.
-pub fn read(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
-    if xml.len() > MAX_DRAWING_PART_BYTES {
-        return Err(limit("drawing part bytes"));
+pub fn read(xml: &str, limits: &Limits) -> Result<Option<Vec<AnchoredObject>>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_drawing_part_bytes {
+        return Err(limit(
+            LimitKind::DrawingBytes,
+            xml.len(),
+            limits.max_drawing_part_bytes,
+        ));
     }
     let xml = litchi_ooxml_common::mce::process_str(xml)?;
-    if xml.len() > MAX_DRAWING_PART_BYTES {
-        return Err(limit("drawing part bytes"));
+    if xml.len() > limits.max_drawing_part_bytes {
+        return Err(limit(
+            LimitKind::DrawingBytes,
+            xml.len(),
+            limits.max_drawing_part_bytes,
+        ));
     }
-    Parser::parse(xml.as_ref())
+    Parser::parse(xml.as_ref(), limits)
 }
 
 /// Decode a relationship-namespace attribute while rejecting duplicates.
@@ -273,6 +281,7 @@ impl ObjectBuilder {
 
 struct Parser<'x> {
     document: &'x [u8],
+    limits: Limits,
     objects: Vec<AnchoredObject>,
     object_count: usize,
     text_bytes: usize,
@@ -284,13 +293,14 @@ struct Parser<'x> {
 }
 
 impl<'x> Parser<'x> {
-    fn parse(xml: &'x str) -> Result<Option<Vec<AnchoredObject>>> {
+    fn parse(xml: &'x str, limits: Limits) -> Result<Option<Vec<AnchoredObject>>> {
         let document = xml.as_bytes();
         let mut reader = NsReader::from_reader(document);
         reader.config_mut().trim_text(false);
         let origin = ReaderOrigin::of(document);
         let mut parser = Self {
             document,
+            limits,
             objects: Vec::new(),
             object_count: 0,
             text_bytes: 0,
@@ -356,8 +366,12 @@ impl<'x> Parser<'x> {
                     let context =
                         parser.start(parent, &namespace, &element, decoder, &resolver, false)?;
                     stack.push(context);
-                    if stack.len() > MAX_XML_DEPTH {
-                        return Err(limit("drawing XML depth"));
+                    if stack.len() > parser.limits.max_xml_depth {
+                        return Err(limit(
+                            LimitKind::XmlDepth,
+                            stack.len(),
+                            parser.limits.max_xml_depth,
+                        ));
                     }
                     if context == Context::Body {
                         parser.open_text(stack.len())?;
@@ -445,9 +459,13 @@ impl<'x> Parser<'x> {
         self.text_bytes = self
             .text_bytes
             .checked_add(text.len())
-            .ok_or_else(|| limit("shape text bytes"))?;
-        if self.text_bytes > MAX_TEXT_BYTES {
-            return Err(limit("shape text bytes"));
+            .ok_or_else(|| limit(LimitKind::TextBytes, usize::MAX, self.limits.max_text_bytes))?;
+        if self.text_bytes > self.limits.max_text_bytes {
+            return Err(limit(
+                LimitKind::TextBytes,
+                self.text_bytes,
+                self.limits.max_text_bytes,
+            ));
         }
         if let Some(body) = self.text.as_mut() {
             body.builder.text(text).map_err(text_error)?;
@@ -459,7 +477,7 @@ impl<'x> Parser<'x> {
     /// parser stack length `depth`.
     fn open_text(&mut self, depth: usize) -> Result<()> {
         self.text = Some(TextBody {
-            builder: TextBuilder::new(self.document, text_limits())?,
+            builder: TextBuilder::new(self.document, text_limits(self.limits)?)?,
             depth,
         });
         Ok(())
@@ -558,12 +576,15 @@ impl<'x> Parser<'x> {
             .ok_or_else(|| invalid("missing unknown drawing capture"))?;
         match event {
             Event::Start(_) => {
-                capture.depth = capture
-                    .depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("unknown drawing element depth"))?;
-                if capture.depth > MAX_XML_DEPTH {
-                    return Err(limit("unknown drawing element depth"));
+                capture.depth = capture.depth.checked_add(1).ok_or_else(|| {
+                    limit(LimitKind::XmlDepth, usize::MAX, self.limits.max_xml_depth)
+                })?;
+                if capture.depth > self.limits.max_xml_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        capture.depth,
+                        self.limits.max_xml_depth,
+                    ));
                 }
             },
             Event::End(_) => {
@@ -581,8 +602,12 @@ impl<'x> Parser<'x> {
             .writer
             .write_event(event.clone())
             .map_err(|_| malformed_xml("could not retain SpreadsheetML drawing markup"))?;
-        if capture.writer.get_ref().len() > MAX_DRAWING_PART_BYTES {
-            return Err(limit("unknown drawing element bytes"));
+        if capture.writer.get_ref().len() > self.limits.max_drawing_part_bytes {
+            return Err(limit(
+                LimitKind::DrawingBytes,
+                capture.writer.get_ref().len(),
+                self.limits.max_drawing_part_bytes,
+            ));
         }
         Ok(capture.depth == 0)
     }
@@ -603,8 +628,12 @@ impl<'x> Parser<'x> {
         if self.anchor.is_none() {
             return Err(invalid("drawing object outside an anchor"));
         }
-        if self.builders.len() >= MAX_GROUP_DEPTH {
-            return Err(limit("shape group depth"));
+        if self.builders.len() >= self.limits.max_group_depth {
+            return Err(limit(
+                LimitKind::GroupDepth,
+                self.builders.len().saturating_add(1),
+                self.limits.max_group_depth,
+            ));
         }
         self.builders.push(ObjectBuilder::new(kind));
         Ok(Context::Object)
@@ -953,8 +982,12 @@ impl<'x> Parser<'x> {
         writer
             .write_event(event)
             .map_err(|_| malformed_xml("could not retain SpreadsheetML drawing markup"))?;
-        if writer.get_ref().len() > MAX_DRAWING_PART_BYTES {
-            return Err(limit("unknown drawing element bytes"));
+        if writer.get_ref().len() > self.limits.max_drawing_part_bytes {
+            return Err(limit(
+                LimitKind::DrawingBytes,
+                writer.get_ref().len(),
+                self.limits.max_drawing_part_bytes,
+            ));
         }
         self.unknown = Some(UnknownCapture {
             depth: usize::from(!empty),
@@ -1029,9 +1062,13 @@ impl<'x> Parser<'x> {
         self.object_count = self
             .object_count
             .checked_add(1)
-            .ok_or_else(|| limit("objects per drawing"))?;
-        if self.object_count > MAX_OBJECTS_PER_DRAWING {
-            return Err(limit("objects per drawing"));
+            .ok_or_else(|| limit(LimitKind::Objects, usize::MAX, self.limits.max_objects))?;
+        if self.object_count > self.limits.max_objects {
+            return Err(limit(
+                LimitKind::Objects,
+                self.object_count,
+                self.limits.max_objects,
+            ));
         }
         if let Some(parent) = self.builders.last_mut() {
             parent.children.push(object);
@@ -1046,13 +1083,14 @@ impl<'x> Parser<'x> {
 
     /// Open the `a:custGeom` element of the current shape.
     fn open_custom_geometry(&mut self) -> Result<Context> {
+        let geometry_limits = self.limits.geometry;
         let builder = self.builder_mut()?;
         if builder.geometry.is_some() || builder.geometry_builder.is_some() {
             return Err(invalid(
                 "drawing shape contains competing or duplicate geometries",
             ));
         }
-        builder.geometry_builder = Some(CustomGeometryBuilder::new(GeometryLimits::DEFAULT)?);
+        builder.geometry_builder = Some(CustomGeometryBuilder::new(geometry_limits)?);
         Ok(Context::CustomGeometry(GeometryElement::CustomGeometry))
     }
 
@@ -1230,8 +1268,9 @@ impl<'x> Parser<'x> {
                 Anchor::Absolute { position, extent }
             },
         };
-        if self.objects.len() >= MAX_ANCHORS_PER_DRAWING {
-            return Err(limit("anchors per drawing"));
+        let next = self.objects.len().saturating_add(1);
+        if next > self.limits.max_anchors {
+            return Err(limit(LimitKind::Anchors, next, self.limits.max_anchors));
         }
         self.objects.push(AnchoredObject {
             anchor,
@@ -1388,14 +1427,14 @@ fn any_truthy_attribute(element: &BytesStart<'_>, decoder: Decoder) -> Result<bo
 /// The shared text-body reader's limits inside a drawing. The host's drawing
 /// limits and the shared semantic text limits are deliberately finite and
 /// use the same source budgets.
-fn text_limits() -> text_reader::Limits {
+fn text_limits(limits: Limits) -> Result<text_reader::Limits> {
     text_reader::Limits::new(
-        MAX_DRAWING_PART_BYTES,
-        MAX_XML_DEPTH.saturating_mul(2),
-        MAX_TEXT_ELEMENTS,
-        MAX_TEXT_BYTES,
+        limits.max_drawing_part_bytes,
+        limits.max_xml_depth.saturating_mul(2),
+        limits.max_text_elements,
+        limits.max_text_bytes,
     )
-    .unwrap_or(text_reader::Limits::DEFAULT)
+    .ok_or_else(|| invalid("invalid SpreadsheetDrawing text limits"))
 }
 
 /// Preserve the shared reader's content-free typed error source.
@@ -1449,6 +1488,6 @@ fn encoding_error(message: &'static str) -> Error {
     Error::Encoding(message.to_owned())
 }
 
-fn limit(name: &str) -> Error {
-    invalid(format!("XLSX drawing shape {name} limit exceeded"))
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

@@ -213,6 +213,8 @@ pub enum LimitKind {
     Workbook(crate::workbook::LimitKind),
     /// Worksheet-image authoring ([`crate::package::drawing_image::LimitKind`]).
     Image(crate::package::drawing_image::LimitKind),
+    /// Shared SpreadsheetDrawing XML scanners and rewriters.
+    Drawing(litchi_spreadsheet_drawing::LimitKind),
 }
 
 impl fmt::Display for LimitKind {
@@ -230,6 +232,7 @@ impl fmt::Display for LimitKind {
             Self::VolatileDependencies(kind) => fmt::Display::fmt(kind, f),
             Self::Workbook(kind) => fmt::Display::fmt(kind, f),
             Self::Image(kind) => fmt::Display::fmt(kind, f),
+            Self::Drawing(kind) => fmt::Display::fmt(kind, f),
         }
     }
 }
@@ -291,6 +294,12 @@ impl From<crate::workbook::LimitKind> for LimitKind {
 impl From<crate::opc::LimitKind> for LimitKind {
     fn from(kind: crate::opc::LimitKind) -> Self {
         Self::Opc(kind)
+    }
+}
+
+impl From<litchi_spreadsheet_drawing::LimitKind> for LimitKind {
+    fn from(kind: litchi_spreadsheet_drawing::LimitKind) -> Self {
+        Self::Drawing(kind)
     }
 }
 
@@ -625,6 +634,20 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
     fn from(error: litchi_spreadsheet_drawing::Error) -> Self {
         match error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
+            litchi_spreadsheet_drawing::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::limit(kind, observed, maximum),
+            litchi_spreadsheet_drawing::Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => Self::InvalidLimit {
+                kind: kind.into(),
+                value,
+                maximum,
+            },
             litchi_spreadsheet_drawing::Error::Invalid(_) => {
                 Self::InvalidFormat("the drawing is not valid")
             },

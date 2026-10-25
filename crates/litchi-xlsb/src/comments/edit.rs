@@ -477,7 +477,8 @@ impl Edit {
         match self.vml(worksheet)? {
             Some((_, name)) => {
                 let xml = self.staged.blob(&name)?;
-                let shapes = vml::shapes(xml)?;
+                let limits = vml::Limits::from_source_limits(self.staged.opc().read_limits());
+                let shapes = vml::shapes(xml, &limits)?;
                 if shapes.iter().any(|shape| shape.note == Some((row, col))) {
                     return Ok(());
                 }
@@ -527,7 +528,8 @@ impl Edit {
             return Ok(());
         };
         let xml = self.staged.blob(&name)?;
-        let shapes = vml::shapes(xml)?;
+        let limits = vml::Limits::from_source_limits(self.staged.opc().read_limits());
+        let shapes = vml::shapes(xml, &limits)?;
         let Some(shape) = shapes.iter().find(|shape| shape.note == Some((row, col))) else {
             return Ok(());
         };

@@ -7,7 +7,71 @@
 
 use std::ops::Range;
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
+
+/// The largest VML shape member retained by a scanner.
+pub(crate) const MAX_VML_BYTES: usize = crate::objects::MAX_DRAWING_BYTES;
+/// The largest VML shape inventory retained by a scanner.
+pub(crate) const MAX_SHAPES: usize = 100_000;
+
+/// Caller-selected bounds for a raw VML shape scan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum VML member bytes inspected.
+    pub max_xml_bytes: usize,
+    /// Maximum shapes retained by one scan.
+    pub max_shapes: usize,
+}
+
+impl Limits {
+    /// The established finite VML scanner policy.
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_VML_BYTES,
+        max_shapes: MAX_SHAPES,
+    };
+
+    /// Construct explicit VML scanner bounds.
+    #[must_use = "use the selected VML limits"]
+    pub const fn new(max_xml_bytes: usize, max_shapes: usize) -> Self {
+        Self {
+            max_xml_bytes,
+            max_shapes,
+        }
+    }
+
+    /// Derive VML bounds from an OPC source owner without widening the hard
+    /// scanner ceilings.
+    #[must_use = "use the limits derived from the retained source policy"]
+    pub fn from_source_limits(source: litchi_opc::SourceLimits) -> Self {
+        Self {
+            max_xml_bytes: usize::try_from(source.max_part_bytes())
+                .unwrap_or(usize::MAX)
+                .clamp(1, MAX_VML_BYTES),
+            max_shapes: source.max_events().clamp(1, MAX_SHAPES),
+        }
+    }
+
+    /// Validate the policy against the hard scanner ceilings.
+    pub fn validate(self) -> Result<Self> {
+        for (kind, value) in [
+            (LimitKind::DrawingBytes, self.max_xml_bytes),
+            (LimitKind::VmlShapes, self.max_shapes),
+        ] {
+            let maximum = kind.maximum();
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 fn invalid(message: &str) -> Error {
     Error::Invalid(message.to_owned())
@@ -72,7 +136,15 @@ fn element_text(xml: &[u8], tag: &[u8]) -> Option<u32> {
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for an unterminated shape.
-pub fn shapes(xml: &[u8]) -> Result<Vec<Shape>> {
+pub fn shapes(xml: &[u8], limits: &Limits) -> Result<Vec<Shape>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(Error::limit(
+            LimitKind::DrawingBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
+    }
     let mut shapes = Vec::new();
     let mut cursor = 0;
     while let Some(start) = find(xml, b"<v:shape", cursor) {
@@ -100,6 +172,13 @@ pub fn shapes(xml: &[u8]) -> Result<Vec<Shape>> {
                 .count();
             std::str::from_utf8(&digits[..len]).ok()?.parse().ok()
         });
+        let next = shapes
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| Error::limit(LimitKind::VmlShapes, usize::MAX, limits.max_shapes))?;
+        if next > limits.max_shapes {
+            return Err(Error::limit(LimitKind::VmlShapes, next, limits.max_shapes));
+        }
         shapes.push(Shape {
             span: start..end,
             note,
@@ -154,4 +233,37 @@ pub fn new_drawing(sheet: usize, row: u32, column: u32) -> String {
         sheet + 1,
         note_shape(first_shape_id(sheet), row, column)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shape_scan_admits_the_selected_shape_count_before_retaining() {
+        let xml = br#"<xml><v:shape id="_x0000_s1"/><v:shape id="_x0000_s2"/></xml>"#;
+        let limits = Limits::new(xml.len(), 1);
+        assert!(matches!(
+            shapes(xml, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::VmlShapes,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn shape_scan_rejects_oversized_input_before_scanning() {
+        let xml = br#"<xml/>"#;
+        let limits = Limits::new(xml.len() - 1, MAX_SHAPES);
+        assert!(matches!(
+            shapes(xml, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::DrawingBytes,
+                observed,
+                maximum: 5,
+            }) if observed == xml.len()
+        ));
+    }
 }

@@ -448,6 +448,20 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
         match error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
             litchi_spreadsheet_drawing::Error::Mce(error) => Self::MarkupCompatibility(error),
+            litchi_spreadsheet_drawing::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::limit(kind, observed, maximum),
+            litchi_spreadsheet_drawing::Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => Self::InvalidLimit {
+                kind: kind.into(),
+                value: u64::try_from(value).unwrap_or(u64::MAX),
+                maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            },
             litchi_spreadsheet_drawing::Error::Invalid(message)
             | litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Invalid(message),
             other => Self::Invalid(other.to_string()),

@@ -70,6 +70,7 @@ pub(crate) fn serialize_drawing(
     connections: &[ConnectionShapeSpec],
     xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
+    let shape_limits = crate::shapes::Limits::from_core(xml_limits);
     if images.is_empty()
         && charts.is_empty()
         && shapes.is_empty()
@@ -128,7 +129,7 @@ pub(crate) fn serialize_drawing(
         shapes,
         groups,
         connections,
-        litchi_drawingml::geometry::Limits::DEFAULT,
+        shape_limits.geometry,
     )?;
     for shape in shapes {
         emitter.write_anchored_shape(&mut xml, shape)?;
@@ -146,7 +147,8 @@ pub(crate) fn serialize_drawing(
     ensure_drawing_size(xml.len())?;
     // The detailed shared reader verifies the complete shape/group/connector
     // grammar in addition to the lightweight XLSB drawing inventory below.
-    crate::shapes::read(&xml)?.ok_or(Error::Encoding("authored drawing lacks an xdr:wsDr root"))?;
+    crate::shapes::read(&xml, &shape_limits)?
+        .ok_or(Error::Encoding("authored drawing lacks an xdr:wsDr root"))?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.
     crate::package::drawing::parse_drawing_part(&bytes, xml_limits)?;
@@ -180,6 +182,7 @@ pub(crate) fn append_image_anchor(
     relationship_id: &str,
     xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
+    let shape_limits = crate::shapes::Limits::from_core(xml_limits);
     image.validate()?;
     let _inventory = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let root_end = drawing_root_end(source)?;
@@ -200,7 +203,8 @@ pub(crate) fn append_image_anchor(
     let _inventory = crate::package::drawing::parse_drawing_part(&output, xml_limits)?;
     let xml = std::str::from_utf8(&output)
         .map_err(|_error| Error::Encoding("drawing XML is not UTF-8"))?;
-    crate::shapes::read(xml)?.ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
+    crate::shapes::read(xml, &shape_limits)?
+        .ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
     Ok(output)
 }
 
@@ -211,6 +215,7 @@ pub(crate) fn append_drawing_anchors(
     anchors: &[Vec<u8>],
     xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
+    let shape_limits = crate::shapes::Limits::from_core(xml_limits);
     let before = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let root_end = drawing_root_end(source)?;
     let added = anchors.iter().try_fold(0usize, |total, anchor| {
@@ -255,7 +260,8 @@ pub(crate) fn append_drawing_anchors(
     }
     let xml = std::str::from_utf8(&output)
         .map_err(|_error| Error::Encoding("drawing XML is not UTF-8"))?;
-    crate::shapes::read(xml)?.ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
+    crate::shapes::read(xml, &shape_limits)?
+        .ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
     Ok(output)
 }
 
