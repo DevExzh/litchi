@@ -688,6 +688,23 @@ impl From<litchi_ooxml_common::Error> for Error {
                 Self::SourceChanged { expected, observed }
             },
             litchi_ooxml_common::Error::Internal(reason) => Self::Internal(reason),
+            other @ litchi_ooxml_common::Error::Opc(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Patch(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Xml(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Missing(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::ContentType { .. } => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Relationship(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Invalid(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::SpreadsheetXmlMaps(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Limit { .. } => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Allocation { .. } => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Uri(_) => Self::Common(other),
+            #[cfg(feature = "vba-inspection")]
+            other @ litchi_ooxml_common::Error::Vba(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Mce(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Decode(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Io(_) => Self::Common(other),
+            other @ litchi_ooxml_common::Error::Fmt(_) => Self::Common(other),
             other => Self::Common(other),
         }
     }
