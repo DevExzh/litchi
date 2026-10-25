@@ -34,8 +34,8 @@
     "vendor_tree": null,
     "locks": {
       "Cargo.lock": {
-        "sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
-        "bytes": 139189
+        "sha256": "02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a",
+        "bytes": 139207
       },
       "tools/perf-baseline/Cargo.lock": {
         "sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
@@ -51,7 +51,7 @@
     "workspace": {
       "path": "Cargo.lock",
       "baseline": {"sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1", "bytes": 139606},
-      "candidate": {"sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811", "bytes": 139189}
+      "candidate": {"sha256": "02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a", "bytes": 139207}
     },
     "perf": {
       "path": "tools/perf-baseline/Cargo.lock",
@@ -66,8 +66,8 @@
   },
   "baseline_workspace_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
   "baseline_workspace_lock_bytes": 139606,
-  "candidate_workspace_lock_sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
-  "candidate_workspace_lock_bytes": 139189,
+  "candidate_workspace_lock_sha256": "02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a",
+  "candidate_workspace_lock_bytes": 139207,
   "baseline_perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
   "baseline_perf_lock_bytes": 57227,
   "candidate_perf_lock_sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",

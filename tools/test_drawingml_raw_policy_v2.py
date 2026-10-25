@@ -120,6 +120,30 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
             self.assertEqual(len(spec["candidate"]["sha256"]), 64)
             self.assertGreater(spec["candidate"]["bytes"], 0)
 
+    def test_workspace_candidate_lock_is_canonical_in_all_v2_consumers(self) -> None:
+        expected = {
+            "sha256": "02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a",
+            "bytes": 139_207,
+        }
+        self.assertEqual(policy.ROLE_LOCKS["workspace"]["candidate"], expected)
+        manifest = json.loads(
+            (ROOT / "tools/native_qualification/manifests/drawingml-raw-v2.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(manifest["candidate"]["locks"]["Cargo.lock"], expected)
+        self.assertEqual(manifest["role_locks"]["workspace"]["candidate"], expected)
+        self.assertEqual(manifest["candidate_workspace_lock_sha256"], expected["sha256"])
+        self.assertEqual(manifest["candidate_workspace_lock_bytes"], expected["bytes"])
+        self.assertEqual(
+            manifest["baseline_workspace_lock_sha256"],
+            policy.ROLE_LOCKS["workspace"]["baseline"]["sha256"],
+        )
+        self.assertEqual(
+            manifest["baseline_workspace_lock_bytes"],
+            policy.ROLE_LOCKS["workspace"]["baseline"]["bytes"],
+        )
+
     def test_dependency_policy_contains_exact_three_path_transitions(self) -> None:
         self.assertEqual(len(policy.DEPENDENCY_PATH_TRANSITIONS), 3)
         self.assertEqual(
