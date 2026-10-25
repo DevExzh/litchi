@@ -8,21 +8,32 @@
 //!
 //! The timed regions are:
 //!
-//! * `cold_capture`: `Package::from_bytes` and `opened_presentation`;
+//! * `cold_capture`: `opened_presentation` over a pre-parsed package;
 //! * `warm_notes_commit`: a real notes edit and commit with all slide roots
 //!   unchanged, so the opened snapshot's memo is eligible for every root;
 //! * `changed_slide_commit`: a real title edit on slide zero and commit, so
 //!   exactly one slide root is changed while the other two remain eligible.
 //!
 //! Fixture creation, source setup for the two edit rows, serialization,
-//! semantic fidelity checks, and source immutability checks are outside the
-//! clocks.  The allocator binary enters the same operation-scoped region as
-//! the normal binary; the latter reports an explicit unavailable sample.
+//! semantic reopen and raw ZIP fidelity checks, and source immutability checks
+//! are outside the clocks.  The allocator binary enters the same
+//! operation-scoped region as the normal binary; the latter reports an
+//! explicit unavailable sample.
 
-use std::{error::Error, ffi::OsString, fs::OpenOptions, io::Write, path::PathBuf, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
+    ffi::OsString,
+    fs::OpenOptions,
+    io::Write,
+    path::PathBuf,
+    time::Instant,
+};
 
 use litchi_pptx::{Package, builder::Builder, notes::Limits as NotesLimits};
 use serde::Serialize;
+use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
+use soapberry_zip::{PreservationIndex, ZipArchive};
 
 const SCHEMA: &str = "pptx_notes_memo_probe_v1";
 const GENERATOR: &str = "pptx-notes-memo-three-slide-v1";
@@ -35,7 +46,7 @@ const COLD_CASE: &str = "pptx_notes_memo_cold_capture";
 const WARM_CASE: &str = "pptx_notes_memo_warm_notes_commit";
 const CHANGED_CASE: &str = "pptx_notes_memo_changed_slide_commit";
 
-const COLD_SCOPE: &str = "Package::from_bytes plus opened_presentation; fixture construction and all fidelity checks are outside";
+const COLD_SCOPE: &str = "opened_presentation over a pre-parsed package; Package::from_bytes fixture setup and all fidelity checks are outside";
 const WARM_SCOPE: &str = "opened Snapshot::edit, set_notes_text(1), and commit; source package setup, serialization, and fidelity checks are outside";
 const CHANGED_SCOPE: &str = "opened Snapshot::edit, set_shape_text(0, 0), and commit; source package setup, serialization, and fidelity checks are outside";
 
@@ -99,18 +110,51 @@ struct FixtureIdentity {
     recipe: &'static str,
 }
 
-#[derive(Clone, Debug, Serialize)]
-struct Fidelity {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct SemanticFidelity {
     verified: bool,
     slide_count: usize,
     notes_slide_count: usize,
     slide_text_sha256: String,
     notes_text_sha256: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RawOracle {
+    source_member_count: usize,
+    output_member_count: usize,
+    source_payload_sha256: String,
+    output_payload_sha256: String,
+    member_names_equal: bool,
+    untouched_payloads_equal: bool,
+    relationship_member_count: usize,
+    relationship_names_equal: bool,
+    relationship_payloads_equal: bool,
+    master_theme_member_count: usize,
+    master_theme_payloads_equal: bool,
+    changed_members: Vec<String>,
+    expected_changed_members: Vec<String>,
+    exact_changed_member_set: bool,
+    changed_payloads_nonempty: bool,
+    slide_root_count: usize,
+    notes_root_count: usize,
+    changed_slide_index: Option<usize>,
+    changed_notes_slide_index: Option<usize>,
+    untouched_slide_root_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct Fidelity {
+    semantic: SemanticFidelity,
     #[serde(skip_serializing_if = "Option::is_none")]
     source_immutable: Option<bool>,
     changed_commit_reported: bool,
+    output_reopened: bool,
+    output_bytes_verified: bool,
+    output_digest_verified: bool,
     changed_slide_index: Option<usize>,
     untouched_slide_root_count: usize,
+    raw: RawOracle,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -259,12 +303,232 @@ fn expected_note_text(index: usize, warm_notes: bool) -> String {
     }
 }
 
-fn check_fidelity(
+#[derive(Debug)]
+struct RawArchive {
+    payloads: BTreeMap<String, Vec<u8>>,
+}
+
+fn raw_archive(bytes: &[u8]) -> Result<RawArchive, Box<dyn Error>> {
+    let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
+    let limits = ArchiveLimits::default();
+    let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut scratch, limits)?;
+    let reader = ArchiveReader::new(bytes, limits)?;
+    let mut payloads = BTreeMap::new();
+    for entry in index.entries() {
+        let name = std::str::from_utf8(entry.raw_name_bytes())?.to_owned();
+        if payloads.insert(name.clone(), reader.read(&name)?).is_some() {
+            return Err("notes memo archive contains duplicate member names".into());
+        }
+    }
+    if payloads.is_empty() {
+        return Err("notes memo archive has no members".into());
+    }
+    Ok(RawArchive { payloads })
+}
+
+fn payload_digest(payloads: &BTreeMap<String, Vec<u8>>) -> String {
+    let mut input = Vec::new();
+    for (name, payload) in payloads {
+        input.extend_from_slice(&(name.len() as u64).to_le_bytes());
+        input.extend_from_slice(name.as_bytes());
+        input.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        input.extend_from_slice(payload);
+    }
+    crate::sha256_hex(&input)
+}
+
+fn member_set_with_suffix(payloads: &BTreeMap<String, Vec<u8>>, suffix: &str) -> BTreeSet<String> {
+    payloads
+        .keys()
+        .filter(|name| name.ends_with(suffix))
+        .cloned()
+        .collect()
+}
+
+fn slide_root_names(payloads: &BTreeMap<String, Vec<u8>>) -> BTreeSet<String> {
+    payloads
+        .keys()
+        .filter(|name| {
+            name.strip_prefix("ppt/slides/slide")
+                .and_then(|name| name.strip_suffix(".xml"))
+                .is_some_and(|index| {
+                    !index.is_empty() && index.bytes().all(|byte| byte.is_ascii_digit())
+                })
+        })
+        .cloned()
+        .collect()
+}
+
+fn notes_root_names(payloads: &BTreeMap<String, Vec<u8>>) -> BTreeSet<String> {
+    payloads
+        .keys()
+        .filter(|name| {
+            name.strip_prefix("ppt/notesSlides/notesSlide")
+                .and_then(|name| name.strip_suffix(".xml"))
+                .is_some_and(|index| {
+                    !index.is_empty() && index.bytes().all(|byte| byte.is_ascii_digit())
+                })
+        })
+        .cloned()
+        .collect()
+}
+
+fn slide_index(name: &str) -> Option<usize> {
+    name.strip_prefix("ppt/slides/slide")
+        .and_then(|name| name.strip_suffix(".xml"))
+        .and_then(|index| index.parse::<usize>().ok())
+        .and_then(|index| index.checked_sub(1))
+}
+
+fn notes_slide_index(name: &str) -> Option<usize> {
+    name.strip_prefix("ppt/notesSlides/notesSlide")
+        .and_then(|name| name.strip_suffix(".xml"))
+        .and_then(|index| index.parse::<usize>().ok())
+        .and_then(|index| index.checked_sub(1))
+}
+
+fn expected_changed_members(operation: Operation) -> BTreeSet<String> {
+    match operation {
+        Operation::Cold => BTreeSet::new(),
+        Operation::WarmNotes => BTreeSet::from(["ppt/notesSlides/notesSlide2.xml".to_owned()]),
+        Operation::ChangedSlide => BTreeSet::from(["ppt/slides/slide1.xml".to_owned()]),
+    }
+}
+
+fn check_raw_oracle(
+    source: &[u8],
+    output: &[u8],
+    operation: Operation,
+) -> Result<RawOracle, Box<dyn Error>> {
+    let source = raw_archive(source)?.payloads;
+    let output = raw_archive(output)?.payloads;
+    let source_payload_sha256 = payload_digest(&source);
+    let output_payload_sha256 = payload_digest(&output);
+    let digests_match = source_payload_sha256 == output_payload_sha256;
+    if matches!(operation, Operation::Cold) != digests_match {
+        return Err(format!(
+            "notes memo source/output payload digest relationship is wrong for {}",
+            operation.name()
+        )
+        .into());
+    }
+    let source_names = source.keys().cloned().collect::<BTreeSet<_>>();
+    let output_names = output.keys().cloned().collect::<BTreeSet<_>>();
+    let member_names_equal = source_names == output_names;
+    if !member_names_equal {
+        return Err("notes memo output changed the ZIP member identity set".into());
+    }
+    let changed_members = source_names
+        .iter()
+        .filter(|name| source[*name] != output[*name])
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let expected = expected_changed_members(operation);
+    let exact_changed_member_set = changed_members == expected;
+    if !exact_changed_member_set {
+        return Err(format!(
+            "notes memo changed members differ: actual={changed_members:?} expected={expected:?}"
+        )
+        .into());
+    }
+    let untouched_payloads_equal = source_names
+        .difference(&changed_members)
+        .all(|name| source[name] == output[name]);
+    if !untouched_payloads_equal {
+        return Err("notes memo changed an untouched payload".into());
+    }
+    let changed_payloads_nonempty = changed_members
+        .iter()
+        .all(|name| !source[name].is_empty() && !output[name].is_empty());
+    if !changed_payloads_nonempty && !changed_members.is_empty() {
+        return Err("notes memo changed payload evidence is empty".into());
+    }
+
+    let source_relationships = member_set_with_suffix(&source, ".rels");
+    let output_relationships = member_set_with_suffix(&output, ".rels");
+    let relationship_names_equal = source_relationships == output_relationships;
+    let relationship_payloads_equal = relationship_names_equal
+        && source_relationships
+            .iter()
+            .all(|name| source[name] == output[name]);
+    if !relationship_payloads_equal {
+        return Err("notes memo changed relationship identities or targets".into());
+    }
+
+    let source_masters = source
+        .keys()
+        .filter(|name| {
+            name.contains("/notesMasters/")
+                || name.contains("/slideMasters/")
+                || name.contains("/slideLayouts/")
+                || name.contains("/theme/")
+        })
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let output_masters = output
+        .keys()
+        .filter(|name| {
+            name.contains("/notesMasters/")
+                || name.contains("/slideMasters/")
+                || name.contains("/slideLayouts/")
+                || name.contains("/theme/")
+        })
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let master_theme_payloads_equal = source_masters == output_masters
+        && source_masters
+            .iter()
+            .all(|name| source[name] == output[name]);
+    if !master_theme_payloads_equal {
+        return Err("notes memo changed a master, layout, or theme payload".into());
+    }
+
+    let slide_roots = slide_root_names(&source);
+    let notes_roots = notes_root_names(&source);
+    if slide_roots.len() != FIXTURE_SLIDES || notes_roots.len() != FIXTURE_SLIDES {
+        return Err("notes memo fixture root inventory is not three-by-three".into());
+    }
+    let changed_slide_indices = changed_members
+        .iter()
+        .filter_map(|name| slide_index(name))
+        .collect::<Vec<_>>();
+    let changed_notes_indices = changed_members
+        .iter()
+        .filter_map(|name| notes_slide_index(name))
+        .collect::<Vec<_>>();
+    if changed_slide_indices.len() > 1 || changed_notes_indices.len() > 1 {
+        return Err("notes memo changed more than one slide or notes root".into());
+    }
+    let changed_slide_count = changed_slide_indices.len();
+    Ok(RawOracle {
+        source_member_count: source.len(),
+        output_member_count: output.len(),
+        source_payload_sha256,
+        output_payload_sha256,
+        member_names_equal,
+        untouched_payloads_equal,
+        relationship_member_count: source_relationships.len(),
+        relationship_names_equal,
+        relationship_payloads_equal,
+        master_theme_member_count: source_masters.len(),
+        master_theme_payloads_equal,
+        changed_members: changed_members.into_iter().collect(),
+        expected_changed_members: expected.into_iter().collect(),
+        exact_changed_member_set,
+        changed_payloads_nonempty,
+        slide_root_count: slide_roots.len(),
+        notes_root_count: notes_roots.len(),
+        changed_slide_index: changed_slide_indices.first().copied(),
+        changed_notes_slide_index: changed_notes_indices.first().copied(),
+        untouched_slide_root_count: slide_roots.len() - changed_slide_count,
+    })
+}
+
+fn check_semantic_fidelity(
     package: &Package,
     operation: Operation,
-    source_immutable: Option<bool>,
-    changed_commit_reported: bool,
-) -> Result<Fidelity, Box<dyn Error>> {
+) -> Result<SemanticFidelity, Box<dyn Error>> {
     let changed = matches!(operation, Operation::ChangedSlide);
     let warm_notes = matches!(operation, Operation::WarmNotes);
     let presentation = package.presentation()?;
@@ -300,20 +564,12 @@ fn check_fidelity(
         }
         note_texts.push(text);
     }
-    Ok(Fidelity {
+    Ok(SemanticFidelity {
         verified: true,
         slide_count: slides.len(),
         notes_slide_count: notes.slides().len(),
         slide_text_sha256: crate::sha256_hex(slide_texts.join("\u{1f}").as_bytes()),
         notes_text_sha256: crate::sha256_hex(note_texts.join("\u{1f}").as_bytes()),
-        source_immutable,
-        changed_commit_reported,
-        changed_slide_index: changed.then_some(0),
-        untouched_slide_root_count: match operation {
-            Operation::Cold => 0,
-            Operation::WarmNotes => FIXTURE_SLIDES,
-            Operation::ChangedSlide => FIXTURE_SLIDES - 1,
-        },
     })
 }
 
@@ -350,19 +606,20 @@ struct TimedOperation {
 }
 
 fn run_cold(source: &[u8]) -> Result<TimedOperation, Box<dyn Error>> {
+    // Package ingestion is fixture setup.  The cold row measures only the
+    // opened-presentation capture, which is the physical notes-root scan
+    // under comparison.
+    let package = Package::from_bytes(source)?;
     let region = crate::allocation_metrics::begin();
     let started = Instant::now();
-    let result: Result<Package, Box<dyn Error>> = (|| {
-        let package = Package::from_bytes(source)?;
-        let _opened = package.opened_presentation()?;
-        Ok(package)
-    })();
+    let result = package.opened_presentation();
     let elapsed_ns = crate::elapsed_ns(started.elapsed())?;
     let allocation = region
         .finish()
         .unwrap_or_else(crate::allocation_metrics::unavailable_sample);
+    result?;
     Ok(TimedOperation {
-        package: result?,
+        package,
         changed_commit_reported: false,
         elapsed_ns,
         allocation,
@@ -407,14 +664,31 @@ fn one_iteration(
         Operation::Cold => run_cold(source)?,
         Operation::WarmNotes | Operation::ChangedSlide => run_edit(source, operation)?,
     };
-    let fidelity = check_fidelity(
-        &timed.package,
-        operation,
-        timed.source_immutable,
-        timed.changed_commit_reported,
-    )?;
+    let semantic = check_semantic_fidelity(&timed.package, operation)?;
     let output = timed.package.to_bytes()?;
     let output_sha256 = crate::sha256_hex(&output);
+    let reopened = Package::from_bytes(&output)?;
+    let reopened_semantic = check_semantic_fidelity(&reopened, operation)?;
+    if reopened_semantic != semantic {
+        return Err("notes memo output failed the independent semantic reopen oracle".into());
+    }
+    let raw = check_raw_oracle(source, &output, operation)?;
+    let output_bytes_verified = !output.is_empty() && raw.output_member_count > 0;
+    let output_digest_verified = crate::sha256_hex(&output) == output_sha256;
+    if !output_bytes_verified || !output_digest_verified {
+        return Err("notes memo output byte or digest oracle failed".into());
+    }
+    let fidelity = Fidelity {
+        semantic,
+        source_immutable: timed.source_immutable,
+        changed_commit_reported: timed.changed_commit_reported,
+        output_reopened: true,
+        output_bytes_verified,
+        output_digest_verified,
+        changed_slide_index: raw.changed_slide_index,
+        untouched_slide_root_count: raw.untouched_slide_root_count,
+        raw,
+    };
     Ok(Observation {
         sample_index,
         elapsed_ns: timed.elapsed_ns,
