@@ -4794,3 +4794,40 @@ See [0063](0063-source-pptx-modern-comments.md).
   before atomic composition. The four bounded validation slots remain active.
   Fresh integrated capture, full gate, the pending signed-batch contract choice
   and actual native/performance qualification remain required. Nothing is pushed.
+
+- Coordinator DOCX and PPT integration (2026-10-25):
+  DOCX atomic `f9e3bff3b3` merges at `192197f975`, with the missed
+  standalone PPTX validation call and historical adapter in the same commit.
+  Adapter ancestry merges at `805c08facf`; record 0362ul57b preserves the
+  historical full harness library through six exact spelling reversals.
+  Root verifies 1,525 passing DOCX library tests, affected all-target check
+  and final Clippy, including logs, traces, locks and process cleanup. The
+  final source differs from the library-tested source only by an equivalent
+  test initializer. The composed standalone harness check is assigned
+  slot 3 on a fresh capture of `805c08facf`, with its original tool lock.
+
+  PPT atomic `6a1317ab04` merges at `2771017a58` and contains the full leaf
+  on its actual common ancestor `939d401609`. Its final tree equals preserved `ec014b1592`; independent
+  review accepts the compile/error conversions and Clippy corrections. Root
+  verifies the exact 288/287 boundary, focused profile tests, 1,267 passing
+  library tests with one ignored, affected check and final Clippy. Record
+  0362ul39 retains the earlier failed compile and boundary attempts, and
+  distinguishes its scoped validation from actual native qualification.
+
+  Current-source audit confirms remaining PPTX default/no-policy raw APIs.
+  Three source workers own required returns 0362ul61 (laser, transition and
+  shape), 0362ul62 (content codecs), and 0362ul63 (view/presentation properties
+  and model3d). These are engineering work, not accepted exceptions; all
+  consumers, owner-selected profiles and glossary signatures migrate together.
+
+  Font source `1511dbc9ea` passes independent review of the required raw
+  limits, private cumulative session and exact staging rules. Its actual f5
+  run passes all eight standalone budget-counter tests, then fails with
+  thirteen vendor compile errors. The vendor owner takes over the combined
+  font leaf and slot 2 for finite repairs with failed evidence preserved.
+  ODF retains slot 1; crypto retains slot 4 for selected encryption-profile
+  retention. The generic f5 runner needs no font-specific relaxation. Final
+  qualification needs new versioned policies bound to the new path sources
+  and separate historical/current locks; historical evidence stays unchanged.
+  The integrated gate, actual native/performance qualification and pending
+  signed-batch contract choice remain open. Nothing is pushed.
