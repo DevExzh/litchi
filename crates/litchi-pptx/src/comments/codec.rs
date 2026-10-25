@@ -279,10 +279,23 @@ pub fn write_comment_authors(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     validate_authors_with_limit(authors, limits.max_string_bytes, limits.max_nodes)?;
-    let mut output = BoundedOutput::new(limits.max_output_bytes);
+    let mut output = BoundedOutput::new(
+        limits.max_output_bytes,
+        limits.max_string_bytes,
+        limits.max_attribute_bytes,
+    );
+    write_comment_authors_output(&mut output, authors, conformance)?;
+    output.finish()
+}
+
+fn write_comment_authors_output(
+    output: &mut BoundedOutput,
+    authors: &[Author],
+    conformance: Conformance,
+) -> Result<()> {
     output.write(declaration())?;
-    output.write(b"<p:cmAuthorLst xmlns:p=\"")?;
-    output.escape(conformance.namespace())?;
+    output.write(b"<p:cmAuthorLst")?;
+    output.attribute("xmlns:p", conformance.namespace())?;
     output.write(b"\">")?;
     for author in authors {
         output.write(b"<p:cmAuthor")?;
@@ -294,7 +307,7 @@ pub fn write_comment_authors(
         output.write(b"/>")?;
     }
     output.write(b"</p:cmAuthorLst>")?;
-    output.finish()
+    Ok(())
 }
 
 /// # Errors
@@ -306,10 +319,23 @@ pub fn write_slide_comments(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     validate_comment_list_with_limit(comments, limits.max_string_bytes, limits.max_nodes)?;
-    let mut output = BoundedOutput::new(limits.max_output_bytes);
+    let mut output = BoundedOutput::new(
+        limits.max_output_bytes,
+        limits.max_string_bytes,
+        limits.max_attribute_bytes,
+    );
+    write_slide_comments_output(&mut output, comments, conformance)?;
+    output.finish()
+}
+
+fn write_slide_comments_output(
+    output: &mut BoundedOutput,
+    comments: &[Comment],
+    conformance: Conformance,
+) -> Result<()> {
     output.write(declaration())?;
-    output.write(b"<p:cmLst xmlns:p=\"")?;
-    output.escape(conformance.namespace())?;
+    output.write(b"<p:cmLst")?;
+    output.attribute("xmlns:p", conformance.namespace())?;
     output.write(b"\">")?;
     for comment in comments {
         output.write(b"<p:cm")?;
@@ -322,11 +348,31 @@ pub fn write_slide_comments(
         output.attribute("x", &comment.x.to_string())?;
         output.attribute("y", &comment.y.to_string())?;
         output.write(b"/><p:text>")?;
-        output.escape(&comment.text)?;
+        output.text(&comment.text)?;
         output.write(b"</p:text></p:cm>")?;
     }
     output.write(b"</p:cmLst>")?;
-    output.finish()
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn measured_comment_authors_string_bytes(
+    authors: &[Author],
+    conformance: Conformance,
+) -> Result<usize> {
+    let mut output = BoundedOutput::new(usize::MAX, usize::MAX, usize::MAX);
+    write_comment_authors_output(&mut output, authors, conformance)?;
+    Ok(output.string_bytes)
+}
+
+#[cfg(test)]
+pub(crate) fn measured_slide_comments_string_bytes(
+    comments: &[Comment],
+    conformance: Conformance,
+) -> Result<usize> {
+    let mut output = BoundedOutput::new(usize::MAX, usize::MAX, usize::MAX);
+    write_slide_comments_output(&mut output, comments, conformance)?;
+    Ok(output.string_bytes)
 }
 
 pub(super) fn validate_authors_with_limit(
@@ -887,13 +933,19 @@ fn declaration() -> &'static [u8] {
 struct BoundedOutput {
     bytes: Vec<u8>,
     limit: usize,
+    string_limit: usize,
+    string_bytes: usize,
+    attribute_limit: usize,
 }
 
 impl BoundedOutput {
-    fn new(limit: usize) -> Self {
+    fn new(limit: usize, string_limit: usize, attribute_limit: usize) -> Self {
         Self {
             bytes: Vec::new(),
             limit,
+            string_limit,
+            string_bytes: 0,
+            attribute_limit,
         }
     }
 
@@ -919,6 +971,25 @@ impl BoundedOutput {
         Ok(())
     }
 
+    fn charge_string(&mut self, amount: usize) -> Result<()> {
+        let next = self.string_bytes.checked_add(amount).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::StringBytes,
+                usize::MAX,
+                self.string_limit,
+            )
+        })?;
+        if next > self.string_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                next,
+                self.string_limit,
+            ));
+        }
+        self.string_bytes = next;
+        Ok(())
+    }
+
     fn escape(&mut self, value: &str) -> Result<()> {
         for character in value.chars() {
             match character {
@@ -938,7 +1009,33 @@ impl BoundedOutput {
         Ok(())
     }
 
+    fn text(&mut self, value: &str) -> Result<()> {
+        self.charge_string(value.len())?;
+        self.escape(value)
+    }
+
     fn attribute(&mut self, name: &str, value: &str) -> Result<()> {
+        let escaped_length = escaped_attribute_length(value).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                usize::MAX,
+                self.attribute_limit,
+            )
+        })?;
+        if escaped_length > self.attribute_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                escaped_length,
+                self.attribute_limit,
+            ));
+        }
+        self.charge_string(name.len().checked_add(value.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::StringBytes,
+                usize::MAX,
+                self.string_limit,
+            )
+        })?)?;
         self.write(b" ")?;
         self.write(name.as_bytes())?;
         self.write(b"=\"")?;
@@ -949,6 +1046,20 @@ impl BoundedOutput {
     fn finish(self) -> Result<Vec<u8>> {
         Ok(self.bytes)
     }
+}
+
+fn escaped_attribute_length(value: &str) -> Option<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' => 6,
+            '\t' => 5,
+            '\n' | '\r' => 6,
+            _ => character.len_utf8(),
+        };
+        length.checked_add(encoded)
+    })
 }
 
 fn output_limit(observed: usize, maximum: usize) -> Error {
