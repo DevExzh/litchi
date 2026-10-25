@@ -5565,3 +5565,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   Four retired worktrees are authorized for guarded cleanup71; results are
   pending. The protected probe is unchanged. Completed changes are committed;
   final acceptance remains open and nothing is pushed.
+
+
+  The actual fc5 compiler packet passes formatting then reports three comments
+  compiler diagnostics. Root verifies the terminal failure and independently
+  reviews/fast-forwards compiler-only repair `2ac6bca410` (89az). Fresh compiler
+  and runtime bindings are required. Cleanup71 is complete and root-verified:
+  four retired worktrees removed, twelve blobs restored, branches retained,
+  7,692,996,608 bytes recovered; cleanup68–71 totals 60,657,246,208 bytes.
+  The live-holder 89at tree and all external captures/targets remain intact.
