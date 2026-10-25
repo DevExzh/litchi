@@ -5761,3 +5761,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   the recorded exclusions and evidence limitations. Further detached-candidate
   cleanup continues. Full runtime, workspace/wsdoc, API/fidelity and performance
   acceptance remain open. No push.
+
+  The fresh a8 runtime packet stops in the common library with 529 passing
+  tests and two VBA failures: relationship-size fixture accounting and source
+  fixture publication. Record119 returns these for 119a diagnosis/repair;
+  remaining groups continue diagnostically on frozen a8. No preservation or
+  limit rule is waived. Compiler8 remains passing, full runtime stays open.
+  Cleanup95's first seven snapshots are root-verified and removed, bringing
+  totals to 422 refs and 238 worktrees. Its missing pre-allocation measurement
+  is disclosed; the allocated ledger remains unchanged. Further stale after
+  snapshots are reviewed while canonical before controls remain available.
