@@ -564,7 +564,7 @@ impl Slot {
                 let core = Core::merged(self.source.as_ref(), metadata)?;
                 (write::sync(package, &core)?, Some(core))
             },
-            None => (clear(package)?, None),
+            None => (write::clear(package)?, None),
         };
         Ok(Stage {
             slot: self,
