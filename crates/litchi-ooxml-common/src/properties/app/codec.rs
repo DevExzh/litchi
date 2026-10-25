@@ -100,9 +100,9 @@ pub(crate) fn plan_splice(xml: &[u8], target: &Props) -> Result<Option<SplicePla
     if layout.props == *target {
         return Ok(None);
     }
-    let output_len = splice_len_from_layout(xml, &layout, target)?.ok_or_else(|| {
-        Error::Invalid("changed application-properties edit became a no-op".to_owned())
-    })?;
+    let output_len = splice_len_from_layout(xml, &layout, target)?.ok_or(Error::Internal(
+        "application-properties prepared-size invariant failed",
+    ))?;
     Ok(Some(SplicePlan { layout, output_len }))
 }
 
@@ -180,8 +180,8 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
     let mut cursor = 0;
     for (range, replacement) in edits {
         if range.start < cursor || range.end > xml.len() {
-            return Err(Error::Invalid(
-                "extended-properties edits overlap".to_owned(),
+            return Err(Error::Internal(
+                "application-properties output invariant failed",
             ));
         }
         output.extend_from_slice(&xml[cursor..range.start]);
@@ -191,8 +191,8 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
     output.extend_from_slice(&xml[cursor..]);
     output.shrink_to_fit();
     if output.len() != output_len {
-        return Err(Error::Invalid(
-            "extended-properties prepared-size invariant failed".to_owned(),
+        return Err(Error::Internal(
+            "application-properties output invariant failed",
         ));
     }
     if output.len() > MAX_XML_BYTES {
@@ -203,8 +203,8 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
         });
     }
     if decode(&output)? != *target {
-        return Err(Error::Invalid(
-            "extended-properties edit did not read back as requested".to_owned(),
+        return Err(Error::Internal(
+            "application-properties output invariant failed",
         ));
     }
     Ok(output)
@@ -274,7 +274,9 @@ fn replace_len(current: usize, removed: usize, added: usize) -> Result<usize> {
     current
         .checked_sub(removed)
         .and_then(|value| value.checked_add(added))
-        .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))
+        .ok_or(Error::Internal(
+            "application-properties prepared-size invariant failed",
+        ))
 }
 
 /// Encode a new Transitional part holding `props`, elements in schema order.
@@ -318,8 +320,8 @@ pub(crate) fn encode_new_preflighted(props: &Props, encoded_len: usize) -> Resul
     }
     xml.shrink_to_fit();
     if xml.len() != encoded_len {
-        return Err(Error::Invalid(
-            "extended-properties encoded-size invariant failed".to_owned(),
+        return Err(Error::Internal(
+            "application-properties output invariant failed",
         ));
     }
     Ok(xml)
@@ -342,19 +344,21 @@ pub(crate) fn encode_new_len(props: &Props) -> Result<usize> {
             total
                 .checked_add(element_len(&[], field, value)?)
                 .ok_or_else(|| {
-                    Error::Invalid("extended-properties encoded size overflow".to_owned())
+                    Error::Internal("application-properties prepared-size invariant failed")
                 })
         })?;
     length = if children == 0 {
-        length
-            .checked_add(2)
-            .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))?
+        length.checked_add(2).ok_or(Error::Internal(
+            "application-properties prepared-size invariant failed",
+        ))?
     } else {
         length
             .checked_add(1)
             .and_then(|value| value.checked_add(children))
             .and_then(|value| value.checked_add(b"</Properties>".len()))
-            .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))?
+            .ok_or(Error::Internal(
+                "application-properties prepared-size invariant failed",
+            ))?
     };
     if length > MAX_XML_BYTES {
         return Err(Error::Limit {
@@ -677,6 +681,7 @@ fn scan(xml: &[u8]) -> Result<Layout> {
             },
             Scanned::End => {
                 if let Some((field, element_start, content_start, name, text)) = active.take() {
+                    validate_source_text(field, &text)?;
                     field.set_lexical(&mut props, text)?;
                     elements.push(Element {
                         field,
@@ -739,6 +744,17 @@ fn push_text(value: &mut String, text: &str) -> Result<()> {
         });
     }
     value.push_str(text);
+    Ok(())
+}
+
+fn validate_source_text(field: Field, value: &str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| !is_xml_char(*character)) {
+        return Err(Error::Invalid(format!(
+            "extended property {} contains XML 1.0-forbidden character U+{:04X}",
+            field.local_name(),
+            u32::from(character)
+        )));
+    }
     Ok(())
 }
 

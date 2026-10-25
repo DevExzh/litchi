@@ -6,6 +6,7 @@ use super::{
 #[cfg(test)]
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+use litchi_core::metadata::Metadata;
 #[cfg(test)]
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 #[cfg(test)]
@@ -214,6 +215,15 @@ pub(super) fn encode_preflighted(
 /// image of a core-properties part.
 pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
     preflight(props, dialect)
+}
+
+/// Validate the core fields supplied by an edit before they are merged with
+/// retained source state. Keeping this boundary separate makes a lexical
+/// failure in an authored value an invalid value, while failures from the
+/// retained source remain package corruption.
+pub(super) fn validate_target(target: &Metadata) -> Result<()> {
+    let target = Core::merged(None, target)?;
+    encoded_len(&target, Dialect::Transitional).map(|_| ())
 }
 
 fn preflight(props: &Core, dialect: Dialect) -> Result<usize> {

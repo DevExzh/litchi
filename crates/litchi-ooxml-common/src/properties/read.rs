@@ -587,7 +587,9 @@ fn keyword_lang(
                     "keyword contains duplicate xml:lang attributes".to_owned(),
                 ));
             }
-            language = Some(keyword::Lang::new(value.into_owned())?);
+            let value = value.into_owned();
+            validate_source_text(&value, "cp:keywords xml:lang")?;
+            language = Some(keyword::Lang::new(value)?);
             continue;
         }
         recorder.record(
@@ -769,12 +771,16 @@ fn push_property_text(active: &mut Option<Active>, value: &str) -> Result<()> {
         ));
     };
     match active {
-        Active::Text(_, text) => append_bounded(text, value),
+        Active::Text(property, text) => {
+            validate_source_text(value, property_str(*property))?;
+            append_bounded(text, value)
+        },
         Active::Keywords {
             value: keywords,
             child,
             bytes,
         } => {
+            validate_source_text(value, "cp:keywords")?;
             *bytes = bytes.checked_add(value.len()).ok_or(Error::Limit {
                 kind: crate::LimitKind::CorePropertyTextBytes,
                 maximum: MAX_PROPERTY_TEXT,
@@ -812,6 +818,21 @@ fn append_bounded(text: &mut String, value: &str) -> Result<()> {
     }
     text.push_str(value);
     Ok(())
+}
+
+fn validate_source_text(value: &str, property: &str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| !is_xml_10_char(*character)) {
+        return Err(Error::Invalid(format!(
+            "{property} contains XML 1.0-forbidden character U+{:04X}",
+            u32::from(character)
+        )));
+    }
+    Ok(())
+}
+
+fn is_xml_10_char(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || matches!(u32::from(character), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
 fn apply_property(

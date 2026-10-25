@@ -148,6 +148,15 @@ fn values_xml_cannot_carry_are_refused() {
     ));
 }
 
+#[test]
+fn source_xml_controls_are_rejected_at_the_decode_boundary() {
+    let source = r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>&#x1;</Company></Properties>"#;
+    assert!(matches!(
+        decode(source.as_bytes()),
+        Err(Error::Invalid(message)) if message.contains("U+0001")
+    ));
+}
+
 fn package_with(xml: &[u8]) -> OpcPackage {
     let mut package = OpcPackage::new();
     package.add_part(Box::new(BlobPart::new(
