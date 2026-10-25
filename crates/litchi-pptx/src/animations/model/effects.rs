@@ -118,13 +118,6 @@ impl Effect {
                 .unwrap_or("entr"),
         }
     }
-
-    /// Get the preset class string (deprecated, use `preset_class` instead).
-    #[deprecated(note = "Use preset_class() and preset_id() instead")]
-    #[must_use]
-    pub fn to_preset(&self) -> &str {
-        self.preset_class()
-    }
 }
 
 /// `EffectInstance` trigger type.
