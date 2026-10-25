@@ -1184,9 +1184,9 @@ impl<'a> Edit<'a> {
             .after
             .as_ref()
             .ok_or(Error::Internal("changed VBA patch has no graph target"))?;
-        let admission = self.base_admission.ok_or_else(|| {
-            Error::Internal("VBA edit candidate has no recipient admission summary")
-        })?;
+        let admission = self.base_admission.ok_or(Error::Internal(
+            "VBA edit candidate has no recipient admission summary",
+        ))?;
         validate_snapshot_limits(
             self.source,
             before,
@@ -1780,7 +1780,7 @@ fn relationship_token_metrics(
     })
 }
 
-fn graph_part_states<'a>(graph: &'a GraphSnapshot) -> impl Iterator<Item = &'a PartState> {
+fn graph_part_states(graph: &GraphSnapshot) -> impl Iterator<Item = &PartState> {
     std::iter::once(&graph.source)
         .chain(graph.project.iter())
         .chain(graph.supplemental.iter())
@@ -1828,11 +1828,9 @@ fn validate_archive_structural_limits(
     let projected_physical_relationship_parts = admission
         .physical_relationship_members
         .checked_sub(current_graph_relationships.members)
-        .ok_or_else(|| {
-            Error::Internal(
-                "selected graph relationship members exceed the recipient physical namespace",
-            )
-        })?
+        .ok_or(Error::Internal(
+            "selected graph relationship members exceed the recipient physical namespace",
+        ))?
         .saturating_add(target_graph_relationships.members);
     let projected_content_type_bytes =
         u64::try_from(projected_content_types.bytes().len()).unwrap_or(u64::MAX);
@@ -2258,7 +2256,7 @@ fn content_types_after_graph_replace(
         let old_parts = std::iter::once(&graph.project_part)
             .chain(graph.supplemental.iter().map(|(part, _)| part));
         for old_part in old_parts {
-            if !target_names.iter().any(|name| *name == old_part) {
+            if !target_names.contains(&old_part) {
                 part_overrides_to_remove.push(old_part.clone());
                 removed_graph_parts.push(old_part.clone());
             }

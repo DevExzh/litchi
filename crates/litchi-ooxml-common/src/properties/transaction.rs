@@ -682,12 +682,11 @@ impl Snapshot {
     ///
     /// Returns the strict decoding errors of [`super::app::read`].
     pub fn app_props(&self) -> Result<Option<app::Props>> {
-        Ok(self
-            .app
+        self.app
             .present
             .as_ref()
             .map(|present| app::decode(&present.bytes).map_err(source_error))
-            .transpose()?)
+            .transpose()
     }
 
     /// The custom properties; empty when the package has no
@@ -1110,13 +1109,12 @@ impl OwnerAdmission {
                         "metadata owner admission replacement accounting overflow",
                     ))?,
                 (Some(before), None) => {
-                    let part_bytes = family.present_part_bytes.ok_or_else(|| {
-                        Error::Internal("metadata owner admission removal part missing")
-                    })?;
-                    let relationship_bytes =
-                        family.present_relationship_bytes.ok_or_else(|| {
-                            Error::Internal("metadata owner admission removal relationship missing")
-                        })?;
+                    let part_bytes = family.present_part_bytes.ok_or(Error::Internal(
+                        "metadata owner admission removal part missing",
+                    ))?;
+                    let relationship_bytes = family.present_relationship_bytes.ok_or(
+                        Error::Internal("metadata owner admission removal relationship missing"),
+                    )?;
                     let removed = part_bytes
                         .checked_add(before)
                         .and_then(|value| value.checked_add(relationship_bytes))
@@ -1688,18 +1686,18 @@ impl PreparedPlan {
                     app::splice_planned(
                         &present.bytes,
                         props,
-                        app.plan.ok_or_else(|| {
-                            Error::Internal("missing prepared application-properties layout")
-                        })?,
+                        app.plan.ok_or(Error::Internal(
+                            "missing prepared application-properties layout",
+                        ))?,
                     )
                     .map_err(app_generated_error)?,
                 ),
                 (None, Some(props)) => Some(
                     app::encode_new_preflighted(
                         props,
-                        app.after_len.ok_or_else(|| {
-                            Error::Internal("missing prepared application-properties length")
-                        })?,
+                        app.after_len.ok_or(Error::Internal(
+                            "missing prepared application-properties length",
+                        ))?,
                     )
                     .map_err(app_generated_error)?,
                 ),
@@ -1718,9 +1716,9 @@ impl PreparedPlan {
                 Some(
                     custom::encode_preflighted(
                         &custom.target,
-                        custom.after_len.ok_or_else(|| {
-                            Error::Internal("missing prepared custom-properties length")
-                        })?,
+                        custom
+                            .after_len
+                            .ok_or(Error::Internal("missing prepared custom-properties length"))?,
                     )
                     .map_err(custom_generated_error)?,
                 )

@@ -148,9 +148,9 @@ pub fn plan_put(
             } else if source_profile_matches
                 && custom_function_add_in_only_changed(&old_pane.add_in, &pane.add_in, limits)?
             {
-                let extension_list = pane.add_in.extension_list.as_ref().ok_or_else(|| {
-                    Error::Internal("Web Extensions custom-function update lost the add-in extLst")
-                })?;
+                let extension_list = pane.add_in.extension_list.as_ref().ok_or(Error::Internal(
+                    "Web Extensions custom-function update lost the add-in extLst",
+                ))?;
                 Arc::new(splice_add_in_extension_list_with(
                     source_part.blob(),
                     extension_list,
@@ -187,13 +187,12 @@ pub fn plan_put(
                     }
                     reserved_names.insert(part_key.clone());
                     if counted_snapshot_parts.insert(part_key) {
-                        total_snapshot_bytes = total_snapshot_bytes
-                            .checked_add(data.len())
-                            .ok_or_else(|| {
-                                Error::Internal(
+                        total_snapshot_bytes =
+                            total_snapshot_bytes
+                                .checked_add(data.len())
+                                .ok_or(Error::Internal(
                                     "Web Extensions aggregate snapshot byte count overflow",
-                                )
-                            })?;
+                                ))?;
                         if total_snapshot_bytes > limits.total_image_bytes {
                             return limit(
                                 LimitKind::AggregateSnapshotBytes,
@@ -289,11 +288,9 @@ pub fn plan_put(
                 .rels()
                 .get(&graph.root_relationship_id)
                 .map(RelationshipState::capture)
-                .ok_or_else(|| {
-                    Error::Internal(
-                        "Web Extensions task-pane root relationship disappeared while planning",
-                    )
-                })
+                .ok_or(Error::Internal(
+                    "Web Extensions task-pane root relationship disappeared while planning",
+                ))
         })
         .transpose()?;
     let root_after = Some(RelationshipState {
@@ -409,9 +406,9 @@ pub(in crate::web::package) fn source_bound_noop_patch(
         .rels()
         .get(&graph.root_relationship_id)
         .map(RelationshipState::capture)
-        .ok_or_else(|| {
-            Error::Internal("Web Extensions task-pane root relationship disappeared while planning")
-        })?;
+        .ok_or(Error::Internal(
+            "Web Extensions task-pane root relationship disappeared while planning",
+        ))?;
     Patch::planned(
         package,
         PatchPlan {
@@ -772,7 +769,7 @@ impl<'a> Edit<'a> {
                     .apply(self.source);
             }
             let panes = load(self.source, &self.limits)?
-                .ok_or_else(|| Error::Internal("Web Extensions edit lost its staged panes"))?;
+                .ok_or(Error::Internal("Web Extensions edit lost its staged panes"))?;
             return plan_put(
                 self.source,
                 panes,
@@ -829,9 +826,9 @@ pub fn plan_remove(package: &OpcPackage, limits: &Limits) -> Result<Patch> {
         .rels()
         .get(&existing.root_relationship_id)
         .map(RelationshipState::capture)
-        .ok_or_else(|| {
-            Error::Internal("Web Extensions task-pane root relationship disappeared while planning")
-        })?;
+        .ok_or(Error::Internal(
+            "Web Extensions task-pane root relationship disappeared while planning",
+        ))?;
     let patch = Patch::planned(
         package,
         PatchPlan {
