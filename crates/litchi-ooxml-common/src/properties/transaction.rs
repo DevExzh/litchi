@@ -72,6 +72,24 @@ fn merge_core_metadata(target: &mut Metadata, core: &Metadata) {
     target.last_printed = core.last_printed;
 }
 
+fn clear_core_metadata(metadata: &mut Metadata) {
+    metadata.title = None;
+    metadata.subject = None;
+    metadata.author = None;
+    metadata.keywords.clear();
+    metadata.description = None;
+    metadata.identifier = None;
+    metadata.language = None;
+    metadata.last_modified_by = None;
+    metadata.revision = None;
+    metadata.created = None;
+    metadata.modified = None;
+    metadata.category = None;
+    metadata.content_status = None;
+    metadata.version = None;
+    metadata.last_printed = None;
+}
+
 /// The resource a metadata limit bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -961,10 +979,14 @@ impl Plan {
     /// Returns the decoding errors of [`Snapshot::metadata`] when no value is
     /// staged.
     pub fn metadata(&self) -> Result<Metadata> {
-        match &self.metadata {
-            Some(staged) => Ok(staged.clone()),
-            None => self.base.metadata(),
+        let mut metadata = match &self.metadata {
+            Some(staged) => staged.clone(),
+            None => self.base.metadata()?,
+        };
+        if self.clear_core {
+            clear_core_metadata(&mut metadata);
         }
+        Ok(metadata)
     }
 
     /// Stage the complete metadata. Fields equal to the snapshot's change
@@ -1004,9 +1026,16 @@ impl Plan {
     /// Returns the decoding errors of [`Snapshot::metadata`].
     pub fn update_metadata(&mut self, update: impl FnOnce(&mut Metadata)) -> Result<&mut Self> {
         let mut metadata = self.metadata()?;
+        let before = metadata.clone();
         update(&mut metadata);
+        if self.clear_core
+            && before
+                .changed_fields(&metadata)
+                .any(|field| CORE_FIELDS.contains(&field))
+        {
+            self.clear_core = false;
+        }
         self.metadata = Some(metadata);
-        self.clear_core = false;
         Ok(self)
     }
 
@@ -1062,7 +1091,36 @@ impl Plan {
             options: _,
         } = self;
         let (core_metadata, app_target, changed_fields) = if clear_core {
-            (Some(None), staged_app, Vec::new())
+            match metadata {
+                Some(target) => {
+                    let before = base.metadata()?;
+                    let changed_fields: Vec<_> = before
+                        .changed_fields(&target)
+                        .filter(|field| !CORE_FIELDS.contains(field))
+                        .collect();
+                    if let Some(field) = changed_fields
+                        .iter()
+                        .copied()
+                        .find(|field| !app::METADATA_FIELDS.contains(field))
+                    {
+                        return Err(Error::Unsupported { field });
+                    }
+                    let app_changed = changed_fields
+                        .iter()
+                        .any(|field| app::METADATA_FIELDS.contains(field));
+                    let app_base = match &staged_app {
+                        Some(staged) => staged.clone(),
+                        None => base.app_props()?,
+                    };
+                    let app_target = if app_changed {
+                        Some(Some(app::Props::merged(app_base.as_ref(), &target)?))
+                    } else {
+                        staged_app
+                    };
+                    (Some(None), app_target, changed_fields)
+                },
+                None => (Some(None), staged_app, Vec::new()),
+            }
         } else {
             match metadata {
                 Some(target) => {
@@ -1159,7 +1217,10 @@ impl Plan {
         };
 
         let custom = custom
-            .filter(|target| !target.same_values(&base.custom_value))
+            .filter(|target| {
+                !target.same_values(&base.custom_value)
+                    || (target.is_empty() && base.custom.present.is_some())
+            })
             .map(|target| {
                 target.validate_for(base.host)?;
                 if !base.custom_value.tolerance_report().is_clean() {

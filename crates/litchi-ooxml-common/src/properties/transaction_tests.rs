@@ -90,6 +90,64 @@ fn core_only_staging_preserves_application_properties() {
 }
 
 #[test]
+fn staging_empty_custom_properties_removes_an_existing_empty_part() {
+    const EMPTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"></Properties>"#;
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
+        .unwrap()
+        .set_blob(EMPTY_CUSTOM.to_vec());
+
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.set_custom_props(custom::Props::new());
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let cleared = commit.into_package();
+    assert!(
+        cleared
+            .get_part(&PackURI::new("/docProps/custom.xml").unwrap())
+            .is_err()
+    );
+
+    let mut signed = package;
+    sign(&mut signed);
+    let mut edit = Edit::new(&signed, Host::Word).unwrap();
+    edit.set_custom_props(custom::Props::new());
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+}
+
+#[test]
+fn clearing_core_keeps_the_app_projection_staged() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.clear_metadata();
+    let staged = edit.metadata().unwrap();
+    assert_eq!(staged.title, None);
+    assert_eq!(staged.company.as_deref(), Some("Old"));
+    edit.update_metadata(|metadata| metadata.company = Some("New".to_owned()))
+        .unwrap();
+    let cleared = edit.commit().unwrap().into_package();
+
+    assert!(
+        Snapshot::read(&cleared, Host::Word)
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .title
+            .is_none()
+    );
+    assert_eq!(
+        Snapshot::read(&cleared, Host::Word)
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .company
+            .as_deref(),
+        Some("New")
+    );
+}
+
+#[test]
 fn metadata_commit_admits_exact_escaped_patch_size_before_capture() {
     let package = full();
     let mut edit = Edit::new(&package, Host::Word).unwrap();
