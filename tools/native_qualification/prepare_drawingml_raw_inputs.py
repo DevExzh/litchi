@@ -40,12 +40,36 @@ ADAPTER_PATHS = (
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json",
 )
 
+# The DrawingML probe is shared with the historical RTF benchmark parent.  The
+# current RTF leaf renamed these two constructors in 1d273acbf2, but the
+# historical baseline still exposes the old spelling.  The baseline adapter
+# below changes exactly these two consumer references while leaving every
+# DrawingML route byte-identical.  Candidate sources are never transformed.
+RTF_STREAMING_ADAPTER_PATH = "tools/perf-baseline/src/lib.rs"
+RTF_STREAMING_REPLACEMENTS = (
+    (
+        b"litchi_rtf::streaming::Limits::new",
+        b"litchi_rtf::write::StreamingRtfLimits::new",
+    ),
+    (
+        b"litchi_rtf::streaming::Writer::new",
+        b"litchi_rtf::write::StreamingRtfWriter::new",
+    ),
+)
+RTF_STREAMING_TRANSFORM_COUNT = len(RTF_STREAMING_REPLACEMENTS)
+RTF_STREAMING_CURRENT_SHA256 = "ff0ca3a924852cfc5d8497f812fbf412c4eb71b5f289f1c3b3136dea92c7ed9f"
+RTF_STREAMING_HISTORICAL_SHA256 = "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"
+RTF_STREAMING_TRANSFORM_BYTES = sum(
+    len(historical) - len(current)
+    for current, historical in RTF_STREAMING_REPLACEMENTS
+)
+
 # Filled from the reviewed adapter in this leaf.  Keeping this table in the
 # preparer means a future protocol edit cannot silently become historical
 # baseline evidence merely because it is copied into a worktree.
 STATIC_REVIEWED_ADAPTER_SHA256 = {
     "tools/perf-baseline/Cargo.toml": "61e103809753ffc528b2cd2c2e00a1525d40fc4e6360668ad982bec22a60bb73",
-    "tools/perf-baseline/src/lib.rs": "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a",
+    "tools/perf-baseline/src/lib.rs": RTF_STREAMING_CURRENT_SHA256,
     "tools/perf-baseline/src/drawingml_raw_probe.rs": "539e4641b1eecda7ef97f1bfca2e526348f0a0d4941cdec781cadb3c99a18477",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
@@ -61,12 +85,18 @@ LOCK_PATHS = frozenset(("Cargo.lock", "tools/perf-baseline/Cargo.lock"))
 def _reviewed_adapter_hashes(
     perf_lock_sha256: str,
     workspace_lock_sha256: str,
+    role: str = "candidate",
 ) -> dict[str, str]:
-    return {
+    if role not in {"baseline", "candidate"}:
+        raise ValueError(f"unknown DrawingML adapter role: {role}")
+    result = {
         **STATIC_REVIEWED_ADAPTER_SHA256,
         "Cargo.lock": workspace_lock_sha256,
         "tools/perf-baseline/Cargo.lock": perf_lock_sha256,
     }
+    if role == "baseline":
+        result[RTF_STREAMING_ADAPTER_PATH] = RTF_STREAMING_HISTORICAL_SHA256
+    return result
 
 
 class PreparationError(ValueError):
@@ -80,6 +110,61 @@ def _expect(condition: bool, message: str) -> None:
 
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _rtf_streaming_adapter_receipt() -> dict[str, Any]:
+    return {
+        "path": RTF_STREAMING_ADAPTER_PATH,
+        "candidate_sha256": RTF_STREAMING_CURRENT_SHA256,
+        "baseline_sha256": RTF_STREAMING_HISTORICAL_SHA256,
+        "replacement_count": RTF_STREAMING_TRANSFORM_COUNT,
+        "changed_bytes": RTF_STREAMING_TRANSFORM_BYTES,
+        "replacements": [
+            {
+                "candidate": current.decode("ascii"),
+                "baseline": historical.decode("ascii"),
+                "count": 1,
+            }
+            for current, historical in RTF_STREAMING_REPLACEMENTS
+        ],
+    }
+
+
+def _adapt_baseline_adapter(relative: str, source: bytes) -> bytes:
+    """Apply only the historical RTF consumer spelling to a baseline copy."""
+
+    if relative != RTF_STREAMING_ADAPTER_PATH:
+        return source
+    _expect(
+        _sha256_bytes(source) == RTF_STREAMING_CURRENT_SHA256,
+        "candidate RTF consumer adapter is not the reviewed current source",
+    )
+    adapted = source
+    replacement_count = 0
+    changed_bytes = 0
+    for current, historical in RTF_STREAMING_REPLACEMENTS:
+        current_count = adapted.count(current)
+        historical_count = adapted.count(historical)
+        _expect(
+            current_count == 1 and historical_count == 0,
+            "RTF consumer adapter spelling/count changed",
+        )
+        adapted = adapted.replace(current, historical)
+        replacement_count += current_count
+        changed_bytes += len(historical) - len(current)
+    _expect(
+        replacement_count == RTF_STREAMING_TRANSFORM_COUNT,
+        "RTF consumer adapter replacement count changed",
+    )
+    _expect(
+        changed_bytes == RTF_STREAMING_TRANSFORM_BYTES,
+        "RTF consumer adapter byte delta changed",
+    )
+    _expect(
+        _sha256_bytes(adapted) == RTF_STREAMING_HISTORICAL_SHA256,
+        "historical RTF consumer adapter hash changed",
+    )
+    return adapted
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -153,6 +238,7 @@ def _validate_adapter(
     label: str,
     *,
     reviewed: bool,
+    role: str = "candidate",
     perf_lock_sha256: str,
     workspace_lock_sha256: str,
     workspace_lock_bytes: int,
@@ -166,7 +252,9 @@ def _validate_adapter(
     _expect(identity.get("workspace_lock_bytes") == workspace_lock_bytes, f"{label} workspace lock byte count differs")
     _expect(identity.get("perf_lock_sha256") == perf_lock_sha256, f"{label} does not use the selected perf-baseline lock")
     if reviewed:
-        for path, expected in _reviewed_adapter_hashes(perf_lock_sha256, workspace_lock_sha256).items():
+        for path, expected in _reviewed_adapter_hashes(
+            perf_lock_sha256, workspace_lock_sha256, role
+        ).items():
             observed = hashes[path].get("sha256")
             _expect(observed == expected, f"{label} reviewed adapter hash mismatch: {path}")
 
@@ -204,12 +292,16 @@ def _validate_receipt_data(
     )
     _expect(receipt.get("perf_lock_sha256") == perf_lock_sha256, "receipt perf-baseline lock differs")
     _expect(
+        receipt.get("role_adapter") == _rtf_streaming_adapter_receipt(),
+        "role-aware RTF consumer adapter receipt changed",
+    )
+    _expect(
         receipt.get("reviewed_adapter_sha256") == {
             "baseline": _reviewed_adapter_hashes(
-                perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256
+                perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256, "baseline"
             ),
             "candidate": _reviewed_adapter_hashes(
-                perf_lock_sha256, candidate_workspace_lock_sha256
+                perf_lock_sha256, candidate_workspace_lock_sha256, "candidate"
             ),
         },
         "reviewed adapter hashes changed",
@@ -226,6 +318,7 @@ def _validate_receipt_data(
         baseline,
         "baseline",
         reviewed=True,
+        role="baseline",
         perf_lock_sha256=perf_lock_sha256,
         workspace_lock_sha256=HISTORICAL_WORKSPACE_LOCK_SHA256,
         workspace_lock_bytes=HISTORICAL_WORKSPACE_LOCK_BYTES,
@@ -234,6 +327,7 @@ def _validate_receipt_data(
         candidate,
         "candidate",
         reviewed=True,
+        role="candidate",
         perf_lock_sha256=perf_lock_sha256,
         workspace_lock_sha256=candidate_workspace_lock_sha256,
         workspace_lock_bytes=candidate["workspace_lock_bytes"],
@@ -243,12 +337,12 @@ def _validate_receipt_data(
         {
             path: baseline["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS
+            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
         }
         == {
             path: candidate["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS
+            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
         },
         "non-lock adapter bytes differ",
     )
@@ -333,6 +427,7 @@ def prepare(
         candidate,
         "candidate",
         reviewed=True,
+        role="candidate",
         perf_lock_sha256=perf_lock_sha256,
         workspace_lock_sha256=candidate_workspace_lock_sha256,
         workspace_lock_bytes=candidate["workspace_lock_bytes"],
@@ -345,12 +440,16 @@ def prepare(
         _expect(not source.is_symlink() and source.is_file(), f"candidate adapter path is missing: {source}")
         _expect(not target.is_symlink(), f"baseline adapter target is a symlink: {target}")
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
+        if relative == RTF_STREAMING_ADAPTER_PATH:
+            target.write_bytes(_adapt_baseline_adapter(relative, source.read_bytes()))
+        else:
+            shutil.copyfile(source, target)
     baseline = _identity(baseline_root)
     _validate_adapter(
         baseline,
         "baseline",
         reviewed=True,
+        role="baseline",
         perf_lock_sha256=perf_lock_sha256,
         workspace_lock_sha256=HISTORICAL_WORKSPACE_LOCK_SHA256,
         workspace_lock_bytes=HISTORICAL_WORKSPACE_LOCK_BYTES,
@@ -361,12 +460,12 @@ def prepare(
         {
             path: baseline["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS
+            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
         }
         == {
             path: candidate["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS
+            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
         },
         "non-lock adapter bytes differ",
     )
@@ -382,12 +481,13 @@ def prepare(
         "candidate_workspace_lock_bytes": candidate["workspace_lock_bytes"],
         "perf_lock_sha256": perf_lock_sha256,
         "perf_lock_bytes": candidate["perf_lock_bytes"],
+        "role_adapter": _rtf_streaming_adapter_receipt(),
         "reviewed_adapter_sha256": {
             "baseline": _reviewed_adapter_hashes(
-                perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256
+                perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256, "baseline"
             ),
             "candidate": _reviewed_adapter_hashes(
-                perf_lock_sha256, candidate_workspace_lock_sha256
+                perf_lock_sha256, candidate_workspace_lock_sha256, "candidate"
             ),
         },
         "baseline": baseline,

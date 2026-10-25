@@ -472,13 +472,67 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), expected, relative)
 
     def test_adapter_locks_bind_each_source_role(self) -> None:
-        baseline = preparation._reviewed_adapter_hashes("a" * 64, preparation.HISTORICAL_WORKSPACE_LOCK_SHA256)
+        baseline = preparation._reviewed_adapter_hashes(
+            "a" * 64,
+            preparation.HISTORICAL_WORKSPACE_LOCK_SHA256,
+            "baseline",
+        )
         candidate = preparation._reviewed_adapter_hashes("b" * 64, "c" * 64)
         self.assertNotIn("Cargo.lock", preparation.STATIC_REVIEWED_ADAPTER_SHA256)
         self.assertEqual(baseline["Cargo.lock"], preparation.HISTORICAL_WORKSPACE_LOCK_SHA256)
         self.assertEqual(candidate["Cargo.lock"], "c" * 64)
         self.assertEqual(baseline["tools/perf-baseline/Cargo.lock"], "a" * 64)
         self.assertEqual(candidate["tools/perf-baseline/Cargo.lock"], "b" * 64)
+        self.assertEqual(
+            baseline[preparation.RTF_STREAMING_ADAPTER_PATH],
+            preparation.RTF_STREAMING_HISTORICAL_SHA256,
+        )
+        self.assertEqual(
+            candidate[preparation.RTF_STREAMING_ADAPTER_PATH],
+            preparation.RTF_STREAMING_CURRENT_SHA256,
+        )
+
+    def test_historical_rtf_consumer_adapter_changes_only_two_spellings(self) -> None:
+        path = ROOT / preparation.RTF_STREAMING_ADAPTER_PATH
+        source = path.read_bytes()
+        adapted = preparation._adapt_baseline_adapter(
+            preparation.RTF_STREAMING_ADAPTER_PATH, source
+        )
+        expected = source
+        for current, historical in preparation.RTF_STREAMING_REPLACEMENTS:
+            self.assertEqual(source.count(current), 1)
+            self.assertEqual(source.count(historical), 0)
+            expected = expected.replace(current, historical)
+        self.assertEqual(adapted, expected)
+        self.assertEqual(
+            hashlib.sha256(adapted).hexdigest(),
+            preparation.RTF_STREAMING_HISTORICAL_SHA256,
+        )
+        self.assertEqual(preparation.RTF_STREAMING_TRANSFORM_COUNT, 2)
+        self.assertEqual(preparation.RTF_STREAMING_TRANSFORM_BYTES, 16)
+        self.assertEqual(
+            preparation._rtf_streaming_adapter_receipt(),
+            {
+                "path": preparation.RTF_STREAMING_ADAPTER_PATH,
+                "candidate_sha256": preparation.RTF_STREAMING_CURRENT_SHA256,
+                "baseline_sha256": preparation.RTF_STREAMING_HISTORICAL_SHA256,
+                "replacement_count": 2,
+                "changed_bytes": 16,
+                "replacements": [
+                    {
+                        "candidate": current.decode("ascii"),
+                        "baseline": historical.decode("ascii"),
+                        "count": 1,
+                    }
+                    for current, historical in preparation.RTF_STREAMING_REPLACEMENTS
+                ],
+            },
+        )
+        with self.assertRaises(preparation.PreparationError):
+            preparation._adapt_baseline_adapter(
+                preparation.RTF_STREAMING_ADAPTER_PATH,
+                adapted,
+            )
 
     def _write_unavailable_reports(self, output: Path) -> None:
         fixture = ROOT / "tools/native_qualification/fixtures/drawingml_raw_fixtures.json"
