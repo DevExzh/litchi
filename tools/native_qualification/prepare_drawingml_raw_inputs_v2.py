@@ -102,6 +102,13 @@ CANDIDATE_MANIFEST_PATHS = (
     "tools/perf-baseline/Cargo.toml",
     "tools/native-resave/Cargo.toml",
 )
+# Cargo's source graph is not determined by the manifests alone.  Bind the
+# selected toolchain and runner-owned Cargo configuration in the same receipt
+# so a compile consumer cannot silently switch compiler/configuration inputs.
+TOOLCHAIN_PATHS = (
+    "rust-toolchain.toml",
+    ".cargo/config.toml",
+)
 VENDOR_ROOTS = (
     "vendor/allsorts",
     "vendor/flate2",
@@ -220,6 +227,12 @@ def _root(value: Path) -> Path:
 def _head(root: Path) -> str:
     value = str(_git(root, "rev-parse", "HEAD")).strip()
     _expect(len(value) == 40 and value == value.lower(), f"invalid Git HEAD in {root}")
+    return value
+
+
+def _tree(root: Path) -> str:
+    value = str(_git(root, "rev-parse", "HEAD^{tree}")).strip()
+    _expect(len(value) == 40 and value == value.lower(), f"invalid Git tree in {root}")
     return value
 
 
@@ -484,8 +497,10 @@ def _candidate_identity(root: Path, binding: Mapping[str, Any]) -> dict[str, Any
     for path, expected in expected_manifests.items():
         _expect(manifests[path] == {"path": path, "bytes": expected["bytes"], "sha256": expected["sha256"]}, f"candidate manifest differs: {path}")
     locks = _lock_identities(root, "candidate")
-    for relative in PROBE_COPY_PATHS:
-        _file_identity(root, relative)
+    toolchain = {path: _file_identity(root, path) for path in TOOLCHAIN_PATHS}
+    probe_identities = {
+        relative: _file_identity(root, relative) for relative in PROBE_COPY_PATHS
+    }
     vendor = _vendor_tree_identity(root)
     _expect(vendor["sha256"] == binding["vendor_tree"]["sha256"], "candidate vendor tree differs from the bound policy")
     _expect(vendor["files"] == binding["vendor_tree"]["files"], "candidate vendor file count differs")
@@ -493,11 +508,17 @@ def _candidate_identity(root: Path, binding: Mapping[str, Any]) -> dict[str, Any
     return {
         "root": str(root),
         "head": actual_revision,
+        "tree": _tree(root),
         "status_paths": [],
         "manifests": manifests,
+        "toolchain": toolchain,
         "locks": locks,
         "vendor_tree": {key: value for key, value in vendor.items() if key != "entries"},
         "probe_paths": list(PROBE_COPY_PATHS),
+        # Keep the eight copied inputs independently bound.  The path list is
+        # retained for compatibility with the source policy, while this map
+        # prevents a receipt from proving only that names existed.
+        "probe_identities": probe_identities,
     }
 
 
@@ -513,6 +534,7 @@ def _baseline_identity(
     status = _status_paths(root)
     _expect(set(status).issubset(ALLOWED_BASELINE_DIRTY_PATHS), f"baseline changed outside v2 adapter paths: {status!r}")
     locks = _lock_identities(root, "baseline")
+    toolchain = {path: _file_identity(root, path) for path in TOOLCHAIN_PATHS}
     if require_historical_library:
         historical_library = _historical_library_identity(root)
     else:
@@ -525,8 +547,10 @@ def _baseline_identity(
     return {
         "root": str(root),
         "head": baseline_revision,
+        "tree": _tree(root),
         "status_paths": list(status),
         "locks": locks,
+        "toolchain": toolchain,
         "historical_library": historical_library,
         "probe_paths": {path: _file_identity(root, path) for path in PROBE_COPY_PATHS},
     }
@@ -611,6 +635,7 @@ def prepare(
         "dependency_path_transitions": list(DEPENDENCY_PATH_TRANSITIONS),
         "role_locks": ROLE_LOCKS,
         "candidate_manifests": list(CANDIDATE_MANIFEST_PATHS),
+        "toolchain_paths": list(TOOLCHAIN_PATHS),
         "vendor_roots": list(VENDOR_ROOTS),
         "probe_copy_paths": list(PROBE_COPY_PATHS),
         "baseline": baseline,
@@ -677,6 +702,7 @@ def validate_preparation_receipt(
     )
     _expect(receipt.get("role_locks") == ROLE_LOCKS, "role lock policy receipt differs")
     _expect(receipt.get("candidate_manifests") == list(CANDIDATE_MANIFEST_PATHS), "candidate manifest policy receipt differs")
+    _expect(receipt.get("toolchain_paths") == list(TOOLCHAIN_PATHS), "toolchain path policy receipt differs")
     _expect(receipt.get("vendor_roots") == list(VENDOR_ROOTS), "vendor root policy receipt differs")
     _expect(receipt.get("probe_copy_paths") == list(PROBE_COPY_PATHS), "probe path policy receipt differs")
     current_candidate = _candidate_identity(candidate_root, binding)

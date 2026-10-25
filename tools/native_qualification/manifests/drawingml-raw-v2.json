@@ -1,7 +1,20 @@
 {
   "schema": "litchi.drawingml.raw-qualification.manifest.v2",
   "status": "pending_final_candidate_binding",
+  "protocol_root": "${LITCHI_NATIVE_QUAL_ROOT}",
   "preparation_module": "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
+  "runner_module": "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
+  "validator_module": "tools/native_qualification/drawingml_raw_validator_v2.py",
+  "compile_driver_module": "${LITCHI_NATIVE_QUAL_ROOT}/tools/native_qualification/drawingml_compile_driver_v2.py",
+  "plan_path": "docs/unified-ops/results/0362dvie/qualification-plan.json",
+  "plan_sha256": "e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505",
+  "candidate_root": "${DRAWINGML_CANDIDATE_ROOT}",
+  "candidate_revision": "${DRAWINGML_CANDIDATE_REVISION}",
+  "trusted_root": "${DRAWINGML_TRUSTED_ROOT}",
+  "output_dir": "${DRAWINGML_OUTPUT_DIR}",
+  "target_root": "${DRAWINGML_TARGET_ROOT}",
+  "fixture_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+  "fixture_bytes": 2407,
   "historical_source": {
     "ref": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "path": "tools/perf-baseline/src/lib.rs",
@@ -34,10 +47,43 @@
       }
     }
   },
+  "role_locks": {
+    "workspace": {
+      "path": "Cargo.lock",
+      "baseline": {"sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1", "bytes": 139606},
+      "candidate": {"sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811", "bytes": 139189}
+    },
+    "perf": {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "baseline": {"sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", "bytes": 57227},
+      "candidate": {"sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea", "bytes": 56941}
+    },
+    "native": {
+      "path": "tools/native-resave/Cargo.lock",
+      "baseline": {"sha256": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378", "bytes": 56975},
+      "candidate": {"sha256": "989da70f10deab4460a77e4afa3a1b840b4697bbea2c07e134e22d9b4c5084ae", "bytes": 56689}
+    }
+  },
+  "baseline_workspace_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+  "baseline_workspace_lock_bytes": 139606,
+  "candidate_workspace_lock_sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
+  "candidate_workspace_lock_bytes": 139189,
+  "baseline_perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+  "baseline_perf_lock_bytes": 57227,
+  "candidate_perf_lock_sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
+  "candidate_perf_lock_bytes": 56941,
+  "baseline_native_lock_sha256": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+  "baseline_native_lock_bytes": 56975,
+  "candidate_native_lock_sha256": "989da70f10deab4460a77e4afa3a1b840b4697bbea2c07e134e22d9b4c5084ae",
+  "candidate_native_lock_bytes": 56689,
   "candidate_manifest_paths": [
     "Cargo.toml",
     "tools/perf-baseline/Cargo.toml",
     "tools/native-resave/Cargo.toml"
+  ],
+  "toolchain_paths": [
+    "rust-toolchain.toml",
+    ".cargo/config.toml"
   ],
   "vendor_roots": [
     "vendor/allsorts",
@@ -76,5 +122,115 @@
       "candidate_source": "path",
       "candidate_path": "vendor/zlib-rs"
     }
-  ]
+  ],
+  "profiles": [
+    {
+      "id": "drawingml-chart-raw",
+      "baseline_root": "${DRAWINGML_CHART_BASELINE_ROOT}",
+      "baseline_revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+      "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "preparation_receipt": "${DRAWINGML_CHART_PREPARATION}",
+      "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
+      "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"],
+      "source_fence": "chart raw codec parent 2f7db7e; owner route is a separate 945eb1d6 endpoint",
+      "record": "0362ul137 §1 drawingml-chart-raw"
+    },
+    {
+      "id": "drawingml-diagram-raw",
+      "baseline_root": "${DRAWINGML_DIAGRAM_BASELINE_ROOT}",
+      "baseline_revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+      "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "preparation_receipt": "${DRAWINGML_DIAGRAM_PREPARATION}",
+      "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
+      "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"],
+      "source_fence": "diagram raw codec parent 2f7db7e",
+      "record": "0362ul137 §2 drawingml-diagram-raw"
+    },
+    {
+      "id": "drawingml-text-media-raw",
+      "baseline_root": "${DRAWINGML_TEXT_MEDIA_BASELINE_ROOT}",
+      "baseline_revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+      "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "preparation_receipt": "${DRAWINGML_TEXT_MEDIA_PREPARATION}",
+      "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
+      "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"],
+      "source_fence": "text/media raw parent 2f7db7e",
+      "record": "0362ul137 §3 drawingml-text-media-raw"
+    },
+    {
+      "id": "drawingml-theme-ink",
+      "baseline_root": "${DRAWINGML_THEME_INK_BASELINE_ROOT}",
+      "baseline_revision": "996651b6b19717a0192dfd4144bccd367fb2ea44",
+      "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "preparation_receipt": "${DRAWINGML_THEME_INK_PREPARATION}",
+      "approved_baseline_revisions": ["996651b6b19717a0192dfd4144bccd367fb2ea44"],
+      "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"],
+      "raw_scope": "bulk",
+      "source_fence": "theme and InkML bulk raw parent 996651b6",
+      "record": "0362ul137 §4 drawingml-theme-ink"
+    },
+    {
+      "id": "drawingml-geometry-color-formatcode2-transform",
+      "baseline_root": "${DRAWINGML_GEOMETRY_BASELINE_ROOT}",
+      "baseline_revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
+      "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "preparation_receipt": "${DRAWINGML_GEOMETRY_PREPARATION}",
+      "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
+      "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"],
+      "source_fence": "geometry/color/formatcode2/transform parent 2f7db7e",
+      "record": "0362ul137 §5 drawingml-geometry-color-formatcode2-transform"
+    }
+  ],
+  "route_profiles": [
+    {
+      "id": "drawingml-theme-family-raw",
+      "lane": "drawingml-theme-ink",
+      "endpoint": "raw",
+      "raw_scope": "family",
+      "baseline_root": "${DRAWINGML_THEME_FAMILY_BASELINE_ROOT}",
+      "baseline_revision": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+      "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
+      "preparation_receipt": "${DRAWINGML_THEME_FAMILY_PREPARATION}",
+      "approved_baseline_revisions": ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
+      "baseline_features": ["drawingml-owner-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"],
+      "source_fence": "theme-family raw codec parent 11728db",
+      "record": "0362ul137 §6 theme-family raw"
+    }
+  ],
+  "owner_profiles": [
+    {
+      "id": "drawingml-chart-owner", "lane": "drawingml-chart-raw", "endpoint": "owner", "owner_route": "drawingml-chart",
+      "baseline_root": "${DRAWINGML_OWNER_CHART_BASELINE_ROOT}", "baseline_revision": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d", "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", "preparation_receipt": "${DRAWINGML_OWNER_CHART_PREPARATION}", "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"], "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"], "source_fence": "chart Package/Edit owner transition 945eb1d6", "record": "0362ul137 §7 chart owner"
+    },
+    {
+      "id": "drawingml-theme-family-owner", "lane": "drawingml-theme-ink", "endpoint": "owner", "owner_route": "drawingml-theme-family",
+      "baseline_root": "${DRAWINGML_OWNER_THEME_BASELINE_ROOT}", "baseline_revision": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d", "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", "preparation_receipt": "${DRAWINGML_OWNER_THEME_PREPARATION}", "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"], "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"], "source_fence": "theme-family Package/Edit owner transition 945eb1d6", "record": "0362ul137 §8 theme-family owner"
+    },
+    {
+      "id": "drawingml-ink-actions-owner", "lane": "drawingml-theme-ink", "endpoint": "owner", "owner_route": "drawingml-ink-actions",
+      "baseline_root": "${DRAWINGML_OWNER_INK_BASELINE_ROOT}", "baseline_revision": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d", "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", "preparation_receipt": "${DRAWINGML_OWNER_INK_PREPARATION}", "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"], "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"], "source_fence": "Ink actions owner transition 945eb1d6", "record": "0362ul137 §9 Ink actions owner"
+    },
+    {
+      "id": "drawingml-transform-owner", "lane": "drawingml-geometry-color-formatcode2-transform", "endpoint": "owner", "owner_route": "drawingml-transform",
+      "baseline_root": "${DRAWINGML_OWNER_TRANSFORM_BASELINE_ROOT}", "baseline_revision": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d", "perf_lock_sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", "preparation_receipt": "${DRAWINGML_OWNER_TRANSFORM_PREPARATION}", "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"], "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current", "drawingml-raw-current"], "source_fence": "transform Package/Edit owner transition 945eb1d6", "record": "0362ul137 §10 transform owner"
+    }
+  ],
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmups": 3,
+    "samples_per_leg": 20,
+    "blocks": 5,
+    "minimum_leg_ms": 150,
+    "target_leg_ms": 500,
+    "fresh_process_per_leg": true,
+    "normal_and_allocator_are_separate": true,
+    "fidelity_outside_timing": true
+  },
+  "claim_scope": "paired DrawingML raw and detached-owner endpoints only; current-source absolute profiles are controls, not qualification"
 }

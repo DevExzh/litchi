@@ -269,3 +269,13 @@ complete-part `add_family`/`replace_family`/`remove_family` calls under its
 typed limit policy. Owner routes never reuse a raw baseline.
 It never promotes an absolute current-source profile into a
 candidate-versus-baseline claim.
+
+The current-source policy is versioned separately in
+`drawingml_raw_paired_runner_v2.py` and `manifests/drawingml-raw-v2.json`.
+It imports `prepare_drawingml_raw_inputs_v2.py`, checks all three role locks,
+and passes the v2 preparation receipt through
+`drawingml_raw_validator_v2.py`; the v1 runner and receipts are never
+relabelled.  Its candidate binding is deliberately pending until the
+coordinator freezes the exact source commit, manifests, and vendor-tree
+digest.  The v2 compile adapter applies the same fail-closed identity rule to
+source-only compile receipts.
