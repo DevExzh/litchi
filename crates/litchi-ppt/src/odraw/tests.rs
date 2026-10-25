@@ -61,10 +61,62 @@ fn concatenated_drawing_roots_are_complete_and_strict() {
 
 #[test]
 fn source_limits_intersect_officeart_safety_ceiling() {
+    let dg = record(0, 0, RecordKind::Dg.raw(), &[0; 8]);
+    let drawing = record(0x0f, 0, RecordKind::DgContainer.raw(), &dg);
     let source = crate::SourceLimits::default();
     let limits = super::limits_for_source(source);
     assert_eq!(limits.max_depth, super::Limits::default().max_depth);
-    assert!(parse(&[], &limits).unwrap().is_empty());
+    assert!(parse(&drawing, &limits).unwrap().is_empty());
+
+    let restrictive_source = crate::SourceLimits::builder()
+        .max_record_bytes(1024)
+        .unwrap()
+        .max_events(16)
+        .unwrap()
+        .max_depth(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let restrictive = super::limits_for_source(restrictive_source);
+    assert_eq!(restrictive.max_record_bytes, 1024);
+    assert_eq!(restrictive.max_records, 16);
+    assert_eq!(restrictive.max_depth, 1);
+    assert!(parse(&drawing, &restrictive).unwrap().is_empty());
+
+    let spgr = record(0, 0, RecordKind::Spgr.raw(), &[0; 16]);
+    let group_header = |flags: u32| {
+        let mut shape_atom = Vec::new();
+        shape_atom.extend_from_slice(&1u32.to_le_bytes());
+        shape_atom.extend_from_slice(&flags.to_le_bytes());
+        let shape = record(2, 0, RecordKind::Sp.raw(), &shape_atom);
+        [spgr.as_slice(), shape.as_slice()].concat()
+    };
+    let inner_group_header = group_header(0x0001);
+    let inner_group = record(
+        0x0f,
+        0,
+        RecordKind::SpgrContainer.raw(),
+        &inner_group_header,
+    );
+    let outer_group_header = group_header(0x0005);
+    let outer_group_payload = [outer_group_header.as_slice(), inner_group.as_slice()].concat();
+    let outer_group = record(
+        0x0f,
+        0,
+        RecordKind::SpgrContainer.raw(),
+        &outer_group_payload,
+    );
+    let nested_drawing_payload = [dg.as_slice(), outer_group.as_slice()].concat();
+    let nested_drawing = record(
+        0x0f,
+        0,
+        RecordKind::DgContainer.raw(),
+        &nested_drawing_payload,
+    );
+    assert!(
+        parse(&nested_drawing, &restrictive).is_err(),
+        "a nested group beyond the caller's depth must remain rejected"
+    );
 }
 
 #[test]
