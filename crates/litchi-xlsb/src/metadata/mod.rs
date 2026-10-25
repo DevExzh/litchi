@@ -12,7 +12,7 @@
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
 //! unchanged value. A field no OOXML family stores is refused with
-//! [`Error::Unsupported`]; a changed edit of a signed workbook is refused
+//! [`Error::Refused`]; a changed edit of a signed workbook is refused
 //! with [`Error::Signed`]; an exact no-op keeps every byte.
 //!
 //! ```
@@ -159,7 +159,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.

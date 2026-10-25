@@ -10,7 +10,7 @@
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
 //! unchanged value. A field no OOXML family stores is refused with
-//! [`Error::Unsupported`]; a changed edit of a signed workbook is refused
+//! [`Error::Refused`]; a changed edit of a signed workbook is refused
 //! with [`Error::Signed`]; an exact no-op keeps every byte.
 //!
 //! ```
@@ -97,9 +97,10 @@ fn owner_family(
     let package_relationships = package.opc().rels();
     let (present_part_bytes, present_relationship_bytes) = match snapshot.part_name(family) {
         Some(part_name) => {
-            let part = package.opc().part_metadata(part_name).ok_or_else(|| {
-                Error::Invalid("metadata part disappeared during admission".to_owned())
-            })?;
+            let part = package
+                .opc()
+                .part_metadata(part_name)
+                .ok_or_else(|| Error::Internal("metadata part disappeared during admission"))?;
             let relationship = match snapshot.relationship_id_value(family) {
                 Some(relationship_id) => package_relationships.get(relationship_id),
                 None => package_relationships.iter().find(|relationship| {
@@ -109,9 +110,7 @@ fn owner_family(
                         })
                 }),
             }
-            .ok_or_else(|| {
-                Error::Invalid("metadata relationship disappeared during admission".to_owned())
-            })?;
+            .ok_or_else(|| Error::Internal("metadata relationship disappeared during admission"))?;
             (
                 Some(retained_part_metadata_bytes(part)),
                 Some(retained_relationship_bytes(relationship)),
@@ -128,7 +127,7 @@ fn owner_family(
         Family::Core => litchi_opc::constants::relationship_type::CORE_PROPERTIES,
         Family::App => litchi_opc::constants::relationship_type::EXTENDED_PROPERTIES,
         Family::Custom => litchi_opc::constants::relationship_type::CUSTOM_PROPERTIES,
-        _ => return Err(Error::Invalid("unknown OOXML metadata family".to_owned())),
+        _ => return Err(Error::Internal("unknown OOXML metadata family")),
     };
     let created_relationship_base_bytes = size_of::<Relationship>()
         .saturating_add(relationship_type.len())
@@ -282,7 +281,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.

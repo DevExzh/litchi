@@ -14,7 +14,7 @@
 //!
 //! The transaction is the shared OOXML engine's
 //! ([`litchi_ooxml_common::properties`]), so field routing, lexical
-//! preservation, refusals ([`Error::Unsupported`], [`Error::Signed`]) and
+//! preservation, refusals ([`Error::Refused`], [`Error::Signed`]) and
 //! the exact no-op contract are those of [`super::Edit`].
 //!
 //! ```
@@ -184,7 +184,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, [`Error::Signed`] for a changed edit of a signed
     /// workbook, and the source-change and topology errors of the planner.

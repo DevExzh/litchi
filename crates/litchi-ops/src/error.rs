@@ -1388,17 +1388,26 @@ impl Classify for litchi_docx::metadata::Error {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::PatchConflict => Class::of(Code::InvalidInput),
             // Application and custom properties (record 0342).
-            Self::Properties(error) => Class::of(match error {
-                litchi_ooxml_common::properties::Error::Unsupported { .. } => {
-                    Code::UnsupportedProperty
+            Self::Properties(error) => match error {
+                litchi_ooxml_common::properties::Error::Refused(refusal) => refusal.classify(),
+                litchi_ooxml_common::properties::Error::Invalid(_) => Class::of(Code::InvalidValue),
+                litchi_ooxml_common::properties::Error::Limit { .. } => {
+                    Class::of(Code::LimitExceeded)
                 },
-                litchi_ooxml_common::properties::Error::Invalid(_) => Code::InvalidValue,
-                litchi_ooxml_common::properties::Error::Limit { .. } => Code::LimitExceeded,
-                litchi_ooxml_common::properties::Error::Signed => Code::DocumentProtected,
-                litchi_ooxml_common::properties::Error::PatchConflict => Code::InvalidInput,
-                litchi_ooxml_common::properties::Error::Internal(_) => Code::InternalError,
-                _ => Code::CorruptFile,
-            }),
+                litchi_ooxml_common::properties::Error::Signed => {
+                    Class::of(Code::DocumentProtected)
+                },
+                litchi_ooxml_common::properties::Error::PatchConflict => {
+                    Class::of(Code::InvalidInput)
+                },
+                litchi_ooxml_common::properties::Error::SourceChanged { .. } => {
+                    Class::of(Code::IoError)
+                },
+                litchi_ooxml_common::properties::Error::Internal(_) => {
+                    Class::of(Code::InternalError)
+                },
+                _ => Class::of(Code::CorruptFile),
+            },
             _ => Class::of(Code::InternalError),
         }
     }

@@ -7,7 +7,7 @@
 use litchi_core::metadata::{Field, Metadata, Timestamp};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, TargetMode};
 
 use super::{Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
@@ -90,6 +90,20 @@ fn core_only_staging_preserves_application_properties() {
 }
 
 #[test]
+fn core_only_staging_refuses_application_fields_as_properties() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    assert!(matches!(
+        edit.set_core_metadata(Metadata {
+            company: Some("not core".to_owned()),
+            ..Metadata::default()
+        }),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
+    ));
+}
+
+#[test]
 fn setting_empty_custom_properties_preserves_an_existing_empty_part() {
     const EMPTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"></Properties>"#;
     let mut package = full();
@@ -157,6 +171,48 @@ fn explicit_custom_removal_keeps_dirty_raw_graphs_removable() {
             .get_part(&PackURI::new("/docProps/custom.xml").unwrap())
             .is_err()
     );
+}
+
+#[test]
+fn rewriting_tolerated_custom_content_is_a_typed_refusal() {
+    const DIRTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="Keep"><vt:lpwstr>value</vt:lpwstr></property><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="3" name="Skip"><vt:date>2026-01-01</vt:date></property></Properties>"#;
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
+        .unwrap()
+        .set_blob(DIRTY_CUSTOM.to_vec());
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    let mut target = plan.custom_props().clone();
+    target.insert("Keep", "changed").unwrap();
+    plan.set_custom_props(target);
+    assert!(matches!(
+        plan.finish(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+}
+
+#[test]
+fn shared_metadata_removal_is_a_typed_refusal() {
+    let mut package = full();
+    package
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "docProps/custom.xml".to_owned(),
+            "rIdExtra".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    plan.remove_custom_props();
+    assert!(matches!(
+        plan.finish(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
 }
 
 #[test]
@@ -759,17 +815,79 @@ fn fields_no_family_stores_are_refused_not_dropped() {
             metadata.last_backup = Some(Timestamp::parse("2024-01-01T00:00:00").unwrap());
         }),
     ];
-    for (field, update) in updates {
+    for (_field, update) in updates {
         let mut plan = snapshot.plan();
         plan.update_metadata(update).unwrap();
-        assert!(
-            matches!(plan.finish(), Err(Error::Unsupported { field: refused }) if refused == field)
-        );
+        assert!(matches!(
+            plan.finish(),
+            Err(Error::Refused(refusal))
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
+        ));
     }
     let mut plan = snapshot.plan();
     plan.update_metadata(|metadata| metadata.page_count = Some(u32::MAX))
         .unwrap();
     assert!(matches!(plan.finish(), Err(Error::Invalid(_))));
+}
+
+#[test]
+fn metadata_refusals_are_typed_and_content_free() {
+    let snapshot = Snapshot::read(&full(), Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    plan.update_metadata(|metadata| {
+        metadata.content_type = Some("authored/type".into());
+    })
+    .unwrap();
+    let Error::Refused(refusal) = plan.finish().unwrap_err() else {
+        panic!("unsupported metadata fields must be typed refusals");
+    };
+    assert_eq!(
+        refusal.kind(),
+        litchi_core::edit::RefusalKind::UnsupportedProperty
+    );
+    assert_eq!(refusal.operation(), "set_metadata");
+    assert!(!refusal.reason().contains("contentType"));
+}
+
+#[test]
+fn nested_opc_source_changes_are_promoted() {
+    let expected = litchi_core::SourceVersion::new(7, 11);
+    let observed = litchi_core::SourceVersion::new(7, 12);
+    let error = Error::from(OpcError::IncompleteOutput {
+        written: 1,
+        source: Box::new(OpcError::SourceChanged {
+            expected,
+            actual: observed,
+        }),
+    });
+    assert!(matches!(
+        error,
+        Error::SourceChanged {
+            expected: got_expected,
+            observed: got_observed,
+        } if got_expected == expected && got_observed == observed
+    ));
+}
+
+#[test]
+fn malformed_source_property_xml_is_package_corruption() {
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<cp:coreProperties xmlns:cp=\"broken\">".to_vec());
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(_))
+    ));
+
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/app.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<Properties>".to_vec());
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(matches!(snapshot.metadata(), Err(Error::Package(_))));
 }
 
 #[test]

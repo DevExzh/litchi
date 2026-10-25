@@ -342,6 +342,25 @@ fn ensure_core_only(metadata: &Metadata) -> Result<()> {
     }
 }
 
+/// Refuse a core-only semantic transaction carrying an application field.
+fn ensure_core_only_transaction(
+    metadata: &Metadata,
+) -> std::result::Result<(), transaction::Error> {
+    match Field::ALL
+        .into_iter()
+        .find(|field| metadata.is_set(*field) && !CORE_FIELDS.contains(field))
+    {
+        Some(_) => Err(transaction::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedProperty,
+                "set_core_metadata",
+                "the OOXML metadata route does not support this property",
+            ),
+        )),
+        None => Ok(()),
+    }
+}
+
 /// Read the relationship-selected core properties of an OOXML package,
 /// appending every reference-compatible repair to `report`.
 ///
@@ -602,9 +621,8 @@ mod tests {
         let error = edit.commit().unwrap_err();
         assert!(matches!(
             error,
-            Error::Unsupported {
-                field: Field::ContentType
-            }
+            Error::Refused(refusal)
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
         ));
         assert!(
             read_with_report(&package, &mut ToleranceReport::default())

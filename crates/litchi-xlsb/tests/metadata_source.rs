@@ -260,7 +260,11 @@ fn unsupported_fields_are_refused_and_change_nothing() {
     let mut edit = workbook.edit_metadata().unwrap();
     edit.update(|metadata| metadata.content_type = Some("text/plain".to_owned()))
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::Unsupported { .. })));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
+    ));
     assert_eq!(published(&workbook), bytes);
 }
 

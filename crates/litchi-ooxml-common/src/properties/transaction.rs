@@ -26,7 +26,7 @@
 //! Each [`Metadata`] field lands in the family that stores it
 //! ([`super::CORE_FIELDS`], [`super::app::METADATA_FIELDS`]); changing a
 //! field no OOXML family stores (`content_type`, `last_backup`, `codepage`)
-//! is refused with [`Error::Unsupported`], never dropped. A field left
+//! is refused with [`Error::Refused`], never dropped. A field left
 //! unchanged keeps its exact lexical form, and an exact no-op commits an
 //! empty patch that publishes the package unchanged, a signed one included.
 //! A changed patch refuses a signed package ([`Error::Signed`], ADR 0006).
@@ -37,6 +37,7 @@ use std::collections::BTreeSet;
 use std::mem::size_of;
 use std::sync::Arc;
 
+use litchi_core::edit::{Refusal, RefusalKind};
 use litchi_core::metadata::{Field, Metadata};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -155,12 +156,10 @@ impl EditOptions {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// The field cannot be stored by any OOXML property family.
-    #[error("OOXML packages cannot store the metadata field `{field}`")]
-    Unsupported {
-        /// The refused field.
-        field: Field,
-    },
+    /// A well-formed metadata request or source topology cannot be carried by
+    /// this lossless route.
+    #[error(transparent)]
+    Refused(Refusal),
     /// A value violates its family's lexical or structural rules, or a part
     /// holds content its writer cannot carry.
     #[error("invalid OOXML metadata: {0}")]
@@ -181,11 +180,21 @@ pub enum Error {
     /// A patch or staged composition does not match the recipient base.
     #[error("OOXML metadata patch base does not match the recipient")]
     PatchConflict,
+    /// The retained positional source changed while a source-backed property
+    /// operation was reading or authenticating it.
+    #[error("OOXML metadata source changed")]
+    SourceChanged {
+        /// The source version captured at open.
+        expected: litchi_core::SourceVersion,
+        /// The source version observed during the operation.
+        observed: litchi_core::SourceVersion,
+    },
     /// The transaction found an invariant that its own validation should have
     /// guaranteed.
     #[error("OOXML metadata transaction invariant failed: {0}")]
     Internal(&'static str),
-    /// Another package, graph or XML failure.
+    /// Another package, graph or XML failure. A nested source change is
+    /// promoted to [`Error::SourceChanged`] before it reaches this wrapper.
     #[error(transparent)]
     Package(crate::Error),
 }
@@ -194,6 +203,10 @@ impl From<crate::Error> for Error {
     fn from(error: crate::Error) -> Self {
         match error {
             crate::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy) => Self::Signed,
+            crate::Error::Opc(error) => match source_changed(&error) {
+                Some((expected, observed)) => Self::SourceChanged { expected, observed },
+                None => Self::Package(crate::Error::Opc(error)),
+            },
             crate::Error::Invalid(message) => Self::Invalid(message),
             crate::Error::Limit {
                 kind: resource,
@@ -236,6 +249,61 @@ impl From<OpcError> for Error {
     fn from(error: OpcError) -> Self {
         Self::from(crate::Error::Opc(error))
     }
+}
+
+/// Preserve malformed source XML and metadata graphs as package corruption;
+/// authored codec failures use [`From<crate::Error>`] and remain invalid
+/// values. A source change still gets its typed freshness error.
+fn source_error(error: crate::Error) -> Error {
+    match error {
+        error @ crate::Error::Invalid(_) => Error::Package(error),
+        other => Error::from(other),
+    }
+}
+
+/// Preserve a malformed source graph discovered by a local transaction
+/// helper as package corruption.  The local `Invalid` variant is also used
+/// for authored value validation, so only callers that have just inspected
+/// retained source state use this conversion.
+fn source_local_error(error: Error) -> Error {
+    match error {
+        Error::Invalid(message) => Error::Package(crate::Error::Invalid(message)),
+        other => other,
+    }
+}
+
+fn source_changed(
+    error: &OpcError,
+) -> Option<(litchi_core::SourceVersion, litchi_core::SourceVersion)> {
+    match error {
+        OpcError::SourceChanged { expected, actual } => Some((*expected, *actual)),
+        OpcError::IncompleteOutput { source, .. } => source_changed(source),
+        _ => None,
+    }
+}
+
+fn unsupported_property() -> Error {
+    Error::Refused(Refusal::new(
+        RefusalKind::UnsupportedProperty,
+        "set_metadata",
+        "the OOXML metadata route does not support this property",
+    ))
+}
+
+fn unsupported_custom_content() -> Error {
+    Error::Refused(Refusal::new(
+        RefusalKind::UnsupportedContent,
+        "set_custom_props",
+        "rewriting unsupported custom-property content is refused",
+    ))
+}
+
+fn shared_family_removal() -> Error {
+    Error::Refused(Refusal::new(
+        RefusalKind::UnsupportedContent,
+        "remove_metadata",
+        "removing a shared OOXML metadata part is refused",
+    ))
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -341,13 +409,13 @@ impl Snapshot {
     /// target of another content type), and the read errors of the core and
     /// custom parts.
     pub fn read(package: &OpcPackage, host: Host) -> Result<Self> {
-        let core_graph = graph::inspect(package)?;
-        let app_graph = app::inspect(package)?;
-        let custom_graph = custom::inspect_graph(package)?;
+        let core_graph = graph::inspect(package).map_err(source_error)?;
+        let app_graph = app::inspect(package).map_err(source_error)?;
+        let custom_graph = custom::inspect_graph(package).map_err(source_error)?;
         let bytes = |part: &PackURI| -> Result<Arc<Vec<u8>>> {
             Ok(package
                 .get_part(part)
-                .map_err(crate::Error::from)?
+                .map_err(|error| source_error(crate::Error::Opc(error)))?
                 .blob_arc())
         };
         Self::capture(
@@ -377,11 +445,15 @@ impl Snapshot {
     /// error.
     pub fn read_source_backed(package: &SourceBackedPackage, host: Host) -> Result<Self> {
         package.check_execution()?;
-        let core_graph = graph::inspect_source_strict(package)?;
-        let app_graph = app::inspect_source(package)?;
-        let custom_graph = custom::inspect_source_graph(package)?;
+        let core_graph = graph::inspect_source_strict(package).map_err(source_error)?;
+        let app_graph = app::inspect_source(package).map_err(source_error)?;
+        let custom_graph = custom::inspect_source_graph(package).map_err(source_error)?;
         let bytes = |part: &PackURI| -> Result<Arc<Vec<u8>>> {
-            let data = package.part(part)?.data()?;
+            let data = package
+                .part(part)
+                .map_err(|error| source_error(crate::Error::Opc(error)))?
+                .data()
+                .map_err(|error| source_error(crate::Error::Opc(error)))?;
             package.check_execution()?;
             Ok(Arc::new(data.as_bytes().to_vec()))
         };
@@ -414,9 +486,12 @@ impl Snapshot {
             app: (app_part, app_id),
             custom: (custom_part, custom_id),
         } = graphs;
-        let core = family_state(package, Family::Core, core_part, core_id, &bytes)?;
-        let app = family_state(package, Family::App, app_part, app_id, &bytes)?;
-        let custom = family_state(package, Family::Custom, custom_part, custom_id, &bytes)?;
+        let core = family_state(package, Family::Core, core_part, core_id, &bytes)
+            .map_err(source_local_error)?;
+        let app = family_state(package, Family::App, app_part, app_id, &bytes)
+            .map_err(source_local_error)?;
+        let custom = family_state(package, Family::Custom, custom_part, custom_id, &bytes)
+            .map_err(source_local_error)?;
         let mut core_report = ToleranceReport::default();
         let core_value = core
             .present
@@ -429,9 +504,11 @@ impl Snapshot {
                     &mut core_report,
                 )
             })
-            .transpose()?;
+            .transpose()
+            .map_err(source_error)?;
         let custom_value = match &custom.present {
-            Some(present) => custom::Props::decode_for(&present.bytes, &present.part, host)?,
+            Some(present) => custom::Props::decode_for(&present.bytes, &present.part, host)
+                .map_err(source_error)?,
             None => custom::Props::new(),
         };
         let relationship_ids = package
@@ -500,7 +577,7 @@ impl Snapshot {
             .app
             .present
             .as_ref()
-            .map(|present| app::decode(&present.bytes))
+            .map(|present| app::decode(&present.bytes).map_err(source_error))
             .transpose()?)
     }
 
@@ -906,11 +983,9 @@ impl OwnerAdmission {
         } else {
             self.source_bytes
                 .checked_sub(self.source_archive_bytes)
-                .ok_or_else(|| {
-                    Error::Invalid(
-                        "metadata target endpoint underflowed its source archive".to_owned(),
-                    )
-                })?
+                .ok_or(Error::Internal(
+                    "metadata owner admission endpoint underflow",
+                ))?
         };
         for change in prepared.planned_changes.iter().flatten() {
             let family = self.family(change.family);
@@ -918,40 +993,38 @@ impl OwnerAdmission {
                 (Some(before), Some(after)) => target
                     .checked_sub(before)
                     .and_then(|value| value.checked_add(after))
-                    .ok_or_else(|| {
-                        Error::Invalid(
-                            "metadata replacement endpoint accounting overflowed".to_owned(),
-                        )
-                    })?,
+                    .ok_or(Error::Internal(
+                        "metadata owner admission replacement accounting overflow",
+                    ))?,
                 (Some(before), None) => {
                     let part_bytes = family.present_part_bytes.ok_or_else(|| {
-                        Error::Invalid("metadata removal part disappeared".to_owned())
+                        Error::Internal("metadata owner admission removal part missing")
                     })?;
                     let relationship_bytes =
                         family.present_relationship_bytes.ok_or_else(|| {
-                            Error::Invalid("metadata removal relationship disappeared".to_owned())
+                            Error::Internal("metadata owner admission removal relationship missing")
                         })?;
-                    target
-                        .checked_sub(
-                            part_bytes
-                                .saturating_add(before)
-                                .saturating_add(relationship_bytes),
-                        )
-                        .ok_or_else(|| {
-                            Error::Invalid("metadata removal endpoint underflowed".to_owned())
-                        })?
+                    let removed = part_bytes
+                        .checked_add(before)
+                        .and_then(|value| value.checked_add(relationship_bytes))
+                        .ok_or(Error::Internal(
+                            "metadata owner admission removal accounting overflow",
+                        ))?;
+                    target.checked_sub(removed).ok_or(Error::Internal(
+                        "metadata owner admission endpoint underflow",
+                    ))?
                 },
                 (None, Some(after)) => target
                     .checked_add(family.created_part_bytes)
                     .and_then(|value| value.checked_add(after))
                     .and_then(|value| value.checked_add(family.created_relationship_base_bytes))
                     .and_then(|value| value.checked_add(change.relationship_id.len()))
-                    .ok_or_else(|| {
-                        Error::Invalid("metadata creation endpoint overflowed".to_owned())
-                    })?,
+                    .ok_or(Error::Internal(
+                        "metadata owner admission creation accounting overflow",
+                    ))?,
                 (None, None) => {
-                    return Err(Error::Invalid(
-                        "metadata admission carried an empty topology change".to_owned(),
+                    return Err(Error::Internal(
+                        "metadata owner admission carried an empty topology change",
                     ));
                 },
             };
@@ -960,9 +1033,9 @@ impl OwnerAdmission {
             .source_bytes
             .checked_add(target)
             .and_then(|value| value.checked_add(prepared.planned_retained_bytes))
-            .ok_or_else(|| {
-                Error::Invalid("metadata retained-byte accounting overflowed".to_owned())
-            })?;
+            .ok_or(Error::Internal(
+                "metadata owner admission retained-byte accounting overflow",
+            ))?;
         if observed > maximum {
             return Err(Error::Limit {
                 kind: LimitKind::RetainedBytes,
@@ -1014,7 +1087,7 @@ impl Plan {
     /// family is edited separately from application and custom properties.
     /// Non-core fields are rejected instead of being silently discarded.
     pub fn set_core_metadata(&mut self, metadata: Metadata) -> Result<&mut Self> {
-        super::ensure_core_only(&metadata)?;
+        super::ensure_core_only_transaction(&metadata)?;
         let mut target = self.metadata()?;
         merge_core_metadata(&mut target, &metadata);
         self.metadata = Some(target);
@@ -1130,7 +1203,7 @@ impl Plan {
                         .copied()
                         .find(|field| !app::METADATA_FIELDS.contains(field))
                     {
-                        return Err(Error::Unsupported { field });
+                        return Err(unsupported_property());
                     }
                     let app_changed = changed_fields
                         .iter()
@@ -1156,7 +1229,7 @@ impl Plan {
                     if let Some(field) = changed_fields.iter().copied().find(|field| {
                         !CORE_FIELDS.contains(field) && !app::METADATA_FIELDS.contains(field)
                     }) {
-                        return Err(Error::Unsupported { field });
+                        return Err(unsupported_property());
                     }
                     let core_changed = changed_fields
                         .iter()
@@ -1189,14 +1262,16 @@ impl Plan {
                 let (current, dialect) = match &base.core.present {
                     Some(present) => {
                         let xml = std::str::from_utf8(&present.bytes).map_err(|error| {
-                            Error::Invalid(format!("invalid UTF-8 in core properties: {error}"))
+                            Error::Package(crate::Error::Invalid(format!(
+                                "invalid UTF-8 in core properties: {error}"
+                            )))
                         })?;
-                        let (current, dialect) = read::decode(xml)?;
+                        let (current, dialect) = read::decode(xml).map_err(source_error)?;
                         if Some(dialect) != base.core_dialect {
-                            return Err(Error::Invalid(
-                            "core-properties XML namespace does not match its relationship dialect"
-                                .to_owned(),
-                        ));
+                            return Err(Error::Package(crate::Error::Invalid(
+                                "core-properties XML namespace does not match its relationship dialect"
+                                    .to_owned(),
+                            )));
                         }
                         (current, dialect)
                     },
@@ -1254,10 +1329,7 @@ impl Plan {
                     target.validate_for(base.host)?;
                 }
                 if !remove_custom && !base.custom_value.tolerance_report().is_clean() {
-                    return Err(Error::Invalid(
-                        "the custom properties were repaired when they were read; rewriting them would drop the properties that were skipped"
-                            .to_owned(),
-                    ));
+                    return Err(unsupported_custom_content());
                 }
                 let after_len = (!remove_custom && !target.is_empty())
                     .then(|| custom::encoded_len(&target))
@@ -1273,14 +1345,18 @@ impl Plan {
         if let Some(core) = &core {
             let (bytes, change) =
                 planned_change_bytes(&base, Family::Core, core.after_len, &mut relationship_ids)?;
-            retained_changes = retained_changes.saturating_add(bytes);
+            retained_changes = retained_changes.checked_add(bytes).ok_or(Error::Internal(
+                "metadata prepared retained-byte accounting overflow",
+            ))?;
             planned_changes[family_index(Family::Core)] = Some(change);
             changed = true;
         }
         if let Some(app) = &app {
             let (bytes, change) =
                 planned_change_bytes(&base, Family::App, app.after_len, &mut relationship_ids)?;
-            retained_changes = retained_changes.saturating_add(bytes);
+            retained_changes = retained_changes.checked_add(bytes).ok_or(Error::Internal(
+                "metadata prepared retained-byte accounting overflow",
+            ))?;
             planned_changes[family_index(Family::App)] = Some(change);
             changed = true;
         }
@@ -1291,15 +1367,28 @@ impl Plan {
                 custom.after_len,
                 &mut relationship_ids,
             )?;
-            retained_changes = retained_changes.saturating_add(bytes);
+            retained_changes = retained_changes.checked_add(bytes).ok_or(Error::Internal(
+                "metadata prepared retained-byte accounting overflow",
+            ))?;
             planned_changes[family_index(Family::Custom)] = Some(change);
             changed = true;
         }
         let planned_retained_bytes = if changed {
-            size_of::<Patch>().saturating_add(retained_changes)
+            size_of::<Patch>()
+                .checked_add(retained_changes)
+                .ok_or(Error::Internal(
+                    "metadata prepared retained-byte accounting overflow",
+                ))?
         } else {
             let scope = planned_scope_bytes(&base)?;
-            size_of::<Patch>().saturating_add(scope.saturating_mul(2))
+            let scope = scope.checked_mul(2).ok_or(Error::Internal(
+                "metadata prepared scope accounting overflow",
+            ))?;
+            size_of::<Patch>()
+                .checked_add(scope)
+                .ok_or(Error::Internal(
+                    "metadata prepared retained-byte accounting overflow",
+                ))?
         };
         Ok(PreparedPlan {
             base,
@@ -1318,11 +1407,13 @@ impl Plan {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a changed field no OOXML family
-    /// stores; [`Error::Invalid`] for a core or custom part that holds
-    /// content its writer cannot carry, a value outside its lexical space,
-    /// or removing a part another relationship targets; and
-    /// [`Error::Limit`] for an exceeded bound.
+    /// Returns [`Error::Refused`] for a changed field no OOXML family stores
+    /// or content that this lossless route cannot carry; [`Error::Invalid`]
+    /// for a core or custom part that holds content its writer cannot carry
+    /// or a value outside its lexical space; [`Error::Internal`] for a
+    /// violated prepared-plan or admission invariant; [`Error::Limit`] for
+    /// an exceeded bound; and [`Error::SourceChanged`] for source-backed
+    /// freshness failure.
     pub fn finish(self) -> Result<(Snapshot, Patch, Diagnostics)> {
         let maximum = self.options.max_retained_bytes_value();
         let owner = self.options.owner;
@@ -1339,7 +1430,8 @@ fn retained_string(value: &str) -> String {
 }
 
 fn exact_part(part: &PackURI) -> Result<PackURI> {
-    PackURI::new(retained_string(part.as_str())).map_err(Error::Invalid)
+    PackURI::new(retained_string(part.as_str()))
+        .map_err(|_| Error::Internal("retained metadata part URI became invalid"))
 }
 
 #[derive(Debug, Clone)]
@@ -1449,8 +1541,8 @@ impl PreparedPlan {
                 ),
                 (None, None) => (None, None),
                 _ => {
-                    return Err(Error::Invalid(
-                        "core-properties prepared target and length disagree".to_owned(),
+                    return Err(Error::Internal(
+                        "core-properties prepared target and length disagree",
                     ));
                 },
             };
@@ -1475,13 +1567,13 @@ impl PreparedPlan {
                     &present.bytes,
                     props,
                     app.plan.ok_or_else(|| {
-                        Error::Invalid("missing prepared application-properties layout".to_owned())
+                        Error::Internal("missing prepared application-properties layout")
                     })?,
                 )?),
                 (None, Some(props)) => Some(app::encode_new_preflighted(
                     props,
                     app.after_len.ok_or_else(|| {
-                        Error::Invalid("missing prepared application-properties length".to_owned())
+                        Error::Internal("missing prepared application-properties length")
                     })?,
                 )?),
                 (_, None) => None,
@@ -1499,7 +1591,7 @@ impl PreparedPlan {
                 Some(custom::encode_preflighted(
                     &custom.target,
                     custom.after_len.ok_or_else(|| {
-                        Error::Invalid("missing prepared custom-properties length".to_owned())
+                        Error::Internal("missing prepared custom-properties length")
                     })?,
                 )?)
             };
@@ -1564,8 +1656,8 @@ fn stage_prepared_change(
     }
     match (state.present, prepared.before_len, is_removal, bytes) {
         (Some(present), Some(_), true, None) => {
-            if let Some(reason) = state.shared_by {
-                return Err(Error::Invalid(reason));
+            if state.shared_by.is_some() {
+                return Err(shared_family_removal());
             }
             after.relationship_ids.remove(&prepared.relationship_id);
             let slot = after.family_mut(family);
@@ -1687,12 +1779,15 @@ fn planned_change_bytes(
         after_len,
     };
     let bytes = size_of::<Change>()
-        .saturating_add(change.part.as_str().len())
-        .saturating_add(change.relationship_id.capacity())
-        .saturating_add(change.relationship_type.capacity())
-        .saturating_add(change.relationship_target.capacity())
-        .saturating_add(change.before_len.unwrap_or(0))
-        .saturating_add(change.after_len.unwrap_or(0));
+        .checked_add(change.part.as_str().len())
+        .and_then(|value| value.checked_add(change.relationship_id.capacity()))
+        .and_then(|value| value.checked_add(change.relationship_type.capacity()))
+        .and_then(|value| value.checked_add(change.relationship_target.capacity()))
+        .and_then(|value| value.checked_add(change.before_len.unwrap_or(0)))
+        .and_then(|value| value.checked_add(change.after_len.unwrap_or(0)))
+        .ok_or(Error::Internal(
+            "metadata planned-change accounting overflow",
+        ))?;
     Ok((bytes, change))
 }
 
@@ -1703,11 +1798,26 @@ fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
         let state = snapshot.family(family);
         let bytes = match &state.present {
             Some(present) => size_of::<Change>()
-                .saturating_add(present.part.as_str().len())
-                .saturating_add(retained_string(&present.relationship_id).capacity())
-                .saturating_add(retained_string(&present.relationship_type).capacity())
-                .saturating_add(retained_string(&present.relationship_target).capacity())
-                .saturating_add(present.bytes.capacity().saturating_mul(2)),
+                .checked_add(present.part.as_str().len())
+                .and_then(|value| {
+                    value.checked_add(retained_string(&present.relationship_id).capacity())
+                })
+                .and_then(|value| {
+                    value.checked_add(retained_string(&present.relationship_type).capacity())
+                })
+                .and_then(|value| {
+                    value.checked_add(retained_string(&present.relationship_target).capacity())
+                })
+                .and_then(|value| {
+                    present
+                        .bytes
+                        .capacity()
+                        .checked_mul(2)
+                        .and_then(|bytes| value.checked_add(bytes))
+                })
+                .ok_or(Error::Internal(
+                    "metadata planned-scope accounting overflow",
+                ))?,
             None => {
                 let relationship_id = retained_string(&next_relationship_id(&relationship_ids)?);
                 relationship_ids.insert(relationship_id.clone());
@@ -1719,13 +1829,18 @@ fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
                 let relationship_target =
                     retained_string(state.new_part.as_str().trim_start_matches('/'));
                 size_of::<Change>()
-                    .saturating_add(state.new_part.as_str().len())
-                    .saturating_add(relationship_id.capacity())
-                    .saturating_add(relationship_type.capacity())
-                    .saturating_add(relationship_target.capacity())
+                    .checked_add(state.new_part.as_str().len())
+                    .and_then(|value| value.checked_add(relationship_id.capacity()))
+                    .and_then(|value| value.checked_add(relationship_type.capacity()))
+                    .and_then(|value| value.checked_add(relationship_target.capacity()))
+                    .ok_or(Error::Internal(
+                        "metadata planned-scope accounting overflow",
+                    ))?
             },
         };
-        total = total.saturating_add(bytes);
+        total = total.checked_add(bytes).ok_or(Error::Internal(
+            "metadata planned-scope accounting overflow",
+        ))?;
     }
     Ok(total)
 }
@@ -1893,11 +2008,13 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a changed field no OOXML family
-    /// stores; [`Error::Invalid`] for a core or custom part that holds
-    /// content its writer cannot carry, a value outside its lexical space,
-    /// or removing a part another relationship targets; [`Error::Limit`]
-    /// for an exceeded bound; and [`Error::Signed`] for a changed edit of a
+    /// Returns [`Error::Refused`] for a changed field no OOXML family stores
+    /// or content that this lossless route cannot carry; [`Error::Invalid`]
+    /// for a core or custom part that holds content its writer cannot carry
+    /// or a value outside its lexical space; [`Error::Internal`] for a
+    /// violated prepared-plan or admission invariant; [`Error::Limit`] for
+    /// an exceeded bound; [`Error::SourceChanged`] for source-backed
+    /// freshness failure; and [`Error::Signed`] for a changed edit of a
     /// signed package.
     pub fn commit(self) -> Result<Commit> {
         let (_, patch, diagnostics) = self.plan.finish()?;
@@ -2109,7 +2226,7 @@ impl Patch {
                 Some(part) => Some(
                     package
                         .get_part(part)
-                        .map_err(crate::Error::from)?
+                        .map_err(|error| source_error(crate::Error::Opc(error)))?
                         .blob_arc(),
                 ),
                 None => None,
@@ -2130,7 +2247,7 @@ impl Patch {
                     Some(part) => Some(
                         package
                             .get_part(part)
-                            .map_err(crate::Error::from)?
+                            .map_err(|error| source_error(crate::Error::Opc(error)))?
                             .blob_arc(),
                     ),
                     None => None,
@@ -2310,7 +2427,13 @@ impl Patch {
         for change in self.check_changes() {
             let graph = source_graph(package, change.family)?;
             let bytes = match &graph.0 {
-                Some(part) => Some(package.part(part)?.data()?),
+                Some(part) => Some(
+                    package
+                        .part(part)
+                        .map_err(|error| source_error(crate::Error::Opc(error)))?
+                        .data()
+                        .map_err(|error| source_error(crate::Error::Opc(error)))?,
+                ),
                 None => None,
             };
             check_change(
@@ -2324,7 +2447,13 @@ impl Patch {
             for change in &self.changes {
                 let graph = source_graph(package, change.family)?;
                 let bytes = match &graph.0 {
-                    Some(part) => Some(package.part(part)?.data()?),
+                    Some(part) => Some(
+                        package
+                            .part(part)
+                            .map_err(|error| source_error(crate::Error::Opc(error)))?
+                            .data()
+                            .map_err(|error| source_error(crate::Error::Opc(error)))?,
+                    ),
                     None => None,
                 };
                 check_change(
@@ -2362,7 +2491,8 @@ impl Patch {
             if package.has_signature_infrastructure() {
                 return Err(Error::Signed);
             }
-            let root = PackURI::new("/").map_err(Error::Invalid)?;
+            let root = PackURI::new("/")
+                .map_err(|_| Error::Internal("the OPC package root URI became invalid"))?;
             for change in &self.changes {
                 match (&change.before, &change.after) {
                     (Some(_), Some(after)) => {
@@ -2546,15 +2676,15 @@ fn source_graph(
 ) -> Result<(Option<PackURI>, Option<String>)> {
     Ok(match family {
         Family::Core => {
-            let graph = graph::inspect_source_strict(package)?;
+            let graph = graph::inspect_source_strict(package).map_err(source_error)?;
             (graph.part, graph.relationship_id)
         },
         Family::App => {
-            let graph = app::inspect_source(package)?;
+            let graph = app::inspect_source(package).map_err(source_error)?;
             (graph.part, graph.relationship_id)
         },
         Family::Custom => {
-            let graph = custom::inspect_source_graph(package)?;
+            let graph = custom::inspect_source_graph(package).map_err(source_error)?;
             (graph.part_name, graph.relationship_id)
         },
     })
@@ -2565,15 +2695,15 @@ fn source_graph(
 fn owning_graph(package: &OpcPackage, family: Family) -> Result<(Option<PackURI>, Option<String>)> {
     Ok(match family {
         Family::Core => {
-            let graph = graph::inspect(package)?;
+            let graph = graph::inspect(package).map_err(source_error)?;
             (graph.part, graph.relationship_id)
         },
         Family::App => {
-            let graph = app::inspect(package)?;
+            let graph = app::inspect(package).map_err(source_error)?;
             (graph.part, graph.relationship_id)
         },
         Family::Custom => {
-            let graph = custom::inspect_graph(package)?;
+            let graph = custom::inspect_graph(package).map_err(source_error)?;
             (graph.part_name, graph.relationship_id)
         },
     })
@@ -2611,7 +2741,8 @@ fn check_change<P: PackageMetadata>(
                     &change.part,
                     &change.relationship_id,
                     change.family.label(),
-                )?;
+                )
+                .map_err(source_error)?;
             }
         },
         None => {

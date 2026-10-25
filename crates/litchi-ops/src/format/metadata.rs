@@ -9,8 +9,9 @@
 //! (record 0254; matched ASCII case-insensitively), plus `custom.<name>` for
 //! custom properties. `null` removes a property. `keywords` takes a list,
 //! or text split at `;` and `,` (record 0354). A key no OOXML part stores
-//! (`contentType`) is refused by the leaf with a typed error naming the
-//! field. Unlike OfficeCLI, a set never stamps `modified` (ADR 0006,
+//! (`contentType`) is refused by the leaf with a typed
+//! `UnsupportedProperty` refusal whose reason is fixed and content-free.
+//! Unlike OfficeCLI, a set never stamps `modified` (ADR 0006,
 //! determinism). The path is set-only; reads go through `File::metadata()`
 //! and the root node's properties.
 
@@ -519,11 +520,9 @@ fn invalid(key: &str, format: FileFormat) -> Error {
 /// Map a leaf metadata error onto the unified taxonomy.
 pub(crate) fn native_error(error: properties::Error, format: FileFormat) -> Error {
     let error = match error {
-        properties::Error::Unsupported { field } => Error::new(
-            Code::UnsupportedProperty,
-            "the format cannot store this metadata field",
-        )
-        .with_property(field.name()),
+        properties::Error::Refused(refusal) => {
+            Error::new(crate::error::refusal_code(refusal.kind()), refusal.reason())
+        },
         properties::Error::Invalid(message) => Error::new(Code::InvalidValue, message),
         properties::Error::Limit {
             kind,
@@ -537,6 +536,10 @@ pub(crate) fn native_error(error: properties::Error, format: FileFormat) -> Erro
         properties::Error::PatchConflict => Error::new(
             Code::InvalidInput,
             "the metadata patch base does not match the package",
+        ),
+        properties::Error::SourceChanged { .. } => Error::new(
+            Code::IoError,
+            "the metadata source changed after it was opened",
         ),
         properties::Error::Internal(_) => Error::new(
             Code::InternalError,
@@ -640,6 +643,35 @@ mod tests {
             let error = native_error(properties::Error::PatchConflict, format);
             assert_eq!(error.code(), Code::InvalidInput, "{format:?}");
         }
+    }
+
+    #[test]
+    fn native_metadata_refusal_and_source_change_keep_their_codes() {
+        let refusal = properties::Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedProperty,
+            "set_metadata",
+            "the OOXML metadata route does not support this property",
+        ));
+        let error = native_error(refusal, FileFormat::Xlsx);
+        assert_eq!(error.code(), Code::UnsupportedProperty);
+        assert_eq!(error.property(), None);
+
+        let error = native_error(
+            properties::Error::SourceChanged {
+                expected: litchi_core::SourceVersion::new(8, 1),
+                observed: litchi_core::SourceVersion::new(8, 2),
+            },
+            FileFormat::Xlsb,
+        );
+        assert_eq!(error.code(), Code::IoError);
+
+        let error = native_error(
+            properties::Error::Package(litchi_ooxml_common::Error::Invalid(
+                "malformed metadata XML".to_owned(),
+            )),
+            FileFormat::Xlsx,
+        );
+        assert_eq!(error.code(), Code::CorruptFile);
     }
 
     #[test]
