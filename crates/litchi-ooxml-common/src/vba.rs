@@ -3063,13 +3063,6 @@ mod tests {
         package
     }
 
-    fn excel_source_package_with_directory_entries() -> OpcPackage {
-        const SOURCE: &[u8] = include_bytes!(
-            "../../../test-data/poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx"
-        );
-        OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap()
-    }
-
     fn serialized_archive_counts(bytes: &[u8]) -> (usize, usize) {
         let archive = soapberry_zip::ZipArchive::from_slice(bytes).unwrap();
         let mut members = 0usize;
@@ -3097,6 +3090,16 @@ mod tests {
             writer.write_stored_file(name, &payload).unwrap();
         }
         writer.finish().unwrap()
+    }
+
+    fn excel_source_package_with_existing_vba_and_directory_entry() -> OpcPackage {
+        let package = excel_package();
+        let mut initial = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        initial.store(b"source".to_vec(), None).unwrap();
+        let stored = initial.commit().unwrap().into_package();
+        let authored = PackageWriter::to_bytes(&stored).unwrap();
+        let source = add_directory_entry(&authored);
+        OpcPackage::from_vec(source, SourceLimits::default()).unwrap()
     }
 
     fn word_package() -> OpcPackage {
@@ -3565,7 +3568,10 @@ mod tests {
 
     #[test]
     fn edit_rejects_tighter_structural_limits_before_publication() {
-        let package = excel_source_package_with_directory_entries();
+        // The authored package exercises graph growth without opaque ZIP
+        // members, so manifest and relationship limits reach their intended
+        // refusal kinds before publication.
+        let package = excel_package();
         let limits = package.read_limits();
         let content_types = package.source_content_types(limits).unwrap();
         let relationships = relationship_totals(&package, limits).unwrap();
@@ -3586,24 +3592,9 @@ mod tests {
             }
         }
         assert_eq!(relationships.xml_bytes, expected_relationship_bytes);
-        let projected = {
-            let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
-            edit.store(b"project".to_vec(), None).unwrap();
-            let candidate = edit.commit().unwrap().into_package();
-            let bytes = PackageWriter::to_bytes(&candidate).unwrap();
-            OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap()
-        };
-        let projected_bytes = PackageWriter::to_bytes(&projected).unwrap();
-        let projected_relationships =
-            relationship_totals(&projected, SourceLimits::default()).unwrap();
-        let (projected_members, projected_entries) = serialized_archive_counts(&projected_bytes);
-        assert!(
-            projected_entries > projected_members,
-            "the structural fixture must retain directory entries"
-        );
         let before = PackageWriter::to_bytes(&package).unwrap();
 
-        let assert_refused = |operation_limits: SourceLimits, expected: LimitKind| {
+        let assert_growth_refused = |operation_limits: SourceLimits, expected: LimitKind| {
             let result = (|| {
                 let options = EditOptions::new().source_limits(operation_limits);
                 let mut edit = Edit::new(&package, Host::Excel, options)?;
@@ -3620,7 +3611,7 @@ mod tests {
             assert_eq!(PackageWriter::to_bytes(&package).unwrap(), before);
         };
 
-        assert_refused(
+        assert_growth_refused(
             SourceLimits::builder()
                 .max_content_type_mappings(content_types.mapping_count())
                 .unwrap()
@@ -3628,7 +3619,7 @@ mod tests {
                 .unwrap(),
             LimitKind::ContentTypeMappings,
         );
-        assert_refused(
+        assert_growth_refused(
             SourceLimits::builder()
                 .max_total_relationship_xml_events(relationships.events as usize)
                 .unwrap()
@@ -3636,7 +3627,49 @@ mod tests {
                 .unwrap(),
             LimitKind::TotalRelationshipXmlEvents,
         );
-        assert_refused(
+
+        // The directory-bearing source already owns the VBA graph. Updating
+        // that known graph keeps the targeted preservation route eligible,
+        // while its physical directory entry makes the member and total-entry
+        // ceilings independently representable.
+        let directory_package = excel_source_package_with_existing_vba_and_directory_entry();
+        let projected = {
+            let mut edit = Edit::new(&directory_package, Host::Excel, EditOptions::new()).unwrap();
+            edit.store(b"project".to_vec(), None).unwrap();
+            let candidate = edit.commit().unwrap().into_package();
+            let bytes = PackageWriter::to_bytes(&candidate).unwrap();
+            OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap()
+        };
+        let projected_bytes = PackageWriter::to_bytes(&projected).unwrap();
+        let projected_relationships =
+            relationship_totals(&projected, SourceLimits::default()).unwrap();
+        let (projected_members, projected_entries) = serialized_archive_counts(&projected_bytes);
+        assert!(
+            projected_entries > projected_members,
+            "the structural fixture must retain directory entries"
+        );
+        let directory_before = PackageWriter::to_bytes(&directory_package).unwrap();
+        let assert_archive_refused = |operation_limits: SourceLimits, expected: LimitKind| {
+            let result = (|| {
+                let options = EditOptions::new().source_limits(operation_limits);
+                let mut edit = Edit::new(&directory_package, Host::Excel, options)?;
+                edit.store(b"project".to_vec(), None)?;
+                edit.commit()
+            })();
+            assert!(matches!(
+                result,
+                Err(Error::Limit {
+                    kind: crate::LimitKind::Vba(kind),
+                    ..
+                }) if kind == expected
+            ));
+            assert_eq!(
+                PackageWriter::to_bytes(&directory_package).unwrap(),
+                directory_before
+            );
+        };
+
+        assert_archive_refused(
             SourceLimits::builder()
                 .max_parts(projected.part_count())
                 .unwrap()
@@ -3650,7 +3683,7 @@ mod tests {
                 .unwrap(),
             LimitKind::ArchiveMembers,
         );
-        assert_refused(
+        assert_archive_refused(
             SourceLimits::builder()
                 .max_parts(projected.part_count())
                 .unwrap()

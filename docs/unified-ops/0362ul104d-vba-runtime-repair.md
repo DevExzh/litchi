@@ -45,3 +45,20 @@ No Cargo, compiler, rustdoc, native, or performance command was run in this
 leaf.  Source inspection, formatting, and repository-size/binary checks were
 the only validation performed; the coordinator owns the focused and common
 runtime reruns.
+
+## Return 0362ul119b
+
+The first 119a correction still projected a new VBA graph into the POI
+directory-bearing source.  That is intentionally refused by the OPC targeted
+writer because the directory records are opaque members.  This follow-up
+splits the structural limit cases: the authored package reaches
+ContentTypeMappings and TotalRelationshipXmlEvents through graph growth, while
+a small source-backed package with an existing VBA graph and one real
+directory entry reaches ArchiveMembers and ArchiveTotalEntries through an
+eligible graph replacement.  Both cases retain independent ZIP counts and
+exact/one-under policies; no PreservationUnavailable assertion or production
+policy was weakened.
+
+No Cargo, compiler, rustdoc, native, or performance command was run.  The
+coordinator owns focused and common runtime reruns from this source-only
+commit.
