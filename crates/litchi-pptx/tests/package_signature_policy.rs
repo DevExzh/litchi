@@ -6,10 +6,10 @@
 
 //! The package-level edit families refuse a signed package (ADR 0006;
 //! unified-ops record 0014a). A changed edit is refused with
-//! `SignedSourceRequiresExplicitPolicy` and leaves the package untouched;
-//! after an explicit `Package::unsign` the same edit publishes a package
-//! without signature parts; an exact no-op keeps the signed source byte for
-//! byte.
+//! `SignedSourceRequiresExplicitPolicy` (or the format-owned `Error::Signed`
+//! for the shared VBA owner) and leaves the package untouched; after an
+//! explicit `Package::unsign` the same edit publishes a package without
+//! signature parts; an exact no-op keeps the signed source byte for byte.
 
 mod in_place;
 use in_place::InPlace as _;
@@ -94,6 +94,21 @@ fn is_refusal(error: &Error) -> bool {
         error,
         Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
     )
+}
+
+#[cfg(feature = "vba-inspection")]
+fn is_vba_refusal(error: &Error) -> bool {
+    matches!(error, Error::Signed)
+}
+
+fn is_family_refusal(family_name: &'static str, error: &Error) -> bool {
+    #[cfg(feature = "vba-inspection")]
+    if family_name == "VBA project (shared owner)" {
+        return is_vba_refusal(error);
+    }
+    #[cfg(not(feature = "vba-inspection"))]
+    let _ = family_name;
+    is_refusal(error)
 }
 
 /// `plain` with an OPC signature graph (origin part, one XML signature and
@@ -906,7 +921,7 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
             let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
             let error = (change.edit)(&mut package)
                 .expect_err(&format!("{label}: a signed package must refuse"));
-            assert!(is_refusal(&error), "{label}: {error:?}");
+            assert!(is_family_refusal(family.name, &error), "{label}: {error:?}");
             assert!(package.opc().unwrap().is_signed(), "{label}");
             assert_eq!(package.to_bytes().unwrap(), source, "{label}: refusal");
 
