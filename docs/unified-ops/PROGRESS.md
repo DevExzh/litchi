@@ -6005,3 +6005,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   The census remains 55 worktrees/74 heads, with four active unified controls.
   Native measurements, remaining gates, census review, final merge and cleanup
   remain required. Nothing is pushed.
+
+  DrawingML's literal binding and consumer migration pass all 27 focused tests
+  in an isolated P checkout (152); root verifies the exact combined patch.
+  The signed test successor now requires production binding without a skip
+  and keeps explicit pending negatives. Eleven tracked fixtures are restored
+  in P, with unchanged content identities; its existing 14 policy tests pass.
+  DrawingML v5 admits only the exact reviewed baseline overlays. Independent
+  source checks and root's positive eleven-input check pass; the approved
+  lock changes only the recorded VBA dependency edge. Seventeen final65 rows
+  are verified; the gate and two source-generation services remain live.
+  Common-P installation, actual measurements, final census, merge and cleanup
+  remain open. Nothing is pushed.
