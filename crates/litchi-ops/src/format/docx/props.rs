@@ -80,7 +80,9 @@ pub(super) fn equation_latex(block: &super::node::Block) -> Result<Option<String
         };
         let mut latex = String::new();
         for formula in formulas {
-            let Ok(converted) = litchi_formula::omml_to_latex(&formula) else {
+            let Ok(converted) =
+                litchi_formula::omml_to_latex(&formula, &litchi_formula::omml::Limits::DEFAULT)
+            else {
                 return Ok(None);
             };
             // The converter wraps a math paragraph in display delimiters;

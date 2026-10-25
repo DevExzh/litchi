@@ -195,6 +195,12 @@ impl TextBuffer {
         }
     }
 
+    /// Number of UTF-8 bytes retained so far.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
     pub fn clear(&mut self) {
         self.buffer.clear();
         self.has_content = false;

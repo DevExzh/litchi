@@ -14,6 +14,7 @@ mod error;
 /// complex parsing logic. Each handler is organized into separate modules
 /// for better maintainability.
 mod handlers;
+mod limits;
 /// Performance-optimized lookup tables for OMML parsing
 ///
 /// This module provides compile-time generated perfect hash function (PHF)
@@ -47,6 +48,7 @@ mod xml_attributes;
 use crate::ast::MathNode;
 
 pub use error::OmmlError;
+pub use limits::{LimitKind, Limits};
 /// Re-export public API
 pub use parser::OmmlParser;
 pub use writer::OmmlWriter;
@@ -61,7 +63,7 @@ mod tests {
     #[test]
     fn a_marked_input_reports_errors_at_byte_offsets() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
         let plain = "<m:oMath><m:r></m:oMath>";
         let marked = format!("\u{feff}{plain}");
         let position = |xml: &str| match parser.parse(xml) {
@@ -86,7 +88,7 @@ mod tests {
     #[test]
     fn test_parse_simple_text() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#;
         let nodes = parser.parse(xml).unwrap();
@@ -101,7 +103,7 @@ mod tests {
     #[test]
     fn test_parse_multiple_text_runs() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:r><m:t>a</m:t></m:r>
@@ -128,9 +130,33 @@ mod tests {
     }
 
     #[test]
+    fn text_limits_cover_split_text_and_cdata_events() {
+        let xml = r#"<m:oMath><m:r><m:t>abc<![CDATA[def]]>ghij</m:t></m:r></m:oMath>"#;
+        // The shared string ceiling also admits element start tags (the
+        // root tag is nine bytes), so use a ten-byte split text witness.
+        let too_small = Limits::new(4096, 32, 256, 64, 9, 4096).unwrap();
+        let formula = Formula::new();
+        let parser = OmmlParser::new(formula.arena(), too_small);
+        match parser.parse(xml) {
+            Err(OmmlError::LimitExceeded {
+                kind: LimitKind::StringBytes,
+                actual: 10,
+                ..
+            }) => {},
+            other => panic!("split text/CDATA limit result was {other:?}"),
+        }
+
+        let exact = Limits::new(4096, 32, 256, 64, 10, 4096).unwrap();
+        let formula = Formula::new();
+        let parser = OmmlParser::new(formula.arena(), exact);
+        let nodes = parser.parse(xml).expect("the cumulative text fits");
+        assert_eq!(nodes, vec![MathNode::Text("abcdefghij".into())]);
+    }
+
+    #[test]
     fn test_parse_fraction() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:f>
@@ -157,7 +183,7 @@ mod tests {
     #[test]
     fn test_parse_fraction_with_properties() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:f>
@@ -185,7 +211,7 @@ mod tests {
     #[test]
     fn test_parse_delimiter() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:d>
@@ -211,7 +237,7 @@ mod tests {
     #[test]
     fn test_parse_delimiter_brackets() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:d>
@@ -237,7 +263,7 @@ mod tests {
     #[test]
     fn test_parse_function() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:func>
@@ -259,7 +285,7 @@ mod tests {
     #[test]
     fn test_parse_function_complex() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:func>
@@ -287,7 +313,7 @@ mod tests {
     #[test]
     fn test_parse_accent() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:acc>
@@ -311,7 +337,7 @@ mod tests {
     #[test]
     fn test_parse_accent_bar() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:acc>
@@ -335,7 +361,7 @@ mod tests {
     #[test]
     fn test_parse_bar() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:bar>
@@ -356,7 +382,7 @@ mod tests {
     #[test]
     fn test_parse_nary_with_limits() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:nary>
@@ -395,7 +421,7 @@ mod tests {
     #[test]
     fn test_parse_nary_integral() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:nary>
@@ -428,7 +454,7 @@ mod tests {
     #[test]
     fn test_parse_superscript() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:sSup>
@@ -451,7 +477,7 @@ mod tests {
     #[test]
     fn test_parse_subscript() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:sSub>
@@ -474,7 +500,7 @@ mod tests {
     #[test]
     fn test_parse_subsup() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:sSubSup>
@@ -503,7 +529,7 @@ mod tests {
     #[test]
     fn test_parse_radical() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:rad>
@@ -526,7 +552,7 @@ mod tests {
     #[test]
     fn test_parse_radical_simple() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:rad>
@@ -548,7 +574,7 @@ mod tests {
     #[test]
     fn test_parse_matrix() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:m>
@@ -586,7 +612,7 @@ mod tests {
     #[test]
     fn test_parse_box() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:box>
@@ -608,7 +634,7 @@ mod tests {
     #[test]
     fn test_parse_phantom() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:phant>
@@ -629,7 +655,7 @@ mod tests {
     #[test]
     fn test_parse_border_box() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:borderBox>
@@ -651,7 +677,7 @@ mod tests {
     #[test]
     fn test_parse_equation_array() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:eqArr>
@@ -676,7 +702,7 @@ mod tests {
     #[test]
     fn test_parse_group_char() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:groupChr>
@@ -701,7 +727,7 @@ mod tests {
     #[test]
     fn test_parse_spacing() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:r><m:t>a</m:t></m:r>
@@ -719,7 +745,7 @@ mod tests {
     #[test]
     fn test_parse_complex_expression() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:func>
@@ -752,7 +778,7 @@ mod tests {
     #[test]
     fn test_parse_empty_math() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath></m:oMath>"#;
         let result = parser.parse(xml);
@@ -762,7 +788,7 @@ mod tests {
     #[test]
     fn test_parse_invalid_xml() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath><invalid /></m:oMath>"#;
         let result = parser.parse(xml);
@@ -772,7 +798,7 @@ mod tests {
     #[test]
     fn test_parse_malformed_xml() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath><m:r><m:t>unclosed"#;
         let result = parser.parse(xml);
@@ -782,7 +808,7 @@ mod tests {
     #[test]
     fn test_parse_unicode_characters() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:r><m:t>α</m:t></m:r>
@@ -805,7 +831,7 @@ mod tests {
     #[test]
     fn test_parse_complex_nested_expression() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:sSup>
@@ -839,7 +865,7 @@ mod tests {
     #[test]
     fn test_parse_matrix_with_properties() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:m>
@@ -879,7 +905,7 @@ mod tests {
     #[test]
     fn test_parse_nary_with_complex_limits() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:nary>
@@ -924,7 +950,7 @@ mod tests {
     #[test]
     fn test_parse_accent_with_position() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:acc>
@@ -949,7 +975,7 @@ mod tests {
     #[test]
     fn test_parse_group_character_with_position() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:groupChr>
@@ -991,7 +1017,7 @@ mod tests {
     #[test]
     fn test_parse_phantom_element() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:phant>
@@ -1012,7 +1038,7 @@ mod tests {
     #[test]
     fn test_parse_radical_with_degree() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:rad>
@@ -1035,7 +1061,7 @@ mod tests {
     #[test]
     fn test_parse_spacing_element() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:r><m:t>a</m:t></m:r>
@@ -1052,7 +1078,7 @@ mod tests {
     #[test]
     fn test_validation_empty_math() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = "<m:oMath></m:oMath>";
         let result = parser.parse(xml);
@@ -1062,7 +1088,7 @@ mod tests {
     #[test]
     fn test_validation_malformed_xml() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = "<m:oMath><unclosed>";
         let result = parser.parse(xml);
@@ -1072,7 +1098,7 @@ mod tests {
     #[test]
     fn test_validation_invalid_nesting() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         // Numerator outside of fraction
         let xml = r#"<m:oMath>
@@ -1085,7 +1111,7 @@ mod tests {
     #[test]
     fn test_validation_missing_required_elements() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         // Fraction with empty numerator
         let xml = r#"<m:oMath>
@@ -1101,7 +1127,7 @@ mod tests {
     #[test]
     fn test_predefined_symbols() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:r><m:t>α</m:t></m:r>
@@ -1117,7 +1143,7 @@ mod tests {
     #[test]
     fn test_deep_nesting_limit() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         // Create deeply nested XML that exceeds the limit
         let mut xml = "<m:oMath>".to_string();
@@ -1137,7 +1163,7 @@ mod tests {
     #[test]
     fn test_run_properties() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         let xml = r#"<m:oMath>
             <m:r>
@@ -1173,7 +1199,7 @@ mod tests {
     #[test]
     fn test_parse_repeated_attributes_keep_their_first_value() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         for (chr, expected) in [
             (r#"<m:chr m:val="¯"/>"#, AccentType::Bar),
@@ -1211,7 +1237,7 @@ mod tests {
     #[test]
     fn test_parse_tags_of_many_repeated_attribute_names() {
         let formula = Formula::new();
-        let parser = OmmlParser::new(formula.arena());
+        let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
 
         // 20,000 names and 20,000 repeats of the last, on a handled start tag,
         // plain start tags and an empty property tag.

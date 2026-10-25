@@ -7,6 +7,7 @@
 //! Based on rtf2latex2e Profile_TEMPLATES_5 template system.
 
 use crate::ast::{Fence, LargeOperator, MathNode, Operator};
+use crate::mtef::{LimitKind, Limits, MtefError};
 use smallvec::SmallVec;
 
 /// Template argument list type - a small vector of node vectors
@@ -592,6 +593,63 @@ pub(super) fn push_leaf_text(node: &MathNode<'_>, out: &mut String) {
     }
 }
 
+/// Return the exact byte count emitted by [`push_leaf_text`].
+///
+/// Template substitution must admit a complete derived spelling before the
+/// destination String grows.  Keeping this calculation alongside the emitter
+/// avoids a speculative allocation for a child whose textual form is larger
+/// than the caller's selected string budget.
+fn leaf_text_bytes(node: &MathNode<'_>) -> usize {
+    use crate::latex::conv::node::{function_name_to_latex, predefined_symbol_to_latex};
+    use crate::latex::operators::{
+        is_standard_function, large_operator_to_latex, operator_to_latex, space_to_latex,
+    };
+
+    match node {
+        MathNode::Text(text) => text.len(),
+        MathNode::Number(number) => number.len(),
+        MathNode::Symbol(symbol) => symbol
+            .unicode
+            .map_or_else(|| symbol.name.len(), char::len_utf8),
+        MathNode::Operator(operator) => operator_to_latex(*operator).len(),
+        MathNode::PredefinedSymbol(symbol) => predefined_symbol_to_latex(*symbol).len(),
+        MathNode::Space(space) => space_to_latex(*space).len(),
+        MathNode::Function { name, .. } => {
+            if is_standard_function(name) {
+                1usize.saturating_add(name.len())
+            } else {
+                "\\operatorname{}".len().saturating_add(name.len())
+            }
+        },
+        MathNode::PredefinedFunction { function, .. } => function_name_to_latex(*function).len(),
+        MathNode::LargeOp { operator, .. } => large_operator_to_latex(*operator).len(),
+        _ => 1, // The emitter's structural fallback is `?`.
+    }
+}
+
+fn check_template_bytes(limits: Limits, actual: usize) -> Result<(), MtefError> {
+    if actual > limits.max_string_bytes() {
+        return Err(MtefError::LimitExceeded {
+            kind: LimitKind::StringBytes,
+            limit: limits.max_string_bytes(),
+            actual,
+        });
+    }
+    Ok(())
+}
+
+fn append_template_str(result: &mut String, value: &str, limits: Limits) -> Result<(), MtefError> {
+    check_template_bytes(limits, result.len().saturating_add(value.len()))?;
+    result.push_str(value);
+    Ok(())
+}
+
+fn append_template_char(result: &mut String, value: char, limits: Limits) -> Result<(), MtefError> {
+    check_template_bytes(limits, result.len().saturating_add(value.len_utf8()))?;
+    result.push(value);
+    Ok(())
+}
+
 impl TemplateParser {
     /// Find template by selector and variation
     pub fn find_template(selector: u8, variation: u16) -> Option<&'static TemplateDef> {
@@ -605,7 +663,11 @@ impl TemplateParser {
     /// Parses the template string using rtf2latex2e template format and substitutes
     /// the provided arguments. Template format uses LaTeX commands with placeholders
     /// like #1[M], #2[L], etc. and special markers [STARTSUB], [ENDSUB], etc.
-    pub fn parse_template_arguments<'a>(template: &str, args: &TemplateArgs<'a>) -> MathNode<'a> {
+    pub fn parse_template_arguments<'a>(
+        template: &str,
+        args: &TemplateArgs<'a>,
+        limits: Limits,
+    ) -> Result<MathNode<'a>, MtefError> {
         let mut result = String::new();
         let mut chars = template.chars().peekable();
 
@@ -627,11 +689,15 @@ impl TemplateParser {
                     // Substitute the argument
                     if arg_index < args.len() {
                         for node in &args[arg_index] {
+                            check_template_bytes(
+                                limits,
+                                result.len().saturating_add(leaf_text_bytes(node)),
+                            )?;
                             push_leaf_text(node, &mut result);
                         }
                     }
                 } else {
-                    result.push('#');
+                    append_template_char(&mut result, '#', limits)?;
                 }
             } else if ch == '[' {
                 // Handle special markers like [STARTSUB], [ENDSUB], etc.
@@ -644,24 +710,28 @@ impl TemplateParser {
                 }
 
                 match marker.as_str() {
-                    "STARTSUB" => result.push_str("_{"),
-                    "ENDSUB" => result.push('}'),
-                    "STARTSUP" => result.push_str("^{"),
-                    "ENDSUP" => result.push('}'),
+                    "STARTSUB" => append_template_str(&mut result, "_{", limits)?,
+                    "ENDSUB" => append_template_char(&mut result, '}', limits)?,
+                    "STARTSUP" => append_template_str(&mut result, "^{", limits)?,
+                    "ENDSUP" => append_template_char(&mut result, '}', limits)?,
                     _ => {
                         // Unknown marker, keep as is
-                        result.push('[');
-                        result.push_str(&marker);
-                        result.push(']');
+                        append_template_char(&mut result, '[', limits)?;
+                        append_template_str(&mut result, &marker, limits)?;
+                        append_template_char(&mut result, ']', limits)?;
                     },
                 }
             } else {
-                result.push(ch);
+                append_template_char(&mut result, ch, limits)?;
             }
         }
 
         // Try to recognize common LaTeX patterns and convert to AST nodes
-        Self::parse_latex_to_ast(&result, args)
+        // The fallback below clones this derived spelling, so keep the final
+        // check adjacent to the parse boundary as well as checking each growth
+        // above.
+        check_template_bytes(limits, result.len())?;
+        Ok(Self::parse_latex_to_ast(&result, args))
     }
 
     /// Parse LaTeX string back to AST nodes for common patterns

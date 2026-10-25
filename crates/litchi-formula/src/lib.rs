@@ -23,7 +23,7 @@
 //
 // // Parse OMML
 // let formula = Formula::new();
-// let parser = OmmlParser::new(formula.arena());
+// let parser = OmmlParser::new(formula.arena(), omml::Limits::DEFAULT);
 // let nodes = parser.parse("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
 //
 // // Convert to LaTeX
@@ -57,7 +57,7 @@ pub mod latex;
 /// References:
 /// - <http://rtf2latex2e.sourceforge.net/MTEF5.html>
 /// - rtf2latex2e source code
-mod mtef;
+pub mod mtef;
 /// OMML (Office Math Markup Language) Parser
 ///
 /// This module parses Microsoft Office Math Markup Language (OMML) into our AST.
@@ -72,7 +72,7 @@ mod mtef;
 /// - Support for all OMML elements and properties
 ///
 /// Reference: <https://devblogs.microsoft.com/math-in-office/officemath/>
-mod omml;
+pub mod omml;
 
 // Re-export public API
 pub use ast::{
@@ -143,12 +143,15 @@ impl From<MtefWriteError> for FormulaError {
 ///
 /// # Example
 /// ```ignore
-/// let latex = omml_to_latex("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
+/// let latex = omml_to_latex(
+///     "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>",
+///     &omml::Limits::DEFAULT,
+/// )?;
 /// println!("LaTeX: {}", latex);
 /// ```
-pub fn omml_to_latex(omml: &str) -> Result<String, FormulaError> {
+pub fn omml_to_latex(omml: &str, limits: &omml::Limits) -> Result<String, FormulaError> {
     let formula = Formula::new();
-    let parser = OmmlParser::new(formula.arena());
+    let parser = OmmlParser::new(formula.arena(), *limits);
     let nodes = parser.parse(omml)?;
 
     let mut formula = Formula::new();
@@ -162,12 +165,12 @@ pub fn omml_to_latex(omml: &str) -> Result<String, FormulaError> {
 ///
 /// # Example
 /// ```ignore
-/// let latex = mtef_to_latex(mtef_data)?;
+/// let latex = mtef_to_latex(mtef_data, &mtef::Limits::DEFAULT)?;
 /// println!("LaTeX: {}", latex);
 /// ```
-pub fn mtef_to_latex(mtef_data: &[u8]) -> Result<String, FormulaError> {
+pub fn mtef_to_latex(mtef_data: &[u8], limits: &mtef::Limits) -> Result<String, FormulaError> {
     let formula = Formula::new();
-    let mut parser = MtefParser::new(formula.arena(), mtef_data);
+    let mut parser = MtefParser::new(formula.arena(), mtef_data, *limits);
     let nodes = parser.parse()?;
 
     let mut formula = Formula::new();
@@ -185,14 +188,22 @@ pub fn mtef_to_latex(mtef_data: &[u8]) -> Result<String, FormulaError> {
 ///
 /// # Example
 /// ```ignore
-/// let mtef = omml_to_mtef("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
+/// let mtef = omml_to_mtef(
+///     "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>",
+///     &omml::Limits::DEFAULT,
+///     &mtef::Limits::DEFAULT,
+/// )?;
 /// ```
-pub fn omml_to_mtef(omml: &str) -> Result<Vec<u8>, FormulaError> {
+pub fn omml_to_mtef(
+    omml: &str,
+    input_limits: &omml::Limits,
+    output_limits: &mtef::Limits,
+) -> Result<Vec<u8>, FormulaError> {
     let formula = Formula::new();
-    let parser = OmmlParser::new(formula.arena());
+    let parser = OmmlParser::new(formula.arena(), *input_limits);
     let nodes = parser.parse(omml)?;
 
-    let writer = MtefWriter::new();
+    let writer = MtefWriter::new(*output_limits);
     Ok(writer.write_nodes(&nodes)?)
 }
 
@@ -200,13 +211,13 @@ pub fn omml_to_mtef(omml: &str) -> Result<Vec<u8>, FormulaError> {
 ///
 /// # Example
 /// ```ignore
-/// let omml = latex_to_omml(r"x^2 + \sqrt{y}")?;
+/// let omml = latex_to_omml(r"x^2 + \sqrt{y}", &omml::Limits::DEFAULT)?;
 /// ```
-pub fn latex_to_omml(latex: &str) -> Result<String, FormulaError> {
+pub fn latex_to_omml(latex: &str, limits: &omml::Limits) -> Result<String, FormulaError> {
     let parser = LatexParser::new();
     let nodes = parser.parse(latex)?;
 
-    let mut writer = OmmlWriter::new();
+    let writer = OmmlWriter::new(*limits);
     Ok(writer.write_nodes(&nodes)?.to_string())
 }
 
@@ -217,13 +228,13 @@ pub fn latex_to_omml(latex: &str) -> Result<String, FormulaError> {
 ///
 /// # Example
 /// ```ignore
-/// let mtef = latex_to_mtef(r"\alpha + \beta")?;
+/// let mtef = latex_to_mtef(r"\alpha + \beta", &mtef::Limits::DEFAULT)?;
 /// ```
-pub fn latex_to_mtef(latex: &str) -> Result<Vec<u8>, FormulaError> {
+pub fn latex_to_mtef(latex: &str, limits: &mtef::Limits) -> Result<Vec<u8>, FormulaError> {
     let parser = LatexParser::new();
     let nodes = parser.parse(latex)?;
 
-    let writer = MtefWriter::new();
+    let writer = MtefWriter::new(*limits);
     Ok(writer.write_nodes(&nodes)?)
 }
 
@@ -234,15 +245,23 @@ pub fn latex_to_mtef(latex: &str) -> Result<Vec<u8>, FormulaError> {
 ///
 /// # Example
 /// ```ignore
-/// let omml = mtef_to_omml(mtef_data)?;
+/// let omml = mtef_to_omml(
+///     mtef_data,
+///     &mtef::Limits::DEFAULT,
+///     &omml::Limits::DEFAULT,
+/// )?;
 /// println!("OMML: {}", omml);
 /// ```
-pub fn mtef_to_omml(mtef_data: &[u8]) -> Result<String, FormulaError> {
+pub fn mtef_to_omml(
+    mtef_data: &[u8],
+    input_limits: &mtef::Limits,
+    output_limits: &omml::Limits,
+) -> Result<String, FormulaError> {
     let formula = Formula::new();
-    let mut parser = MtefParser::new(formula.arena(), mtef_data);
+    let mut parser = MtefParser::new(formula.arena(), mtef_data, *input_limits);
     let nodes = parser.parse()?;
 
-    let mut writer = OmmlWriter::new();
+    let writer = OmmlWriter::new(*output_limits);
     Ok(writer.write_nodes(&nodes)?.to_string())
 }
 
@@ -253,7 +272,7 @@ mod tests {
     #[test]
     fn test_omml_to_latex() {
         let omml = r#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#;
-        let result = omml_to_latex(omml);
+        let result = omml_to_latex(omml, &omml::Limits::DEFAULT);
         assert!(result.is_ok());
     }
 
@@ -290,7 +309,12 @@ mod tests {
 
     #[test]
     fn mtef_to_omml_emits_a_namespaced_omath_fragment() {
-        let omml = mtef_to_omml(&minimal_mtef5()).expect("minimal MTEF 5 converts");
+        let omml = mtef_to_omml(
+            &minimal_mtef5(),
+            &mtef::Limits::DEFAULT,
+            &omml::Limits::DEFAULT,
+        )
+        .expect("minimal MTEF 5 converts");
         assert!(
             omml.starts_with("<m:oMath "),
             "expected an m:oMath root, got {omml}"
@@ -306,7 +330,8 @@ mod tests {
     fn mtef_to_omml_rejects_no_data_without_panicking() {
         // Too short for the OLE equation header: the parser yields no nodes
         // rather than panicking, so the conversion still produces a fragment.
-        let omml = mtef_to_omml(&[0u8; 4]).expect("short input is not fatal");
+        let omml = mtef_to_omml(&[0u8; 4], &mtef::Limits::DEFAULT, &omml::Limits::DEFAULT)
+            .expect("short input is not fatal");
         assert!(omml.starts_with("<m:oMath "));
         assert!(omml.ends_with("</m:oMath>"));
     }
@@ -315,21 +340,24 @@ mod tests {
 #[cfg(test)]
 mod conversion_tests {
     use super::*;
+    use std::borrow::Cow;
 
     /// `omml_to_mtef` used to be an `unimplemented!()` panic in the public API.
     #[test]
     fn omml_to_mtef_produces_a_stream_the_reader_accepts() {
         let omml = r#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#;
-        let mtef = omml_to_mtef(omml).expect("OMML converts to MTEF");
+        let mtef = omml_to_mtef(omml, &omml::Limits::DEFAULT, &mtef::Limits::DEFAULT)
+            .expect("OMML converts to MTEF");
         assert!(!mtef.is_empty(), "expected a non-empty MTEF stream");
 
-        let latex = mtef_to_latex(&mtef).expect("the writer's output parses back");
+        let latex =
+            mtef_to_latex(&mtef, &mtef::Limits::DEFAULT).expect("the writer's output parses back");
         assert!(latex.contains('x'), "round trip lost the operand: {latex}");
     }
 
     #[test]
     fn latex_to_omml_emits_a_namespaced_fragment() {
-        let omml = latex_to_omml(r"x^2").expect("LaTeX converts to OMML");
+        let omml = latex_to_omml(r"x^2", &omml::Limits::DEFAULT).expect("LaTeX converts to OMML");
         assert!(omml.starts_with("<m:oMath "), "got {omml}");
         assert!(omml.contains("officeDocument/2006/math"), "got {omml}");
         assert!(omml.ends_with("</m:oMath>"), "unclosed fragment: {omml}");
@@ -338,8 +366,9 @@ mod conversion_tests {
 
     #[test]
     fn latex_to_mtef_round_trips_through_the_reader() {
-        let mtef = latex_to_mtef(r"a+b").expect("LaTeX converts to MTEF");
-        let latex = mtef_to_latex(&mtef).expect("the writer's output parses back");
+        let mtef = latex_to_mtef(r"a+b", &mtef::Limits::DEFAULT).expect("LaTeX converts to MTEF");
+        let latex =
+            mtef_to_latex(&mtef, &mtef::Limits::DEFAULT).expect("the writer's output parses back");
         for expected in ['a', '+', 'b'] {
             assert!(
                 latex.contains(expected),
@@ -351,8 +380,8 @@ mod conversion_tests {
     /// A LaTeX fragment survives a full OMML round trip.
     #[test]
     fn latex_survives_a_round_trip_through_omml() {
-        let omml = latex_to_omml(r"\frac{a}{b}").expect("converts to OMML");
-        let latex = omml_to_latex(&omml).expect("converts back to LaTeX");
+        let omml = latex_to_omml(r"\frac{a}{b}", &omml::Limits::DEFAULT).expect("converts to OMML");
+        let latex = omml_to_latex(&omml, &omml::Limits::DEFAULT).expect("converts back to LaTeX");
         assert!(latex.contains("\\frac"), "lost the fraction: {latex}");
         assert!(
             latex.contains('a') && latex.contains('b'),
@@ -363,7 +392,137 @@ mod conversion_tests {
     /// Malformed LaTeX must be reported, never panic.
     #[test]
     fn malformed_latex_is_an_error_not_a_panic() {
-        assert!(latex_to_omml(r"\frac{a").is_err());
-        assert!(latex_to_mtef(r"{{{").is_err());
+        assert!(latex_to_omml(r"\frac{a", &omml::Limits::DEFAULT).is_err());
+        assert!(latex_to_mtef(r"{{{", &mtef::Limits::DEFAULT).is_err());
+    }
+
+    #[test]
+    fn raw_boundaries_reject_input_and_output_before_codec_work() {
+        let omml = r#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#;
+        let input_limits = omml::Limits::new(omml.len(), 32, 256, 256, 1024, 4096)
+            .expect("finite OMML boundary policy");
+        assert!(omml_to_latex(omml, &input_limits).is_ok());
+
+        let too_small_input = omml::Limits::new(omml.len() - 1, 32, 256, 256, 1024, 4096)
+            .expect("finite OMML boundary policy");
+        assert!(matches!(
+            omml_to_latex(omml, &too_small_input),
+            Err(FormulaError::Omml(OmmlError::LimitExceeded {
+                kind: omml::LimitKind::InputBytes,
+                ..
+            }))
+        ));
+
+        let tiny_mtef_input =
+            mtef::Limits::new(4, 32, 256, 256, 1024, 4096).expect("finite MTEF input policy");
+        assert!(matches!(
+            mtef_to_latex(&[0; 5], &tiny_mtef_input),
+            Err(FormulaError::Mtef(MtefError::LimitExceeded {
+                kind: mtef::LimitKind::InputBytes,
+                ..
+            }))
+        ));
+
+        let tiny_omml_output =
+            omml::Limits::new(4096, 32, 256, 256, 1024, 1).expect("finite OMML output policy");
+        assert!(matches!(
+            latex_to_omml("x", &tiny_omml_output),
+            Err(FormulaError::Omml(OmmlError::LimitExceeded {
+                kind: omml::LimitKind::OutputBytes,
+                ..
+            }))
+        ));
+
+        let tiny_mtef_output =
+            mtef::Limits::new(4096, 32, 256, 256, 1024, 1).expect("finite MTEF output policy");
+        assert!(matches!(
+            latex_to_mtef("x", &tiny_mtef_output),
+            Err(FormulaError::MtefWrite(MtefWriteError::LimitExceeded {
+                kind: mtef::LimitKind::OutputBytes,
+                ..
+            }))
+        ));
+    }
+
+    #[test]
+    fn raw_parser_depth_is_caller_selected() {
+        let xml = r#"<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"#;
+        let limits =
+            omml::Limits::new(4096, 1, 256, 256, 1024, 4096).expect("finite OMML depth policy");
+        assert!(matches!(
+            omml_to_latex(xml, &limits),
+            Err(FormulaError::Omml(OmmlError::LimitExceeded {
+                kind: omml::LimitKind::Depth,
+                ..
+            }))
+        ));
+    }
+
+    #[test]
+    fn raw_writers_charge_work_items_and_strings() {
+        let nodes = [MathNode::Text(Cow::Borrowed("xx"))];
+        let mtef_string_limits =
+            mtef::Limits::new(4096, 32, 256, 256, 1, 4096).expect("finite MTEF string policy");
+        assert!(matches!(
+            MtefWriter::new(mtef_string_limits).write_nodes(&nodes),
+            Err(MtefWriteError::LimitExceeded {
+                kind: mtef::LimitKind::StringBytes,
+                ..
+            })
+        ));
+
+        let omml_string_limits =
+            omml::Limits::new(4096, 32, 256, 256, 1, 4096).expect("finite OMML string policy");
+        assert!(matches!(
+            OmmlWriter::new(omml_string_limits).write_nodes(&nodes),
+            Err(OmmlError::LimitExceeded {
+                kind: omml::LimitKind::StringBytes,
+                ..
+            })
+        ));
+
+        let mtef_item_limits =
+            mtef::Limits::new(4096, 32, 256, 1, 1024, 4096).expect("finite MTEF item policy");
+        let two_nodes = [
+            MathNode::Text(Cow::Borrowed("x")),
+            MathNode::Text(Cow::Borrowed("y")),
+        ];
+        assert!(matches!(
+            MtefWriter::new(mtef_item_limits).write_nodes(&two_nodes),
+            Err(MtefWriteError::LimitExceeded {
+                kind: mtef::LimitKind::Items,
+                ..
+            })
+        ));
+
+        let omml_item_limits =
+            omml::Limits::new(4096, 32, 256, 1, 1024, 4096).expect("finite OMML item policy");
+        assert!(matches!(
+            OmmlWriter::new(omml_item_limits).write_nodes(&two_nodes),
+            Err(OmmlError::LimitExceeded {
+                kind: omml::LimitKind::Items,
+                ..
+            })
+        ));
+
+        let mtef_work_limits =
+            mtef::Limits::new(4096, 32, 1, 256, 1024, 4096).expect("finite MTEF work policy");
+        assert!(matches!(
+            MtefWriter::new(mtef_work_limits).write_nodes(&[MathNode::Text(Cow::Borrowed("x"))]),
+            Err(MtefWriteError::LimitExceeded {
+                kind: mtef::LimitKind::Work,
+                ..
+            })
+        ));
+
+        let omml_work_limits =
+            omml::Limits::new(4096, 32, 1, 256, 1024, 4096).expect("finite OMML work policy");
+        assert!(matches!(
+            OmmlWriter::new(omml_work_limits).write_nodes(&[MathNode::Text(Cow::Borrowed("x"))]),
+            Err(OmmlError::LimitExceeded {
+                kind: omml::LimitKind::Work,
+                ..
+            })
+        ));
     }
 }

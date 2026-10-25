@@ -4,17 +4,21 @@
 //! field widths, matrix dimensions, nesting depth) is reported as one of these
 //! variants instead.
 
+use crate::mtef::LimitKind;
+
 /// Error produced when a formula cannot be encoded as MTEF
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MtefWriteError {
-    /// The AST nests deeper than the writer is willing to recurse
-    ///
-    /// The limit exists so that a pathological (or maliciously constructed)
-    /// tree cannot exhaust the stack.
-    DepthExceeded {
-        /// Maximum nesting depth accepted by the writer
+    /// A caller-selected resource policy rejected the operation before output
+    /// allocation or emission.
+    LimitExceeded {
+        /// Resource that exceeded the selected policy.
+        kind: LimitKind,
+        /// Selected maximum.
         limit: usize,
+        /// Observed or conservatively admitted amount.
+        actual: usize,
     },
 
     /// A character cannot be represented by a 16-bit MathType character code
@@ -46,9 +50,11 @@ pub enum MtefWriteError {
 impl std::fmt::Display for MtefWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MtefWriteError::DepthExceeded { limit } => {
-                write!(f, "formula nests deeper than {} levels", limit)
-            },
+            MtefWriteError::LimitExceeded {
+                kind,
+                limit,
+                actual,
+            } => write!(f, "MTEF {kind} limit {limit} exceeded by {actual}"),
             MtefWriteError::UnsupportedCharacter(ch) => {
                 write!(
                     f,

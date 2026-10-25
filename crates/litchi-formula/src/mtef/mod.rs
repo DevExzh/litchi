@@ -1,10 +1,12 @@
 mod binary;
 mod constants;
+mod limits;
 mod templates;
 mod writer;
 
 // Re-exported for `lib.rs`; the allow drops away once the crate root re-exports
 // these alongside `MtefParser`.
+pub use limits::{LimitKind, Limits};
 #[allow(unused_imports)]
 pub use writer::{MtefWriteError, MtefWriteOptions, MtefWriter};
 
@@ -16,15 +18,33 @@ pub struct MtefParser<'arena> {
     #[allow(dead_code)]
     arena: &'arena bumpalo::Bump,
     binary_parser: Option<binary::MtefBinaryParser<'arena>>,
+    limit_error: Option<MtefError>,
+    limits: Limits,
 }
 
 impl<'arena> MtefParser<'arena> {
     /// Create a new MTEF parser
-    pub fn new(arena: &'arena bumpalo::Bump, data: &'arena [u8]) -> Self {
-        let binary_parser = binary::MtefBinaryParser::new(arena, data).ok();
+    pub fn new(arena: &'arena bumpalo::Bump, data: &'arena [u8], limits: Limits) -> Self {
+        let (binary_parser, limit_error) = if data.len() > limits.max_input_bytes {
+            (
+                None,
+                Some(MtefError::LimitExceeded {
+                    kind: LimitKind::InputBytes,
+                    limit: limits.max_input_bytes,
+                    actual: data.len(),
+                }),
+            )
+        } else {
+            match binary::MtefBinaryParser::new(arena, data, limits) {
+                Ok(parser) => (Some(parser), None),
+                Err(error) => (None, Some(error)),
+            }
+        };
         Self {
             arena,
             binary_parser,
+            limit_error,
+            limits,
         }
     }
 
@@ -33,10 +53,18 @@ impl<'arena> MtefParser<'arena> {
     /// # Example
     /// ```ignore
     /// let formula = Formula::new();
-    /// let parser = MtefParser::new(formula.arena(), mtef_data);
+    /// let parser = MtefParser::new(formula.arena(), mtef_data, Limits::DEFAULT);
     /// let nodes = parser.parse()?;
     /// ```
     pub fn parse(&mut self) -> Result<Vec<MathNode<'arena>>, MtefError> {
+        if let Some(error) = self.limit_error.clone() {
+            return match error {
+                MtefError::LimitExceeded { .. } => Err(error),
+                // Invalid source bytes retain the historical lenient parser
+                // behavior; a selected resource limit does not.
+                _ => Ok(Vec::new()),
+            };
+        }
         if let Some(ref mut parser) = self.binary_parser {
             parser.parse()
         } else {
@@ -49,6 +77,11 @@ impl<'arena> MtefParser<'arena> {
     /// Check if the MTEF data is valid and can be parsed
     pub fn is_valid(&self) -> bool {
         self.binary_parser.is_some()
+    }
+
+    /// The resource policy retained by this parser.
+    pub fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Get MTEF version information if available
@@ -66,13 +99,21 @@ impl<'arena> MtefParser<'arena> {
 }
 
 /// Errors that can occur during MTEF parsing
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MtefError {
     InvalidFormat(String),
     UnexpectedEof,
     UnknownTag(u8),
     ParseError(String),
+    LimitExceeded {
+        /// Resource that exceeded the caller's selected policy.
+        kind: LimitKind,
+        /// Selected maximum.
+        limit: usize,
+        /// Observed amount.
+        actual: usize,
+    },
 }
 
 impl std::fmt::Display for MtefError {
@@ -82,6 +123,11 @@ impl std::fmt::Display for MtefError {
             MtefError::UnexpectedEof => write!(f, "Unexpected end of file"),
             MtefError::UnknownTag(tag) => write!(f, "Unknown tag: {:#x}", tag),
             MtefError::ParseError(msg) => write!(f, "Parse error: {}", msg),
+            MtefError::LimitExceeded {
+                kind,
+                limit,
+                actual,
+            } => write!(f, "MTEF {kind} limit {limit} exceeded by {actual}"),
         }
     }
 }
@@ -98,7 +144,7 @@ mod tests {
     #[test]
     fn test_mtef_parser_creation() {
         let formula = Formula::new();
-        let parser = MtefParser::new(formula.arena(), &[0u8; 100]);
+        let parser = MtefParser::new(formula.arena(), &[0u8; 100], Limits::DEFAULT);
 
         // Should not be valid with random data
         assert!(!parser.is_valid());
@@ -132,7 +178,7 @@ mod tests {
         ];
 
         let formula = Formula::new();
-        let parser = MtefParser::new(formula.arena(), &data);
+        let parser = MtefParser::new(formula.arena(), &data, Limits::DEFAULT);
 
         // Should be valid with proper headers
         assert!(parser.is_valid());
@@ -151,13 +197,13 @@ mod tests {
         let formula = Formula::new();
 
         // Test with data too short for OLE header
-        let parser1 = MtefParser::new(formula.arena(), &[0u8; 10]);
+        let parser1 = MtefParser::new(formula.arena(), &[0u8; 10], Limits::DEFAULT);
         assert!(!parser1.is_valid());
 
         // Test with invalid OLE header
         let mut data = vec![0u8; 28];
         data[0] = 0x10; // Invalid cb_hdr
-        let parser2 = MtefParser::new(formula.arena(), &data);
+        let parser2 = MtefParser::new(formula.arena(), &data, Limits::DEFAULT);
         assert!(!parser2.is_valid());
     }
 

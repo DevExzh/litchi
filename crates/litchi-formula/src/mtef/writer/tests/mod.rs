@@ -14,6 +14,7 @@ mod structures;
 
 use super::{MtefWriteOptions, MtefWriter};
 use crate::ast::{Formula, MathNode};
+use crate::mtef::Limits;
 use crate::mtef::MtefParser;
 use crate::mtef::constants::*;
 use crate::mtef::templates::push_leaf_text;
@@ -25,14 +26,14 @@ use std::borrow::Cow;
 
 /// Serialize nodes with the OLE equation header
 fn write(nodes: &[MathNode<'_>]) -> Vec<u8> {
-    MtefWriter::new()
+    MtefWriter::new(Limits::DEFAULT)
         .write_nodes(nodes)
         .expect("serialization should succeed")
 }
 
 /// Serialize nodes without the OLE equation header
 fn write_bare(nodes: &[MathNode<'_>]) -> Vec<u8> {
-    MtefWriter::with_options(MtefWriteOptions::without_ole_header())
+    MtefWriter::with_options(Limits::DEFAULT, MtefWriteOptions::without_ole_header())
         .write_nodes(nodes)
         .expect("serialization should succeed")
 }
@@ -44,7 +45,7 @@ fn write_bare(nodes: &[MathNode<'_>]) -> Vec<u8> {
 fn roundtrip<R>(nodes: &[MathNode<'_>], check: impl FnOnce(&[MathNode<'_>]) -> R) -> R {
     let bytes = write(nodes);
     let formula = Formula::new();
-    let mut parser = MtefParser::new(formula.arena(), &bytes);
+    let mut parser = MtefParser::new(formula.arena(), &bytes, Limits::DEFAULT);
     assert!(parser.is_valid(), "writer produced an unparsable header");
     let recovered = parser.parse().expect("parsing should succeed");
     check(&recovered)
@@ -170,7 +171,10 @@ fn header_can_be_omitted_for_bare_streams() {
 
 #[test]
 fn inline_equations_set_the_inline_flag() {
-    let writer = MtefWriter::with_options(MtefWriteOptions::default().with_inline(true));
+    let writer = MtefWriter::with_options(
+        Limits::DEFAULT,
+        MtefWriteOptions::default().with_inline(true),
+    );
     let bytes = writer.write_nodes(&[text("x")]).expect("serialization");
     assert_eq!(bytes[OLE_HEADER_LEN + 6], EQUATION_INLINE);
 }
@@ -188,7 +192,7 @@ fn a_single_character_encodes_the_expected_records() {
 
 #[test]
 fn writing_into_a_shared_buffer_appends() {
-    let writer = MtefWriter::new();
+    let writer = MtefWriter::new(Limits::DEFAULT);
     let mut buffer = vec![0xAA, 0xBB];
     writer
         .write_nodes_into(&[text("x")], &mut buffer)
@@ -203,6 +207,54 @@ fn writing_into_a_shared_buffer_appends() {
 }
 
 #[test]
+fn writing_into_a_shared_buffer_preserves_its_prefix_on_encoding_errors() {
+    let writer = MtefWriter::new(Limits::DEFAULT);
+    let prefix = vec![0xAA, 0xBB];
+
+    let mut unsupported = prefix.clone();
+    assert_eq!(
+        writer.write_nodes_into(&[text("x"), text("𝕏")], &mut unsupported),
+        Err(super::MtefWriteError::UnsupportedCharacter('𝕏'))
+    );
+    assert_eq!(unsupported, prefix);
+
+    // Exercise the admitted low-level path directly as well: this is the
+    // path that can have emitted a header and earlier CHAR record before a
+    // later encoder refusal.
+    let mut low_level = prefix.clone();
+    assert_eq!(
+        writer.write_nodes_into_admitted(&[text("x"), text("𝕏")], &mut low_level),
+        Err(super::MtefWriteError::UnsupportedCharacter('𝕏'))
+    );
+    assert_eq!(low_level, prefix);
+
+    let bad_font = MathNode::Run {
+        content: vec![text("x")],
+        literal: None,
+        style: None,
+        font: Some(Cow::Borrowed("bad\0font")),
+        color: None,
+        underline: None,
+        overline: None,
+        strike_through: None,
+        double_strike_through: None,
+    };
+    let mut invalid_font = prefix.clone();
+    assert_eq!(
+        writer.write_nodes_into(std::slice::from_ref(&bad_font), &mut invalid_font),
+        Err(super::MtefWriteError::InvalidFontName)
+    );
+    assert_eq!(invalid_font, prefix);
+
+    let mut low_level_font = prefix.clone();
+    assert_eq!(
+        writer.write_nodes_into_admitted(&[bad_font], &mut low_level_font),
+        Err(super::MtefWriteError::InvalidFontName)
+    );
+    assert_eq!(low_level_font, prefix);
+}
+
+#[test]
 fn an_empty_equation_still_produces_a_valid_stream() {
     roundtrip(&[], |recovered| assert!(recovered.is_empty()));
 }
@@ -212,7 +264,9 @@ fn a_formula_can_be_serialized_directly() {
     let mut formula = Formula::new();
     formula.set_root(vec![text("x")]);
 
-    let bytes = MtefWriter::new().write(&formula).expect("serialization");
+    let bytes = MtefWriter::new(Limits::DEFAULT)
+        .write(&formula)
+        .expect("serialization");
     assert_eq!(bytes, write(&[text("x")]));
 }
 
@@ -250,7 +304,7 @@ fn the_mtef3_fixture_still_parses() {
     let bytes = with_ole_header(&decode_hex_fixture(fixture));
 
     let formula = Formula::new();
-    let mut parser = MtefParser::new(formula.arena(), &bytes);
+    let mut parser = MtefParser::new(formula.arena(), &bytes, Limits::DEFAULT);
     assert!(parser.is_valid(), "fixture header is accepted");
     assert_eq!(parser.version_info().map(|info| info.0), Some(3));
 

@@ -859,7 +859,7 @@ impl MarkdownWriter {
 
         // Write display formulas
         for omml_xml in display_formulas {
-            let latex = omml_to_latex(&omml_xml)?;
+            let latex = omml_to_latex(&omml_xml, &litchi_formula::omml::Limits::DEFAULT)?;
 
             // Display formulas use display style (false = display mode)
             let formula_md = self.format_formula(&latex, false);
@@ -1699,7 +1699,10 @@ impl MarkdownWriter {
             // Parse OMML and convert to LaTeX
             #[cfg(feature = "formula")]
             {
-                let latex = litchi_formula::omml_to_latex(&omml_xml)?;
+                let latex = litchi_formula::omml_to_latex(
+                    &omml_xml,
+                    &litchi_formula::omml::Limits::DEFAULT,
+                )?;
                 return Ok(Some(self.format_formula(&latex, true))); // true = inline
             }
 

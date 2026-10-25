@@ -48,6 +48,31 @@ pub(crate) fn first_wins<'a>(tag: &'a BytesStart<'_>) -> FirstWins<'a> {
     }
 }
 
+/// Count a tag's attributes without enabling quick-xml's duplicate-name
+/// checks. Callers use this to charge the item budget before collecting or
+/// retaining any attribute values.
+#[allow(clippy::disallowed_methods)]
+pub(crate) fn count(tag: &BytesStart<'_>) -> usize {
+    let mut attributes = tag.attributes();
+    attributes.with_checks(false);
+    attributes.count()
+}
+
+/// Count the source bytes occupied by a tag name and its attributes without
+/// allocating an attribute vector or enabling duplicate-name checks.
+#[allow(clippy::disallowed_methods)]
+pub(crate) fn encoded_bytes(tag: &BytesStart<'_>) -> usize {
+    let mut bytes = tag.name().as_ref().len();
+    let mut attributes = tag.attributes();
+    attributes.with_checks(false);
+    for attribute in attributes.flatten() {
+        bytes = bytes
+            .saturating_add(attribute.key.as_ref().len())
+            .saturating_add(attribute.value.len());
+    }
+    bytes
+}
+
 /// The iterator [`first_wins`] returns.
 #[derive(Debug)]
 pub(crate) struct FirstWins<'a> {

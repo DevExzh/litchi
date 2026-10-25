@@ -3,10 +3,11 @@ use crate::omml::attributes::*;
 use crate::omml::elements::*;
 use crate::omml::error::OmmlError;
 use crate::omml::handlers::*;
+use crate::omml::limits::{LimitKind, Limits};
 use crate::omml::lookup::*;
 use crate::omml::properties::*;
 use crate::omml::utils::{validate_element_nesting, validate_omml_structure, *};
-use crate::omml::xml_attributes::first_wins;
+use crate::omml::xml_attributes::{count as count_attributes, encoded_bytes, first_wins};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use std::borrow::Cow;
@@ -14,12 +15,18 @@ use std::borrow::Cow;
 /// OMML parser that converts OMML XML to our formula AST
 pub struct OmmlParser<'arena> {
     arena: &'arena bumpalo::Bump,
+    limits: Limits,
 }
 
 impl<'arena> OmmlParser<'arena> {
     /// Create a new OMML parser with the given arena
-    pub fn new(arena: &'arena bumpalo::Bump) -> Self {
-        Self { arena }
+    pub fn new(arena: &'arena bumpalo::Bump, limits: Limits) -> Self {
+        Self { arena, limits }
+    }
+
+    /// The resource policy retained by this parser.
+    pub fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Parse OMML from a string
@@ -27,13 +34,20 @@ impl<'arena> OmmlParser<'arena> {
     /// # Example
     /// ```ignore
     /// let formula = Formula::new();
-    /// let parser = OmmlParser::new(formula.arena());
+    /// let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
     /// let nodes = parser.parse("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
     /// ```
     pub fn parse(&self, xml: &str) -> Result<Vec<MathNode<'arena>>, OmmlError> {
         // Validate input
         if xml.trim().is_empty() {
             return Err(OmmlError::InvalidStructure("Empty XML input".to_string()));
+        }
+        if xml.len() > self.limits.max_input_bytes() {
+            return Err(OmmlError::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                limit: self.limits.max_input_bytes(),
+                actual: xml.len(),
+            });
         }
 
         let mut reader = Reader::from_str(xml);
@@ -45,22 +59,35 @@ impl<'arena> OmmlParser<'arena> {
         let origin = if xml.starts_with('\u{feff}') { 3 } else { 0 };
 
         // Use high-performance element stack with capacity hint and context pooling
-        let mut stack = ElementStack::with_capacity(64);
-        let mut context_pool = ContextPool::new(32);
-        let mut result = Vec::new();
+        let mut stack = ElementStack::with_capacity(64.min(self.limits.max_depth()));
+        let mut context_pool = ContextPool::new(32.min(self.limits.max_items()));
+        let mut result = Vec::with_capacity(64.min(self.limits.max_items()));
         let mut depth = 0;
-        const MAX_DEPTH: usize = 1000; // Prevent stack overflow attacks
+        let mut work = 0usize;
+        let mut items = 0usize;
 
         loop {
+            work = work.saturating_add(1);
+            if work > self.limits.max_work() {
+                return Err(OmmlError::LimitExceeded {
+                    kind: LimitKind::Work,
+                    limit: self.limits.max_work(),
+                    actual: work,
+                });
+            }
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
                     depth += 1;
-                    if depth > MAX_DEPTH {
-                        return Err(OmmlError::InvalidStructure(format!(
-                            "Maximum XML depth {} exceeded",
-                            MAX_DEPTH
-                        )));
+                    if depth > self.limits.max_depth() {
+                        return Err(OmmlError::LimitExceeded {
+                            kind: LimitKind::Depth,
+                            limit: self.limits.max_depth(),
+                            actual: depth,
+                        });
                     }
+                    items = items.saturating_add(1);
+                    self.charge_items(items)?;
+                    self.check_start_bytes(e)?;
                     self.handle_start_element(e, &mut stack, &mut context_pool)?;
                 },
                 Ok(Event::End(ref e)) => {
@@ -74,17 +101,23 @@ impl<'arena> OmmlParser<'arena> {
                     depth = depth.saturating_sub(1);
                 },
                 Ok(Event::Text(ref e)) => {
+                    self.check_string_bytes(e.as_ref().len())?;
                     // Decode, unescape entities (&amp;, &lt;, ...), and normalize
                     // end-of-line characters before storing.
                     let text = e
                         .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|err| OmmlError::XmlError(format!("Unescape error: {}", err)))?;
+                    self.check_string_bytes(text.len())?;
                     self.handle_text_element(text.as_bytes(), &mut stack)?;
                 },
                 Ok(Event::CData(ref e)) => {
+                    self.check_string_bytes(e.as_ref().len())?;
                     self.handle_cdata_element(e, &mut stack)?;
                 },
                 Ok(Event::Empty(ref e)) => {
+                    items = items.saturating_add(1);
+                    self.charge_items(items)?;
+                    self.check_start_bytes(e)?;
                     // Handle self-closing tags
                     self.handle_empty_element(e, &mut stack, &mut result, &mut context_pool)?;
                 },
@@ -126,6 +159,32 @@ impl<'arena> OmmlParser<'arena> {
         Ok(result)
     }
 
+    fn charge_items(&self, actual: usize) -> Result<(), OmmlError> {
+        if actual > self.limits.max_items() {
+            return Err(OmmlError::LimitExceeded {
+                kind: LimitKind::Items,
+                limit: self.limits.max_items(),
+                actual,
+            });
+        }
+        Ok(())
+    }
+
+    fn check_string_bytes(&self, actual: usize) -> Result<(), OmmlError> {
+        if actual > self.limits.max_string_bytes() {
+            return Err(OmmlError::LimitExceeded {
+                kind: LimitKind::StringBytes,
+                limit: self.limits.max_string_bytes(),
+                actual,
+            });
+        }
+        Ok(())
+    }
+
+    fn check_start_bytes(&self, elem: &BytesStart<'_>) -> Result<(), OmmlError> {
+        self.check_string_bytes(encoded_bytes(elem))
+    }
+
     fn handle_start_element(
         &self,
         elem: &BytesStart,
@@ -156,7 +215,12 @@ impl<'arena> OmmlParser<'arena> {
         let parent_type = stack.last().map(|ctx| ctx.element_type);
         validate_element_nesting(&element_type, parent_type.as_ref())?;
 
-        // Create new context for this element using the context pool
+        // Reject large attribute sets before collecting the first-wins view.
+        let attribute_count = count_attributes(elem);
+        self.charge_items(attribute_count)?;
+
+        // Create new context for this element using the context pool only
+        // after the item budget has admitted its input-controlled attributes.
         let mut context = context_pool.get(element_type);
 
         // Parse attributes using SIMD-accelerated parsing with caching
@@ -537,12 +601,16 @@ impl<'arena> OmmlParser<'arena> {
         event: &[u8],
         stack: &mut ElementStack<'arena>,
     ) -> Result<(), OmmlError> {
-        if let Some(context) = stack.last_mut() {
-            // For OMML, text content is typically plain and doesn't need unescaping
-            let text_str =
-                std::str::from_utf8(event).map_err(|e| OmmlError::ParseError(e.to_string()))?;
+        // For OMML, text content is typically plain and doesn't need
+        // unescaping.  Check the trimmed bytes against the existing buffer
+        // before `process_text_zero_copy` can allocate an owned trim.
+        let text_str =
+            std::str::from_utf8(event).map_err(|e| OmmlError::ParseError(e.to_string()))?;
+        let retained = text_str.trim();
+        let current = stack.last().map_or(0, |context| context.text.len());
+        self.check_string_bytes(current.saturating_add(retained.len()))?;
 
-            // Process text efficiently
+        if let Some(context) = stack.last_mut() {
             let processed_text = process_text_zero_copy(text_str);
             context.text.push_str(processed_text.as_ref());
         }
@@ -555,12 +623,16 @@ impl<'arena> OmmlParser<'arena> {
         event: &[u8],
         stack: &mut ElementStack<'arena>,
     ) -> Result<(), OmmlError> {
-        if let Some(context) = stack.last_mut() {
-            // CDATA content is already unescaped by quick-xml
-            let text_str =
-                std::str::from_utf8(event).map_err(|e| OmmlError::ParseError(e.to_string()))?;
+        // CDATA content is already unescaped by quick-xml.  Text and CDATA
+        // events can be split for one m:t element, so charge the cumulative
+        // retained TextBuffer rather than each event independently.
+        let text_str =
+            std::str::from_utf8(event).map_err(|e| OmmlError::ParseError(e.to_string()))?;
+        let retained = text_str.trim();
+        let current = stack.last().map_or(0, |context| context.text.len());
+        self.check_string_bytes(current.saturating_add(retained.len()))?;
 
-            // Process text efficiently
+        if let Some(context) = stack.last_mut() {
             let processed_text = process_text_zero_copy(text_str);
             context.text.push_str(processed_text.as_ref());
         }
@@ -593,6 +665,11 @@ impl<'arena> OmmlParser<'arena> {
             ("e" | "m:e", Some(ElementType::MatrixRow)) => ElementType::MatrixCell,
             _ => element_type,
         };
+
+        // Reject large attribute sets before collecting the first-wins view or
+        // allocating a context for this self-closing element.
+        let attribute_count = count_attributes(elem);
+        self.charge_items(attribute_count)?;
 
         // For self-closing elements, we need to handle both start and end logic
         let mut context = context_pool.get(element_type);

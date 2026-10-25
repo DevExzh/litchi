@@ -2406,11 +2406,15 @@ impl Classify for litchi_crypto::ooxml::Error {
 #[cfg(feature = "formula")]
 impl Classify for litchi_formula::FormulaError {
     fn classify(&self) -> Class {
-        use litchi_formula::OmmlError;
+        use litchi_formula::{MtefError, MtefWriteError, OmmlError};
 
         match self {
             Self::Omml(OmmlError::UnsupportedFeature(_)) => Class::of(Code::UnsupportedElement),
-            Self::Omml(OmmlError::DepthLimitExceeded(_)) => Class::of(Code::LimitExceeded),
+            Self::Omml(OmmlError::LimitExceeded { .. }) => Class::of(Code::LimitExceeded),
+            Self::Mtef(MtefError::LimitExceeded { .. })
+            | Self::MtefWrite(MtefWriteError::LimitExceeded { .. }) => {
+                Class::of(Code::LimitExceeded)
+            },
             Self::Omml(OmmlError::ArenaAllocationError(_)) => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }

@@ -166,6 +166,14 @@ Record 0362i names ODraw traversal resources `LimitKind` and image resources
 `image::LimitKind`. The former root names `Limit` and `ImageLimit` are deleted
 and banned; error variants and their existing observations stay unchanged.
 
+Record 0362ul69 registers the Formula raw codec profile. `mtef::MtefParser`,
+`mtef::MtefWriter`, `omml::OmmlParser` and `omml::OmmlWriter` retain the
+caller-selected finite `mtef::Limits`/`omml::Limits` policy, and the public
+MTEF/OMML conversion helpers require those policies at every raw boundary.
+Input, depth, work, item, string and output ceilings are checked before
+retention, allocation or emission; the conversion and parser tests preserve
+wire and semantic round trips.
+
 ### Migration status by wave (record 0351)
 
 Each wave flips only its own lines, so parallel waves do not edit the same
