@@ -350,7 +350,7 @@ fn exercise_precompressed_republication<R: ReaderAt>(
         let error = index
             .write_to_with_accounting(&plan, &mut partial_sink, &mut partial_accounting)
             .expect_err("partial sink must fail after its accepted prefix");
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(partial_sink.bytes, output[..fail_after]);
         let accepted_payload = accepted_prefix as u64;
         match token.compression_method() {

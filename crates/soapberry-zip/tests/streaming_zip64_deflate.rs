@@ -621,10 +621,7 @@ fn owned_stream_reports_sink_failure_with_progress() {
         Ok(_) => panic!("poisoned entry unexpectedly finished"),
         Err(failure) => failure,
     };
-    assert!(matches!(
-        failure.error().kind(),
-        ErrorKind::IO(_) | ErrorKind::Io(_)
-    ));
+    assert!(matches!(failure.error().kind(), ErrorKind::IO(_)));
     assert!(failure.progress().is_poisoned());
     assert!(failure.progress().output_bytes() <= sink.fail_after as u64);
 }

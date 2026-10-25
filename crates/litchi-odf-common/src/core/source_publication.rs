@@ -1795,7 +1795,7 @@ pub(crate) fn map_preflight_zip_error(
         ZipErrorKind::UnsupportedCompressionMethod(method) => {
             unsupported(format!("unsupported source compression method {method}"))
         },
-        ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => map_owned_io_error(
+        ZipErrorKind::IO(source) => map_owned_io_error(
             source,
             SourceContentPublicationProgress::Untouched,
             UnmarkedIo::Source,
@@ -1825,7 +1825,7 @@ fn map_zip_error(
                 reason: format!("unsupported generated compression method {method}"),
             }
         },
-        ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => {
+        ZipErrorKind::IO(source) => {
             let default = if progress == SourceContentPublicationProgress::Untouched {
                 UnmarkedIo::Archive
             } else {

@@ -16434,15 +16434,10 @@ impl soapberry_zip::office::CancellationProbe for PublicationCancellation {
 }
 
 fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
-    let is_io = matches!(
-        error.kind(),
-        soapberry_zip::ErrorKind::IO(_) | soapberry_zip::ErrorKind::Io(_)
-    );
+    let is_io = matches!(error.kind(), soapberry_zip::ErrorKind::IO(_));
     if is_io {
         return match error.into_kind() {
-            soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-                map_io_error(error)
-            },
+            soapberry_zip::ErrorKind::IO(error) => map_io_error(error),
             kind => OpcError::ZipError(kind.to_string()),
         };
     }

@@ -1590,7 +1590,7 @@ pub(crate) fn map_zip_error(error: soapberry_zip::Error) -> Error {
             actual,
             maximum,
         } => zip_limit_error(resource, actual, maximum),
-        ZipErrorKind::IO(io_error) | ZipErrorKind::Io(io_error) => {
+        ZipErrorKind::IO(io_error) => {
             if let Some(source) = io_error
                 .get_ref()
                 .and_then(|source| source.downcast_ref::<SourceChangedIo>())
@@ -1646,9 +1646,7 @@ fn map_source_member_reader_error<E>(
 
 fn map_source_member_zip_error(error: soapberry_zip::Error) -> Error {
     match error.into_kind() {
-        ZipErrorKind::IO(error) | ZipErrorKind::Io(error) => {
-            map_source_member_transport_error(error)
-        },
+        ZipErrorKind::IO(error) => map_source_member_transport_error(error),
         kind => map_zip_error(soapberry_zip::Error::from(kind)),
     }
 }

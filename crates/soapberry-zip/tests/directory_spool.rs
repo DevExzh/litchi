@@ -1000,7 +1000,7 @@ fn final_output_flush_failure_is_preserved() {
         .write_stored_file("flush.bin", STORED_PAYLOAD)
         .expect("flush entry");
     let error = archive.finish().expect_err("sink flush must fail");
-    assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+    assert!(matches!(error.kind(), ErrorKind::IO(_)));
     assert!(!sink.bytes.is_empty());
 }
 
@@ -1440,7 +1440,7 @@ fn no_spool_partial_sized_write_poisons_future_writes_and_finish() {
     let error = archive
         .write_stored_file("sized.bin", STORED_PAYLOAD)
         .expect_err("partial sized output must fail");
-    assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+    assert!(matches!(error.kind(), ErrorKind::IO(_)));
 
     let next = archive
         .write_stored_file("after.bin", b"after")
@@ -1460,7 +1460,7 @@ fn no_spool_partial_directory_header_poisons_future_writes_and_finish() {
         .new_dir("partial/")
         .create()
         .expect_err("partial directory header must fail");
-    assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+    assert!(matches!(error.kind(), ErrorKind::IO(_)));
 
     let next = archive
         .write_stored_file("after.bin", b"after")

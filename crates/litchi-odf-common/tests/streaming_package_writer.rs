@@ -373,7 +373,7 @@ fn reader_failure_preserves_nested_source_chain() {
         other => panic!("expected archive source, got {other:?}"),
     };
     let io_error = match archive.kind() {
-        soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => error,
+        soapberry_zip::ErrorKind::IO(error) => error,
         other => panic!("expected retained I/O source, got {other:?}"),
     };
     assert!(
@@ -462,7 +462,7 @@ fn finalization_sink_failure_preserves_nested_source_chain() {
         other => panic!("expected archive failure source, got {other:?}"),
     };
     let io_error = match failure.error().kind() {
-        soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => error,
+        soapberry_zip::ErrorKind::IO(error) => error,
         other => panic!("expected retained I/O source, got {other:?}"),
     };
     assert!(

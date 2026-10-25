@@ -444,11 +444,11 @@ impl std::error::Error for PackageWriterError {
         match self {
             Self::Core(error) => Some(error),
             Self::Archive(error) => match error.kind() {
-                ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => Some(source),
+                ZipErrorKind::IO(source) => Some(source),
                 _ => Some(error),
             },
             Self::ArchiveFailure(failure) => match failure.error().kind() {
-                ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => Some(source),
+                ZipErrorKind::IO(source) => Some(source),
                 _ => Some(failure),
             },
             Self::IncompleteOutput { source, .. } | Self::LimitExceeded { source, .. } => {
