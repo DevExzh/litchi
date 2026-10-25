@@ -218,6 +218,7 @@ pub(super) fn readback_incremental(
                 container.bytes,
                 position,
                 slide.outline_text_bodies(),
+                slide.source_limits(),
                 target,
             )?;
             replacements.push((position, after));
@@ -241,19 +242,23 @@ fn convert_changed_shape(
     container: &[u8],
     index: usize,
     outline: &[crate::OutlineTextBody],
+    source_limits: crate::SourceLimits,
     target: &ReadbackTarget<'_>,
 ) -> Option<ShapeEnum<'static>> {
     // The role checks a drawing applies (`PATRIARCH`/`CHILD` against the
     // topology) read only the unchanged `Sp` atom, which the source parse
     // already accepted at this position; a standalone parse builds the same
     // shape value.
-    let escher = litchi_odraw::shape::parse(container, Default::default()).ok()?;
+    let escher =
+        litchi_odraw::shape::parse(container, crate::odraw::limits_for_source(source_limits))
+            .ok()?;
     let [escher] = escher.as_slice() else {
         return None;
     };
     let mut report = crate::leniency::ToleranceReport::default();
     let mut shape =
-        Slide::convert_odraw_to_shape_enum(escher, index, outline, &mut report).ok()??;
+        Slide::convert_odraw_to_shape_enum(escher, index, outline, source_limits, &mut report)
+            .ok()??;
     if !report.defects().is_empty() || report.unrecorded() != 0 {
         return None;
     }

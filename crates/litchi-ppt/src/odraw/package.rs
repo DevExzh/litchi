@@ -20,15 +20,17 @@ pub(super) struct RawRecords<'data> {
     data: &'data [u8],
     offset: usize,
     seen: u32,
+    max_records: u32,
     failed: bool,
 }
 
 impl<'data> RawRecords<'data> {
-    pub(super) fn new(data: &'data [u8]) -> Self {
+    pub(super) fn new(data: &'data [u8], max_records: u32) -> Self {
         Self {
             data,
             offset: 0,
             seen: 0,
+            max_records,
             failed: false,
         }
     }
@@ -42,7 +44,7 @@ impl<'data> Iterator for RawRecords<'data> {
             return None;
         }
         self.seen = match self.seen.checked_add(1) {
-            Some(seen) if seen <= MAX_HOST_RECORDS => seen,
+            Some(seen) if seen <= self.max_records => seen,
             _ => {
                 self.failed = true;
                 return Some(Err(corrupted("Host payload exceeds the PPT record limit")));
@@ -122,11 +124,11 @@ pub(super) fn advance(offset: usize, consumed: usize, context: &str) -> Result<u
         .ok_or_else(|| corrupted(&format!("{context} offset overflow")))
 }
 
-pub(super) fn visit_host_record(records: &mut u32) -> Result<()> {
+pub(super) fn visit_host_record(records: &mut u32, max_records: u32) -> Result<()> {
     *records = records
         .checked_add(1)
         .ok_or_else(|| corrupted("Host payload record count overflow"))?;
-    if *records > MAX_HOST_RECORDS {
+    if *records > max_records {
         return Err(corrupted("Host payload exceeds the PPT record limit"));
     }
     Ok(())

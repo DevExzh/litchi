@@ -173,6 +173,7 @@ pub struct SpeakerNotes {
     persist_id: u32,
     slide_id_ref: u32,
     record: Record,
+    source_limits: SourceLimits,
     /// Lazily parsed shapes, together with the non-structural defects
     /// repaired while they were parsed.
     shapes: OnceCell<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)>,
@@ -237,6 +238,7 @@ impl SpeakerNotes {
             persist_id: descriptor.persist_id,
             slide_id_ref,
             record,
+            source_limits: limits,
             shapes: OnceCell::new(),
             text: OnceCell::new(),
         })
@@ -358,12 +360,19 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok((Vec::new(), report));
         };
-        let parsed = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
+        let parsed = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for (index, shape) in parsed.iter().enumerate() {
-            if let Some(mut converted_shape) =
-                Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &[], &mut report)?
-            {
+            if let Some(mut converted_shape) = Slide::<'static>::convert_odraw_to_shape_enum(
+                shape,
+                index,
+                &[],
+                self.source_limits,
+                &mut report,
+            )? {
                 converted_shape.mark_source_bound_recursive();
                 shapes.push(converted_shape);
             }
@@ -387,7 +396,10 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
+        let shapes = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut ids = Vec::new();
         let mut pending = shapes.iter().rev().collect::<Vec<_>>();
         let mut visited = 0usize;
@@ -415,7 +427,10 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(String::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
+        let shapes = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut text = Vec::new();
         for shape in &shapes {
             collect_notes_body_text(shape, &mut text)?;

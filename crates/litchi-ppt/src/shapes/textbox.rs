@@ -89,6 +89,7 @@ impl<'a> TextBox<'a> {
         properties: ShapeProperties,
         shape: &OdrawShape<'_>,
         outline: &[crate::OutlineTextBody],
+        source_limits: crate::SourceLimits,
         report: &mut crate::leniency::ToleranceReport,
     ) -> super::super::package::Result<TextBox<'static>> {
         let first_defect = report.defects().len();
@@ -96,12 +97,22 @@ impl<'a> TextBox<'a> {
         let wrapper = textbox
             .as_ref()
             .map(|record| {
-                crate::EscherTextboxWrapper::new_with_report(record.data().to_vec(), report)
+                crate::EscherTextboxWrapper::new_source_bound_with_report(
+                    record.data().to_vec(),
+                    source_limits,
+                    report,
+                )
             })
             .transpose()?;
         let outline_wrapper = match (&textbox, &wrapper) {
             (Some(record), Some(inline)) if !inline.outline_text_refs().is_empty() => {
-                Self::outline_wrapper(record.data(), outline, report)?
+                Self::outline_wrapper(
+                    record.data(),
+                    outline,
+                    source_limits,
+                    shape.container().record().limits().max_records,
+                    report,
+                )?
             },
             _ => None,
         };
@@ -187,16 +198,21 @@ impl<'a> TextBox<'a> {
     fn outline_wrapper(
         payload: &[u8],
         outline: &[crate::OutlineTextBody],
+        source_limits: crate::SourceLimits,
+        max_records: u32,
         report: &mut crate::leniency::ToleranceReport,
     ) -> super::super::package::Result<Option<crate::EscherTextboxWrapper>> {
         use crate::odraw::TextRecords;
 
-        let unresolved = match crate::odraw::textbox_text_records(payload, outline)? {
+        let unresolved = match crate::odraw::textbox_text_records(payload, outline, max_records)? {
             TextRecords::Inline(_) => return Ok(None),
             TextRecords::Outline { index, body } => {
                 let checkpoint = report.checkpoint();
-                match crate::EscherTextboxWrapper::new_with_report(body.records().to_vec(), report)
-                {
+                match crate::EscherTextboxWrapper::new_source_bound_with_report(
+                    body.records().to_vec(),
+                    source_limits,
+                    report,
+                ) {
                     Ok(wrapper) => return Ok(Some(wrapper)),
                     Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
                         report.rollback(checkpoint);
@@ -933,6 +949,7 @@ mod tests {
             properties,
             shape,
             &[],
+            crate::SourceLimits::default(),
             &mut crate::leniency::ToleranceReport::default(),
         )
     }

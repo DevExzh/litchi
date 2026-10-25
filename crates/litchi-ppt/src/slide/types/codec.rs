@@ -104,9 +104,13 @@ impl Slide<'_> {
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());
         for (index, escher_shape) in escher_shapes.iter().enumerate() {
-            if let Some(mut shape) =
-                Self::convert_odraw_to_shape_enum(escher_shape, index, outline, report)?
-            {
+            if let Some(mut shape) = Self::convert_odraw_to_shape_enum(
+                escher_shape,
+                index,
+                outline,
+                source_limits,
+                report,
+            )? {
                 shape.mark_source_bound_recursive();
                 shapes.push(shape);
             }
@@ -132,9 +136,10 @@ impl Slide<'_> {
         odraw_shape: &litchi_odraw::shape::Shape<'_>,
         index: usize,
         outline: &[crate::OutlineTextBody],
+        source_limits: crate::SourceLimits,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
-        Self::convert_odraw_shape(odraw_shape, 0, index, outline, report)
+        Self::convert_odraw_shape(odraw_shape, 0, index, outline, source_limits, report)
     }
 
     /// Convert one shape and, for a group, each of its children, isolating
@@ -152,6 +157,7 @@ impl Slide<'_> {
         depth: usize,
         index: usize,
         outline: &[crate::OutlineTextBody],
+        source_limits: crate::SourceLimits,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
         if depth >= super::validation::MAX_SHAPE_DEPTH {
@@ -161,26 +167,27 @@ impl Slide<'_> {
         }
 
         let checkpoint = report.checkpoint();
-        let mut converted = match Self::convert_odraw_shape_node(escher_shape, outline, report) {
-            Ok(converted) => converted,
-            Err(error) => {
-                report.rollback(checkpoint);
-                if !super::validation::is_isolatable_shape_error(&error)
-                    || crate::odraw::validate_host_framing(escher_shape).is_err()
-                {
-                    return Err(error);
-                }
-                report.record_at(
-                    crate::leniency::ShapeDefect::UnreadableShape,
-                    u32::try_from(index).unwrap_or(u32::MAX),
-                    crate::leniency::DefectLocation {
-                        persist_id: None,
-                        shape_id: Some(escher_shape.id()),
-                    },
-                );
-                return Ok(None);
-            },
-        };
+        let mut converted =
+            match Self::convert_odraw_shape_node(escher_shape, outline, source_limits, report) {
+                Ok(converted) => converted,
+                Err(error) => {
+                    report.rollback(checkpoint);
+                    if !super::validation::is_isolatable_shape_error(&error)
+                        || crate::odraw::validate_host_framing(escher_shape).is_err()
+                    {
+                        return Err(error);
+                    }
+                    report.record_at(
+                        crate::leniency::ShapeDefect::UnreadableShape,
+                        u32::try_from(index).unwrap_or(u32::MAX),
+                        crate::leniency::DefectLocation {
+                            persist_id: None,
+                            shape_id: Some(escher_shape.id()),
+                        },
+                    );
+                    return Ok(None);
+                },
+            };
 
         // The shape keeps its stable position among its siblings — `index`
         // counts every sibling, read or not — and its name and alternative
@@ -207,6 +214,7 @@ impl Slide<'_> {
                     depth + 1,
                     child_index,
                     outline,
+                    source_limits,
                     report,
                 )? {
                     group.add_decoded_child(child_shape);
@@ -235,19 +243,24 @@ impl Slide<'_> {
         let Some(textbox) = crate::odraw::textbox(escher_shape)? else {
             return Ok(None);
         };
-        let unresolved = match crate::odraw::textbox_text_records(textbox.data(), outline)? {
-            TextRecords::Inline(payload) => {
-                return crate::odraw::text_from_textbox_payload(payload);
-            },
-            TextRecords::Outline { index, body } => {
-                match crate::odraw::text_from_textbox_payload(body.records()) {
-                    Ok(text) => return Ok(text),
-                    Err(error) if super::validation::is_isolatable_shape_error(&error) => index,
-                    Err(error) => return Err(error),
-                }
-            },
-            TextRecords::Unresolved(context) => context,
-        };
+        let max_records = escher_shape.container().record().limits().max_records;
+        let unresolved =
+            match crate::odraw::textbox_text_records(textbox.data(), outline, max_records)? {
+                TextRecords::Inline(payload) => {
+                    return crate::odraw::text_from_textbox_payload_bounded(payload, max_records);
+                },
+                TextRecords::Outline { index, body } => {
+                    match crate::odraw::text_from_textbox_payload_bounded(
+                        body.records(),
+                        max_records,
+                    ) {
+                        Ok(text) => return Ok(text),
+                        Err(error) if super::validation::is_isolatable_shape_error(&error) => index,
+                        Err(error) => return Err(error),
+                    }
+                },
+                TextRecords::Unresolved(context) => context,
+            };
         report.record_at(
             crate::leniency::ShapeDefect::UnresolvedOutlineTextRef,
             unresolved,
@@ -263,6 +276,7 @@ impl Slide<'_> {
     fn convert_odraw_shape_node(
         escher_shape: &litchi_odraw::shape::Shape<'_>,
         outline: &[crate::OutlineTextBody],
+        source_limits: crate::SourceLimits,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Option<ShapeEnum<'static>>> {
         use crate::shapes::{
@@ -361,6 +375,7 @@ impl Slide<'_> {
                     properties,
                     escher_shape,
                     outline,
+                    source_limits,
                     report,
                 )?)))
             },
@@ -554,8 +569,11 @@ impl Slide<'_> {
         // outline references resolved into the slide-list text they select
         // (L-PPT-R1). This is separate from regular record text extraction.
         if let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) {
-            let escher_text =
-                crate::odraw::text_from_slide_drawing(&ppdrawing.data, self.outline_text_bodies)?;
+            let escher_text = crate::odraw::text_from_slide_drawing(
+                &ppdrawing.data,
+                self.outline_text_bodies,
+                self.source_limits,
+            )?;
             let escher_trimmed = escher_text.trim();
             if !escher_trimmed.is_empty() {
                 text_parts.push(escher_trimmed.to_string());

@@ -1961,12 +1961,13 @@ fn outline_references_supply_text_and_record_what_they_cannot_resolve() {
     // Slide text resolves the same references in drawing order (each text
     // box ends with a line feed; `Slide::text` trims the whole).
     assert_eq!(
-        crate::odraw::text_from_slide_drawing(&drawing, &bodies).unwrap(),
+        crate::odraw::text_from_slide_drawing(&drawing, &bodies, crate::SourceLimits::default())
+            .unwrap(),
         "Resolved title\nBody\rtext\nBody\rtext\nResolved title\n"
     );
     // Without a slide, only inline text is read.
     assert_eq!(
-        crate::odraw::text_from_drawing(&drawing).unwrap(),
+        crate::odraw::text_from_drawing(&drawing, crate::SourceLimits::default()).unwrap(),
         "Inline\n"
     );
 }

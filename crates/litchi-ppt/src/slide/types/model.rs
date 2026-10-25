@@ -38,6 +38,10 @@ impl<'doc> Slide<'doc> {
             source_limits: data.source_limits,
         }
     }
+
+    pub(crate) const fn source_limits(&self) -> crate::SourceLimits {
+        self.source_limits
+    }
 }
 
 /// A parsed comment from a PPT slide.

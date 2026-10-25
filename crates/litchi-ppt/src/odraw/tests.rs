@@ -29,7 +29,7 @@ fn ppt_text_atoms_use_their_specified_encodings() {
     bytes.extend_from_slice(&[0x80, 0xe9]);
 
     let mut text = String::new();
-    text_from_ppt_records(&bytes, &mut text).unwrap();
+    text_from_ppt_records(&bytes, &mut text, super::package::MAX_HOST_RECORDS).unwrap();
 
     assert_eq!(text, "😀\n\u{80}é");
 }
@@ -37,8 +37,18 @@ fn ppt_text_atoms_use_their_specified_encodings() {
 #[test]
 fn malformed_embedded_record_stops_without_panicking() {
     let mut text = String::new();
-    assert!(text_from_ppt_records(&[0; 7], &mut text).is_err());
+    assert!(text_from_ppt_records(&[0; 7], &mut text, super::package::MAX_HOST_RECORDS).is_err());
     assert!(text.is_empty());
+}
+
+#[test]
+fn embedded_text_records_honor_the_caller_event_limit() {
+    let first = record(0, 0, 4000, &[0; 2]);
+    let second = record(0, 0, 4000, &[0; 2]);
+    let data = [first.as_slice(), second.as_slice()].concat();
+    let mut text = String::new();
+
+    assert!(text_from_ppt_records(&data, &mut text, 1).is_err());
 }
 
 #[test]
@@ -52,21 +62,53 @@ fn concatenated_drawing_roots_are_complete_and_strict() {
             .unwrap()
             .is_empty()
     );
-    assert_eq!(text_from_drawing(&stream).unwrap(), "");
+    assert_eq!(
+        text_from_drawing(&stream, crate::SourceLimits::default()).unwrap(),
+        ""
+    );
 
     let malformed = [stream.as_slice(), &[0]].concat();
     assert!(parse(&malformed, &super::Limits::default()).is_err());
-    assert!(text_from_drawing(&malformed).is_err());
+    assert!(text_from_drawing(&malformed, crate::SourceLimits::default()).is_err());
 }
 
 #[test]
 fn source_limits_intersect_officeart_safety_ceiling() {
     let dg = record(0, 0, RecordKind::Dg.raw(), &[0; 8]);
-    let drawing = record(0x0f, 0, RecordKind::DgContainer.raw(), &dg);
+    let mut shape_atom = Vec::new();
+    shape_atom.extend_from_slice(&42u32.to_le_bytes());
+    shape_atom.extend_from_slice(&0x0800u32.to_le_bytes());
+    let shape = record(
+        0x0f,
+        0,
+        RecordKind::SpContainer.raw(),
+        &record(2, 1, RecordKind::Sp.raw(), &shape_atom),
+    );
+    let shape_drawing_payload = [dg.as_slice(), shape.as_slice()].concat();
+    let shape_drawing = record(
+        0x0f,
+        0,
+        RecordKind::DgContainer.raw(),
+        &shape_drawing_payload,
+    );
     let source = crate::SourceLimits::default();
     let limits = super::limits_for_source(source);
+    let expected_body_limit = source
+        .max_record_bytes()
+        .saturating_sub(8)
+        .min(source.max_record_payload_bytes());
+    assert_eq!(limits.max_record_bytes as usize, expected_body_limit);
     assert_eq!(limits.max_depth, super::Limits::default().max_depth);
-    assert!(parse(&drawing, &limits).unwrap().is_empty());
+    assert_eq!(parse(&shape_drawing, &limits).unwrap().len(), 1);
+
+    let hard_depth_source = crate::SourceLimits::builder()
+        .max_depth(64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let hard_depth = super::limits_for_source(hard_depth_source);
+    assert_eq!(hard_depth.max_depth, 64);
+    assert_eq!(parse(&shape_drawing, &hard_depth).unwrap().len(), 1);
 
     let restrictive_source = crate::SourceLimits::builder()
         .max_record_bytes(1024)
@@ -78,10 +120,41 @@ fn source_limits_intersect_officeart_safety_ceiling() {
         .build()
         .unwrap();
     let restrictive = super::limits_for_source(restrictive_source);
-    assert_eq!(restrictive.max_record_bytes, 1024);
+    assert_eq!(restrictive.max_record_bytes, 1024 - 8);
     assert_eq!(restrictive.max_records, 16);
     assert_eq!(restrictive.max_depth, 1);
-    assert!(parse(&drawing, &restrictive).unwrap().is_empty());
+    assert!(parse(&shape_drawing, &restrictive).is_ok());
+
+    let event_limited_source = crate::SourceLimits::builder()
+        .max_events(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let event_limited = super::limits_for_source(event_limited_source);
+    assert_eq!(event_limited.max_records, 1);
+    assert!(parse(&shape_drawing, &event_limited).is_err());
+
+    let payload_limited_source = crate::SourceLimits::builder()
+        .max_record_bytes(1024)
+        .unwrap()
+        .max_record_payload_bytes(8)
+        .unwrap()
+        .build()
+        .unwrap();
+    let payload_limited = super::limits_for_source(payload_limited_source);
+    assert_eq!(payload_limited.max_record_bytes, 8);
+    assert!(parse(&shape_drawing, &payload_limited).is_err());
+
+    let encoded_limited_source = crate::SourceLimits::builder()
+        .max_record_bytes(12)
+        .unwrap()
+        .max_record_payload_bytes(1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let encoded_limited = super::limits_for_source(encoded_limited_source);
+    assert_eq!(encoded_limited.max_record_bytes, 4);
+    assert!(parse(&shape_drawing, &encoded_limited).is_err());
 
     let spgr = record(0, 0, RecordKind::Spgr.raw(), &[0; 16]);
     let group_header = |flags: u32| {

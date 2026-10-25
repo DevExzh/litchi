@@ -210,6 +210,7 @@ impl PictureBullet {
             self.picture_type,
             &self.officeart_record,
             limits.max_officeart_record_bytes,
+            limits.records,
         )?;
         let payload_len =
             self.officeart_record.len().checked_add(2).ok_or_else(|| {
@@ -479,6 +480,7 @@ fn parse_picture_bullet_with_limits(
         picture_type,
         officeart_record,
         limits.max_officeart_record_bytes,
+        limits.records,
     )?;
 
     let mut owned_officeart = Vec::new();
@@ -508,6 +510,7 @@ fn validate_officeart_record(
     picture_type: PictureBulletType,
     officeart_record: &[u8],
     maximum: usize,
+    source_limits: SourceLimits,
 ) -> Result<()> {
     if officeart_record.len() < 8 || officeart_record.len() > maximum {
         return Err(if officeart_record.len() > maximum {
@@ -516,8 +519,11 @@ fn validate_officeart_record(
             Error::Corrupted("picture-bullet OfficeArt record is truncated".into())
         });
     }
-    let (image_record, consumed) =
-        litchi_odraw::Record::parse(officeart_record, 0, litchi_odraw::Limits::default())?;
+    let (image_record, consumed) = litchi_odraw::Record::parse(
+        officeart_record,
+        0,
+        crate::odraw::limits_for_source(source_limits),
+    )?;
     if consumed != officeart_record.len() {
         return Err(Error::Corrupted(
             "Picture-bullet OfficeArt record has an invalid size".to_string(),
@@ -687,7 +693,10 @@ fn collect_source_picture_bullet_references(
         .into_iter()
         .filter(|record| record.record_type == RecordType::PPDrawing)
     {
-        let drawing = crate::odraw::parse(&record.data, &crate::odraw::Limits::default())?;
+        let drawing = crate::odraw::parse(
+            &record.data,
+            &crate::odraw::limits_for_source(presentation.source_limits()),
+        )?;
         for shape in &drawing {
             if let Some(tags) = shape.programmable_tags_with_limits(shape_limits)?
                 && let Some(style) = tags.powerpoint9()

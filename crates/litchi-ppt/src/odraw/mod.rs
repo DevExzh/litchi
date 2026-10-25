@@ -20,6 +20,6 @@ pub use model::{Anchor, Drawing, FrameKind, Placeholder, ShapeExt};
 
 pub(crate) use codec::{
     TextRecords, limits_for_source, powerpoint12_shape_metadata, shape_labels,
-    text_from_slide_drawing, text_from_textbox_payload, textbox, textbox_text_records,
-    validate_host_framing,
+    text_from_slide_drawing, text_from_textbox_payload, text_from_textbox_payload_bounded, textbox,
+    textbox_text_records, validate_host_framing,
 };
