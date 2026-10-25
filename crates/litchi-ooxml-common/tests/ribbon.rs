@@ -30,7 +30,7 @@ fn stores_borrows_and_roundtrips_local_ribbon_xml() {
     );
 
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let reopened = ribbon::load(&reopened, &ribbon::Limits::standard()).unwrap();
     let reopened = reopened.effective().unwrap();
     assert_eq!(reopened.part().as_str(), "/customUI/customUI.xml");
