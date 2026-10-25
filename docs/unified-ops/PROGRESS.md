@@ -4618,3 +4618,35 @@ See [0063](0063-source-pptx-modern-comments.md).
   budget gaps; this performance regression is not accepted. All remaining
   source fixes, full-gate and performance obligations stay active. Nothing
   is pushed.
+
+- Coordinator iWork naming and validation update (2026-10-25):
+  Canonical iWork removal-result names merge at `21fafcc599` from final
+  `0524a814ae`. Root verifies the seventeen identifier migrations and exact
+  source equality with pinned `375f55e8df` apart from documentation. The
+  pinned Rust 1.95 iWork and ops/facade all-target Clippy runs pass; retained
+  log/trace digests, source identity, lock identities and target guards match.
+  Record 0362ul48 preserves the missing-fixture failure and explicitly states
+  that only selected terminal receipt fields, not a full preflight, survived.
+  All 82 composed glossary, iWork API and benchmark-matrix tests pass.
+
+  The attempted matrix classification exposes a separate guard defect:
+  numbered follow-ups such as `0362ul48` are not recognized by its record-ID
+  pattern. A dedicated tooling leaf is fixing the pattern and auditing every
+  newly recognized evidence directory; no measurement is relabeled as source
+  validation. The unsuccessful classification check remains in the record.
+
+  Four bounded validation slots now belong to source-reviewed DOC/OLE
+  `1678388376`, DOCX `4046be273f`, SpreadsheetDrawing `e71f7b95e2`, and
+  crypto `6c3277b18e`. XLS `378a311c74` passes independent source review
+  after separating physical CFB limits from logical worksheet scan limits.
+  Corrected ODF `6861ee48f9` and PPT `f0bf93fea1` are undergoing source
+  review. RTF's scoped suites pass, but its standalone performance consumer
+  still needs the new required open options and a locked build before merge.
+  The font subset adapter remains under repair for complete allocation
+  accounting and separate output/working limits; no dependency lock change
+  or native execution is approved by this checkpoint.
+
+  Cleanup wave 57 is preflight-only. The previous two completed waves retain
+  all quarantined evidence and reclaim about 15.1 GB of checkout allocation.
+  Final capture, the full gate, signed-batch contract choice and actual native
+  qualification remain open. Nothing is pushed.
