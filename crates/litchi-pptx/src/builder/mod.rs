@@ -101,6 +101,28 @@ impl std::fmt::Debug for Builder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::PackURI;
+    use litchi_opc::part::Part;
+
+    fn media_value(data: Vec<u8>) -> crate::Result<crate::media_parts::List> {
+        Ok(crate::media_parts::List {
+            pictures: vec![crate::media_parts::Picture {
+                shape_id: 4,
+                name: "sample.mp4".into(),
+                kind: crate::media_parts::Kind::Video,
+                relationship_id: "rIdVideo".into(),
+                resource: Some(crate::media_parts::Resource::new(
+                    "/ppt/media/media1.mp4",
+                    "video/mp4",
+                    data,
+                )),
+                poster: None,
+                transform: Some(crate::media_parts::Transform::emu(0, 0, 1, 1)?),
+                office_extension: None,
+            }],
+        })
+    }
+
     #[test]
     fn build_finalizes_authored_graph_for_immutable_edits() -> Result<()> {
         let mut builder = Builder::new()?;
@@ -123,6 +145,77 @@ mod tests {
         changed.write_to(&mut output)?;
         let reopened = Package::from_reader(std::io::Cursor::new(output))?;
         assert!(changed.same_content(&reopened)?);
+        Ok(())
+    }
+
+    #[test]
+    fn authored_notes_index_survives_changed_notes_replay() -> Result<()> {
+        let mut builder = Builder::new()?;
+        let presentation = builder.presentation()?;
+        presentation.add_slide()?.set_notes("before");
+        presentation.add_slide()?.set_notes("unchanged");
+        let package = builder.build()?;
+        let names = [
+            "/ppt/notesMasters/notesMaster1.xml",
+            "/ppt/theme/theme2.xml",
+            "/ppt/notesSlides/notesSlide1.xml",
+            "/ppt/notesSlides/notesSlide2.xml",
+        ];
+        let expected = names.into_iter().try_fold(0_u64, |total, name| {
+            let part_name = PackURI::new(name).map_err(crate::Error::Uri)?;
+            let bytes = u64::try_from(package.opc.get_part(&part_name)?.blob().len())
+                .map_err(|_| crate::Error::Invalid("notes index byte count overflow".into()))?;
+            total
+                .checked_add(bytes)
+                .ok_or_else(|| crate::Error::Invalid("notes index byte count overflow".into()))
+        })?;
+        assert_eq!(package.replay_index.notes_total_bytes(), expected);
+
+        let mut edit = package.edit_notes()?;
+        assert!(edit.set_text(0_usize, "after")?);
+        let commit = edit.commit()?;
+        let replayed = package.apply_notes(commit.patch())?;
+        assert!(replayed.diagnostics().changed());
+        Ok(())
+    }
+
+    #[test]
+    fn authored_media_index_supports_resource_only_replay() -> Result<()> {
+        let mut builder = Builder::new()?;
+        builder.presentation()?.add_slide()?;
+        let package = builder.build()?;
+        let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(crate::Error::Uri)?;
+        let initial = media_value(vec![0, 1, 2])?;
+        let mut raw = package.edit_opc()?;
+        raw.update(|opc| {
+            crate::media_parts::store_with(
+                opc,
+                &slide_name,
+                &initial,
+                crate::media_parts::Conformance::Transitional,
+                false,
+            )
+        })?;
+        let with_media = raw.commit()?.into_package();
+        let media_name = PackURI::new("/ppt/media/media1.mp4").map_err(crate::Error::Uri)?;
+        assert!(
+            with_media
+                .replay_index
+                .media_slides(&media_name)
+                .is_some_and(|slides| slides.iter().any(|slide| slide == &slide_name))
+        );
+
+        let mut after = (*with_media.opc).clone();
+        after
+            .get_part_mut(&media_name)?
+            .set_blob(vec![0, 1, 2, 3, 4]);
+        let after = std::sync::Arc::new(after);
+        let patch = crate::media_parts::Patch(crate::part_edit::PartPatch::capture(
+            &with_media.opc,
+            &after,
+        )?);
+        let replayed = with_media.apply_media(&patch)?;
+        assert!(replayed.diagnostics().changed());
         Ok(())
     }
 }

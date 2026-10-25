@@ -418,6 +418,15 @@ impl Package {
         }
         #[cfg(feature = "automatic-fonts")]
         self.embed_fonts_for_presentation(presentation)?;
+        // `new_authoring` installs the minimal package's index before the
+        // builder materializes slides, notes, and their relationships.  The
+        // final authoring graph is the one that future source-backed replay
+        // must validate, so refresh the semantic closures at this existing
+        // publication boundary.  Ordinary edit/replay publication continues
+        // to use changed-part deltas and never takes this package-wide path.
+        self.replay_index = std::sync::Arc::new(
+            crate::package::replay_index::ReplayIndex::from_package(&self.opc)?,
+        );
         Ok(self)
     }
 
