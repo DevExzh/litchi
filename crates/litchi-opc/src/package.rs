@@ -960,12 +960,11 @@ impl OpcPackage {
                 },
                 SourceMemberKind::Part(partname) => {
                     !preserved
-                        && self.parts.get(partname).is_some_and(|part| {
-                            provenance
-                                .parts
-                                .get(partname)
-                                .is_some_and(|source_part| source_part.member_present)
-                        })
+                        && self.parts.contains_key(partname)
+                        && provenance
+                            .parts
+                            .get(partname)
+                            .is_some_and(|source_part| source_part.member_present)
                 },
                 SourceMemberKind::PartRelationships(partname) => {
                     !preserved
