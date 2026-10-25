@@ -200,7 +200,7 @@ impl Package {
             return Err(error);
         }
         for old_target in old_targets {
-            if !self.part_is_referenced(&old_target) {
+            if !self.part_is_referenced(&old_target)? {
                 self.opc.remove_part(&old_target);
             }
         }
@@ -311,7 +311,7 @@ impl Package {
         crate::signature_policy::ensure_unsigned(&self.opc)?;
         self.commit_settings_part(&snapshot, replacement)?;
         for old_target in old_targets {
-            if !self.part_is_referenced(&old_target) {
+            if !self.part_is_referenced(&old_target)? {
                 self.opc.remove_part(&old_target);
             }
         }

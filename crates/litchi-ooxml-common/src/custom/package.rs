@@ -1,16 +1,14 @@
-//! Package graph discovery and mutation for custom document properties.
+//! Package graph discovery for custom document properties.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Relationships, SourceBackedPackage};
 
 use super::codec;
 use super::model::Props;
 use super::reserved::{self, Host};
-use super::schema::{PART_NAME, PART_TARGET, invalid};
+use super::schema::{PART_NAME, invalid};
 use crate::leniency::CustomPropertiesDefect;
 use crate::properties::package_graph::GraphPart;
-use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 impl Props {
@@ -55,8 +53,8 @@ impl Props {
     /// property scoped to another host, or one whose value lacks the inferred
     /// format, is skipped and recorded as
     /// [`ReservedProperty`](crate::leniency::CustomPropertiesDefect::ReservedProperty)
-    /// rather than failing the document. [`Self::write_for`] still validates
-    /// strictly.
+    /// rather than failing the document. The semantic metadata transaction
+    /// validates the host scope again before publication.
     pub fn read_for(package: &OpcPackage, host: Host) -> Result<Self> {
         let (properties, part_name) = Self::read_selected(package)?;
         properties.admit_for(part_name.as_ref(), host)
@@ -92,83 +90,6 @@ impl Props {
         }
         properties.validate_for(host)?;
         Ok(properties)
-    }
-
-    /// Writes this collection to a package.
-    ///
-    /// Empty properties remove both the target part and its package-level
-    /// relationship. Non-empty properties update the existing validated target
-    /// or create the canonical `/docProps/custom.xml` part and relationship.
-    ///
-    /// Properties that serialize to the stored bytes, and empty properties
-    /// over an absent graph, publish nothing, so a signed package keeps its
-    /// signature. Any other write to a signed package is refused before it
-    /// mutates anything (ADR 0006): remove the signature explicitly first, with
-    /// [`OpcPackage::unsign`] or the format facade's `unsign`.
-    /// # Errors
-    ///
-    /// Returns [`Error::Opc`] with
-    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// for a change to a signed package, and an error when input violates
-    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
-    /// package operation fails.
-    pub fn write(&self, package: &mut OpcPackage) -> Result<()> {
-        let graph = inspect_graph(package)?;
-        if self.is_empty() {
-            if graph.part_name.is_none() && graph.relationship_id.is_none() {
-                return Ok(());
-            }
-            // Refuses a signed package before the removal; an unsigned one
-            // only has its OPC signature-policy state settled, as before.
-            settle_unsigned_change(package)?;
-            if let Some(part_name) = graph.part_name {
-                let removed = package.remove_part(&part_name);
-                if !removed {
-                    return Err(Error::Missing(part_name.to_string()));
-                }
-            }
-            if let Some(relationship_id) = graph.relationship_id {
-                let removed = package.rels_mut().remove(&relationship_id);
-                if removed.is_none() {
-                    return Err(Error::Relationship(format!(
-                        "custom-properties relationship '{relationship_id}' disappeared during removal"
-                    )));
-                }
-            }
-            return Ok(());
-        }
-
-        let xml = codec::encode(self)?;
-        if let Some(part_name) = graph.part_name {
-            if package.get_part(&part_name)?.blob() == xml.as_slice() {
-                return Ok(());
-            }
-            refuse_signed_change(package)?;
-            package.get_part_mut(&part_name)?.set_blob(xml);
-            settle_unsigned_change(package)?;
-        } else {
-            let part_name = custom_part_name()?;
-            package.validate_new_part_name(&part_name)?;
-            let part = BlobPart::new(part_name, ct::OFC_CUSTOM_PROPERTIES.to_owned(), xml);
-            settle_unsigned_change(package)?;
-            package.add_part(Box::new(part));
-            package.relate_to(PART_TARGET, rt::CUSTOM_PROPERTIES);
-        }
-        Ok(())
-    }
-
-    /// Validates reserved names for `host` and writes this collection, under
-    /// the signature policy of [`Self::write`].
-    /// # Errors
-    ///
-    /// Returns [`Error::Opc`] with
-    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// for a change to a signed package, and an error when input violates
-    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
-    /// package operation fails.
-    pub fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
-        self.validate_for(host)?;
-        self.write(package)
     }
 }
 

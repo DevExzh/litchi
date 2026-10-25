@@ -25,13 +25,14 @@
 //! contract this implements, in particular which refusals stay at `open()` and
 //! which become first-access refusals.
 
+use std::io;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use soapberry_zip::office::{IndexedArchive, VerifiedPrecompressedEntry};
+use soapberry_zip::office::{IndexedArchive, VerifiedEntryReaderError, VerifiedPrecompressedEntry};
 
-use crate::error::{OpcError, Result, replicate_deferred_error};
+use crate::error::{OpcError, Result, map_io_error, replicate_deferred_error};
 use crate::limits::{SourceLimitKind, SourceLimits};
 
 /// The retained owned source archive that deferred payloads inflate from.
@@ -217,6 +218,59 @@ impl DeferredPayload {
             .as_ref()
             .map_err(replicate_deferred_error)
     }
+
+    /// Compare a deferred member with a candidate without retaining the
+    /// decoded payload. The callback reader has a fixed scratch buffer, so a
+    /// same-length replacement can be distinguished from the source without
+    /// hydrating an unrelated part merely to decide whether its central
+    /// record may be copied.
+    fn same_bytes(&self, expected: &[u8]) -> Result<bool> {
+        if let Some(outcome) = self.cell.get() {
+            return outcome
+                .as_ref()
+                .map(|bytes| bytes.as_slice() == expected)
+                .map_err(replicate_deferred_error);
+        }
+        let admitted_len = self.admitted_len()?;
+        if admitted_len != expected.len() {
+            return Ok(false);
+        }
+        let archive = self.source.index()?;
+        let entry_id = archive
+            .entry_id(&self.member)
+            .ok_or_else(|| OpcError::PartNotFound(self.member.to_string()))?;
+        archive
+            .with_verified_entry_reader(entry_id, |reader| {
+                let mut offset = 0_usize;
+                let mut equal = true;
+                loop {
+                    let chunk_len = {
+                        let chunk = reader.fill_buf()?;
+                        if chunk.is_empty() {
+                            break;
+                        }
+                        let end = offset
+                            .checked_add(chunk.len())
+                            .ok_or_else(|| io::Error::other("deferred payload length overflow"))?;
+                        if expected.get(offset..end) != Some(chunk) {
+                            equal = false;
+                        }
+                        end - offset
+                    };
+                    offset += chunk_len;
+                    reader.consume(chunk_len);
+                }
+                Ok(equal && offset == expected.len())
+            })
+            .map_err(|error| match error {
+                VerifiedEntryReaderError::Archive { error, .. } => OpcError::from(error),
+                VerifiedEntryReaderError::Transport { error, .. }
+                | VerifiedEntryReaderError::Callback(error) => map_io_error(error),
+                _ => {
+                    OpcError::ZipError("unrecognized verified ZIP entry-reader failure".to_owned())
+                },
+            })
+    }
 }
 
 /// A materialized payload that also carries a verified compressed
@@ -297,6 +351,19 @@ fn empty_payload() -> &'static Arc<Vec<u8>> {
 }
 
 impl PartPayload {
+    /// Compare this payload with candidate bytes without materializing a
+    /// deferred source member. Materialized forms use their existing shared
+    /// allocation; deferred forms stream through the retained ZIP member with
+    /// the fixed-size verified reader above.
+    pub(crate) fn same_bytes(&self, expected: &[u8]) -> Result<bool> {
+        match self {
+            Self::Ready(bytes) => Ok(bytes.as_slice() == expected),
+            Self::Deferred(deferred) => deferred.same_bytes(expected),
+            Self::Transferred(transferred) => Ok(transferred.decoded().as_slice() == expected),
+            Self::Verified(verified) => Ok(verified.bytes().as_slice() == expected),
+        }
+    }
+
     pub(crate) fn ready(bytes: Arc<Vec<u8>>) -> Self {
         Self::Ready(bytes)
     }

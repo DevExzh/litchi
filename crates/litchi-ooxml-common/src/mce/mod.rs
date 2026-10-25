@@ -20,6 +20,7 @@ mod shared_names_tests;
 mod tests;
 
 pub use admission::{binds_namespace_by_reference, mentions_namespace};
+pub(crate) use codec::{ActiveOffsetOutput, process_markup_compatibility_with_source_offsets};
 pub use codec::{
     active_offsets, process_markup_compatibility, process_ooxml, process_part, process_part_arc,
     process_str,

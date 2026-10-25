@@ -13,31 +13,15 @@ use super::durable::{WebIntent, bind_intent, custom_edit_for_graph};
 use super::{
     PackageGraphIndex, Patch, PatchPlan, PlannedGraph, PlannedPart, PlannedRelationship,
     RelationshipState, add_or_match_planned_part, existing_web_extension_graph, fold_part_name,
-    folded_name_conflicts, graph_matches_plan, has_task_panes_relationship,
+    folded_name_conflicts, graph_matches_plan, has_task_panes_relationship, load,
     next_package_relationship_id, next_task_panes_part_name, next_web_extension_part_name,
     planned_deletions, preflight_planned_parts, validate_plan_counts,
 };
 use crate::web::LimitKind;
-/// Create or replace the package-level persisted task-pane graph under
-/// `limits` ([`Limits::standard`] for the safe defaults).
-///
-/// Add-in references, bindings, properties, and snapshot resources are stored
-/// as inert data. External snapshot links are never contacted.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn put(
-    package: &mut OpcPackage,
-    task_panes: Panes,
-    conformance: Conformance,
-    limits: &Limits,
-) -> Result<()> {
-    plan_put(package, task_panes, conformance, limits)?
-        .apply(package)
-        .map(|_| ())
-}
-
+use crate::xml::attributes::BytesStartExt as _;
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
 /// Plan an exact, source-checked replacement of the persisted task-pane graph
 /// under `limits`.
 ///
@@ -164,9 +148,9 @@ pub fn plan_put(
             } else if source_profile_matches
                 && custom_function_add_in_only_changed(&old_pane.add_in, &pane.add_in, limits)?
             {
-                let extension_list = pane.add_in.extension_list.as_ref().ok_or_else(|| {
-                    Error::Invalid("custom-function update lost the add-in extLst".into())
-                })?;
+                let extension_list = pane.add_in.extension_list.as_ref().ok_or(Error::Internal(
+                    "Web Extensions custom-function update lost the add-in extLst",
+                ))?;
                 Arc::new(splice_add_in_extension_list_with(
                     source_part.blob(),
                     extension_list,
@@ -203,11 +187,12 @@ pub fn plan_put(
                     }
                     reserved_names.insert(part_key.clone());
                     if counted_snapshot_parts.insert(part_key) {
-                        total_snapshot_bytes = total_snapshot_bytes
-                            .checked_add(data.len())
-                            .ok_or_else(|| {
-                                Error::Invalid("aggregate snapshot byte count overflow".into())
-                            })?;
+                        total_snapshot_bytes =
+                            total_snapshot_bytes
+                                .checked_add(data.len())
+                                .ok_or(Error::Internal(
+                                    "Web Extensions aggregate snapshot byte count overflow",
+                                ))?;
                         if total_snapshot_bytes > limits.total_image_bytes {
                             return limit(
                                 LimitKind::AggregateSnapshotBytes,
@@ -279,9 +264,9 @@ pub fn plan_put(
         return Ok(bind_intent(
             source_bound_noop_patch(
                 package,
-                existing
-                    .as_ref()
-                    .ok_or_else(|| Error::Invalid("no-op plan lost existing graph".into()))?,
+                existing.as_ref().ok_or(Error::Internal(
+                    "Web Extensions no-op plan lost existing graph",
+                ))?,
                 limits,
             )?,
             WebIntent::Put {
@@ -303,11 +288,9 @@ pub fn plan_put(
                 .rels()
                 .get(&graph.root_relationship_id)
                 .map(RelationshipState::capture)
-                .ok_or_else(|| {
-                    Error::Relationship(
-                        "task-pane root relationship disappeared while planning".into(),
-                    )
-                })
+                .ok_or(Error::Internal(
+                    "Web Extensions task-pane root relationship disappeared while planning",
+                ))
         })
         .transpose()?;
     let root_after = Some(RelationshipState {
@@ -423,9 +406,9 @@ pub(in crate::web::package) fn source_bound_noop_patch(
         .rels()
         .get(&graph.root_relationship_id)
         .map(RelationshipState::capture)
-        .ok_or_else(|| {
-            Error::Relationship("task-pane root relationship disappeared while planning".into())
-        })?;
+        .ok_or(Error::Internal(
+            "Web Extensions task-pane root relationship disappeared while planning",
+        ))?;
     Patch::planned(
         package,
         PatchPlan {
@@ -587,17 +570,95 @@ fn relationship_attributes_use_namespace(
     )?;
     let root = effective.root()?;
     let mut opposite_seen = false;
-    inspect_relationship_attributes(root, expected, &mut opposite_seen);
-    // A source with no relationship attributes has no conformance profile to
-    // rewrite.  Only an actual expanded-name attribute from the opposite
-    // profile requires canonicalization.
-    Ok(!opposite_seen)
+    let mut expected_seen = false;
+    let (root_expected, root_opposite) = root_namespace_profile(xml, expected)?;
+    expected_seen |= root_expected;
+    opposite_seen |= root_opposite;
+    inspect_relationship_attributes(root, expected, &mut opposite_seen, &mut expected_seen);
+    // Preserve the declared profile even when a graph happens to contain no
+    // relationship-valued attributes.  Without this check a strict request
+    // could be reported as a signed no-op for a transitional source (and
+    // vice versa), losing the caller's explicit conformance intent.
+    Ok(expected_seen && !opposite_seen)
 }
 
-fn inspect_relationship_attributes(node: &Node, expected: &str, opposite_seen: &mut bool) {
+fn root_namespace_profile(xml: &[u8], expected: &str) -> Result<(bool, bool)> {
+    let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
+        STRICT_RELATIONSHIPS_NAMESPACE
+    } else {
+        TRANSITIONAL_RELATIONSHIPS_NAMESPACE
+    };
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer)? {
+            Event::Start(element) | Event::Empty(element) => {
+                let mut expected_seen = false;
+                let mut opposite_seen = false;
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let name = std::str::from_utf8(attribute.key.as_ref())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if name != "xmlns" && !name.starts_with("xmlns:") {
+                        continue;
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if value == expected {
+                        expected_seen = true;
+                    }
+                    if value == opposite {
+                        opposite_seen = true;
+                    }
+                }
+                return Ok((expected_seen, opposite_seen));
+            },
+            Event::Eof => return Ok((false, false)),
+            Event::DocType(_) => return invalid("DTD is forbidden in web extension XML".into()),
+            _ => buffer.clear(),
+        }
+    }
+}
+
+fn inspect_relationship_attributes(
+    node: &Node,
+    expected: &str,
+    opposite_seen: &mut bool,
+    expected_seen: &mut bool,
+) {
+    if let Some(fragment) = &node.raw_fragment {
+        let mut scope = Some(fragment.namespaces.as_ref());
+        while let Some(current) = scope {
+            if current
+                .local
+                .values()
+                .any(|namespace| namespace == expected)
+            {
+                *expected_seen = true;
+            }
+            let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
+                STRICT_RELATIONSHIPS_NAMESPACE
+            } else {
+                TRANSITIONAL_RELATIONSHIPS_NAMESPACE
+            };
+            if current
+                .local
+                .values()
+                .any(|namespace| namespace == opposite)
+            {
+                *opposite_seen = true;
+            }
+            scope = current.parent.as_deref();
+        }
+    }
     for attribute in &node.attributes {
         if !matches!(attribute.local_name.as_str(), "id" | "embed" | "link") {
             continue;
+        }
+        if attribute.namespace == expected {
+            *expected_seen = true;
         }
         if attribute.namespace != expected
             && ((expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE
@@ -609,20 +670,130 @@ fn inspect_relationship_attributes(node: &Node, expected: &str, opposite_seen: &
         }
     }
     for child in &node.children {
-        inspect_relationship_attributes(child, expected, opposite_seen);
+        inspect_relationship_attributes(child, expected, opposite_seen, expected_seen);
     }
 }
 
-/// Remove the package-level task-pane relationship and graph under the
-/// package graph and deletion ceilings of `limits`.
+/// A staged Web Extensions edit over one OPC package.
 ///
-/// Parts still referenced elsewhere remain in the package.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
-    plan_remove(package, limits)?.apply(package)
+/// The source package is shared and never changed. Each operation publishes
+/// into the private working graph; `commit` creates one source-checked patch
+/// from the original package to the final graph.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    /// Resource ceilings used by Web Extensions reads and publication.
+    pub limits: Limits,
+}
+
+/// A staged Web Extensions edit over one OPC package.
+#[derive(Clone)]
+pub struct Edit<'a> {
+    source: &'a OpcPackage,
+    working: Option<OpcPackage>,
+    limits: Limits,
+    conformance: Option<Conformance>,
+}
+
+impl std::fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    /// Start an edit over `package` using the standard graph limits.
+    pub fn new(package: &'a OpcPackage) -> Result<Self> {
+        Self::new_with_options(package, EditOptions::default())
+    }
+
+    /// Start an edit with caller-selected graph limits.
+    pub fn new_with_options(package: &'a OpcPackage, options: EditOptions) -> Result<Self> {
+        Ok(Self {
+            source: package,
+            working: None,
+            limits: options.limits.bounded_by_source(package.read_limits()),
+            conformance: None,
+        })
+    }
+
+    fn current(&self) -> &OpcPackage {
+        self.working.as_ref().unwrap_or(self.source)
+    }
+
+    /// Replace the complete task-pane graph.
+    pub fn put(&mut self, panes: Panes, conformance: Conformance) -> Result<bool> {
+        let patch = plan_put(self.current(), panes, conformance, &self.limits)?;
+        let commit = patch.apply(self.current())?;
+        let changed = commit.diagnostics().changed();
+        if changed {
+            self.working = Some(commit.into_package());
+        }
+        self.conformance = Some(conformance);
+        Ok(changed)
+    }
+
+    /// Remove the complete task-pane graph.
+    pub fn remove(&mut self) -> Result<bool> {
+        let patch = plan_remove(self.current(), &self.limits)?;
+        let commit = patch.apply(self.current())?;
+        let changed = commit.diagnostics().changed();
+        if changed {
+            self.working = Some(commit.into_package());
+        }
+        self.conformance = None;
+        Ok(changed)
+    }
+
+    /// Discard all staged operations.
+    pub fn reset(&mut self) {
+        self.working = None;
+        self.conformance = None;
+    }
+
+    /// Publish the final graph as a shared commit triad.
+    pub fn commit(self) -> Result<super::Commit> {
+        let Some(working) = self.working else {
+            if self.conformance.is_none() {
+                let mut budget = OperationBudget::default();
+                let index = PackageGraphIndex::build(self.source, &self.limits, &mut budget)?;
+                if let Some(graph) =
+                    existing_web_extension_graph(self.source, &self.limits, &index, &mut budget)?
+                {
+                    return source_bound_noop_patch(self.source, &graph, &self.limits)?
+                        .apply(self.source);
+                }
+                return empty_source_bound_noop_patch(self.source, &self.limits)?
+                    .apply(self.source);
+            }
+            let panes = load(self.source, &self.limits)?
+                .ok_or(Error::Internal("Web Extensions edit lost its staged panes"))?;
+            return plan_put(
+                self.source,
+                panes,
+                self.conformance.unwrap_or(Conformance::Transitional),
+                &self.limits,
+            )?
+            .apply(self.source);
+        };
+
+        let after = load(&working, &self.limits)?;
+        if after.is_none() {
+            return plan_remove(self.source, &self.limits)?.apply(self.source);
+        }
+        if let Some(panes) = after {
+            return plan_put(
+                self.source,
+                panes,
+                self.conformance.unwrap_or(Conformance::Transitional),
+                &self.limits,
+            )?
+            .apply(self.source);
+        }
+        unreachable!("the Web Extensions edit's final graph was checked above")
+    }
 }
 
 /// Plan removal of the package-level task-pane relationship and owned graph
@@ -655,9 +826,9 @@ pub fn plan_remove(package: &OpcPackage, limits: &Limits) -> Result<Patch> {
         .rels()
         .get(&existing.root_relationship_id)
         .map(RelationshipState::capture)
-        .ok_or_else(|| {
-            Error::Relationship("task-pane root relationship disappeared while planning".into())
-        })?;
+        .ok_or(Error::Internal(
+            "Web Extensions task-pane root relationship disappeared while planning",
+        ))?;
     let patch = Patch::planned(
         package,
         PatchPlan {

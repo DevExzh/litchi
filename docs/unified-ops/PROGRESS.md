@@ -5584,3 +5584,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   are root-verified and retained. Baseline `6cb65f6358` now includes the
   previously missing vendored release inputs with unchanged production and
   identical harness. No runtime or performance exception is accepted.
+
+
+- Coordinator joint source integration (2026-10-25):
+  Reviewed PPTX `afede08087` merges privately at `75988e5eec` (101a), then
+  reviewed OOXML `df57ad24df` joins it. Root resolves the one production
+  conflict by preserving shared metadata Commit extraction and PPTX's fallible
+  byte accounting. All 499 changed Rust paths pass formatting without edits;
+  glossary JSON retains 69 unique profiles and 33 signature-bearing profiles.
+  Records 0362ul101a/101 retain the composition details. Independent final-merge
+  review and joint qualification follow; this private merge is not acceptance.
+
+  The f167 OOXML Clippy run stops on redundant qualifications introduced by
+  broad imports. Its complete receipt is root-verified; 94va qualifies only
+  the new references and is composed after review. The standalone afede PPTX
+  compiler packet continues unchanged; separate df57 packets remain inert.
+  Subsequent validation will bind the combined source. Runtime, fidelity,
+  performance and final acceptance remain open; nothing is pushed.

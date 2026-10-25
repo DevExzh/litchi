@@ -13,7 +13,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// The underlying OPC graph is malformed or could not be mutated safely.
     #[error("OPC error: {0}")]
-    Opc(#[from] litchi_opc::error::OpcError),
+    Opc(#[source] litchi_opc::error::OpcError),
 
     /// A bounded durable semantic patch failed decoding or validation.
     #[error("invalid durable OOXML patch: {0}")]
@@ -39,6 +39,31 @@ pub enum Error {
     /// A package relationship violates the shared vocabulary.
     #[error("invalid OOXML relationship: {0}")]
     Relationship(String),
+
+    /// A semantic patch was built from a different selected graph base.
+    #[error("OOXML patch base does not match recipient")]
+    PatchConflict,
+
+    /// A well-formed operation was refused without exposing package content.
+    #[error("OOXML operation refused: {0}")]
+    Refused(litchi_core::edit::Refusal),
+
+    /// A changed package still carries signature infrastructure.
+    #[error("signed OOXML package requires an explicit signature disposition")]
+    Signed,
+
+    /// A source-backed package changed while an operation was in progress.
+    #[error("OOXML source changed while the operation was in progress")]
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+
+    /// A generated staging or publication invariant was not satisfied.
+    #[error("OOXML internal invariant failed: {0}")]
+    Internal(&'static str),
 
     /// Parsed data violates a structural, cardinality, or value constraint.
     #[error("invalid OOXML data: {0}")]
@@ -95,6 +120,50 @@ pub enum Error {
     Fmt(#[from] std::fmt::Error),
 }
 
+impl Error {
+    /// Creates a content-free typed refusal for a well-formed request.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+}
+
+impl From<litchi_opc::error::OpcError> for Error {
+    fn from(error: litchi_opc::error::OpcError) -> Self {
+        match error {
+            litchi_opc::error::OpcError::SourceChanged { expected, actual } => {
+                Self::SourceChanged {
+                    expected,
+                    observed: actual,
+                }
+            },
+            litchi_opc::error::OpcError::SignedSourceRequiresExplicitPolicy => Self::Signed,
+            other => Self::Opc(other),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opc_errors_retain_their_source_chain() {
+        let error = Error::from(litchi_opc::error::OpcError::PartNotFound(
+            "missing.xml".to_owned(),
+        ));
+        let source = std::error::Error::source(&error).expect("OPC source");
+        assert!(
+            source
+                .downcast_ref::<litchi_opc::error::OpcError>()
+                .is_some()
+        );
+    }
+}
+
 impl From<quick_xml::Error> for Error {
     fn from(error: quick_xml::Error) -> Self {
         Self::Xml(error.to_string())
@@ -125,6 +194,12 @@ pub enum LimitKind {
     Web(crate::web::LimitKind),
     /// A Ribbon (customUI) budget ([`crate::ribbon::LimitKind`]).
     Ribbon(crate::ribbon::LimitKind),
+    /// A document-properties transaction budget
+    /// ([`crate::properties::LimitKind`]).
+    Properties(crate::properties::LimitKind),
+    /// A VBA graph publication budget ([`crate::vba::LimitKind`]).
+    #[cfg(feature = "vba-inspection")]
+    Vba(crate::vba::LimitKind),
     /// Core keyword items.
     CoreKeywordItems,
     /// Core-properties part-name candidates.
@@ -219,6 +294,9 @@ impl LimitKind {
             Self::CustomXml(kind) => kind.as_str(),
             Self::Web(kind) => kind.as_str(),
             Self::Ribbon(kind) => kind.as_str(),
+            Self::Properties(kind) => kind.as_str(),
+            #[cfg(feature = "vba-inspection")]
+            Self::Vba(kind) => kind.as_str(),
             Self::CoreKeywordItems => "core keyword items",
             Self::CorePropertiesPartNameCandidates => "core-properties part-name candidates",
             Self::CorePropertiesXmlBytes => "core-properties XML bytes",
@@ -286,5 +364,11 @@ impl From<crate::web::LimitKind> for LimitKind {
 impl From<crate::ribbon::LimitKind> for LimitKind {
     fn from(kind: crate::ribbon::LimitKind) -> Self {
         Self::Ribbon(kind)
+    }
+}
+
+impl From<crate::properties::LimitKind> for LimitKind {
+    fn from(kind: crate::properties::LimitKind) -> Self {
+        Self::Properties(kind)
     }
 }

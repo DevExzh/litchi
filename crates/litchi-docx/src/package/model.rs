@@ -634,14 +634,6 @@ fn ensure_word_font_settings(
     Ok(true)
 }
 
-/// The Ribbon customization a package stores in `family`.
-fn ribbon_slot(set: ribbon::Set<'_>, family: ribbon::Family) -> Option<ribbon::Ui<'_>> {
-    match family {
-        ribbon::Family::Legacy => set.legacy(),
-        ribbon::Family::Modern => set.modern(),
-    }
-}
-
 impl Package {
     /// Get an owned, read-only projection of the current main document.
     ///
@@ -810,7 +802,7 @@ impl Package {
         {
             return Ok(project);
         }
-        let payload = std::sync::Arc::new(payload.into_bytes());
+        let payload = payload.into_bytes();
         self.edit_semantic_opc(operation, move |candidate| {
             let source = candidate.main_document_part()?.partname().clone();
             store_vba_project_in_document(candidate, &source, payload, supplemental_xml)
@@ -846,18 +838,9 @@ impl Package {
         version: ribbon::Version,
         xml: Vec<u8>,
     ) -> Result<&mut Self> {
-        // The shared Ribbon owner removes signatures itself, so a change to a
-        // signed package is refused here, before it is reached.
-        if crate::signature_policy::is_signed(&self.opc) {
-            let stored = ribbon_slot(
-                ribbon::load(&self.opc, &ribbon::Limits::standard())?,
-                version.family(),
-            );
-            if !stored.is_some_and(|ui| ui.version() == version && ui.xml() == xml.as_slice()) {
-                crate::signature_policy::ensure_unsigned(&self.opc)?;
-            }
-        }
-        ribbon::put(&mut self.opc, version, xml, &ribbon::Limits::standard())?;
+        let mut edit = ribbon::Edit::new(&self.opc)?;
+        edit.put(version, xml)?;
+        self.opc = edit.commit()?.into_package().into();
         Ok(self)
     }
 
@@ -872,16 +855,10 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
-        if crate::signature_policy::is_signed(&self.opc)
-            && ribbon_slot(
-                ribbon::load(&self.opc, &ribbon::Limits::standard())?,
-                family,
-            )
-            .is_some()
-        {
-            crate::signature_policy::ensure_unsigned(&self.opc)?;
-        }
-        Ok(ribbon::remove(&mut self.opc, family)?)
+        let mut edit = ribbon::Edit::new(&self.opc)?;
+        let changed = edit.remove(family)?;
+        self.opc = edit.commit()?.into_package().into();
+        Ok(changed)
     }
 
     /// Read typed font metadata and inert embedded-font resources.

@@ -401,7 +401,7 @@ impl AddIn {
         let extension = self
             .extension_list
             .as_mut()
-            .ok_or_else(|| Error::Invalid("web extension list was not initialized".into()))?;
+            .ok_or(Error::Internal("Web Extensions list was not initialized"))?;
         extension.set_custom_functions_with_limits(value, limits)?;
         Ok(self)
     }

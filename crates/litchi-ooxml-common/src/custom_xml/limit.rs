@@ -10,6 +10,10 @@
 pub enum LimitKind {
     /// Custom XML element nesting depth.
     Depth,
+    /// XML events accepted by a properties source projection.
+    XmlEvents,
+    /// Bytes in one XML attribute accepted by a properties source projection.
+    XmlAttributeBytes,
     /// Custom XML elements of one payload.
     Elements,
     /// Custom XML data items of one package.
@@ -32,6 +36,8 @@ impl LimitKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Depth => "custom XML depth",
+            Self::XmlEvents => "custom XML events",
+            Self::XmlAttributeBytes => "custom XML attribute bytes",
             Self::Elements => "custom XML elements",
             Self::Items => "custom XML items",
             Self::PayloadBytes => "custom XML payload bytes",

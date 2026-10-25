@@ -1,0 +1,62 @@
+# 0362ul101 — Joint PPTX and OOXML source integration
+
+The coordinator composes reviewed OOXML tip
+`df57ad24df6543119add8d1be10a2ac57e3f755e` with PPTX integration
+`75988e5eecafbb62aa157083a5442edcd2f5c001` (101a). The two reviewed leaf
+chains are now together in private integration. Both parent histories are
+retained; nothing is pushed or accepted solely by this composition.
+
+## Conflict resolution
+
+One production hunk conflicts: `Package::apply_metadata` in PPTX. The final
+implementation obtains the new owner from the shared immutable replay API:
+
+```rust
+let opc = patch.apply(self.opc.as_ref())?.into_package();
+self.with_metadata_opc(opc)?
+```
+
+This preserves OOXML's `Patch::apply(&OpcPackage) -> Commit` API and PPTX's
+fallible part-byte accounting. Exact no-op handling still authenticates the
+recorded base and duplicates the owner without cloning its graph. Source
+immutability, signature behavior and existing replay/inverse assertions remain.
+
+The three-way merge retains OPC part-byte accounting together with retained
+archive metrics and bounded authored XML publication; PPTX typed limits and
+shared error conversions; the transactional VBA route; fallible DOCX reference
+checking; bounded source-preserving Custom XML; and the checked PPTX validation
+counter. Both glossary signature sets and all consumer changes are retained.
+Coordinator PROGRESS matches trunk before this new coordinator entry; no
+branch's older progress file replaces it. No progress conflict occurs in the
+actual integration merge.
+
+Root checks all 499 Rust paths changed by both integrations against pre-merge
+`9a3e0b17e7`: repository rustfmt passes without edits. The staged diff is clean.
+Merged glossary JSON parses with 69 unique profiles, 33 having required
+signatures. Independent review of the final merge is requested separately.
+These checks do not replace compiler, runtime or rustdoc qualification.
+
+## Current validation state
+
+The earlier f167 OOXML run passes formatting and fails leaf Clippy because
+its two broad type imports make 35 existing qualifications redundant. Root
+verifies the terminal receipt and independently reviews 94va's smaller repair:
+remove those imports and qualify only the fifteen new uses. The doc-only child
+df57 corrects the command scope to all-feature DOCX/PPTX/XLSX/XLSB Clippy.
+Root verifies repository formatting before composing this chain.
+
+External packet `.coord/ooxml-combined-0362ul94-f5-final-f167986c` retains
+`rows.json` (12,754 bytes, SHA-256
+`be82d095ad6681cd7c5d26bf938cbf48f6bbda989813ba43aa04eb42e9b12108`) and
+`result.json` (13,874 bytes, SHA-256
+`1653cc3db1891f10576b9caacf79b5e31d940565c5bd8995cc3a78f0e3789e78`).
+Formatting takes 2.277 seconds; the failed leaf row takes 45.642 seconds and
+ends with a 171,771,667-byte target. Later rows do not run. The df57 compiler,
+runtime and glossary packets are inert and retained; the next qualification
+will instead bind this combined source to exercise the interacting APIs.
+
+The standalone afede PPTX compiler packet is still running on its unchanged
+source. Its completed results will remain scoped to that source. Fresh joint
+compiler/runtime/glossary validation, final workspace gate/rustdoc, inventories,
+native fidelity and quiet ABBA are required. Only audit22 is deferred. The
+protected untracked constructor probe and all external captures remain intact.

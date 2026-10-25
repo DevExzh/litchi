@@ -1,4 +1,5 @@
 use litchi_core::Metadata;
+use litchi_ooxml_common::custom::Host;
 use litchi_ooxml_common::properties;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -17,6 +18,22 @@ fn titled(title: &str) -> Metadata {
         title: Some(title.to_owned()),
         ..Metadata::default()
     }
+}
+
+fn publish_core(package: &mut OpcPackage, value: Option<Metadata>) -> bool {
+    let mut edit = properties::Edit::new(package, Host::Word).expect("metadata edit");
+    match value {
+        Some(value) => {
+            edit.set_metadata(value);
+        },
+        None => {
+            edit.clear_metadata();
+        },
+    }
+    let commit = edit.commit().expect("metadata commit");
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    changed
 }
 
 const STRICT_REL: &str =
@@ -47,7 +64,7 @@ fn strict_core_properties_preserve_the_selected_graph() {
         Some("Original")
     );
 
-    properties::write(&mut package, &titled("Changed")).unwrap();
+    assert!(publish_core(&mut package, Some(titled("Changed"))));
     let relationship = package
         .rels()
         .iter()
@@ -67,7 +84,7 @@ fn strict_core_properties_preserve_the_selected_graph() {
             .any(|relationship| relationship.reltype() == rt::CORE_PROPERTIES)
     );
 
-    assert!(properties::clear(&mut package).unwrap());
+    assert!(publish_core(&mut package, None));
     assert!(read_clean(&package).unwrap().is_none());
     assert!(
         !package
@@ -80,8 +97,8 @@ fn strict_core_properties_preserve_the_selected_graph() {
 fn absent_core_properties_are_idempotent() {
     let mut package = OpcPackage::new();
     assert!(read_clean(&package).unwrap().is_none());
-    assert!(!properties::clear(&mut package).unwrap());
-    assert!(properties::write(&mut package, &titled("Created")).unwrap());
+    assert!(!publish_core(&mut package, None));
+    assert!(publish_core(&mut package, Some(titled("Created"))));
     assert_eq!(
         read_clean(&package).unwrap().unwrap().title.as_deref(),
         Some("Created")

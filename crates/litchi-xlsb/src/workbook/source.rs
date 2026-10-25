@@ -2613,10 +2613,20 @@ fn publication_error(error: crate::metadata::Error) -> Error {
         crate::metadata::Error::PatchConflict => Error::PatchConflict {
             part: "the document-property parts",
         },
-        crate::metadata::Error::Unsupported { .. }
-        | crate::metadata::Error::Invalid(_)
-        | crate::metadata::Error::Limit { .. }
-        | _ => Error::InvalidFormat("the package structure is not valid"),
+        crate::metadata::Error::Refused(refusal) => Error::Refused(refusal),
+        crate::metadata::Error::SourceChanged { expected, observed } => {
+            Error::Opc(litchi_opc::OpcError::SourceChanged {
+                expected,
+                actual: observed,
+            })
+        },
+        crate::metadata::Error::Limit {
+            observed, maximum, ..
+        } => Error::limit(crate::opc::LimitKind::PatchBytes, observed, maximum),
+        crate::metadata::Error::Internal(reason) => Error::CapacityOverflow { resource: reason },
+        crate::metadata::Error::Invalid(_) | _ => {
+            Error::InvalidFormat("the package structure is not valid")
+        },
     }
 }
 

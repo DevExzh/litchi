@@ -67,11 +67,17 @@ impl Package {
     /// The same entry point applies [`Patch::inverse`].
     pub(crate) fn apply_task_panes_patch(&mut self, patch: &Patch) -> Result<bool> {
         self.ensure_story_opc_current("apply_task_panes_patch")?;
-        if patch.is_empty() {
-            return Ok(patch.apply(&mut self.opc)?);
+        if patch.is_noop() {
+            let commit = patch.apply(&self.opc)?;
+            let changed = commit.diagnostics().changed();
+            self.opc = commit.into_package().into();
+            return Ok(changed);
         }
         self.edit_semantic_opc("apply_task_panes_patch", |candidate| {
-            Ok(patch.apply(candidate)?)
+            let commit = patch.apply(candidate)?;
+            let changed = commit.diagnostics().changed();
+            *candidate = commit.into_package();
+            Ok(changed)
         })
     }
 }

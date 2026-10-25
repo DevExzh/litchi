@@ -5,6 +5,7 @@ use super::super::{
     TASK_PANES_RELATIONSHIP, VecDeque, WEB_EXTENSION_NAMESPACE,
 };
 use super::{PlannedPart, PlannedRelationship, fold_part_name, folded_name_conflicts};
+use crate::signature::refuse_signed_change;
 use crate::web::LimitKind;
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{
@@ -48,7 +49,7 @@ impl std::fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Patch")
-            .field("empty", &self.is_empty())
+            .field("empty", &self.is_noop())
             .field(
                 "affected_parts",
                 &self
@@ -160,9 +161,9 @@ impl Patch {
         Ok(patch)
     }
 
-    /// Return whether this patch makes no changes.
+    /// Return whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         !self.has_changes()
     }
 
@@ -193,33 +194,35 @@ impl Patch {
 
     /// Apply this patch after checking its exact source graph.
     ///
-    /// Returns `true` when the package changed. Source checks, destination-name
-    /// checks, and relationship staging all finish before the first mutation.
+    /// The source package is unchanged; the returned commit owns the new
+    /// package. Source checks, destination-name checks, and relationship
+    /// staging all finish before publication.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
-        if self.is_empty() {
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
+        if self.is_noop() {
             if self.is_source_bound() {
                 self.validate_source(package)?;
                 self.validate_protection(package)?;
             }
-            return Ok(false);
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                Diagnostics::UNCHANGED,
+            ));
         }
         self.validate_source(package)?;
         self.validate_protection(package)?;
         self.validate_destination_names(package)?;
-        if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy));
-        }
+        refuse_signed_change(package)?;
         // The exact token APIs can still fail on a bounded reservation.
         // Publish through an Arc-sharing package clone so every failure,
         // including a late lexical replacement, is atomic.
         let mut candidate = package.clone();
         self.apply_to_candidate(&mut candidate)?;
-        *package = candidate;
-        Ok(true)
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
 
     pub(in crate::web) fn has_changes(&self) -> bool {
@@ -249,9 +252,7 @@ impl Patch {
                 None => first.is_none(),
             };
             if !root_matches {
-                return Err(Error::Relationship(
-                    "Web Extensions patch source relationship changed".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
             if let Some(after) = &root.after {
                 let reuses_source_id = root
@@ -259,9 +260,7 @@ impl Patch {
                     .as_ref()
                     .is_some_and(|before| before.id == after.id);
                 if !reuses_source_id && package.rels().get(&after.id).is_some() {
-                    return Err(Error::Relationship(
-                        "Web Extensions patch destination relationship is occupied".into(),
-                    ));
+                    return Err(Error::PatchConflict);
                 }
             }
         }
@@ -277,9 +276,7 @@ impl Patch {
                 _ => false,
             };
             if !matches {
-                return Err(Error::Relationship(
-                    "Web Extensions patch source part changed".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
         }
         if let Some(lexical) = &self.lexical {
@@ -331,8 +328,8 @@ impl Patch {
                 };
                 let part = package.get_part(&xml.name)?;
                 if part.blob() != after.bytes() {
-                    return Err(Error::Relationship(
-                        "Web Extensions patch XML destination changed while staging".into(),
+                    return Err(Error::Internal(
+                        "Web Extensions patch XML destination changed while staging",
                     ));
                 }
                 package.try_replace_owned_xml_part(after.bytes(), after.clone())?;
@@ -369,8 +366,10 @@ impl Patch {
         if !changed_existing.is_empty() {
             let protected = protected_parts(package, &guard.source, &guard.limits)?;
             if changed_existing.iter().any(|name| protected.contains(name)) {
-                return Err(Error::Relationship(
-                    "Web Extensions patch would change a newly shared source part".into(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "web_extensions.apply",
+                    "the Web Extensions graph has a shared source part",
                 ));
             }
         }
@@ -387,8 +386,10 @@ impl Patch {
                 .iter()
                 .any(|name| protected.contains(name))
             {
-                return Err(Error::Relationship(
-                    "Web Extensions patch would create a newly shared destination part".into(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "web_extensions.apply",
+                    "the Web Extensions graph has a shared destination part",
                 ));
             }
         }
@@ -405,7 +406,9 @@ impl Patch {
         for change in changed {
             let folded = fold_part_name(&change.name);
             if folded_name_conflicts(&destinations, &folded) {
-                return invalid("Web Extensions patch destination parts conflict".into());
+                return Err(Error::Internal(
+                    "Web Extensions patch destination parts conflict",
+                ));
             }
             destinations.insert(folded.clone());
             if change.before.is_some() {
@@ -424,12 +427,18 @@ impl Patch {
                 .get(&folded)
                 .is_some_and(|name| *name == existing.partname());
             if !is_replaced_source {
-                return invalid("Web Extensions patch destination part is occupied".into());
+                return Err(Error::PatchConflict);
             }
         }
         Ok(())
     }
 }
+
+/// A published Web Extensions graph change.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
+
+/// Minimal content-free diagnostics for a Web Extensions commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[derive(Clone)]
 pub(in crate::web::package) struct LexicalChange {
@@ -1157,27 +1166,21 @@ impl LexicalChange {
         after: bool,
     ) -> Result<()> {
         if package.source_content_types(package.read_limits())?.bytes() != content_types.bytes() {
-            return Err(Error::Relationship(
-                if after {
-                    "Web Extensions patch destination content-types source changed"
-                } else {
-                    "Web Extensions patch source content-types changed"
-                }
-                .into(),
-            ));
+            return Err(if after {
+                Error::Internal("Web Extensions patch destination content-types changed")
+            } else {
+                Error::PatchConflict
+            });
         }
         for change in &self.relationships {
             let expected = if after { &change.after } else { &change.before };
             let actual = optional_relationships(package, &change.owner)?;
             if actual.as_ref() != expected.as_ref() {
-                return Err(Error::Relationship(
-                    if after {
-                        "Web Extensions patch destination relationship source changed"
-                    } else {
-                        "Web Extensions patch source relationship metadata changed"
-                    }
-                    .into(),
-                ));
+                return Err(if after {
+                    Error::Internal("Web Extensions patch destination relationships changed")
+                } else {
+                    Error::PatchConflict
+                });
             }
         }
         for change in &self.parts {
@@ -1190,14 +1193,13 @@ impl LexicalChange {
             let actual_part = package.get_part(&change.name);
             if !expected_exists {
                 if actual_part.is_ok() {
-                    return Err(Error::Relationship(
-                        if after {
-                            "Web Extensions patch destination XML part unexpectedly exists"
-                        } else {
-                            "Web Extensions patch source XML part unexpectedly exists"
-                        }
-                        .into(),
-                    ));
+                    return Err(if after {
+                        Error::Internal(
+                            "Web Extensions patch destination XML part unexpectedly exists",
+                        )
+                    } else {
+                        Error::PatchConflict
+                    });
                 }
                 continue;
             }
@@ -1209,14 +1211,11 @@ impl LexicalChange {
             };
             let actual = optional_xml_part(package, &change.name)?;
             if actual.as_ref() != Some(expected) {
-                return Err(Error::Relationship(
-                    if after {
-                        "Web Extensions patch destination XML source changed"
-                    } else {
-                        "Web Extensions patch source XML metadata changed"
-                    }
-                    .into(),
-                ));
+                return Err(if after {
+                    Error::Internal("Web Extensions patch destination XML changed")
+                } else {
+                    Error::PatchConflict
+                });
             }
         }
         Ok(())

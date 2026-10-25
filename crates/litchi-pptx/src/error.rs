@@ -869,6 +869,19 @@ pub enum Error {
     #[error("PPTX patch base does not match the target package")]
     PatchConflict,
 
+    /// A changed package still carries signature infrastructure.
+    #[error("PPTX signed package requires an explicit signature disposition")]
+    Signed,
+
+    /// A source-backed package changed while the operation was in progress.
+    #[error("PPTX source changed while the operation was in progress")]
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+
     /// A broken internal invariant: state the crate itself should have
     /// provided is missing or inconsistent.
     #[error("PPTX {operation} internal invariant failed: {reason}")]
@@ -921,7 +934,7 @@ pub enum Error {
 
     /// Shared custom document-property graph or value validation failed.
     #[error("PPTX custom document-property error: {0}")]
-    CustomProperties(#[from] litchi_ooxml_common::Error),
+    CustomProperties(#[source] litchi_ooxml_common::Error),
 
     /// Optional system-font discovery, subsetting, or EOT preparation failed.
     #[cfg(feature = "automatic-fonts")]
@@ -1082,6 +1095,21 @@ impl Error {
         match self {
             Self::Refused(refusal) => Some(refusal),
             _ => None,
+        }
+    }
+}
+
+impl From<litchi_ooxml_common::Error> for Error {
+    fn from(error: litchi_ooxml_common::Error) -> Self {
+        match error {
+            litchi_ooxml_common::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ooxml_common::Error::PatchConflict => Self::PatchConflict,
+            litchi_ooxml_common::Error::Signed => Self::Signed,
+            litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            litchi_ooxml_common::Error::Internal(reason) => Self::internal("shared OOXML", reason),
+            other => Self::CustomProperties(other),
         }
     }
 }

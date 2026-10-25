@@ -164,13 +164,13 @@ impl Patch {
 }
 
 /// Apply one durable Web Extensions transaction under the caller's graph
-/// limits. The caller owns the package mutation; every failure leaves it
-/// unchanged.
+/// limits. The source package is unchanged; the returned commit owns the
+/// published package and every failure leaves the source untouched.
 pub fn apply_durable<Mode>(
-    package: &mut OpcPackage,
+    package: &OpcPackage,
     patch: &CorePatch<Mode>,
     limits: &Limits,
-) -> Result<bool> {
+) -> Result<super::Commit> {
     let planned = plan_durable(package, patch, limits)?;
     planned.apply(package)
 }
@@ -205,9 +205,7 @@ pub fn plan_durable<Mode>(
                 MAX_CLOSURE_BYTES.min(limits.total_xml_bytes.max(limits.total_image_bytes));
             let actual = scope_hash_from_patch_scope(&generated, true, maximum)?;
             if actual != source {
-                return Err(Error::Relationship(
-                    "Web Extensions durable no-op source scope changed".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
             Ok(generated)
         },
@@ -224,15 +222,10 @@ pub fn plan_durable<Mode>(
             let generated_source = scope_hash_from_patch_scope(&generated, true, maximum)?;
             let generated_target = scope_hash_from_patch_scope(&generated, false, maximum)?;
             if generated_source != source {
-                return Err(Error::Relationship(
-                    "Web Extensions durable typed replay target mismatch (source scope mismatch)"
-                        .into(),
-                ));
+                return Err(Error::PatchConflict);
             }
             if generated_target != target {
-                return Err(Error::Relationship(
-                    "Web Extensions durable typed replay target mismatch".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
             Ok(generated.with_durable_intent(intent))
         },
@@ -248,9 +241,7 @@ pub fn plan_durable<Mode>(
             match validate_closure_source(package, &records, limits) {
                 Ok(()) => {},
                 Err(Error::Invalid(message)) if message.starts_with("stale Web Extensions") => {
-                    return Err(Error::Relationship(
-                        "Web Extensions durable restore forward replay mismatch".into(),
-                    ));
+                    return Err(Error::PatchConflict);
                 },
                 Err(error) => return Err(error),
             }
@@ -266,9 +257,7 @@ pub fn plan_durable<Mode>(
                 || replayed_target != source
                 || expected_closure.as_slice() != closure_bytes
             {
-                return Err(Error::Relationship(
-                    "Web Extensions durable restore forward replay mismatch".into(),
-                ));
+                return Err(Error::PatchConflict);
             }
             // The generated inverse carries exact source XML/relationship tokens
             // captured from the proof candidate. Apply it only after every
@@ -302,7 +291,7 @@ fn to_durable(
         })?;
     // A no-op carries only its bounded source-scope digest.  It deliberately
     // works with zero blob allowance because no payload is retained.
-    if patch.is_empty() {
+    if patch.is_noop() {
         let source = scope_hash_from_patch_scope(patch, true, MAX_CLOSURE_BYTES)?;
         let target = scope_hash_from_patch_scope(patch, false, MAX_CLOSURE_BYTES)?;
         return reversible_noop(limits, &source, &target);
@@ -1252,7 +1241,7 @@ fn map_intent_decode_error(error: Error) -> Error {
         &error,
         Error::Invalid(message) if message.contains("text is not permitted")
     ) {
-        Error::Relationship("Web Extensions durable typed replay target mismatch".into())
+        Error::PatchConflict
     } else {
         error
     }

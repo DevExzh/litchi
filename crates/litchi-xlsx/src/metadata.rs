@@ -10,7 +10,7 @@
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
 //! unchanged value. A field no OOXML family stores is refused with
-//! [`Error::Unsupported`]; a changed edit of a signed workbook is refused
+//! [`Error::Refused`]; a changed edit of a signed workbook is refused
 //! with [`Error::Signed`]; an exact no-op keeps every byte.
 //!
 //! ```
@@ -97,9 +97,12 @@ fn owner_family(
     let package_relationships = package.opc().rels();
     let (present_part_bytes, present_relationship_bytes) = match snapshot.part_name(family) {
         Some(part_name) => {
-            let part = package.opc().part_metadata(part_name).ok_or_else(|| {
-                Error::Invalid("metadata part disappeared during admission".to_owned())
-            })?;
+            let part = package
+                .opc()
+                .part_metadata(part_name)
+                .ok_or(Error::Internal(
+                    "metadata part disappeared during admission",
+                ))?;
             let relationship = match snapshot.relationship_id_value(family) {
                 Some(relationship_id) => package_relationships.get(relationship_id),
                 None => package_relationships.iter().find(|relationship| {
@@ -109,9 +112,9 @@ fn owner_family(
                         })
                 }),
             }
-            .ok_or_else(|| {
-                Error::Invalid("metadata relationship disappeared during admission".to_owned())
-            })?;
+            .ok_or(Error::Internal(
+                "metadata relationship disappeared during admission",
+            ))?;
             (
                 Some(retained_part_metadata_bytes(part)),
                 Some(retained_relationship_bytes(relationship)),
@@ -128,7 +131,7 @@ fn owner_family(
         Family::Core => litchi_opc::constants::relationship_type::CORE_PROPERTIES,
         Family::App => litchi_opc::constants::relationship_type::EXTENDED_PROPERTIES,
         Family::Custom => litchi_opc::constants::relationship_type::CUSTOM_PROPERTIES,
-        _ => return Err(Error::Invalid("unknown OOXML metadata family".to_owned())),
+        _ => return Err(Error::Internal("unknown OOXML metadata family")),
     };
     let created_relationship_base_bytes = size_of::<Relationship>()
         .saturating_add(relationship_type.len())
@@ -259,9 +262,20 @@ impl Edit {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> Result<&mut Self> {
         self.ensure_inner()?.set_custom_props(props);
+        Ok(self)
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> Result<&mut Self> {
+        self.ensure_inner()?.remove_custom_props();
         Ok(self)
     }
 
@@ -271,7 +285,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
@@ -398,8 +412,7 @@ impl Package {
                 diagnostics: patch.diagnostics(),
             });
         }
-        let mut candidate = self.opc().clone();
-        patch.apply(&mut candidate)?;
+        let candidate = patch.apply(self.opc())?.into_package();
         let package = self.adopt_metadata(candidate)?;
         Ok(Commit {
             package,
@@ -466,6 +479,7 @@ mod tests {
     #[test]
     fn edits_publish_a_new_snapshot_and_replay_exactly() {
         let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
         let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
@@ -486,6 +500,7 @@ mod tests {
         assert!(replayed.diagnostics().changed());
         let replayed = replayed.into_package();
         assert!(replayed.same_content(&after).unwrap());
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
             Err(Error::PatchConflict)
@@ -495,6 +510,7 @@ mod tests {
             .unwrap()
             .into_package();
         assert!(restored.same_content(&package).unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), original);
     }
 
     #[test]

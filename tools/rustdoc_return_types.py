@@ -27,6 +27,15 @@ FACADE_COMMIT_PATHS = frozenset({
 # identity before extracting the alias's owner argument.
 ODF_METADATA_COMMIT = ("litchi_odf_common", "metadata", "Commit")
 
+# rustdoc JSON for a dependency may omit a root re-export while retaining the
+# defining item's canonical path. This is an explicit, audited binding for
+# the one external root limit type registered by the glossary; it is not a
+# basename heuristic and must be extended only with reviewed re-export
+# provenance.
+CANONICAL_ROOT_REEXPORTS = {
+    ("litchi_opc", "SourceLimits"): ("litchi_opc", "limits", "SourceLimits"),
+}
+
 
 class ReturnTypes:
     def __init__(self, surface):
@@ -106,8 +115,19 @@ class ReturnTypes:
                 and entry.get("crate_id") != self.surface.crate_id
                 and entry.get("kind") in NOMINAL_KINDS
             ]
+            if not candidates:
+                defining_path = CANONICAL_ROOT_REEXPORTS.get(path)
+                if defining_path is None:
+                    return None
+                candidates = [
+                    item_id for item_id, entry in self.surface.paths.items()
+                    if tuple(entry.get("path", ())) == defining_path
+                    if entry.get("crate_id") != self.surface.crate_id
+                    and entry.get("kind") in NOMINAL_KINDS
+                ]
             # Multiple rustdoc IDs for one canonical path are ambiguous, even
-            # when their spelling happens to match.
+            # when their spelling happens to match. The same fail-closed rule
+            # applies to the explicit root-reexport binding above.
             if len(candidates) != 1:
                 return None
             item_id = candidates[0]
@@ -195,13 +215,26 @@ class ReturnTypes:
         return None
 
     def matches_owner(self, method, expected, args=()):
-        """A registered owner replay publishes the receiver's owner type.
+        """A registered owner replay publishes its source package type.
 
         Durable wire patches can differ from the returned family's Patch.
         Their input semantics remain Rust test obligations; this return-shape
-        check verifies the exact family Commit and its published owner.
+        check verifies the exact family Commit and its published owner.  A
+        ``Patch::apply`` method is defined on the patch but publishes the
+        package supplied as its second argument, so it must not be compared
+        with the patch receiver.
         """
         owner = self.type_at(method[:-1])
+        if len(method) >= 2 and method[-1] == "apply" and method[-2] == "Patch":
+            item_id = self.surface.item_ids.get(method)
+            function = self.surface.index.get(item_id, {}).get("inner", {}).get("function")
+            inputs = function.get("sig", {}).get("inputs", []) if isinstance(function, dict) else []
+            if (not isinstance(inputs, list) or len(inputs) < 2
+                    or any(not isinstance(item, list) or len(item) != 2 for item in inputs)):
+                return False
+            owner = self.resolve(inputs[1][1])
+            while isinstance(owner, tuple) and owner and owner[0] == "ref":
+                owner = owner[2]
         return owner is not None and self.commit_package(expected, args) == owner
 
     def resolve(self, value: Any, bindings=None, self_type=None, visiting=frozenset()):

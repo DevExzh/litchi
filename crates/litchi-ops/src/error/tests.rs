@@ -12,6 +12,8 @@ use litchi_core::{ExecutionError, FileFormat, Resource, ResourceLimit, SourceVer
 
 #[cfg(any(feature = "doc", feature = "xls", feature = "ppt", feature = "xlsb"))]
 use super::PASSWORD_SUGGESTION;
+#[cfg(feature = "xlsx")]
+use super::classify_xlsx_join_source;
 use super::{Code, Error, LIMIT_SUGGESTION, SIGNED_SUGGESTION, Source};
 
 #[test]
@@ -333,6 +335,127 @@ fn row_other_io_and_source_changes_are_io_error() {
     }
 }
 
+/// A real XLSX join wrapper still takes the explicit join-classification path;
+/// non-normalization join failures keep their historical corrupt-file code.
+#[test]
+#[cfg(feature = "xlsx")]
+fn xlsx_join_error_preserves_other_join_fallback_through_ops_conversion() {
+    let mut left = litchi_xlsx::Package::new()
+        .expect("left workbook")
+        .edit()
+        .expect("left edit");
+    let right = litchi_xlsx::Package::new()
+        .expect("right workbook")
+        .edit()
+        .expect("right edit");
+    let join = left
+        .join(right)
+        .expect_err("edits from different snapshots must not join");
+
+    let leaf = litchi_xlsx::Error::from(join);
+    let error: Error = leaf.into();
+    assert_eq!(error.code(), Code::CorruptFile);
+    assert_eq!(error.format(), Some(FileFormat::Xlsx));
+    assert!(matches!(error.leaf(), Source::Xlsx(_)));
+    let source = std::error::Error::source(&error).expect("typed XLSX join source");
+    assert!(
+        source
+            .downcast_ref::<litchi_xlsx::Error>()
+            .is_some_and(|error| matches!(error, litchi_xlsx::Error::Join(_)))
+    );
+}
+
+/// The two operation-boundary leaves remain typed when a join retains them;
+/// the public cross-snapshot test above covers the no-source join fallback.
+#[test]
+#[cfg(feature = "xlsx")]
+fn xlsx_join_source_classifier_preserves_operation_boundary_codes() {
+    let (expected, observed) = changed();
+    let source_changed = litchi_xlsx::Error::SourceChanged { expected, observed };
+    assert_eq!(
+        classify_xlsx_join_source(Some(&source_changed)).code,
+        Code::IoError
+    );
+
+    let internal = litchi_xlsx::Error::Internal("generated staging invariant");
+    assert_eq!(
+        classify_xlsx_join_source(Some(&internal)).code,
+        Code::InternalError
+    );
+}
+
+#[test]
+#[cfg(feature = "xlsx")]
+fn xlsx_join_source_classifier_delegates_retained_leaf_codes() {
+    use super::Classify as _;
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    for kind in RefusalKind::ALL.iter().copied() {
+        let source = litchi_xlsx::Error::Refused(Refusal::new(kind, "operation", "reason"));
+        assert_eq!(
+            classify_xlsx_join_source(Some(&source)).code,
+            kind.classify().code,
+            "{kind}"
+        );
+    }
+
+    let conflict = litchi_xlsx::Error::PatchConflict {
+        part: "/xl/workbook.xml".into(),
+    };
+    assert_eq!(
+        classify_xlsx_join_source(Some(&conflict)).code,
+        Code::InvalidInput
+    );
+
+    let limit = litchi_xlsx::Error::Limit {
+        kind: litchi_xlsx::LimitKind::ConditionalFormatting(
+            litchi_xlsx::conditional_formatting::edit::LimitKind::Formats,
+        ),
+        observed: 2,
+        maximum: 1,
+    };
+    assert_eq!(
+        classify_xlsx_join_source(Some(&limit)).code,
+        Code::LimitExceeded
+    );
+
+    let direct = litchi_xlsx::Error::SourceChanged {
+        expected: SourceVersion::new(7, 1),
+        observed: SourceVersion::new(7, 2),
+    };
+    let nested = litchi_xlsx::Error::Common(litchi_ooxml_common::Error::SourceChanged {
+        expected: SourceVersion::new(7, 1),
+        observed: SourceVersion::new(7, 2),
+    });
+    let direct_code = classify_xlsx_join_source(Some(&direct)).code;
+    assert_eq!(direct_code, Code::IoError);
+    assert_eq!(classify_xlsx_join_source(Some(&nested)).code, direct_code);
+    assert_eq!(classify_xlsx_join_source(None).code, Code::CorruptFile);
+}
+
+#[cfg(feature = "docx")]
+#[test]
+fn docx_nested_metadata_refusal_and_source_change_keep_classification() {
+    let refusal = litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "set_custom_props",
+        "rewriting unsupported custom-property content is refused",
+    );
+    assert_code(
+        litchi_docx::metadata::Error::Properties(litchi_ooxml_common::properties::Error::Refused(
+            refusal,
+        )),
+        Code::UnsupportedCapability,
+    );
+    let (expected, observed) = changed();
+    assert_code(
+        litchi_docx::metadata::Error::Properties(
+            litchi_ooxml_common::properties::Error::SourceChanged { expected, observed },
+        ),
+        Code::IoError,
+    );
+}
+
 #[cfg(feature = "docx")]
 #[test]
 fn docx_recorded_replay_conflicts_are_invalid_input() {
@@ -471,8 +594,8 @@ fn row_malformed_input_is_corrupt_file() {
 // Row: `ResourceLimit`, OPC `Limit`, leaf limit errors -> `limit_exceeded`
 // (record 0007, Q1), with the limit detail kept in the typed source.
 /// The typed budgets of the shared OOXML families (Custom XML, Web
-/// Extensions, Ribbon), carried by each OOXML crate's shared-error variant,
-/// are limit errors (record 0360).
+/// Extensions, document properties, Ribbon), carried by each OOXML crate's
+/// shared-error variant, are limit errors (record 0360).
 #[test]
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn shared_ooxml_family_limits_are_limit_exceeded() {
@@ -495,6 +618,13 @@ fn shared_ooxml_family_limits_are_limit_exceeded() {
             litchi_ooxml_common::Error::Limit {
                 kind: litchi_ooxml_common::LimitKind::Ribbon(
                     litchi_ooxml_common::ribbon::LimitKind::XmlBytes,
+                ),
+                observed: 11,
+                maximum: 10,
+            },
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::Properties(
+                    litchi_ooxml_common::properties::LimitKind::RetainedBytes,
                 ),
                 observed: 11,
                 maximum: 10,
@@ -539,6 +669,128 @@ fn shared_ooxml_family_limits_are_limit_exceeded() {
         check(
             litchi_xlsb::package::PackageError::Common(litchi_ooxml_common::Error::Mce(mce()))
                 .into(),
+        );
+    }
+}
+
+#[cfg(feature = "docx")]
+#[test]
+fn docx_metadata_limit_conversion_keeps_details_and_classifies_downstream() {
+    let cases = [
+        (
+            litchi_ooxml_common::properties::LimitKind::TextBytes,
+            11,
+            10,
+        ),
+        (litchi_ooxml_common::properties::LimitKind::XmlBytes, 13, 12),
+        (
+            litchi_ooxml_common::properties::LimitKind::XmlEvents,
+            15,
+            14,
+        ),
+        (
+            litchi_ooxml_common::properties::LimitKind::CustomProperties,
+            17,
+            16,
+        ),
+        (litchi_ooxml_common::properties::LimitKind::Names, 19, 18),
+        (
+            litchi_ooxml_common::properties::LimitKind::RetainedBytes,
+            21,
+            20,
+        ),
+    ];
+    for (kind, observed, maximum) in cases {
+        let docx_error: litchi_docx::Error = litchi_ooxml_common::properties::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }
+        .into();
+        match &docx_error {
+            litchi_docx::Error::Common(litchi_ooxml_common::Error::Limit {
+                kind: common_kind,
+                observed: actual,
+                maximum: max,
+            }) => {
+                assert_eq!(
+                    *common_kind,
+                    litchi_ooxml_common::LimitKind::Properties(kind)
+                );
+                assert_eq!(*actual, observed);
+                assert_eq!(*max, maximum);
+                assert_eq!(common_kind.as_str(), kind.as_str());
+            },
+            other => panic!("properties limit lost its typed common wrapper: {other:?}"),
+        }
+        let unified: Error = litchi_docx::metadata::Error::Package(docx_error).into();
+        assert_eq!(unified.code(), Code::LimitExceeded);
+        assert!(std::error::Error::source(&unified).is_some());
+    }
+}
+
+/// Shared semantic publication failures retain their contract when a format
+/// adapter receives them through its common-error wrapper.
+#[test]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn shared_ooxml_semantic_errors_keep_their_wire_classes() {
+    let shared = || {
+        vec![
+            (
+                litchi_ooxml_common::Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "test",
+                    "the operation is not supported",
+                )),
+                Code::UnsupportedCapability,
+            ),
+            (
+                litchi_ooxml_common::Error::PatchConflict,
+                Code::InvalidInput,
+            ),
+            (litchi_ooxml_common::Error::Signed, Code::DocumentProtected),
+            (
+                litchi_ooxml_common::Error::SourceChanged {
+                    expected: SourceVersion::new(7, 1),
+                    observed: SourceVersion::new(7, 2),
+                },
+                Code::IoError,
+            ),
+            (
+                litchi_ooxml_common::Error::Internal("generated invariant"),
+                Code::InternalError,
+            ),
+        ]
+    };
+    let check = |error: Error, expected| assert_eq!(error.code(), expected, "{error:?}");
+    #[cfg(feature = "docx")]
+    for (error, expected) in shared() {
+        check(litchi_docx::Error::Common(error).into(), expected);
+    }
+    #[cfg(feature = "docx")]
+    check(
+        litchi_docx::Error::Common(litchi_ooxml_common::Error::Opc(
+            litchi_opc::OpcError::SourceChanged {
+                expected: SourceVersion::new(8, 1),
+                actual: SourceVersion::new(8, 2),
+            },
+        ))
+        .into(),
+        Code::IoError,
+    );
+    #[cfg(feature = "pptx")]
+    for (error, expected) in shared() {
+        check(litchi_pptx::Error::CustomProperties(error).into(), expected);
+    }
+    #[cfg(feature = "xlsx")]
+    for (error, expected) in shared() {
+        check(litchi_xlsx::Error::Common(error).into(), expected);
+    }
+    #[cfg(feature = "xlsb")]
+    for (error, expected) in shared() {
+        check(
+            litchi_xlsb::package::PackageError::Common(error).into(),
+            expected,
         );
     }
 }

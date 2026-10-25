@@ -1,10 +1,9 @@
 use super::MAX_PAYLOAD_BYTES;
 use super::model::Project;
 use crate::{Error, Result};
-use litchi_ooxml_common::vba::{Host, remove_project_graph, store_project_graph};
+use litchi_ooxml_common::vba::{Edit as VbaEdit, EditOptions, Host};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
-use std::sync::Arc;
 
 /// Discover the one inert VBA graph attached to a presentation main part.
 ///
@@ -74,8 +73,10 @@ pub(crate) fn store(
             maximum: MAX_PAYLOAD_BYTES,
         });
     }
-    store_project_graph(package, source, Host::PowerPoint, Arc::new(payload), None)
-        .map_err(map_common)?;
+    let mut edit =
+        VbaEdit::new(package, Host::PowerPoint, EditOptions::new()).map_err(map_common)?;
+    edit.store(payload, None).map_err(map_common)?;
+    *package = edit.commit().map_err(map_common)?.into_package();
     discover(package, source)?
         .ok_or_else(|| Error::Invalid("stored VBA project is not discoverable".to_string()))
 }
@@ -91,10 +92,14 @@ pub(crate) fn store(
 ///
 /// # Errors
 ///
-/// Returns [`Error::Opc`] for a change to a signed package, and an error if
+/// Returns [`Error::Signed`] for a change to a signed package, and an error if
 /// the operation fails.
-pub(crate) fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
-    remove_project_graph(package, source, Host::PowerPoint).map_err(map_common)
+pub(crate) fn remove(package: &mut OpcPackage, _source: &PackURI) -> Result<bool> {
+    let mut edit =
+        VbaEdit::new(package, Host::PowerPoint, EditOptions::new()).map_err(map_common)?;
+    let changed = edit.remove().map_err(map_common)?;
+    *package = edit.commit().map_err(map_common)?.into_package();
+    Ok(changed)
 }
 
 fn map_common(error: litchi_ooxml_common::Error) -> Error {
@@ -106,6 +111,16 @@ fn map_common(error: litchi_ooxml_common::Error) -> Error {
             Error::ContentType { expected, actual }
         },
         litchi_ooxml_common::Error::Relationship(message) => Error::Relationship(message),
+        litchi_ooxml_common::Error::PatchConflict => Error::PatchConflict,
+        litchi_ooxml_common::Error::Refused(refusal) => Error::Refused(refusal),
+        litchi_ooxml_common::Error::Signed => Error::Signed,
+        litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+            Error::SourceChanged { expected, observed }
+        },
+        litchi_ooxml_common::Error::Internal(reason) => Error::Internal {
+            operation: "vba",
+            reason,
+        },
         litchi_ooxml_common::Error::Invalid(message) => Error::Invalid(message),
         litchi_ooxml_common::Error::Limit {
             kind,

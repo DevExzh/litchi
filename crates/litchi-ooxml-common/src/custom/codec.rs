@@ -574,6 +574,7 @@ fn repair_shape_fragments(props: &mut Props, sink: &mut Sink<'_>) -> Result<()> 
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
     let encoded = encoded_len(props)?;
     encode_preflighted(props, encoded)
@@ -646,7 +647,7 @@ pub(crate) fn encode_preflighted(props: &Props, encoded: usize) -> Result<Vec<u8
 
 /// Plan the exact byte length of a canonical custom-properties part without
 /// allocating the XML payload. The calculation mirrors the `quick_xml`
-/// writer calls in [`encode`], including attribute and text escaping.
+/// writer calls in [`encode_preflighted`], including attribute and text escaping.
 pub(crate) fn encoded_len(props: &Props) -> Result<usize> {
     validate_collection(props)?;
     let mut length = 0usize;

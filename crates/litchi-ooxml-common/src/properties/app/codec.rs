@@ -5,11 +5,13 @@ use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
-use quick_xml::events::Event;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{Field, MAX_TEXT_BYTES, MAX_XML_BYTES, NAMESPACE, Props, STRICT_NAMESPACE, Value};
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml::decode_xml_reference;
 use crate::{Error, Result};
 
@@ -72,6 +74,7 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
 ///
 /// The errors of [`decode`] for `xml`, and [`Error::Invalid`] when a target
 /// text value holds a character XML 1.0 cannot carry.
+#[cfg(test)]
 pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     let Some(plan) = plan_splice(xml, target)? else {
         return Ok(None);
@@ -99,10 +102,23 @@ pub(crate) fn plan_splice(xml: &[u8], target: &Props) -> Result<Option<SplicePla
     if layout.props == *target {
         return Ok(None);
     }
-    let output_len = splice_len_from_layout(xml, &layout, target)?.ok_or_else(|| {
-        Error::Invalid("changed application-properties edit became a no-op".to_owned())
-    })?;
+    let output_len = splice_len_from_layout(xml, &layout, target)?.ok_or(Error::Internal(
+        "application-properties prepared-size invariant failed",
+    ))?;
     Ok(Some(SplicePlan { layout, output_len }))
+}
+
+/// Validate the authored scalar values before a retained source is scanned.
+/// Keeping this pass separate lets the transaction distinguish an invalid
+/// requested value from an invalid source part, even when both codecs use the
+/// same structural error type.
+pub(crate) fn validate_target(target: &Props) -> Result<()> {
+    for field in Field::ALL {
+        if let Some(value) = field.get(target) {
+            lexical_len(field, value)?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Result<Vec<u8>> {
@@ -166,8 +182,8 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
     let mut cursor = 0;
     for (range, replacement) in edits {
         if range.start < cursor || range.end > xml.len() {
-            return Err(Error::Invalid(
-                "extended-properties edits overlap".to_owned(),
+            return Err(Error::Internal(
+                "application-properties output invariant failed",
             ));
         }
         output.extend_from_slice(&xml[cursor..range.start]);
@@ -177,8 +193,8 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
     output.extend_from_slice(&xml[cursor..]);
     output.shrink_to_fit();
     if output.len() != output_len {
-        return Err(Error::Invalid(
-            "extended-properties prepared-size invariant failed".to_owned(),
+        return Err(Error::Internal(
+            "application-properties output invariant failed",
         ));
     }
     if output.len() > MAX_XML_BYTES {
@@ -189,8 +205,8 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
         });
     }
     if decode(&output)? != *target {
-        return Err(Error::Invalid(
-            "extended-properties edit did not read back as requested".to_owned(),
+        return Err(Error::Internal(
+            "application-properties output invariant failed",
         ));
     }
     Ok(output)
@@ -260,7 +276,9 @@ fn replace_len(current: usize, removed: usize, added: usize) -> Result<usize> {
     current
         .checked_sub(removed)
         .and_then(|value| value.checked_add(added))
-        .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))
+        .ok_or(Error::Internal(
+            "application-properties prepared-size invariant failed",
+        ))
 }
 
 /// Encode a new Transitional part holding `props`, elements in schema order.
@@ -304,8 +322,8 @@ pub(crate) fn encode_new_preflighted(props: &Props, encoded_len: usize) -> Resul
     }
     xml.shrink_to_fit();
     if xml.len() != encoded_len {
-        return Err(Error::Invalid(
-            "extended-properties encoded-size invariant failed".to_owned(),
+        return Err(Error::Internal(
+            "application-properties output invariant failed",
         ));
     }
     Ok(xml)
@@ -328,19 +346,21 @@ pub(crate) fn encode_new_len(props: &Props) -> Result<usize> {
             total
                 .checked_add(element_len(&[], field, value)?)
                 .ok_or_else(|| {
-                    Error::Invalid("extended-properties encoded size overflow".to_owned())
+                    Error::Internal("application-properties prepared-size invariant failed")
                 })
         })?;
     length = if children == 0 {
-        length
-            .checked_add(2)
-            .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))?
+        length.checked_add(2).ok_or(Error::Internal(
+            "application-properties prepared-size invariant failed",
+        ))?
     } else {
         length
             .checked_add(1)
             .and_then(|value| value.checked_add(children))
             .and_then(|value| value.checked_add(b"</Properties>".len()))
-            .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))?
+            .ok_or(Error::Internal(
+                "application-properties prepared-size invariant failed",
+            ))?
     };
     if length > MAX_XML_BYTES {
         return Err(Error::Limit {
@@ -549,38 +569,79 @@ fn scan(xml: &[u8]) -> Result<Layout> {
                 },
             };
             match event {
-                Event::Start(element) => Scanned::Element {
-                    empty: false,
-                    namespace,
-                    local: element.local_name().as_ref().to_vec(),
-                    name: element.name().as_ref().to_vec(),
+                Event::Start(element) => {
+                    validate_source_attributes(&element, reader.decoder())?;
+                    Scanned::Element {
+                        empty: false,
+                        namespace,
+                        local: element.local_name().as_ref().to_vec(),
+                        name: element.name().as_ref().to_vec(),
+                    }
                 },
-                Event::Empty(element) => Scanned::Element {
-                    empty: true,
-                    namespace,
-                    local: element.local_name().as_ref().to_vec(),
-                    name: element.name().as_ref().to_vec(),
+                Event::Empty(element) => {
+                    validate_source_attributes(&element, reader.decoder())?;
+                    Scanned::Element {
+                        empty: true,
+                        namespace,
+                        local: element.local_name().as_ref().to_vec(),
+                        name: element.name().as_ref().to_vec(),
+                    }
                 },
                 Event::End(_) => Scanned::End,
                 Event::Text(text) => {
                     let decoded = text
                         .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|error| Error::Xml(error.to_string()))?;
-                    Scanned::Text(
-                        quick_xml::escape::unescape(&decoded)
-                            .map_err(|error| Error::Xml(error.to_string()))?
-                            .into_owned(),
-                    )
+                    let decoded = quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    let decoded = decoded.into_owned();
+                    validate_source_chars(&decoded, "extended properties XML text")?;
+                    Scanned::Text(decoded)
                 },
-                Event::CData(text) => Scanned::Text(
-                    text.xml_content(XmlVersion::Explicit1_0)
+                Event::CData(text) => {
+                    let decoded = text
+                        .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|error| Error::Xml(error.to_string()))?
-                        .into_owned(),
-                ),
-                Event::GeneralRef(reference) => Scanned::Text(decode_xml_reference(&reference)?),
+                        .into_owned();
+                    validate_source_chars(&decoded, "extended properties XML text")?;
+                    Scanned::Text(decoded)
+                },
+                Event::GeneralRef(reference) => {
+                    let decoded = decode_xml_reference(&reference)?;
+                    validate_source_chars(&decoded, "extended properties XML text")?;
+                    Scanned::Text(decoded)
+                },
                 Event::DocType(_) => Scanned::DocType,
                 Event::Eof => Scanned::Eof,
-                Event::Comment(_) | Event::Decl(_) | Event::PI(_) => Scanned::Other,
+                Event::Comment(comment) => {
+                    validate_source_bytes(
+                        reader.decoder(),
+                        comment.as_ref(),
+                        "extended properties XML comment",
+                    )?;
+                    Scanned::Other
+                },
+                Event::Decl(declaration) => {
+                    validate_source_bytes(
+                        reader.decoder(),
+                        declaration.as_ref(),
+                        "extended properties XML declaration",
+                    )?;
+                    Scanned::Other
+                },
+                Event::PI(instruction) => {
+                    validate_source_bytes(
+                        reader.decoder(),
+                        instruction.target(),
+                        "extended properties XML processing instruction",
+                    )?;
+                    validate_source_bytes(
+                        reader.decoder(),
+                        instruction.content(),
+                        "extended properties XML processing instruction",
+                    )?;
+                    Scanned::Other
+                },
             }
         };
         let end = offset(origin, reader.buffer_position())?;
@@ -714,6 +775,34 @@ fn scan(xml: &[u8]) -> Result<Layout> {
         root_name,
         root_end,
     })
+}
+
+fn validate_source_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_chars(&value, "extended properties XML attribute")?;
+    }
+    Ok(())
+}
+
+fn validate_source_bytes(decoder: Decoder, bytes: &[u8], context: &str) -> Result<()> {
+    let value = decoder
+        .decode(bytes)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    validate_source_chars(&value, context)
+}
+
+fn validate_source_chars(value: &str, context: &str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| !is_xml_char(*character)) {
+        return Err(Error::Invalid(format!(
+            "{context} contains XML 1.0-forbidden character U+{:04X}",
+            u32::from(character)
+        )));
+    }
+    Ok(())
 }
 
 fn push_text(value: &mut String, text: &str) -> Result<()> {

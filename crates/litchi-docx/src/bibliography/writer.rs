@@ -653,9 +653,11 @@ fn write_element(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Error as DocxError;
     use crate::bibliography::discover_bibliography_source_stores;
+    use litchi_core::edit::RefusalKind;
     use litchi_ooxml_common::custom_xml::{
-        Conformance, Item, NewItem, NewProps, Props, add, discover,
+        Conformance, Edit, Item, NewItem, NewProps, Props, discover,
     };
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::part::BlobPart;
@@ -669,26 +671,25 @@ mod tests {
             ct::WML_DOCUMENT_MAIN.to_string(),
             Vec::new(),
         )));
-        add(
-            &mut package,
-            NewItem {
-                source,
-                rel_id: "rIdBib".to_string(),
-                part: PackURI::new("/customXml/item1.xml").unwrap(),
-                content_type: "application/xml".to_string(),
-                xml: xml.to_vec(),
-                props: Some(NewProps {
-                    part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
-                    rel_id: "rIdProps".to_string(),
-                    value: Props {
-                        id: "{11111111-1111-1111-1111-111111111111}".to_string(),
-                        schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
-                    },
-                }),
-                conformance: Conformance::Transitional,
-            },
-        )
+        let mut edit = Edit::new(&package).unwrap();
+        edit.insert(NewItem {
+            source,
+            rel_id: "rIdBib".to_string(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".to_string(),
+            xml: xml.to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".to_string(),
+                value: Props {
+                    id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+                    schemas: vec![OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
+                },
+            }),
+            conformance: Conformance::Transitional,
+        })
         .unwrap();
+        package = edit.commit().unwrap().into_package();
         let item = discover(&package).unwrap().remove(0);
         assert_eq!(item.root().namespace, namespace);
         assert_eq!(item.root().local_name, local_name);
@@ -938,6 +939,17 @@ mod tests {
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
+        let mut empty = Package::new().unwrap();
+        let missing_store = empty
+            .replace_bibliography_source(
+                "Missing",
+                BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing").unwrap(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            missing_store,
+            DocxError::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+        ));
         let mut package = Package::new().unwrap();
         package.add_bibliography_source(built()).unwrap();
         // Duplicate tags are rejected before any mutation.
@@ -952,15 +964,16 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-        assert!(
-            package
-                .replace_bibliography_source(
-                    "Missing",
-                    BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing")
-                        .unwrap(),
-                )
-                .is_err()
-        );
+        let missing_source = package
+            .replace_bibliography_source(
+                "Missing",
+                BibliographySourceBuilder::new(BibliographySourceKind::Report, "Missing").unwrap(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            missing_source,
+            DocxError::Refused(refusal) if refusal.kind() == RefusalKind::NotFound
+        ));
 
         assert!(package.remove_bibliography_source("Doe2024").unwrap());
         assert!(!package.remove_bibliography_source("Doe2024").unwrap());

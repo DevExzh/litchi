@@ -315,7 +315,7 @@ fn public_task_pane_plan_is_nonmutating_and_inverse_restores_saved_members_exact
     let patch = package
         .plan_task_panes(panes, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert_eq!(members(&package_bytes(&package)), original);
 
     assert!({
@@ -357,7 +357,7 @@ fn changed_and_exact_noop_public_patches_have_expected_effects() {
     let noop = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(noop.is_empty());
+    assert!(noop.is_noop());
     assert!(!{
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&noop).unwrap();
@@ -370,7 +370,7 @@ fn changed_and_exact_noop_public_patches_have_expected_effects() {
     let patch = package
         .plan_task_panes(changed.clone(), web::Conformance::Strict)
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -467,7 +467,7 @@ fn signed_noop_is_preserved_but_changed_publication_requires_explicit_unsign() {
     let noop = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(noop.is_empty());
+    assert!(noop.is_noop());
     assert!(!{
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&noop).unwrap();
@@ -624,7 +624,7 @@ fn public_remove_and_inverse_restore_task_panes_after_save_and_reopen() {
     };
     let original = members(&package_bytes(&package));
     let patch = package.plan_remove_task_panes().unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -708,7 +708,7 @@ fn custom_function_rewrite_targets_later_payload_extension_after_vendor_extensio
     let patch = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -780,7 +780,7 @@ fn custom_function_semantic_noop_preserves_noncanonical_addin_taskpane_xml_and_s
     let patch = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(patch.is_empty());
+    assert!(patch.is_noop());
     assert!(!{
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -822,7 +822,7 @@ fn omitted_contains_boolean_is_distinct_from_explicit_false_and_inverse_restores
             web::Conformance::Transitional,
         )
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -887,7 +887,7 @@ fn known_custom_function_payload_comments_and_processing_instructions_are_retain
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
+            assert!(!patch.is_noop());
             match apply_plan(&mut package, &patch) {
                 Err(error) => {
                     let message = error.to_string().to_ascii_lowercase();
@@ -949,7 +949,7 @@ fn internal_custom_payload_markup_survives_changed_attributes_or_refuses_atomica
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
+            assert!(!patch.is_noop());
             match apply_plan(&mut package, &patch) {
                 Err(error) => {
                     let message = error.to_string().to_ascii_lowercase();
@@ -1029,7 +1029,7 @@ fn empty_custom_function_list_grows_without_dropping_internal_markup_or_siblings
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
+            assert!(!patch.is_noop());
             assert!({
                 let mut edit = package.edit_task_panes();
                 let value = edit.apply_plan(&patch).unwrap();
@@ -1099,7 +1099,7 @@ fn changed_custom_metadata_preserves_noncanonical_owner_bytes_and_inverse_after_
     let patch = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -1126,7 +1126,7 @@ fn changed_custom_metadata_preserves_noncanonical_owner_bytes_and_inverse_after_
     let second_patch = package
         .plan_task_panes(second_desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!second_patch.is_empty());
+    assert!(!second_patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&second_patch).unwrap();
@@ -1181,7 +1181,7 @@ fn two_pane_custom_metadata_edit_is_local_to_selected_extension() {
     let patch = package
         .plan_task_panes(desired, web::Conformance::Transitional)
         .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!({
         let mut edit = package.edit_task_panes();
         let value = edit.apply_plan(&patch).unwrap();
@@ -1399,7 +1399,7 @@ fn conformance_noop_ignores_missing_unused_prefix_and_vendor_other_dialect_text(
             let before = members(&package_bytes(&package));
             let loaded = package.task_panes().unwrap().unwrap();
             let patch = package.plan_task_panes(loaded, conformance).unwrap();
-            assert!(patch.is_empty(), "{name} incorrectly became a changed plan");
+            assert!(patch.is_noop(), "{name} incorrectly became a changed plan");
             assert!(!{
                 let mut edit = package.edit_task_panes();
                 let value = edit.apply_plan(&patch).unwrap();
@@ -1473,7 +1473,7 @@ fn inactive_mce_branch_is_retained_or_rejected_precisely_during_custom_edit() {
             assert_eq!(members(&package_bytes(&package)), before);
         },
         Ok(patch) => {
-            assert!(!patch.is_empty());
+            assert!(!patch.is_noop());
             match apply_plan(&mut package, &patch) {
                 Err(error) => {
                     let message = error.to_string().to_ascii_lowercase();
@@ -1533,7 +1533,7 @@ fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
     let noop = source
         .plan_task_panes(loaded, web::Conformance::Transitional)
         .unwrap();
-    assert!(noop.is_empty());
+    assert!(noop.is_noop());
     let original = package_bytes(&source);
     let stale_bytes = rewrite_member(&original, "webextensions/webextension1.xml", |content| {
         replace_once(content, b"runtime-public", b"runtime-stale")
@@ -1570,7 +1570,7 @@ fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
             web::Conformance::Transitional,
         )
         .unwrap();
-    assert!(add_in_noop.is_empty());
+    assert!(add_in_noop.is_noop());
     let add_in_relationship_lexical_bytes = rewrite_member(
         &add_in_relationship_bytes,
         "webextensions/_rels/webextension1.xml.rels",

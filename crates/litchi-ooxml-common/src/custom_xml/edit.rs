@@ -9,6 +9,7 @@ use super::codec::{
     is_props_relationship, read_props, require_rel_id, rewrite_props, validate_content_type,
     validate_payload, validate_props, write_props,
 };
+use super::errors::{not_found, unsupported_target};
 use super::model::{Conformance, Item, NewItem, Props, Relationship};
 use super::package;
 use super::patch::{Commit, Diagnostics, Patch};
@@ -80,7 +81,7 @@ impl Edit {
         let current = self
             .draft
             .get(index)
-            .ok_or_else(|| Error::Invalid(format!("custom XML item index {index} is absent")))?;
+            .ok_or_else(|| not_found("custom_xml.set_xml"))?;
         if current.xml() == xml.as_slice() {
             return Ok(false);
         }
@@ -107,7 +108,7 @@ impl Edit {
         let current = self
             .draft
             .get(index)
-            .ok_or_else(|| Error::Invalid(format!("custom XML item index {index} is absent")))?;
+            .ok_or_else(|| not_found("custom_xml.set_content_type"))?;
         if current.content_type() == content_type {
             return Ok(false);
         }
@@ -139,10 +140,11 @@ impl Edit {
         let current = self
             .draft
             .get(index)
-            .ok_or_else(|| Error::Invalid(format!("custom XML item index {index} is absent")))?;
+            .ok_or_else(|| not_found("custom_xml.set_properties_xml"))?;
         if current.props_part().is_none() {
-            return Err(Error::Invalid(
-                "custom XML item has no properties relationship".into(),
+            return Err(unsupported_target(
+                "custom_xml.set_properties_xml",
+                "the Custom XML item has no properties target",
             ));
         }
         if current.props_xml() == Some(xml.as_slice()) {
@@ -163,7 +165,8 @@ impl Edit {
 
     /// Replace the typed properties projection using the source conformance
     /// family. Use [`Self::set_properties_xml`] when custom XML lexical form
-    /// and unknown markup must be authored explicitly.
+    /// and unknown markup must be authored explicitly. Schema-reference edits
+    /// refuse an opaque source part that cannot be rewritten losslessly.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -173,13 +176,19 @@ impl Edit {
         let current = self
             .draft
             .get(index)
-            .ok_or_else(|| Error::Invalid(format!("custom XML item index {index} is absent")))?;
+            .ok_or_else(|| not_found("custom_xml.set_properties"))?;
         let before = current.props().ok_or_else(|| {
-            Error::Invalid("custom XML item has no typed properties projection".into())
+            unsupported_target(
+                "custom_xml.set_properties",
+                "the Custom XML item has no typed properties target",
+            )
         })?;
-        let source = current
-            .props_xml()
-            .ok_or_else(|| Error::Invalid("custom XML item has no properties source XML".into()))?;
+        let source = current.props_xml().ok_or_else(|| {
+            unsupported_target(
+                "custom_xml.set_properties",
+                "the Custom XML item has no properties source",
+            )
+        })?;
         let conformance = if source
             .windows(super::model::STRICT_NAMESPACE.len())
             .any(|window| window == super::model::STRICT_NAMESPACE.as_bytes())
@@ -204,7 +213,7 @@ impl Edit {
         let current = self
             .draft
             .get(index)
-            .ok_or_else(|| Error::Invalid(format!("custom XML item index {index} is absent")))?;
+            .ok_or_else(|| not_found("custom_xml.remove_properties"))?;
         if current.props_part().is_none() {
             return Ok(false);
         }
@@ -236,11 +245,10 @@ impl Edit {
         if self.draft.iter().any(|existing| {
             existing.source() == item.source() && existing.rel_id() == item.rel_id()
         }) {
-            return Err(Error::Relationship(format!(
-                "custom XML relationship '{}' already exists on '{}'",
-                item.rel_id(),
-                item.source().as_str()
-            )));
+            return Err(unsupported_target(
+                "custom_xml.insert",
+                "the Custom XML relationship target is already occupied",
+            ));
         }
         if self.draft.iter().any(|existing| {
             existing.part() == item.part()
@@ -248,8 +256,9 @@ impl Edit {
                     existing.part() == part || existing.props_part() == Some(part)
                 })
         }) {
-            return Err(Error::Invalid(
-                "custom XML insertion reuses an existing data graph part".into(),
+            return Err(unsupported_target(
+                "custom_xml.insert",
+                "the Custom XML data target is already occupied",
             ));
         }
         if !self
@@ -293,11 +302,9 @@ impl Edit {
     /// [`OpcPackage::unsign`] or the format facade's `unsign`.
     /// # Errors
     ///
-    /// Returns [`Error::Opc`] with
-    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// for a change to a signed package, and an error when input violates
-    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
-    /// package operation fails.
+    /// Returns [`Error::Signed`] for a change to a signed package, and an
+    /// error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn commit(self) -> Result<Commit> {
         if !self.is_staged() {
             let patch = Patch::new(self.before.clone(), self.before);
@@ -319,8 +326,8 @@ impl Edit {
         }
         let after = Snapshot::load_scoped(&candidate, &hints)?;
         if after.items() != self.draft.as_slice() {
-            return Err(Error::Invalid(
-                "custom XML publication changed the staged occurrence set".into(),
+            return Err(Error::Internal(
+                "custom XML publication changed the staged occurrence set",
             ));
         }
         let patch = Patch::new(self.before, after);
@@ -336,22 +343,22 @@ fn new_item(package: &OpcPackage, value: NewItem) -> Result<Item> {
     match package.get_part(&value.source) {
         Ok(_) => {},
         Err(OpcError::PartNotFound(_)) => {
-            return Err(Error::Missing(format!(
-                "custom XML source '{}' is absent",
-                value.source.as_str()
-            )));
+            return Err(not_found("custom_xml.insert"));
         },
         Err(error) => return Err(error.into()),
     }
     if value.part.as_str() == "/" {
-        return Err(Error::Invalid("custom XML data part cannot be root".into()));
+        return Err(unsupported_target(
+            "custom_xml.insert",
+            "the Custom XML data target cannot be the package root",
+        ));
     }
-    package.validate_new_part_name(&value.part)?;
+    validate_new_part_name(package, &value.part, "custom_xml.insert")?;
 
     let (props_part, props, props_xml, mut relationships) = if let Some(new_props) = value.props {
         validate_props(&new_props.value)?;
         require_rel_id(&new_props.rel_id, "custom XML properties relationship")?;
-        package.validate_new_part_name(&new_props.part)?;
+        validate_new_part_name(package, &new_props.part, "custom_xml.insert")?;
         let props_xml = write_props(&new_props.value, value.conformance, &source_limits)?;
         let relationship = Relationship {
             id: new_props.rel_id,
@@ -412,6 +419,25 @@ fn clone_item(
         props_xml.map(Arc::new),
         relationships.into(),
     )
+}
+
+fn validate_new_part_name(
+    package: &OpcPackage,
+    part: &PackURI,
+    operation: &'static str,
+) -> Result<()> {
+    match package.validate_new_part_name(part) {
+        Ok(()) => Ok(()),
+        Err(
+            OpcError::DuplicatePartName(_)
+            | OpcError::EquivalentPartNames { .. }
+            | OpcError::DerivedPartNames { .. },
+        ) => Err(unsupported_target(
+            operation,
+            "the Custom XML destination part is already occupied",
+        )),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn push_name(names: &mut Vec<PackURI>, name: &PackURI) {

@@ -6,7 +6,7 @@ use crate::constants::content_type as ct;
 #[cfg(test)]
 use crate::content_type::ContentType;
 use crate::error::Result;
-use crate::package::{OpcPackage, SourceMember, SourceMemberKind};
+use crate::package::{OpcPackage, SourceMember, SourceMemberKind, source_blob_retained};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::part::Part;
 use crate::phys_pkg::PhysPkgWriter;
@@ -775,7 +775,7 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                if source_blob_retained(source_part, part) {
+                if source_blob_retained(source_part, part.blob.as_deref().map(Vec::as_slice)) {
                     None
                 } else {
                     Some(part.materialized_blob()?.len())
@@ -886,7 +886,7 @@ fn try_write_preserved<W: Write>(
                     let Some(source_part) = provenance.parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if source_blob_retained(source_part, part) {
+                    if source_blob_retained(source_part, part.blob.as_deref().map(Vec::as_slice)) {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
                         regenerated_part_action(
@@ -910,7 +910,11 @@ fn try_write_preserved<W: Write>(
                         let Some(source_part) = provenance.parts.get(partname) else {
                             return Ok(PreservationWrite::Fallback(writer));
                         };
-                        if source_part.relationships_xml.as_bytes() == relationships.bytes() {
+                        if package.source_relationships_retained(
+                            part.partname,
+                            source_part,
+                            part.rels,
+                        )? {
                             soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                         } else {
                             regenerated_action(
@@ -959,31 +963,6 @@ fn try_write_preserved<W: Write>(
         .write_to(&plan, Chunked { inner: writer })
         .map(|writer| PreservationWrite::Written(writer.inner))
         .map_err(|error| crate::OpcError::ZipError(error.to_string()))
-}
-
-/// Whether the part still holds the exact payload the source member carries.
-///
-/// The provenance normally retains the very allocation the part was loaded
-/// with, so the pointer settles the untouched case before a whole-part
-/// comparison is charged. The byte comparison remains the decision for every
-/// part whose payload was replaced.
-fn source_blob_retained(source_part: &crate::package::SourcePart, part: &PlannedPart<'_>) -> bool {
-    let Some(blob) = part.blob.as_deref().map(Vec::as_slice) else {
-        // The part still holds the payload its source member carries, so no
-        // caller has ever held its bytes and it cannot have been replaced.
-        // The member is copied without decoding it (ADR 0030).
-        return true;
-    };
-    if let Some(source) = source_part.blob.decoded() {
-        return std::ptr::eq(source.as_slice(), blob) || source.as_slice() == blob;
-    }
-    // The part was decoded, so the source payload has to be decoded too to
-    // decide. A source payload that cannot be decoded proves nothing, and the
-    // planned payload is republished instead of copied.
-    source_part
-        .blob
-        .force()
-        .is_ok_and(|source| source.as_slice() == blob)
 }
 
 /// A plan reached the full writer with members only preservation can publish.
@@ -2429,6 +2408,40 @@ mod tests {
         bytes
     }
 
+    fn add_central_extra_to_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let mut target = None;
+        let mut record = central;
+        while record < eocd {
+            let name_len = usize::from(read_u16(&bytes, record + 28));
+            let name_start = record + 46;
+            let name_end = name_start + name_len;
+            if std::str::from_utf8(&bytes[name_start..name_end]).unwrap() == wanted {
+                target = Some(record);
+                break;
+            }
+            record += central_record_len(&bytes, record);
+        }
+        let target = target.expect("named central member");
+        let extra = [0xef, 0xbe, 3, 0, b'c', b'e', b'n'];
+        let name_len = usize::from(read_u16(&bytes, target + 28));
+        let old_extra_len = usize::from(read_u16(&bytes, target + 30));
+        let insert = target + 46 + name_len + old_extra_len;
+        bytes[target + 30..target + 32].copy_from_slice(
+            &u16::try_from(old_extra_len + extra.len())
+                .unwrap()
+                .to_le_bytes(),
+        );
+        bytes.splice(insert..insert, extra);
+        let final_eocd = eocd + extra.len();
+        let central_size = read_u32(&bytes, final_eocd + 12);
+        bytes[final_eocd + 12..final_eocd + 16]
+            .copy_from_slice(&(central_size + extra.len() as u32).to_le_bytes());
+        bytes
+    }
+
     fn reverse_central_order(mut bytes: Vec<u8>) -> Vec<u8> {
         let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
         let central = archive.directory_offset() as usize;
@@ -2670,6 +2683,107 @@ mod tests {
             .write_to(&mut streamed)
             .expect("stream exact source");
         assert_eq!(streamed, source);
+    }
+
+    #[test]
+    fn equal_payload_and_reverted_relationships_keep_source_central_metadata() {
+        let (source, _first, second) = two_part_source(b"metadata regression");
+        let source = add_central_extra_to_member(source, second.membername());
+        let baseline = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open source baseline");
+        let baseline_metrics = baseline
+            .retained_archive_metrics(SourceLimits::default())
+            .expect("baseline metrics")
+            .expect("owned source metrics");
+
+        let mut equal = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open equal-payload source");
+        let equal_bytes = equal
+            .get_part(&second)
+            .expect("second part")
+            .blob()
+            .to_vec();
+        equal
+            .get_part_mut(&second)
+            .expect("second part")
+            .set_blob(equal_bytes);
+        let equal_metrics = equal
+            .retained_archive_metrics(SourceLimits::default())
+            .expect("equal payload metrics")
+            .expect("equal payload source metrics");
+        assert_eq!(
+            equal_metrics.metadata_bytes(),
+            baseline_metrics.metadata_bytes()
+        );
+        let assert_metadata_boundary = |package: &OpcPackage, exact: u64| {
+            let exact_limits = SourceLimits::builder()
+                .max_archive_metadata_bytes(exact)
+                .unwrap()
+                .build()
+                .unwrap();
+            assert!(package.retained_archive_metrics(exact_limits).is_ok());
+            let under_limits = SourceLimits::builder()
+                .max_archive_metadata_bytes(exact - 1)
+                .unwrap()
+                .build()
+                .unwrap();
+            assert!(matches!(
+                package.retained_archive_metrics(under_limits),
+                Err(crate::OpcError::Limit {
+                    kind: crate::SourceLimitKind::ArchiveMetadataBytes,
+                    ..
+                })
+            ));
+        };
+        assert_metadata_boundary(&equal, baseline_metrics.metadata_bytes());
+        assert_eq!(PackageWriter::to_bytes(&equal).unwrap(), source);
+
+        let mut authored = OpcPackage::new();
+        let rel_part = PackURI::new("/custom/relationship.bin").unwrap();
+        let mut part = crate::BlobPart::new(
+            rel_part.clone(),
+            "application/octet-stream".to_owned(),
+            b"payload".to_vec(),
+        );
+        part.relate_to_ext("https://example.test/source", "urn:source");
+        authored.add_part(Box::new(part));
+        let relationship_source = PackageWriter::to_bytes(&authored).unwrap();
+        let relationship_name = rel_part.rels_uri().unwrap().membername().to_owned();
+        let relationship_source =
+            add_central_extra_to_member(relationship_source, &relationship_name);
+        let mut reverted =
+            OpcPackage::from_vec(relationship_source.clone(), SourceLimits::default())
+                .expect("open relationship source");
+        let baseline_relationship_metrics = reverted
+            .retained_archive_metrics(SourceLimits::default())
+            .expect("relationship baseline metrics")
+            .expect("relationship source metrics");
+        let relationships = reverted
+            .get_part_mut(&rel_part)
+            .expect("relationship part")
+            .rels_mut();
+        relationships
+            .try_add_relationship(
+                "urn:temporary".to_owned(),
+                "https://example.test/temporary".to_owned(),
+                "rIdTemporary".to_owned(),
+                crate::TargetMode::External,
+            )
+            .unwrap();
+        relationships.remove("rIdTemporary");
+        let reverted_metrics = reverted
+            .retained_archive_metrics(SourceLimits::default())
+            .expect("reverted relationship metrics")
+            .expect("reverted relationship source metrics");
+        assert_eq!(
+            reverted_metrics.metadata_bytes(),
+            baseline_relationship_metrics.metadata_bytes()
+        );
+        assert_metadata_boundary(&reverted, baseline_relationship_metrics.metadata_bytes());
+        assert_eq!(
+            PackageWriter::to_bytes(&reverted).unwrap(),
+            relationship_source
+        );
     }
 
     #[test]

@@ -10,13 +10,10 @@
 
 use crate::error::{Error, Result};
 use litchi_core::xml::escape::escape_xml;
-use litchi_ooxml_common::vba::{
-    Host, read_project_part, remove_project_graph, store_project_graph,
-};
+use litchi_ooxml_common::vba::{Edit as VbaEdit, EditOptions, Host, read_project_part};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use litchi_vba::{Limits, project::Project};
-use std::sync::Arc;
 
 const WORD_VBA_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2006/wordml";
 const MAX_MACRO_NAME_CHARACTERS: usize = 255;
@@ -432,10 +429,12 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Arc<Vec<u8>>,
+    payload: Vec<u8>,
     supplemental_xml: Vec<u8>,
 ) -> Result<VbaProject> {
-    store_project_graph(package, source, Host::Word, payload, Some(supplemental_xml))?;
+    let mut edit = VbaEdit::new(package, Host::Word, EditOptions::new())?;
+    edit.store(payload, Some(supplemental_xml))?;
+    *package = edit.commit()?.into_package();
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
         Error::InvalidFormat("stored Word VBA project was not discoverable".to_string())
@@ -463,8 +462,11 @@ pub(crate) fn matching_vba_project(
     Ok(Some(project))
 }
 
-pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
-    Ok(remove_project_graph(package, source, Host::Word)?)
+pub(crate) fn remove_vba_project(package: &mut OpcPackage, _source: &PackURI) -> Result<bool> {
+    let mut edit = VbaEdit::new(package, Host::Word, EditOptions::new())?;
+    let changed = edit.remove()?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
 }
 
 fn validate_supplemental_string(value: &str, field: &str) -> Result<()> {

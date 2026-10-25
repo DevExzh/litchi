@@ -14,7 +14,7 @@
 //! 3. after the mutation, [`settle_unsigned_change`] settles the OPC
 //!    signature-policy state of the package, which step 2 proved unsigned.
 
-use litchi_opc::{OpcError, OpcPackage};
+use litchi_opc::OpcPackage;
 
 use crate::{Error, Result};
 
@@ -32,11 +32,10 @@ pub(crate) fn requires_disposition(package: &OpcPackage) -> bool {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with [`OpcError::SignedSourceRequiresExplicitPolicy`]
-/// when [`requires_disposition`] holds.
+/// Returns [`Error::Signed`] when [`requires_disposition`] holds.
 pub(crate) fn refuse_signed_change(package: &OpcPackage) -> Result<()> {
     if requires_disposition(package) {
-        return Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy));
+        return Err(Error::Signed);
     }
     Ok(())
 }
@@ -74,7 +73,7 @@ mod tests {
         assert!(requires_disposition(&package));
         assert!(matches!(
             settle_unsigned_change(&mut package),
-            Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+            Err(Error::Signed)
         ));
         assert!(package.is_signed());
 

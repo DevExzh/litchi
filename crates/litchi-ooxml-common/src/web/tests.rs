@@ -19,6 +19,33 @@ const LOCAL_EXTENSION_LISTS_EXTENSION: &[u8] =
 const LOCAL_EXTENSION_LISTS_TASK_PANES: &[u8] =
     include_bytes!("../../../../test-data/ooxml/web_extensions/extension_lists_taskpanes.xml");
 
+fn put(
+    package: &mut OpcPackage,
+    panes: Panes,
+    conformance: Conformance,
+    limits: &Limits,
+) -> Result<()> {
+    let patch = plan_put(package, panes, conformance, limits)?;
+    let commit = patch.apply(package)?;
+    *package = commit.into_package();
+    Ok(())
+}
+
+fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
+    let patch = plan_remove(package, limits)?;
+    let commit = patch.apply(package)?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
+fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<bool> {
+    let commit = patch.apply(package)?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
 #[test]
 fn loads_local_omex_and_registry_fixtures_inertly() {
     let omex = local_fixture_package(LOCAL_VISIBLE_TASK_PANES, LOCAL_OMEX_EXTENSION);
@@ -559,9 +586,9 @@ fn byte_identical_put_is_a_signature_preserving_no_op() {
         &Limits::standard(),
     )
     .unwrap();
-    assert!(patch.is_empty());
-    assert!(patch.inverse().is_empty());
-    assert!(!patch.apply(&mut package).unwrap());
+    assert!(patch.is_noop());
+    assert!(patch.inverse().is_noop());
+    assert!(!apply_patch(&mut package, &patch).unwrap());
     assert_eq!(
         format!("{patch:?}"),
         "Patch { empty: true, affected_parts: 0, .. }"
@@ -609,8 +636,8 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         &Limits::standard(),
     )
     .unwrap();
-    assert!(noop.is_empty());
-    assert!(!noop.apply(&mut package).unwrap());
+    assert!(noop.is_noop());
+    assert!(!apply_patch(&mut package, &noop).unwrap());
 
     let mut changed = loaded.clone();
     changed.panes[0].add_in.set_custom_functions(None).unwrap();
@@ -621,14 +648,14 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         &Limits::standard(),
     )
     .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     let inverse = patch.inverse();
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &patch).unwrap());
     assert_eq!(
         load(&package, &Limits::standard()).unwrap(),
         Some(changed.clone())
     );
-    assert!(inverse.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &inverse).unwrap());
     assert_eq!(
         load(&package, &Limits::standard()).unwrap(),
         Some(authored.clone())
@@ -649,7 +676,7 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         .get_part(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
         .unwrap()
         .blob_arc();
-    assert!(stale.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &stale).is_err());
     assert!(Arc::ptr_eq(
         &package
             .get_part(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
@@ -703,9 +730,9 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
         &Limits::standard(),
     )
     .unwrap();
-    assert!(!signed_patch.is_empty());
+    assert!(!signed_patch.is_noop());
     let signed_before = package.get_part(&image_name).unwrap().blob_arc();
-    assert!(signed_patch.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &signed_patch).is_err());
     assert!(package.is_signed());
     assert!(Arc::ptr_eq(
         &package.get_part(&image_name).unwrap().blob_arc(),
@@ -723,7 +750,7 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
         &Limits::standard(),
     )
     .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     let image_change = patch
         .parts
         .iter()
@@ -746,7 +773,7 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
     assert!(!format!("{patch:?}").contains("rId"));
     assert!(!format!("{patch:?}").contains("/webextensions"));
 
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &patch).unwrap());
     assert!(!package.is_signed());
     let applied = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(!applied.get(0usize).unwrap().visible());
@@ -763,7 +790,7 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
         &replacement_image,
     ));
 
-    assert!(inverse.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &inverse).unwrap());
     let restored = load(&package, &Limits::standard()).unwrap().unwrap();
     assert!(restored.get(0usize).unwrap().visible());
     assert_eq!(
@@ -803,7 +830,7 @@ fn remove_patch_restores_exact_shared_parts() {
 
     let signed_patch = plan_remove(&package, &Limits::standard()).unwrap();
     let signed_before = package.get_part(&image_name).unwrap().blob_arc();
-    assert!(signed_patch.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &signed_patch).is_err());
     assert!(package.is_signed());
     assert!(Arc::ptr_eq(
         &package.get_part(&image_name).unwrap().blob_arc(),
@@ -821,12 +848,12 @@ fn remove_patch_restores_exact_shared_parts() {
         .unwrap();
     assert!(Arc::ptr_eq(&restored_image.data, &original_image));
 
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &patch).unwrap());
     assert!(!package.is_signed());
     assert!(load(&package, &Limits::standard()).unwrap().is_none());
     assert!(package.get_part(&image_name).is_err());
 
-    assert!(inverse.apply(&mut package).unwrap());
+    assert!(apply_patch(&mut package, &inverse).unwrap());
     assert_eq!(load(&package, &Limits::standard()).unwrap(), Some(original));
     assert!(Arc::ptr_eq(
         &package.get_part(&image_name).unwrap().blob_arc(),
@@ -869,7 +896,7 @@ fn patch_rejects_changed_root_and_part_before_mutation() {
     );
     let task_name = PackURI::new("/webextensions/taskpanes.xml").unwrap();
     let task_before = root_changed.get_part(&task_name).unwrap().blob_arc();
-    assert!(patch.apply(&mut root_changed).is_err());
+    assert!(apply_patch(&mut root_changed, &patch).is_err());
     assert!(root_changed.is_signed());
     assert!(Arc::ptr_eq(
         &root_changed.get_part(&task_name).unwrap().blob_arc(),
@@ -900,7 +927,7 @@ fn patch_rejects_changed_root_and_part_before_mutation() {
         .unwrap()
         .set_blob(vec![9, 8, 7]);
     let task_before = part_changed.get_part(&task_name).unwrap().blob_arc();
-    assert!(patch.apply(&mut part_changed).is_err());
+    assert!(apply_patch(&mut part_changed, &patch).is_err());
     assert!(part_changed.is_signed());
     assert!(Arc::ptr_eq(
         &part_changed.get_part(&task_name).unwrap().blob_arc(),
@@ -927,7 +954,7 @@ fn patch_rechecks_shared_graph_protection_before_mutation() {
     let task_name = add_shared_task_pane_ingress(&mut stale);
     let before_parts = stale.part_count();
 
-    assert!(patch.apply(&mut stale).is_err());
+    assert!(apply_patch(&mut stale, &patch).is_err());
     assert!(stale.is_signed());
     assert_eq!(stale.part_count(), before_parts);
     assert!(stale.get_part(&task_name).is_ok());
@@ -969,7 +996,7 @@ fn patch_rejects_new_inbound_relationship_to_absent_destination() {
         false,
     );
 
-    assert!(patch.apply(&mut package).is_err());
+    assert!(apply_patch(&mut package, &patch).is_err());
     assert!(package.is_signed());
     assert_eq!(package.part_count(), 0);
     assert!(

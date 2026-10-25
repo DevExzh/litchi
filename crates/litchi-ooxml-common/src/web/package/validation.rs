@@ -43,10 +43,11 @@ pub(in crate::web) fn preflight_planned_parts(
                 ));
             }
             if !planned_part_matches_existing(existing, part) && protected.contains(&folded) {
-                return Err(Error::Relationship(format!(
-                    "cannot replace protected shared web extension part '{}'",
-                    part.name.as_str()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "web_extensions.put",
+                    "the Web Extensions graph has a protected shared part",
+                ));
             }
         } else if index.conflicts(&part.name) {
             return invalid(format!(
@@ -151,7 +152,9 @@ pub(in crate::web) fn validate_plan_counts(
         if let Some(canonical) = index.canonical(&part.name) {
             relationships = relationships
                 .checked_sub(package.get_part(canonical)?.rels().len())
-                .ok_or_else(|| Error::Invalid("relationship count underflow".into()))?;
+                .ok_or(Error::Internal(
+                    "Web Extensions relationship count underflow",
+                ))?;
         }
         relationships =
             relationships

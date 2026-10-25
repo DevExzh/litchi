@@ -5,7 +5,7 @@
 //! high-level operations for working with office documents.
 
 use crate::constants::relationship_type;
-use crate::content_type::ContentTypeMap;
+use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
 use crate::leniency::ToleranceReport;
@@ -36,6 +36,121 @@ pub use relationships::{
     RelationshipFragmentEdit, RelationshipFragmentPlan, RelationshipFragments,
     RelationshipSourcePlan, RelationshipsEditPlan,
 };
+
+/// Physical dimensions of an immutable source ZIP retained by an OPC package.
+///
+/// The metrics are collected from central-directory metadata only. They let a
+/// targeted source edit account for opaque non-part members that the writer
+/// carries forward without inflating or exposing their payloads. The returned
+/// source totals describe the original archive; admission checks below charge
+/// only source members the writer will actually copy for the package's current
+/// graph, while callers compose newly generated members separately.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetainedArchiveMetrics {
+    members: usize,
+    entries: usize,
+    aggregate_bytes: u64,
+    metadata_bytes: u64,
+    opaque_members: usize,
+    opaque_entries: usize,
+    opaque_bytes: u64,
+    known_metadata: Arc<Vec<(String, u64)>>,
+}
+
+impl RetainedArchiveMetrics {
+    /// Number of non-directory physical members.
+    #[must_use]
+    pub const fn members(&self) -> usize {
+        self.members
+    }
+
+    /// Number of central-directory entries, including directory markers.
+    #[must_use]
+    pub const fn entries(&self) -> usize {
+        self.entries
+    }
+
+    /// Aggregate declared uncompressed bytes of non-directory members.
+    #[must_use]
+    pub const fn aggregate_bytes(&self) -> u64 {
+        self.aggregate_bytes
+    }
+
+    /// Variable central-directory and archive-tail metadata emitted for the
+    /// package's current publication image. The fixed central-directory
+    /// header is intentionally excluded.
+    #[must_use]
+    pub const fn metadata_bytes(&self) -> u64 {
+        self.metadata_bytes
+    }
+
+    /// Number of retained non-directory members outside the OPC projection.
+    #[must_use]
+    pub const fn opaque_members(&self) -> usize {
+        self.opaque_members
+    }
+
+    /// Number of retained opaque central-directory entries, including
+    /// directory markers.
+    #[must_use]
+    pub const fn opaque_entries(&self) -> usize {
+        self.opaque_entries
+    }
+
+    /// Aggregate declared bytes of retained opaque non-directory members.
+    #[must_use]
+    pub const fn opaque_bytes(&self) -> u64 {
+        self.opaque_bytes
+    }
+
+    /// Variable metadata bytes in the retained source record for a known OPC
+    /// member. The lookup uses the physical member spelling, and returns
+    /// `None` for opaque or absent members.
+    #[must_use]
+    pub fn source_member_metadata(&self, name: &str) -> Option<u64> {
+        self.known_metadata
+            .iter()
+            .find_map(|(member, bytes)| (member == name).then_some(*bytes))
+    }
+}
+
+/// Count archive-level ZIP metadata which is not attached to one central
+/// directory entry.  `metadata_size_hint` covers each entry's variable name,
+/// extra-field, and comment fields; the fixed 46-byte central header is not a
+/// source-policy resource.  The terminal EOCD comment and (when present) the
+/// ZIP64 EOCD extensible data are the remaining variable metadata.
+fn archive_tail_metadata_bytes<T: AsRef<[u8]>>(
+    archive: &soapberry_zip::ZipSliceArchive<T>,
+) -> Result<u64> {
+    const ZIP64_EOCD_FIXED_BYTES: u64 = 56;
+    const ZIP64_LOCATOR_FIXED_BYTES: u64 = 20;
+
+    let comment_bytes = u64::try_from(archive.comment().as_bytes().len()).map_err(|_| {
+        OpcError::ZipError("ZIP EOCD comment length does not fit this platform".to_owned())
+    })?;
+    if !archive.is_zip64() {
+        return Ok(comment_bytes);
+    }
+
+    let locator_offset = archive
+        .eocd_offset()
+        .checked_sub(ZIP64_LOCATOR_FIXED_BYTES)
+        .ok_or_else(|| {
+            OpcError::ZipError("ZIP64 locator offset underflows the EOCD tail".to_owned())
+        })?;
+    let fixed_record_end = archive
+        .head_eocd_offset()
+        .checked_add(ZIP64_EOCD_FIXED_BYTES)
+        .ok_or_else(|| OpcError::ZipError("ZIP64 EOCD offset overflows".to_owned()))?;
+    let extensible_bytes = locator_offset
+        .checked_sub(fixed_record_end)
+        .ok_or_else(|| {
+            OpcError::ZipError("ZIP64 EOCD extensible data has an invalid span".to_owned())
+        })?;
+    comment_bytes
+        .checked_add(extensible_bytes)
+        .ok_or_else(|| OpcError::ZipError("ZIP archive metadata overflows".to_owned()))
+}
 
 fn same_optional_manifest_bytes(left: Option<&[u8]>, right: Option<&[u8]>) -> bool {
     match (left, right) {
@@ -142,6 +257,21 @@ pub(crate) struct SourcePart {
     pub(crate) relationships_xml: Arc<PreservedRelationshipsXml>,
     pub(crate) member_present: bool,
     pub(crate) relationships_member_present: bool,
+}
+
+/// Apply the same source-payload decision used by targeted publication.
+///
+/// A deferred current payload is compared through the retained archive's
+/// bounded verified reader rather than being inflated into a payload-sized
+/// allocation. Equal replacement bytes are safe to copy with the source
+/// central record and compressed stream, while a same-length but different
+/// replacement is regenerated. Admission and the selected writer therefore
+/// make the same exact decision without a conservative length-only branch.
+pub(crate) fn source_blob_retained(source_part: &SourcePart, current: Option<&[u8]>) -> bool {
+    let Some(current) = current else {
+        return true;
+    };
+    source_part.blob.same_bytes(current).is_ok_and(|same| same)
 }
 
 /// A compact semantic fingerprint for one relationship collection.
@@ -398,11 +528,71 @@ impl OwnedContentTypes {
         Arc::clone(&self.xml.bytes)
     }
 
+    /// Return the admitted content type resolved for one part name.
+    ///
+    /// This semantic projection lets a format-level graph patch compare or
+    /// compose only the overrides it owns while retaining the source
+    /// manifest's unrelated lexical bytes.
+    #[must_use]
+    pub fn part_content_type(&self, part: &PackURI) -> Option<&str> {
+        self.binding.lookup(part).map(ContentType::as_str)
+    }
+
+    /// Whether this manifest carries an explicit `<Override>` for a part.
+    ///
+    /// The resolved type alone cannot distinguish an explicit declaration from
+    /// a matching extension default; graph editors use that distinction to
+    /// avoid needlessly deleting and appending an unchanged source element.
+    #[must_use]
+    pub fn has_part_override(&self, part: &PackURI) -> bool {
+        self.binding.override_for(part).is_some()
+    }
+
+    /// Number of admitted default and override mappings in this manifest.
+    #[must_use]
+    pub fn mapping_count(&self) -> usize {
+        self.binding.mapping_count()
+    }
+
+    /// Re-admit this manifest token under a recipient's bounded source policy
+    /// without changing a package.
+    pub fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
+        let limits = self.xml.limits().min(limits);
+        self.xml.preflight_under(limits)?;
+        let parsed = ContentTypeMap::from_xml(self.bytes(), limits)?;
+        if parsed != *self.binding {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-types token binding does not match its XML".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Remove exact part and relationship-part overrides while preserving all
     /// surrounding manifest bytes. Defaults, comments, ordering, and unrelated
     /// overrides remain source-backed in the returned token.
     pub fn without_parts(&self, parts: &[PackURI], max_output_bytes: usize) -> Result<Self> {
         let xml = content_types::without_part_overrides(&self.xml, parts, max_output_bytes)?;
+        if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
+            return Ok(self.clone());
+        }
+        let binding = Arc::new(ContentTypeMap::from_xml(&xml.bytes, xml.limits())?);
+        Ok(Self { xml, binding })
+    }
+
+    /// Remove only the explicit part overrides for the supplied names.
+    ///
+    /// The corresponding relationship-member overrides remain in the source
+    /// manifest.  This is useful for a graph edit whose owner part remains in
+    /// place (for example the host document): its `.rels` member is still
+    /// physically present and its authored lexical manifest entry must not be
+    /// needlessly removed and recreated.
+    pub fn without_part_overrides_only(
+        &self,
+        parts: &[PackURI],
+        max_output_bytes: usize,
+    ) -> Result<Self> {
+        let xml = content_types::without_part_overrides_only(&self.xml, parts, max_output_bytes)?;
         if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
             return Ok(self.clone());
         }
@@ -641,6 +831,332 @@ impl OpcPackage {
         &self.non_part_members
     }
 
+    /// Re-admit the retained source archive's physical structure under a
+    /// tighter operation policy without decoding any member. Per-entry name,
+    /// metadata, compressed-size, and uncompressed-size ceilings are checked
+    /// only for source members the writer will copy for the current graph;
+    /// omitted or regenerated known members are admitted by the caller's
+    /// current/prospective metadata checks. Callers use the returned opaque
+    /// totals when composing a prospective recipient archive.
+    pub fn retained_archive_metrics(
+        &self,
+        limits: SourceLimits,
+    ) -> Result<Option<RetainedArchiveMetrics>> {
+        let Some(source) = self.source_archive.as_ref() else {
+            return Ok(None);
+        };
+        let archive = soapberry_zip::ZipArchive::from_slice(source.bytes().as_slice())
+            .map_err(OpcError::from)?;
+        let declared_entries = usize::try_from(archive.entries_hint()).map_err(|_| {
+            OpcError::ZipError("ZIP total entry count does not fit this platform".to_owned())
+        })?;
+        let mut entries = 0usize;
+        let mut members = 0usize;
+        let mut metadata_bytes = archive_tail_metadata_bytes(&archive)?;
+        let mut aggregate_bytes = 0u64;
+        let mut preserved_entries = 0usize;
+        let mut preserved_members = 0usize;
+        let mut preserved_aggregate_bytes = 0u64;
+        let mut opaque_members = 0usize;
+        let mut opaque_entries = 0usize;
+        let mut opaque_bytes = 0u64;
+        // The writer's preservation decision is based on the immutable source
+        // classification captured at ingress.  Looking at `self.parts` here
+        // is incorrect after an edit: a removed known source part is omitted,
+        // while a source member classified as `Unknown` is copied verbatim.
+        // Keep the classification indexed by the physical central-directory
+        // order so this pass remains metadata-only and follows that exact
+        // publication rule.
+        let Some(provenance) = self.preservation.as_deref() else {
+            return Err(OpcError::PreservationUnavailable {
+                reason: "retained source archive has no immutable preservation provenance"
+                    .to_owned(),
+            });
+        };
+        let source_members = provenance.members.as_slice();
+        let mut known_metadata = Vec::new();
+        known_metadata
+            .try_reserve_exact(source_members.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC retained known-member metadata",
+                source,
+            })?;
+        let parts_match_source = provenance.parts.len() == self.parts.len()
+            && self.iter_parts_undecoded().all(|part| {
+                provenance
+                    .parts
+                    .get(part.partname())
+                    .is_some_and(|source| source.content_type == part.content_type())
+            });
+        let content_types_pristine = parts_match_source
+            && self
+                .source_content_types_source()?
+                .is_some_and(|(source, _)| source == provenance.content_types_xml.as_slice());
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let package_relationships_pristine = self
+            .source_relationships_xml(&package_uri, &self.rels)?
+            .is_some_and(|source| source == provenance.package_relationships_xml.as_bytes());
+
+        // ZIP central-directory records have a fixed 46-byte header that is
+        // not part of the archive metadata budget.  The variable fields are
+        // counted by each entry's hint; the terminal EOCD comment and ZIP64
+        // extensible data are archive metadata too and must be included once.
+        limits.check(
+            crate::SourceLimitKind::ArchiveMetadataBytes,
+            metadata_bytes,
+            limits.max_archive_metadata_bytes(),
+        )?;
+        for entry_result in archive.entries() {
+            let entry = entry_result.map_err(OpcError::from)?;
+            entries = entries.checked_add(1).ok_or_else(|| {
+                OpcError::ZipError("ZIP central-directory entry count overflows".to_owned())
+            })?;
+            let source_member = source_members.get(entries - 1).ok_or_else(|| {
+                OpcError::ZipError(
+                    "ZIP preservation member count is shorter than central directory".to_owned(),
+                )
+            })?;
+            let preserved = match &source_member.kind {
+                SourceMemberKind::ContentTypes => content_types_pristine,
+                SourceMemberKind::PackageRelationships => package_relationships_pristine,
+                SourceMemberKind::Part(partname) => provenance
+                    .parts
+                    .get(partname)
+                    .zip(self.parts.get(partname))
+                    .is_some_and(|(source_part, current)| {
+                        source_part.member_present
+                            && source_blob_retained(source_part, current.decoded_blob())
+                    }),
+                SourceMemberKind::PartRelationships(partname) => {
+                    match provenance.parts.get(partname).zip(self.parts.get(partname)) {
+                        Some((source_part, current))
+                            if source_part.relationships_member_present =>
+                        {
+                            self.source_relationships_retained(
+                                partname,
+                                source_part,
+                                current.rels(),
+                            )?
+                        },
+                        _ => false,
+                    }
+                },
+                // Unknown source members are copied by the targeted writer,
+                // including when the current OPC graph has a name collision.
+                SourceMemberKind::Unknown => true,
+            };
+            if matches!(&source_member.kind, &SourceMemberKind::Unknown) {
+                opaque_entries = opaque_entries.checked_add(1).ok_or_else(|| {
+                    OpcError::ZipError("ZIP opaque entry count overflows".to_owned())
+                })?;
+            }
+            if preserved {
+                preserved_entries = preserved_entries.checked_add(1).ok_or_else(|| {
+                    OpcError::ZipError("ZIP preserved entry count overflows".to_owned())
+                })?;
+                limits.check(
+                    crate::SourceLimitKind::ArchiveMemberNameBytes,
+                    entry.file_path().as_ref().len() as u64,
+                    limits.max_archive_member_name_bytes(),
+                )?;
+            }
+            let generated = match &source_member.kind {
+                SourceMemberKind::ContentTypes | SourceMemberKind::PackageRelationships => {
+                    !preserved
+                },
+                SourceMemberKind::Part(partname) => {
+                    !preserved
+                        && self.parts.contains_key(partname)
+                        && provenance
+                            .parts
+                            .get(partname)
+                            .is_some_and(|source_part| source_part.member_present)
+                },
+                SourceMemberKind::PartRelationships(partname) => {
+                    !preserved
+                        && self.parts.get(partname).is_some_and(|part| {
+                            !part.rels().is_empty()
+                                || self.source_relationships_member_present(partname)
+                        })
+                },
+                SourceMemberKind::Unknown => false,
+            };
+            let source_entry_metadata = entry.metadata_size_hint();
+            if !matches!(&source_member.kind, SourceMemberKind::Unknown)
+                && let Ok(name) = std::str::from_utf8(entry.file_path().as_ref())
+            {
+                known_metadata.push((name.to_owned(), source_entry_metadata));
+            }
+            let entry_metadata = if generated {
+                // RegeneratedEntry has no extra field or comment; its name is
+                // the source name retained by the targeted writer.
+                entry.file_path().as_ref().len() as u64
+            } else {
+                source_entry_metadata
+            };
+            if preserved || generated {
+                metadata_bytes = metadata_bytes.checked_add(entry_metadata).ok_or_else(|| {
+                    OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
+                })?;
+                limits.check(
+                    crate::SourceLimitKind::ArchiveMetadataBytes,
+                    metadata_bytes,
+                    limits.max_archive_metadata_bytes(),
+                )?;
+            }
+            if entry.is_dir() {
+                continue;
+            }
+            members = members
+                .checked_add(1)
+                .ok_or_else(|| OpcError::ZipError("ZIP member count overflows".to_owned()))?;
+            if preserved {
+                preserved_members = preserved_members.checked_add(1).ok_or_else(|| {
+                    OpcError::ZipError("ZIP preserved member count overflows".to_owned())
+                })?;
+                limits.check(
+                    crate::SourceLimitKind::Members,
+                    preserved_members as u64,
+                    limits.max_members() as u64,
+                )?;
+                limits.check(
+                    crate::SourceLimitKind::ArchiveCompressedBytes,
+                    entry.compressed_size_hint(),
+                    limits.max_archive_compressed_bytes(),
+                )?;
+                limits.check(
+                    crate::SourceLimitKind::EntryBytes,
+                    entry.uncompressed_size_hint(),
+                    limits.max_entry_bytes(),
+                )?;
+            }
+            aggregate_bytes = aggregate_bytes
+                .checked_add(entry.uncompressed_size_hint())
+                .ok_or_else(|| {
+                    OpcError::ZipError("ZIP aggregate uncompressed bytes overflow".to_owned())
+                })?;
+            if preserved {
+                preserved_aggregate_bytes = preserved_aggregate_bytes
+                    .checked_add(entry.uncompressed_size_hint())
+                    .ok_or_else(|| {
+                        OpcError::ZipError("ZIP preserved aggregate bytes overflow".to_owned())
+                    })?;
+                limits.check(
+                    crate::SourceLimitKind::AggregateBytes,
+                    preserved_aggregate_bytes,
+                    limits.max_aggregate_bytes(),
+                )?;
+            }
+            if matches!(&source_member.kind, &SourceMemberKind::Unknown) {
+                opaque_members = opaque_members.checked_add(1).ok_or_else(|| {
+                    OpcError::ZipError("ZIP opaque member count overflows".to_owned())
+                })?;
+                opaque_bytes = opaque_bytes
+                    .checked_add(entry.uncompressed_size_hint())
+                    .ok_or_else(|| {
+                        OpcError::ZipError("ZIP opaque member bytes overflow".to_owned())
+                    })?;
+            }
+        }
+        if entries != declared_entries {
+            return Err(OpcError::ZipError(
+                "ZIP central-directory entry count differs from EOCD".to_owned(),
+            ));
+        }
+        if source_members.len() != entries {
+            return Err(OpcError::ZipError(
+                "ZIP preservation member count differs from central directory".to_owned(),
+            ));
+        }
+        // The ordinary writer always emits the package-level relationships
+        // member, even when the source archive omitted `_rels/.rels` and the
+        // targeted preservation path therefore falls back to ordinary
+        // publication.  Charge the generated member name exactly once.  A
+        // source member that was present is already in `known_metadata`, so
+        // this also keeps the projection aligned with the writer's central
+        // directory without double-counting it.
+        let package_relationship_name = package_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        if !known_metadata
+            .iter()
+            .any(|(name, _)| name == package_relationship_name.membername())
+        {
+            metadata_bytes = metadata_bytes
+                .checked_add(package_relationship_name.membername().len() as u64)
+                .ok_or_else(|| {
+                    OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
+                })?;
+            limits.check(
+                crate::SourceLimitKind::ArchiveMetadataBytes,
+                metadata_bytes,
+                limits.max_archive_metadata_bytes(),
+            )?;
+        }
+        limits.check(
+            crate::SourceLimitKind::ArchiveTotalEntries,
+            preserved_entries as u64,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        limits.check(
+            crate::SourceLimitKind::Members,
+            preserved_members as u64,
+            limits.max_members() as u64,
+        )?;
+        // A targeted publication appends newly authored parts and relationship
+        // members after the retained source namespace. Their generated
+        // central records have only the member name as variable metadata, so
+        // account for them here as part of the same recipient summary.
+        for part in self.iter_parts_undecoded() {
+            if !known_metadata
+                .iter()
+                .any(|(name, _)| name == part.partname().membername())
+            {
+                metadata_bytes = metadata_bytes
+                    .checked_add(part.partname().membername().len() as u64)
+                    .ok_or_else(|| {
+                        OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
+                    })?;
+                limits.check(
+                    crate::SourceLimitKind::ArchiveMetadataBytes,
+                    metadata_bytes,
+                    limits.max_archive_metadata_bytes(),
+                )?;
+            }
+            if !part.rels().is_empty() {
+                let relationship_name = part
+                    .partname()
+                    .rels_uri()
+                    .map_err(OpcError::InvalidPackUri)?;
+                if !known_metadata
+                    .iter()
+                    .any(|(name, _)| name == relationship_name.membername())
+                {
+                    metadata_bytes = metadata_bytes
+                        .checked_add(relationship_name.membername().len() as u64)
+                        .ok_or_else(|| {
+                            OpcError::ZipError(
+                                "ZIP central-directory metadata overflows".to_owned(),
+                            )
+                        })?;
+                    limits.check(
+                        crate::SourceLimitKind::ArchiveMetadataBytes,
+                        metadata_bytes,
+                        limits.max_archive_metadata_bytes(),
+                    )?;
+                }
+            }
+        }
+        Ok(Some(RetainedArchiveMetrics {
+            members,
+            entries,
+            aggregate_bytes,
+            metadata_bytes,
+            opaque_members,
+            opaque_entries,
+            opaque_bytes,
+            known_metadata: Arc::new(known_metadata),
+        }))
+    }
+
     /// Replace the reader-reported ZIP members that are not OPC parts.
     ///
     /// This is crate-private because only package ingress paths can establish
@@ -672,6 +1188,17 @@ impl OpcPackage {
 
     pub(crate) fn source_relationships_member_present(&self, partname: &PackURI) -> bool {
         self.source_relationships_xml.contains_key(partname)
+    }
+
+    /// Whether an admitted source archive carried a physical relationships
+    /// member for `owner`, even when that member's relationship collection is
+    /// empty. This metadata-only projection is used by bounded publication
+    /// planning to retain the writer's empty-member decision without decoding
+    /// any payload.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn has_retained_relationship_member(&self, owner: &PackURI) -> bool {
+        self.source_relationships_member_present(owner)
     }
 
     fn check_source_content_types_limits(
@@ -1086,6 +1613,74 @@ impl OpcPackage {
             .get(owner)
             .filter(|source| source.binding.matches(relationships))
             .map(|source| source.bytes.as_slice()))
+    }
+
+    /// Whether a current relationship collection will be copied with the
+    /// source central record by targeted publication.
+    ///
+    /// The source capture settles the untouched case without serialization.
+    /// A mutate-then-revert collection keeps its semantic source binding and
+    /// is likewise copied byte-for-byte. Only a collection with no matching
+    /// source binding needs one canonical serialization for the final byte
+    /// comparison the writer performs.
+    pub(crate) fn source_relationships_retained(
+        &self,
+        owner: &PackURI,
+        source_part: &SourcePart,
+        relationships: &Relationships,
+    ) -> Result<bool> {
+        if !source_part.relationships_member_present {
+            return Ok(false);
+        }
+        if relationships
+            .source_capture()
+            .is_some_and(|capture| Arc::ptr_eq(capture, &source_part.relationships_xml))
+        {
+            return Ok(true);
+        }
+        if let Some(source) = self.source_relationships_xml(owner, relationships)? {
+            return Ok(source_part.relationships_xml.as_bytes() == source);
+        }
+        Ok(source_part.relationships_xml.as_bytes() == relationships.try_to_xml_bytes()?)
+    }
+
+    /// Whether `part` will use the retained source member and central record
+    /// during targeted publication.
+    #[doc(hidden)]
+    pub fn source_part_member_retained(&self, part: &dyn Part) -> bool {
+        self.preservation
+            .as_deref()
+            .and_then(|provenance| provenance.parts.get(part.partname()))
+            .is_some_and(|source_part| {
+                source_part.member_present && source_blob_retained(source_part, part.decoded_blob())
+            })
+    }
+
+    /// Whether the current relationship collection will use its retained
+    /// source member and central record during targeted publication.
+    #[doc(hidden)]
+    pub fn source_relationship_member_retained(
+        &self,
+        owner: &PackURI,
+        relationships: &Relationships,
+    ) -> Result<bool> {
+        let Some(source_part) = self
+            .preservation
+            .as_deref()
+            .and_then(|provenance| provenance.parts.get(owner))
+        else {
+            return Ok(false);
+        };
+        self.source_relationships_retained(owner, source_part, relationships)
+    }
+
+    /// Whether the exact source content-types bytes can be copied for a
+    /// projected publication image.
+    #[doc(hidden)]
+    pub fn source_content_types_member_retained(&self, bytes: &[u8]) -> bool {
+        self.preservation
+            .as_deref()
+            .is_some_and(|provenance| provenance.content_types_xml.as_slice() == bytes)
     }
 
     /// Compare retained content-type spelling without serializing fallback XML.
@@ -1751,9 +2346,9 @@ impl OpcPackage {
     /// bytes a caller supplied, and bytes that merely *equal* the source's are
     /// indistinguishable from authored ones by inspection, so an equality test
     /// would let a mutation escape the audit. Change 0665 replaced that
-    /// equality test with this proof; the preservation planner's own
-    /// `source_blob_retained` keeps its byte comparison, because there an
-    /// equal payload publishes equal bytes either way.
+    /// equality test with this proof; the shared `source_blob_retained`
+    /// publication predicate keeps its byte comparison, because an equal
+    /// payload publishes equal bytes either way.
     ///
     /// Publication does not decide compactness from this signal — no member is
     /// refused for spelling any more (change 0665) — only whether the member
@@ -1812,6 +2407,7 @@ impl OpcPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let current = self.get_part(&replacement.name)?;
+        let canonical_name = current.partname().clone();
         // A deferred payload reports its own refusal rather than comparing as
         // an empty member (ADR 0030).
         current.ensure_payload()?;
@@ -1828,17 +2424,17 @@ impl OpcPackage {
         // provenance exempts a payload from the writer's publication audit
         // (change 0665). They came from the caller, so audit them now, before
         // any mutation, and hand the part the proof (change 0754).
-        let verified = verified_source_payload(&replacement.name, Arc::clone(&replacement.bytes))?;
+        let verified = verified_source_payload(&canonical_name, Arc::clone(&replacement.bytes))?;
         self.source_xml_parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
                 resource: "owned XML provenance",
                 source,
             })?;
-        let part = self.get_part_mut(&replacement.name)?;
+        let part = self.get_part_mut(&canonical_name)?;
         part.set_blob_verified(verified);
         let payload = part.payload_handle().payload().clone();
-        self.source_xml_parts.insert(replacement.name, payload);
+        self.source_xml_parts.insert(canonical_name, payload);
         Ok(())
     }
 
@@ -1857,9 +2453,11 @@ impl OpcPackage {
         expected: &[u8],
         replacement: Arc<Vec<u8>>,
     ) -> Result<()> {
-        let content_type = self.get_part(partname)?.content_type().to_owned();
+        let current = self.get_part(partname)?;
+        let canonical_name = current.partname().clone();
+        let content_type = current.content_type().to_owned();
         let token = crate::OwnedXmlPart::capture_with_limits(
-            partname.clone(),
+            canonical_name,
             content_type,
             replacement,
             self.read_limits,
@@ -1901,6 +2499,107 @@ impl OpcPackage {
         let source =
             crate::OwnedXmlPart::capture_with_limits(name, content_type, bytes, self.read_limits)?;
         self.try_add_owned_xml_part(source)
+    }
+
+    /// Add caller-authored XML while retaining its exact bytes as publication
+    /// provenance.
+    ///
+    /// This is for format-owned opaque XML whose semantics have already been
+    /// validated by the format codec. It performs the ordinary bounded XML
+    /// publication audit, but does not issue an [`OwnedXmlPart`] source-splice
+    /// token: source-splice tokens require literal namespace declarations so
+    /// expanded-name edits cannot be ambiguous, while a whole-part authored
+    /// replacement preserves the caller's namespace spelling byte-for-byte.
+    /// The shared payload is retained without copying and is published through
+    /// the same source-preserving writer as an exact source part. The retained
+    /// allocation is publication provenance only; this does not create an
+    /// [`crate::OwnedXmlPart`] or [`crate::SourceXmlPart`] range-splice token.
+    pub fn try_add_authored_xml_part_bytes(
+        &mut self,
+        name: PackURI,
+        content_type: String,
+        bytes: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if !xml_minifier::audit::package::is_xml_part(name.as_str(), &content_type) {
+            return Err(OpcError::XmlError(
+                "authored XML part content type is not XML".to_owned(),
+            ));
+        }
+        let limits = self.read_limits.min(limits);
+        let mut part = crate::BlobPart::new_shared(name, content_type, Arc::clone(&bytes));
+        let source_xml = self.preflight_authored_source_part_addition(&part, limits)?;
+        crate::OwnedXmlPart::check_capture_size(part.partname(), bytes.len(), limits)?;
+        let verified = verified_source_payload_with_source_limits(
+            part.partname(),
+            Arc::clone(&bytes),
+            limits,
+        )?;
+        crate::xml_splice::validate_authored_xml_bytes(part.partname(), &bytes, limits)?;
+        part.set_blob_verified(verified);
+        self.install_prevalidated_source_part(Box::new(part), source_xml)
+    }
+
+    /// Replace one exact XML payload with caller-authored bytes while
+    /// retaining those bytes as publication provenance.
+    ///
+    /// The expected payload is an exact stale-source guard. The replacement
+    /// is admitted by the bounded publication audit rather than the stricter
+    /// source-splice namespace proof, because the format owner is replacing
+    /// the whole opaque XML member and does not splice its internals. Equal
+    /// replacement bytes are an audited no-op, including for a signed package;
+    /// non-no-op failures leave package and signature state untouched.
+    pub fn try_replace_authored_xml_part_bytes(
+        &mut self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let current = self.get_part(partname)?;
+        let canonical_name = current.partname().clone();
+        let content_type = current.content_type().to_owned();
+        if !xml_minifier::audit::package::is_xml_part(canonical_name.as_str(), &content_type) {
+            return Err(OpcError::XmlError(
+                "authored XML part content type is not XML".to_owned(),
+            ));
+        }
+        current.ensure_payload()?;
+        if current.blob() != expected {
+            return Err(OpcError::XmlError(
+                "stale authored XML part replacement".to_owned(),
+            ));
+        }
+        let limits = self.read_limits.min(limits);
+        let unchanged = current.blob() == replacement.as_slice();
+        if self.requires_signature_edit_policy() && !unchanged {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        crate::OwnedXmlPart::check_capture_size(&canonical_name, replacement.len(), limits)?;
+        self.check_authored_xml_replacement_limits(&canonical_name, replacement.len(), limits)?;
+        let verified = verified_source_payload_with_source_limits(
+            &canonical_name,
+            Arc::clone(&replacement),
+            limits,
+        )?;
+        crate::xml_splice::validate_authored_xml_bytes(&canonical_name, &replacement, limits)?;
+        if unchanged {
+            return Ok(());
+        }
+        self.source_xml_parts
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "owned authored XML provenance",
+                source,
+            })?;
+        let part = self.get_part_mut(&canonical_name)?;
+        part.set_blob_verified(verified);
+        let payload = part.payload_handle().payload().clone();
+        self.source_xml_parts.insert(canonical_name, payload);
+        Ok(())
     }
 
     /// Get a reference to the main document part.
@@ -2446,31 +3145,151 @@ impl OpcPackage {
     /// the publication audit. Source-backed conversion uses this narrow seam
     /// so unchanged opaque XML remains publishable without reparsing or
     /// normalizing it. The source blob is shared with the inserted part and
-    /// the metadata map grows through a fallible reservation.
+    /// the metadata map grows through a fallible reservation. The retained
+    /// bytes are publication provenance only; this path does not create an
+    /// [`crate::OwnedXmlPart`] or [`crate::SourceXmlPart`] range-splice token.
+    /// Keep this private source-materialization route cheap: its callers have
+    /// already admitted their payloads, so it checks names and reservations
+    /// without rescanning every existing payload for an aggregate total.
     pub(crate) fn try_add_source_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
-        self.revoke_exact_source();
-        self.signature_graph_tracked = true;
-        self.content_types_source_state.reset();
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
+        let source_xml =
+            xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type());
+        self.install_prevalidated_source_part(part, source_xml)
+    }
+
+    fn preflight_authored_source_part_addition(
+        &self,
+        part: &dyn Part,
+        limits: SourceLimits,
+    ) -> Result<bool> {
+        let partname = part.partname();
+        let maximum_parts = u64::try_from(limits.max_parts()).unwrap_or(u64::MAX);
+        limits.check(
+            crate::SourceLimitKind::ArchiveMemberNameBytes,
+            u64::try_from(partname.membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        self.validate_new_part_name(partname)?;
+        let payload_len = part.payload_len()?;
+        let payload_bytes = u64::try_from(payload_len).map_err(|_| OpcError::Limit {
+            kind: crate::SourceLimitKind::PartBytes,
+            observed: u64::MAX,
+            maximum: limits.max_part_bytes(),
+        })?;
+        limits.check(
+            crate::SourceLimitKind::PartBytes,
+            payload_bytes,
+            limits.max_part_bytes(),
+        )?;
+        let next_parts = self.parts.len().checked_add(1).ok_or(OpcError::Limit {
+            kind: crate::SourceLimitKind::Parts,
+            observed: u64::MAX,
+            maximum: maximum_parts,
+        })?;
+        limits.check(
+            crate::SourceLimitKind::Parts,
+            u64::try_from(next_parts).unwrap_or(u64::MAX),
+            maximum_parts,
+        )?;
+        let mut total_bytes = payload_bytes;
+        for existing in self.parts.values() {
+            let bytes = u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
+                kind: crate::SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+            total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: crate::SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+        }
+        limits.check(
+            crate::SourceLimitKind::TotalPartBytes,
+            total_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+        Ok(xml_minifier::audit::package::is_xml_part(
+            partname.as_str(),
+            part.content_type(),
+        ))
+    }
+
+    fn check_authored_xml_replacement_limits(
+        &self,
+        partname: &PackURI,
+        replacement_len: usize,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let replacement_bytes = u64::try_from(replacement_len).map_err(|_| OpcError::Limit {
+            kind: crate::SourceLimitKind::PartBytes,
+            observed: u64::MAX,
+            maximum: limits.max_part_bytes(),
+        })?;
+        limits.check(
+            crate::SourceLimitKind::PartBytes,
+            replacement_bytes,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            crate::SourceLimitKind::Parts,
+            u64::try_from(self.parts.len()).unwrap_or(u64::MAX),
+            u64::try_from(limits.max_parts()).unwrap_or(u64::MAX),
+        )?;
+        let mut total_bytes = 0u64;
+        for existing in self.parts.values() {
+            let bytes = if existing
+                .partname()
+                .as_str()
+                .eq_ignore_ascii_case(partname.as_str())
+            {
+                replacement_bytes
+            } else {
+                u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
+                    kind: crate::SourceLimitKind::TotalPartBytes,
+                    observed: u64::MAX,
+                    maximum: limits.max_total_part_bytes(),
+                })?
+            };
+            total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: crate::SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+        }
+        limits.check(
+            crate::SourceLimitKind::TotalPartBytes,
+            total_bytes,
+            limits.max_total_part_bytes(),
+        )
+    }
+
+    fn install_prevalidated_source_part(
+        &mut self,
+        part: Box<dyn Part + Send + Sync>,
+        source_xml: bool,
+    ) -> Result<()> {
+        let partname = part.partname().clone();
         self.parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
                 resource: "OPC source-materialized parts",
                 source,
             })?;
-        let source_blob =
-            if xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type()) {
-                self.source_xml_parts
-                    .try_reserve(1)
-                    .map_err(|source| OpcError::Allocation {
-                        resource: "OPC source-preserved XML parts",
-                        source,
-                    })?;
-                Some(part.payload_handle())
-            } else {
-                None
-            };
+        if source_xml {
+            self.source_xml_parts
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC source-preserved XML parts",
+                    source,
+                })?;
+        }
+        let source_blob = source_xml.then(|| part.payload_handle());
+        self.revoke_exact_source();
+        self.signature_graph_tracked = true;
+        self.content_types_source_state.reset();
         self.source_relationships_xml.remove(&partname);
         self.part_bytes = None;
         self.parts.insert(partname.clone(), part);
@@ -3624,6 +4443,37 @@ fn verified_source_payload_with_limits(
     })
 }
 
+fn verified_source_payload_with_source_limits(
+    name: &PackURI,
+    bytes: Arc<Vec<u8>>,
+    limits: SourceLimits,
+) -> Result<xml_minifier::audit::VerifiedSource> {
+    let audit_limits = xml_minifier::audit::Limits::default()
+        .narrow(
+            xml_minifier::audit::Resource::Bytes,
+            as_usize(limits.max_part_bytes()),
+        )
+        .narrow(xml_minifier::audit::Resource::Depth, limits.max_depth())
+        .narrow(xml_minifier::audit::Resource::Events, limits.max_events())
+        .narrow(
+            xml_minifier::audit::Resource::TokenBytes,
+            as_usize(limits.max_part_bytes()),
+        )
+        .narrow(
+            xml_minifier::audit::Resource::TextBytes,
+            as_usize(limits.max_part_bytes()),
+        );
+    verified_source_payload_with_limits(name, bytes, audit_limits)
+}
+
+const fn as_usize(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
+}
+
 /// Audit a `[Content_Types].xml` or `.rels` token the package is about to
 /// retain as its source, under limits that honour the read policy.
 ///
@@ -3847,6 +4697,19 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn create_source_without_package_relationships() -> Vec<u8> {
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.write_stored("document.xml", b"<document/>").unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn create_two_part_source() -> Vec<u8> {
         let mut package =
             OpcPackage::from_bytes(&create_minimal_docx(), SourceLimits::default()).unwrap();
@@ -4056,6 +4919,72 @@ mod tests {
         let pkg = OpcPackage::from_reader(cursor, SourceLimits::default()).unwrap();
 
         assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn source_without_package_relationships_charges_generated_root_metadata() {
+        let source = create_source_without_package_relationships();
+        let source_archive = soapberry_zip::office::ArchiveReader::new(
+            &source,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            !source_archive
+                .file_names()
+                .any(|name| name == "_rels/.rels")
+        );
+
+        let package = OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap();
+        let metrics = package
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .expect("owned source metrics");
+        let source_zip = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+        let source_entry_metadata: u64 = source_zip
+            .entries()
+            .map(|entry| entry.unwrap().metadata_size_hint())
+            .sum();
+        let expected_metadata = archive_tail_metadata_bytes(&source_zip).unwrap()
+            + source_entry_metadata
+            + "_rels/.rels".len() as u64;
+        assert_eq!(metrics.metadata_bytes(), expected_metadata);
+
+        let exact = SourceLimits::builder()
+            .max_archive_metadata_bytes(metrics.metadata_bytes())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(package.retained_archive_metrics(exact).is_ok());
+
+        let under = SourceLimits::builder()
+            .max_archive_metadata_bytes(metrics.metadata_bytes() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.retained_archive_metrics(under),
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ArchiveMetadataBytes,
+                ..
+            })
+        ));
+
+        // A graph-only reopen exercises the ordinary writer path that must
+        // synthesize the missing root member; the owned package above is kept
+        // intact so the metrics cover its retained source archive.
+        let authored = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
+        let output = crate::PackageWriter::to_bytes(&authored).unwrap();
+        let output_archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            output_archive
+                .file_names()
+                .any(|name| name == "_rels/.rels")
+        );
     }
 
     #[test]
@@ -4758,6 +5687,85 @@ mod tests {
                 maximum,
             }) if actual == content_types.len() as u64 && maximum == (content_types.len() - 1) as u64
         ));
+    }
+
+    #[test]
+    fn same_length_deferred_replacement_is_regenerated_without_hydrating_twice() {
+        let target = PackURI::new("/custom/unrelated.bin").unwrap();
+        let mut original_payload = Vec::with_capacity(64 * 1024);
+        let mut state = 0x1234_5678_u32;
+        for _ in 0..64 * 1024 {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            original_payload.push((state >> 24) as u8);
+        }
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/document.xml").unwrap(),
+            crate::constants::content_type::XML.to_owned(),
+            b"<document/>".to_vec(),
+        )));
+        package.add_part(Box::new(BlobPart::new(
+            target.clone(),
+            "application/octet-stream".to_owned(),
+            original_payload.clone(),
+        )));
+        let source = crate::PackageWriter::to_bytes(&package).unwrap();
+        let archive = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+        let target_member = target.membername().as_bytes().to_owned();
+        let mut target_compressed = 0_u64;
+        let mut retained_compressed = 0_u64;
+        for entry in archive.entries() {
+            let entry = entry.unwrap();
+            if entry.is_dir() {
+                continue;
+            }
+            let compressed = entry.compressed_size_hint();
+            if entry.file_path().as_ref() == target_member.as_slice() {
+                target_compressed = compressed;
+            } else {
+                retained_compressed = retained_compressed.max(compressed);
+            }
+        }
+        assert!(target_compressed > retained_compressed);
+
+        let mut recipient = OpcPackage::from_vec(source, SourceLimits::default()).unwrap();
+        assert_eq!(recipient.deferred_decode_counters(), Some((0, 0)));
+        let original_len = original_payload.len() as u64;
+        let mut replacement = original_payload;
+        replacement[0] ^= 0xff;
+        let replacement_for_assertion = replacement.clone();
+        recipient
+            .replace_part_payloads(vec![(target, replacement)])
+            .unwrap();
+        let after_replacement = recipient.deferred_decode_counters();
+        assert_eq!(after_replacement, Some((1, original_len)));
+
+        let final_metrics = recipient
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .unwrap();
+        let limits = SourceLimits::builder()
+            .max_archive_compressed_bytes(retained_compressed)
+            .unwrap()
+            .max_archive_metadata_bytes(final_metrics.metadata_bytes())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(recipient.retained_archive_metrics(limits).is_ok());
+        assert_eq!(recipient.deferred_decode_counters(), after_replacement);
+        recipient.read_limits = limits;
+        let output = crate::PackageWriter::to_bytes(&recipient).unwrap();
+        let reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
+        assert_eq!(
+            reopened
+                .get_part(&PackURI::new("/custom/unrelated.bin").unwrap())
+                .unwrap()
+                .blob(),
+            replacement_for_assertion.as_slice()
+        );
+        assert_eq!(recipient.deferred_decode_counters(), after_replacement);
     }
 
     #[test]

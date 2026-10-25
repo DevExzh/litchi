@@ -97,6 +97,7 @@ impl Package {
         &self,
         app: Option<Option<app::Props>>,
         custom: Option<CustomProps>,
+        remove_custom: bool,
     ) -> Result<families::Patch> {
         // A dirty cached value would make the part bytes stale.
         self.ensure_opc_current("edit_metadata")?;
@@ -106,7 +107,11 @@ impl Package {
             plan.set_app_props(app);
         }
         if let Some(custom) = custom {
-            plan.set_custom_props(custom);
+            if remove_custom {
+                plan.remove_custom_props();
+            } else {
+                plan.set_custom_props(custom);
+            }
         }
         Ok(plan.finish()?.1)
     }
@@ -141,13 +146,25 @@ impl Package {
         let mut failure = None;
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
             if core {
+                let mut core_edit =
+                    families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
                 match target {
-                    Some(props) => litchi_ooxml_common::properties::write(opc, props)?,
-                    None => litchi_ooxml_common::properties::clear(opc)?,
-                };
+                    Some(props) => {
+                        core_edit
+                            .set_core_metadata(props.clone())
+                            .map_err(crate::Error::from)?;
+                    },
+                    None => {
+                        core_edit.clear_metadata();
+                    },
+                }
+                *opc = core_edit
+                    .commit()
+                    .map_err(crate::Error::from)?
+                    .into_package();
             }
             if !parts_noop {
-                if let Err(error) = parts.apply(opc) {
+                if let Err(error) = parts.apply(opc).map(|commit| *opc = commit.into_package()) {
                     failure = Some(error);
                     return Err(crate::Error::InvalidFormat(
                         "document-property parts refused the patch".to_owned(),

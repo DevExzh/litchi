@@ -3192,7 +3192,8 @@ impl Patch {
             }
         }
         if let Some(web) = &self.web {
-            let _ = web.apply(&mut package)?;
+            let commit = web.apply(&package)?;
+            package = commit.into_package();
         }
         if !self.svg_final_guards.is_empty() || !self.svg_parts.is_empty() {
             validate_svg_final_removals(&package, &self.svg_parts)?;

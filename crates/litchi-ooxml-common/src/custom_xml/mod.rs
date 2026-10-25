@@ -12,6 +12,7 @@
 
 mod codec;
 mod edit;
+mod errors;
 mod limit;
 mod model;
 mod package;
@@ -33,7 +34,7 @@ pub use model::{
     STRICT_NAMESPACE, STRICT_PROPS_RELATIONSHIP, STRICT_RELATIONSHIP, TRANSITIONAL_NAMESPACE,
     TRANSITIONAL_PROPS_RELATIONSHIP, TRANSITIONAL_RELATIONSHIP,
 };
-pub use package::{add, discover};
+pub use package::discover;
 pub use patch::{Commit, Diagnostics, Patch};
 pub use snapshot::Snapshot;
 

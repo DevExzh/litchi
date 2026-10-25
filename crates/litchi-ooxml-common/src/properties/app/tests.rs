@@ -6,7 +6,7 @@
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcError, OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI};
 
 use super::*;
 use crate::Error;
@@ -148,6 +148,55 @@ fn values_xml_cannot_carry_are_refused() {
     ));
 }
 
+#[test]
+fn source_xml_controls_are_rejected_at_the_decode_boundary() {
+    let sources = [
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" data="&#x1;"/>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:opaque="urn:opaque&#x1;"/>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><Nested>&#x1;</Nested></Unknown></Properties>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>&#x1;</Company></Properties>"#,
+    ];
+    for source in sources {
+        assert!(
+            matches!(decode(source.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+            "source control was not rejected: {source}"
+        );
+    }
+
+    let cdata = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><![CDATA[{}]]></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(decode(cdata.as_bytes()).is_err());
+
+    let comment = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><!--{}--></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(
+        matches!(decode(comment.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+        "source control in a comment was not rejected"
+    );
+
+    let pi = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><?keep {}?></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(
+        matches!(decode(pi.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+        "source control in a processing instruction was not rejected"
+    );
+}
+
+#[test]
+fn splice_preserves_valid_inert_comment_and_processing_instruction_bytes() {
+    let source = r#"<?xml version="1.0" encoding="UTF-8"?><!--inert & opaque--><?keep data?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Old</Company><?tail data?></Properties>"#;
+    let target = Props::new().company("New");
+    let output = splice(source.as_bytes(), &target).unwrap().unwrap();
+    let expected = source.replace("<Company>Old</Company>", "<Company>New</Company>");
+    assert_eq!(String::from_utf8(output).unwrap(), expected);
+}
+
 fn package_with(xml: &[u8]) -> OpcPackage {
     let mut package = OpcPackage::new();
     package.add_part(Box::new(BlobPart::new(
@@ -169,11 +218,23 @@ fn sign(package: &mut OpcPackage) {
     assert!(package.is_signed());
 }
 
+fn publish(
+    package: &mut OpcPackage,
+    props: Option<Props>,
+) -> Result<bool, crate::properties::Error> {
+    let mut edit = crate::properties::Edit::new(package, crate::custom::Host::Word)?;
+    edit.set_app_props(props);
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
 #[test]
 fn package_write_creates_edits_and_clears_the_graph() {
     let mut package = OpcPackage::new();
     assert_eq!(read(&package).unwrap(), None);
-    assert!(write(&mut package, Props::new().company("Litchi")).unwrap());
+    assert!(publish(&mut package, Some(Props::new().company("Litchi"))).unwrap());
     assert_eq!(
         read(&package).unwrap(),
         Some(Props::new().company("Litchi"))
@@ -182,11 +243,11 @@ fn package_write_creates_edits_and_clears_the_graph() {
         .get_part(&PackURI::new("/docProps/app.xml").unwrap())
         .unwrap();
     assert_eq!(part.content_type(), ct::OFC_EXTENDED_PROPERTIES);
-    assert!(!write(&mut package, Props::new().company("Litchi")).unwrap());
-    assert!(write(&mut package, Props::new().manager("Ada")).unwrap());
+    assert!(!publish(&mut package, Some(Props::new().company("Litchi"))).unwrap());
+    assert!(publish(&mut package, Some(Props::new().manager("Ada"))).unwrap());
     assert_eq!(read(&package).unwrap(), Some(Props::new().manager("Ada")));
-    assert!(clear(&mut package).unwrap());
-    assert!(!clear(&mut package).unwrap());
+    assert!(publish(&mut package, None).unwrap());
+    assert!(!publish(&mut package, None).unwrap());
     assert_eq!(read(&package).unwrap(), None);
     assert!(
         package
@@ -200,19 +261,19 @@ fn package_write_creates_edits_and_clears_the_graph() {
 fn signed_packages_keep_noops_and_refuse_changes() {
     let mut package = package_with(WORD.as_bytes());
     sign(&mut package);
-    assert!(!write(&mut package, word()).unwrap());
+    assert!(!publish(&mut package, Some(word())).unwrap());
     assert!(matches!(
-        write(&mut package, Props::new()),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        publish(&mut package, Some(Props::new())),
+        Err(crate::properties::Error::Signed)
     ));
     assert!(matches!(
-        clear(&mut package),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        publish(&mut package, None),
+        Err(crate::properties::Error::Signed)
     ));
     assert_eq!(read(&package).unwrap(), Some(word()));
     assert!(package.is_signed());
     package.unsign();
-    assert!(write(&mut package, Props::new()).unwrap());
+    assert!(publish(&mut package, Some(Props::new())).unwrap());
     assert_eq!(read(&package).unwrap(), Some(Props::new()));
 }
 
@@ -228,6 +289,12 @@ fn graph_anomalies_are_errors() {
 
     let mut shared = package_with(WORD.as_bytes());
     shared.relate_to("docProps/app.xml", "urn:test:other");
-    assert!(matches!(clear(&mut shared), Err(Error::Relationship(_))));
+    assert!(matches!(
+        publish(&mut shared, None),
+        Err(crate::properties::Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+                && refusal.operation() == "remove_metadata"
+                && refusal.reason() == "removing a shared OOXML metadata part is refused"
+    ));
     assert_eq!(read(&shared).unwrap(), Some(word()));
 }

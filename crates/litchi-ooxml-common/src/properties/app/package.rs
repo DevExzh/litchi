@@ -1,17 +1,10 @@
-//! Package graph discovery and mutation for extended document properties.
-
-use std::sync::Arc;
+//! Package graph discovery for extended document properties.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::part::BlobPart;
-use litchi_opc::rel::TargetMode;
 use litchi_opc::{OpcPackage, PackURI, Relationships, SourceBackedPackage};
 
 use super::{Props, STRICT_RELATIONSHIP, codec};
-use crate::properties::package_graph::{
-    GraphPart, ensure_only_inbound, free_part_name, same_part_name,
-};
-use crate::signature::{refuse_signed_change, settle_unsigned_change};
+use crate::properties::package_graph::{GraphPart, same_part_name};
 use crate::{Error, Result};
 
 /// The validated extended-properties graph of a package.
@@ -176,106 +169,4 @@ pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>
     let props = codec::decode(data.as_bytes())?;
     package.source_version()?;
     Ok(Some(props))
-}
-
-/// Write `props` to a package's extended-properties part.
-///
-/// An existing part is edited in place: only the scalar elements whose
-/// value changes are rewritten, so the vector properties, extension content
-/// and the bytes of every unchanged element survive. A missing part is
-/// created as `/docProps/app.xml` (or the first free `/docProps/appN.xml`)
-/// with a package-level relationship. Returns whether the package changed.
-///
-/// An equal value publishes nothing, so a signed package keeps its
-/// signature; a change to a signed package is refused before anything is
-/// mutated (ADR 0006): remove the signature explicitly first with
-/// [`OpcPackage::unsign`] or the format facade's `unsign`.
-///
-/// # Errors
-///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, the errors of [`read`], and an error
-/// when a value cannot be written.
-pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
-    let graph = inspect(package)?;
-    if let Some(part) = graph.part {
-        let current = package.get_part(&part)?.blob();
-        let Some(xml) = codec::splice(current, &props)? else {
-            return Ok(false);
-        };
-        refuse_signed_change(package)?;
-        package.get_part_mut(&part)?.set_blob_shared(Arc::new(xml));
-        settle_unsigned_change(package)?;
-        return Ok(true);
-    }
-    let part = free_part_name(
-        &*package,
-        "/docProps/app",
-        crate::LimitKind::ExtendedPropertiesPartNames,
-    )?;
-    let xml = codec::encode_new(&props)?;
-    let mut relationships = package.rels().clone();
-    let id = next_relationship_id(&relationships)?;
-    relationships.try_add_relationship(
-        rt::EXTENDED_PROPERTIES.to_owned(),
-        part.as_str().trim_start_matches('/').to_owned(),
-        id,
-        TargetMode::Internal,
-    )?;
-    package.validate_new_part_name(&part)?;
-    refuse_signed_change(package)?;
-    package.add_part(Box::new(BlobPart::new(
-        part,
-        ct::OFC_EXTENDED_PROPERTIES.to_owned(),
-        xml,
-    )));
-    *package.rels_mut() = relationships;
-    settle_unsigned_change(package)?;
-    Ok(true)
-}
-
-/// Remove a package's extended-properties part and its relationship.
-///
-/// Absence is a successful no-op, which keeps a signed package's
-/// signature. A part another relationship also targets is refused, as is
-/// removing a present part from a signed package (ADR 0006). Returns whether
-/// the package changed.
-///
-/// # Errors
-///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a signed package, [`Error::Relationship`] for a shared part, and the
-/// graph errors of [`read`].
-pub fn clear(package: &mut OpcPackage) -> Result<bool> {
-    let graph = inspect(package)?;
-    let (Some(part), Some(id)) = (graph.part, graph.relationship_id) else {
-        return Ok(false);
-    };
-    ensure_only_inbound(&*package, &part, &id, "extended-properties")?;
-    let mut relationships = package.rels().clone();
-    relationships.remove(&id);
-    refuse_signed_change(package)?;
-    if !package.remove_part(&part) {
-        return Err(Error::Missing(part.to_string()));
-    }
-    *package.rels_mut() = relationships;
-    settle_unsigned_change(package)?;
-    Ok(true)
-}
-
-/// The first `rIdN` the package-level relationships do not use.
-pub(crate) fn next_relationship_id(relationships: &Relationships) -> Result<String> {
-    for index in 1..=u32::MAX {
-        let candidate = format!("rId{index}");
-        if relationships.get(&candidate).is_none() {
-            return Ok(candidate);
-        }
-    }
-    Err(Error::Limit {
-        kind: crate::LimitKind::PackageRelationshipIdentifiers,
-        maximum: u32::MAX as usize,
-        observed: usize::MAX,
-    })
 }

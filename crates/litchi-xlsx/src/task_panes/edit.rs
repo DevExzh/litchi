@@ -122,19 +122,27 @@ impl Edit {
         };
         self.apply(move |candidate| {
             if let Some(conformance) = conformance {
-                common_web::put(
+                let patch = common_web::plan_put(
                     candidate,
                     panes,
                     conformance,
                     &common_web::Limits::standard(),
                 )
-                .map_err(Error::from)
+                .map_err(Error::from)?;
+                let commit = patch.apply(candidate).map_err(Error::from)?;
+                let changed = commit.diagnostics().changed();
+                *candidate = commit.into_package();
+                Ok(changed)
             } else {
-                common_web::remove(candidate, &common_web::Limits::standard())
-                    .map(|_| ())
-                    .map_err(Error::from)
+                let patch = common_web::plan_remove(candidate, &common_web::Limits::standard())
+                    .map_err(Error::from)?;
+                let commit = patch.apply(candidate).map_err(Error::from)?;
+                let changed = commit.diagnostics().changed();
+                *candidate = commit.into_package();
+                Ok(changed)
             }
         })
+        .map(|_| ())
     }
 
     /// Add one task pane, allocating a deterministic relationship ID when
@@ -176,7 +184,12 @@ impl Edit {
     /// Remove the complete task-pane graph.
     pub fn clear(&mut self) -> Result<bool> {
         self.apply(|candidate| {
-            common_web::remove(candidate, &common_web::Limits::standard()).map_err(Error::from)
+            let patch = common_web::plan_remove(candidate, &common_web::Limits::standard())
+                .map_err(Error::from)?;
+            let commit = patch.apply(candidate).map_err(Error::from)?;
+            let changed = commit.diagnostics().changed();
+            *candidate = commit.into_package();
+            Ok(changed)
         })
     }
 

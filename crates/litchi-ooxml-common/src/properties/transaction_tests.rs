@@ -7,7 +7,7 @@
 use litchi_core::metadata::{Field, Metadata, Timestamp};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, TargetMode};
 
 use super::{Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
@@ -32,8 +32,9 @@ fn full() -> OpcPackage {
     package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
     let mut props = custom::Props::new();
     props.insert("Project", "Litchi").unwrap();
-    props.write_for(&mut package, Host::Word).unwrap();
-    package
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.set_custom_props(props);
+    edit.commit().unwrap().into_package()
 }
 
 fn sign(package: &mut OpcPackage) {
@@ -65,6 +66,225 @@ fn snapshot_projects_core_and_app_fields_into_one_metadata() {
     assert_eq!(
         snapshot.custom_props().get("Project"),
         Some(&Value::Text("Litchi".into()))
+    );
+}
+
+#[test]
+fn core_only_staging_preserves_application_properties() {
+    let package = full();
+    let app_before = bytes(&package, "/docProps/app.xml").unwrap();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.set_core_metadata(Metadata {
+        title: Some("After".to_owned()),
+        ..Metadata::default()
+    })
+    .unwrap();
+    let after = edit.commit().unwrap().into_package();
+
+    assert_eq!(bytes(&after, "/docProps/app.xml").unwrap(), app_before);
+    let snapshot = Snapshot::read(&after, Host::Word).unwrap();
+    let metadata = snapshot.metadata().unwrap();
+    assert_eq!(metadata.title.as_deref(), Some("After"));
+    assert_eq!(metadata.application.as_deref(), Some("Producer"));
+    assert_eq!(metadata.company.as_deref(), Some("Old"));
+}
+
+#[test]
+fn repaired_core_content_is_refused_only_when_core_is_rewritten() {
+    let mut package = full();
+    let mut dirty = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap()).unwrap();
+    let closing = dirty.find("</cp:coreProperties>").unwrap();
+    dirty.insert_str(closing, "<cp:opaque>preserve me</cp:opaque>");
+    let dirty = dirty.into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(dirty.clone());
+
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(!snapshot.core_tolerance_report().is_clean());
+
+    let mut core_edit = Edit::new(&package, Host::Word).unwrap();
+    core_edit
+        .update_metadata(|metadata| metadata.title = Some("rewritten".to_owned()))
+        .unwrap();
+    assert!(matches!(
+        core_edit.commit(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+
+    let mut app_edit = Edit::new(&package, Host::Word).unwrap();
+    app_edit
+        .update_metadata(|metadata| metadata.company = Some("New".to_owned()))
+        .unwrap();
+    let after = app_edit.commit().unwrap().into_package();
+    assert_eq!(bytes(&after, "/docProps/core.xml").unwrap(), dirty);
+    assert_eq!(
+        Snapshot::read(&after, Host::Word)
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .company
+            .as_deref(),
+        Some("New")
+    );
+}
+
+#[test]
+fn core_only_staging_refuses_application_fields_as_properties() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    assert!(matches!(
+        edit.set_core_metadata(Metadata {
+            company: Some("not core".to_owned()),
+            ..Metadata::default()
+        }),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
+    ));
+}
+
+#[test]
+fn setting_empty_custom_properties_preserves_an_existing_empty_part() {
+    const EMPTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"></Properties>"#;
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
+        .unwrap()
+        .set_blob(EMPTY_CUSTOM.to_vec());
+    let raw_before = bytes(&package, "/docProps/custom.xml").unwrap();
+
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.set_custom_props(custom::Props::new());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    let preserved = commit.into_package();
+    assert_eq!(
+        bytes(&preserved, "/docProps/custom.xml").unwrap(),
+        raw_before
+    );
+
+    let mut signed_noop = package.clone();
+    sign(&mut signed_noop);
+    let mut edit = Edit::new(&signed_noop, Host::Word).unwrap();
+    edit.set_custom_props(custom::Props::new());
+    let kept = edit.commit().unwrap();
+    assert!(!kept.diagnostics().changed());
+    assert!(kept.package().is_signed());
+
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.remove_custom_props();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let cleared = commit.into_package();
+    assert!(
+        cleared
+            .get_part(&PackURI::new("/docProps/custom.xml").unwrap())
+            .is_err()
+    );
+
+    let mut signed = package;
+    sign(&mut signed);
+    let mut edit = Edit::new(&signed, Host::Word).unwrap();
+    edit.remove_custom_props();
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+}
+
+#[test]
+fn explicit_custom_removal_keeps_dirty_raw_graphs_removable() {
+    const DIRTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="Keep"><vt:lpwstr>value</vt:lpwstr></property><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="3" name="Skip"><vt:date>2026-01-01</vt:date></property></Properties>"#;
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
+        .unwrap()
+        .set_blob(DIRTY_CUSTOM.to_vec());
+
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(!snapshot.custom_props().tolerance_report().is_clean());
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.remove_custom_props();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert!(
+        commit
+            .into_package()
+            .get_part(&PackURI::new("/docProps/custom.xml").unwrap())
+            .is_err()
+    );
+}
+
+#[test]
+fn rewriting_tolerated_custom_content_is_a_typed_refusal() {
+    const DIRTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="Keep"><vt:lpwstr>value</vt:lpwstr></property><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="3" name="Skip"><vt:date>2026-01-01</vt:date></property></Properties>"#;
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
+        .unwrap()
+        .set_blob(DIRTY_CUSTOM.to_vec());
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    let mut target = plan.custom_props().clone();
+    target.insert("Keep", "changed").unwrap();
+    plan.set_custom_props(target);
+    assert!(matches!(
+        plan.finish(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+}
+
+#[test]
+fn shared_metadata_removal_is_a_typed_refusal() {
+    let mut package = full();
+    package
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "docProps/custom.xml".to_owned(),
+            "rIdExtra".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    plan.remove_custom_props();
+    assert!(matches!(
+        plan.finish(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+}
+
+#[test]
+fn clearing_core_keeps_the_app_projection_staged() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.clear_metadata();
+    let staged = edit.metadata().unwrap();
+    assert_eq!(staged.title, None);
+    assert_eq!(staged.company.as_deref(), Some("Old"));
+    edit.update_metadata(|metadata| metadata.company = Some("New".to_owned()))
+        .unwrap();
+    let cleared = edit.commit().unwrap().into_package();
+
+    assert!(
+        Snapshot::read(&cleared, Host::Word)
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .title
+            .is_none()
+    );
+    assert_eq!(
+        Snapshot::read(&cleared, Host::Word)
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .company
+            .as_deref(),
+        Some("New")
     );
 }
 
@@ -201,7 +421,7 @@ fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
     .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().fields(), [Field::Keywords]);
-    assert!(commit.patch().apply(&mut package).unwrap());
+    assert!(commit.patch().apply_in_place(&mut package).unwrap());
     assert_eq!(
         bytes(commit.package(), "/docProps/core.xml"),
         bytes(&package, "/docProps/core.xml")
@@ -233,7 +453,7 @@ fn metadata_edit_routes_fields_to_their_families_and_inverts_exactly() {
         [Field::Title, Field::Created, Field::Manager]
     );
     let patch = commit.patch().clone();
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(patch.apply_in_place(&mut package).unwrap());
 
     let after = Snapshot::read(&package, Host::Word).unwrap();
     let metadata = after.metadata().unwrap();
@@ -250,7 +470,7 @@ fn metadata_edit_routes_fields_to_their_families_and_inverts_exactly() {
         APP.replace("</Properties>", "<Manager>Lin</Manager></Properties>")
     );
 
-    assert!(patch.inverse().apply(&mut package).unwrap());
+    assert!(patch.inverse().apply_in_place(&mut package).unwrap());
     assert_eq!(bytes(&package, "/docProps/core.xml").unwrap(), core_before);
     assert_eq!(
         bytes(&package, "/docProps/app.xml").unwrap(),
@@ -269,7 +489,7 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert!(commit.package().is_signed());
-    assert!(!commit.patch().apply(&mut package).unwrap());
+    assert!(!commit.patch().apply_in_place(&mut package).unwrap());
 
     // A changed edit of a signed package is refused at commit; its planned
     // patch is refused by the replay.
@@ -281,7 +501,10 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
     plan.update_metadata(|metadata| metadata.title = Some("Changed".into()))
         .unwrap();
     let (_, patch, _) = plan.finish().unwrap();
-    assert!(matches!(patch.apply(&mut package), Err(Error::Signed)));
+    assert!(matches!(
+        patch.apply_in_place(&mut package),
+        Err(Error::Signed)
+    ));
 }
 
 #[test]
@@ -299,14 +522,14 @@ fn an_exact_no_op_patch_rejects_a_different_property_owner() {
     let (_, changed, diagnostics) = changed_plan.finish().unwrap();
     assert!(diagnostics.changed());
     let mut different = source.clone();
-    changed.apply(&mut different).unwrap();
+    changed.apply_in_place(&mut different).unwrap();
     assert!(matches!(
-        no_op.apply(&mut different),
+        no_op.apply_in_place(&mut different),
         Err(Error::PatchConflict)
     ));
 
     let mut exact = source.clone();
-    assert!(!no_op.apply(&mut exact).unwrap());
+    assert!(!no_op.apply_in_place(&mut exact).unwrap());
 }
 
 #[test]
@@ -322,9 +545,9 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     // reducing authentication to the changed family.
     let no_op_then_changed = no_op.compose(&changed).unwrap();
     let mut direct = source.clone();
-    no_op_then_changed.apply(&mut direct).unwrap();
+    no_op_then_changed.apply_in_place(&mut direct).unwrap();
     let mut sequential = source.clone();
-    changed.apply(&mut sequential).unwrap();
+    changed.apply_in_place(&mut sequential).unwrap();
     assert_eq!(
         bytes(&direct, "/docProps/core.xml"),
         bytes(&sequential, "/docProps/core.xml")
@@ -332,7 +555,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
 
     let changed_then_no_op = changed.compose(&changed_no_op).unwrap();
     let mut direct = source.clone();
-    changed_then_no_op.apply(&mut direct).unwrap();
+    changed_then_no_op.apply_in_place(&mut direct).unwrap();
     assert_eq!(
         bytes(&direct, "/docProps/core.xml"),
         bytes(&sequential, "/docProps/core.xml")
@@ -347,9 +570,9 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     }));
     let (_app_state, app_patch, _) = app_plan.finish().unwrap();
     let mut different = source.clone();
-    app_patch.apply(&mut different).unwrap();
+    app_patch.apply_in_place(&mut different).unwrap();
     assert!(matches!(
-        no_op_then_changed.apply(&mut different),
+        no_op_then_changed.apply_in_place(&mut different),
         Err(Error::PatchConflict)
     ));
 
@@ -366,11 +589,11 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     // no-op on the original owner only.
     let round_trip = changed.compose(&changed.inverse()).unwrap();
     let mut exact = source.clone();
-    assert!(!round_trip.apply(&mut exact).unwrap());
+    assert!(!round_trip.apply_in_place(&mut exact).unwrap());
     let mut after = source.clone();
-    changed.apply(&mut after).unwrap();
+    changed.apply_in_place(&mut after).unwrap();
     assert!(matches!(
-        round_trip.apply(&mut after),
+        round_trip.apply_in_place(&mut after),
         Err(Error::PatchConflict)
     ));
 
@@ -385,17 +608,17 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     let (_, app_patch, _) = app_plan.finish().unwrap();
     let disjoint = round_trip.compose(&app_patch).unwrap();
     let mut composed = source.clone();
-    disjoint.apply(&mut composed).unwrap();
+    disjoint.apply_in_place(&mut composed).unwrap();
     let mut expected = source.clone();
-    app_patch.apply(&mut expected).unwrap();
+    app_patch.apply_in_place(&mut expected).unwrap();
     assert_eq!(
         bytes(&composed, "/docProps/app.xml"),
         bytes(&expected, "/docProps/app.xml")
     );
     let mut wrong = source.clone();
-    changed.apply(&mut wrong).unwrap();
+    changed.apply_in_place(&mut wrong).unwrap();
     assert!(matches!(
-        disjoint.apply(&mut wrong),
+        disjoint.apply_in_place(&mut wrong),
         Err(Error::PatchConflict)
     ));
 }
@@ -407,22 +630,27 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let (_, no_op, _) = snapshot.plan().finish().unwrap();
     assert!(no_op.compose(&no_op).unwrap().is_noop());
     let mut exact = empty.clone();
-    assert!(!no_op.apply(&mut exact).unwrap());
+    assert!(!no_op.apply_in_place(&mut exact).unwrap());
 
     let (changed_state, changed) = edited(&snapshot, "Created");
     let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
     let composed = no_op.compose(&changed).unwrap();
     let mut composed_package = empty.clone();
-    composed.apply(&mut composed_package).unwrap();
+    composed.apply_in_place(&mut composed_package).unwrap();
     let mut expected = empty.clone();
-    changed.apply(&mut expected).unwrap();
+    changed.apply_in_place(&mut expected).unwrap();
     assert_eq!(
         bytes(&composed_package, "/docProps/core.xml"),
         bytes(&expected, "/docProps/core.xml")
     );
     // The untouched absent families retain diagnostic placeholders, but replay
     // authenticates their actual absence independently of those IDs.
-    assert!(composed.inverse().apply(&mut composed_package).unwrap());
+    assert!(
+        composed
+            .inverse()
+            .apply_in_place(&mut composed_package)
+            .unwrap()
+    );
     assert_eq!(composed_package.iter_parts().count(), 0);
 
     // The same wildcard absence guard composes with an application-only or
@@ -435,8 +663,11 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let (_, app_creation, _) = app_plan.finish().unwrap();
     let app_composed = no_op.compose(&app_creation).unwrap();
     let mut app_package = empty.clone();
-    app_composed.apply(&mut app_package).unwrap();
-    app_composed.inverse().apply(&mut app_package).unwrap();
+    app_composed.apply_in_place(&mut app_package).unwrap();
+    app_composed
+        .inverse()
+        .apply_in_place(&mut app_package)
+        .unwrap();
     assert_eq!(app_package.iter_parts().count(), 0);
 
     let mut custom_plan = snapshot.plan();
@@ -446,23 +677,26 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let (_, custom_creation, _) = custom_plan.finish().unwrap();
     let custom_composed = no_op.compose(&custom_creation).unwrap();
     let mut custom_package = empty.clone();
-    custom_composed.apply(&mut custom_package).unwrap();
+    custom_composed.apply_in_place(&mut custom_package).unwrap();
     custom_composed
         .inverse()
-        .apply(&mut custom_package)
+        .apply_in_place(&mut custom_package)
         .unwrap();
     assert_eq!(custom_package.iter_parts().count(), 0);
 
     // A creation followed by an independently captured exact-after no-op
     // keeps its creation relationship and still composes to one patch.
     let mut created = empty.clone();
-    changed.apply(&mut created).unwrap();
+    changed.apply_in_place(&mut created).unwrap();
     let after_snapshot = Snapshot::read(&created, Host::Excel).unwrap();
     let (_, after_no_op, _) = after_snapshot.plan().finish().unwrap();
     let creation_then_no_op = changed.compose(&after_no_op).unwrap();
     let mut recreated = empty.clone();
-    creation_then_no_op.apply(&mut recreated).unwrap();
-    creation_then_no_op.inverse().apply(&mut recreated).unwrap();
+    creation_then_no_op.apply_in_place(&mut recreated).unwrap();
+    creation_then_no_op
+        .inverse()
+        .apply_in_place(&mut recreated)
+        .unwrap();
     assert_eq!(recreated.iter_parts().count(), 0);
     assert!(matches!(
         no_op.compose(&changed_no_op),
@@ -497,7 +731,7 @@ fn composed_creation_authenticates_its_actual_relationship_id() {
         )
         .unwrap();
     assert!(matches!(
-        composed.apply(&mut occupied),
+        composed.apply_in_place(&mut occupied),
         Err(Error::PatchConflict)
     ));
 
@@ -513,17 +747,17 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     let source = full();
     let snapshot = Snapshot::read(&source, Host::Word).unwrap();
     let mut remove_plan = snapshot.plan();
-    remove_plan.set_custom_props(custom::Props::new());
+    remove_plan.remove_custom_props();
     let (_, removal, _) = remove_plan.finish().unwrap();
 
     let mut removed = source.clone();
-    assert!(removal.apply(&mut removed).unwrap());
+    assert!(removal.apply_in_place(&mut removed).unwrap());
     let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
     let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
     let composed = removal.compose(&exact_no_op).unwrap();
     let mut round_trip = source.clone();
-    assert!(composed.apply(&mut round_trip).unwrap());
-    assert!(composed.inverse().apply(&mut round_trip).unwrap());
+    assert!(composed.apply_in_place(&mut round_trip).unwrap());
+    assert!(composed.inverse().apply_in_place(&mut round_trip).unwrap());
     assert_eq!(
         bytes(&round_trip, "/docProps/custom.xml"),
         bytes(&source, "/docProps/custom.xml")
@@ -560,11 +794,11 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     let composed_with_different_gap = removal.compose(&different_no_op).unwrap();
     let mut different_gap_result = source.clone();
     composed_with_different_gap
-        .apply(&mut different_gap_result)
+        .apply_in_place(&mut different_gap_result)
         .unwrap();
     composed_with_different_gap
         .inverse()
-        .apply(&mut different_gap_result)
+        .apply_in_place(&mut different_gap_result)
         .unwrap();
     assert_eq!(
         bytes(&different_gap_result, "/docProps/custom.xml"),
@@ -577,11 +811,11 @@ fn composed_removal_authenticates_all_inbound_relationships() {
     let source = full();
     let snapshot = Snapshot::read(&source, Host::Word).unwrap();
     let mut remove_plan = snapshot.plan();
-    remove_plan.set_custom_props(custom::Props::new());
+    remove_plan.remove_custom_props();
     let (_, removal, _) = remove_plan.finish().unwrap();
 
     let mut removed = source.clone();
-    removal.apply(&mut removed).unwrap();
+    removal.apply_in_place(&mut removed).unwrap();
     let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
     let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
     let composed = removal.compose(&exact_no_op).unwrap();
@@ -600,7 +834,7 @@ fn composed_removal_authenticates_all_inbound_relationships() {
         )
         .unwrap();
     assert!(matches!(
-        composed.apply(&mut extra_inbound),
+        composed.apply_in_place(&mut extra_inbound),
         Err(Error::Package(crate::Error::Relationship(_)))
     ));
 
@@ -623,17 +857,239 @@ fn fields_no_family_stores_are_refused_not_dropped() {
             metadata.last_backup = Some(Timestamp::parse("2024-01-01T00:00:00").unwrap());
         }),
     ];
-    for (field, update) in updates {
+    for (_field, update) in updates {
         let mut plan = snapshot.plan();
         plan.update_metadata(update).unwrap();
-        assert!(
-            matches!(plan.finish(), Err(Error::Unsupported { field: refused }) if refused == field)
-        );
+        assert!(matches!(
+            plan.finish(),
+            Err(Error::Refused(refusal))
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
+        ));
     }
     let mut plan = snapshot.plan();
     plan.update_metadata(|metadata| metadata.page_count = Some(u32::MAX))
         .unwrap();
     assert!(matches!(plan.finish(), Err(Error::Invalid(_))));
+}
+
+#[test]
+fn metadata_refusals_are_typed_and_content_free() {
+    let snapshot = Snapshot::read(&full(), Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    plan.update_metadata(|metadata| {
+        metadata.content_type = Some("authored/type".into());
+    })
+    .unwrap();
+    let Error::Refused(refusal) = plan.finish().unwrap_err() else {
+        panic!("unsupported metadata fields must be typed refusals");
+    };
+    assert_eq!(
+        refusal.kind(),
+        litchi_core::edit::RefusalKind::UnsupportedProperty
+    );
+    assert_eq!(refusal.operation(), "set_metadata");
+    assert!(!refusal.reason().contains("contentType"));
+}
+
+#[test]
+fn nested_opc_source_changes_are_promoted() {
+    let expected = litchi_core::SourceVersion::new(7, 11);
+    let observed = litchi_core::SourceVersion::new(7, 12);
+    let error = Error::from(OpcError::IncompleteOutput {
+        written: 1,
+        source: Box::new(OpcError::SourceChanged {
+            expected,
+            actual: observed,
+        }),
+    });
+    assert!(matches!(
+        error,
+        Error::SourceChanged {
+            expected: got_expected,
+            observed: got_observed,
+        } if got_expected == expected && got_observed == observed
+    ));
+}
+
+#[test]
+fn direct_common_semantic_errors_keep_their_metadata_classification() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    let refusal = Refusal::new(
+        RefusalKind::UnsupportedContent,
+        "set_metadata",
+        "unsupported metadata content cannot be rewritten",
+    );
+    assert!(matches!(
+        Error::from(crate::Error::Refused(refusal)),
+        Error::Refused(value)
+            if value.kind() == RefusalKind::UnsupportedContent
+                && value.reason() == "unsupported metadata content cannot be rewritten"
+    ));
+    assert!(matches!(
+        Error::from(crate::Error::PatchConflict),
+        Error::PatchConflict
+    ));
+    assert!(matches!(Error::from(crate::Error::Signed), Error::Signed));
+    let expected = litchi_core::SourceVersion::new(8, 1);
+    let observed = litchi_core::SourceVersion::new(8, 2);
+    assert!(matches!(
+        Error::from(crate::Error::SourceChanged { expected, observed }),
+        Error::SourceChanged { expected: before, observed: after }
+            if before == expected && after == observed
+    ));
+    assert!(matches!(
+        Error::from(crate::Error::Internal("prepared metadata invariant failed")),
+        Error::Internal("prepared metadata invariant failed")
+    ));
+}
+
+#[test]
+fn malformed_source_property_xml_is_package_corruption() {
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<cp:coreProperties xmlns:cp=\"broken\">".to_vec());
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(_))
+    ));
+
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/app.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<Properties>".to_vec());
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(matches!(snapshot.metadata(), Err(Error::Package(_))));
+}
+
+#[test]
+fn authored_application_xml_text_remains_an_invalid_value() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| metadata.company = Some("bad\0value".to_owned()))
+        .unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Invalid(message)) if message.contains("XML 1.0-forbidden character")
+    ));
+}
+
+#[test]
+fn source_xml_controls_are_corruption_but_authored_core_controls_are_invalid_values() {
+    let mut package = full();
+    let app = String::from_utf8(bytes(&package, "/docProps/app.xml").unwrap())
+        .unwrap()
+        .replace("<Company>Old</Company>", "<Company>&#x1;</Company>")
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/app.xml").unwrap())
+        .unwrap()
+        .set_blob(app);
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(matches!(
+        snapshot.metadata(),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace("<dc:title>Before</dc:title>", "<dc:title>&#x1;</dc:title>")
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "<cp:coreProperties",
+            "<cp:coreProperties xmlns:opaque=\"urn:opaque&#x1;\"",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><cp:nested>&#x1;</cp:nested></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><!--\u{1}--></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><?keep \u{1}?></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| metadata.title = Some("bad\0value".to_owned()))
+        .unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Invalid(message)) if message.contains("U+0000")
+    ));
 }
 
 #[test]
@@ -655,7 +1111,7 @@ fn an_empty_package_gains_canonical_parts() {
             .iter()
             .all(|change| change.before().is_none() && change.after().is_some())
     );
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(patch.apply_in_place(&mut package).unwrap());
     let metadata = super::read_with_report(&package, &mut ToleranceReport::default())
         .unwrap()
         .unwrap();
@@ -664,7 +1120,7 @@ fn an_empty_package_gains_canonical_parts() {
         app::read(&package).unwrap().unwrap().company.as_deref(),
         Some("Litchi")
     );
-    assert!(patch.inverse().apply(&mut package).unwrap());
+    assert!(patch.inverse().apply_in_place(&mut package).unwrap());
     assert_eq!(package.iter_parts().count(), 0);
     assert_eq!(package.rels().iter().count(), 0);
 }
@@ -680,10 +1136,10 @@ fn a_stale_patch_conflicts_without_mutation() {
     edit.update_metadata(|metadata| metadata.title = Some("Two".into()))
         .unwrap();
     let second = edit.commit().unwrap().patch().clone();
-    assert!(first.apply(&mut package).unwrap());
+    assert!(first.apply_in_place(&mut package).unwrap());
     let before = bytes(&package, "/docProps/core.xml");
     assert!(matches!(
-        second.apply(&mut package),
+        second.apply_in_place(&mut package),
         Err(Error::PatchConflict)
     ));
     assert_eq!(bytes(&package, "/docProps/core.xml"), before);
@@ -716,10 +1172,10 @@ fn composed_patches_apply_as_their_sequence_and_an_inverse_composes_to_a_no_op()
     let (_, second) = edited(&once, "Two");
     let composed = first.compose(&second).unwrap();
     let mut sequential = package.clone();
-    first.apply(&mut sequential).unwrap();
-    second.apply(&mut sequential).unwrap();
+    first.apply_in_place(&mut sequential).unwrap();
+    second.apply_in_place(&mut sequential).unwrap();
     let mut direct = package.clone();
-    composed.apply(&mut direct).unwrap();
+    composed.apply_in_place(&mut direct).unwrap();
     assert_eq!(
         bytes(&direct, "/docProps/core.xml"),
         bytes(&sequential, "/docProps/core.xml")
@@ -757,7 +1213,7 @@ fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
 
     // The same patch on the owning package stores the same parts.
     let mut owning = package.clone();
-    patch.apply(&mut owning).unwrap();
+    patch.apply_in_place(&mut owning).unwrap();
     for name in [
         "/docProps/core.xml",
         "/docProps/app.xml",
@@ -818,6 +1274,6 @@ fn an_edit_publishes_a_new_package_and_leaves_its_source_unchanged() {
     assert_eq!(after.metadata().unwrap().title.as_deref(), Some("After"));
     let (published, patch) = commit.into_parts();
     let mut restored = published.clone();
-    assert!(patch.inverse().apply(&mut restored).unwrap());
+    assert!(patch.inverse().apply_in_place(&mut restored).unwrap());
     assert_eq!(bytes(&restored, "/docProps/core.xml").unwrap(), core_before);
 }

@@ -1,14 +1,24 @@
+#[cfg(test)]
+use super::graph;
 use super::{
-    Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, graph, keyword::Item,
+    Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, keyword::Item,
 };
+#[cfg(test)]
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+use litchi_core::metadata::Metadata;
+#[cfg(test)]
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+#[cfg(test)]
 use litchi_opc::part::BlobPart;
+#[cfg(test)]
 use litchi_opc::rel::TargetMode;
+#[cfg(test)]
 use litchi_opc::{OpcPackage, PackURI};
 
+#[cfg(test)]
 const CANONICAL_PART: &str = "/docProps/core.xml";
+#[cfg(test)]
 const MAX_PART_CANDIDATES: u32 = 10_000;
 // Reserve enough reader events for the declaration, root, every other
 // property, and EOF. A nonempty structured keyword value costs Start, Text,
@@ -29,11 +39,10 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 /// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
+#[cfg(test)]
 pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> {
     let result = sync(package, &props);
     drop(props);
@@ -49,12 +58,11 @@ pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> 
 /// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
-pub fn clear(package: &mut OpcPackage) -> Result<bool> {
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
+#[cfg(test)]
+pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
         return Ok(false);
@@ -83,6 +91,7 @@ pub fn clear(package: &mut OpcPackage) -> Result<bool> {
     Ok(true)
 }
 
+#[cfg(test)]
 pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     let graph = graph::inspect(package)?;
     match (graph.part, graph.dialect) {
@@ -137,6 +146,7 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     }
 }
 
+#[cfg(test)]
 pub(super) fn encode(props: &Core, dialect: Dialect) -> Result<String> {
     let encoded_bytes = preflight(props, dialect)?;
     encode_preflighted(props, dialect, encoded_bytes)
@@ -200,11 +210,39 @@ pub(super) fn encode_preflighted(
     xml.finish()
 }
 
-/// Return the exact UTF-8 length produced by [`encode`] without allocating
+/// Return the exact UTF-8 length produced by [`encode_preflighted`] without allocating
 /// the XML string. Metadata admission uses this before retaining an after
 /// image of a core-properties part.
 pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
     preflight(props, dialect)
+}
+
+/// Validate the core fields supplied by an edit before they are merged with
+/// retained source state. Keeping this boundary separate makes a lexical
+/// failure in an authored value an invalid value, while failures from the
+/// retained source remain package corruption.
+pub(super) fn validate_target(target: &Metadata) -> Result<()> {
+    for (property, value) in [
+        ("dc:title", target.title.as_deref()),
+        ("dc:subject", target.subject.as_deref()),
+        ("dc:creator", target.author.as_deref()),
+        ("dc:description", target.description.as_deref()),
+        ("dc:identifier", target.identifier.as_deref()),
+        ("cp:lastModifiedBy", target.last_modified_by.as_deref()),
+        ("cp:category", target.category.as_deref()),
+        ("cp:contentStatus", target.content_status.as_deref()),
+        ("cp:revision", target.revision.as_deref()),
+        ("cp:version", target.version.as_deref()),
+        ("dc:language", target.language.as_deref()),
+    ] {
+        if let Some(value) = value {
+            validate_text(value, property)?;
+        }
+    }
+    for value in &target.keywords {
+        validate_text(value, "cp:keywords")?;
+    }
+    Ok(())
 }
 
 fn preflight(props: &Core, dialect: Dialect) -> Result<usize> {
@@ -573,6 +611,7 @@ fn is_xml_10_char(character: char) -> bool {
         || matches!(u32::from(character), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
+#[cfg(test)]
 fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..=MAX_PART_CANDIDATES {
         let candidate = if index == 1 {
@@ -592,6 +631,7 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     })
 }
 
+#[cfg(test)]
 fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
     let mut index = 1u32;
     loop {
@@ -668,7 +708,7 @@ mod tests {
     fn preserves_strict_dialect_and_byte_identical_write_is_a_noop() {
         let props = Core::new().title("Strict");
         let original = format!(
-            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
+            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <!--inert & opaque--><?keep data?>\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
             Dialect::Strict.namespace()
         )
         .into_bytes();
@@ -723,12 +763,7 @@ mod tests {
         // A changed value refuses the signed package and leaves the slot dirty
         // until the signature is removed explicitly (ADR 0006).
         slot.get_mut().unwrap().title = Some("Changed".to_owned());
-        assert!(matches!(
-            slot.flush(&mut package),
-            Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-            ))
-        ));
+        assert!(matches!(slot.flush(&mut package), Err(Error::Signed)));
         assert!(slot.is_dirty());
         assert!(package.is_signed());
         assert_eq!(
@@ -890,12 +925,7 @@ mod tests {
             unknown
         );
 
-        assert!(matches!(
-            clear(&mut package),
-            Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-            ))
-        ));
+        assert!(matches!(clear(&mut package), Err(Error::Signed)));
         assert!(package.is_signed());
         assert_eq!(
             package
