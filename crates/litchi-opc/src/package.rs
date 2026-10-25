@@ -9,10 +9,10 @@ use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
 use crate::leniency::ToleranceReport;
-use crate::limits::{SourceLimitKind, SourceLimits};
+use crate::limits::SourceLimits;
 use crate::members::{NonPartMember, PartNameIndex};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI, PartNameConflict};
-use crate::part::{BlobPart, Part, PartFactory, PartMetadata};
+use crate::part::{Part, PartFactory, PartMetadata};
 use crate::payload::PartPayload;
 use crate::phys_pkg::{PhysPkgReader, read_limited, read_owned_path_with_limits};
 use crate::pkgreader::PackageReader;
@@ -2517,7 +2517,7 @@ impl OpcPackage {
             ));
         }
         let limits = self.read_limits.min(limits);
-        let mut part = BlobPart::new_shared(name, content_type, Arc::clone(&bytes));
+        let mut part = crate::BlobPart::new_shared(name, content_type, Arc::clone(&bytes));
         let source_xml = self.preflight_authored_source_part_addition(&part, limits)?;
         crate::OwnedXmlPart::check_capture_size(part.partname(), bytes.len(), limits)?;
         let verified = verified_source_payload_with_source_limits(
@@ -3146,47 +3146,47 @@ impl OpcPackage {
         let partname = part.partname();
         let maximum_parts = u64::try_from(limits.max_parts()).unwrap_or(u64::MAX);
         limits.check(
-            SourceLimitKind::ArchiveMemberNameBytes,
+            crate::SourceLimitKind::ArchiveMemberNameBytes,
             u64::try_from(partname.membername().len()).unwrap_or(u64::MAX),
             limits.max_archive_member_name_bytes(),
         )?;
         self.validate_new_part_name(partname)?;
         let payload_len = part.payload_len()?;
         let payload_bytes = u64::try_from(payload_len).map_err(|_| OpcError::Limit {
-            kind: SourceLimitKind::PartBytes,
+            kind: crate::SourceLimitKind::PartBytes,
             observed: u64::MAX,
             maximum: limits.max_part_bytes(),
         })?;
         limits.check(
-            SourceLimitKind::PartBytes,
+            crate::SourceLimitKind::PartBytes,
             payload_bytes,
             limits.max_part_bytes(),
         )?;
         let next_parts = self.parts.len().checked_add(1).ok_or(OpcError::Limit {
-            kind: SourceLimitKind::Parts,
+            kind: crate::SourceLimitKind::Parts,
             observed: u64::MAX,
             maximum: maximum_parts,
         })?;
         limits.check(
-            SourceLimitKind::Parts,
+            crate::SourceLimitKind::Parts,
             u64::try_from(next_parts).unwrap_or(u64::MAX),
             maximum_parts,
         )?;
         let mut total_bytes = payload_bytes;
         for existing in self.parts.values() {
             let bytes = u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
-                kind: SourceLimitKind::TotalPartBytes,
+                kind: crate::SourceLimitKind::TotalPartBytes,
                 observed: u64::MAX,
                 maximum: limits.max_total_part_bytes(),
             })?;
             total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
-                kind: SourceLimitKind::TotalPartBytes,
+                kind: crate::SourceLimitKind::TotalPartBytes,
                 observed: u64::MAX,
                 maximum: limits.max_total_part_bytes(),
             })?;
         }
         limits.check(
-            SourceLimitKind::TotalPartBytes,
+            crate::SourceLimitKind::TotalPartBytes,
             total_bytes,
             limits.max_total_part_bytes(),
         )?;
@@ -3203,17 +3203,17 @@ impl OpcPackage {
         limits: SourceLimits,
     ) -> Result<()> {
         let replacement_bytes = u64::try_from(replacement_len).map_err(|_| OpcError::Limit {
-            kind: SourceLimitKind::PartBytes,
+            kind: crate::SourceLimitKind::PartBytes,
             observed: u64::MAX,
             maximum: limits.max_part_bytes(),
         })?;
         limits.check(
-            SourceLimitKind::PartBytes,
+            crate::SourceLimitKind::PartBytes,
             replacement_bytes,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::Parts,
+            crate::SourceLimitKind::Parts,
             u64::try_from(self.parts.len()).unwrap_or(u64::MAX),
             u64::try_from(limits.max_parts()).unwrap_or(u64::MAX),
         )?;
@@ -3227,19 +3227,19 @@ impl OpcPackage {
                 replacement_bytes
             } else {
                 u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
-                    kind: SourceLimitKind::TotalPartBytes,
+                    kind: crate::SourceLimitKind::TotalPartBytes,
                     observed: u64::MAX,
                     maximum: limits.max_total_part_bytes(),
                 })?
             };
             total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
-                kind: SourceLimitKind::TotalPartBytes,
+                kind: crate::SourceLimitKind::TotalPartBytes,
                 observed: u64::MAX,
                 maximum: limits.max_total_part_bytes(),
             })?;
         }
         limits.check(
-            SourceLimitKind::TotalPartBytes,
+            crate::SourceLimitKind::TotalPartBytes,
             total_bytes,
             limits.max_total_part_bytes(),
         )
