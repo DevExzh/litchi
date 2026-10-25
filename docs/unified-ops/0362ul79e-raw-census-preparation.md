@@ -29,9 +29,10 @@ checks are not changed. The new matrix only carries the old manifest's
 approved F5 policy as preparation metadata.
 
 The source commit pins the input files, not this self-describing preparation
-file. `--check` reads that pin, verifies every glossary, workspace and direct
-manifest blob still matches it, and then checks deterministic JSON output.
-When any input changes, regenerate against the new frozen candidate with the
+file. `--check` reads that pin, verifies every glossary, workspace, legacy
+coverage and direct-manifest blob still matches it, and verifies that the
+working-tree bytes are the selected tracked bytes before hashing them. When
+any input changes, regenerate against the new frozen candidate with the
 default current `HEAD` (or an explicit `--source-commit`). This prevents a
 new tool/doc commit from making a valid input matrix appear stale while still
 forcing an explicit rebind when an input source changes.

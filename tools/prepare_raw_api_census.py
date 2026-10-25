@@ -84,13 +84,23 @@ def _git_blob(root: Path, relative: str) -> str:
     return _git_blob_at(root, "HEAD", relative)
 
 
+def _worktree_blob(root: Path, relative: str) -> str:
+    """Return the blob hash of the bytes currently present in the worktree."""
+    return _git(root, "hash-object", f"--path={relative}", relative)
+
+
 def _file_identity(root: Path, relative: str) -> dict[str, Any]:
     path = root / relative
     _expect(path.is_file() and not path.is_symlink(), f"required source file is missing or symlinked: {path}")
     payload = path.read_bytes()
+    blob = _git_blob(root, relative)
+    _expect(
+        _worktree_blob(root, relative) == blob,
+        f"working-tree bytes differ from the tracked blob: {relative}",
+    )
     return {
         "path": relative,
-        "blob": _git_blob(root, relative),
+        "blob": blob,
         "bytes": len(payload),
         "sha256": _sha256(payload),
     }
@@ -212,6 +222,7 @@ def build_matrix(root: Path, *, source_commit: str | None = None) -> dict[str, A
     for relative, identity in (
         (GLOSSARY_PATH, glossary_identity),
         (WORKSPACE_PATH, workspace_identity),
+        (LEGACY_MANIFEST_PATH, legacy_identity),
     ):
         _expect(
             _git_blob_at(root, source_commit, relative) == identity["blob"],

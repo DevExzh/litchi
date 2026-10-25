@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import subprocess
 import unittest
+from unittest.mock import patch
 
 from tools import prepare_raw_api_census as census
 
@@ -89,6 +90,24 @@ class RawApiCensusPreparationTests(unittest.TestCase):
         self.assertEqual(self.matrix["legacy_coverage"]["profiles"], 15)
         self.assertEqual(self.matrix["legacy_coverage"]["entries"], 22)
         self.assertEqual(self.matrix["legacy_coverage"]["lanes"], 12)
+
+    def test_dirty_input_overlay_is_rejected(self) -> None:
+        with patch.object(census, "_worktree_blob", return_value="0" * 40):
+            with self.assertRaisesRegex(census.CensusError, "working-tree bytes"):
+                census._file_identity(ROOT, census.GLOSSARY_PATH)
+
+    def test_legacy_manifest_must_match_the_selected_source_commit(self) -> None:
+        source_commit = self.matrix["source"]["commit"]
+        original = census._git_blob_at
+
+        def hide_legacy_blob(root: Path, revision: str, relative: str) -> str:
+            if revision == source_commit and relative == census.LEGACY_MANIFEST_PATH:
+                return "0" * 40
+            return original(root, revision, relative)
+
+        with patch.object(census, "_git_blob_at", side_effect=hide_legacy_blob):
+            with self.assertRaisesRegex(census.CensusError, "raw_api_coverage.json differs"):
+                census.build_matrix(ROOT, source_commit=source_commit)
 
     def test_matrix_carries_approved_f5_policy_without_capture_claims(self) -> None:
         policy = self.matrix["capture_policy"]
