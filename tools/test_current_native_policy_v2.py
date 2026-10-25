@@ -276,7 +276,20 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             parent = Path(directory)
             output_root = parent / "outputs"
             output_root.mkdir()
-            identities = {"before": {}, "after": {}}
+            identities = {
+                "before": {"source_root": str(parent / "before")},
+                "after": {"source_root": str(parent / "after")},
+            }
+            binary_provenance = {
+                "before": [
+                    {"path": str(parent / "before-bin"), "sha256": "1" * 64, "bytes": 1},
+                    {"path": str(parent / "before-correctness-bin"), "sha256": "3" * 64, "bytes": 1},
+                ],
+                "after": [
+                    {"path": str(parent / "after-bin"), "sha256": "2" * 64, "bytes": 1},
+                    {"path": str(parent / "after-correctness-bin"), "sha256": "4" * 64, "bytes": 1},
+                ],
+            }
             tooling = {"test": "tooling"}
             prepared = {
                 "receipt": {
@@ -308,7 +321,7 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 }
                 abba = []
                 for index, leg in enumerate(policy.ABBA_ORDER):
-                    relative_leg = f".abba/{route.route.replace('/', '_')}/{index}-{leg}.stream"
+                    relative_leg = f".abba/{route.route.replace('/', '_')}/b1-{index}-{leg}.stream"
                     leg_path = output_root / relative_leg
                     leg_path.parent.mkdir(parents=True, exist_ok=True)
                     leg_path.write_bytes(f"{route.route}/{leg}".encode())
@@ -316,8 +329,12 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                         "route": route.route,
                         "role": leg,
                         "index": index,
+                        "block": 1,
                         "returncode": 0,
                         "source_binding": bindings[leg] if leg in bindings else bindings["before"],
+                        "cwd": identities[leg]["source_root"],
+                        "argv": ["cargo", "build", "--release"] if route.kind == "build" else [binary_provenance[leg][1 if route.program == "scoped_patch_correctness" else 0]["path"]],
+                        "binary": binary_provenance[leg][1 if route.program == "scoped_patch_correctness" else 0],
                         "output_artifact": {
                             "path": str(leg_path.resolve()),
                             "sha256": hashlib.sha256(leg_path.read_bytes()).hexdigest(),
@@ -328,7 +345,12 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 rows.append({
                     **route.json(),
                     "status": route.status,
-                    "evidence": {"source_bindings": bindings, "output_artifact": artifact, "abba": abba},
+                    "evidence": {
+                        "source_bindings": bindings,
+                        "binary_provenance": binary_provenance,
+                        "output_artifact": artifact,
+                        "abba": abba,
+                    },
                 })
             execution = {
                 "schema": "litchi.current-native-execution.v2",
@@ -341,6 +363,9 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 "source_artifacts": identities,
                 "tooling": tooling,
                 "abba_order": list(policy.ABBA_ORDER),
+                "abba_blocks": 1,
+                "adapter_features": {"before": ["all-features"], "after": ["all-features"]},
+                "binary_provenance": binary_provenance,
                 "runner": validator._file_identity(ROOT / "tools/native_qualification_runner.py", "runner"),
                 "route_receipts": rows,
             }
@@ -353,9 +378,11 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 "preparation_receipt_sha256": "preparation",
                 "lane": "ppt-auxiliary",
                 "abba_order": list(policy.ABBA_ORDER),
+                "abba_blocks": 1,
                 "output_root": str(output_root.resolve()),
                 "source_artifacts": identities,
                 "tooling": tooling,
+                "binary_provenance": binary_provenance,
                 "routes": routes,
                 "results": rows,
                 "execution_receipt": {
@@ -468,10 +495,22 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             preparation_path = parent / "preparation.json"
             output_root = parent / "outputs"
             qualification_path = parent / "qualification.json"
-            calls = []
+            calls: list[dict[str, object]] = []
 
             def fake_executor(step: dict[str, object]) -> dict[str, object]:
-                calls.append((step.get("name"), step.get("route"), step.get("abba_role")))
+                calls.append(step.copy())
+                if step.get("produces_binaries"):
+                    identities = []
+                    for raw_path in step["binary_paths"]:
+                        path = Path(str(raw_path))
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(f"{step['side']}:{path.name}".encode())
+                        identities.append({
+                            "path": str(path.resolve()),
+                            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                            "bytes": path.stat().st_size,
+                        })
+                    return {"returncode": 0, "binary_identities": identities}
                 route = step.get("route", step.get("name", "build"))
                 role = step.get("abba_role", "build")
                 return {
@@ -495,8 +534,16 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 result = policy.execute_v2(preparation_path, qualification_path, executor=fake_executor)
                 self.assertEqual(result["schema"], policy.QUALIFICATION_SCHEMA)
                 self.assertEqual(result["lane"], "ppt-auxiliary")
-                self.assertEqual(len(calls), 10)
-                self.assertEqual(calls[0][0:2], ("ppt-scoped-build", "ppt-scoped-build"))
+                self.assertEqual(len(calls), 12)
+                self.assertEqual(calls[0]["name"], "ppt-scoped-build")
+                self.assertEqual(calls[0]["side"], "before")
+                self.assertEqual(calls[2]["name"], "ppt-scoped-build")
+                self.assertEqual(calls[2]["side"], "after")
+                self.assertNotEqual(calls[0]["cwd"], calls[2]["cwd"])
+                self.assertNotEqual(calls[0]["binary_paths"], calls[2]["binary_paths"])
+                route_calls = [step for step in calls if step.get("abba_role")]
+                self.assertTrue(all(step["cwd"] == (str(before) if step["abba_role"] == "before" else str(after)) for step in route_calls))
+                self.assertTrue(all(step["binary"] in step["argv"] for step in route_calls if step["kind"] == "argv" and step["route"] == "ppt-scoped-correctness"))
                 value = json.loads(qualification_path.read_text(encoding="utf-8"))
                 self.assertEqual([row["route"] for row in value["results"]], [route.route for route in policy.PPT_ROUTES])
                 self.assertTrue(all(len(row["evidence"]["abba"]) == 4 for row in value["results"]))
@@ -519,12 +566,40 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
 
             def fake_executor(step: dict[str, object]) -> dict[str, object]:
                 calls.append(step)
+                if step.get("produces_binaries"):
+                    identities = []
+                    for raw_path in step["binary_paths"]:
+                        path = Path(str(raw_path))
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_bytes(f"{step['side']}:{path.name}".encode())
+                        identities.append({
+                            "path": str(path.resolve()),
+                            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                            "bytes": path.stat().st_size,
+                        })
+                    return {"returncode": 0, "binary_identities": identities}
+                rows = []
+                for fixed_route in policy.LEGACY_CURRENT_ROUTES:
+                    rows.append({
+                        "scenario": fixed_route.route.rsplit("/", 1)[-1],
+                        "median_us": 1.0,
+                        "workload": "rtf-refusal-contract-v1",
+                        "outcome": "ok" if fixed_route.status == "ok" else "refused",
+                        "fidelity": "exact" if fixed_route.status == "ok" else "unchanged",
+                        **(
+                            {
+                                "refusal_kind": "protected" if fixed_route.route.endswith("protected_commit") else "unsupported_content",
+                                "operation": "edit",
+                                "reason": "document protection refuses changed publication" if fixed_route.route.endswith("protected_commit") else "underline edits require non-empty text within one paragraph",
+                            }
+                            if fixed_route.status == "refused" else {}
+                        ),
+                    })
                 return {
                     "returncode": 0,
-                    "output_bytes": json.dumps(
-                        {"route": step.get("route"), "role": step.get("abba_role")},
-                        sort_keys=True,
-                    ).encode() + b"\n",
+                    "output_bytes": b"".join(
+                        (json.dumps(row, sort_keys=True).encode() + b"\n") for row in rows
+                    ),
                 }
 
             with mock.patch.object(policy, "TRUSTED_POLICY", trusted), \
@@ -547,10 +622,52 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     [row["route"] for row in value["results"]],
                     [route.route for route in policy.LEGACY_CURRENT_ROUTES],
                 )
-                self.assertTrue(all(len(row["evidence"]["abba"]) == 4 for row in value["results"]))
+                self.assertTrue(all(len(row["evidence"]["abba"]) == 20 for row in value["results"]))
                 route_calls = [step for step in calls if step.get("route")]
-                self.assertEqual(len(route_calls), 8 * len(policy.ABBA_ORDER))
+                self.assertEqual(len(route_calls), 8 * 5 * len(policy.ABBA_ORDER))
                 self.assertTrue(all("--check-only" not in step["argv"] for step in route_calls))
+                self.assertEqual({step["side"] for step in route_calls}, {"before", "after"})
+                self.assertEqual({step["adapter_features"][0] for step in route_calls}, {"rtf-legacy-api", "rtf-current-api"})
+
+    def test_route_payload_rejects_untyped_bytes_and_requires_fixed_legacy_fields(self) -> None:
+        route = policy.LEGACY_CURRENT_ROUTES[0]
+        with self.assertRaises(policy.PolicyMismatch):
+            policy._v2_result_payload({"output_bytes": b"arbitrary native bytes"}, route, Path("/tmp"))
+        with self.assertRaises(policy.PolicyMismatch):
+            policy._v2_result_payload({"stdout": b"not-json\n"}, route, Path("/tmp"))
+        with self.assertRaises(policy.PolicyMismatch):
+            policy._v2_result_payload(
+                {"output_bytes": json.dumps({"scenario": "open_1k", "median_us": 1}).encode()},
+                route,
+                Path("/tmp"),
+            )
+
+    def test_execution_rejects_disallowed_qualification_overlap_before_child(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before, before_archive = self._complete_source(parent / "before", "overlap-before", "before.tar")
+            after, after_archive = self._complete_source(parent / "after", "overlap-after", "after.tar")
+            trusted = self._complete_policy(before, before_archive, after, after_archive)
+            manifest = self._manifest_for_policy(parent / "manifest.json", "ppt-auxiliary", trusted)
+            preparation_path = parent / "preparation.json"
+            output_root = parent / "outputs"
+            calls: list[dict[str, object]] = []
+
+            def fake_executor(step: dict[str, object]) -> dict[str, object]:
+                calls.append(step)
+                return {"returncode": 0}
+
+            with mock.patch.object(policy, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(preparer, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(validator, "TRUSTED_POLICY", trusted):
+                preparer.prepare(
+                    lane="ppt-auxiliary", manifest=manifest, before=before, after=after,
+                    before_archive=before_archive, after_archive=after_archive,
+                    output_root=output_root, output=preparation_path,
+                )
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy.execute_v2(preparation_path, before / "qualification.json", executor=fake_executor)
+            self.assertEqual(calls, [])
 
     def test_ready_pipeline_rejects_wrong_source_lock_archive_and_route(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -22,6 +22,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -87,6 +88,16 @@ TARGET = "x86_64-unknown-linux-gnu"
 PROFILE = "release"
 FEATURES = ("all-features",)
 ABBA_ORDER = ("before", "after", "after", "before")
+# The auxiliary PPT workload has one four-leg ABBA sequence.  The historical
+# RTF consumer contract is deliberately stronger: it has five independent
+# blocks, each with the reviewed four-leg order (31 samples per route in the
+# native child).  Keep the block count in this protocol rather than silently
+# collapsing the legacy workload to the generic one-block shape.
+ABBA_BLOCKS = MappingProxyType({"ppt-auxiliary": 1, "legacy-current": 5})
+ADAPTER_FEATURES = MappingProxyType({
+    "ppt-auxiliary": MappingProxyType({"baseline": ("all-features",), "candidate": ("all-features",)}),
+    "legacy-current": MappingProxyType({"baseline": ("rtf-legacy-api",), "candidate": ("rtf-current-api",)}),
+})
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -362,6 +373,14 @@ class CurrentNativePolicyV2:
                 "evidence_catalog": "gate-evidence-catalog.v2",
                 "signed_native": "signed-native-protocol.v2",
                 "abba_order": list(ABBA_ORDER),
+                "abba_blocks": dict(ABBA_BLOCKS),
+                "adapter_features": {
+                    lane: {
+                        ("before" if side == "baseline" else "after"): list(features)
+                        for side, features in sides.items()
+                    }
+                    for lane, sides in ADAPTER_FEATURES.items()
+                }
             },
             "source_transitions": list(SOURCE_TRANSITIONS),
             "source_transition_count": len(SOURCE_TRANSITIONS),
@@ -418,10 +437,18 @@ class CurrentNativePolicyV2:
             "source_manifests": list(SOURCE_MANIFEST_PATHS),
             "toolchain": {
                 "features": list(self.candidate.features),
+                "adapter_features": {
+                    lane: {
+                        ("before" if side == "baseline" else "after"): list(features)
+                        for side, features in sides.items()
+                    }
+                    for lane, sides in ADAPTER_FEATURES.items()
+                },
                 "paths": [self.candidate.toolchain.relative_path, self.candidate.cargo_config.relative_path],
                 "profile": self.candidate.profile,
                 "target": self.candidate.target,
             },
+            "abba_blocks": dict(ABBA_BLOCKS),
         }
 
     def require_execution_ready(self) -> None:
@@ -963,17 +990,40 @@ def _check_plan_paths(root: Path, state_dir: Path, target: Path, source_archive:
                 raise PolicyMismatch(f"PPT v2 source/output/archive paths overlap: {left_label} and {right_label}")
 
 
-def _role_lock_path(root: Path, role: str) -> Path:
+def _policy_pin(side: str) -> SourcePin:
+    if side in {"baseline", "before"}:
+        return TRUSTED_POLICY.baseline
+    if side in {"candidate", "after"}:
+        return TRUSTED_POLICY.candidate
+    raise PolicyError(f"unknown policy side: {side}")
+
+
+def _policy_side(side: str) -> str:
+    if side in {"baseline", "before"}:
+        return "baseline"
+    if side in {"candidate", "after"}:
+        return "candidate"
+    raise PolicyError(f"unknown policy side: {side}")
+
+
+def _adapter_features(lane: str, side: str) -> tuple[str, ...]:
+    try:
+        return tuple(ADAPTER_FEATURES[lane][_policy_side(side)])
+    except KeyError as error:
+        raise PolicyError(f"no reviewed adapter features for {lane}/{side}") from error
+
+
+def _role_lock_path(root: Path, role: str, side: str = "candidate") -> Path:
     """Resolve a role lock only from the reviewed source pin."""
 
-    pin = TRUSTED_POLICY.candidate.lock_for_role(role)
+    pin = _policy_pin(side).lock_for_role(role)
     if not pin.complete() or pin.relative_path != ROLE_LOCK_PATHS[role]:
-        raise PolicyIncomplete(f"candidate {role} lock pin is not complete")
+        raise PolicyIncomplete(f"{side} {role} lock pin is not complete")
     return root / pin.relative_path
 
 
-def _guarded_lock(root: Path, role: str, guard: Path) -> list[str]:
-    return [sys.executable, str(guard), "guard-role-lock", role, str(root), "--"]
+def _guarded_lock(root: Path, role: str, guard: Path, side: str = "candidate") -> list[str]:
+    return [sys.executable, str(guard), "guard-role-lock", role, str(root), "--side", side, "--"]
 
 
 def make_ppt_steps_v2(
@@ -982,6 +1032,7 @@ def make_ppt_steps_v2(
     target: Path,
     *,
     source_archive: Path | None = None,
+    side: str = "candidate",
 ) -> list[dict[str, Any]]:
     """Build the opt-in PPT auxiliary plan after the fixed policy is ready.
 
@@ -996,33 +1047,54 @@ def make_ppt_steps_v2(
     target = Path(target)
     _check_plan_paths(root, state_dir, target, source_archive)
     if source_archive is None:
-        raise PolicyMismatch("PPT v2 execution requires the verified candidate source archive")
+        raise PolicyMismatch(f"PPT v2 {side} execution requires the verified source archive")
     # Do the full candidate check at plan construction time as well as at
     # receipt consumption.  A plan must never be able to pair a later binary
     # with a merely named source root or archive.
-    validate_source(root, "candidate", source_archive)
+    policy_side = _policy_side(side)
+    validate_source(root, policy_side, source_archive)
     guard = Path(__file__).resolve()
     host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
-    fixture_pins = TRUSTED_POLICY.candidate.fixtures
+    fixture_pins = _policy_pin(policy_side).fixtures
     if not fixture_pins:
         raise PolicyIncomplete("candidate fixture pins are not complete")
     fixture = root / fixture_pins[0].relative_path
-    binary = target / TARGET / "release/examples/scoped_patch_correctness"
+    binary_paths = [
+        target / TARGET / "release/examples/scoped_patch_probe",
+        target / TARGET / "release/examples/scoped_patch_correctness",
+    ]
+    binary = binary_paths[1]
     receipt = state_dir / "ppt-scoped-correctness.json"
-    guarded = _guarded_lock(root, "workspace", guard)
+    suite_receipt = state_dir / "ppt-correctness-suite.json"
+    guarded = _guarded_lock(root, "workspace", guard, policy_side)
+    adapter_features = _adapter_features("ppt-auxiliary", side)
+    feature_flags = ["--all-features"] if adapter_features == ("all-features",) else [
+        "--no-default-features", "--features", ",".join(adapter_features)
+    ]
     correctness = (
         "set -eu; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt --all-features --lib scoped::tests -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt --all-features --lib -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-cfb --all-features --lib -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt --all-features --tests -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-cfb --all-features --tests -- --test-threads=1; "
-        f"cargo clippy --offline --locked --target {TARGET} --release -p litchi-ppt --all-features --all-targets -- -D warnings; "
-        f"cargo clippy --offline --locked --target {TARGET} --release -p litchi-cfb --all-features --all-targets -- -D warnings"
+        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --lib scoped::tests -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --lib -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --release -p litchi-cfb {' '.join(feature_flags)} --lib -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --tests -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --release -p litchi-cfb {' '.join(feature_flags)} --tests -- --test-threads=1; "
+        f"cargo clippy --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --all-targets -- -D warnings; "
+        f"cargo clippy --offline --locked --target {TARGET} --release -p litchi-cfb {' '.join(feature_flags)} --all-targets -- -D warnings; "
+        f"printf '%s\\n' {shlex.quote(json.dumps({'route': 'ppt-scoped-correctness-suite', 'status': 'ok'}, separators=(',', ':')))} > {shlex.quote(str(suite_receipt))}"
     )
 
-    def direct(name: str, argv: list[str], *, route: RoutePin | None = None, phase: str = "route", env: dict[str, str] | None = None) -> dict[str, Any]:
-        step = {"name": name, "kind": "argv", "argv": argv, "isolated": True, "env": env or {}, "cwd": str(root), "phase": phase}
+    def direct(name: str, argv: list[str], *, route: RoutePin | None = None, phase: str = "route", env: dict[str, str] | None = None, artifact_path: Path | None = None) -> dict[str, Any]:
+        step = {
+            "name": name, "kind": "argv", "argv": argv, "isolated": True,
+            "env": env or {}, "cwd": str(root), "phase": phase, "side": side,
+            "adapter_features": list(adapter_features),
+            "binary_paths": [str(path) for path in binary_paths],
+            "binary": str(binary),
+        }
+        if artifact_path is not None:
+            step["artifact_path"] = str(artifact_path)
+        if phase == "build" and name.endswith("-build"):
+            step["produces_binaries"] = True
         if route is not None:
             step.update({"route": route.route, "output": route.output, "status": route.status})
         return step
@@ -1030,12 +1102,13 @@ def make_ppt_steps_v2(
     return [
         direct(
             "ppt-scoped-build",
-            [*guarded, str(host_guard), "--", "cargo", "build", "--offline", "--locked", "--target", TARGET, "--release", "--all-features", "-p", "litchi-ppt", "--example", "scoped_patch_probe", "--example", "scoped_patch_correctness"],
+            [*guarded, str(host_guard), "--", "cargo", "build", "--offline", "--locked", "--target", TARGET, "--release", *feature_flags, "-p", "litchi-ppt", "--example", "scoped_patch_probe", "--example", "scoped_patch_correctness"],
             route=PPT_ROUTES[0], phase="build",
+            artifact_path=binary_paths[0],
         ),
-        direct("ppt-scoped-correctness-suite", [*guarded, "sh", "-c", correctness], route=PPT_ROUTES[1], phase="build", env={"RUST_TEST_THREADS": "1"}),
-        direct("ppt-scoped-correctness", [sys.executable, str(host_guard), "--", str(binary), str(fixture), str(receipt)], route=PPT_ROUTES[2]),
-        direct("ppt-scoped-correctness-validate", [sys.executable, str(root / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"), str(receipt), str(fixture)], route=PPT_ROUTES[3]),
+        direct("ppt-scoped-correctness-suite", [*guarded, "sh", "-c", correctness], route=PPT_ROUTES[1], phase="build", env={"RUST_TEST_THREADS": "1"}, artifact_path=suite_receipt),
+        direct("ppt-scoped-correctness", [sys.executable, str(host_guard), "--", str(binary), str(fixture), str(receipt)], route=PPT_ROUTES[2], artifact_path=receipt),
+        direct("ppt-scoped-correctness-validate", [sys.executable, str(root / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"), str(receipt), str(fixture)], route=PPT_ROUTES[3], artifact_path=receipt),
     ]
 
 
@@ -1045,6 +1118,7 @@ def make_legacy_steps_v2(
     target: Path,
     *,
     source_archive: Path | None = None,
+    side: str = "candidate",
 ) -> list[dict[str, Any]]:
     """Build the current legacy consumer plan after fixed-source admission.
 
@@ -1061,28 +1135,40 @@ def make_legacy_steps_v2(
     target = Path(target)
     _check_plan_paths(root, state_dir, target, source_archive)
     if source_archive is None:
-        raise PolicyMismatch("legacy v2 execution requires the verified candidate source archive")
-    validate_source(root, "candidate", source_archive)
+        raise PolicyMismatch(f"legacy v2 {side} execution requires the verified source archive")
+    policy_side = _policy_side(side)
+    validate_source(root, policy_side, source_archive)
     guard = Path(__file__).resolve()
     host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
-    binary = target / TARGET / "release/examples/refusal_contract_bench"
-    guarded = _guarded_lock(root, "perf", guard)
+    binary_paths = [target / TARGET / "release/examples/refusal_contract_bench"]
+    binary = binary_paths[0]
+    guarded = _guarded_lock(root, "perf", guard, policy_side)
+    adapter_features = _adapter_features("legacy-current", side)
     build = [
         *guarded,
         str(host_guard),
         "--",
         "cargo", "build", "--offline", "--locked", "--target", TARGET, "--release",
         "--manifest-path", "tools/perf-baseline/Cargo.toml", "--no-default-features",
-        "--features", "rtf-current-api", "--example", "refusal_contract_bench",
+        "--features", *adapter_features, "--example", "refusal_contract_bench",
     ]
 
-    def direct(name: str, argv: list[str], *, route: RoutePin | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
-        step = {"name": name, "kind": "argv", "argv": argv, "isolated": True, "env": env or {}, "cwd": str(root), "phase": "route" if route is not None else "build"}
+    def direct(name: str, argv: list[str], *, route: RoutePin | None = None, env: dict[str, str] | None = None, artifact_path: Path | None = None) -> dict[str, Any]:
+        step = {
+            "name": name, "kind": "argv", "argv": argv, "isolated": True,
+            "env": env or {}, "cwd": str(root), "phase": "route" if route is not None else "build",
+            "side": side, "adapter_features": list(adapter_features),
+            "binary_paths": [str(path) for path in binary_paths], "binary": str(binary),
+        }
+        if artifact_path is not None:
+            step["artifact_path"] = str(artifact_path)
+        if route is None:
+            step["produces_binaries"] = True
         if route is not None:
             step.update({"route": route.route, "output": route.output, "status": route.status, "phase": "route"})
         return step
 
-    steps = [direct("legacy-current-build", build)]
+    steps = [direct("legacy-current-build", build, artifact_path=binary)]
     for route in LEGACY_CURRENT_ROUTES:
         steps.append(
             direct(
@@ -1090,6 +1176,7 @@ def make_legacy_steps_v2(
                 [sys.executable, str(host_guard), "--", str(binary)],
                 route=route,
                 env={"RUST_TEST_THREADS": "1"},
+                artifact_path=state_dir / Path(route.output).name,
             )
         )
     return steps
@@ -1123,51 +1210,131 @@ def _default_v2_executor(step: Mapping[str, Any]) -> dict[str, Any]:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    return {
+    result: dict[str, Any] = {
         "returncode": int(completed.returncode),
         "stdout": completed.stdout,
         "stderr": completed.stderr,
+        "cwd": str(cwd) if isinstance(cwd, str) else None,
+        "argv": list(argv),
     }
+    artifact_path = step.get("artifact_path")
+    if isinstance(artifact_path, str) and Path(artifact_path).is_file() and not Path(artifact_path).is_symlink():
+        result["output_path"] = artifact_path
+    return result
 
 
 def _v2_result_payload(result: Mapping[str, Any], route: RoutePin, output_root: Path) -> bytes:
-    """Extract one route's output stream without accepting a fake success."""
+    """Extract one reviewed, typed route stream without accepting raw bytes.
+
+    The native RTF child emits a JSON-lines report containing all eight fixed
+    scenarios.  The PPT correctness child emits its reviewed receipt, while
+    the suite wrapper emits a tiny typed completion receipt.  Every accepted
+    path is parsed and checked against the route; arbitrary stdout or an
+    untagged ``output_bytes`` value is never promoted into evidence.
+    """
+
+    def objects(payload: bytes, label: str) -> list[tuple[dict[str, Any], bytes]]:
+        if not payload:
+            raise PolicyMismatch(f"{label} produced an empty output stream")
+        try:
+            value = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            value = None
+        if isinstance(value, Mapping):
+            return [(dict(value), payload)]
+        parsed: list[tuple[dict[str, Any], bytes]] = []
+        for line in payload.splitlines(keepends=True):
+            if not line.strip():
+                continue
+            try:
+                item = json.loads(line.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise PolicyMismatch(f"{label} contains a non-JSON route record") from error
+            if not isinstance(item, Mapping):
+                raise PolicyMismatch(f"{label} contains a non-object route record")
+            parsed.append((dict(item), line))
+        if not parsed:
+            raise PolicyMismatch(f"{label} produced no JSON route records")
+        return parsed
+
+    def matching(payload: bytes, label: str) -> bytes:
+        rows = objects(payload, label)
+        suffix = route.route.rsplit("/", 1)[-1]
+        if route.program == "legacy-current":
+            selected = []
+            for value, raw in rows:
+                if value.get("scenario") != suffix:
+                    continue
+                if value.get("workload") != "rtf-refusal-contract-v1" or value.get("outcome") not in {"ok", "refused"}:
+                    raise PolicyMismatch(f"{route.route} has an untyped legacy workload record")
+                median = value.get("median_us")
+                if not isinstance(median, (int, float)) or isinstance(median, bool) or median <= 0:
+                    raise PolicyMismatch(f"{route.route} has an invalid median")
+                if value.get("fidelity") not in {"exact", "unchanged"}:
+                    raise PolicyMismatch(f"{route.route} has an invalid fidelity marker")
+                if route.status == "refused":
+                    expected_kind = "protected" if suffix == "protected_commit" else "unsupported_content"
+                    expected_reason = (
+                        "document protection refuses changed publication"
+                        if suffix == "protected_commit"
+                        else "underline edits require non-empty text within one paragraph"
+                    )
+                    if value.get("outcome") != "refused" or value.get("refusal_kind") != expected_kind or value.get("operation") != "edit" or value.get("reason") != expected_reason:
+                        raise PolicyMismatch(f"{route.route} refusal fields differ from the fixed contract")
+                elif value.get("outcome") != "ok" or value.get("fidelity") != "exact":
+                    raise PolicyMismatch(f"{route.route} success fields differ from the fixed contract")
+                selected.append(raw)
+            if len(selected) != 1:
+                raise PolicyMismatch(f"{route.route} did not produce exactly one fixed scenario record")
+            return selected[0]
+        selected: list[bytes] = []
+        for value, raw in rows:
+            if value.get("route") == route.route:
+                selected.append(raw)
+                continue
+            if route.kind == "correctness" and value.get("status") == "ok":
+                selected.append(raw)
+            elif route.kind == "probe" and value.get("mode") == "scoped_patch_correctness":
+                required = {
+                    "source_sha256", "target_sha256", "replay_target_sha256",
+                    "replay_matches_target", "inverse_source_sha256", "inverse_matches_source",
+                }
+                if required.issubset(value) and value.get("replay_matches_target") is True and value.get("inverse_matches_source") is True:
+                    selected.append(raw)
+            elif route.kind == "validate" and value.get("status") == "passed":
+                selected.append(raw)
+        if len(selected) != 1:
+            raise PolicyMismatch(f"{route.route} did not produce exactly one typed route record")
+        return selected[0]
 
     output_bytes = result.get("output_bytes")
     if isinstance(output_bytes, bytes):
-        return output_bytes
+        return matching(output_bytes, f"{route.route} output_bytes")
     if isinstance(output_bytes, str):
-        return output_bytes.encode("utf-8")
+        return matching(output_bytes.encode("utf-8"), f"{route.route} output_bytes")
     output_path = result.get("output_path")
     if isinstance(output_path, str):
         path = Path(output_path).absolute()
-        expected = (output_root / route.output).absolute()
-        if path != expected and output_root.absolute() not in path.parents:
+        if output_root.absolute() not in path.parents:
             raise PolicyMismatch(f"{route.route} executor output is outside the prepared output root")
         _reject_symlink_components(path, f"{route.route} executor output")
         if path.is_symlink() or not path.is_file():
             raise PolicyMismatch(f"{route.route} executor output is not a regular file")
-        return path.read_bytes()
+        payload = path.read_bytes()
+        # The validator route's child writes the correctness receipt and emits
+        # a separate typed ``status=passed`` summary.  Prefer that summary for
+        # its leg when present; the receipt itself remains the bound artifact.
+        if route.kind == "validate" and result.get("stdout"):
+            return matching(result["stdout"].encode() if isinstance(result["stdout"], str) else result["stdout"], f"{route.route} validator stdout")
+        return matching(payload, f"{route.route} output file")
     stdout = result.get("stdout")
     if isinstance(stdout, str):
         stdout = stdout.encode("utf-8")
     if isinstance(stdout, bytes) and stdout:
-        # The legacy consumer emits one JSON line per route.  Select the
-        # matching scenario when present; otherwise preserve the complete
-        # stream for a PPT correctness route.
-        suffix = route.route.rsplit("/", 1)[-1]
-        selected: list[bytes] = []
-        for line in stdout.splitlines(keepends=True):
-            try:
-                value = json.loads(line.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                continue
-            if isinstance(value, Mapping) and value.get("scenario") == suffix:
-                selected.append(line)
-        return b"".join(selected) or stdout
+        return matching(stdout, f"{route.route} stdout")
     expected = output_root / route.output
     if expected.is_file() and not expected.is_symlink():
-        return expected.read_bytes()
+        return matching(expected.read_bytes(), f"{route.route} policy output")
     raise PolicyMismatch(f"{route.route} executor produced no bound output stream")
 
 
@@ -1195,6 +1362,78 @@ def _v2_file_identity(path: Path, label: str) -> dict[str, Any]:
     return {"path": str(path.resolve()), "sha256": digest, "bytes": size}
 
 
+def _binary_identities(step: Mapping[str, Any], result: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Bind every binary produced by one side's reviewed build step."""
+
+    paths = step.get("binary_paths")
+    if not isinstance(paths, Sequence) or isinstance(paths, (str, bytes)) or not paths:
+        raise PolicyMismatch(f"{step.get('name')} has no fixed binary output paths")
+    expected_paths = [str(Path(value).absolute()) for value in paths if isinstance(value, str)]
+    if len(expected_paths) != len(paths):
+        raise PolicyMismatch(f"{step.get('name')} binary output paths are malformed")
+    supplied = result.get("binary_identities")
+    if supplied is not None:
+        if not isinstance(supplied, Sequence) or isinstance(supplied, (str, bytes)) or len(supplied) != len(expected_paths):
+            raise PolicyMismatch(f"{step.get('name')} binary identity count differs from its fixed plan")
+        identities: list[dict[str, Any]] = []
+        for expected, value in zip(expected_paths, supplied):
+            if not isinstance(value, Mapping) or value.get("path") != str(Path(expected).resolve()):
+                raise PolicyMismatch(f"{step.get('name')} returned a binary outside its fixed target")
+            digest = value.get("sha256")
+            size = value.get("bytes")
+            if not isinstance(digest, str) or SHA256.fullmatch(digest) is None or type(size) is not int or size < 0:
+                raise PolicyMismatch(f"{step.get('name')} returned a malformed binary identity")
+            path = Path(expected)
+            if not path.is_file() or path.is_symlink():
+                raise PolicyMismatch(f"{step.get('name')} binary identity has no regular file: {path}")
+            if _v2_file_identity(path, f"{step.get('name')} binary") != {
+                "path": str(path.resolve()), "sha256": digest, "bytes": size
+            }:
+                raise PolicyMismatch(f"{step.get('name')} binary changed after executor reported it")
+            identities.append({"path": str(path.resolve()), "sha256": digest, "bytes": size})
+        return identities
+    identities = []
+    for expected in expected_paths:
+        path = Path(expected)
+        if not path.is_file() or path.is_symlink():
+            raise PolicyMismatch(f"{step.get('name')} did not produce required binary: {path}")
+        identities.append(_v2_file_identity(path, f"{step.get('name')} binary"))
+    return identities
+
+
+def _ensure_execution_paths(
+    output_root: Path,
+    qualification: Path,
+    source_roots: Mapping[str, Path],
+    archives: Mapping[str, Path],
+    targets: Mapping[str, Path],
+    states: Mapping[str, Path],
+) -> None:
+    """Reject every disallowed overlap before a child or receipt is written."""
+
+    paths: list[tuple[str, Path]] = [("qualification output", qualification), ("prepared output root", output_root)]
+    paths.extend((f"{side} source", path) for side, path in source_roots.items())
+    paths.extend((f"{side} source archive", path) for side, path in archives.items())
+    paths.extend((f"{side} target", path) for side, path in targets.items())
+    paths.extend((f"{side} state", path) for side, path in states.items())
+    resolved: list[tuple[str, Path]] = []
+    for label, raw in paths:
+        lexical = Path(raw).absolute()
+        _reject_symlink_components(lexical, label)
+        resolved.append((label, lexical.resolve(strict=False)))
+    for index, (left_label, left) in enumerate(resolved):
+        for right_label, right in resolved[index + 1 :]:
+            # The target/state directories are intentionally inside the fresh
+            # prepared output root; all other roots must remain disjoint from
+            # one another and from the qualification receipt.
+            if left_label == "prepared output root" and right_label in {"before target", "after target", "before state", "after state"}:
+                continue
+            if right_label == "prepared output root" and left_label in {"before target", "after target", "before state", "after state"}:
+                continue
+            if left == right or left in right.parents or right in left.parents:
+                raise PolicyMismatch(f"execution paths overlap: {left_label} and {right_label}")
+
+
 def execute_v2(
     preparation: Path,
     qualification: Path,
@@ -1220,86 +1459,157 @@ def execute_v2(
     if not isinstance(output_root, Path):
         raise PolicyMismatch("v2 execution requires a prepared output root")
     output_root = output_root.resolve()
-    target = Path(target) if target is not None else output_root / "target"
-    state_dir = Path(state_dir) if state_dir is not None else output_root / "state"
-    identity_after = prepared["receipt"]["identities"]["after"]
-    archive_record = identity_after.get("archive")
-    verified_archive = Path(str(archive_record["path"])) if isinstance(archive_record, Mapping) and archive_record.get("path") else source_archive
-    if verified_archive is None:
-        raise PolicyMismatch("v2 execution requires a verified candidate source archive")
+    base_target = Path(target) if target is not None else output_root / "target"
+    base_state = Path(state_dir) if state_dir is not None else output_root / "state"
     lane = prepared["lane"]
-    if lane == "ppt-auxiliary":
-        steps = make_ppt_steps_v2(Path(identity_after["source_root"]), state_dir, target, source_archive=verified_archive)
-    elif lane == "legacy-current":
-        steps = make_legacy_steps_v2(Path(identity_after["source_root"]), state_dir, target, source_archive=verified_archive)
-    else:
+    if lane not in TRUSTED_POLICY.routes:
         raise PolicyError(f"v2 execution lane is not admitted: {lane}")
+    identities = prepared["receipt"].get("identities")
+    if not isinstance(identities, Mapping):
+        raise PolicyMismatch("v2 preparation has no paired source identities")
+    source_roots: dict[str, Path] = {}
+    archives: dict[str, Path] = {}
+    for side in ("before", "after"):
+        identity = identities.get(side)
+        if not isinstance(identity, Mapping) or not isinstance(identity.get("source_root"), str):
+            raise PolicyMismatch(f"v2 preparation identity is missing {side} source root")
+        archive = identity.get("archive")
+        archive_path = archive.get("path") if isinstance(archive, Mapping) else None
+        if not isinstance(archive_path, str):
+            raise PolicyMismatch(f"v2 preparation identity is missing {side} source archive")
+        source_roots[side] = Path(str(identity["source_root"])).resolve()
+        archives[side] = Path(archive_path).resolve()
+    if source_archive is not None and Path(source_archive).resolve() != archives["after"]:
+        raise PolicyMismatch("caller source archive differs from the preparation-bound candidate archive")
+    targets = {"before": base_target / "before", "after": base_target / "after"}
+    states = {"before": base_state / "before", "after": base_state / "after"}
+    qualification_path = Path(qualification).absolute()
+    _reject_protocol_source(qualification_path.parent, "v2 qualification output")
+    if qualification_path.exists() or qualification_path.is_symlink():
+        raise PolicyMismatch("v2 qualification receipt path is not fresh")
+    _ensure_execution_paths(output_root, qualification_path, source_roots, archives, targets, states)
+    for side in ("before", "after"):
+        states[side].mkdir(parents=True, exist_ok=True)
+
+    plan_builder = make_ppt_steps_v2 if lane == "ppt-auxiliary" else make_legacy_steps_v2
+    plans: dict[str, list[dict[str, Any]]] = {}
+    for side in ("before", "after"):
+        plans[side] = plan_builder(
+            source_roots[side], states[side], targets[side],
+            source_archive=archives[side], side=side,
+        )
     run_step = executor or _default_v2_executor
     step_receipts: list[dict[str, Any]] = []
-    route_steps: dict[str, Mapping[str, Any]] = {}
-    preflight_results: dict[str, Mapping[str, Any]] = {}
-    for step in steps:
-        route = step.get("route")
-        if isinstance(route, str):
-            route_steps[route] = step
-        if step.get("phase") == "route":
-            continue
-        result = run_step(step)
-        if not isinstance(result, Mapping):
-            raise PolicyError(f"executor returned a non-object for {step.get('name')}")
-        returncode = int(result.get("returncode", 0))
-        if returncode != 0:
-            raise PolicyMismatch(f"v2 build step failed: {step.get('name')}")
-        if isinstance(route, str):
-            preflight_results[route] = result
-        step_receipts.append({"name": step.get("name"), "phase": step.get("phase"), "returncode": returncode})
-    expected_routes = TRUSTED_POLICY.routes_for(lane)
-    if set(route_steps) != {route.route for route in expected_routes}:
-        raise PolicyMismatch(f"v2 plan route mapping differs from the fixed {lane} routes")
-    source_bindings = {
-        side: hashlib.sha256(_canonical(prepared["receipt"]["identities"][side])).hexdigest()
-        for side in ("before", "after")
-    }
-    leg_records: dict[str, list[dict[str, Any]]] = {route.route: [] for route in expected_routes}
-    for route in expected_routes:
-        step = route_steps[route.route]
-        for index, side in enumerate(ABBA_ORDER):
-            invocation = dict(step)
-            invocation.update({
-                "abba_index": index,
-                "abba_role": side,
-                "source_root": prepared["receipt"]["identities"][side]["source_root"],
-                "source_binding": source_bindings[side],
-            })
-            result = preflight_results.get(route.route) if route.route in preflight_results else run_step(invocation)
+    route_steps: dict[str, dict[str, Mapping[str, Any]]] = {"before": {}, "after": {}}
+    preflight_results: dict[str, dict[str, Mapping[str, Any]]] = {"before": {}, "after": {}}
+    side_binaries: dict[str, list[dict[str, Any]]] = {}
+    for side in ("before", "after"):
+        for step in plans[side]:
+            route = step.get("route")
+            if isinstance(route, str):
+                route_steps[side][route] = step
+            if step.get("phase") == "route":
+                continue
+            result = run_step(step)
             if not isinstance(result, Mapping):
-                raise PolicyError(f"executor returned a non-object for {route.route}/{side}")
+                raise PolicyError(f"executor returned a non-object for {step.get('name')}")
             returncode = int(result.get("returncode", 0))
             if returncode != 0:
-                raise PolicyMismatch(f"v2 route failed: {route.route}/{side}")
-            payload = _v2_result_payload(result, route, output_root)
-            relative_leg = f".abba/{re.sub(r'[^A-Za-z0-9_.-]+', '_', route.route)}/{index}-{side}.stream"
-            leg_path = _v2_output_path(output_root, relative_leg)
-            leg_path.write_bytes(payload)
-            leg_records[route.route].append({
-                "route": route.route,
-                "role": side,
-                "index": index,
-                "returncode": returncode,
-                "source_binding": source_bindings[side],
-                "output_artifact": _v2_output_identity(leg_path, relative_leg),
+                raise PolicyMismatch(f"v2 {side} build step failed: {step.get('name')}")
+            binary_identities = _binary_identities(step, result) if step.get("produces_binaries") else []
+            if step.get("produces_binaries"):
+                side_binaries[side] = binary_identities
+            if isinstance(route, str):
+                preflight_results[side][route] = result
+            step_receipts.append({
+                "name": step.get("name"), "side": side, "phase": step.get("phase"),
+                "returncode": returncode, "cwd": step.get("cwd"),
+                "argv": list(step.get("argv", [])), "adapter_features": step.get("adapter_features"),
+                "binary_identities": binary_identities,
             })
-            if route.route not in preflight_results:
-                step_receipts.append({"name": route.route, "phase": "route", "abba_index": index, "role": side, "returncode": returncode})
+        if side not in side_binaries:
+            raise PolicyMismatch(f"v2 {side} build did not produce binary provenance")
+    expected_routes = TRUSTED_POLICY.routes_for(lane)
+    expected_route_names = {route.route for route in expected_routes}
+    for side in ("before", "after"):
+        if set(route_steps[side]) != expected_route_names:
+            raise PolicyMismatch(f"v2 {side} plan route mapping differs from the fixed {lane} routes")
+    source_bindings = {
+        side: hashlib.sha256(_canonical(identities[side])).hexdigest()
+        for side in ("before", "after")
+    }
+    blocks = ABBA_BLOCKS[lane]
+    leg_records: dict[str, list[dict[str, Any]]] = {route.route: [] for route in expected_routes}
+    final_payloads: dict[str, bytes] = {}
+    for route in expected_routes:
+        for block in range(1, blocks + 1):
+            for index, side in enumerate(ABBA_ORDER):
+                planned = route_steps[side][route.route]
+                invocation = dict(planned)
+                binary_index = 1 if lane == "ppt-auxiliary" and route.program == "scoped_patch_correctness" else 0
+                binary_identity = side_binaries[side][binary_index]
+                invocation.update({
+                    "abba_block": block,
+                    "abba_index": index,
+                    "abba_role": side,
+                    "source_root": str(source_roots[side]),
+                    "source_binding": source_bindings[side],
+                    "binary": binary_identity["path"],
+                    "binary_identity": binary_identity,
+                })
+                if planned.get("phase") == "route":
+                    result = run_step(invocation)
+                else:
+                    result = preflight_results[side][route.route]
+                if not isinstance(result, Mapping):
+                    raise PolicyError(f"executor returned a non-object for {route.route}/{side}")
+                returncode = int(result.get("returncode", 0))
+                if returncode != 0:
+                    raise PolicyMismatch(f"v2 route failed: {route.route}/{side}")
+                if route.kind == "build":
+                    payload = _canonical({"route": route.route, "status": "ok", "binary": binary_identity})
+                    actual_for_final = Path(binary_identity["path"]).read_bytes() if Path(binary_identity["path"]).is_file() else payload
+                else:
+                    payload = _v2_result_payload(result, route, output_root)
+                    artifact_path = result.get("output_path") or planned.get("artifact_path")
+                    actual_for_final = Path(str(artifact_path)).read_bytes() if isinstance(artifact_path, str) and Path(artifact_path).is_file() else payload
+                relative_leg = f".abba/{re.sub(r'[^A-Za-z0-9_.-]+', '_', route.route)}/b{block}-{index}-{side}.stream"
+                leg_path = _v2_output_path(output_root, relative_leg)
+                leg_path.write_bytes(payload)
+                leg_records[route.route].append({
+                    "route": route.route, "role": side, "index": index, "block": block,
+                    "returncode": returncode, "source_binding": source_bindings[side],
+                    "cwd": invocation.get("cwd"), "argv": invocation.get("argv"),
+                    "binary": binary_identity,
+                    "output_artifact": _v2_output_identity(leg_path, relative_leg),
+                })
+                if side == "after":
+                    final_payloads[route.route] = actual_for_final
+                if planned.get("phase") == "route":
+                    step_receipts.append({
+                        "name": route.route, "side": side, "phase": "route", "block": block,
+                        "abba_index": index, "role": side, "returncode": returncode,
+                        "cwd": invocation.get("cwd"), "argv": invocation.get("argv"),
+                        "binary": binary_identity,
+                    })
+    written_outputs: set[str] = set()
     for route in expected_routes:
         final_path = _v2_output_path(output_root, route.output)
-        if not final_path.exists():
-            final_path.write_bytes(_canonical({"route": route.route, "abba": leg_records[route.route]}))
+        if route.output in written_outputs:
+            continue
+        if final_path.exists() or final_path.is_symlink():
+            raise PolicyMismatch(f"v2 route output is not fresh: {route.output}")
+        payload = final_payloads.get(route.route)
+        if payload is None:
+            raise PolicyMismatch(f"v2 route has no actual output artifact: {route.route}")
+        final_path.write_bytes(payload)
+        written_outputs.add(route.output)
     rows: list[dict[str, Any]] = []
     for route in expected_routes:
         final_path = _v2_output_path(output_root, route.output)
         evidence = {
             "source_bindings": source_bindings,
+            "binary_provenance": side_binaries,
             "output_artifact": _v2_output_identity(final_path, route.output),
             "abba": leg_records[route.route],
         }
@@ -1318,6 +1628,11 @@ def execute_v2(
         "tooling": prepared["receipt"]["tooling"],
         "runner": runner,
         "abba_order": list(ABBA_ORDER),
+        "abba_blocks": blocks,
+        "targets": {side: str(path.resolve()) for side, path in targets.items()},
+        "states": {side: str(path.resolve()) for side, path in states.items()},
+        "adapter_features": {side: list(_adapter_features(lane, side)) for side in ("before", "after")},
+        "binary_provenance": side_binaries,
         "step_receipts": step_receipts,
         "route_receipts": rows,
     }
@@ -1341,9 +1656,11 @@ def execute_v2(
         "preparation_receipt_sha256": prepared["receipt_sha256"],
         "lane": lane,
         "abba_order": list(ABBA_ORDER),
+        "abba_blocks": blocks,
         "output_root": str(output_root),
         "source_artifacts": prepared["receipt"]["identities"],
         "tooling": prepared["receipt"]["tooling"],
+        "binary_provenance": side_binaries,
         "routes": [route.json() for route in expected_routes],
         "results": rows,
         "execution_receipt": execution_identity,
@@ -1352,12 +1669,12 @@ def execute_v2(
     return validator.validate_qualification(qualification_path, Path(preparation))
 
 
-def _cli_guard_lock(source_root: Path, command: Sequence[str], role: str = "workspace") -> int:
+def _cli_guard_lock(source_root: Path, command: Sequence[str], role: str = "workspace", side: str = "candidate") -> int:
     """CLI implementation for a role guard; no expected hash input."""
 
-    validate_lock(source_root, "candidate", role)
+    validate_lock(source_root, side, role)
     if not command:
-        print(TRUSTED_POLICY.candidate.lock_for_role(role).sha256)
+        print(_policy_pin(side).lock_for_role(role).sha256)
         return 0
     completed = subprocess.run(list(command), check=False)
     return int(completed.returncode)
@@ -1374,19 +1691,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError:
         separator = len(args)
     if args[0] == "guard-role-lock":
-        if len(args) < 3 or separator != 3 or args[1] not in ROLE_NAMES:
-            print("usage: current_native_policy_v2.py guard-role-lock ROLE SOURCE_ROOT [-- COMMAND ...]", file=sys.stderr)
+        if len(args) < 3 or args[1] not in ROLE_NAMES:
+            print("usage: current_native_policy_v2.py guard-role-lock ROLE SOURCE_ROOT [--side SIDE] [-- COMMAND ...]", file=sys.stderr)
             return 2
         role = args[1]
         path_index = 2
+        side = "candidate"
+        pre_separator = args[3:separator]
+        if pre_separator:
+            if len(pre_separator) != 2 or pre_separator[0] != "--side" or pre_separator[1] not in {"baseline", "candidate"}:
+                print("usage: current_native_policy_v2.py guard-role-lock ROLE SOURCE_ROOT [--side SIDE] [-- COMMAND ...]", file=sys.stderr)
+                return 2
+            side = pre_separator[1]
     else:
         if len(args) < 2 or separator != 2:
             print("usage: current_native_policy_v2.py guard-lock SOURCE_ROOT [-- COMMAND ...]", file=sys.stderr)
             return 2
         role = "workspace"
         path_index = 1
+        side = "candidate"
     try:
-        return _cli_guard_lock(Path(args[path_index]), args[separator + 1 :], role)
+        return _cli_guard_lock(Path(args[path_index]), args[separator + 1 :], role, side)
     except (OSError, PolicyError) as error:
         print(f"current-source policy guard refused: {error}", file=sys.stderr)
         return 1
