@@ -2,12 +2,14 @@
 
 use std::ops::Range;
 
+use super::super::{Limits, checked_output_len, process_ooxml};
 use super::model::{Map, Override, Role, Slot, Value};
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
-use litchi_ooxml_common::mce::process_ooxml;
-use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{
+    attributes::BytesStartExt as _, is_drawingml_name, unqualified_attribute_value,
+};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
@@ -29,35 +31,43 @@ pub(crate) struct Located {
     pub(crate) map_attributes: Option<[Range<usize>; 12]>,
 }
 
-pub(crate) fn locate_master(xml: &[u8]) -> Result<Located> {
-    locate_source(xml, &Source::Master)
+pub(crate) fn locate_master(xml: &[u8], limits: Limits) -> Result<Located> {
+    locate_source(xml, &Source::Master, limits)
 }
 
-pub(crate) fn locate_override(xml: &[u8], root_name: &[u8], root_label: &str) -> Result<Located> {
+pub(crate) fn locate_override(
+    xml: &[u8],
+    root_name: &[u8],
+    root_label: &str,
+    limits: Limits,
+) -> Result<Located> {
     locate_source(
         xml,
         &Source::Override {
             root_name: root_name.to_vec(),
             root_label: root_label.to_owned(),
         },
+        limits,
     )
 }
 
-pub(crate) fn locate_source(xml: &[u8], source: &Source) -> Result<Located> {
+pub(crate) fn locate_source(xml: &[u8], source: &Source, limits: Limits) -> Result<Located> {
+    check_input(xml, limits)?;
     let value = match source {
-        Source::Master => Value::Master(parse_master(xml)?),
+        Source::Master => Value::Master(parse_master(xml, limits)?),
         Source::Override {
             root_name,
             root_label,
-        } => Value::Override(parse_override(xml, root_name, root_label)?),
+        } => Value::Override(parse_override(xml, root_name, root_label, limits)?),
     };
-    locate(xml, source.clone(), value)
+    locate(xml, source.clone(), value, limits)
 }
 
-fn locate(xml: &[u8], source: Source, value: Value) -> Result<Located> {
+fn locate(xml: &[u8], source: Source, value: Value, limits: Limits) -> Result<Located> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut state = ScanState::default();
+    let mut nodes = 0usize;
 
     loop {
         let start = position(&reader, origin)?;
@@ -66,9 +76,31 @@ fn locate(xml: &[u8], source: Source, value: Value) -> Result<Located> {
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    resource: "color-map XML nodes",
+                    limit: limits.max_nodes(),
+                })?;
+                if nodes > limits.max_nodes() || state.depth >= limits.max_depth() {
+                    return Err(Error::Limit {
+                        resource: "color-map XML nodes or depth",
+                        limit: limits.max_nodes(),
+                    });
+                }
                 scan_start(&mut state, &namespace, &element, &source, start)?;
             },
             Event::Empty(element) => {
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    resource: "color-map XML nodes",
+                    limit: limits.max_nodes(),
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(Error::Limit {
+                        resource: "color-map XML nodes",
+                        limit: limits.max_nodes(),
+                    });
+                }
                 scan_empty(&mut state, &namespace, &element, &source, start)?;
             },
             Event::End(element) => scan_end(&mut state, &namespace, &element)?,
@@ -199,8 +231,20 @@ fn scan_end(
     Ok(())
 }
 
-pub(crate) fn rewrite(source: &[u8], located: &Located, desired: Value) -> Result<Vec<u8>> {
+pub(crate) fn rewrite(
+    source: &[u8],
+    located: &Located,
+    desired: Value,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    check_input(source, limits)?;
     if located.value == desired {
+        if source.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "serialized color-map XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
         return Ok(source.to_vec());
     }
     let before = mapped_value(&located.value).ok_or_else(|| {
@@ -213,6 +257,34 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, desired: Value) -> Resul
         Error::Invalid("color-map source has no editable mapping attributes".to_string())
     })?;
 
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for (index, slot) in Slot::ALL.into_iter().enumerate() {
+        let old = before.color(slot);
+        let new = after.color(slot);
+        if old != new {
+            let range = &attributes[index];
+            removed =
+                removed
+                    .checked_add(range.end - range.start)
+                    .ok_or(Error::CapacityOverflow {
+                        resource: "serialized color-map XML",
+                    })?;
+            added = added
+                .checked_add(new.as_str().len())
+                .ok_or(Error::CapacityOverflow {
+                    resource: "serialized color-map XML",
+                })?;
+        }
+    }
+    checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "serialized color-map XML",
+    )?;
+
     let mut replacements = Vec::new();
     for (index, slot) in Slot::ALL.into_iter().enumerate() {
         let old = before.color(slot);
@@ -224,7 +296,17 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, desired: Value) -> Resul
             });
         }
     }
-    apply_replacements(source, replacements)
+    apply_replacements(source, replacements, limits)
+}
+
+fn check_input(xml: &[u8], limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_input_bytes() {
+        return Err(Error::Limit {
+            resource: "color-map XML input",
+            limit: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
 }
 
 fn mapped_value(value: &Value) -> Option<Map> {
@@ -397,11 +479,16 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
+fn apply_replacements(
+    source: &[u8],
+    mut replacements: Vec<Replacement>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
     replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
-    let mut output = source.to_vec();
     let mut upper = source.len();
-    for replacement in replacements {
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for replacement in &replacements {
         if replacement.range.start > replacement.range.end
             || replacement.range.end > source.len()
             || replacement.range.end > upper
@@ -410,9 +497,40 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
                 "color-map patch ranges overlap or escape the source".to_string(),
             ));
         }
-        output.splice(replacement.range.clone(), replacement.value);
+        removed = removed
+            .checked_add(replacement.range.end - replacement.range.start)
+            .ok_or(Error::CapacityOverflow {
+                resource: "serialized color-map XML",
+            })?;
+        added = added
+            .checked_add(replacement.value.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "serialized color-map XML",
+            })?;
         upper = replacement.range.start;
     }
+    let output_len = checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "serialized color-map XML",
+    )?;
+    let mut output = Vec::new();
+    output
+        .try_reserve(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "serialized color-map XML",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for replacement in replacements.into_iter().rev() {
+        output.extend_from_slice(&source[cursor..replacement.range.start]);
+        output.extend_from_slice(&replacement.value);
+        cursor = replacement.range.end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    debug_assert_eq!(output.len(), output_len);
     Ok(output)
 }
 
@@ -468,12 +586,20 @@ impl Map {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_master(xml: &[u8]) -> Result<Map> {
-    let xml = process_ooxml(xml)?;
+pub fn parse_master(xml: &[u8], limits: Limits) -> Result<Map> {
+    check_input(xml, limits)?;
+    let xml = process_ooxml(xml, limits)?;
+    if xml.len() > limits.max_output_bytes() {
+        return Err(Error::Limit {
+            resource: "processed color-map XML",
+            limit: limits.max_output_bytes(),
+        });
+    }
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut depth = 0usize;
     let mut saw_root = false;
     let mut color_map = None;
+    let mut nodes = 0usize;
 
     loop {
         let decoder = reader.decoder();
@@ -482,9 +608,20 @@ pub fn parse_master(xml: &[u8]) -> Result<Map> {
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    resource: "color-map XML nodes",
+                    limit: limits.max_nodes(),
+                })?;
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::Invalid("color-map XML nesting is too deep".to_string())
                 })?;
+                if nodes > limits.max_nodes() || depth > limits.max_depth() {
+                    return Err(Error::Limit {
+                        resource: "color-map XML nodes or depth",
+                        limit: limits.max_nodes(),
+                    });
+                }
                 if depth == 1 {
                     if saw_root {
                         return Err(Error::Invalid(
@@ -503,6 +640,17 @@ pub fn parse_master(xml: &[u8]) -> Result<Map> {
                 }
             },
             Event::Empty(element) => {
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    resource: "color-map XML nodes",
+                    limit: limits.max_nodes(),
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(Error::Limit {
+                        resource: "color-map XML nodes",
+                        limit: limits.max_nodes(),
+                    });
+                }
                 if depth == 0 {
                     if saw_root {
                         return Err(Error::Invalid(
@@ -541,14 +689,27 @@ pub fn parse_master(xml: &[u8]) -> Result<Map> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_override(xml: &[u8], root_name: &[u8], root_label: &str) -> Result<Option<Override>> {
-    let xml = process_ooxml(xml)?;
+pub fn parse_override(
+    xml: &[u8],
+    root_name: &[u8],
+    root_label: &str,
+    limits: Limits,
+) -> Result<Option<Override>> {
+    check_input(xml, limits)?;
+    let xml = process_ooxml(xml, limits)?;
+    if xml.len() > limits.max_output_bytes() {
+        return Err(Error::Limit {
+            resource: "processed color-map XML",
+            limit: limits.max_output_bytes(),
+        });
+    }
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut depth = 0usize;
     let mut saw_root = false;
     let mut saw_override = false;
     let mut override_depth = None;
     let mut mapping = None;
+    let mut nodes = 0usize;
 
     loop {
         let decoder = reader.decoder();
@@ -557,9 +718,20 @@ pub fn parse_override(xml: &[u8], root_name: &[u8], root_label: &str) -> Result<
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    resource: "color-map XML nodes",
+                    limit: limits.max_nodes(),
+                })?;
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::Invalid("color-map XML nesting is too deep".to_string())
                 })?;
+                if nodes > limits.max_nodes() || depth > limits.max_depth() {
+                    return Err(Error::Limit {
+                        resource: "color-map XML nodes or depth",
+                        limit: limits.max_nodes(),
+                    });
+                }
                 if depth == 1 {
                     if saw_root {
                         return Err(Error::Invalid(
@@ -583,6 +755,17 @@ pub fn parse_override(xml: &[u8], root_name: &[u8], root_label: &str) -> Result<
                 }
             },
             Event::Empty(element) => {
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    resource: "color-map XML nodes",
+                    limit: limits.max_nodes(),
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(Error::Limit {
+                        resource: "color-map XML nodes",
+                        limit: limits.max_nodes(),
+                    });
+                }
                 if depth == 0 {
                     if saw_root {
                         return Err(Error::Invalid(
@@ -645,6 +828,49 @@ fn require_root(
             "color-map XML must have a PresentationML {label} root"
         )))
     }
+}
+
+fn check_attributes(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count.checked_add(1).ok_or(Error::Limit {
+            resource: "color-map XML attributes",
+            limit: limits.max_attributes(),
+        })?;
+        if count > limits.max_attributes() {
+            return Err(Error::Limit {
+                resource: "color-map XML attributes",
+                limit: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "color-map XML attribute name",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "color-map XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "color-map XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn parse_override_mapping(
@@ -719,6 +945,7 @@ mod tests {
     fn parses_master_map_and_layout_override_by_namespace() {
         let master = parse_master(
             format!(r#"<p:sldMaster xmlns:p="{P}"><p:clrMap {MAP}/></p:sldMaster>"#).as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(master.color(Slot::Background1), Role::Light1);
@@ -732,6 +959,7 @@ mod tests {
             .as_bytes(),
             b"sldLayout",
             "slide layout",
+            Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(layout, Some(Override::Override(master)));
@@ -748,19 +976,19 @@ mod tests {
     fn rejects_incomplete_or_duplicate_color_maps() {
         let incomplete =
             format!(r#"<p:sldMaster xmlns:p="{P}"><p:clrMap bg1="lt1"/></p:sldMaster>"#);
-        assert!(parse_master(incomplete.as_bytes()).is_err());
+        assert!(parse_master(incomplete.as_bytes(), Limits::DEFAULT).is_err());
 
         let duplicate = format!(
             r#"<p:sld xmlns:p="{P}" xmlns:a="{A}"><p:clrMapOvr>
                 <a:masterClrMapping/><a:masterClrMapping/></p:clrMapOvr></p:sld>"#
         );
-        assert!(parse_override(duplicate.as_bytes(), b"sld", "slide").is_err());
+        assert!(parse_override(duplicate.as_bytes(), b"sld", "slide", Limits::DEFAULT).is_err());
 
         let multiple_roots = format!(
             r#"<p:sldMaster xmlns:p="{P}"><p:clrMap {MAP}/></p:sldMaster>
             <p:sldMaster><p:clrMap {MAP}/></p:sldMaster>"#
         );
-        assert!(parse_master(multiple_roots.as_bytes()).is_err());
+        assert!(parse_master(multiple_roots.as_bytes(), Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -771,6 +999,7 @@ mod tests {
         let master = parse_master(
             format!(r#"<q:sldMaster xmlns:q="{STRICT_P}"><q:clrMap {MAP}/></q:sldMaster>"#)
                 .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(
@@ -786,6 +1015,7 @@ mod tests {
             .as_bytes(),
             b"sld",
             "slide",
+            Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(slide, Some(Override::Master));

@@ -186,6 +186,7 @@ pub(crate) fn stage_with_limits(
     max_output_bytes: usize,
     transition_limits: crate::transition::Limits,
     operation: &'static str,
+    protection_limits: crate::presentation_properties::metadata::protection::Limits,
 ) -> Result<(Option<Vec<u8>>, bool)> {
     let layout = locate(xml, operation, transition_limits)?;
     let current = if layout.transition.is_some() {
@@ -215,7 +216,7 @@ pub(crate) fn stage_with_limits(
     if same_semantics(current.as_ref(), target) {
         return Ok((None, false));
     }
-    if presentation_is_protected(presentation_xml)? {
+    if presentation_is_protected(presentation_xml, protection_limits)? {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::Protected,
             operation,
@@ -2182,11 +2183,14 @@ fn effect_attributes(local: &[u8]) -> &'static [&'static [u8]] {
     }
 }
 
-fn presentation_is_protected(xml: &[u8]) -> Result<bool> {
+fn presentation_is_protected(
+    xml: &[u8],
+    limits: crate::presentation_properties::metadata::protection::Limits,
+) -> Result<bool> {
     let text = std::str::from_utf8(xml)
         .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
     Ok(
-        crate::presentation_properties::metadata::protection::Settings::parse_xml(text)?
+        crate::presentation_properties::metadata::protection::Settings::parse_xml(text, limits)?
             .is_protected(),
     )
 }

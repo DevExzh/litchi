@@ -1,7 +1,7 @@
 //! Typed custom slide shows with a transactional PresentationML round-trip.
 
 use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::custom_show::{List, Show};
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, List, Show};
 use litchi_pptx::presentation_properties::metadata::structure;
 use std::error::Error as StdError;
 
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     // their stable PresentationML IDs.
     let mut package = builder.build()?;
     let slide_ids = package
-        .with_opc(structure::load)?
+        .with_opc(|opc| structure::load(opc, Limits::DEFAULT))?
         .slides
         .into_iter()
         .map(|slide| slide.slide_id)
@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         "Executive Summary"
     );
 
-    let xml = shows.to_xml();
+    let xml = shows.to_xml(Limits::DEFAULT)?;
     println!("\n--- Generated Typed XML ---");
     println!("XML length: {} bytes", xml.len());
     assert!(xml.contains("<p:custShowLst>"));
@@ -127,7 +127,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         package = edit.commit()?.into_package();
     }
 
-    let graph = package.with_opc(structure::load)?;
+    let graph = package.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.custom_shows.shows, shows.shows);
     println!(
         "\nPublished {} custom shows transactionally.",
@@ -143,7 +143,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     }
 
     let round_trip = Package::from_bytes(&package.to_bytes()?)?;
-    let graph = round_trip.with_opc(structure::load)?;
+    let graph = round_trip.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.custom_shows.len(), 3);
     assert!(graph.custom_shows.get_by_name("Quick Demo").is_none());
     assert_eq!(

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
+use super::super::Limits;
 pub(crate) use super::codec::{
     add_custom_show, add_custom_show_slide, add_section, add_section_slide, remove_custom_show,
     remove_custom_show_slide, remove_section, remove_section_slide, reorder_custom_show_slides,
@@ -21,8 +22,8 @@ use crate::{Error, Result};
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
-    let graph = load(package)?;
+pub fn load_snapshot(package: &OpcPackage, limits: Limits) -> Result<Snapshot> {
+    let graph = load(package, limits)?;
     let presentation = package.main_document_part()?;
     Snapshot::from_wire(
         presentation.partname().to_string(),
@@ -30,6 +31,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
         presentation.blob_arc(),
         Snapshot::capture_relationships(presentation),
         graph,
+        limits,
     )
 }
 
@@ -46,7 +48,8 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
-    let current = load_snapshot(package)?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    let current = load_snapshot(package, limits)?;
     if !current.same_source(patch.before()) {
         return Err(invalid("presentation structure source is stale"));
     }
@@ -65,7 +68,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Sn
     candidate
         .get_part_mut(&presentation_name)?
         .set_blob_shared(Arc::clone(patch.after().source_arc()));
-    let result = load_snapshot(&candidate)?;
+    let result = load_snapshot(&candidate, limits)?;
     if !result.same_source(patch.after()) || result.graph() != patch.after().graph() {
         return Err(invalid(
             "published presentation structure differs from the commit",

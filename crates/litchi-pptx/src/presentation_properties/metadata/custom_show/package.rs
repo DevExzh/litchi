@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, PackURI};
 
+use super::Limits;
 use super::model::List;
 use super::transaction::{Change, Prepared, Snapshot};
 use super::wire;
@@ -15,8 +16,8 @@ use crate::{Error, Result};
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<List> {
-    Ok(load_snapshot(package)?.list().clone())
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<List> {
+    Ok(load_snapshot(package, limits)?.list().clone())
 }
 
 /// Atomically store a typed custom-show list.
@@ -32,7 +33,7 @@ pub fn load(package: &OpcPackage) -> Result<List> {
 ///
 /// Returns an error if the output cannot be encoded or written.
 pub(crate) fn store(package: &mut OpcPackage, value: &List) -> Result<()> {
-    let snapshot = load_snapshot(package)?;
+    let snapshot = load_snapshot(package, Limits::from_source_limits(package.read_limits()))?;
     let mut transaction = snapshot.edit();
     transaction.replace(value.clone())?;
     let commit = transaction.commit()?;
@@ -45,14 +46,15 @@ pub(crate) fn store(package: &mut OpcPackage, value: &List) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
+pub fn load_snapshot(package: &OpcPackage, limits: Limits) -> Result<Snapshot> {
     let presentation = package.main_document_part()?;
-    let located = wire::locate(package)?;
+    let located = wire::locate(package, limits)?;
     Snapshot::from_located(
         presentation.partname().to_string(),
         presentation.content_type().to_owned(),
         presentation.blob_arc(),
         located,
+        limits,
     )
 }
 
@@ -69,7 +71,8 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
-    let current = load_snapshot(package)?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    let current = load_snapshot(package, limits)?;
     if !current.same_source(patch.before()) {
         return Err(invalid("custom-show PresentationML source is stale"));
     }
@@ -89,7 +92,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Sn
     candidate
         .get_part_mut(&target)?
         .set_blob_shared(Arc::clone(patch.after().source_arc()));
-    let result = load_snapshot(&candidate)?;
+    let result = load_snapshot(&candidate, limits)?;
     if !result.same_source(patch.after()) {
         return Err(invalid(
             "published custom-show source differs from the committed snapshot",
@@ -133,7 +136,7 @@ pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
-    let before = load_snapshot(package)?;
+    let before = load_snapshot(package, Limits::from_source_limits(package.read_limits()))?;
     if before.list().is_empty() {
         return Ok(None);
     }

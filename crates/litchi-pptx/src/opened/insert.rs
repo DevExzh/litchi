@@ -94,8 +94,13 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     super::copy_plan::reject_mce(main.blob(), "presentation owner").map_err(source_refusal)?;
     let main_text =
         std::str::from_utf8(main.blob()).map_err(|_| invalid("presentation XML is not UTF-8"))?;
-    if crate::presentation_properties::metadata::protection::Settings::parse_xml(main_text)?
-        .is_protected()
+    if crate::presentation_properties::metadata::protection::Settings::parse_xml(
+        main_text,
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            source.package.read_limits(),
+        ),
+    )?
+    .is_protected()
     {
         return Err(refuse(
             "the presentation has an active modify-password verifier",

@@ -130,10 +130,13 @@ impl Edit<'_> {
 fn source(opc: &OpcPackage, part_name: &PackURI) -> Result<Snapshot> {
     let part = opc.get_part(part_name)?;
     let xml = part.blob().to_vec();
+    let limits = Limits::from_source_limits(opc.read_limits());
     match part.content_type() {
-        ct::PML_SLIDE_MASTER => Snapshot::from_master_owned(xml),
-        ct::PML_SLIDE_LAYOUT => Snapshot::from_override_owned(xml, b"sldLayout", "slide layout"),
-        ct::PML_SLIDE => Snapshot::from_override_owned(xml, b"sld", "slide"),
+        ct::PML_SLIDE_MASTER => Snapshot::from_master_owned(xml, limits),
+        ct::PML_SLIDE_LAYOUT => {
+            Snapshot::from_override_owned(xml, b"sldLayout", "slide layout", limits)
+        },
+        ct::PML_SLIDE => Snapshot::from_override_owned(xml, b"sld", "slide", limits),
         _ => Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedTarget,
             "update",
@@ -150,7 +153,9 @@ fn publish(opc: &mut OpcPackage, part_name: &PackURI, prepared: &Prepared) -> Re
     }
     refuse_signed_change(opc)?;
     let mut xml = opc.get_part(part_name)?.blob().to_vec();
-    prepared.patch().apply(&mut xml)?;
+    prepared
+        .patch()
+        .apply(&mut xml, Limits::from_source_limits(opc.read_limits()))?;
     opc.get_part_mut(part_name)?.set_blob(xml);
     settle_unsigned_change(opc)
 }

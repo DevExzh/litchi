@@ -396,6 +396,10 @@ impl Revision {
                 slide: Arc::new(binding),
             },
             max_output_bytes: super::super::source_slide_output_limit(limits, semantic.shape()),
+            protection_limits:
+                crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                    limits,
+                ),
             semantic_limits: package.owner.semantic_limits.clone(),
             source_version,
             lineage: package.owner.package.source_lineage(),

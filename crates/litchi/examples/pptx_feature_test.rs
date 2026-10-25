@@ -5,8 +5,8 @@
 //! is summarized in the package, keeping the package facade focused on slides.
 
 use litchi_pptx::Package;
-use litchi_pptx::animations::{Effect, EffectInstance, Limits, Sequence, Trigger};
-use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
+use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, List as ShowList, Show};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
 use std::error::Error as StdError;
@@ -176,8 +176,8 @@ fn animation_demo() -> Result<String, Box<dyn StdError>> {
             .with_trigger(Trigger::AfterPrevious)
             .with_duration_ms(750),
     );
-    let xml = sequence.to_xml(Limits::DEFAULT)?;
-    let parsed = Sequence::parse_timing_xml(&xml, Limits::DEFAULT)?;
+    let xml = sequence.to_xml(litchi_pptx::animations::Limits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, litchi_pptx::animations::Limits::DEFAULT)?;
     assert_eq!(parsed.animations.len(), 2);
     Ok(xml)
 }
@@ -190,13 +190,15 @@ fn sections_demo() -> Result<String, Box<dyn StdError>> {
     sections.add_section(
         Section::new("Section 2", "{00000000-0000-4000-8000-000000000002}").with_slides([257]),
     );
-    Ok(sections.to_xml()?)
+    Ok(sections.to_xml(Limits::DEFAULT)?)
 }
 
 fn custom_shows_demo() -> String {
     let mut shows = ShowList::new();
     shows.add(Show::new(1, "My Show").with_slides(vec![256, 257]));
-    shows.to_xml()
+    shows
+        .to_xml(Limits::DEFAULT)
+        .expect("default metadata limits accept the example")
 }
 
 fn handout_demo() -> String {
@@ -205,5 +207,6 @@ fn handout_demo() -> String {
         .with_header("Feature Test")
         .with_footer("Created with Litchi")
         .with_slide_numbers()
-        .to_xml()
+        .to_xml(Limits::DEFAULT)
+        .expect("default metadata limits accept the example")
 }

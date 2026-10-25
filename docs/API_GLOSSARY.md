@@ -3401,3 +3401,24 @@ relationships, links and embedded model/preview payloads.
 | `litchi_pptx::model3d::codec::{read, write}`; `model3d::validation::validate` | adopted (0362ul63); model3d package, selected-shape and edit consumers propagate the retained owner policy, including payload and relationship ceilings |
 
 See [0362ul63](unified-ops/0362ul63-pptx-raw-properties.md).
+
+## PPTX structural metadata policies (record 0362ul81)
+
+The eight PresentationML structural metadata families share one required
+`presentation_properties::metadata::Limits` policy.  Package owners derive
+that policy from their retained `SourceLimits`; detached and raw operations
+receive it explicitly.  Changed replay validates the candidate payload under
+the recipient's policy, while an equal-content no-op keeps the recipient
+profile and exact bytes without a second semantic rewrite.
+
+| API | Status / contract |
+|---|---|
+| `litchi_pptx::presentation_properties::metadata::Limits` and its re-exports from `custom_show`, `guides`, `sections`, `structure`, `color_map`, `handout`, `template` and `protection` | adopted (0362ul81); one checked policy carries input/output bytes, tree/nodes, strings, extensions, family counts, references, attributes and relationships |
+| `custom_show::List::{parse_xml, to_xml, to_xml_with_rel_map}` | adopted (0362ul81); required metadata limits, bounded MCE selection, relationship-aware output and no fixed codec ceilings |
+| `guides::Guides::{from_xml, to_xml}`, `sections::{List, Section}::{from_xml, to_xml}` | adopted (0362ul81); required limits through DOM, extension, reference and writer paths, with opaque extension bytes retained |
+| `structure::{load, load_snapshot}` and `structure::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362ul81); package-aware graph edits use the shared triad, derive owner policy, and replay against equal content rather than patch lineage |
+| `color_map::{parse_master, parse_override}` and `color_map::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362ul81); master/layout/slide sources retain their exact owner bytes and apply changed payloads under recipient limits |
+| `handout::Master::{parse_xml, to_xml}`, `protection::Settings::{parse_xml, to_xml, to_pres_props_xml}`, `template::pres_props_xml_with_handout` | adopted (0362ul81); required limits cover input, output, attributes, strings, nodes and password verifier fields; detached handout/protection writers retain canonical typed-model semantics, while static template constants remain format-invariant |
+| `custom_show`, `guides`, `structure` and `color_map` replay | adopted (0362ul81); no-op patches preserve exact recipient content and policy, changed patches perform bounded recipient validation, and no public `_with_limits`/default twins remain; `Snapshot::read`, projection aliases and draft `snapshot` wrappers (including `color_map::Draft::snapshot`) are banned in these scopes |
+
+See [0362ul81](unified-ops/0362ul81-pptx-metadata-structural.md).

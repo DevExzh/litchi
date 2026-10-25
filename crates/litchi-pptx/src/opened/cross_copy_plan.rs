@@ -1262,8 +1262,20 @@ fn prepare_cross_slide_copy_for_slides(
         destination_presentation.blob(),
         "destination presentation owner",
     )?;
-    reject_protected(source_presentation.blob(), "source presentation")?;
-    reject_protected(destination_presentation.blob(), "destination presentation")?;
+    reject_protected(
+        source_presentation.blob(),
+        "source presentation",
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            source.package.read_limits(),
+        ),
+    )?;
+    reject_protected(
+        destination_presentation.blob(),
+        "destination presentation",
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            destination.package.read_limits(),
+        ),
+    )?;
     if source.slides.is_empty() || destination.slides.is_empty() {
         return refusal(
             SlideCopyRefusal::AmbiguousTopology,
@@ -2682,10 +2694,14 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
     Ok(format!("rId{candidate}"))
 }
 
-fn reject_protected(xml: &[u8], context: &'static str) -> Result<()> {
+fn reject_protected(
+    xml: &[u8],
+    context: &'static str,
+    limits: crate::presentation_properties::metadata::protection::Limits,
+) -> Result<()> {
     let text = std::str::from_utf8(xml)
         .map_err(|error| Error::Xml(format!("{context} XML is not UTF-8: {error}")))?;
-    if crate::presentation_properties::metadata::protection::Settings::parse_xml(text)?
+    if crate::presentation_properties::metadata::protection::Settings::parse_xml(text, limits)?
         .is_protected()
     {
         return refusal(

@@ -2837,6 +2837,61 @@
           "replacement": "use SourceLimitKind"
         },
         {
+          "name": "read",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Snapshot",
+          "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
+        },
+        {
+          "name": "custom_shows",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Snapshot",
+          "replacement": "use Snapshot::list; no projection alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Draft",
+          "replacement": "use Draft::list; no draft snapshot alias (record 0362ul81a)"
+        },
+        {
+          "name": "push",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Draft",
+          "replacement": "use Draft::add; no compatibility mutator alias (record 0362ul81a)"
+        },
+        {
+          "name": "read",
+          "scope": "litchi_pptx::presentation_properties::metadata::guides::Snapshot",
+          "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
+        },
+        {
+          "name": "value",
+          "scope": "litchi_pptx::presentation_properties::metadata::guides::Snapshot",
+          "replacement": "use Snapshot::guides; no projection alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::guides::Draft",
+          "replacement": "use Draft::guides; no draft snapshot alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::color_map::Draft",
+          "replacement": "use Draft::value; no draft snapshot alias (record 0362ul81b)"
+        },
+        {
+          "name": "read",
+          "scope": "litchi_pptx::presentation_properties::metadata::structure::Snapshot",
+          "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
+        },
+        {
+          "name": "structure",
+          "scope": "litchi_pptx::presentation_properties::metadata::structure::Snapshot",
+          "replacement": "use Snapshot::graph; no projection alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::structure::Draft",
+          "replacement": "use Draft::graph; no draft snapshot alias (record 0362ul81a)"
+        },
+        {
           "name": "Index",
           "scope": "litchi_pptx::shape::owned::Selector",
           "replacement": "use Position(Position)"
@@ -3633,7 +3688,115 @@
         {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
         {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml_owned", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
         {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml", "inputs": ["source", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
-        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml_owned", "inputs": ["source", "slide_part_name", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"}
+        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml_owned", "inputs": ["source", "slide_part_name", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml_with_rel_map",
+          "inputs": ["self", "slide_id_to_rel_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::to_xml",
+          "inputs": ["self", "strict", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::Section::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load_snapshot",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_master",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_override",
+          "inputs": ["xml", "root_name", "root_label", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_pres_props_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::template::pres_props_xml_with_handout",
+          "inputs": ["prn_what", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        }
       ],
       "result_methods": [
         {
@@ -3864,6 +4027,61 @@
           "name": "ReadResource",
           "scope": "litchi_pptx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "read",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Snapshot",
+          "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
+        },
+        {
+          "name": "custom_shows",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Snapshot",
+          "replacement": "use Snapshot::list; no projection alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Draft",
+          "replacement": "use Draft::list; no draft snapshot alias (record 0362ul81a)"
+        },
+        {
+          "name": "push",
+          "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Draft",
+          "replacement": "use Draft::add; no compatibility mutator alias (record 0362ul81a)"
+        },
+        {
+          "name": "read",
+          "scope": "litchi_pptx::presentation_properties::metadata::guides::Snapshot",
+          "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
+        },
+        {
+          "name": "value",
+          "scope": "litchi_pptx::presentation_properties::metadata::guides::Snapshot",
+          "replacement": "use Snapshot::guides; no projection alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::guides::Draft",
+          "replacement": "use Draft::guides; no draft snapshot alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::color_map::Draft",
+          "replacement": "use Draft::value; no draft snapshot alias (record 0362ul81b)"
+        },
+        {
+          "name": "read",
+          "scope": "litchi_pptx::presentation_properties::metadata::structure::Snapshot",
+          "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
+        },
+        {
+          "name": "structure",
+          "scope": "litchi_pptx::presentation_properties::metadata::structure::Snapshot",
+          "replacement": "use Snapshot::graph; no projection alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::structure::Draft",
+          "replacement": "use Draft::graph; no draft snapshot alias (record 0362ul81a)"
         },
         {
           "name": "Index",
@@ -4688,7 +4906,115 @@
         {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
         {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml_owned", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
         {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml", "inputs": ["source", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
-        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml_owned", "inputs": ["source", "slide_part_name", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"}
+        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml_owned", "inputs": ["source", "slide_part_name", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml_with_rel_map",
+          "inputs": ["self", "slide_id_to_rel_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::to_xml",
+          "inputs": ["self", "strict", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::Section::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load_snapshot",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_master",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_override",
+          "inputs": ["xml", "root_name", "root_label", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_pres_props_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::template::pres_props_xml_with_handout",
+          "inputs": ["prn_what", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        }
       ],
       "result_methods": [
         {
