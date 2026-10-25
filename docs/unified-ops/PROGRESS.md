@@ -5850,3 +5850,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   777,580,584,960 bytes under its recorded exclusions and evidence limits
   (132). Main/office and independent office branches remain untouched.
   Final qualification, performance and trunk integration stay open; no push.
+
+  Frozen C passes all eight compiler/consumer rows; root verifies the terminal
+  capture and starts the fresh 34-group runtime suite after preflight (133).
+  Glossary26/full53, final census and fidelity/performance remain open.
+  The reviewed 126 performance adapter and rebound notes packet pass their
+  synthetic checks; actual measurements remain unrun. Census v7 is returned
+  for capturing its binding hash too late; v8 must seal it before execution.
+
+  Cleanup101 removes two archived obsolete ODP duplicates while preserving
+  the canonical comparison endpoint. Root verifies 268 removed worktrees,
+  430 deleted refs and a conservative allocated ledger of 785,182,834,688
+  bytes under the recorded exclusions. A fresh branch census finds only
+  trunk, integration and the active runner in scope. Main/office and their
+  independent siblings are untouched. Final trunk integration is pending;
+  nothing is pushed.
