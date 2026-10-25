@@ -48,6 +48,7 @@ pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
 pub mod pptx_range_source;
 pub mod pptx_retention;
+pub mod pptx_notes_memo;
 pub mod ppt_lazy_native;
 mod pptx_slide_boundaries;
 mod pptx_streaming_create;
