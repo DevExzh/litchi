@@ -184,6 +184,23 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             forged["path"] = str(unrelated)
             with self.assertRaises(validator.ValidationError):
                 validator._validate_output_artifact({"output_artifact": forged}, expected, root.resolve(), "output")
+            escaped_root = Path(directory) / "escaped-root"
+            escaped_root.mkdir()
+            outside = Path(directory) / "outside"
+            outside_output = outside / expected.output
+            outside_output.parent.mkdir(parents=True)
+            outside_output.write_bytes(b"escaped output")
+            (escaped_root / "target").symlink_to(outside / "target", target_is_directory=True)
+            escaped_artifact = {
+                "path": str(outside_output),
+                "sha256": hashlib.sha256(outside_output.read_bytes()).hexdigest(),
+                "bytes": outside_output.stat().st_size,
+                "relative_path": expected.output,
+            }
+            with self.assertRaises(validator.ValidationError):
+                validator._validate_output_artifact(
+                    {"output_artifact": escaped_artifact}, expected, escaped_root.resolve(), "output"
+                )
 
     def test_preparation_requires_a_fresh_output_root(self) -> None:
         manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
