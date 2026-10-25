@@ -1298,10 +1298,21 @@ impl crate::Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_shape_designer_properties(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_shape_designer_properties")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_shape_designer_properties",
+            |package, target, patch| {
+                let shape_limits = package.semantic_limits().shape();
+                patch.validate_changed_parts(target, |_, part| {
+                    if part.content_type() == litchi_opc::constants::content_type::PML_SLIDE {
+                        crate::shape::Scene::read(part.blob(), shape_limits).map(|_| ())
+                    } else {
+                        Ok(())
+                    }
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 

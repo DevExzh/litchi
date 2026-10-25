@@ -13,6 +13,8 @@
 
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
+use litchi_opc::Part;
+use litchi_opc::constants::content_type as ct;
 
 family!("shape-tag");
 
@@ -44,10 +46,23 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_shape_tags(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_shape_tags")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_shape_tags",
+            |package, target, patch| {
+                let shape_limits = package.semantic_limits().shape();
+                patch.validate_changed_parts(target, |_, part| {
+                    if part.content_type() == ct::PML_SLIDE {
+                        crate::shape::Scene::read(part.blob(), shape_limits).map(|_| ())
+                    } else if part.content_type() == crate::tag::CONTENT_TYPE {
+                        crate::tag::parse(part.blob()).map(|_| ())
+                    } else {
+                        Ok(())
+                    }
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
