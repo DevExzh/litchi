@@ -3,7 +3,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use litchi_crypto::ooxml::{Mode, encrypt};
+use litchi_crypto::ooxml::{Limits, Mode, encrypt};
 
 struct CountingAllocator;
 
@@ -35,7 +35,12 @@ fn encryption_allocations(clear_len: usize) -> usize {
     let clear = vec![0x5a; clear_len];
     ALLOCATIONS.store(0, Ordering::Relaxed);
     COUNTING.store(true, Ordering::Relaxed);
-    let result = encrypt(clear, "allocation regression password", Mode::Agile);
+    let result = encrypt(
+        clear,
+        "allocation regression password",
+        Mode::Agile,
+        &Limits::default(),
+    );
     COUNTING.store(false, Ordering::Relaxed);
     result.expect("Agile encryption");
     ALLOCATIONS.load(Ordering::Relaxed)

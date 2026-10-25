@@ -2,7 +2,7 @@
 
 #![cfg(feature = "ooxml")]
 
-use litchi_crypto::ooxml::{Kind, Limits, Mode, inspect_with, open_with, rekey_with};
+use litchi_crypto::ooxml::{Kind, Limits, Mode, inspect, open, rekey};
 use litchi_crypto::spaces;
 
 const PASSWORD: &str = "Litchi synthetic crypto fixture 2026";
@@ -24,12 +24,12 @@ fn opens_independent_standard_aes192_and_aes256_vectors() {
         ),
     ] {
         assert_eq!(
-            inspect_with(encrypted, &limits).unwrap_or_else(|error| {
+            inspect(encrypted, &limits).unwrap_or_else(|error| {
                 panic!("{name} profile classification failed: {error}")
             }),
             Kind::Encrypted(expected_mode),
         );
-        let opened = open_with(encrypted.to_vec(), PASSWORD, &limits)
+        let opened = open(encrypted.to_vec(), PASSWORD, &limits)
             .unwrap_or_else(|error| panic!("{name} fixture must open: {error}"));
         assert_eq!(opened.mode(), Some(expected_mode));
         assert_eq!(opened.bytes(), CLEAR, "{name} clear package bytes");
@@ -52,12 +52,12 @@ fn opens_independent_agile_sha512_and_mixed_key_size_vectors() {
         ),
     ] {
         assert_eq!(
-            inspect_with(encrypted, &limits).unwrap_or_else(|error| {
+            inspect(encrypted, &limits).unwrap_or_else(|error| {
                 panic!("{name} profile classification failed: {error}")
             }),
             Kind::Encrypted(Mode::AgileAes256Sha512),
         );
-        let opened = open_with(encrypted.to_vec(), PASSWORD, &limits)
+        let opened = open(encrypted.to_vec(), PASSWORD, &limits)
             .unwrap_or_else(|error| panic!("{name} fixture must open: {error}"));
         assert_eq!(opened.mode(), Some(Mode::AgileAes256Sha512));
         assert_eq!(opened.bytes(), CLEAR, "{name} clear package bytes");
@@ -69,13 +69,13 @@ fn rekey_preserves_an_opened_non_default_profile() {
     let limits = Limits::default();
     let input =
         include_bytes!("data/ooxml/msoffcrypto-agile-aes256-sha512-valid-graph.docx").to_vec();
-    let rekeyed = rekey_with(input, PASSWORD, "new fixture password", &limits)
+    let rekeyed = rekey(input, PASSWORD, "new fixture password", &limits)
         .expect("rekey independent Agile fixture");
     assert_eq!(
-        inspect_with(&rekeyed, &limits).expect("inspect rekeyed fixture"),
+        inspect(&rekeyed, &limits).expect("inspect rekeyed fixture"),
         Kind::Encrypted(Mode::AgileAes256Sha512)
     );
-    let opened = open_with(rekeyed, "new fixture password", &limits).expect("open rekeyed fixture");
+    let opened = open(rekeyed, "new fixture password", &limits).expect("open rekeyed fixture");
     assert_eq!(opened.mode(), Some(Mode::AgileAes256Sha512));
     assert_eq!(opened.bytes(), CLEAR);
 }
@@ -83,8 +83,8 @@ fn rekey_preserves_an_opened_non_default_profile() {
 #[test]
 fn ooxml_read_compatibility_normalizes_msoffcrypto_zero_block_graph() {
     let encrypted = include_bytes!("data/ooxml/msoffcrypto-agile-aes256-sha512.docx");
-    assert!(spaces::inspect_bytes(encrypted).is_err());
-    let opened = open_with(encrypted.to_vec(), PASSWORD, &Limits::default())
+    assert!(spaces::inspect_bytes(encrypted, &spaces::Limits::default()).is_err());
+    let opened = open(encrypted.to_vec(), PASSWORD, &Limits::default())
         .expect("OOXML compatibility reader accepts advisory zero block size");
     assert_eq!(opened.mode(), Some(Mode::AgileAes256Sha512));
     assert_eq!(opened.bytes(), CLEAR);

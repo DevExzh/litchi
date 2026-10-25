@@ -589,7 +589,12 @@ fn owning_ingress_refuses_lazy_options_before_io() {
         {
             let mut clear = Vec::new();
             Package::new().unwrap().write_to(&mut clear).unwrap();
-            let decrypted = litchi_docx::encryption::open(clear, "pw").unwrap();
+            let decrypted = litchi_docx::encryption::open(
+                clear,
+                "pw",
+                &litchi_docx::encryption::Limits::default(),
+            )
+            .unwrap();
             assert_policy(Package::from_decrypted(decrypted, options.clone()));
             assert_policy(Package::from_reader_with_password_and_options(
                 NeverRead,

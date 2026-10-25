@@ -400,8 +400,13 @@ fn encrypted_source_refuses_metadata_mutation_until_explicit_plain_reopen() {
 
     const PASSWORD: &str = "calculation-metadata-password";
     let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
-    let encrypted =
-        litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, EncryptionMode::Standard).unwrap();
+    let encrypted = litchi_xlsx::encryption::encrypt(
+        plaintext,
+        PASSWORD,
+        EncryptionMode::Standard,
+        &litchi_xlsx::encryption::Limits::default(),
+    )
+    .unwrap();
     let opened = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
     assert!(matches!(
         opened.edit_calculation_metadata(),

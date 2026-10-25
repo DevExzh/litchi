@@ -350,9 +350,13 @@ fn signed_and_encrypted_packages_refuse_chart_writes() {
 fn encrypted_packages_refuse_plaintext_chart_publication() {
     use litchi_ops::Password;
     let clear = deck().to_bytes().unwrap();
-    let encrypted =
-        litchi_pptx::encryption::encrypt(clear, "pw", litchi_pptx::encryption::Mode::Standard)
-            .unwrap();
+    let encrypted = litchi_pptx::encryption::encrypt(
+        clear,
+        "pw",
+        litchi_pptx::encryption::Mode::Standard,
+        &litchi_pptx::encryption::Limits::default(),
+    )
+    .unwrap();
     let File::Locked(locked) = litchi_ops::open_bytes(encrypted).unwrap() else {
         panic!("encrypted")
     };

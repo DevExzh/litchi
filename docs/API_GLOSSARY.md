@@ -3279,6 +3279,22 @@ a required argument.
 | `format::docx::Docx::section_inventory(&section::Limits)` | adopted (0362); `section_inventory_with_limits` merged |
 | `litchi_doc::{body_text, source_backed}::Refusal::kind` | adopted (0362) |
 
+## Crypto raw codec limits (record 0362ul52)
+
+The raw crypto codecs do not hide a process-wide capability behind a limit-less
+entry point. Every parser, inspector, and serializer receives its module-owned
+profile; package owners retain the profile selected at ingress.
+
+| Name | Status |
+|---|---|
+| `litchi_crypto::ooxml::{open, inspect, load, encrypt, rekey}(..., &ooxml::Limits)` | adopted (0362ul52); duplicate `*_with` wrappers deleted, while explicit integrity-policy variants remain `*_with_policy` |
+| `litchi_crypto::spaces::{inspect, inspect_bytes, parse_*, write_*}(..., &spaces::Limits)` | adopted (0362ul52); profile covers stream, aggregate, entry, component, string, XML-depth/node and output ceilings |
+| `litchi_crypto::labels::{parse, write}(..., &labels::Limits)` | adopted (0362ul52); profile covers XML bytes, labels, extensions, depth/nodes, attributes and output |
+| `spaces::Error::{InvalidLimit, LimitExceeded, Allocation}` and `labels::Error::{InvalidLimit, LimitExceeded, Allocation}` | adopted (0362ul52); typed limit dimensions preserve invalid-argument, limit-exceeded and allocation classification through OOXML, DOC and ops consumers |
+| `spaces::Snapshot` / `spaces::Patch` profile retention and OOXML StrongEncryption propagation | adopted (0362ul52); inert IRM/license/label payloads remain source data |
+| `spaces::Patch::write_to` and DataSpaces directory/source capture | adopted (0362ul52); directory traversal, aggregate payload admission, and final CFB publication are bounded before or during allocation |
+| `litchi_doc::{OpenOptions, raw::Reader}::{data_spaces_limits, data_spaces_limits_value, data_spaces, data_spaces_snapshot}` | adopted (0362ul52); the DOC raw reader retains the ingress DataSpaces profile and passes it to both graph projections |
+
 ## Spreadsheet chart authoring placement (record 0362zab)
 
 Record 0351 §2.1.7 treats a freshly authored chart as a builder draft, not

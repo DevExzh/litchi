@@ -121,30 +121,32 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Self {
-        Self {
-            max_input_bytes: 512 * 1024 * 1024,
-            max_info_bytes: 1024 * 1024,
-            max_xml_bytes: 1024 * 1024,
-            max_xml_depth: 64,
-            max_xml_nodes: 4_096,
-            max_xml_attributes: 4_096,
-            // Office normally writes 100,000. A caller must explicitly opt in
-            // to the schema maximum when handling unusually expensive input.
-            max_spin_count: 1_000_000,
-            max_password_chars: 255,
-            max_plaintext_bytes: 512 * 1024 * 1024,
-            max_encrypted_bytes: 520 * 1024 * 1024,
-            max_output_bytes: 528 * 1024 * 1024,
-            max_cfb_directory_bytes: litchi_cfb::OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES
-                as usize,
-            max_cfb_allocation_table_bytes:
-                litchi_cfb::OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES as usize,
-            allow_missing_data_spaces: false,
-        }
+        Self::DEFAULT
     }
 }
 
 impl Limits {
+    /// The bounded profile used by an ordinary OOXML operation.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: 512 * 1024 * 1024,
+        max_info_bytes: 1024 * 1024,
+        max_xml_bytes: 1024 * 1024,
+        max_xml_depth: 64,
+        max_xml_nodes: 4_096,
+        max_xml_attributes: 4_096,
+        // Office normally writes 100,000. A caller must explicitly opt in
+        // to the schema maximum when handling unusually expensive input.
+        max_spin_count: 1_000_000,
+        max_password_chars: 255,
+        max_plaintext_bytes: 512 * 1024 * 1024,
+        max_encrypted_bytes: 520 * 1024 * 1024,
+        max_output_bytes: 528 * 1024 * 1024,
+        max_cfb_directory_bytes: litchi_cfb::OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES as usize,
+        max_cfb_allocation_table_bytes:
+            litchi_cfb::OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES as usize,
+        allow_missing_data_spaces: false,
+    };
+
     fn validate(self) -> Result<Self> {
         if self.max_input_bytes == 0 {
             return Err(Error::InvalidLimit("max_input_bytes must be nonzero"));
@@ -484,31 +486,36 @@ impl Opened {
     }
 }
 
-/// Open an ordinary or encrypted package with safe default limits.
+/// Open an ordinary or encrypted package under the caller's resource policy.
 ///
 /// Ordinary OPC input is returned in the exact caller-provided allocation.
 ///
 /// # Errors
 ///
-/// Returns an [`enum@Error`] when the input violates the default resource policy
+/// Returns an [`enum@Error`] when the input violates the resource policy
 /// or the encrypted package cannot be validated or decrypted.
-pub fn open(bytes: Vec<u8>, password: &str) -> Result<Opened> {
-    open_with(bytes, password, &Limits::default())
+pub fn open(bytes: Vec<u8>, password: &str, limits: &Limits) -> Result<Opened> {
+    open_with_policy(
+        bytes,
+        password,
+        limits,
+        IntegrityPolicy::RequireAuthenticated,
+    )
 }
 
 /// Classify an ordinary or encrypted package without reading encrypted content.
 ///
 /// # Errors
 ///
-/// Returns an [`enum@Error`] when the input violates the default resource policy
+/// Returns an [`enum@Error`] when the input violates the resource policy
 /// or the encryption metadata is malformed or unsupported.
-pub fn inspect(bytes: &[u8]) -> Result<Kind> {
-    inspect_with(bytes, &Limits::default())
+pub fn inspect(bytes: &[u8], limits: &Limits) -> Result<Kind> {
+    inspect_with_policy(bytes, limits, IntegrityPolicy::RequireAuthenticated)
 }
 
 /// Classify a package under an explicit resource and Agile-integrity policy.
 ///
-/// The ordinary [`inspect`] and [`inspect_with`] entry points require
+/// The ordinary [`inspect`] entry point requires
 /// authenticated Agile metadata. Use this method when an application has
 /// deliberately opted into the schema's unauthenticated Agile profile.
 pub fn inspect_with_policy(
@@ -526,30 +533,22 @@ pub fn inspect_with_policy(
     Ok(Kind::Encrypted(mode))
 }
 
-/// Classify a package under an explicit resource policy.
-///
-/// This parses the CFB header and `EncryptionInfo` only; it does not allocate
-/// or read the potentially large `EncryptedPackage` stream.
-///
-/// # Errors
-///
-/// Returns an [`enum@Error`] when the limits are invalid, the input exceeds them,
-/// or the encryption metadata is malformed or unsupported.
-pub fn inspect_with(bytes: &[u8], limits: &Limits) -> Result<Kind> {
-    inspect_with_policy(bytes, limits, IntegrityPolicy::RequireAuthenticated)
-}
-
-/// Read and open an ordinary or encrypted package with safe default limits.
+/// Read and open an ordinary or encrypted package under the caller's resource policy.
 ///
 /// The reader is runtime-neutral and never consumes more than the configured
 /// input ceiling plus one detection byte.
 ///
 /// # Errors
 ///
-/// Returns an [`enum@Error`] when reading fails, the input violates the default
+/// Returns an [`enum@Error`] when reading fails, the input violates the
 /// resource policy, or the encrypted package cannot be opened.
-pub fn load<R: Read>(reader: R, password: &str) -> Result<Opened> {
-    load_with(reader, password, &Limits::default())
+pub fn load<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Opened> {
+    load_with_policy(
+        reader,
+        password,
+        limits,
+        IntegrityPolicy::RequireAuthenticated,
+    )
 }
 
 /// Read and open a package under an explicit resource and Agile-integrity
@@ -561,21 +560,6 @@ pub fn load_with_policy<R: Read>(
     integrity_policy: IntegrityPolicy,
 ) -> Result<Opened> {
     load_with_policy_inner(reader, password, limits, integrity_policy)
-}
-
-/// Read and open an ordinary or encrypted package under an explicit policy.
-///
-/// # Errors
-///
-/// Returns an [`enum@Error`] when reading fails, the limits are invalid or
-/// exceeded, or the encrypted package cannot be opened.
-pub fn load_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Opened> {
-    load_with_policy_inner(
-        reader,
-        password,
-        limits,
-        IntegrityPolicy::RequireAuthenticated,
-    )
 }
 
 fn load_with_policy_inner<R: Read>(
@@ -621,21 +605,6 @@ fn load_with_policy_inner<R: Read>(
     }
 }
 
-/// Open an ordinary or encrypted package under an explicit resource policy.
-///
-/// # Errors
-///
-/// Returns an [`enum@Error`] when the limits are invalid or exceeded, the password
-/// violates policy or is incorrect, or the package is malformed.
-pub fn open_with(bytes: Vec<u8>, password: &str, limits: &Limits) -> Result<Opened> {
-    open_with_policy(
-        bytes,
-        password,
-        limits,
-        IntegrityPolicy::RequireAuthenticated,
-    )
-}
-
 /// Open an ordinary or encrypted package under an explicit resource and
 /// Agile-integrity policy.
 ///
@@ -679,28 +648,13 @@ pub fn open_with_policy(
     })
 }
 
-/// Encrypt a moved OPC package with safe default limits.
+/// Encrypt a moved OPC package under the caller's resource policy.
 ///
 /// # Errors
 ///
 /// Returns an [`enum@Error`] when the package is empty, the password is empty or
-/// violates policy, the default limits are exceeded, or encryption fails.
-pub fn encrypt(bytes: Vec<u8>, password: &str, mode: Mode) -> Result<Vec<u8>> {
-    encrypt_with(bytes, password, mode, &Limits::default())
-}
-
-/// Encrypt a moved OPC package under an explicit resource policy.
-///
-/// # Errors
-///
-/// Returns an [`enum@Error`] when the package is empty, the password is empty or
-/// violates policy, the limits are invalid or exceeded, or encryption fails.
-pub fn encrypt_with(
-    bytes: Vec<u8>,
-    password: &str,
-    mode: Mode,
-    limits: &Limits,
-) -> Result<Vec<u8>> {
+/// violates policy, the limits are exceeded, or encryption fails.
+pub fn encrypt(bytes: Vec<u8>, password: &str, mode: Mode, limits: &Limits) -> Result<Vec<u8>> {
     let validated = limits.validate()?;
     if bytes.is_empty() {
         return Err(malformed("cannot encrypt an empty OPC package"));
@@ -724,20 +678,9 @@ pub fn encrypt_with(
 /// # Errors
 ///
 /// Returns an [`enum@Error`] when the input is not encrypted, the old password is
-/// incorrect, the new password violates policy, or the default limits are
+/// incorrect, the new password violates policy, or the limits are
 /// exceeded.
-pub fn rekey(bytes: Vec<u8>, old_password: &str, new_password: &str) -> Result<Vec<u8>> {
-    rekey_with(bytes, old_password, new_password, &Limits::default())
-}
-
-/// Change a password under an explicit policy without copying clear package bytes.
-///
-/// # Errors
-///
-/// Returns an [`enum@Error`] when the input is not encrypted, the old password is
-/// incorrect, the new password violates policy, or the limits are invalid or
-/// exceeded.
-pub fn rekey_with(
+pub fn rekey(
     bytes: Vec<u8>,
     old_password: &str,
     new_password: &str,
@@ -766,7 +709,7 @@ pub fn rekey_with_policy(
 ) -> Result<Vec<u8>> {
     let opened = open_with_policy(bytes, old_password, limits, integrity_policy)?;
     let mode = opened.mode().ok_or(Error::NotEncrypted)?;
-    encrypt_with(opened.into_bytes(), new_password, mode, limits)
+    encrypt(opened.into_bytes(), new_password, mode, limits)
 }
 
 fn family_mode(info: &[u8]) -> Result<Mode> {
@@ -847,7 +790,7 @@ mod tests {
     fn ordinary_input_moves_without_reallocation() {
         let bytes = Vec::from(&b"PK\x03\x04ordinary package"[..]);
         let pointer = bytes.as_ptr();
-        let opened = open(bytes, "unused").expect("ordinary input");
+        let opened = open(bytes, "unused", &Limits::default()).expect("ordinary input");
         assert_eq!(opened.mode(), None);
         assert_eq!(opened.integrity(), None);
         let moved = opened.into_bytes();
@@ -857,7 +800,7 @@ mod tests {
     #[test]
     fn opened_debug_never_discloses_package_bytes() {
         let marker = b"confidential document marker 7qZ";
-        let opened = open(marker.to_vec(), "unused").expect("ordinary input");
+        let opened = open(marker.to_vec(), "unused", &Limits::default()).expect("ordinary input");
         let debug = format!("{opened:?}");
 
         assert!(debug.contains("byte_len"));
@@ -872,7 +815,7 @@ mod tests {
             max_password_chars: 1,
             ..Limits::default()
         };
-        let opened = open_with(bytes, "deliberately over limit", &limits)
+        let opened = open(bytes, "deliberately over limit", &limits)
             .expect("password is irrelevant to ordinary OPC input");
         let moved = opened.into_bytes();
         assert_eq!(moved.as_ptr(), pointer);
@@ -916,7 +859,7 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            load_with(Cursor::new(b"12345"), "unused", &limits),
+            load(Cursor::new(b"12345"), "unused", &limits),
             Err(Error::Limit {
                 resource: "input",
                 actual: 5,
@@ -927,16 +870,24 @@ mod tests {
 
     #[test]
     fn inspect_distinguishes_plain_from_malformed_cfb() {
-        assert!(matches!(inspect(b"PK\x03\x04ordinary"), Ok(Kind::Plain)));
+        assert!(matches!(
+            inspect(b"PK\x03\x04ordinary", &Limits::default()),
+            Ok(Kind::Plain)
+        ));
         let mut malformed_cfb = vec![0u8; 1_536];
         malformed_cfb[..8].copy_from_slice(&[0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
-        assert!(inspect(&malformed_cfb).is_err());
+        assert!(inspect(&malformed_cfb, &Limits::default()).is_err());
     }
 
     #[test]
     fn rekey_rejects_plain_input_and_password_debug_is_redacted() {
         assert!(matches!(
-            rekey(Vec::from(&b"PK\x03\x04ordinary"[..]), "old", "new"),
+            rekey(
+                Vec::from(&b"PK\x03\x04ordinary"[..]),
+                "old",
+                "new",
+                &Limits::default(),
+            ),
             Err(Error::NotEncrypted)
         ));
         let password = Password::new("never print me".to_string());
@@ -946,7 +897,12 @@ mod tests {
     #[test]
     fn authoring_requires_a_nonempty_password() {
         assert!(matches!(
-            encrypt(Vec::from(&b"PK\x03\x04ordinary"[..]), "", Mode::Standard),
+            encrypt(
+                Vec::from(&b"PK\x03\x04ordinary"[..]),
+                "",
+                Mode::Standard,
+                &Limits::default(),
+            ),
             Err(Error::PasswordRequired)
         ));
     }

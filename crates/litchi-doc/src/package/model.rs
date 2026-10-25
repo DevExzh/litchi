@@ -223,6 +223,8 @@ impl std::fmt::Debug for Password {
 pub struct OpenOptions {
     password: Option<Password>,
     source_limits: SourceLimits,
+    /// Resource profile retained for inert MS-OFFCRYPTO `DataSpaces` reads.
+    data_spaces_limits: litchi_crypto::spaces::Limits,
     /// How opt-in stylesheet-defect repairs are treated.
     ///
     /// Defaults to [`crate::Leniency::Strict`], under which those defects
@@ -257,6 +259,20 @@ impl OpenOptions {
     #[must_use]
     pub const fn source_limits_value(&self) -> SourceLimits {
         self.source_limits
+    }
+
+    /// Select the resource profile retained for inert MS-OFFCRYPTO
+    /// `DataSpaces` inspection and snapshot capture.
+    #[must_use]
+    pub const fn data_spaces_limits(mut self, limits: litchi_crypto::spaces::Limits) -> Self {
+        self.data_spaces_limits = limits;
+        self
+    }
+
+    /// Return the MS-OFFCRYPTO `DataSpaces` profile selected for this open.
+    #[must_use]
+    pub const fn data_spaces_limits_value(&self) -> litchi_crypto::spaces::Limits {
+        self.data_spaces_limits
     }
 
     /// Provide a password-to-open credential through the non-cloneable boundary.
@@ -625,6 +641,8 @@ pub struct Reader<R: Read + Seek = File> {
     pub(super) ole: OleFile<R>,
     /// Source limits inherited by [`Package::document`](super::Package::document).
     pub(super) source_limits: SourceLimits,
+    /// DataSpaces limits retained by the raw reader's crypto projections.
+    pub(super) data_spaces_limits: litchi_crypto::spaces::Limits,
 }
 
 impl<R: Read + Seek> std::fmt::Debug for Reader<R> {
@@ -632,6 +650,7 @@ impl<R: Read + Seek> std::fmt::Debug for Reader<R> {
         formatter
             .debug_struct("Reader")
             .field("source_limits", &self.source_limits)
+            .field("data_spaces_limits", &self.data_spaces_limits)
             .finish_non_exhaustive()
     }
 }
@@ -764,8 +783,42 @@ fn core_crypto_error(error: litchi_crypto::spaces::Error) -> litchi_core::Error 
         litchi_crypto::spaces::Error::Invalid(_) => {
             litchi_core::Error::CorruptedFile("DOC DataSpaces operation failed".to_string())
         },
+        litchi_crypto::spaces::Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        } => litchi_core::Error::InvalidLimit {
+            kind: core_crypto_resource(kind),
+            value: u64::try_from(value).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            scope: "DOC DataSpaces operation",
+        },
+        litchi_crypto::spaces::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+            resource: core_crypto_resource(kind),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+            scope: Arc::from("DOC DataSpaces operation"),
+        }),
+        litchi_crypto::spaces::Error::Allocation { .. } => {
+            litchi_core::Error::CorruptedFile("DOC DataSpaces allocation failed".to_string())
+        },
         litchi_crypto::spaces::Error::PatchConflict => litchi_core::Error::PatchConflict,
         _ => litchi_core::Error::CorruptedFile("DOC DataSpaces operation failed".to_string()),
+    }
+}
+
+fn core_crypto_resource(kind: litchi_crypto::spaces::LimitKind) -> litchi_core::Resource {
+    match kind {
+        litchi_crypto::spaces::LimitKind::OutputBytes => litchi_core::Resource::OutputBytes,
+        litchi_crypto::spaces::LimitKind::XmlDepth => litchi_core::Resource::Depth,
+        litchi_crypto::spaces::LimitKind::Entries
+        | litchi_crypto::spaces::LimitKind::Components
+        | litchi_crypto::spaces::LimitKind::XmlNodes => litchi_core::Resource::Objects,
+        _ => litchi_core::Resource::InputBytes,
     }
 }
 
@@ -898,5 +951,21 @@ mod error_tests {
         let core: litchi_core::Error =
             Error::Crypto(litchi_crypto::spaces::Error::PatchConflict).into();
         assert!(matches!(core, litchi_core::Error::PatchConflict));
+
+        let core: litchi_core::Error = Error::Crypto(litchi_crypto::spaces::Error::LimitExceeded {
+            kind: litchi_crypto::spaces::LimitKind::OutputBytes,
+            observed: 9,
+            maximum: 8,
+        })
+        .into();
+        assert!(matches!(core, litchi_core::Error::ResourceLimit(_)));
+
+        let core: litchi_core::Error = Error::Crypto(litchi_crypto::spaces::Error::InvalidLimit {
+            kind: litchi_crypto::spaces::LimitKind::Entries,
+            value: 0,
+            maximum: 1,
+        })
+        .into();
+        assert!(matches!(core, litchi_core::Error::InvalidLimit { .. }));
     }
 }

@@ -1790,7 +1790,7 @@ mod tests {
         reason = "test code panics on failure; assertions stay concise"
     )]
     use super::*;
-    use crate::ooxml::{Mode, open_with};
+    use crate::ooxml::{Mode, open};
 
     const MATERIAL: Material = Material {
         verifier_salt: [
@@ -1835,7 +1835,7 @@ mod tests {
                 encrypt_parts(clear.clone(), "correct horse", profile, &material, &limits)
                     .expect("encrypt Agile parts");
             let compound = container::write(&info, encrypted, &limits).expect("wrap Agile parts");
-            let opened = open_with(compound, "correct horse", &limits).expect("open Agile package");
+            let opened = open(compound, "correct horse", &limits).expect("open Agile package");
             assert_eq!(opened.mode(), Some(mode));
             assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
             assert_eq!(opened.bytes(), clear);
@@ -1910,8 +1910,7 @@ mod tests {
         alias_info.extend_from_slice(xml.as_bytes());
         let compound =
             container::write(&alias_info, encrypted, &limits).expect("wrap SHA1 alias profile");
-        let opened =
-            open_with(compound, "correct horse", &limits).expect("read SHA1 alias profile");
+        let opened = open(compound, "correct horse", &limits).expect("read SHA1 alias profile");
         assert_eq!(opened.mode(), Some(Mode::Agile));
         assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
         assert_eq!(opened.bytes(), clear);
@@ -1947,11 +1946,11 @@ mod tests {
             .expect("wrap schema-legal descriptor");
 
         assert!(matches!(
-            open_with(compound.clone(), "correct horse", &limits),
+            open(compound.clone(), "correct horse", &limits),
             Err(Error::Unsupported(message)) if message.contains("dataIntegrity")
         ));
         assert!(matches!(
-            crate::ooxml::inspect_with(&compound, &limits),
+            crate::ooxml::inspect(&compound, &limits),
             Err(Error::Unsupported(message)) if message.contains("dataIntegrity")
         ));
         assert_eq!(
@@ -2086,8 +2085,7 @@ mod tests {
         let verifier_hash = parsed.encrypted_verifier_hash.as_slice();
         assert_eq!(verifier_hash.len(), wrapper_profile.encrypted_hash_bytes());
         let compound = container::write(&info, encrypted, &limits).expect("wrap mixed profile");
-        let opened =
-            open_with(compound, "correct horse", &limits).expect("open mixed wrapper profile");
+        let opened = open(compound, "correct horse", &limits).expect("open mixed wrapper profile");
         assert_eq!(opened.mode(), Some(Mode::Agile));
         assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
         assert_eq!(opened.bytes(), clear);

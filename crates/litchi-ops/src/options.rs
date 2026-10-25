@@ -72,6 +72,9 @@ pub struct OpenOptions {
     /// OOXML package read limits shared by DOCX, PPTX, XLSX and XLSB.
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     pub(crate) ooxml_limits: Option<litchi_opc::SourceLimits>,
+    /// Outer OOXML encryption limits retained by password-bearing opens.
+    #[cfg(feature = "encryption")]
+    pub(crate) ooxml_encryption_limits: litchi_crypto::ooxml::Limits,
     /// OOXML source-backed part cache policy.
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     pub(crate) ooxml_cache: Option<litchi_opc::SourceCacheLimits>,
@@ -115,6 +118,8 @@ impl OpenOptions {
             retain_source: true,
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             ooxml_limits: None,
+            #[cfg(feature = "encryption")]
+            ooxml_encryption_limits: litchi_crypto::ooxml::Limits::DEFAULT,
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             ooxml_cache: None,
             #[cfg(feature = "doc")]
@@ -222,6 +227,15 @@ impl OpenOptions {
     #[must_use]
     pub const fn ooxml_limits(mut self, limits: litchi_opc::SourceLimits) -> Self {
         self.ooxml_limits = Some(limits);
+        self
+    }
+
+    /// Replace the outer OOXML encryption limits used by password-bearing
+    /// DOCX, PPTX, XLSX and XLSB opens.
+    #[cfg(feature = "encryption")]
+    #[must_use]
+    pub const fn ooxml_encryption_limits(mut self, limits: litchi_crypto::ooxml::Limits) -> Self {
+        self.ooxml_encryption_limits = limits;
         self
     }
 

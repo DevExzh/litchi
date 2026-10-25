@@ -1741,7 +1741,13 @@ fn invalid_intermediate_signed_edits_return_their_typed_error_without_publicatio
 fn an_unlocked_signed_package_is_not_unsigned_into_the_clear() {
     let plain = read("poi/test-data/xmldsign/hello-world-signed.docx");
     let encrypted =
-        litchi_crypto::ooxml::encrypt(plain, "signed", litchi_crypto::ooxml::Mode::Agile).unwrap();
+        litchi_crypto::ooxml::encrypt(
+            plain,
+            "signed",
+            litchi_crypto::ooxml::Mode::Agile,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .unwrap();
     let File::Locked(locked) = crate::open_bytes(encrypted).unwrap() else {
         panic!("an encrypted package opens locked");
     };
