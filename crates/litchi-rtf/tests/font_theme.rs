@@ -10,7 +10,7 @@
 //! Round-trip tests for theme-font selectors on font-table entries.
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{FontTheme, RtfWriter};
+use litchi_rtf::{FontTheme, write::Writer};
 
 const SELECTORS: &[(&str, FontTheme)] = &[
     (r"\flomajor", FontTheme::MajorLatin),
@@ -25,7 +25,7 @@ const SELECTORS: &[(&str, FontTheme)] = &[
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -37,7 +37,7 @@ fn theme_font_selectors_round_trip() {
         let source = format!(
             r"{{\rtf1\ansi{{\fonttbl{{\f0\froman{control} Times New Roman;}}}}\f0 Text\par}}"
         );
-        let document = Tree::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(document.font_table().get(0).unwrap().theme, Some(*theme));
 
         let output = write(&document);
@@ -47,7 +47,7 @@ fn theme_font_selectors_round_trip() {
             "missing {control} in {serialized}"
         );
 
-        let reparsed = Tree::parse(&serialized).unwrap();
+        let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(reparsed.font_table().get(0).unwrap().theme, Some(*theme));
     }
 }
@@ -55,12 +55,12 @@ fn theme_font_selectors_round_trip() {
 #[test]
 fn fonts_without_theme_selectors_have_none() {
     let source = r"{\rtf1\ansi{\fonttbl{\f0\froman Arial;}}\f0 Text\par}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.font_table().get(0).unwrap().theme, None);
 }
 
 #[test]
 fn duplicate_theme_selectors_are_rejected() {
     let source = r"{\rtf1\ansi{\fonttbl{\f0\flomajor\fhimajor Arial;}}\f0 X\par}";
-    assert!(Tree::parse(source).is_err());
+    assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err());
 }

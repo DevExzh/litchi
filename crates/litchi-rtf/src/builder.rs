@@ -7,7 +7,7 @@
 
 use crate::Package;
 use crate::codec::limits::{OpenOptions, SourceLimitKind, SourceLimits};
-use crate::codec::writer::{Charset, RtfWriter, WriterOptions};
+use crate::write::{Charset, Options, Writer};
 use std::fmt;
 use std::io::{self, Write};
 
@@ -163,11 +163,11 @@ impl Builder {
     /// Returns a typed source-limit, writer-I/O, or strict-reopen error.
     pub fn build(self) -> Result<Package> {
         let mut sink = BoundedSink::new(self.source_limits.max_input_bytes());
-        let mut writer = RtfWriter::with_options(
+        let mut writer = Writer::with_options(
             &mut sink,
-            WriterOptions {
+            Options {
                 charset: self.charset,
-                ..WriterOptions::default()
+                ..Options::default()
             },
         );
         let write_result = writer

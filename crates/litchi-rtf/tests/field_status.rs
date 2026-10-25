@@ -8,12 +8,12 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Field, FieldStatus, FieldType, RtfWriter};
+use litchi_rtf::{Field, FieldStatus, FieldType, write::Writer};
 use std::borrow::Cow;
 
 fn write_document(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     String::from_utf8(output).unwrap()
@@ -33,7 +33,7 @@ fn parses_presence_and_omission_without_changing_field_content() {
         r"{\rtf1 A{\field\fldpriv\fldlock\fldedit\flddirty",
         r"{\*\fldinst MARKED}{\fldrslt cached}}",
         r"{\field{\*\fldinst OMITTED}{\fldrslt plain}}B}"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
 
     assert_eq!(
@@ -56,7 +56,7 @@ fn nested_fields_have_independent_status() {
     let document = Tree::parse(concat!(
         r"{\rtf1{\field\flddirty{\*\fldinst OUTER}{\fldrslt A",
         r"{\field\fldlock{\*\fldinst INNER}{\fldrslt B}}C}}}"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
 
     assert_eq!(
@@ -80,19 +80,19 @@ fn rejects_parameters_duplicates_and_misplacement() {
     for control in ["flddirty", "fldedit", "fldlock", "fldpriv"] {
         let parameterized =
             format!("{{\\rtf1{{\\field\\{control}1{{\\*\\fldinst TEST}}{{\\fldrslt x}}}}}}");
-        assert!(Tree::parse(&parameterized).is_err(), "{control}");
+        assert!(Tree::parse(&parameterized, litchi_rtf::read::OpenOptions::default()).is_err(), "{control}");
 
         let duplicate = format!(
             "{{\\rtf1{{\\field\\{control}\\{control}{{\\*\\fldinst TEST}}{{\\fldrslt x}}}}}}"
         );
-        assert!(Tree::parse(&duplicate).is_err(), "{control}");
+        assert!(Tree::parse(&duplicate, litchi_rtf::read::OpenOptions::default()).is_err(), "{control}");
 
         let late = format!("{{\\rtf1{{\\field{{\\*\\fldinst TEST}}\\{control}{{\\fldrslt x}}}}}}");
-        assert!(Tree::parse(&late).is_err(), "{control}");
+        assert!(Tree::parse(&late, litchi_rtf::read::OpenOptions::default()).is_err(), "{control}");
 
         let grouped =
             format!("{{\\rtf1{{\\field{{\\{control}}}{{\\*\\fldinst TEST}}{{\\fldrslt x}}}}}}");
-        assert!(Tree::parse(&grouped).is_err(), "{control}");
+        assert!(Tree::parse(&grouped, litchi_rtf::read::OpenOptions::default()).is_err(), "{control}");
     }
 }
 
@@ -111,14 +111,14 @@ fn writer_uses_canonical_order_and_mutation_api() {
     });
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_field(&field).unwrap();
+    Writer::new(&mut output).write_field(&field).unwrap();
     let serialized = String::from_utf8(output).unwrap();
     assert!(serialized.starts_with(r"{\field\flddirty\fldedit\fldlock\fldpriv{\*\fldinst{"));
 
-    let document = Tree::parse(&format!("{{\\rtf1{serialized}}}")).unwrap();
+    let document = Tree::parse(&format!("{{\\rtf1{serialized}}}"), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.fields()[0].status(), field.status());
     let once = write_document(&document);
-    let twice = write_document(&Tree::parse(&once).unwrap());
+    let twice = write_document(&Tree::parse(&once, litchi_rtf::read::OpenOptions::default()).unwrap());
     assert_eq!(once, twice);
 }
 
@@ -127,7 +127,7 @@ fn parses_local_field_status_fixtures() {
     let dirty_private = Tree::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/field-status-dirty-private.rtf"
-    )))
+    )), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(
         dirty_private
@@ -145,14 +145,14 @@ fn parses_local_field_status_fixtures() {
     let edited = Tree::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/field-status-edited.rtf"
-    )))
+    )), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(edited.fields().iter().any(|field| field.status.edited));
 
     let locked = Tree::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/field-status-locked.rtf"
-    )))
+    )), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(locked.fields().iter().any(|field| field.status.locked));
 }

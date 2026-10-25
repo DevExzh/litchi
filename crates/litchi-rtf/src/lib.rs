@@ -92,10 +92,12 @@ pub use content::{field, math, section, table};
 pub use drawing::{picture, shape};
 pub use numbering::list;
 
-// Crate-private compatibility aliases keep the retained model isolated from
-// the source layout. New code should depend on its responsibility module.
+// Crate-private implementation imports keep the retained model isolated from
+// the source layout. New public code should depend on its responsibility
+// module.
 use api::story;
 use codec::{compressed, error, lexer, limits, parser, writer};
+use codec::error::{RtfError, RtfResult};
 use content::{equation, form_field, math_properties};
 use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
 use metadata::{
@@ -103,6 +105,7 @@ use metadata::{
     generator, info, mail_merge, smart_tag, theme, user_property, window_caption,
     write_reservation, xml_namespace, xsl_transform,
 };
+use metadata::info::RtfTimestamp;
 use model::{document, types};
 use numbering::{
     generated_list_marker, legacy_numbering, legacy_paragraph_numbering, navigation_entry,
@@ -142,9 +145,6 @@ pub mod write {
         MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter as Writer, WriterOptions as Options,
     };
     pub use crate::model::types::Formatting as Format;
-    pub use crate::streaming::{
-        StreamingRtfError, StreamingRtfLimits, StreamingRtfOptions, StreamingRtfWriter,
-    };
 }
 
 /// Bounded Outlook/MAPI compressed-RTF transport codec.
@@ -221,7 +221,7 @@ mod native {
         document_save_preferences, document_style_policies, document_style_restrictions,
         document_table_layout_compatibility, document_theme_languages, document_variable,
         document_view, document_word_2003_compatibility, document_xml_policies, editable_region,
-        equation, error, external_reference, field, file_table, form_field, generated_list_marker,
+        equation, external_reference, field, file_table, form_field, generated_list_marker,
         generator, hyphenation, info, kinsoku, language, latent_style, legacy_drawing,
         legacy_numbering, legacy_paragraph_numbering, legacy_text_box, limits, list, mail_merge,
         math, math_properties, move_bookmark, navigation_entry, note_options, note_separator,
@@ -298,7 +298,6 @@ mod native {
         EquationGroup, EquationIntegral, EquationIntegralSymbol, EquationModel, EquationOverstrike,
         EquationScript, EquationSegment, EquationSpacing, EquationSwitch,
     };
-    pub use error::{RtfError, RtfResult};
     pub use external_reference::{
         DocumentExternalReferences, MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
         MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
@@ -327,7 +326,6 @@ mod native {
         TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
         TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
         TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
-        parse_field_code,
     };
     pub use field::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
     pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
@@ -339,7 +337,7 @@ mod native {
     };
     pub use info::{
         DocumentInfo, DocumentProtection, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel,
-        ProtectionType, RtfTimestamp,
+        ProtectionType,
     };
     pub use kinsoku::DocumentKinsoku;
     pub use language::{DocumentLanguageDefaults, LanguageId};
@@ -480,7 +478,6 @@ mod native {
     };
     pub use writer::{
         Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-        RtfWriter, WriterOptions,
     };
     pub use xml_namespace::XmlNamespace;
     pub use xsl_transform::{

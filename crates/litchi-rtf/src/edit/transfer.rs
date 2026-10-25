@@ -1,7 +1,7 @@
 //! Checked transfer of ordinary RTF owners and their bounded dependencies.
 
 use super::{Commit, Edit, Error, HeaderFooterParagraph, Package};
-use crate::{RtfWriter, TableCellPath};
+use crate::{TableCellPath, write::Writer};
 use litchi_core::Position;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -558,11 +558,11 @@ fn canonical_candidate(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
-    let mut model = crate::document::Tree::parse_bytes_with_options(bytes, target.options())?;
+    let mut model = crate::document::Tree::parse_bytes(bytes, target.options())?;
     mutation(&mut model)?;
     let limit = target.limits().max_input_bytes();
     let mut output = BoundedOutput::new(limit);
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(&model)
         .map_err(|error| Error::Write(error.to_string()))?;
     let output = output.into_inner();
@@ -583,7 +583,7 @@ fn canonical_candidate(
 
 /// A fallible, source-size-bounded sink for canonical transfer output.
 ///
-/// `RtfWriter` writes incrementally, so retaining the output in a plain
+/// `write::Writer` writes incrementally, so retaining the output in a plain
 /// `Vec<u8>` would otherwise permit infallible growth until the writer's
 /// final size check.  This sink enforces the document limit before every
 /// append and maps allocation failure back into the writer's `io::Result`.

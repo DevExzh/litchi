@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{CharacterGrid, CharacterType, Formatting, RtfWriter};
+use litchi_rtf::{CharacterGrid, CharacterType, Formatting, write::Writer};
 
 fn formatting_for<'a>(document: &'a Tree<'a>, text: &str) -> Formatting {
     document
@@ -28,7 +28,7 @@ fn character_type_complex_script_and_grid_scope_and_round_trip() {
         r#"{\hich\fcs0\cgrid-12 Nested}"#,
         r#"Tail{\dbch\cgrid0 Double}}"#,
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     let root = formatting_for(&document, "Root");
     assert_eq!(root.character_type, Some(CharacterType::LowAnsi));
@@ -46,7 +46,7 @@ fn character_type_complex_script_and_grid_scope_and_round_trip() {
     assert_eq!(double.character_grid, Some(CharacterGrid::Value(0)));
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
     let serialized = String::from_utf8(first.clone()).unwrap();
@@ -54,7 +54,7 @@ fn character_type_complex_script_and_grid_scope_and_round_trip() {
     assert!(serialized.contains(r"\fcs0\hich\cgrid-12\fs24"));
     assert!(serialized.contains(r"\fcs1\dbch\cgrid0\fs24"));
 
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     for text in ["Root", "Nested", "Tail", "Double"] {
         assert_eq!(
             formatting_for(&reparsed, text),
@@ -62,7 +62,7 @@ fn character_type_complex_script_and_grid_scope_and_round_trip() {
         );
     }
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -99,7 +99,7 @@ fn rejects_invalid_parameters_and_duplicate_document_defaults() {
         r"{\rtf1{\*\defchp\cgrid\cgrid0}X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
             "accepted {source}"
         );
     }
@@ -110,7 +110,7 @@ fn keeps_selector_like_controls_in_field_instructions_inert() {
     let document = Tree::parse(concat!(
         r#"{\rtf1{\field{\*\fldinst TEST \fcs2\loch0\cgrid32768}"#,
         r#"{\fldrslt Result}}}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert_eq!(document.fields().len(), 1);
     assert!(document.blocks().iter().all(|block| {

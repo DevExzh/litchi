@@ -24,7 +24,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use litchi_core::Metadata;
-use litchi_core::metadata::Timestamp;
+use litchi_core::metadata::Timestamp as CoreTimestamp;
 use litchi_rtf::Package;
 use litchi_rtf::leniency::ToleranceReport;
 use litchi_rtf::raw::Tree;
@@ -303,7 +303,7 @@ impl fmt::Debug for Rtf {
 }
 
 fn timestamp_to_naive(
-    timestamp: Option<litchi_rtf::RtfTimestamp>,
+    timestamp: Option<litchi_rtf::metadata::Timestamp>,
 ) -> Option<chrono::NaiveDateTime> {
     let timestamp = timestamp?;
     let year = timestamp.year?;
@@ -335,8 +335,8 @@ fn metadata(document: &Tree<'_>) -> Metadata {
         template: None,
         last_modified_by: text(info.operator.as_deref()),
         revision: info.version.map(|value| value.to_string()),
-        created: timestamp_to_naive(info.creation_timestamp).map(Timestamp::Unzoned),
-        modified: timestamp_to_naive(info.revision_timestamp).map(Timestamp::Unzoned),
+        created: timestamp_to_naive(info.creation_timestamp).map(CoreTimestamp::Unzoned),
+        modified: timestamp_to_naive(info.revision_timestamp).map(CoreTimestamp::Unzoned),
         page_count: info.pages,
         word_count: info.words,
         character_count: info.characters,
@@ -351,8 +351,8 @@ fn metadata(document: &Tree<'_>) -> Metadata {
         content_status: None,
         content_type: None,
         version: info.revision.map(|value| value.to_string()),
-        last_printed: timestamp_to_naive(info.print_timestamp).map(Timestamp::Unzoned),
-        last_backup: timestamp_to_naive(info.backup_timestamp).map(Timestamp::Unzoned),
+        last_printed: timestamp_to_naive(info.print_timestamp).map(CoreTimestamp::Unzoned),
+        last_backup: timestamp_to_naive(info.backup_timestamp).map(CoreTimestamp::Unzoned),
         hyperlink_base: text(info.hyperlink_base.as_deref()),
         security: None,
         codepage: None,

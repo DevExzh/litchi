@@ -11,20 +11,20 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    RtfWriter, TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment, TableRowAlignment,
+    write::Writer, TableCellLayout, TableCellTextFlow, TableCellVerticalAlignment, TableRowAlignment,
     TableRowLayout, TextDirection,
 };
 
 fn write(document: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes).write_document(document).unwrap();
+    Writer::new(&mut bytes).write_document(document).unwrap();
     String::from_utf8(bytes).unwrap()
 }
 
 #[test]
 fn parses_complete_layout_family_and_round_trips_deterministically() {
     let source = r"{\rtf1\trowd\trhdr\trkeep\trkeepfollow\trqc\rtlrow\clvertalt\cltxlrtb\clFitText\clNoWrap\clhidemark\cellx1000\clvertalc\cltxtbrl\cellx2000\clvertalb\cltxbtlr\cellx3000\cltxlrtbv\cellx4000\cltxtbrlv\cellx5000\intbl A\cell B\cell C\cell D\cell E\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let row = &document.tables()[0].rows()[0];
     assert_eq!(row.direction(), Some(TextDirection::RightToLeft));
     assert_eq!(row.layout().alignment, Some(TableRowAlignment::Center));
@@ -57,7 +57,7 @@ fn parses_complete_layout_family_and_round_trips_deterministically() {
         ]
     );
     let first = write(&document);
-    let reparsed = Tree::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     let second = write(&reparsed);
     assert_eq!(first, second);
     assert_eq!(reparsed.tables()[0].rows()[0].layout(), row.layout());
@@ -66,7 +66,7 @@ fn parses_complete_layout_family_and_round_trips_deterministically() {
 #[test]
 fn resets_trowd_and_restores_groups_and_inert_destinations() {
     let source = r"{\rtf1\trowd{\trhdr\trqr\rtlrow\clvertalb\clNoWrap}{\*\unknown\trhdr\clNoWrap}\trql\cellx1000\intbl A\cell\row\trowd\cellx1000\intbl B\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].layout().alignment, Some(TableRowAlignment::Left));
     assert!(!rows[0].layout().header);
@@ -79,7 +79,7 @@ fn resets_trowd_and_restores_groups_and_inert_destinations() {
 #[test]
 fn applies_end_defined_nested_layout_without_leaking_outer_state() {
     let source = r"{\rtf1\trowd\trhdr\trqc\clvertalc\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\trkeep\trqr\ltrrow\clvertalb\cltxbtlr\clNoWrap\cellx1000\nestrow}\intbl\itap1\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let outer = &document.tables()[0].rows()[0];
     assert!(outer.layout().header);
     assert_eq!(outer.layout().alignment, Some(TableRowAlignment::Center));
@@ -101,7 +101,7 @@ fn applies_end_defined_nested_layout_without_leaking_outer_state() {
     );
     assert!(nested.cells()[0].layout().no_wrap);
     assert_eq!(
-        Tree::parse(&write(&document)).unwrap().tables()[0].rows()[0].cells()[0].nested_tables()[0]
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0].cells()[0].nested_tables()[0]
             .table
             .rows()[0]
             .layout(),
@@ -114,12 +114,12 @@ fn parses_real_libreoffice_row_and_text_flow_fixtures() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa");
     let header = Tree::parse(
-        &std::fs::read_to_string(base.join("extras/rtfimport/data/tblrepeat.rtf")).unwrap(),
+        &std::fs::read_to_string(base.join("extras/rtfimport/data/tblrepeat.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default()
     )
     .unwrap();
     assert!(header.tables()[0].rows()[0].layout().header);
     let flow = Tree::parse(
-        &std::fs::read_to_string(base.join("extras/rtfexport/data/btlr-cell.rtf")).unwrap(),
+        &std::fs::read_to_string(base.join("extras/rtfexport/data/btlr-cell.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default()
     )
     .unwrap();
     let cells = flow.tables()[0].rows()[0].cells();
@@ -159,7 +159,7 @@ fn rejects_parameters_and_enforces_existing_cell_cap() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
             "accepted {word}"
         );
     }
@@ -170,6 +170,6 @@ fn rejects_parameters_and_enforces_existing_cell_cap() {
     }
     source.push('}');
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Tree::parse(&source)
+        &Tree::parse(&source, litchi_rtf::read::OpenOptions::default())
     ));
 }

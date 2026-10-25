@@ -10,13 +10,13 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{ParagraphLogicalIndentation, RtfWriter, StyleBlock};
+use litchi_rtf::{ParagraphLogicalIndentation, write::Writer, StyleBlock};
 fn block<'a>(d: &'a Tree<'a>, s: &str) -> &'a StyleBlock<'a> {
     d.blocks().iter().find(|b| b.text.contains(s)).unwrap()
 }
 #[test]
 fn parses_inherits_resets_destinations() {
-    let d=Tree::parse(r"{\rtf1\pard\lin120\rin240\cufi-10\culi20\curi30\indmirror Outer\par {\lin0\rin0 Inner\par }Tail\par {\pard Reset\par }{\*\unknown\lin9 Ignored}Visible\par}").unwrap();
+    let d=Tree::parse(r"{\rtf1\pard\lin120\rin240\cufi-10\culi20\curi30\indmirror Outer\par {\lin0\rin0 Inner\par }Tail\par {\pard Reset\par }{\*\unknown\lin9 Ignored}Visible\par}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let x = block(&d, "Outer").paragraph.logical_indentation;
     assert_eq!(
         x,
@@ -39,7 +39,7 @@ fn parses_inherits_resets_destinations() {
 #[test]
 fn stylesheet_writer_round_trip() {
     let d = Tree::parse(
-        r"{\rtf1{\stylesheet{\s9\lin120\rin240\cufi-10\culi20\curi30\indmirror Logical;}}Body}",
+        r"{\rtf1{\stylesheet{\s9\lin120\rin240\cufi-10\culi20\curi30\indmirror Logical;}}Body}", litchi_rtf::read::OpenOptions::default()
     )
     .unwrap();
     let x = d
@@ -50,8 +50,8 @@ fn stylesheet_writer_round_trip() {
         .unwrap()
         .logical_indentation;
     let mut a = Vec::new();
-    RtfWriter::new(&mut a).write_document(&d).unwrap();
-    let d2 = Tree::parse_bytes(&a).unwrap();
+    Writer::new(&mut a).write_document(&d).unwrap();
+    let d2 = Tree::parse_bytes(&a, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         d2.stylesheet()
             .get(9)
@@ -62,7 +62,7 @@ fn stylesheet_writer_round_trip() {
         x
     );
     let mut b = Vec::new();
-    RtfWriter::new(&mut b).write_document(&d2).unwrap();
+    Writer::new(&mut b).write_document(&d2).unwrap();
     assert_eq!(a, b);
 }
 #[test]
@@ -70,7 +70,7 @@ fn real_libreoffice() {
     let b = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf"
     );
-    let d = Tree::parse_bytes(b).unwrap();
+    let d = Tree::parse_bytes(b, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         d.blocks()
             .iter()
@@ -88,7 +88,7 @@ fn malformed() {
         r"{\rtf1\indmirror0 X}",
     ] {
         assert!(repair_support::rejected_or_parameter_repaired(
-            &Tree::parse(s)
+            &Tree::parse(s, litchi_rtf::read::OpenOptions::default())
         ));
     }
 }

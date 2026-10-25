@@ -10,7 +10,7 @@
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     LegacyCalloutType, LegacyDrawingFillPattern, LegacyDrawingLineStyle, LegacyDrawingPrimitive,
-    RtfWriter,
+    write::Writer,
 };
 
 fn isolated_drawing(fixture: &[u8]) -> Vec<u8> {
@@ -51,7 +51,7 @@ fn parses_all_simple_primitives_and_round_trips_canonically() {
         r#"{\*\do\dobxpage\dobypara\dodhgt5\dppolyline\dppolygon\dppolycount3\dpptx0\dppty0\dpptx10\dppty0\dpptx10\dppty10\dpx1\dpy2\dpxsize3\dpysize4}"#,
         "B}",
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     assert_eq!(document.legacy_drawings().len(), 5);
     let LegacyDrawingPrimitive::Line { properties, .. } = &document.legacy_drawings()[0].primitive
@@ -87,13 +87,13 @@ fn parses_all_simple_primitives_and_round_trips_canonically() {
     assert_eq!(points.len(), 3);
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.legacy_drawings(), document.legacy_drawings());
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -112,7 +112,7 @@ fn parses_recursive_groups_and_callouts() {
         r#"\dptxbx\dptxbxmar2{\dptxbxtext hello\par}\dpx10\dpy10\dpxsize30\dpysize20}"#,
         "}",
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.legacy_drawings().len(), 2);
     let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive
     else {
@@ -140,14 +140,14 @@ fn parses_named_libreoffice_primitive_fixtures() {
     let polyline = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dppolyline.rtf"
     );
-    let document = Tree::parse_bytes(polyline).unwrap();
+    let document = Tree::parse_bytes(polyline, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.legacy_drawings().len(), 4);
     assert!(document.legacy_drawings().iter().all(|drawing| matches!(&drawing.primitive, LegacyDrawingPrimitive::Polyline { points, .. } if points.len() == 2)));
 
     let rectangle = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/dprect-anchor.rtf"
     );
-    let document = Tree::parse_bytes(rectangle).unwrap();
+    let document = Tree::parse_bytes(rectangle, litchi_rtf::read::OpenOptions::default()).unwrap();
     let LegacyDrawingPrimitive::Rectangle {
         rounded,
         properties,
@@ -169,7 +169,7 @@ fn parses_named_libreoffice_primitive_fixtures() {
     let group = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf"
     );
-    let document = Tree::parse_bytes(&isolated_drawing(group)).unwrap();
+    let document = Tree::parse_bytes(&isolated_drawing(group), litchi_rtf::read::OpenOptions::default()).unwrap();
     let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive
     else {
         panic!()
@@ -192,7 +192,7 @@ fn rejects_malformed_order_duplicates_cardinality_and_caps() {
     ];
     for source in malformed {
         assert!(
-            Tree::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed drawing: {source}"
         );
     }

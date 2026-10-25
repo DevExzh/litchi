@@ -8,7 +8,7 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{ListLevelType, RtfWriter};
+use litchi_rtf::{ListLevelType, write::Writer};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\listtable
@@ -26,7 +26,7 @@ const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 
 #[test]
 fn retains_and_resolves_extended_list_metadata() {
-    let doc = Tree::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let table = doc.list_table();
     assert_eq!(table.picture_bullet_count, 1);
     let list = table.get(77).unwrap();
@@ -63,15 +63,15 @@ fn retains_and_resolves_extended_list_metadata() {
 
 #[test]
 fn writer_round_trips_list_models_deterministically() {
-    let doc = Tree::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC, litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut first = Vec::new();
-    RtfWriter::new(&mut first).write_document(&doc).unwrap();
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    Writer::new(&mut first).write_document(&doc).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(doc.list_table(), reparsed.list_table());
     assert_eq!(doc.list_override_table(), reparsed.list_override_table());
 
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -90,7 +90,7 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
     ];
     for source in malformed {
         assert!(
-            Tree::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -100,7 +100,7 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
 fn parses_rare_libreoffice_list_fixtures() {
     let picture = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(picture.list_table().picture_bullet_count > 0);
     assert!(
@@ -114,7 +114,7 @@ fn parses_rare_libreoffice_list_fixtures() {
 
     let style = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(
         style
@@ -126,7 +126,7 @@ fn parses_rare_libreoffice_list_fixtures() {
 
     let starts = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     assert!(starts.list_override_table().overrides().iter().any(
         |entry| entry.levels.len() >= 2 && entry.levels[0].start_at != entry.levels[1].start_at

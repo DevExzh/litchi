@@ -10,11 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{PictureShapeProperties, RtfWriter, ShapeProperty};
+use litchi_rtf::{PictureShapeProperties, write::Writer, ShapeProperty};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -47,7 +47,7 @@ fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
     let mut isolated = r"{\rtf1{\shp{\*\shpinst".to_string();
     isolated.push_str(&source[property_start..property_end]);
     isolated.push_str("}}}");
-    let producer = Tree::parse(&isolated).unwrap();
+    let producer = Tree::parse(&isolated, litchi_rtf::read::OpenOptions::default()).unwrap();
     let property = producer
         .shapes()
         .iter()
@@ -59,7 +59,7 @@ fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
     assert!(payload.len() > 1_000);
 
     let mut document =
-        Tree::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}")
+        Tree::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}", litchi_rtf::read::OpenOptions::default())
             .unwrap();
     let payload_ptr = payload.as_ptr();
     document
@@ -103,7 +103,7 @@ fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("{\\sp{\\sn metroBlob}{\\sv{\\*\\svb 504b0304"));
 
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_property = &reparsed.pictures()[0]
         .shape_properties
         .as_ref()
@@ -117,7 +117,7 @@ fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
 
 #[test]
 fn round_trips_binary_background_property_canonically() {
-    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = litchi_rtf::Shape::new(litchi_rtf::ShapeType::Rectangle);
     shape.properties.push(ShapeProperty::new_binary(
         Cow::Borrowed("pInkData"),
@@ -131,7 +131,7 @@ fn round_trips_binary_background_property_canonically() {
             .unwrap()
             .contains("{\\sp{\\sn pInkData}{\\sv{\\*\\svb 007f80ff}}}")
     );
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let property = reparsed
         .background_shape()
         .unwrap()
@@ -162,7 +162,7 @@ fn rejects_hostile_shape_binary_value_grammar() {
         r"{\rtf1{\pict{\*\picprop{\sp{\sn{\*\svb 00}}{\sv 1}}}\pngblip 89504e470d0a1a0a}}",
         r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv\svb 00}}}\pngblip 89504e470d0a1a0a}}",
     ] {
-        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
     }
 }
 

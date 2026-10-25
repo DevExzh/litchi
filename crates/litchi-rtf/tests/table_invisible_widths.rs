@@ -10,11 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, TablePreferredWidthUnit, TextDirection};
+use litchi_rtf::{write::Writer, TablePreferredWidthUnit, TextDirection};
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     String::from_utf8(output).unwrap()
@@ -23,7 +23,7 @@ fn write(document: &Tree<'_>) -> String {
 #[test]
 fn parses_logical_leading_trailing_widths_bidi_and_canonical_order() {
     let source = r"{\rtf1\trowd\ltrrow\trftsWidth2\trwWidth5000\trftsWidthB3\trwWidthB240\trftsWidthA2\trwWidthA1250\cellx900\cellx2100\intbl A\cell B\cell\row\trowd\rtlrow\trftsWidthB2\trwWidthB750\trftsWidthA3\trwWidthA360\cellx1000\cellx2200\intbl C\cell D\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].direction(), Some(TextDirection::LeftToRight));
     assert_eq!(rows[1].direction(), Some(TextDirection::RightToLeft));
@@ -79,14 +79,14 @@ fn parses_logical_leading_trailing_widths_bidi_and_canonical_order() {
     assert!(first.contains(
         "\\trftsWidth2\\trwWidth5000\\trftsWidthB3\\trwWidthB240\\trftsWidthA2\\trwWidthA1250"
     ));
-    let second = write(&Tree::parse(&first).unwrap());
+    let second = write(&Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap());
     assert_eq!(first, second);
 }
 
 #[test]
 fn restores_groups_resets_trowd_and_normalizes_unit_only_defaults() {
     let source = r"{\rtf1\trowd{\trftsWidthB3\trwWidthB100\trftsWidthA2\trwWidthA500}\cellx1000\intbl A\cell\row\trowd\trftsWidthB3\trftsWidthA2\cellx1100\intbl B\cell\row\trowd\cellx1200\intbl C\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].geometry().leading_invisible_width(), None);
     assert_eq!(rows[0].geometry().trailing_invisible_width(), None);
@@ -117,7 +117,7 @@ fn restores_groups_resets_trowd_and_normalizes_unit_only_defaults() {
 #[test]
 fn applies_end_defined_nested_widths_and_owned_conversion() {
     let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\rtlrow\trftsWidthB3\trwWidthB144\trftsWidthA2\trwWidthA625\cellx700\nestrow}\intbl\itap1\cell\row}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let nested = &document.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
         .rows()[0];
@@ -135,7 +135,7 @@ fn applies_end_defined_nested_widths_and_owned_conversion() {
         Some(625)
     );
     assert_eq!(nested.cells()[0].right_boundary(), Some(700));
-    let reparsed = Tree::parse(&write(&document)).unwrap();
+    let reparsed = Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     let nested = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
         .rows()[0];
@@ -170,11 +170,11 @@ fn rejects_malformed_duplicate_unpaired_and_out_of_range_controls() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
             "accepted {controls}"
         );
     }
-    assert!(Tree::parse(r"{\rtf1\trowd\trftsWidthB2\trwWidthB5000\trftsWidthA3\trwWidthA31680\cellx31680\intbl X\cell\row}").is_ok());
+    assert!(Tree::parse(r"{\rtf1\trowd\trftsWidthB2\trwWidthB5000\trftsWidthA3\trwWidthA31680\cellx31680\intbl X\cell\row}", litchi_rtf::read::OpenOptions::default()).is_ok());
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn parses_real_libreoffice_unit_only_invisible_widths() {
     let document = Tree::parse(&format!(
         "{{\\rtf1{}\\cellx1000\\intbl X\\cell\\row}}",
         &fixture[start..end]
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     let row = &document.tables()[0].rows()[0];
     assert!(
@@ -205,7 +205,7 @@ fn parses_real_libreoffice_unit_only_invisible_widths() {
                 |width| width.unit() == TablePreferredWidthUnit::Twips && width.value() == Some(0)
             )
     );
-    let reparsed = Tree::parse(&write(&document)).unwrap();
+    let reparsed = Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         reparsed.tables()[0].rows()[0]
             .geometry()

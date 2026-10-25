@@ -10,11 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, SectionRendering};
+use litchi_rtf::{write::Writer, SectionRendering};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -23,7 +23,7 @@ fn write(document: &Tree<'_>) -> Vec<u8> {
 #[test]
 fn parses_section_rendering_and_column_balance_and_round_trips() {
     let document =
-        Tree::parse(r"{\rtf1\ansi\sectd\vertsect\nocolbal\cols2\pgnstarts6 Body}").unwrap();
+        Tree::parse(r"{\rtf1\ansi\sectd\vertsect\nocolbal\cols2\pgnstarts6 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "Body");
     let section = &document.sections()[0];
     assert_eq!(
@@ -36,7 +36,7 @@ fn parses_section_rendering_and_column_balance_and_round_trips() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\vertsect"));
     assert!(serialized.contains("\\nocolbal"));
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
         reparsed.sections()[0].properties.rendering,
@@ -47,7 +47,7 @@ fn parses_section_rendering_and_column_balance_and_round_trips() {
 
 #[test]
 fn parses_horizontal_rendering_and_balanced_default() {
-    let document = Tree::parse(r"{\rtf1\ansi\sectd\horzsect Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi\sectd\horzsect Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let section = &document.sections()[0];
     assert_eq!(
         section.properties.rendering,
@@ -59,13 +59,13 @@ fn parses_horizontal_rendering_and_balanced_default() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\horzsect"));
     assert!(!serialized.contains("nocolbal"));
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.sections()[0].properties.rendering,
         Some(SectionRendering::Horizontal)
     );
 
-    let implicit = Tree::parse(r"{\rtf1\ansi\sectd Body}").unwrap();
+    let implicit = Tree::parse(r"{\rtf1\ansi\sectd Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(implicit.sections()[0].properties.rendering.is_none());
     assert!(implicit.sections()[0].properties.balance_columns);
 }
@@ -73,7 +73,7 @@ fn parses_horizontal_rendering_and_balanced_default() {
 #[test]
 fn parses_paragraph_suppression_flags_and_round_trips() {
     let document =
-        Tree::parse(r"{\rtf1\ansi\pard\noline\notabind Suppressed\par\pard Normal\par}").unwrap();
+        Tree::parse(r"{\rtf1\ansi\pard\noline\notabind Suppressed\par\pard Normal\par}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let suppressed = document
         .blocks()
         .iter()
@@ -93,7 +93,7 @@ fn parses_paragraph_suppression_flags_and_round_trips() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\noline"));
     assert!(serialized.contains("\\notabind"));
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let reparsed_block = reparsed
         .blocks()
         .iter()
@@ -113,7 +113,7 @@ fn rejects_parameterized_section_and_paragraph_flags() {
         r"{\rtf1\pard\notabind0 Text\par}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf, litchi_rtf::read::OpenOptions::default())),
             "accepted malformed {rtf}"
         );
     }

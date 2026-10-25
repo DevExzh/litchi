@@ -7,7 +7,7 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::RtfWriter;
+use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
 
 const SPECIAL_CHARACTERS: &[(&str, &str)] = &[
@@ -25,7 +25,7 @@ const SPECIAL_CHARACTERS: &[(&str, &str)] = &[
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -35,7 +35,7 @@ fn write(document: &Tree<'_>) -> Vec<u8> {
 fn special_character_control_words_extract_their_unicode_text() {
     for (control, expected) in SPECIAL_CHARACTERS {
         let source = format!(r"{{\rtf1\ansi A{control} B}}");
-        let document = Tree::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(document.text(), format!("A{expected}B"), "parsed {source}");
     }
 }
@@ -44,7 +44,7 @@ fn special_character_control_words_extract_their_unicode_text() {
 fn special_character_control_words_round_trip_through_the_writer() {
     for (control, expected) in SPECIAL_CHARACTERS {
         let source = format!(r"{{\rtf1\ansi A{control} B}}");
-        let document = Tree::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
         let output = write(&document);
         let serialized = String::from_utf8(output.clone()).unwrap();
@@ -52,7 +52,7 @@ fn special_character_control_words_round_trip_through_the_writer() {
             serialized.contains(&format!("{control} ")),
             "serialized {control} as {serialized}"
         );
-        let reparsed = Tree::parse_bytes(&output).unwrap();
+        let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             reparsed.text(),
             format!("A{expected}B"),
@@ -63,17 +63,17 @@ fn special_character_control_words_round_trip_through_the_writer() {
 
 #[test]
 fn dynamic_date_time_stamps_parse_without_extracted_text() {
-    let document = Tree::parse(r"{\rtf1\ansi A\chdate B\chdpl C\chdpa D\chtime E}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi A\chdate B\chdpl C\chdpa D\chtime E}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "ABCDE");
 }
 
 #[test]
 fn special_character_control_words_survive_inside_generated_list_markers() {
-    let document = Tree::parse(r"{\rtf1\ansi{\listtext\pard\plain\bullet\tab}B}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi{\listtext\pard\plain\bullet\tab}B}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let marker = &document.generated_list_markers()[0];
     assert_eq!(marker.text, "\u{2022}\t");
 
     let output = write(&document);
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.generated_list_markers()[0].text, marker.text);
 }

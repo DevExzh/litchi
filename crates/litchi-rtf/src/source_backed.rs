@@ -82,6 +82,9 @@ struct Inner {
     proof: TailAppendSourceProof,
     context: ExecutionContext,
     options: OpenOptions,
+    /// The source parse profile to reuse when a committed output is
+    /// materialized for a subsequent edit.
+    document_options: crate::read::OpenOptions,
     /// The checked tail splice a committed package writes; `None` for an
     /// opened package, which writes its source.
     pending: Option<TailAppendSourcePublicationPlan>,
@@ -137,7 +140,13 @@ impl Package {
             source.as_ref(),
             &context,
         )?;
-        Ok(Self::opened(source, proof, context, options))
+        Ok(Self::opened(
+            source,
+            proof,
+            context,
+            options,
+            document.open_options(),
+        ))
     }
 
     fn opened(
@@ -145,6 +154,7 @@ impl Package {
         proof: TailAppendSourceProof,
         context: ExecutionContext,
         options: OpenOptions,
+        document_options: crate::read::OpenOptions,
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
@@ -152,6 +162,7 @@ impl Package {
                 proof,
                 context,
                 options,
+                document_options,
                 pending: None,
                 materialized: OnceLock::new(),
             }),
@@ -167,6 +178,7 @@ impl Package {
                 proof: self.inner.proof.clone(),
                 context: self.inner.context.clone(),
                 options: self.inner.options,
+                document_options: self.inner.document_options,
                 pending: Some(plan),
                 materialized: OnceLock::new(),
             }),
@@ -273,9 +285,10 @@ impl Package {
             })
         })?;
         self.write_to(&mut bytes)?;
-        let document = crate::Package::from_bytes(&bytes).map_err(|error| {
-            TailAppendPublicationError::Plan(crate::tail_append::Error::Rtf(error))
-        })?;
+        let document = crate::Package::from_bytes_with_options(&bytes, self.inner.document_options)
+            .map_err(|error| {
+                TailAppendPublicationError::Plan(crate::tail_append::Error::Rtf(error))
+            })?;
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
         let opened = Self::open_with_options(
             &document,

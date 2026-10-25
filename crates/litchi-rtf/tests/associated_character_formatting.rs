@@ -10,7 +10,7 @@
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     AssociatedCharacterBaseline, AssociatedCharacterFormatting, AssociatedUnderlineStyle,
-    LanguageId, RtfWriter,
+    LanguageId, write::Writer,
 };
 
 fn associated_for<'a>(document: &'a Tree<'a>, text: &str) -> AssociatedCharacterFormatting {
@@ -31,7 +31,7 @@ fn parses_inherits_resets_and_writes_associated_character_formatting() {
         r#"\aoutl\ascaps0\ashad\astrike0\auldb A{\ai\aup8\auld B}C}"#,
         r#"{\plain D}}"#,
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     let a = associated_for(&document, "A");
     assert_eq!(a.font_ref, Some(3));
@@ -80,7 +80,7 @@ fn parses_inherits_resets_and_writes_associated_character_formatting() {
     assert_eq!(reset.language, Some(LanguageId::new(1025).unwrap()));
 
     let mut first = Vec::new();
-    RtfWriter::new(&mut first)
+    Writer::new(&mut first)
         .write_document(&document)
         .unwrap();
     let serialized = String::from_utf8(first.clone()).unwrap();
@@ -88,12 +88,12 @@ fn parses_inherits_resets_and_writes_associated_character_formatting() {
         r#"\ab1\acaps0\acf4\adn3\aexpnd-20\af3\afs22\ai0\alang1031"#,
         r#"\aoutl1\ascaps0\ashad1\astrike0\auldb"#,
     )));
-    let reparsed = Tree::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(associated_for(&reparsed, "A"), a);
     assert_eq!(associated_for(&reparsed, "B"), b);
     assert_eq!(associated_for(&reparsed, "D"), reset);
     let mut second = Vec::new();
-    RtfWriter::new(&mut second)
+    Writer::new(&mut second)
         .write_document(&reparsed)
         .unwrap();
     assert_eq!(first, second);
@@ -121,7 +121,7 @@ fn rejects_unbounded_or_missing_associated_values_but_keeps_field_code_inert() {
         r"{\rtf1{\*\defchp\aul\aulnone}X}",
         r"{\rtf1{\stylesheet{\s0\af-1 Bad;}}Body}",
     ] {
-        assert!(Tree::parse(source).is_err(), "accepted {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
     }
 
     // Parameter-shape deviations (a missing value, a nonbinary toggle, or a
@@ -147,12 +147,12 @@ fn rejects_unbounded_or_missing_associated_values_but_keeps_field_code_inert() {
         r"{\rtf1\aulw1 X}",
         r"{\rtf1\aup X}",
     ] {
-        let document = Tree::parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| panic!("{source}: {error}"));
         assert_eq!(document.tolerance_report().total(), 1, "{source}");
     }
 
     let inert =
-        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \af-1\afs0\alang-1}{\fldrslt X}}}").unwrap();
+        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \af-1\afs0\alang-1}{\fldrslt X}}}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(inert.fields().len(), 1);
     assert!(
         inert
@@ -166,7 +166,7 @@ fn rejects_unbounded_or_missing_associated_values_but_keeps_field_code_inert() {
 fn font_size_boundaries_are_strict_in_body_default_and_associated_paths() {
     for size in [1, 23, 65_535] {
         let body_source = format!(r"{{\rtf1\ansi\fs{size} X}}");
-        let body = Tree::parse(&body_source).unwrap();
+        let body = Tree::parse(&body_source, litchi_rtf::read::OpenOptions::default()).unwrap();
         let block = body
             .blocks()
             .iter()
@@ -176,18 +176,18 @@ fn font_size_boundaries_are_strict_in_body_default_and_associated_paths() {
 
         let default_source = format!(r"{{\rtf1\ansi{{\*\defchp\fs{size}}}X}}");
         assert!(
-            Tree::parse(&default_source).is_ok(),
+            Tree::parse(&default_source, litchi_rtf::read::OpenOptions::default()).is_ok(),
             "rejected valid defchp fs value {size}"
         );
 
         let stylesheet_source = format!(r"{{\rtf1{{\stylesheet{{\s0\fs{size} Style;}}}}X}}");
         assert!(
-            Tree::parse(&stylesheet_source).is_ok(),
+            Tree::parse(&stylesheet_source, litchi_rtf::read::OpenOptions::default()).is_ok(),
             "rejected valid stylesheet fs value {size}"
         );
 
         let associated_source = format!(r"{{\rtf1\ansi\afs{size} X}}");
-        let associated = Tree::parse(&associated_source).unwrap();
+        let associated = Tree::parse(&associated_source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(
             associated_for(&associated, "X").font_size.unwrap().get(),
             size
@@ -197,25 +197,25 @@ fn font_size_boundaries_are_strict_in_body_default_and_associated_paths() {
     for value in [0, -1, 65_536, i32::MAX] {
         let body_source = format!(r"{{\rtf1\ansi\fs{value} X}}");
         assert!(
-            Tree::parse(&body_source).is_err(),
+            Tree::parse(&body_source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted invalid body fs value {value}"
         );
 
         let default_source = format!(r"{{\rtf1\ansi{{\*\defchp\fs{value}}}X}}");
         assert!(
-            Tree::parse(&default_source).is_err(),
+            Tree::parse(&default_source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted invalid defchp fs value {value}"
         );
 
         let stylesheet_source = format!(r"{{\rtf1{{\stylesheet{{\s0\fs{value} Style;}}}}X}}");
         assert!(
-            Tree::parse(&stylesheet_source).is_err(),
+            Tree::parse(&stylesheet_source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted invalid stylesheet fs value {value}"
         );
 
         let associated_source = format!(r"{{\rtf1\ansi\afs{value} X}}");
         assert!(
-            Tree::parse(&associated_source).is_err(),
+            Tree::parse(&associated_source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "accepted invalid afs value {value}"
         );
     }
@@ -226,7 +226,7 @@ fn font_size_boundaries_are_strict_in_body_default_and_associated_paths() {
         r"{\rtf1\ansi{\*\defchp\fs}X}",
         r"{\rtf1{\stylesheet{\s0\fs Style;}}X}",
     ] {
-        let document = Tree::parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| panic!("{source}: {error}"));
         assert_eq!(document.tolerance_report().total(), 1, "{source}");
     }
 }
@@ -260,7 +260,7 @@ fn associated_mutation_validates_and_clears_exact_state() {
 #[test]
 fn parses_specification_association_examples() {
     let document =
-        Tree::parse(r"{\rtf1{\ltrch\af2\ab\aul\rtlch First}{\rtlch\af5\ab\ai\ltrch Second}}")
+        Tree::parse(r"{\rtf1{\ltrch\af2\ab\aul\rtlch First}{\rtlch\af5\ab\ai\ltrch Second}}", litchi_rtf::read::OpenOptions::default())
             .unwrap();
     let first = associated_for(&document, "First");
     assert_eq!(first.font_ref, Some(2));
@@ -277,7 +277,7 @@ fn parses_libreoffice_associated_character_fixture() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/sbkeven.rtf"
     );
-    let document = Tree::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.blocks().iter().any(|block| {
         let associated = block.formatting.associated;
         associated.font_ref == Some(31507)
@@ -287,7 +287,7 @@ fn parses_libreoffice_associated_character_fixture() {
 }
 #[test]
 fn body_associated_baseline_changes_split_text_runs() {
-    let document = Tree::parse(r#"{\rtf1 A\aup2 B\aup4 C}"#)
+    let document = Tree::parse(r#"{\rtf1 A\aup2 B\aup4 C}"#, litchi_rtf::read::OpenOptions::default())
         .expect("body associated-baseline source should parse");
     let blocks = document.blocks();
 

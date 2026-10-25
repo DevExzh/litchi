@@ -8,13 +8,13 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{DocumentInfo, RtfTimestamp, RtfWriter};
+use litchi_rtf::{DocumentInfo, metadata::Timestamp, write::Writer};
 use std::borrow::Cow;
 use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -29,7 +29,7 @@ fn parses_complete_typed_info_and_round_trips_without_body_leakage() {
         r#"{\creatim\yr2024\mo2\dy29\hr23\min59\sec58}{\revtim\yr2025\mo7}"#,
         r#"{\printim\yr2026\mo1\dy2}{\buptim\yr2023}"#,
         r#"\version4\vern9\edmins120\nofpages8\nofwords900\nofchars4200\nofcharsws5000\id77}Body}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     let info = document.info();
     assert_eq!(info.comment.as_deref(), Some("Summary"));
@@ -44,7 +44,7 @@ fn parses_complete_typed_info_and_round_trips_without_body_leakage() {
     assert_eq!(info.pages, Some(8));
     assert_eq!(document.text(), "Body");
 
-    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.info(), info);
     assert_eq!(reparsed.text(), "Body");
 }
@@ -52,10 +52,10 @@ fn parses_complete_typed_info_and_round_trips_without_body_leakage() {
 #[test]
 fn writer_accepts_typed_and_legacy_timestamps_and_rejects_unsafe_values() {
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_document_header().unwrap();
     let mut info = DocumentInfo::new();
-    info.creation_timestamp = Some(RtfTimestamp {
+    info.creation_timestamp = Some(Timestamp {
         year: Some(2024),
         month: Some(2),
         day: Some(29),
@@ -66,19 +66,19 @@ fn writer_accepts_typed_and_legacy_timestamps_and_rejects_unsafe_values() {
     info.revision_time = Some(Cow::Borrowed("2025-07-16T12:34:56"));
     writer.write_document_info(&info).unwrap();
     writer.write_str("}").unwrap();
-    let parsed = Tree::parse_bytes(&output).unwrap();
+    let parsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(parsed.info().creation_timestamp.unwrap().hour, None);
     assert_eq!(parsed.info().revision_timestamp.unwrap().minute, Some(34));
 
     let mut invalid = DocumentInfo::new();
     invalid.pages = Some(i32::MAX as u32 + 1);
     assert!(
-        RtfWriter::new(Vec::new())
+        Writer::new(Vec::new())
             .write_document_info(&invalid)
             .is_err()
     );
     invalid.pages = None;
-    invalid.creation_timestamp = Some(RtfTimestamp {
+    invalid.creation_timestamp = Some(Timestamp {
         year: Some(2023),
         month: Some(2),
         day: Some(29),
@@ -87,7 +87,7 @@ fn writer_accepts_typed_and_legacy_timestamps_and_rejects_unsafe_values() {
         second: None,
     });
     assert!(
-        RtfWriter::new(Vec::new())
+        Writer::new(Vec::new())
             .write_document_info(&invalid)
             .is_err()
     );
@@ -103,11 +103,11 @@ fn rejects_ambiguous_or_malformed_known_info_metadata() {
         r"{\rtf1{\info}{\info}}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
     }
 
     let invalid_calendar =
-        Tree::parse(r"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}").unwrap();
+        Tree::parse(r"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         !invalid_calendar
             .info()
@@ -137,7 +137,7 @@ fn parses_real_libreoffice_info_fixtures() {
     );
     for (index, fixture) in FIXTURES.iter().enumerate() {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = Tree::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default())
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         assert!(document.info().document_comment.is_some());
         if index > 0 {
@@ -154,7 +154,7 @@ fn preserves_libreoffice_zero_timestamp_sentinels() {
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf"
     );
     let bytes = fs::read(path).unwrap();
-    let document = Tree::parse_bytes(&bytes).unwrap();
+    let document = Tree::parse_bytes(&bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let revision = document.info().revision_timestamp.unwrap();
     let printed = document.info().print_timestamp.unwrap();
 
@@ -169,7 +169,7 @@ fn preserves_libreoffice_zero_timestamp_sentinels() {
     assert!(!revision.is_valid());
     assert!(!printed.is_valid());
 
-    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.info().revision_timestamp, Some(revision));
     assert_eq!(reparsed.info().print_timestamp, Some(printed));
 }

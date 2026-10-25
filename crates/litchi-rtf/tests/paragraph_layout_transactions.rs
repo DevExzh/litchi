@@ -648,7 +648,7 @@ fn frame_layout_preserves_zero_width_bookmark_events() {
     let commit = edit.commit().unwrap();
     let bytes = commit.package().to_bytes().unwrap();
     assert!(String::from_utf8_lossy(&bytes).contains(r"\bkmkstart bm"));
-    let reopened = Tree::parse_bytes(&bytes).unwrap();
+    let reopened = Tree::parse_bytes(&bytes, OpenOptions::default()).unwrap();
     assert_eq!(reopened.bookmarks().bookmarks().len(), 1);
     assert_eq!(reopened.bookmarks().bookmarks()[0].name, "bm");
     assert_eq!(reopened.bookmarks().bookmarks()[0].position, 3);
@@ -685,7 +685,7 @@ fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
             .count(),
         1
     );
-    let reopened = Tree::parse_bytes(&bytes).unwrap();
+    let reopened = Tree::parse_bytes(&bytes, OpenOptions::default()).unwrap();
     assert_eq!(reopened.bookmarks().bookmarks().len(), 1);
     assert_eq!(
         commit
@@ -714,7 +714,7 @@ fn frame_layout_preserves_offset_only_break_events() {
     assert!(serialized.contains(r"\page "));
     assert!(serialized.contains(r"\column "));
     assert!(serialized.contains(r"\softline "));
-    let reopened = Tree::parse_bytes(&bytes).unwrap();
+    let reopened = Tree::parse_bytes(&bytes, OpenOptions::default()).unwrap();
     assert_eq!(reopened.body_story_events().len(), 3);
     assert_eq!(reopened.text(), "OneTwoThreeFour");
 }

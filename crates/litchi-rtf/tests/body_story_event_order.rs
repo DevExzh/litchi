@@ -8,15 +8,15 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{BodyStoryEvent, RtfWriter};
+use litchi_rtf::{BodyStoryEvent, write::Writer};
 
 fn round_trip(source: &str) -> Tree<'static> {
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut bytes = Vec::new();
-    RtfWriter::new(&mut bytes)
+    Writer::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    Tree::parse(&String::from_utf8(bytes).unwrap()).unwrap()
+    Tree::parse(&String::from_utf8(bytes).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap()
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn preserves_equal_offset_order_across_all_atomic_body_destinations() {
         r#"{\*\atnid A}{\*\atnauthor Ada}\chatn{\*\annotation point}"#,
         r#"{\*\bkmkend B}Z}"#,
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let expected = [
         BodyStoryEvent::BookmarkStart(0),
         BodyStoryEvent::GeneratedListMarker(0),
@@ -50,7 +50,7 @@ fn preserves_equal_offset_order_across_all_atomic_body_destinations() {
 #[test]
 fn preserves_revision_and_form_field_boundaries_without_canonical_ties() {
     let revisions = r"{\rtf1{\*\revtbl{A;}}{\revised\revauth0\revdttm1 X}{\deleted\revauthdel0\revdttmdel2 Y}Z}";
-    let document = Tree::parse(revisions).unwrap();
+    let document = Tree::parse(revisions, litchi_rtf::read::OpenOptions::default()).unwrap();
     let expected = [
         BodyStoryEvent::RevisionStart(0),
         BodyStoryEvent::RevisionEnd(0),

@@ -8,7 +8,7 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{OpenOptions, RtfError, SourceLimitKind, SourceLimits, compress};
+use litchi_rtf::{OpenOptions, Error, SourceLimitKind, SourceLimits, compress};
 
 fn options(limits: SourceLimits) -> OpenOptions {
     OpenOptions::new().source_limits(limits)
@@ -35,8 +35,8 @@ fn source_and_token_limits_are_typed() {
     let source = br"{\rtf1 body}";
     let limits = limits_with_input_bytes(source.len() - 1);
     assert!(matches!(
-        Tree::parse_bytes_with_options(source, options(limits)),
-        Err(RtfError::Limit {
+        Tree::parse_bytes(source, options(limits)),
+        Err(Error::Limit {
             kind: SourceLimitKind::InputBytes,
             observed,
             maximum,
@@ -45,8 +45,8 @@ fn source_and_token_limits_are_typed() {
 
     let limits = limits_with_events(3);
     assert!(matches!(
-        Tree::parse_bytes_with_options(source, options(limits)),
-        Err(RtfError::Limit {
+        Tree::parse_bytes(source, options(limits)),
+        Err(Error::Limit {
             kind: SourceLimitKind::Events,
             observed: 4,
             maximum: 3,
@@ -62,8 +62,8 @@ fn binary_and_compressed_expansion_limits_flow_through_document_parsing() {
         .build()
         .expect("binary profile is consistent");
     assert!(matches!(
-        Tree::parse_with_options(r"{\rtf1\bin4 ABCD}", options(limits)),
-        Err(RtfError::Limit {
+        Tree::parse(r"{\rtf1\bin4 ABCD}", options(limits)),
+        Err(Error::Limit {
             kind: SourceLimitKind::BinaryBytes,
             observed: 4,
             maximum: 3,
@@ -78,8 +78,8 @@ fn binary_and_compressed_expansion_limits_flow_through_document_parsing() {
         .build()
         .expect("decompression profile is consistent");
     assert!(matches!(
-        Tree::parse_bytes_with_options(&compressed, options(limits)),
-        Err(RtfError::Limit {
+        Tree::parse_bytes(&compressed, options(limits)),
+        Err(Error::Limit {
             kind: SourceLimitKind::DecompressedBytes,
             observed,
             maximum,
@@ -94,8 +94,8 @@ fn bounded_file_open_rejects_metadata_before_reading() {
     let observed = usize::try_from(std::fs::metadata(&fixture).unwrap().len()).unwrap();
     let limits = limits_with_input_bytes(observed - 1);
     assert!(matches!(
-        Tree::open_with_options(&fixture, options(limits)),
-        Err(RtfError::Limit {
+        Tree::open(&fixture, options(limits)),
+        Err(Error::Limit {
             kind: SourceLimitKind::InputBytes,
             observed: actual,
             maximum,
@@ -106,10 +106,10 @@ fn bounded_file_open_rejects_metadata_before_reading() {
 #[test]
 fn default_profile_preserves_existing_entry_points() {
     let source = br"{\rtf1\ansi finite defaults}";
-    assert_eq!(Tree::parse_bytes(source).unwrap().text(), "finite defaults");
-    assert_eq!(Tree::from_bytes(source).unwrap().text(), "finite defaults");
+    assert_eq!(Tree::parse_bytes(source, OpenOptions::default()).unwrap().text(), "finite defaults");
+    assert_eq!(Tree::from_bytes(source, OpenOptions::default()).unwrap().text(), "finite defaults");
     assert_eq!(
-        Tree::parse_bytes_with_options(source, options(SourceLimits::default()))
+        Tree::parse_bytes(source, options(SourceLimits::default()))
             .unwrap()
             .text(),
         "finite defaults"
@@ -158,8 +158,8 @@ fn zero_opaque_nodes_is_an_explicit_denial_and_usize_max_is_invalid() {
         .build()
         .expect("zero opaque-node profile is consistent");
     assert!(matches!(
-        Tree::parse_with_options(r"{\rtf1\future1 x}", options(zero_opaque)),
-        Err(RtfError::Limit {
+        Tree::parse(r"{\rtf1\future1 x}", options(zero_opaque)),
+        Err(Error::Limit {
             kind: SourceLimitKind::OpaqueNodes,
             observed: 1,
             maximum: 0,
@@ -168,7 +168,7 @@ fn zero_opaque_nodes_is_an_explicit_denial_and_usize_max_is_invalid() {
 
     assert!(matches!(
         SourceLimits::builder().max_input_bytes(usize::MAX),
-        Err(RtfError::InvalidLimit {
+        Err(Error::InvalidLimit {
             kind: SourceLimitKind::InputBytes,
             value,
             maximum,

@@ -13026,6 +13026,76 @@
           "name": "ProtectedDocument",
           "scope": "litchi_rtf::tail_append::Error",
           "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "RtfError",
+          "scope": "litchi_rtf",
+          "replacement": "use the canonical crate Error (record 0362ul49)"
+        },
+        {
+          "name": "RtfResult",
+          "scope": "litchi_rtf",
+          "replacement": "use the canonical crate Result (record 0362ul49)"
+        },
+        {
+          "name": "RtfWriter",
+          "scope": "litchi_rtf",
+          "replacement": "use write::Writer (record 0362ul49)"
+        },
+        {
+          "name": "RtfTimestamp",
+          "scope": "litchi_rtf",
+          "replacement": "use metadata::Timestamp (record 0362ul49)"
+        },
+        {
+          "name": "StreamingRtfLimits",
+          "scope": "litchi_rtf",
+          "replacement": "use streaming::Limits (record 0362ul49)"
+        },
+        {
+          "name": "StreamingRtfOptions",
+          "scope": "litchi_rtf",
+          "replacement": "use streaming::Options (record 0362ul49)"
+        },
+        {
+          "name": "StreamingRtfError",
+          "scope": "litchi_rtf",
+          "replacement": "use streaming::Error (record 0362ul49)"
+        },
+        {
+          "name": "StreamingRtfWriter",
+          "scope": "litchi_rtf",
+          "replacement": "use streaming::Writer (record 0362ul49)"
+        },
+        {
+          "name": "parse_with_options",
+          "scope": "litchi_rtf::raw::Tree",
+          "replacement": "pass the required read::OpenOptions to raw::Tree::parse (record 0362ul49)",
+          "recursive": false
+        },
+        {
+          "name": "parse_bytes_with_options",
+          "scope": "litchi_rtf::raw::Tree",
+          "replacement": "pass the required read::OpenOptions to raw::Tree::parse_bytes (record 0362ul49)",
+          "recursive": false
+        },
+        {
+          "name": "from_owned_bytes_with_options",
+          "scope": "litchi_rtf::raw::Tree",
+          "replacement": "pass the required read::OpenOptions to raw::Tree::from_owned_bytes (record 0362ul49)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_options",
+          "scope": "litchi_rtf::raw::Tree",
+          "replacement": "pass the required read::OpenOptions to raw::Tree::open (record 0362ul49)",
+          "recursive": false
+        },
+        {
+          "name": "parse_field_code",
+          "scope": "litchi_rtf::field",
+          "replacement": "use Field::parsed_code(); the bounded record parser is crate-private (record 0362ul49)",
+          "recursive": false
         }
       ],
       "families": [

@@ -4,7 +4,7 @@
     reason = "integration-test assertions panic on failure by design"
 )]
 
-use litchi_rtf::RtfError;
+use litchi_rtf::Error;
 use litchi_rtf::raw::Tree;
 
 const STORY_FONT_CODEPAGES: &str = r"{\rtf1\ansi\ansicpg1252\uc1
@@ -18,7 +18,7 @@ Body
 
 #[test]
 fn stories_decode_hex_bytes_with_the_selected_font_code_page() {
-    let document = Tree::parse(STORY_FONT_CODEPAGES).unwrap();
+    let document = Tree::parse(STORY_FONT_CODEPAGES, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(document.sections()[0].headers_footers[0].text(), "あ");
     assert_eq!(document.sections()[0].headers_footers[1].text(), "あ");
@@ -37,7 +37,7 @@ Body
 
 #[test]
 fn story_unicode_fallbacks_skip_the_declared_count_and_decode_remainder_by_font() {
-    let document = Tree::parse(STORY_UNICODE_FALLBACKS).unwrap();
+    let document = Tree::parse(STORY_UNICODE_FALLBACKS, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(document.sections()[0].headers_footers[0].text(), "ああ");
     assert_eq!(document.sections()[0].headers_footers[1].text(), "あ");
@@ -56,7 +56,7 @@ Body
 
 #[test]
 fn stories_restore_the_outer_font_after_nested_groups() {
-    let document = Tree::parse(NESTED_STORY_FONT_RESTORATION).unwrap();
+    let document = Tree::parse(NESTED_STORY_FONT_RESTORATION, litchi_rtf::read::OpenOptions::default()).unwrap();
 
     assert_eq!(document.sections()[0].headers_footers[0].text(), "Aあé");
     assert_eq!(document.sections()[0].headers_footers[1].text(), "Aあé");
@@ -83,7 +83,7 @@ fn malformed_cp932_story_bytes_fail_with_typed_errors() {
         for payload in [r"\'82", r"\'82\'7f"] {
             let source = malformed_story(destination, payload);
             assert!(
-                matches!(Tree::parse(&source), Err(RtfError::MalformedDocument(_))),
+                matches!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()), Err(Error::MalformedDocument(_))),
                 "accepted malformed {destination} payload {payload}"
             );
         }

@@ -10,11 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, Shape, ShapeType};
+use litchi_rtf::{write::Writer, Shape, ShapeType};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -25,18 +25,18 @@ fn parses_real_libreoffice_text_frames_and_round_trips_canonically() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"
     );
-    let producer = Tree::parse_bytes(source).unwrap();
+    let producer = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(producer.shapes().len(), 1);
     assert_eq!(producer.shapes()[0].text, "Textbox text.\n");
     assert!(producer.shapes()[0].text_destination_present);
 
-    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let shape = Shape::text_box(Cow::Borrowed("Line one\nTabbed\tUnicode 你"));
     document.set_background_shape(shape).unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("{\\shptxt Line one\\par Tabbed\\tab Unicode "));
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let text_frame = reparsed.background_shape().unwrap();
     assert_eq!(text_frame.text, "Line one\nTabbed\tUnicode 你");
     assert!(text_frame.text_destination_present);
@@ -46,7 +46,7 @@ fn parses_real_libreoffice_text_frames_and_round_trips_canonically() {
 #[test]
 fn preserves_empty_presence_and_supports_typed_set_and_clear() {
     let source = r"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt}}}}";
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(document.shapes()[0].text.is_empty());
     assert!(document.shapes()[0].text_destination_present);
 
@@ -65,7 +65,7 @@ fn retains_formatting_group_text_but_skips_nested_destinations_inertly() {
         r#"{\shptxt before{\b bold}{\*\unknown LEAK}"#,
         r#"{\pict\pngblip 89504e470d0a1a0a}after\par end}}}B}"#,
     );
-    let document = Tree::parse(source).unwrap();
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.text(), "AB");
     assert_eq!(document.shapes()[0].text, "beforeboldafter\nend");
     assert!(document.pictures().is_empty());
@@ -84,7 +84,7 @@ fn rejects_hostile_shape_text_grammar_and_resource_abuse() {
         r"{\rtf1{\shp{\*\shprslt fallback}{\shptxt late}}}",
         "{\\rtf1{\\shp{\\*\\shpinst{\\shptxt\\bin1 x}}}}",
     ] {
-        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
     }
 
     let mut nested = r"{\rtf1{\shp{\*\shpinst{\shptxt ".to_string();
@@ -92,9 +92,9 @@ fn rejects_hostile_shape_text_grammar_and_resource_abuse() {
     nested.push('x');
     nested.push_str(&"}".repeat(65));
     nested.push_str("}}}");
-    assert!(Tree::parse(&nested).is_err());
+    assert!(Tree::parse(&nested, litchi_rtf::read::OpenOptions::default()).is_err());
 
-    let mut document = Tree::parse(r"{\rtf1}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::TextBox);
     shape.set_text(Cow::Owned("x".repeat(16 * 1_048_576 + 1)));
     assert!(document.set_background_shape(shape).is_err());
@@ -108,7 +108,7 @@ fn shape_text_baseline_controls_fail_closed() {
         r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt \adn2 One\adn4 Two}}}}"#,
     ] {
         assert!(
-            Tree::parse(source).is_err(),
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
             "shape text baseline controls must be rejected"
         );
     }

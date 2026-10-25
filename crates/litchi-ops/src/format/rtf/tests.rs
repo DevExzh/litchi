@@ -1,6 +1,6 @@
 use super::*;
 use crate::detect::{DetectedFormat, detect_format_smart};
-use litchi_core::{Position, detection::FileFormat};
+use litchi_core::{Position, detection::FileFormat, metadata::Timestamp};
 use std::path::PathBuf;
 
 fn fixture(relative: &str) -> PathBuf {
@@ -62,7 +62,7 @@ fn compressed_transports_open_through_the_same_route() {
 #[test]
 fn metadata_matches_the_facade_projection() {
     let bytes = std::fs::read(fixture("rtf/chtoutline.rtf")).expect("read");
-    let leaf = Tree::from_owned_bytes(bytes.clone()).expect("leaf RTF");
+    let leaf = Tree::from_owned_bytes(bytes.clone(), litchi_rtf::read::OpenOptions::default()).expect("leaf RTF");
     let info = leaf.info();
     let metadata = open_detected(bytes)
         .metadata()

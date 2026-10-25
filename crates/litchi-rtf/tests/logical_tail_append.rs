@@ -1097,7 +1097,7 @@ fn native_replay_preserves_recipient_policy_and_noop_identity() {
     assert!(!commit.patch().is_noop());
     assert!(matches!(
         recipient.apply_tail_append(commit.patch()),
-        Err(Error::Rtf(litchi_rtf::RtfError::Limit {
+        Err(Error::Rtf(litchi_rtf::Error::Limit {
             kind: litchi_rtf::SourceLimitKind::InputBytes,
             ..
         }))

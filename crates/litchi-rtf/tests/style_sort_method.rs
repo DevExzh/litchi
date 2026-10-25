@@ -8,11 +8,11 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{DocumentStyleSortMethod, RtfWriter};
+use litchi_rtf::{DocumentStyleSortMethod, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -28,7 +28,7 @@ fn parses_every_specified_numeric_value() {
         (4, DocumentStyleSortMethod::StyleType),
     ] {
         let source = format!(r"{{\rtf1\stylesortmethod{value} Body}}");
-        let document = Tree::parse(&source).unwrap();
+        let document = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
         assert_eq!(document.style_sort_method(), Some(expected));
         assert_eq!(document.effective_style_sort_method(), expected);
         assert_eq!(document.text(), "Body");
@@ -37,14 +37,14 @@ fn parses_every_specified_numeric_value() {
 
 #[test]
 fn omission_and_missing_parameter_use_host_default_but_preserve_presence() {
-    let omitted = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let omitted = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(omitted.style_sort_method(), None);
     assert_eq!(
         omitted.effective_style_sort_method(),
         DocumentStyleSortMethod::HostDefault
     );
 
-    let present = Tree::parse(r"{\rtf1\stylesortmethod Body}").unwrap();
+    let present = Tree::parse(r"{\rtf1\stylesortmethod Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         present.style_sort_method(),
         Some(DocumentStyleSortMethod::HostDefault)
@@ -55,10 +55,10 @@ fn omission_and_missing_parameter_use_host_default_but_preserve_presence() {
 
 #[test]
 fn typed_api_round_trips_and_clears_passive_metadata() {
-    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_style_sort_method(DocumentStyleSortMethod::BasedOnStyle);
     let output = write(&document);
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.style_sort_method(), document.style_sort_method());
     assert_eq!(reparsed.text(), "Body");
     document.clear_style_sort_method();
@@ -74,7 +74,7 @@ fn coexists_independently_with_filter_and_transform_metadata_in_stable_order() {
     let document = Tree::parse(concat!(
         r#"{\rtf1{\*\xform transform.xsl}\usexform"#,
         r#"{\*\wgrffmtfilter 2002}\stylesortmethod4 Body}"#,
-    ))
+    ), litchi_rtf::read::OpenOptions::default())
     .unwrap();
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(serialized.find("\\xform").unwrap() < serialized.find("\\usexform").unwrap());
@@ -96,6 +96,6 @@ fn rejects_undefined_duplicates_starred_grouped_and_late_values() {
         r"{\rtf1{\stylesortmethod2}Body}",
         r"{\rtf1 Body\stylesortmethod2}",
     ] {
-        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
     }
 }

@@ -10,11 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{RtfWriter, Shape, ShapeProperty, ShapeType};
+use litchi_rtf::{write::Writer, Shape, ShapeProperty, ShapeType};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_document(document)
         .unwrap();
     output
@@ -25,7 +25,7 @@ fn parses_and_rewrites_real_producer_background_with_provenance() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/page-background.rtf"
     );
-    let document = Tree::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let background = document.background_shape().unwrap();
     assert_eq!(document.shapes().len(), 1);
     assert_eq!(background.shape_type, ShapeType::Rectangle);
@@ -37,7 +37,7 @@ fn parses_and_rewrites_real_producer_background_with_provenance() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("{\\*\\background{\\shp{\\*\\shpinst"));
     assert!(serialized.contains("{\\sn bWMode}{\\sv 9}"));
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.background_shape().unwrap().property("bWMode"),
         Some("9")
@@ -47,7 +47,7 @@ fn parses_and_rewrites_real_producer_background_with_provenance() {
 
 #[test]
 fn typed_api_round_trips_unknown_scalar_properties_and_clears() {
-    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::Ellipse);
     shape.geometry.x = 10;
     shape.geometry.y = 20;
@@ -60,7 +60,7 @@ fn typed_api_round_trips_unknown_scalar_properties_and_clears() {
     document.set_background_shape(shape).unwrap();
 
     let output = write(&document);
-    let reparsed = Tree::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     let background = reparsed.background_shape().unwrap();
     assert_eq!(background.shape_type, ShapeType::Ellipse);
     assert_eq!(background.geometry.width, 300);
@@ -93,13 +93,13 @@ fn rejects_malformed_destination_grammar_and_duplicates() {
         r"{\rtf1{\*\background{\shp}}{\*\background{\shp}}}",
         r"{\rtf1 Body{\*\background{\shp}}}",
     ] {
-        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
+        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
     }
 }
 
 #[test]
 fn enforces_typed_resource_and_geometry_bounds() {
-    let mut document = Tree::parse(r"{\rtf1}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::Rectangle);
     shape.geometry.x = i32::MAX;
     shape.geometry.width = 1;

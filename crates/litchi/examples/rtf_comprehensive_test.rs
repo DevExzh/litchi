@@ -31,6 +31,7 @@
 
 #[cfg(feature = "rtf")]
 use litchi::rtf::*;
+use litchi::rtf::write::Writer;
 
 #[cfg(feature = "rtf")]
 fn main() -> std::io::Result<()> {
@@ -618,7 +619,7 @@ Tab:\tab Tabbed text here\par
 #[cfg(feature = "rtf")]
 fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> std::io::Result<()> {
     // Parse the RTF
-    let doc = raw::Tree::parse(rtf_content).map_err(|e| {
+    let doc = raw::Tree::parse(rtf_content, litchi::rtf::read::OpenOptions::default()).map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Failed to parse {} RTF: {:?}", test_name, e),
@@ -632,16 +633,16 @@ fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> st
     println!("    - Tables: {}", doc.tables().len());
     println!("    - Text length: {} chars", doc.text().len());
 
-    // Write the original RTF content directly (since RtfWriter has some limitations)
+    // Write the original RTF content directly (since Writer has some limitations)
     // This preserves the comprehensive test structure for verification
     std::fs::write(output_path, rtf_content)?;
 
     println!("  ✓ Written to: {}", output_path);
 
-    // Test the RtfWriter separately to demonstrate its capabilities
+    // Test the Writer separately to demonstrate its capabilities
     let writer_test_path = format!("{}.writer_test.rtf", output_path);
     let file = std::fs::File::create(&writer_test_path)?;
-    let mut writer = RtfWriter::new(file);
+    let mut writer = Writer::new(file);
 
     // Write using the writer (may have formatting differences but demonstrates writer API)
     match writer.write_document(&doc) {
@@ -656,7 +657,7 @@ fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> st
 
     // Verify the original can be re-parsed (demonstrates parser correctness)
     let rtf_output = std::fs::read_to_string(output_path)?;
-    let reparsed = raw::Tree::parse(&rtf_output).map_err(|e| {
+    let reparsed = raw::Tree::parse(&rtf_output, litchi::rtf::read::OpenOptions::default()).map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Failed to reparse {}: {:?}", output_path, e),
