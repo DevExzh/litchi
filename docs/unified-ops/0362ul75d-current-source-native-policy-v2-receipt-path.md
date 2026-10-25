@@ -22,6 +22,8 @@ Result: 18 tests passed.  No native or Cargo work was performed.
 
 Coordinator integration registers `tools.test_current_native_policy_v2` in
 the tracked and external tooling rows (38 to 39 modules; 53 gate steps
-remain). All 18 source-only tests pass in the composed tree. The active
-approved runner is unchanged. The candidate policies remain incomplete and
-fail closed; no actual native or performance qualification is claimed.
+remain). Independent leaf review passed all 18 source-only tests. The first
+isolated composed invocation fails to import the test module; 0362ul75e
+records and repairs that integration failure. The active approved runner is
+unchanged. The candidate policies remain incomplete and fail closed; no actual
+native or performance qualification is claimed.

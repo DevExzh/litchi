@@ -9,16 +9,17 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
-from native_qualification import current_native_policy_v2 as policy
-from native_qualification import prepare_current_native_inputs_v2 as preparer
-from native_qualification import validate_current_native_v2 as validator
-
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+from native_qualification import current_native_policy_v2 as policy  # noqa: E402
+from native_qualification import prepare_current_native_inputs_v2 as preparer  # noqa: E402
+from native_qualification import validate_current_native_v2 as validator  # noqa: E402
 
 
 class CurrentNativePolicyV2Tests(unittest.TestCase):
