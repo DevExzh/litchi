@@ -391,6 +391,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                     namespace,
                     decoder,
                     &mut strings,
+                    limits.max_attribute_bytes,
                     limits.max_string_bytes,
                 )?;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -415,6 +416,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                     namespace,
                     decoder,
                     &mut strings,
+                    limits.max_attribute_bytes,
                     limits.max_string_bytes,
                 )?;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -557,6 +559,7 @@ fn make_node(
     namespace: ResolveResult<'_>,
     decoder: Decoder,
     strings: &mut usize,
+    max_attribute_bytes: usize,
     max_string_bytes: usize,
 ) -> Result<Node> {
     let namespace = match namespace {
@@ -578,6 +581,13 @@ fn make_node(
     let mut seen = HashSet::new();
     for attribute_value in element.checked_attributes() {
         let attribute_value = attribute_value.map_err(xml_error)?;
+        if attribute_value.value.len() > max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute_value.value.len(),
+                max_attribute_bytes,
+            ));
+        }
         let name = std::str::from_utf8(attribute_value.key.as_ref())
             .map_err(xml_error)?
             .to_owned();
