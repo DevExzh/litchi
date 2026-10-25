@@ -83,6 +83,7 @@ pub struct Edit {
 #[derive(Clone)]
 struct LazySource {
     package: Arc<OpcPackage>,
+    replay_index: Arc<crate::package::replay_index::ReplayIndex>,
     limits: super::Limits,
     physical_source_provenance: bool,
     owner_state: Arc<crate::package::OpenedOwnerState>,
@@ -173,6 +174,7 @@ impl Edit {
     /// operation that needs semantic state calls [`Self::ensure_ready`].
     pub(crate) fn new_lazy(
         package: Arc<OpcPackage>,
+        replay_index: Arc<crate::package::replay_index::ReplayIndex>,
         limits: super::Limits,
         physical_source_provenance: bool,
         owner_state: Arc<crate::package::OpenedOwnerState>,
@@ -189,6 +191,7 @@ impl Edit {
             source: None,
             lazy: Some(LazySource {
                 package,
+                replay_index,
                 limits,
                 physical_source_provenance,
                 owner_state,
@@ -237,6 +240,7 @@ impl Edit {
                 return Err(error);
             },
         };
+        snapshot.replay_index = Some(Arc::clone(&lazy.replay_index));
         snapshot.owner_state = Arc::clone(&lazy.owner_state);
         if lazy.release_retained_mce {
             snapshot.release_retained_mce();
@@ -2665,8 +2669,22 @@ impl Edit {
         {
             // The staged graph is exactly the candidate a plan published as
             // this edit's first change: its validated snapshot and patch stand.
-            let package =
-                crate::Package::from_opened_candidate(self.working.into_owned(), &snapshot);
+            let working = self.working.into_owned();
+            let changed = patch.resources().cloned().collect::<Vec<_>>();
+            let base = source.replay_index.clone().map_or_else(
+                || {
+                    crate::package::replay_index::ReplayIndex::from_package(source.package.as_ref())
+                        .map(Arc::new)
+                },
+                Ok,
+            )?;
+            let mut snapshot = snapshot;
+            snapshot.replay_index = Some(Arc::new(base.update(
+                source.package.as_ref(),
+                &working,
+                &changed,
+            )?));
+            let package = crate::Package::from_opened_candidate(working, &snapshot)?;
             return Ok(Commit::new(package, snapshot, patch));
         }
         let mut working = self.working;
@@ -2692,7 +2710,7 @@ impl Edit {
         )?;
         if patch.is_noop() {
             let package =
-                crate::Package::from_opened_candidate(source.package.as_ref().clone(), &source);
+                crate::Package::from_opened_candidate(source.package.as_ref().clone(), &source)?;
             return Ok(Commit {
                 package: Arc::new(package),
                 snapshot: source,
@@ -2712,8 +2730,21 @@ impl Edit {
             source.retained_mce.as_deref(),
             Some(source.slide_roots.as_ref()),
         )?;
+        let changed = patch.resources().cloned().collect::<Vec<_>>();
+        let base = source.replay_index.clone().map_or_else(
+            || {
+                crate::package::replay_index::ReplayIndex::from_package(source.package.as_ref())
+                    .map(Arc::new)
+            },
+            Ok,
+        )?;
+        snapshot.replay_index = Some(Arc::new(base.update(
+            source.package.as_ref(),
+            &working,
+            &changed,
+        )?));
         snapshot.owner_state = Arc::clone(&source.owner_state);
-        let package = crate::Package::from_opened_candidate(working.into_owned(), &snapshot);
+        let package = crate::Package::from_opened_candidate(working.into_owned(), &snapshot)?;
         Ok(Commit {
             package: Arc::new(package),
             snapshot,
@@ -3850,7 +3881,8 @@ impl Commit {
     #[must_use]
     pub fn into_parts(self) -> (crate::Package, Patch) {
         let package = Arc::try_unwrap(self.package).unwrap_or_else(|package| {
-            crate::Package::from_opened_candidate((*package.opc).clone(), &self.snapshot)
+            package
+                .derive_with_replay_index((*package.opc).clone(), Arc::clone(&package.replay_index))
         });
         (package, self.patch)
     }

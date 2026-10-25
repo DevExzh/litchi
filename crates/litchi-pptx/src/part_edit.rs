@@ -474,8 +474,9 @@ impl PartPatch {
         if let Some(validate) = validate {
             validate(package, &target, self)?;
         }
+        let replay_index = self.replay_index_after(package, &target)?;
         crate::package::signature::settle_unsigned_change(&mut target)?;
-        Ok(package.derive(target))
+        Ok(package.derive_with_replay_index(target, replay_index))
     }
 
     /// Visit only added or byte-replaced parts in an assembled replay target.
@@ -502,6 +503,51 @@ impl PartPatch {
             validate(&delta.name, target.get_part(&delta.name)?)?;
         }
         Ok(())
+    }
+
+    pub(crate) fn replay_index_after(
+        &self,
+        package: &Package,
+        target: &OpcPackage,
+    ) -> Result<Arc<crate::package::replay_index::ReplayIndex>> {
+        let mut changed = Vec::new();
+        changed
+            .try_reserve(self.deltas.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PPTX replay changed part index",
+                source,
+            })?;
+        changed.extend(self.deltas.iter().map(|delta| delta.name.clone()));
+        Ok(Arc::new(package.replay_index.update(
+            &package.opc,
+            target,
+            &changed,
+        )?))
+    }
+
+    pub(crate) fn touches_notes(&self, source: &OpcPackage, target: &OpcPackage) -> Result<bool> {
+        for delta in &self.deltas {
+            let old = optional_part(source, &delta.name)?;
+            let new = optional_part(target, &delta.name)?;
+            if old.as_ref().is_some_and(|part| {
+                matches!(
+                    part.content_type(),
+                    litchi_opc::constants::content_type::PML_NOTES_SLIDE
+                        | litchi_opc::constants::content_type::PML_NOTES_MASTER
+                        | litchi_opc::constants::content_type::OFC_THEME
+                )
+            }) || new.as_ref().is_some_and(|part| {
+                matches!(
+                    part.content_type(),
+                    litchi_opc::constants::content_type::PML_NOTES_SLIDE
+                        | litchi_opc::constants::content_type::PML_NOTES_MASTER
+                        | litchi_opc::constants::content_type::OFC_THEME
+                )
+            }) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 
@@ -584,7 +630,11 @@ impl<'a> Staged<'a> {
         if patch.is_noop() {
             return Ok((self.package.duplicate(), patch));
         }
-        Ok((self.package.derive(staged), patch))
+        let replay_index = patch.replay_index_after(self.package, &staged)?;
+        Ok((
+            self.package.derive_with_replay_index(staged, replay_index),
+            patch,
+        ))
     }
 }
 

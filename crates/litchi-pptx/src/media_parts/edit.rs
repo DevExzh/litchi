@@ -80,7 +80,14 @@ impl Package {
                     }
                     Ok(())
                 })?;
-                raw::validate_replay_references(target, &changed_resources, &changed_slides, limits)
+                let index = patch.replay_index_after(package, target)?;
+                raw::validate_replay_references(
+                    target,
+                    &index,
+                    &changed_resources,
+                    &changed_slides,
+                    limits,
+                )
             },
         )?;
         Ok(commit_of((package, patch.0.clone())))

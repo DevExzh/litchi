@@ -91,6 +91,61 @@ struct Scan {
     root: Option<usize>,
     processing_instructions: Vec<Range<usize>>,
     non_whitespace_text: Vec<(usize, Range<usize>)>,
+    index: NodeIndex,
+}
+
+#[derive(Debug, Default)]
+struct NodeIndex {
+    nearest_non_mce_parent: Vec<Option<usize>>,
+    direct_non_mce_children: Vec<Vec<usize>>,
+}
+
+impl NodeIndex {
+    fn build(nodes: &[Node]) -> Result<Self> {
+        let mut nearest_non_mce_parent = Vec::new();
+        nearest_non_mce_parent
+            .try_reserve_exact(nodes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "legacy comment collaboration parent index",
+                source,
+            })?;
+        nearest_non_mce_parent.resize(nodes.len(), None);
+        for (index, node) in nodes.iter().enumerate() {
+            let mut parent = node.parent;
+            while let Some(value) = parent {
+                if !mce_namespace(&nodes[value].namespace) {
+                    break;
+                }
+                parent = nearest_non_mce_parent[value];
+            }
+            nearest_non_mce_parent[index] = parent;
+        }
+
+        let mut direct_non_mce_children = Vec::new();
+        direct_non_mce_children
+            .try_reserve_exact(nodes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "legacy comment collaboration child index",
+                source,
+            })?;
+        direct_non_mce_children.resize_with(nodes.len(), Vec::new);
+        for (index, parent) in nearest_non_mce_parent.iter().enumerate() {
+            let Some(parent) = parent else {
+                continue;
+            };
+            direct_non_mce_children[*parent]
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "legacy comment collaboration child index",
+                    source,
+                })?;
+            direct_non_mce_children[*parent].push(index);
+        }
+        Ok(Self {
+            nearest_non_mce_parent,
+            direct_non_mce_children,
+        })
+    }
 }
 
 /// Locate and parse one selected author or comment extension in a complete
@@ -145,7 +200,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     }
 
     let item_indices = item_indices(&scan, root_index, kind, owner)?;
-    let offsets = collect_offsets(&scan, &item_indices);
+    let offsets = collect_offsets(&scan, &item_indices, limits)?;
     let active = if offsets.is_empty() {
         HashSet::new()
     } else {
@@ -188,7 +243,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     let item_index = active_item[0];
     let item = &scan.nodes[item_index];
 
-    let ext_lists = direct_non_mce_children(&scan, item_index)
+    let ext_lists = direct_non_mce_children(&scan.index, item_index)
         .filter(|index| {
             let node = &scan.nodes[*index];
             is_active(&node.span, &active)
@@ -231,7 +286,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     let mut payloads = Vec::new();
     if let Some(target_index) = target_index {
         let target = &scan.nodes[target_index];
-        for child in direct_non_mce_children(&scan, target_index) {
+        for child in direct_non_mce_children(&scan.index, target_index) {
             let node = &scan.nodes[child];
             if !is_active(&node.span, &active) {
                 continue;
@@ -251,7 +306,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
         }
         let payload_index = payloads[0];
         let parent_index = if kind == Kind::Threading {
-            let parents = direct_non_mce_children(&scan, payload_index)
+            let parents = direct_non_mce_children(&scan.index, payload_index)
                 .filter(|index| {
                     let node = &scan.nodes[*index];
                     is_active(&node.span, &active)
@@ -264,7 +319,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
                     "threadingInfo contains duplicate parentCm elements",
                 ));
             }
-            for child in direct_non_mce_children(&scan, payload_index) {
+            for child in direct_non_mce_children(&scan.index, payload_index) {
                 let node = &scan.nodes[child];
                 if is_active(&node.span, &active)
                     && !(p15_namespace(&node.namespace) && node.local.as_slice() == b"parentCm")
@@ -274,7 +329,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
             }
             parents.first().copied()
         } else {
-            if direct_non_mce_children(&scan, payload_index)
+            if direct_non_mce_children(&scan.index, payload_index)
                 .any(|index| is_active(&scan.nodes[index].span, &active))
             {
                 return Err(invalid("presenceInfo must not contain child elements"));
@@ -287,6 +342,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
                 payload,
                 payload_index,
                 &scan,
+                &scan.index,
                 &active,
                 limits.max_string_bytes,
             )?),
@@ -295,6 +351,7 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
                 payload_index,
                 parent_index,
                 &scan,
+                &scan.index,
                 &active,
             )?),
         };
@@ -403,7 +460,7 @@ fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Resu
     if candidate_items.is_empty() {
         return Ok(());
     }
-    let offsets = collect_offsets(&scan, &candidate_items);
+    let offsets = collect_offsets(&scan, &candidate_items, limits)?;
     let translated_offsets = mce_source.translate_offsets(&offsets)?;
     let active_offsets = active_offsets(
         mce_source.bytes(),
@@ -424,7 +481,14 @@ fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Resu
             resource: "legacy comment collaboration replay active offsets",
             source,
         })?;
-    active.extend(active_offsets);
+    for offset in active_offsets {
+        let index = translated_offsets
+            .binary_search(&offset)
+            .ok()
+            .and_then(|index| offsets.get(index).copied())
+            .ok_or_else(|| invalid("MCE active offset is not source-bound"))?;
+        active.insert(index);
+    }
 
     let mut owners = HashSet::new();
     owners
@@ -458,11 +522,11 @@ fn validate_active_extension(
     active: &HashSet<u32>,
     limits: Limits,
 ) -> Result<()> {
-    let target_ext_list = nearest_non_mce_parent(scan, target_index)
+    let target_ext_list = nearest_non_mce_parent(&scan.index, target_index)
         .ok_or_else(|| invalid("legacy comment collaboration extension list is missing"))?;
     let mut ext_list_count = 0usize;
     let mut target_in_active_ext_list = false;
-    for index in direct_non_mce_children(scan, item_index) {
+    for index in direct_non_mce_children(&scan.index, item_index) {
         let node = &scan.nodes[index];
         if !is_active(&node.span, active)
             || !pml_namespace(&node.namespace)
@@ -485,7 +549,7 @@ fn validate_active_extension(
     }
 
     let mut payload_index = None;
-    for index in direct_non_mce_children(scan, target_index) {
+    for index in direct_non_mce_children(&scan.index, target_index) {
         let node = &scan.nodes[index];
         if !is_active(&node.span, active) {
             continue;
@@ -507,7 +571,7 @@ fn validate_active_extension(
     let payload = &scan.nodes[payload_index];
     match kind {
         Kind::Presence => {
-            if direct_non_mce_children(scan, payload_index)
+            if direct_non_mce_children(&scan.index, payload_index)
                 .any(|index| is_active(&scan.nodes[index].span, active))
             {
                 return Err(invalid("presenceInfo must not contain child elements"));
@@ -516,6 +580,7 @@ fn validate_active_extension(
                 payload,
                 payload_index,
                 scan,
+                &scan.index,
                 active,
                 limits.max_string_bytes,
             )
@@ -523,7 +588,7 @@ fn validate_active_extension(
         },
         Kind::Threading => {
             let mut parent_index = None;
-            for index in direct_non_mce_children(scan, payload_index) {
+            for index in direct_non_mce_children(&scan.index, payload_index) {
                 let node = &scan.nodes[index];
                 if !is_active(&node.span, active) {
                     continue;
@@ -538,7 +603,15 @@ fn validate_active_extension(
                     return Err(invalid("threadingInfo contains an unexpected child"));
                 }
             }
-            parse_threading(payload, payload_index, parent_index, scan, active).map(drop)
+            parse_threading(
+                payload,
+                payload_index,
+                parent_index,
+                scan,
+                &scan.index,
+                active,
+            )
+            .map(drop)
         },
     }
 }
@@ -1157,6 +1230,7 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
     if !stack.is_empty() {
         return Err(invalid("unterminated legacy comment collaboration XML"));
     }
+    scan.index = NodeIndex::build(&scan.nodes)?;
     Ok(scan)
 }
 
@@ -1395,7 +1469,7 @@ fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Ve
         if !pml_namespace(&node.namespace) || node.local.as_slice() != expected {
             continue;
         }
-        if nearest_non_mce_parent(scan, index) != Some(root) {
+        if nearest_non_mce_parent(&scan.index, index) != Some(root) {
             continue;
         }
         let matches = match owner {
@@ -1420,36 +1494,43 @@ fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Ve
     Ok(result)
 }
 
-fn collect_offsets(scan: &Scan, items: &[usize]) -> Vec<u32> {
+fn collect_offsets(scan: &Scan, items: &[usize], limits: Limits) -> Result<Vec<u32>> {
     let mut offsets = Vec::new();
-    offsets.extend(
-        items
-            .iter()
-            .map(|item| scan.nodes[*item].span.range.start as u32),
-    );
-    let item_set = items.iter().copied().collect::<HashSet<_>>();
-    for (index, node) in scan.nodes.iter().enumerate() {
-        let mut current = Some(index);
-        let mut selected = false;
-        while let Some(value) = current {
-            if item_set.contains(&value) {
-                selected = true;
-                break;
+    offsets
+        .try_reserve(items.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration MCE offsets",
+            source,
+        })?;
+    let mut pending = Vec::new();
+    pending
+        .try_reserve(items.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration MCE offset traversal",
+            source,
+        })?;
+    for &item in items {
+        pending.push(item);
+        while let Some(index) = pending.pop() {
+            offsets.push(scan.nodes[index].span.range.start as u32);
+            for &child in scan.nodes[index].children.iter().rev() {
+                pending.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "legacy comment collaboration MCE offset traversal",
+                    source,
+                })?;
+                pending.push(child);
             }
-            current = scan.nodes[value].parent;
         }
-        if !selected {
-            continue;
-        }
-        // Ask the MCE selector about every node in the selected owner, not
-        // only recognized schema nodes. Otherwise an active foreign child
-        // would be absent from `active` and could be mistaken for an
-        // inactive MCE branch by the closed typed grammar.
-        offsets.push(node.span.range.start as u32);
     }
     offsets.sort_unstable();
     offsets.dedup();
-    offsets
+    if offsets.len() > limits.max_nodes {
+        return Err(limit(
+            "legacy comment collaboration MCE offsets",
+            limits.max_nodes,
+        ));
+    }
+    Ok(offsets)
 }
 
 fn target_extension_owner(scan: &Scan, index: usize, kind: Kind) -> Option<usize> {
@@ -1457,12 +1538,12 @@ fn target_extension_owner(scan: &Scan, index: usize, kind: Kind) -> Option<usize
     if !pml_namespace(&node.namespace) || node.local.as_slice() != b"ext" {
         return None;
     }
-    let parent = nearest_non_mce_parent(scan, index)?;
+    let parent = nearest_non_mce_parent(&scan.index, index)?;
     let parent_node = &scan.nodes[parent];
     if !(pml_namespace(&parent_node.namespace) && parent_node.local.as_slice() == b"extLst") {
         return None;
     }
-    let item = nearest_non_mce_parent(scan, parent)?;
+    let item = nearest_non_mce_parent(&scan.index, parent)?;
     let item_node = &scan.nodes[item];
     let expected_item = match kind {
         Kind::Presence => b"cmAuthor".as_slice(),
@@ -1486,23 +1567,12 @@ fn payload_name(node: &Node, kind: Kind) -> bool {
             }
 }
 
-fn nearest_non_mce_parent(scan: &Scan, index: usize) -> Option<usize> {
-    let mut current = scan.nodes[index].parent;
-    while let Some(value) = current {
-        if !mce_namespace(&scan.nodes[value].namespace) {
-            return Some(value);
-        }
-        current = scan.nodes[value].parent;
-    }
-    None
+fn nearest_non_mce_parent(index: &NodeIndex, node: usize) -> Option<usize> {
+    index.nearest_non_mce_parent[node]
 }
 
-fn direct_non_mce_children<'a>(scan: &'a Scan, parent: usize) -> impl Iterator<Item = usize> + 'a {
-    scan.nodes
-        .iter()
-        .enumerate()
-        .filter(move |(index, _)| nearest_non_mce_parent(scan, *index) == Some(parent))
-        .map(|(index, _)| index)
+fn direct_non_mce_children(index: &NodeIndex, parent: usize) -> impl Iterator<Item = usize> + '_ {
+    index.direct_non_mce_children[parent].iter().copied()
 }
 
 fn is_active(span: &Span, active: &HashSet<u32>) -> bool {
@@ -1521,6 +1591,7 @@ fn parse_presence(
     node: &Node,
     payload_index: usize,
     scan: &Scan,
+    index: &NodeIndex,
     active: &HashSet<u32>,
     max_string_bytes: usize,
 ) -> Result<PresenceInfo> {
@@ -1530,7 +1601,7 @@ fn parse_presence(
     }
     let user_id = attr_required(node, b"userId", "presenceInfo")?;
     let provider_id = attr_required(node, b"providerId", "presenceInfo")?;
-    if direct_non_mce_children(scan, payload_index)
+    if direct_non_mce_children(index, payload_index)
         .any(|index| is_active(&scan.nodes[index].span, active))
     {
         return Err(invalid("presenceInfo must not contain child elements"));
@@ -1545,6 +1616,7 @@ fn parse_threading(
     payload_index: usize,
     parent_index: Option<usize>,
     scan: &Scan,
+    index: &NodeIndex,
     active: &HashSet<u32>,
 ) -> Result<ThreadingInfo> {
     ensure_only_attributes(node, &[b"timeZoneBias"], "threadingInfo")?;
@@ -1554,7 +1626,7 @@ fn parse_threading(
     let time_zone_bias = attr_i32(node, b"timeZoneBias")?;
     let mut parent = None;
     let mut element_count = 0usize;
-    for child in direct_non_mce_children(scan, payload_index) {
+    for child in direct_non_mce_children(index, payload_index) {
         if !is_active(&scan.nodes[child].span, active) {
             continue;
         }
@@ -1568,7 +1640,7 @@ fn parse_threading(
             if has_active_non_whitespace_text(scan, child, active) {
                 return Err(invalid("parentCm must contain only whitespace text"));
             }
-            if direct_non_mce_children(scan, child)
+            if direct_non_mce_children(index, child)
                 .any(|index| is_active(&scan.nodes[index].span, active))
             {
                 return Err(invalid("parentCm must not contain child elements"));

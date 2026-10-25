@@ -83,17 +83,50 @@ fn replay_notes_aggregate_accepts_exact_and_refuses_one_byte_under() {
         max_total_bytes: total,
         ..Limits::DEFAULT
     };
-    assert!(super::package::validate_replay_total(&package, exact).is_ok());
+    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    assert!(super::package::validate_replay_total(&index, exact).is_ok());
     let under = Limits {
         max_total_bytes: total.saturating_sub(1),
         ..exact
     };
     assert!(matches!(
-        super::package::validate_replay_total(&package, under),
+        super::package::validate_replay_total(&index, under),
         Err(Error::Limit {
             resource: "notes aggregate bytes",
             limit,
         }) if limit == total.saturating_sub(1)
+    ));
+}
+
+#[test]
+fn replay_notes_index_applies_changed_slide_delta() {
+    let (package, _) = synthetic(Conformance::Transitional);
+    let name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+    let mut target = package.clone();
+    let old_len = target.get_part(&name).unwrap().blob().len();
+    target
+        .get_part_mut(&name)
+        .unwrap()
+        .set_blob(vec![0; old_len + 1]);
+    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    let updated = index
+        .update(&package, &target, std::slice::from_ref(&name))
+        .unwrap();
+    let exact = Limits {
+        max_total_bytes: usize::try_from(updated.notes_total_bytes()).unwrap(),
+        ..Limits::DEFAULT
+    };
+    assert!(super::package::validate_replay_total(&updated, exact).is_ok());
+    let under = Limits {
+        max_total_bytes: exact.max_total_bytes - 1,
+        ..exact
+    };
+    assert!(matches!(
+        super::package::validate_replay_total(&updated, under),
+        Err(Error::Limit {
+            resource: "notes aggregate bytes",
+            ..
+        })
     ));
 }
 

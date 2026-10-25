@@ -174,9 +174,12 @@ impl Package {
         package.add_part(Box::new(core_properties));
         package.add_part(Box::new(extended_properties));
 
+        let replay_index = crate::package::replay_index::ReplayIndex::from_package(&package)?;
+
         Ok(Self {
             opc: std::sync::Arc::new(package),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::new(replay_index),
             physical_source_provenance: false,
             semantic_limits: None,
             tolerance: crate::leniency::ToleranceReport::default(),
@@ -318,9 +321,11 @@ impl Package {
         // metadata above.
         let _deferred_presentation_properties_error =
             crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
+        let replay_index = crate::package::replay_index::ReplayIndex::from_package(&opc)?;
         Ok(Self {
             opc: std::sync::Arc::new(opc),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::new(replay_index),
             physical_source_provenance,
             semantic_limits,
             tolerance,

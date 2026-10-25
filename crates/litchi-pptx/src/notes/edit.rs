@@ -55,13 +55,12 @@ impl Package {
                     .semantic_limits()
                     .notes()
                     .constrained_by_source(target.read_limits());
-                let mut payload_changed = false;
                 patch.validate_changed_parts(target, |_, part| {
-                    payload_changed = true;
                     super::validate_replay_part(part, limits)
                 })?;
-                if payload_changed {
-                    super::validate_replay_total(target, limits)?;
+                if patch.touches_notes(&package.opc, target)? {
+                    let index = patch.replay_index_after(package, target)?;
+                    super::validate_replay_total(&index, limits)?;
                 }
                 Ok(())
             },

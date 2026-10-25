@@ -45,6 +45,10 @@ pub struct Package {
     /// snapshot still empties it.
     pub(crate) part_digests:
         std::sync::Arc<std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>>,
+    /// Retained source-backed relationship closures for semantic replay.
+    /// The index is updated by changed-part deltas, not rescanned on every
+    /// package publication.
+    pub(crate) replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     /// Limits of the encrypted container this package was opened under,
@@ -204,6 +208,7 @@ impl Package {
     ) -> Result<crate::opened::Edit> {
         Ok(crate::opened::Edit::new_lazy(
             std::sync::Arc::clone(&self.opc),
+            std::sync::Arc::clone(&self.replay_index),
             options.limits_value(),
             self.physical_source_provenance,
             std::sync::Arc::new(self.opened_owner_state()),
@@ -230,6 +235,7 @@ impl Package {
                 self.semantic_limits,
             )?,
         };
+        snapshot.replay_index = Some(std::sync::Arc::clone(&self.replay_index));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.offer_part_digests(&snapshot);
         Ok(snapshot)
@@ -275,7 +281,12 @@ impl Package {
         let mut opc = (*self.opc).clone();
         let snapshot =
             crate::opened::apply_removal_patch(&mut opc, patch, self.physical_source_provenance)?;
-        Ok(self.published(opc, snapshot))
+        let changed = patch
+            .opened_patch()
+            .resources()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.published(opc, snapshot, &changed)
     }
 
     fn require_physical_provenance(&self, source: &Self) -> Result<()> {
@@ -308,7 +319,12 @@ impl Package {
                 destination: self.part_digest_memo(),
             },
         )?;
-        Ok(self.published(opc, snapshot))
+        let changed = patch
+            .opened_patch()
+            .resources()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.published(opc, snapshot, &changed)
     }
 
     /// Apply a durable complete-revision-bound slide-removal patch (or its
@@ -369,10 +385,14 @@ impl Package {
         &self,
         opc: OpcPackage,
         mut snapshot: crate::opened::Snapshot,
-    ) -> (Self, crate::opened::Snapshot) {
+        changed: &[PackURI],
+    ) -> Result<(Self, crate::opened::Snapshot)> {
+        snapshot.replay_index = Some(std::sync::Arc::new(
+            self.replay_index.update(&self.opc, &opc, changed)?,
+        ));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
-        let package = Self::from_opened_candidate(opc, &snapshot);
-        (package, snapshot)
+        let package = Self::from_opened_candidate(opc, &snapshot)?;
+        Ok((package, snapshot))
     }
 
     /// Compare exact visible OPC content using the native revision proof.
@@ -425,9 +445,13 @@ impl Package {
             super::signature::refuse_signed_change(&candidate)?;
             candidate.validate_signature_edit_from(&self.opc)?;
         }
+        let changed = patch.resources().cloned().collect::<Vec<_>>();
+        snapshot.replay_index = Some(std::sync::Arc::new(
+            self.replay_index.update(&self.opc, &candidate, &changed)?,
+        ));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         Ok(crate::opened::Commit::new(
-            Self::from_opened_candidate(candidate, &snapshot),
+            Self::from_opened_candidate(candidate, &snapshot)?,
             snapshot,
             patch.clone(),
         ))
@@ -456,12 +480,21 @@ impl Package {
     /// (tolerance report, encryption provenance, physical-source flag). The
     /// payload-digest memo starts empty, because `opc` is another graph.
     pub(crate) fn derive(&self, opc: impl Into<std::sync::Arc<OpcPackage>>) -> Self {
+        self.derive_with_replay_index(opc, std::sync::Arc::clone(&self.replay_index))
+    }
+
+    pub(crate) fn derive_with_replay_index(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
+    ) -> Self {
         Self {
             opc: opc.into(),
             physical_source_provenance: self.physical_source_provenance,
             semantic_limits: self.semantic_limits,
             tolerance: self.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index,
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
@@ -483,21 +516,29 @@ impl Package {
     pub(crate) fn from_opened_candidate(
         opc: OpcPackage,
         snapshot: &crate::opened::Snapshot,
-    ) -> Self {
+    ) -> Result<Self> {
         let state = &snapshot.owner_state;
+        let replay_index = snapshot.replay_index.clone().map_or_else(
+            || {
+                crate::package::replay_index::ReplayIndex::from_package(&opc)
+                    .map(std::sync::Arc::new)
+            },
+            Ok,
+        )?;
         let mut package = Self {
             opc: std::sync::Arc::new(opc),
             physical_source_provenance: snapshot.physical_source_provenance,
             semantic_limits: state.semantic_limits,
             tolerance: state.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index,
             #[cfg(feature = "encryption")]
             encryption: state.encryption,
             #[cfg(feature = "encryption")]
             encryption_limits: state.encryption_limits,
         };
         package.adopt_part_digests(snapshot);
-        package
+        Ok(package)
     }
 
     /// Capture one slide's inert `[MS-PPTX]` change-tracking identifiers.

@@ -491,6 +491,7 @@ fn mce_choice_is_typed_while_fallback_bytes_remain_opaque() {
     let snapshot =
         AuthorPresenceSnapshot::from_xml(&source, 7, crate::comments::Limits::DEFAULT).unwrap();
     assert_eq!(snapshot.value().unwrap().user_id(), "choice");
+    assert!(super::validate_presence_replay(&source, crate::comments::Limits::DEFAULT,).is_ok());
     let mut edit = snapshot.edit();
     edit.set_presence(PresenceInfo::new("updated", "provider"))
         .unwrap();

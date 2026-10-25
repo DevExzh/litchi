@@ -348,16 +348,29 @@ fn replay_resource_only_change_checks_unchanged_slide_aggregate() {
         max_total_payload_bytes: 9,
         ..Limits::DEFAULT
     };
+    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
     assert!(
-        super::package::validate_replay_references(&package, &changed_resources, &[], exact,)
-            .is_ok()
+        super::package::validate_replay_references(
+            &package,
+            &index,
+            &changed_resources,
+            &[],
+            exact,
+        )
+        .is_ok()
     );
     let under = Limits {
         max_total_payload_bytes: 8,
         ..exact
     };
     assert!(matches!(
-        super::package::validate_replay_references(&package, &changed_resources, &[], under),
+        super::package::validate_replay_references(
+            &package,
+            &index,
+            &changed_resources,
+            &[],
+            under,
+        ),
         Err(Error::Limit {
             resource: "total payload bytes"
         })

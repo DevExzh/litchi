@@ -410,6 +410,10 @@ impl Slide {
 pub struct Snapshot {
     pub(crate) owner_state: Arc<crate::package::OpenedOwnerState>,
     pub(crate) package: Arc<OpcPackage>,
+    /// The facade's retained source-backed replay index when this snapshot
+    /// was captured through `Package`; raw capture callers may leave it empty
+    /// until publication attaches the owner state.
+    pub(crate) replay_index: Option<Arc<crate::package::replay_index::ReplayIndex>>,
     pub(crate) presentation_name: PackURI,
     pub(crate) slides: Arc<Vec<Slide>>,
     pub(crate) slide_name_index: Arc<SlideNameIndex>,
@@ -1047,6 +1051,7 @@ fn capture_internal(
     Ok(Snapshot {
         owner_state: Arc::default(),
         package: owned,
+        replay_index: None,
         presentation_name,
         slides: Arc::new(slides),
         slide_name_index: Arc::new(slide_name_index),

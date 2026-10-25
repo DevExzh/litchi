@@ -10,6 +10,7 @@ use super::{
     MAX_SLIDE_XML, MAX_THEME_XML, SLIDE_CT, THEME_CT, allocation, checked_add, invalid, limit,
     own_blob,
 };
+use crate::package::replay_index::ReplayIndex;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 #[cfg(test)]
@@ -330,29 +331,12 @@ pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()
 
 /// Check the recipient's notes-graph aggregate after a payload replay.
 ///
-/// This is deliberately a byte-only inventory: each changed XML member is
-/// parsed by [`validate_replay_part`], while the aggregate ceiling is checked
-/// across the retained notes master, its referenced theme, and notes slides
-/// without reparsing the complete owner graph.
-pub(crate) fn validate_replay_total(package: &OpcPackage, limits: Limits) -> Result<()> {
-    let mut total = 0usize;
-    for part in package.iter_parts() {
-        if part.content_type() == ct::PML_NOTES_SLIDE {
-            total = checked_add(total, part.blob().len(), "aggregate bytes")?;
-        } else if part.content_type() == ct::PML_NOTES_MASTER {
-            total = checked_add(total, part.blob().len(), "aggregate bytes")?;
-            for relationship in part.rels().iter() {
-                if relationship.is_external() || !relationship.reltype().ends_with("/theme") {
-                    continue;
-                }
-                let theme_name = relationship.target_partname().map_err(Error::Opc)?;
-                let theme = package.get_part(&theme_name)?;
-                if theme.content_type() == THEME_CT {
-                    total = checked_add(total, theme.blob().len(), "aggregate bytes")?;
-                }
-            }
-        }
-    }
+/// The aggregate ceiling is read from the retained ingress index, whose
+/// notes-master/theme edges and slide contributions are updated by the exact
+/// replay write set.
+pub(crate) fn validate_replay_total(index: &ReplayIndex, limits: Limits) -> Result<()> {
+    let total = usize::try_from(index.notes_total_bytes())
+        .map_err(|_| invalid("notes aggregate bytes overflow"))?;
     if total > limits.max_total_bytes {
         return Err(limit("notes aggregate bytes", limits.max_total_bytes));
     }

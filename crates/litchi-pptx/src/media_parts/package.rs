@@ -4,6 +4,7 @@ use super::{
     STRICT_AUDIO_REL, STRICT_VIDEO_REL, TimeParseError, ct, document_conformance_with_limits,
     invalid, limit, parse, rt, validate_id, write_pictures, xml_error,
 };
+use crate::package::replay_index::ReplayIndex;
 use litchi_core::xml::ReaderOrigin;
 
 /// # Errors
@@ -109,10 +110,12 @@ pub(crate) fn validate_replay_part(
 /// A media-only patch can replace a resource while leaving its owning slide
 /// XML byte-identical. In that case [`load_with_limits`] must still see the
 /// recipient's complete referenced resource set so its aggregate payload
-/// ceiling is enforced. The relationship walk avoids reparsing unrelated
-/// slides and skips slides already validated as changed payloads.
+/// ceiling is enforced. The retained reverse relationship index avoids
+/// scanning unrelated slides and skips slides already validated as changed
+/// payloads.
 pub(crate) fn validate_replay_references(
     package: &OpcPackage,
+    index: &ReplayIndex,
     changed_resources: &[PackURI],
     changed_slides: &[PackURI],
     limits: Limits,
@@ -120,22 +123,15 @@ pub(crate) fn validate_replay_references(
     if changed_resources.is_empty() {
         return Ok(());
     }
-    for slide in package
-        .iter_parts()
-        .filter(|part| part.content_type() == ct::PML_SLIDE)
-    {
-        if changed_slides.iter().any(|name| name == slide.partname()) {
+    for resource in changed_resources {
+        let Some(slides) = index.media_slides(resource) else {
             continue;
-        }
-        let references_changed_resource = slide.rels().iter().any(|relationship| {
-            !relationship.is_external()
-                && relationship
-                    .target_partname()
-                    .ok()
-                    .is_some_and(|target| changed_resources.iter().any(|name| name == &target))
-        });
-        if references_changed_resource {
-            load_with_limits(package, slide.partname(), limits).map(drop)?;
+        };
+        for slide in slides.iter() {
+            if changed_slides.iter().any(|name| name == slide) {
+                continue;
+            }
+            load_with_limits(package, slide, limits).map(drop)?;
         }
     }
     Ok(())
