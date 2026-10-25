@@ -570,7 +570,10 @@ fn select_cell(
     let cell_source = tile_cell(tile_payload, position.row(), position.column())
         .map_err(|error| map_cell_wire_error(error, position))?;
     charge_bnc_parse(budget, cell_source.len()).map_err(map_core_error)?;
-    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource)?;
+    let limits = package
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let cell = BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource)?;
     let old_format_key = classify_cell(&cell)?;
 
     // Number BNC identifiers in current Keynote files resolve through the
@@ -977,7 +980,13 @@ impl BncReferenceCensus {
     }
 
     fn count_cell(&mut self, source: &[u8]) -> bool {
-        let Ok(cell) = BncCell::parse(source) else {
+        let Ok(limits) = litchi_numbers_wire::Limits::DEFAULT
+            .with_input_bytes(source.len())
+            .and_then(|limits| limits.with_tail_bytes(source.len()))
+        else {
+            return false;
+        };
+        let Ok(cell) = BncCell::parse(source, &limits) else {
             return false;
         };
         let Some(primary) = cell.format_identifier() else {
@@ -1504,7 +1513,10 @@ fn rewrite(
     )
     .map_err(|error| map_cell_wire_error(error, selection.position))?;
     charge_bnc_parse(budget, cell_source.len()).map_err(map_core_error)?;
-    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource)?;
+    let limits = source
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let cell = BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource)?;
     if classify_cell(&cell)? != selection.old_format_key {
         return Err(Error::PatchConflict);
     }
@@ -1563,11 +1575,14 @@ fn rewrite(
         return Err(Error::InvalidSource);
     }
 
-    let mut replacement_cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource)?;
+    let mut replacement_cell =
+        BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource)?;
     replacement_cell
         .set_number_or_percentage_format_identifier_preserving_value(selected_key)
         .map_err(|_| Error::InvalidSource)?;
-    let replacement_cell = replacement_cell.encode();
+    let replacement_cell = replacement_cell
+        .encode(&limits)
+        .map_err(|_| Error::InvalidSource)?;
     if replacement_cell == cell_source && format_replacement.is_none() {
         return Err(Error::Verification);
     }

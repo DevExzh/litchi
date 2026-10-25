@@ -2769,7 +2769,8 @@ Both profiles now register 30 families.
 | --- | --- | --- |
 | `litchi_iwa_text_wire::{CharacterProperties, CharStyleRun, CharStyleError, char_style_runs, styles_in_span, restyle_span, character_style_variation, character_style_properties, character_style_parent, stylesheet_with_style}` | Shared TSWP `table_char_style` runs and the character-style variation records a span restyle writes | ✅ 0309 |
 | `litchi_numbers::cell::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, CharacterProperties}` | Registered family (32nd) in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text_style, apply_table_cell_text_style, table_cell_text_style}`; `Edit::set(At, CharacterProperties)` on stored cells | ✅ 0309 |
-| `litchi_numbers_wire::table_write::{tile_cell, tile_set_cell, header_adjust, list_intern, list_release, cell_bytes, cell_formula_state, table_formula_state, CellInput, FormulaState, TileCellWrite, WriteError}` | Shared TST cell writer for Pages and Keynote tables | ✅ 0309 |
+| `litchi_numbers_wire::{Limits, LimitKind}` and `litchi_numbers_wire::{BncCell, BncCellView, cell_value::decode_cell_value, pre_bnc::PreBncCellView}` | Every raw parse, projection and owned encode takes the caller-selected `&Limits`; unknown wire fields and opaque tails remain source-authoritative | ✅ 0362ul66 |
+| `litchi_numbers_wire::table_write::{tile_cell, tile_set_cell, header_adjust, list_intern, list_release, cell_bytes, cell_formula_state, table_formula_state, CellInput, FormulaState, TileCellWrite, WriteError}` | Shared TST cell writer for Pages and Keynote tables; each variable-size reader/writer takes `&Limits`, preflights input/output/items, and uses fallible staging | ✅ 0309, 0362ul66 |
 | `litchi_pages::table::values::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Value}` | Registered family in `pages`; `Package::{edit_body_table_values, apply_body_table_values}`; `Edit::set(row, column, Value)` | ✅ 0309 |
 | `litchi_keynote::slide::drawable::{Edit::set_table_cell, TableCellValue, Unsupported::{TableFormulas, TableStorage}}` | Slide-table cell values in the slide-drawable commit | ✅ 0309 |
 | `litchi_pages::section::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Run, CharacterProperties}` | Registered family in `pages`; `Package::{edit_section_text_style, apply_section_text_style, section_text_runs}`; `Edit::set(TextSpan, CharacterProperties)` (UTF-16, several per edit) | ✅ 0309 |
@@ -3280,6 +3281,35 @@ sheet traits and no boxed future in the formula engine.
 | `litchi_eval::FormulaEvaluator::{evaluate_cell, evaluate_sheet}` | kept `async` (0353a); the engine core is synchronous and the futures only await the caller's `Fetch` for `WEBSERVICE` between passes |
 
 See [0353a](unified-ops/0353a-sheet-errors-and-sync-engine.md).
+
+## Numbers-wire raw boundaries (records 0362ul66, 0362ul66a)
+
+The standalone `litchi-numbers-wire` leaf has one caller-selected raw policy:
+`Limits` and its typed `LimitKind` error dimensions. `BncCell::{parse, encode}`
+and `BncCellView::parse`, the legacy `PreBncCellView::parse`, and
+`cell_value::decode_cell_value` all require `&Limits`. The shared table-cell
+reader keeps its required aggregate read budget and also receives `&Limits`.
+The borrowed BNC rewrite and clear operations use canonical names and the same
+typed profile: `rewrite_duration_format_identifier`, `rewrite_scalar`,
+`clear_value`, `clear_comment`, `rewrite_formula_cache`, `rewrite_formula`, and
+`rewrite_formula_without_cache`.
+The variable-size table writers (`tile_cell`, `tile_set_cell`, `header_adjust`,
+`list_intern`, `list_release`, `cell_bytes`, and the formula-state readers)
+likewise require the same policy. Input, output, field, opaque-tail and item
+counts are checked before copies or staging allocations; vectors use fallible
+reservation. No default policy is selected inside these boundaries, and no
+`*_with_limits` twin or compatibility alias was introduced.
+
+Owned BNC cells copy fixed fields and opaque tails only after the selected
+profile admits their exact sizes. Re-encoding and all table rewrites retain
+unknown protobuf fields and tail bytes byte-for-byte. Numbers, Pages and Keynote
+consumers carry their owner-selected profile through every raw call; the
+profile is derived from the package ingress and semantic budgets at the owner
+boundary. The raw leaf's source tests cover exact and one-under input,
+field, tail and output caps plus owned round-trip fidelity.
+
+See [0362ul66](unified-ops/0362ul66-numbers-wire-raw.md) and the review return
+[0362ul66a](unified-ops/0362ul66a-numbers-wire-raw-review.md).
 
 ## Unified `File` configuration and commit accessors (record 0362)
 

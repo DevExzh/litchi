@@ -2536,7 +2536,11 @@ fn read_non_popup_control<'source>(
     let cell_bytes = row
         .cell(target.position.column())
         .ok_or(Error::InvalidSource { path })?;
-    let cell = BncCell::parse(cell_bytes).map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(
+        cell_bytes,
+        &crate::cell::wire::limits_for_source(cell_bytes),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let format_identifier = cell.format_identifier();
     let control_identifier = cell.control_cell_spec_identifier();
     if format_identifier.is_none() && control_identifier.is_none() {
@@ -3086,7 +3090,11 @@ fn read_popup_with_policy<'source>(
     let cell_buffer = row
         .cell(target.position.column())
         .ok_or(Error::InvalidSource { path })?;
-    let cell = BncCell::parse(cell_buffer).map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(
+        cell_buffer,
+        &crate::cell::wire::limits_for_source(cell_buffer),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let format_id = cell.format_identifier();
     let control_id = cell.control_cell_spec_identifier();
     if format_id.is_none() && control_id.is_none() {

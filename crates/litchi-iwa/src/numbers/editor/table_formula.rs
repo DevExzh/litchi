@@ -60,7 +60,7 @@ pub(super) fn set_attached_table_formula(
             column,
         )?
         .as_deref()
-        .map(BncCell::parse)
+        .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
         .transpose()?;
         let formula = cell.as_ref().and_then(|cell| match cell.stored_value() {
             StoredValue::Formula(identifier) => Some(identifier),

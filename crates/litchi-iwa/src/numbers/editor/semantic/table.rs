@@ -454,7 +454,8 @@ fn focused_cell_has_numeric_storage(cell: Option<&[u8]>) -> Result<bool> {
     let Some(cell) = cell else {
         return Ok(true);
     };
-    let cell = BncCellView::parse(cell).map_err(focused_data_format_error)?;
+    let cell = BncCellView::parse(cell, &crate::numbers::bnc_limits(cell))
+        .map_err(focused_data_format_error)?;
     let numeric_type = cell.numeric_cell_type();
     let numeric_type = matches!(
         numeric_type,

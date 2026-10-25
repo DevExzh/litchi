@@ -271,11 +271,13 @@ fn formula_error_cell(identifier: u32) -> TestResult<Vec<u8>> {
     // fields in the canonical layout.  The test-only raw construction keeps
     // the wire fixture independent of private production constants while
     // exercising the public BncCell parser on the resulting bytes.
-    let mut bytes = BncCell::minimal().encode();
+    let mut bytes = BncCell::minimal()
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap();
     bytes[1] = 8;
     bytes[8..12].copy_from_slice(&FORMULA_ERROR_FLAG.to_le_bytes());
     bytes.extend_from_slice(&identifier.to_le_bytes());
-    BncCell::parse(&bytes)?;
+    BncCell::parse(&bytes, &litchi_numbers_wire::Limits::DEFAULT)?;
     Ok(bytes)
 }
 
@@ -777,11 +779,19 @@ fn table_tile(comment_identifier: u32) -> TestResult<tst::Tile> {
     number_cell.set_comment_identifier(Some(comment_identifier));
 
     let rows = [
-        string_cell.encode(),
-        formula_cell.encode(),
+        string_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
+        formula_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
         error_cell,
-        rich_text_cell.encode(),
-        number_cell.encode(),
+        rich_text_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
+        number_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap(),
     ];
     let mut row_infos = Vec::new();
     row_infos.try_reserve(rows.len())?;

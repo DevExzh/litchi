@@ -10,7 +10,7 @@ use std::fmt;
 use litchi_iwa_common::formula::FiniteF64;
 
 use crate::pre_bnc::PreBncCellView;
-use crate::{BncCellView, CachedScalar, Error as WireError, StoredValue};
+use crate::{BncCellView, CachedScalar, Error as WireError, Limits, StoredValue};
 
 /// A source-backed value classification with no sidecar resolution.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -101,17 +101,20 @@ impl std::error::Error for DecodeError {
 /// and comment identifiers are intentionally left unresolved for the concrete
 /// package adapter. Formula identifiers take precedence over cached scalar
 /// values in both storage generations.
-pub fn decode_cell_value(source: &[u8]) -> Result<CellValueSource, DecodeError> {
+pub fn decode_cell_value(source: &[u8], limits: &Limits) -> Result<CellValueSource, DecodeError> {
+    limits
+        .check_input(source.len())
+        .map_err(|error| DecodeError::Bnc(error.into()))?;
     match source.first().copied() {
         None => Err(DecodeError::Empty),
-        Some(0..=4) => decode_pre_bnc(source),
-        Some(5) => decode_bnc(source),
+        Some(0..=4) => decode_pre_bnc(source, limits),
+        Some(5) => decode_bnc(source, limits),
         Some(version) => Err(DecodeError::UnsupportedVersion(version)),
     }
 }
 
-fn decode_bnc(source: &[u8]) -> Result<CellValueSource, DecodeError> {
-    let cell = BncCellView::parse(source).map_err(DecodeError::Bnc)?;
+fn decode_bnc(source: &[u8], limits: &Limits) -> Result<CellValueSource, DecodeError> {
+    let cell = BncCellView::parse(source, limits).map_err(DecodeError::Bnc)?;
     let comment_identifier = cell.comment_identifier();
     let stored_value = cell.stored_value();
     if let StoredValue::Formula(identifier) = stored_value {
@@ -181,8 +184,8 @@ fn decode_bnc_duration(cached_scalar: Option<CachedScalar>) -> Result<FiniteF64,
     }
 }
 
-fn decode_pre_bnc(source: &[u8]) -> Result<CellValueSource, DecodeError> {
-    let cell = PreBncCellView::parse(source).map_err(DecodeError::PreBnc)?;
+fn decode_pre_bnc(source: &[u8], limits: &Limits) -> Result<CellValueSource, DecodeError> {
+    let cell = PreBncCellView::parse(source, limits).map_err(DecodeError::PreBnc)?;
     let comment_identifier = cell.comment_identifier();
     if let Some(identifier) = cell.formula_identifier() {
         return Ok(CellValueSource {

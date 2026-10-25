@@ -3360,7 +3360,7 @@ impl<'a> TableDataExtractor<'a> {
         row_count: usize,
         column_count: usize,
     ) -> Result<ParsedCell> {
-        let decoded = decode_cell_value(data)
+        let decoded = decode_cell_value(data, &crate::cell::wire::limits_for_source(data))
             .map_err(|error| map_cell_value_decode_error(error, data, row, column))?;
         let comment_identifier = decoded.comment_identifier;
         let value = match decoded.value {
@@ -7659,7 +7659,9 @@ mod tests {
 
     #[test]
     fn tile_projection_accepts_missing_slots_inside_the_table_width() -> super::Result<()> {
-        let cell = BncCell::minimal().encode();
+        let cell = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let source = tile_source(
             vec![tile_row(
                 0,
@@ -7681,7 +7683,9 @@ mod tests {
 
     #[test]
     fn tile_projection_rejects_sparse_rows_with_a_false_declared_cell_count() {
-        let cell = BncCell::minimal().encode();
+        let cell = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let source = tile_source(
             vec![tile_row(
                 0,
@@ -7724,7 +7728,9 @@ mod tests {
 
     #[test]
     fn tile_rows_use_modern_buffers_only_when_both_are_present() -> super::Result<()> {
-        let modern = BncCell::minimal().encode();
+        let modern = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let source = tile_source(
             vec![tile_row(
                 0,
@@ -7766,7 +7772,9 @@ mod tests {
 
     #[test]
     fn tile_rows_honor_wide_offset_units() -> super::Result<()> {
-        let cell = BncCell::minimal().encode();
+        let cell = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let mut storage = cell.clone();
         storage.extend_from_slice(&cell);
         let source = tile_source(
@@ -7792,7 +7800,7 @@ mod tests {
     fn repeated_comment_cells_charge_owned_materialization_before_insertion() -> super::Result<()> {
         let mut cell = BncCell::minimal();
         cell.set_comment_identifier(Some(7));
-        let cell = cell.encode();
+        let cell = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         let cell_end = u16::try_from(cell.len())
             .map_err(|_| Error::InvalidFormat("test comment cell is too large".to_owned()))?;
         let mut storage = cell.clone();
@@ -7902,7 +7910,7 @@ mod tests {
     fn comment_text_budget_rejects_a_later_copy_before_map_insertion() -> super::Result<()> {
         let mut cell = BncCell::minimal();
         cell.set_comment_identifier(Some(7));
-        let cell = cell.encode();
+        let cell = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         let cell_end = u16::try_from(cell.len())
             .map_err(|_| Error::InvalidFormat("test comment cell is too large".to_owned()))?;
         let mut storage = cell.clone();
@@ -8214,9 +8222,11 @@ mod tests {
             &decimal128_le(-1_234.5)
                 .unwrap_or_else(|error| panic!("test decimal did not encode: {error}")),
         );
-        let round_tripped = BncCell::parse(&encoded)
-            .unwrap_or_else(|error| panic!("type-nine cell did not parse: {error}"))
-            .encode();
+        let round_tripped =
+            BncCell::parse(&encoded, &crate::cell::wire::limits_for_source(&encoded))
+                .unwrap_or_else(|error| panic!("type-nine cell did not parse: {error}"))
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap();
 
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         let parsed = TableDataExtractor::parse_cell_storage(

@@ -25,7 +25,9 @@ pub(super) fn try_at_location(
     else {
         return Ok(false);
     };
-    let Some(list_identifier) = BncCell::parse(&cell)?.conditional_style_identifier() else {
+    let Some(list_identifier) =
+        BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))?.conditional_style_identifier()
+    else {
         return Ok(false);
     };
     let (resolved, entry) = resolve_entry(package, location, list_identifier)?;

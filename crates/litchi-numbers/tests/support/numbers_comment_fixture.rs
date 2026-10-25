@@ -559,7 +559,7 @@ pub(crate) fn comment_cell(key: Option<u32>) -> TestResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_number(42.0)?;
     cell.set_comment_identifier(key);
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 pub(crate) fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
@@ -1194,17 +1194,19 @@ pub(crate) fn source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> 
             let Some(buffer) = row.cell_storage_buffer.as_mut() else {
                 continue;
             };
-            let mut cell = BncCell::parse(buffer.as_slice())?;
+            let mut cell =
+                BncCell::parse(buffer.as_slice(), &litchi_numbers_wire::Limits::DEFAULT)?;
             if cell.comment_identifier().is_some() {
                 cell.set_comment_identifier(Some(4));
-                *buffer = cell.encode();
+                *buffer = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
             }
             if !row.cell_storage_buffer_pre_bnc.is_empty() {
                 let pre_bnc = &mut row.cell_storage_buffer_pre_bnc;
-                let mut cell = BncCell::parse(pre_bnc.as_slice())?;
+                let mut cell =
+                    BncCell::parse(pre_bnc.as_slice(), &litchi_numbers_wire::Limits::DEFAULT)?;
                 if cell.comment_identifier().is_some() {
                     cell.set_comment_identifier(Some(4));
-                    *pre_bnc = cell.encode();
+                    *pre_bnc = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
                 }
             }
         }

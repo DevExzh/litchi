@@ -2766,7 +2766,9 @@ pub(super) fn verify_formula_link(
         column,
     )?
     .ok_or_else(|| Error::InvalidFormat("Numbers formula cell is missing".to_owned()))?;
-    if BncCell::parse(&stored)?.stored_value() != StoredValue::Formula(formula_id) {
+    if BncCell::parse(&stored, &crate::numbers::bnc_limits(&stored))?.stored_value()
+        != StoredValue::Formula(formula_id)
+    {
         return Err(Error::InvalidFormat(
             "Numbers formula cell reference failed validation".to_owned(),
         ));
@@ -3754,19 +3756,24 @@ pub(super) fn update_tile(
                     );
                     return Ok(());
                 };
-                let mut cell = BncCell::parse(data)?;
+                let limits = crate::numbers::bnc_limits(data);
+                let mut cell = BncCell::parse(data, &limits)?;
                 cell.clear_value_preserving_metadata();
-                cells[column] = Some(cell.encode());
+                cells[column] = Some(crate::numbers::bnc_encode(&cell, &limits)?);
             },
             EncodedValue::Comment(identifier) => {
                 if let Some(data) = cells[column].as_deref() {
-                    let mut cell = BncCell::parse(data)?;
+                    let limits = crate::numbers::bnc_limits(data);
+                    let mut cell = BncCell::parse(data, &limits)?;
                     cell.set_comment_identifier(identifier);
-                    cells[column] = Some(cell.encode());
+                    cells[column] = Some(crate::numbers::bnc_encode(&cell, &limits)?);
                 } else if identifier.is_some() {
                     let mut cell = BncCell::minimal();
                     cell.set_comment_identifier(identifier);
-                    cells[column] = Some(cell.encode());
+                    cells[column] = Some(crate::numbers::bnc_encode(
+                        &cell,
+                        &crate::numbers::bnc::Limits::DEFAULT,
+                    )?);
                 } else {
                     updated_cell_count = Some(
                         u32::try_from(cells.iter().filter(|cell| cell.is_some()).count()).map_err(
@@ -3781,13 +3788,17 @@ pub(super) fn update_tile(
                 applied_rule,
             } => {
                 if let Some(data) = cells[column].as_deref() {
-                    let mut cell = BncCell::parse(data)?;
+                    let limits = crate::numbers::bnc_limits(data);
+                    let mut cell = BncCell::parse(data, &limits)?;
                     cell.set_conditional_style(identifier, applied_rule);
-                    cells[column] = Some(cell.encode());
+                    cells[column] = Some(crate::numbers::bnc_encode(&cell, &limits)?);
                 } else if identifier.is_some() {
                     let mut cell = BncCell::minimal();
                     cell.set_conditional_style(identifier, applied_rule);
-                    cells[column] = Some(cell.encode());
+                    cells[column] = Some(crate::numbers::bnc_encode(
+                        &cell,
+                        &crate::numbers::bnc::Limits::DEFAULT,
+                    )?);
                 } else {
                     updated_cell_count = Some(
                         u32::try_from(cells.iter().filter(|cell| cell.is_some()).count()).map_err(
@@ -3798,13 +3809,17 @@ pub(super) fn update_tile(
                 }
             },
             EncodedValue::Raw(data) => {
-                BncCell::parse(&data)?;
+                BncCell::parse(&data, &crate::numbers::bnc_limits(&data))?;
                 cells[column] = Some(data);
             },
             value => {
+                let limits = cells[column]
+                    .as_deref()
+                    .map(crate::numbers::bnc_limits)
+                    .unwrap_or(crate::numbers::bnc::Limits::DEFAULT);
                 let mut cell = cells[column]
                     .as_deref()
-                    .map(BncCell::parse)
+                    .map(|data| BncCell::parse(data, &limits))
                     .transpose()?
                     .unwrap_or_else(BncCell::minimal);
                 match value {
@@ -3827,7 +3842,7 @@ pub(super) fn update_tile(
                     | EncodedValue::ConditionalStyle { .. }
                     | EncodedValue::Raw(_) => unreachable!(),
                 }
-                cells[column] = Some(cell.encode());
+                cells[column] = Some(crate::numbers::bnc_encode(&cell, &limits)?);
             },
         }
 

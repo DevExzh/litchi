@@ -30,12 +30,13 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_protos::{tsk, tst};
 use litchi_numbers_wire::{
     BncCell, CellDataFormatKind, DATE_TIME_CELL_FORMAT_KIND, EXPLICIT_DECIMAL_FORMAT,
-    EXPLICIT_DURATION_FORMAT, EXPLICIT_DURATION_WITH_NUMBER_FORMAT,
+    EXPLICIT_DURATION_FORMAT, EXPLICIT_DURATION_WITH_NUMBER_FORMAT, Limits,
 };
 #[path = "../../../litchi-numbers/tests/support/table_cell_data_format_fixture.rs"]
 mod fixture;
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
+const WIRE_LIMITS: Limits = Limits::DEFAULT;
 const MAX_ENTRIES: usize = 128;
 const MAX_ENTRY_BYTES: u64 = 1024 * 1024;
 const MAX_EXPANDED_BYTES: u64 = 4 * 1024 * 1024;
@@ -641,7 +642,7 @@ fn exercise_secondary_number(data: &[u8]) {
                 .unwrap_or_else(|error| panic!("Duration secondary target cells: {error}"))
                 .into_iter()
                 .next()
-                .and_then(|bytes| BncCell::parse(&bytes).ok())
+                .and_then(|bytes| BncCell::parse(&bytes, &WIRE_LIMITS).ok())
                 .unwrap_or_else(|| panic!("Duration secondary target cell is missing"));
             assert_eq!(
                 changed_cell.secondary_format_identifier(),
@@ -666,7 +667,7 @@ fn exercise_secondary_number(data: &[u8]) {
                 .unwrap_or_else(|error| panic!("Duration secondary cleared cells: {error}"))
                 .into_iter()
                 .next()
-                .and_then(|bytes| BncCell::parse(&bytes).ok())
+                .and_then(|bytes| BncCell::parse(&bytes, &WIRE_LIMITS).ok())
                 .unwrap_or_else(|| panic!("Duration secondary cleared cell is missing"));
             assert_eq!(cleared_cell.secondary_format_identifier(), None);
             assert_eq!(
@@ -715,7 +716,7 @@ fn duration_secondary_source() -> Vec<u8> {
     .unwrap_or_else(|error| panic!("Duration secondary fixture must build: {error}"));
     let source = fixture::rewrite_tile_cells(&source, |cells| {
         for cell_bytes in cells.iter_mut() {
-            let mut encoded = BncCell::parse(cell_bytes)?.encode();
+            let mut encoded = BncCell::parse(cell_bytes, &WIRE_LIMITS)?.encode(&WIRE_LIMITS)?;
             let flags = u32::from_le_bytes(
                 encoded
                     .get(8..12)
@@ -910,7 +911,7 @@ fn exercise_malformed_sources() {
                     CellDataFormatKind::NumberOrPercentage,
                     None,
                 )?;
-                *first = cell.encode();
+                *first = cell.encode(&WIRE_LIMITS)?;
                 Ok(())
             })
             .unwrap_or_else(|error| panic!("Duration wrong-family cell source: {error}")),
@@ -1000,7 +1001,7 @@ fn exercise_malformed_sources() {
                 )?;
                 cell.set_formula_reference(11);
                 cell.set_formula_cached_boolean(true)?;
-                *first = cell.encode();
+                *first = cell.encode(&WIRE_LIMITS)?;
                 Ok(())
             })
             .unwrap_or_else(|error| panic!("Duration formula mismatch source: {error}")),
@@ -1270,9 +1271,11 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) {
     assert_eq!(before.len(), after.len());
     for (left, right) in before.iter().zip(after.iter()) {
         let left_cell =
-            BncCell::parse(left).unwrap_or_else(|error| panic!("Duration source BNC: {error}"));
+            BncCell::parse(left, &WIRE_LIMITS)
+                .unwrap_or_else(|error| panic!("Duration source BNC: {error}"));
         let right_cell =
-            BncCell::parse(right).unwrap_or_else(|error| panic!("Duration target BNC: {error}"));
+            BncCell::parse(right, &WIRE_LIMITS)
+                .unwrap_or_else(|error| panic!("Duration target BNC: {error}"));
         assert_eq!(
             left_cell
                 .cached_scalar()
@@ -1288,9 +1291,12 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) {
 
 fn normalized_cell(cell: &[u8]) -> Vec<u8> {
     let mut parsed =
-        BncCell::parse(cell).unwrap_or_else(|error| panic!("Duration BNC normalization: {error}"));
+        BncCell::parse(cell, &WIRE_LIMITS)
+            .unwrap_or_else(|error| panic!("Duration BNC normalization: {error}"));
     parsed.clear_explicit_format();
-    parsed.encode()
+    parsed
+        .encode(&WIRE_LIMITS)
+        .unwrap_or_else(|error| panic!("Duration BNC normalization encode: {error}"))
 }
 
 fn package_bytes(package: &Package) -> Vec<u8> {

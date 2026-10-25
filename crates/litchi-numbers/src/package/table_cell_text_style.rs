@@ -378,8 +378,11 @@ fn current_style(
     let Some(cell) = locate_cell(working, store, position)? else {
         return Ok(base);
     };
-    let cell =
-        litchi_numbers_wire::BncCell::parse(&cell.bytes).map_err(|_error| Error::InvalidSource)?;
+    let cell = litchi_numbers_wire::BncCell::parse(
+        &cell.bytes,
+        &crate::cell::wire::limits_for_source(&cell.bytes),
+    )
+    .map_err(|_error| Error::InvalidSource)?;
     let Some(key) = cell.text_style_identifier() else {
         return Ok(base);
     };
@@ -510,8 +513,11 @@ fn publish(
     for (position, properties) in cells {
         let located =
             locate_cell(&working, &store, *position)?.ok_or(Error::Refused(Refusal::EmptyCell))?;
-        let cell = litchi_numbers_wire::BncCell::parse(&located.bytes)
-            .map_err(|_error| Error::InvalidSource)?;
+        let cell = litchi_numbers_wire::BncCell::parse(
+            &located.bytes,
+            &crate::cell::wire::limits_for_source(&located.bytes),
+        )
+        .map_err(|_error| Error::InvalidSource)?;
         let current = current_style(&working, sheet, table, *position)?;
         let key = if let Some((_, _, _, key)) = variations
             .iter_mut()
@@ -644,10 +650,12 @@ fn publish(
     for (position, key) in cell_updates {
         let located =
             locate_cell(&working, &store, position)?.ok_or(Error::Refused(Refusal::EmptyCell))?;
-        let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes)
+        let limits = crate::cell::wire::limits_for_source(&located.bytes);
+        let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
             .map_err(|_error| Error::InvalidSource)?;
         cell.set_text_style_identifier(Some(key));
-        let encoded = cell.encode();
+        let encoded =
+            crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
         let (_, tile_data) =
             topology::message(&working, located.tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
         let mut field_index = 0_usize;

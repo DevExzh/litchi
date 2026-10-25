@@ -1692,6 +1692,13 @@ impl Package {
             map_wire_preflight_error(error, "Keynote semantic payload", SemanticPath::Package)
         })
     }
+
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// semantic and archive ingress limits.
+    pub(crate) fn numbers_wire_limits(&self) -> ReadResult<litchi_numbers_wire::Limits> {
+        let wire = self.semantic_wire_limits()?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
+    }
 }
 
 fn slide_placeholder_role(

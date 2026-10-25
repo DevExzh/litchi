@@ -457,6 +457,9 @@ fn message(payload: &[u8], number: u32) -> Result<Vec<&[u8]>, Error> {
 fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let target = edit.target.as_ref().ok_or(Error::InvalidSource)?;
     let package = edit.source;
+    let limits = package
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let mut owners: Vec<&[u8]> = Vec::new();
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
@@ -524,6 +527,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             target.drawable_identifier.get(),
             *row,
             *column,
+            &limits,
         )
         .map_err(storage_error)?
         {
@@ -536,15 +540,15 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         let local = u32::try_from(u64::from(*row) % size).map_err(|_error| Error::InvalidSource)?;
         let (tile_type, tile_payload) = staged.payload(tile, &[TILE])?;
         let tile_payload = tile_payload.to_vec();
-        let previous =
-            table_write::tile_cell(&tile_payload, local, *column).map_err(storage_error)?;
+        let previous = table_write::tile_cell(&tile_payload, local, *column, &limits)
+            .map_err(storage_error)?;
         let (list_type, list_payload) = staged.payload(strings, &DATA_LIST)?;
         let mut list = list_payload.to_vec();
         let mut key = None;
         let input = match value {
             Value::Text(text) => {
                 let (interned, interned_key) =
-                    table_write::list_intern(&list, text).map_err(storage_error)?;
+                    table_write::list_intern(&list, text, &limits).map_err(storage_error)?;
                 list = interned;
                 key = Some(interned_key);
                 CellInput::Text(text)
@@ -553,10 +557,10 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             Value::Boolean(flag) => CellInput::Boolean(*flag),
             Value::Empty => CellInput::Empty,
         };
-        let (cell, released) =
-            table_write::cell_bytes(previous.as_deref(), &input, key).map_err(storage_error)?;
+        let (cell, released) = table_write::cell_bytes(previous.as_deref(), &input, key, &limits)
+            .map_err(storage_error)?;
         if let Some(released) = released {
-            list = table_write::list_release(&list, released).map_err(storage_error)?;
+            list = table_write::list_release(&list, released, &limits).map_err(storage_error)?;
         }
         let written = table_write::tile_set_cell(
             &tile_payload,
@@ -564,6 +568,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             *column,
             target.table_columns,
             cell.as_deref(),
+            &limits,
         )
         .map_err(storage_error)?;
         let delta = i64::from(cell.is_some()) - i64::from(written.previous.is_some());
@@ -575,12 +580,12 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
                 .ok_or(Error::Refused(Refusal::UnsupportedStorage))?;
             let (bucket_type, payload) = staged.payload(bucket, &[HEADER_BUCKET])?;
             let adjusted =
-                table_write::header_adjust(payload, *row, delta).map_err(storage_error)?;
+                table_write::header_adjust(payload, *row, delta, &limits).map_err(storage_error)?;
             staged.payloads.insert(bucket, (bucket_type, adjusted));
             if let Some(column_headers) = column_headers {
                 let (header_type, payload) = staged.payload(column_headers, &[HEADER_BUCKET])?;
-                let adjusted =
-                    table_write::header_adjust(payload, *column, delta).map_err(storage_error)?;
+                let adjusted = table_write::header_adjust(payload, *column, delta, &limits)
+                    .map_err(storage_error)?;
                 staged
                     .payloads
                     .insert(column_headers, (header_type, adjusted));

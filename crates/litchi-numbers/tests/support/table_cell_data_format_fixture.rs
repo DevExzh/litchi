@@ -753,7 +753,7 @@ pub(crate) fn rewrite_currency_secondary_identifier(
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let parsed = BncCell::parse(first)?;
+        let parsed = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         if parsed.secondary_format_identifier().is_none() {
             return Err(io::Error::other("format fixture secondary identifier is missing").into());
         }
@@ -778,7 +778,7 @@ fn currency_secondary_cell() -> FixtureResult<Vec<u8>> {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3a, 0xb0, 0x02, 0x00,
         0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
     ];
-    let cell = BncCell::parse(&bytes).map_err(|error| {
+    let cell = BncCell::parse(&bytes, &litchi_numbers_wire::Limits::DEFAULT).map_err(|error| {
         io::Error::other(format!("invalid Currency secondary fixture: {error}"))
     })?;
     if cell.format_identifier() != Some(4) || cell.secondary_format_identifier() != Some(2) {
@@ -873,14 +873,14 @@ pub(crate) fn corrupted_package_for(
             let first = cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-            let mut cell = BncCell::parse(first)?;
+            let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
             cell.set_data_format_identifier(
                 SECOND_FORMAT_KEY,
                 CellDataFormatKind::NumberOrPercentage,
                 None,
             )?;
             let mut replacement = cells;
-            replacement[0] = cell.encode();
+            replacement[0] = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
             let (storage, offsets) = pack_row(&replacement)?;
             row.cell_storage_buffer = Some(storage);
             row.cell_offsets = Some(offsets);
@@ -1161,21 +1161,21 @@ fn formatted_cell(format_key: u32, kind: CellDataFormatKind, value: f64) -> Fixt
     let mut cell = BncCell::minimal();
     cell.set_data_format_identifier(format_key, kind, None)?;
     cell.set_number(value)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn formatted_text_cell(format_key: u32, string_key: u32) -> FixtureResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_string(string_key);
     cell.set_data_format_identifier(format_key, CellDataFormatKind::Text, None)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn formatted_date_time_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_date(value)?;
     cell.set_data_format_identifier(format_key, CellDataFormatKind::DateTime, None)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn formatted_duration_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8>> {
@@ -1222,11 +1222,13 @@ pub(crate) fn duration_cross_owner_secondary_package() -> FixtureResult<Vec<u8>>
 
         cells[0] = duration_cell_with_number_format(FIRST_FORMAT_KEY, 1234.5, SECOND_FORMAT_KEY)?;
 
-        let mut number = BncCell::parse(&cells[1])?;
+        let mut number = BncCell::parse(&cells[1], &litchi_numbers_wire::Limits::DEFAULT)?;
         number.set_plain_number(0.25)?;
         number
             .set_number_or_percentage_format_identifier_preserving_value(Some(SECOND_FORMAT_KEY))?;
-        cells[1] = number.encode();
+        cells[1] = number
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
 
         cells.push(duration_cell_with_number_format(
             FIRST_FORMAT_KEY,
@@ -1320,7 +1322,7 @@ fn duration_cell_bytes(
         bytes.extend_from_slice(&secondary_key.to_le_bytes());
     }
     bytes.extend_from_slice(&format_key.to_le_bytes());
-    let cell = BncCell::parse(&bytes)
+    let cell = BncCell::parse(&bytes, &litchi_numbers_wire::Limits::DEFAULT)
         .map_err(|error| io::Error::other(format!("invalid literal Duration cell: {error}")))?;
     if cell.explicit_format_flags() != marker
         || cell.cell_format_kind() != Some(4)
@@ -1818,9 +1820,9 @@ pub(crate) fn text_inherited_first_package() -> FixtureResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.clear_explicit_format();
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     rewrite_format_list_payload_for_test(&source, |list| {
@@ -1843,7 +1845,9 @@ pub(crate) fn text_converted_package() -> FixtureResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture first cell is truncated").into());
         }
@@ -1913,7 +1917,9 @@ fn converted_text_cell_with_generic(
     source: &[u8],
     generic_identifier: u32,
 ) -> FixtureResult<Vec<u8>> {
-    let mut encoded = BncCell::parse(source)?.encode();
+    let mut encoded = BncCell::parse(source, &litchi_numbers_wire::Limits::DEFAULT)?
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap();
     if encoded.len() < 24 {
         return Err(io::Error::other("format fixture Text cell is truncated").into());
     }
@@ -1947,7 +1953,9 @@ fn rewrite_converted_generic_identifier(
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture Text cell is truncated").into());
         }
@@ -1989,7 +1997,9 @@ fn sibling_text_identifier_without_kind(source: &[u8]) -> FixtureResult<Vec<u8>>
         let second = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
-        let mut encoded = BncCell::parse(second)?.encode();
+        let mut encoded = BncCell::parse(second, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture Text cell is truncated").into());
         }
@@ -2028,7 +2038,9 @@ fn sibling_text_identifier_with_wrong_kind(source: &[u8]) -> FixtureResult<Vec<u
         let second = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
-        let mut encoded = BncCell::parse(second)?.encode();
+        let mut encoded = BncCell::parse(second, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 24 {
             return Err(io::Error::other("format fixture Text cell is truncated").into());
         }
@@ -2064,9 +2076,9 @@ fn sibling_reserved_known_field(source: &[u8]) -> FixtureResult<Vec<u8>> {
         let second = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
-        let mut cell = BncCell::parse(second)?;
+        let mut cell = BncCell::parse(second, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.clear_explicit_format();
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         if encoded.len() < 12 {
             return Err(io::Error::other("format fixture cell is truncated").into());
         }
@@ -2521,7 +2533,9 @@ pub(crate) fn tile_cells(source: &[u8]) -> FixtureResult<Vec<Vec<u8>>> {
 pub(crate) fn format_keys(source: &[u8]) -> FixtureResult<Vec<Option<u32>>> {
     tile_cells(source)?
         .into_iter()
-        .map(|cell| Ok(BncCell::parse(&cell)?.format_identifier()))
+        .map(|cell| {
+            Ok(BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?.format_identifier())
+        })
         .collect()
 }
 

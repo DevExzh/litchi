@@ -38,6 +38,25 @@ pub(crate) use litchi_numbers::table::dimension::{
     Size as NumbersTableDimensionSize,
 };
 pub(crate) use litchi_numbers_wire as bnc;
+
+/// Select the bounded raw-cell profile for one native source payload.
+pub(crate) fn bnc_limits(source: &[u8]) -> bnc::Limits {
+    if source.is_empty() {
+        return bnc::Limits::DEFAULT;
+    }
+    bnc::Limits::DEFAULT
+        .with_input_bytes(source.len())
+        .and_then(|limits| limits.with_tail_bytes(source.len()))
+        .expect("source-derived Numbers BNC limits stay within hard ceilings")
+}
+
+/// Encode an owned native cell under the Numbers editor's bounded profile.
+pub(crate) fn bnc_encode(
+    cell: &bnc::BncCell,
+    limits: &bnc::Limits,
+) -> std::result::Result<Vec<u8>, bnc::Error> {
+    cell.encode(limits)
+}
 mod formula_owner;
 mod function_map;
 mod table_uid_map;
@@ -47,7 +66,7 @@ impl From<bnc::Error> for crate::Error {
         match error {
             bnc::Error::InvalidFormat(message) => Self::InvalidFormat(message),
             bnc::Error::ParseError(message) => Self::ParseError(message),
-            bnc::Error::OutputLimitExceeded { .. } | bnc::Error::Allocation { .. } => {
+            bnc::Error::LimitExceeded { .. } | bnc::Error::Allocation { .. } => {
                 Self::ParseError(error.to_string())
             },
             _ => Self::ParseError("Numbers cell wire error".to_string()),
@@ -71,10 +90,10 @@ pub use creation::Builder;
 pub use editor::{
     Direction, Draft, PivotCategoryInfo, RemovedSheetAudio, RemovedSheetChart, RemovedSheetImage,
     RemovedSheetMovie, RemovedSheetShape, RemovedTextBox, SheetAudioInfo, SheetAudioOptions,
-    SheetChartInfo, SheetImageInfo,
-    SheetImageOptions, SheetInfo, SheetMovieInfo, SheetMovieOptions, SheetShapeInfo,
-    TableCellConditionalHighlightInfo, TableCellParagraphIndents, TableCellParagraphLineSpacing,
-    TableCellParagraphList, TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
+    SheetChartInfo, SheetImageInfo, SheetImageOptions, SheetInfo, SheetMovieInfo,
+    SheetMovieOptions, SheetShapeInfo, TableCellConditionalHighlightInfo,
+    TableCellParagraphIndents, TableCellParagraphLineSpacing, TableCellParagraphList,
+    TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
     TableCellParagraphListIndentation, TableCellParagraphListLabelColor,
     TableCellParagraphListLevel, TableCellParagraphListLevelPlacement,
     TableCellParagraphListNumberFormat, TableCellParagraphListNumberScale,

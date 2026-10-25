@@ -123,9 +123,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -134,8 +136,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
         assert_eq!(
-            BncCell::parse(before)?.cached_scalar()?,
-            BncCell::parse(after)?.cached_scalar()?,
+            BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
+            BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
             "Fraction format edit changed the cached numeric scalar"
         );
         assert_eq!(
@@ -384,7 +386,10 @@ fn fraction_valid_id_with_inherited_bnc_flags_reads_none_then_restores_and_clear
         .set(fraction(FractionAccuracy::Halves))
         .commit()?;
     let set_bytes = set.package().exact_bytes();
-    let set_cell = BncCell::parse(&fixture::tile_cells(&set_bytes)?[0])?;
+    let set_cell = BncCell::parse(
+        &fixture::tile_cells(&set_bytes)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(
         set_cell.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT
@@ -402,7 +407,10 @@ fn fraction_valid_id_with_inherited_bnc_flags_reads_none_then_restores_and_clear
         .clear()
         .commit()?;
     let cleared_bytes = cleared.package().exact_bytes();
-    let cleared_cell = BncCell::parse(&fixture::tile_cells(&cleared_bytes)?[0])?;
+    let cleared_cell = BncCell::parse(
+        &fixture::tile_cells(&cleared_bytes)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(cleared_cell.explicit_format_flags(), 0);
     assert_eq!(cleared_cell.format_identifier(), None);
     assert_eq!(
@@ -690,9 +698,9 @@ fn fraction_does_not_reuse_a_number_or_percentage_entry() -> TestResult {
         let sibling = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture sibling cell is missing"))?;
-        let mut cell = BncCell::parse(sibling)?;
+        let mut cell = BncCell::parse(sibling, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_number_or_percentage_format_identifier_preserving_value(None)?;
-        *sibling = cell.encode();
+        *sibling = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let source = fixture::rewrite_format_list_payload_for_test(&source, |list| {
@@ -751,11 +759,11 @@ fn fraction_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> Te
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_style_identifier(Some(23));
         cell.set_text_style_identifier(Some(29));
         cell.set_comment_identifier(Some(31));
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
         *first = encoded;
         Ok(())
@@ -767,8 +775,14 @@ fn fraction_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> Te
         .commit()?;
     let target = commit.package().exact_bytes();
     assert_non_format_bnc_bytes(&source, &target)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.style_identifier(), before.style_identifier());
     assert_eq!(
         after.text_style_identifier(),
@@ -1043,6 +1057,7 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_data_format_identifier(
@@ -1050,7 +1065,9 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             CellDataFormatKind::NumericControlNumberOrPercentage,
             Some(77),
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&control)?;
@@ -1060,6 +1077,7 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_string(7);
@@ -1068,7 +1086,9 @@ fn fraction_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResult
             CellDataFormatKind::Text,
             None,
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&text)?;
@@ -1085,11 +1105,14 @@ fn fraction_secondary_and_alternate_number_shapes_fail_closed() -> TestResult {
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement
             .set_currency_format_identifier_preserving_value(Some(fixture::FIRST_FORMAT_KEY))?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_rejected_or_owner(&alternate)?;
@@ -1128,7 +1151,7 @@ fn fraction_rewrite_preserves_empty_cell_value_and_opaque_metadata() -> TestResu
         empty.set_number_or_percentage_format_identifier_preserving_value(Some(
             fixture::FIRST_FORMAT_KEY,
         ))?;
-        let mut encoded = empty.encode();
+        let mut encoded = empty.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(b"empty-fraction-tail");
         *first = encoded;
         Ok(())
@@ -1138,7 +1161,10 @@ fn fraction_rewrite_preserves_empty_cell_value_and_opaque_metadata() -> TestResu
         package.table_cell_fraction_format(0usize, 0usize, selected_position())?,
         Some(fraction(FractionAccuracy::Eighths))
     );
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(before.stored_value(), StoredValue::Empty);
     assert_eq!(before.cached_scalar()?, None);
 
@@ -1147,7 +1173,10 @@ fn fraction_rewrite_preserves_empty_cell_value_and_opaque_metadata() -> TestResu
         .set(fraction(FractionAccuracy::Sixteenths))
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), StoredValue::Empty);
     assert_eq!(after.cached_scalar()?, None);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1163,18 +1192,23 @@ fn fraction_rewrite_preserves_formula_and_cached_scalar() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut formula = BncCell::parse(first)?;
+        let mut formula = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         formula.set_formula_reference(71);
         formula.set_formula_cached_number(-98.25)?;
         formula.set_style_identifier(Some(127));
         formula.set_comment_identifier(Some(131));
-        let mut encoded = formula.encode();
+        let mut encoded = formula
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         encoded.extend_from_slice(b"formula-fraction-tail");
         *first = encoded;
         Ok(())
     })?;
     let package = Package::from_bytes(&source)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     let before_value = before.stored_value();
     let before_cache = before.cached_scalar()?;
     assert!(matches!(before_value, StoredValue::Formula(71)));
@@ -1185,7 +1219,10 @@ fn fraction_rewrite_preserves_formula_and_cached_scalar() -> TestResult {
         .set(fraction(FractionAccuracy::Tenths))
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), before_value);
     assert_eq!(after.cached_scalar()?, before_cache);
     assert_eq!(after.style_identifier(), before.style_identifier());

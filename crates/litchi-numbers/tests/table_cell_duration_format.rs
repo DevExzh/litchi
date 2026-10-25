@@ -126,9 +126,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -136,8 +138,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     let after = fixture::tile_cells(target)?;
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
-        let before_cell = BncCell::parse(before)?;
-        let after_cell = BncCell::parse(after)?;
+        let before_cell = BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let after_cell = BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(
             before_cell.cached_scalar()?,
             after_cell.cached_scalar()?,
@@ -157,7 +159,10 @@ fn first_cell(source: &[u8]) -> TestResult<BncCell> {
     let bytes = cells
         .first()
         .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-    Ok(BncCell::parse(bytes)?)
+    Ok(BncCell::parse(
+        bytes,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?)
 }
 
 fn assert_owner_rejects(source: &[u8]) -> TestResult {
@@ -944,7 +949,7 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
     assert_eq!(fixture::format_keys(&source)?, vec![Some(1), Some(1)]);
     assert_eq!(fixture::format_entry_facts(&source)?, vec![(1, 2), (2, 2)]);
     for cell in fixture::tile_cells(&source)? {
-        let cell = BncCell::parse(&cell)?;
+        let cell = BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(
             cell.explicit_format_flags(),
             litchi_numbers_wire::EXPLICIT_DURATION_WITH_NUMBER_FORMAT
@@ -1030,16 +1035,19 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
         cross_cells
             .first()
             .ok_or_else(|| io::Error::other("cross-owner first cell is missing"))?,
+        &litchi_numbers_wire::Limits::DEFAULT,
     )?;
     let number_primary = BncCell::parse(
         cross_cells
             .get(1)
             .ok_or_else(|| io::Error::other("cross-owner Number cell is missing"))?,
+        &litchi_numbers_wire::Limits::DEFAULT,
     )?;
     let third_duration = BncCell::parse(
         cross_cells
             .get(2)
             .ok_or_else(|| io::Error::other("cross-owner third cell is missing"))?,
+        &litchi_numbers_wire::Limits::DEFAULT,
     )?;
     for cell in [&first_duration, &third_duration] {
         assert_eq!(
@@ -1213,13 +1221,13 @@ fn duration_does_not_reuse_a_number_or_fraction_entry() -> TestResult {
             let sibling = cells
                 .get_mut(1)
                 .ok_or_else(|| io::Error::other("Duration fixture sibling cell is missing"))?;
-            let mut cell = BncCell::parse(sibling)?;
+            let mut cell = BncCell::parse(sibling, &litchi_numbers_wire::Limits::DEFAULT)?;
             // Keep the live Number/Percentage/Fraction entry on the first
             // cell, but make the selected sibling a genuinely unformatted
             // native Duration value before installing Duration metadata.
             cell.set_number_or_percentage_format_identifier_preserving_value(None)?;
             cell.set_duration(0.25)?;
-            *sibling = cell.encode();
+            *sibling = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
             Ok(())
         })?;
         let source = fixture::rewrite_format_list_payload_for_test(&source, |list| {
@@ -1284,7 +1292,7 @@ fn duration_rewrite_preserves_empty_value_style_comment_and_opaque_cell_bytes() 
         empty.set_style_identifier(Some(107));
         empty.set_comment_identifier(Some(113));
         empty.set_duration_format_identifier_preserving_value(Some(fixture::FIRST_FORMAT_KEY))?;
-        let mut encoded = empty.encode();
+        let mut encoded = empty.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(b"empty-duration-tail");
         *first = encoded;
         Ok(())
@@ -1294,7 +1302,10 @@ fn duration_rewrite_preserves_empty_value_style_comment_and_opaque_cell_bytes() 
         package.table_cell_duration_format(0usize, 0usize, selected_position())?,
         Some(baseline_duration())
     );
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(before.stored_value(), StoredValue::Empty);
     assert_eq!(before.cached_scalar()?, None);
 
@@ -1304,7 +1315,10 @@ fn duration_rewrite_preserves_empty_value_style_comment_and_opaque_cell_bytes() 
         .set(desired)
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), StoredValue::Empty);
     assert_eq!(after.cached_scalar()?, None);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1320,20 +1334,25 @@ fn duration_rewrite_preserves_formula_cached_duration_and_unrelated_cell_bytes()
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut formula = BncCell::parse(first)?;
+        let mut formula = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         formula.set_formula_reference(71);
         // set_formula_cached_number follows the cell's Duration semantics and
         // stores a typed Duration cache measured in seconds.
         formula.set_formula_cached_number(-98.25)?;
         formula.set_style_identifier(Some(127));
         formula.set_comment_identifier(Some(131));
-        let mut encoded = formula.encode();
+        let mut encoded = formula
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         encoded.extend_from_slice(b"formula-duration-tail");
         *first = encoded;
         Ok(())
     })?;
     let package = Package::from_bytes(&source)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     let before_value = before.stored_value();
     let before_cache = before.cached_scalar()?;
     assert_eq!(before_value, StoredValue::Formula(71));
@@ -1344,7 +1363,10 @@ fn duration_rewrite_preserves_formula_cached_duration_and_unrelated_cell_bytes()
         .set(custom(Style::FullNames, Unit::Hours, Unit::Milliseconds))
         .commit()?;
     let target = commit.package().exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), before_value);
     assert_eq!(after.cached_scalar()?, before_cache);
     assert_eq!(after.style_identifier(), before.style_identifier());
@@ -1537,9 +1559,11 @@ fn duration_wrong_bnc_family_and_ambiguous_value_shapes_fail_without_mutation() 
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut replacement = BncCell::parse(first)?;
+        let mut replacement = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         replacement.set_plain_number(42.5)?;
-        *first = replacement.encode();
+        *first = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&plain_number)?;
@@ -1548,13 +1572,15 @@ fn duration_wrong_bnc_family_and_ambiguous_value_shapes_fail_without_mutation() 
         let first = cells
             .first()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut replacement = BncCell::parse(first)?;
+        let mut replacement = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         replacement.set_data_format_identifier(
             fixture::FIRST_FORMAT_KEY,
             CellDataFormatKind::NumericControlNumberOrPercentage,
             Some(77),
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&control)?;
@@ -1563,14 +1589,16 @@ fn duration_wrong_bnc_family_and_ambiguous_value_shapes_fail_without_mutation() 
         let first = cells
             .first()
             .ok_or_else(|| io::Error::other("Duration fixture first cell is missing"))?;
-        let mut replacement = BncCell::parse(first)?;
+        let mut replacement = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         replacement.set_string(7);
         replacement.set_data_format_identifier(
             fixture::FIRST_FORMAT_KEY,
             CellDataFormatKind::Text,
             None,
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&text)?;

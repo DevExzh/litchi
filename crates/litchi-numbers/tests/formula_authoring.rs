@@ -744,7 +744,7 @@ fn formula_cell(package: &[u8], position: At) -> TestResult<BncCell> {
             let encoded = storage
                 .get(start..end)
                 .ok_or_else(|| std::io::Error::other("formula cell storage range is malformed"))?;
-            let cell = BncCell::parse(encoded)?;
+            let cell = BncCell::parse(encoded, &litchi_numbers_wire::Limits::DEFAULT)?;
             if matches!(
                 cell.stored_value(),
                 litchi_numbers_wire::StoredValue::Formula(_)

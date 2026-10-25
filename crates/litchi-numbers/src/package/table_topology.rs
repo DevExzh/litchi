@@ -940,6 +940,10 @@ fn released_cells(
     values: bool,
 ) -> Result<Released, Error> {
     let (tiles, size) = tiles(store)?;
+    let limits = working
+        .source()
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let mut released = Released::default();
     for (key, tile) in tiles {
         let (_, data) = message(working, tile, &[TILE_MESSAGE_TYPE])?;
@@ -956,7 +960,7 @@ fn released_cells(
                 }
                 let other = if row_axis { column } else { global };
                 *released.per_index.entry(other).or_insert(0) += 1;
-                let cell = litchi_numbers_wire::BncCell::parse(bytes)
+                let cell = litchi_numbers_wire::BncCell::parse(bytes, &limits)
                     .map_err(|_error| Error::InvalidSource)?;
                 for (kind, list_key) in cell.list_keys() {
                     if values && kind == ListKind::Formula {
@@ -993,6 +997,10 @@ fn patch_cell(
     patched: &mut BTreeMap<u64, Vec<u8>>,
 ) -> Result<Option<u32>, Error> {
     let (tiles, size) = tiles(store)?;
+    let limits = working
+        .source()
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let key = u32::try_from(u64::from(patch.row) / size).map_err(|_error| Error::InvalidSource)?;
     let local =
         u32::try_from(u64::from(patch.row) % size).map_err(|_error| Error::InvalidSource)?;
@@ -1006,11 +1014,11 @@ fn patch_cell(
         None => message(working, tile, &[TILE_MESSAGE_TYPE])?.1.to_vec(),
     };
     let layout = |_error| refuse(Unsupported::StorageLayout);
-    let bytes = litchi_numbers_wire::table_write::tile_cell(&current, local, patch.column)
+    let bytes = litchi_numbers_wire::table_write::tile_cell(&current, local, patch.column, &limits)
         .map_err(layout)?
         .ok_or(Error::InvalidSource)?;
-    let mut cell =
-        litchi_numbers_wire::BncCell::parse(&bytes).map_err(|_error| Error::InvalidSource)?;
+    let mut cell = litchi_numbers_wire::BncCell::parse(&bytes, &limits)
+        .map_err(|_error| Error::InvalidSource)?;
     let mut released = None;
     if let Some(key) = patch.formula_key {
         cell.set_formula_identifier(key)
@@ -1021,12 +1029,14 @@ fn patch_cell(
             .set_formula_cached_error()
             .map_err(|_error| refuse(Unsupported::StorageLayout))?;
     }
+    let cell_bytes = crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
     let written = litchi_numbers_wire::table_write::tile_set_cell(
         &current,
         local,
         patch.column,
         columns,
-        Some(&cell.encode()),
+        Some(&cell_bytes),
+        &limits,
     )
     .map_err(layout)?;
     patched.insert(tile, written.tile);
@@ -1652,10 +1662,12 @@ mod tests {
             .expect("tile")
             .1;
         let (_, data) = message(&working, tile, &[TILE_MESSAGE_TYPE]).expect("tile payload");
-        let bytes = litchi_numbers_wire::table_write::tile_cell(data, local, position.column())
-            .expect("cell")
-            .expect("stored");
-        BncCell::parse(&bytes).expect("cell")
+        let limits = crate::cell::wire::limits_for_source(data);
+        let bytes =
+            litchi_numbers_wire::table_write::tile_cell(data, local, position.column(), &limits)
+                .expect("cell")
+                .expect("stored");
+        BncCell::parse(&bytes, &crate::cell::wire::limits_for_source(&bytes)).expect("cell")
     }
 
     /// Record 0329: a formula whose reference is removed reads `#REF!` and

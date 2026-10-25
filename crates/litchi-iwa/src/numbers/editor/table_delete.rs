@@ -561,7 +561,9 @@ fn stored_cells_on_axis(
                             cells.push((
                                 row,
                                 column,
-                                BncCell::parse(cell)?.comment_identifier().is_some(),
+                                BncCell::parse(cell, &crate::numbers::bnc_limits(cell))?
+                                    .comment_identifier()
+                                    .is_some(),
                             ));
                         }
                     }
@@ -571,7 +573,9 @@ fn stored_cells_on_axis(
                         cells.push((
                             row,
                             target,
-                            BncCell::parse(cell)?.comment_identifier().is_some(),
+                            BncCell::parse(cell, &crate::numbers::bnc_limits(cell))?
+                                .comment_identifier()
+                                .is_some(),
                         ));
                     }
                 },

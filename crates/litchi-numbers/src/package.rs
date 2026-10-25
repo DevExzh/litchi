@@ -993,6 +993,20 @@ impl Package {
         self.state.options
     }
 
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// retained archive and semantic ingress limits.
+    pub(crate) fn numbers_wire_limits(&self) -> Result<litchi_numbers_wire::Limits> {
+        let maximum = self
+            .profile()
+            .archive()
+            .effective_archive_limits()?
+            .max_message_bytes();
+        let wire = WireLimits::default()
+            .with_input_bytes(maximum)?
+            .with_output_bytes(maximum)?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
+    }
+
     /// The physical and semantic ingress profile this package was read
     /// under; focused transactions reopen candidates under it.
     pub fn open_options(&self) -> OpenOptions {
@@ -2611,7 +2625,11 @@ mod tests {
             Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let empty_cell = crate::cell::wire::BncCell::minimal().encode();
+        let empty_cell = crate::cell::wire::encode(
+            &crate::cell::wire::BncCell::minimal(),
+            &crate::cell::wire::Limits::DEFAULT,
+        )
+        .expect("minimal BNC cell encodes under default limits");
         let mut objects = vec![
             object(
                 1,
@@ -2830,7 +2848,11 @@ mod tests {
                 tile_row_index: 0,
                 cell_count: 1,
                 storage_version: Some(5),
-                cell_storage_buffer: Some(formula_cell.encode()),
+                cell_storage_buffer: Some(crate::cell::wire::encode(
+                    &formula_cell,
+                    &crate::cell::wire::Limits::DEFAULT,
+                )
+                .expect("formula BNC cell encodes under default limits")),
                 cell_offsets: Some(vec![0, 0]),
                 ..Default::default()
             }],
@@ -3947,6 +3969,23 @@ mod tests {
                 path: SemanticPath::Sheet { index: 0 },
             })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn materialized_cell_budget_does_not_become_raw_item_width() -> Result<()> {
+        let bytes = package_with_two_materialized_empty_tables()?;
+        let semantic = SemanticLimits::default()
+            .to_builder()
+            .max_materialized_cells(1)
+            .and_then(|builder| builder.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().semantic_limits(semantic),
+        )?;
+        let raw = package.numbers_wire_limits()?;
+        assert_eq!(raw.max_items(), litchi_numbers_wire::Limits::MAX_ITEMS);
         Ok(())
     }
 

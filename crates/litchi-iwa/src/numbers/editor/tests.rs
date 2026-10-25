@@ -2636,7 +2636,11 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
         }
         let tile = Tile::decode(archive.object(30).unwrap().messages[0].data.as_slice()).unwrap();
         let cells = split_row(&tile.row_infos[0]).unwrap();
-        let cell = BncCell::parse(cells[1].as_deref().unwrap()).unwrap();
+        let cell = BncCell::parse(
+            cells[1].as_deref().unwrap(),
+            &crate::numbers::bnc_limits(cells[1].as_deref().unwrap()),
+        )
+        .unwrap();
         assert_eq!(cell.formula_error_identifier(), None);
         assert_eq!(cell.stored_value(), StoredValue::Number);
         let after = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3207,7 +3211,13 @@ fn public_reader_applies_tile_row_origins() {
                 cell_offsets: Some(Vec::new()),
                 has_wide_offsets: Some(false),
             };
-            rebuild_row(&mut row, &[Some(cell.encode())])?;
+            rebuild_row(
+                &mut row,
+                &[Some(crate::numbers::bnc_encode(
+                    &cell,
+                    &crate::numbers::bnc::Limits::DEFAULT,
+                )?)],
+            )?;
             archive.insert_object(
                 ArchiveObject::new(
                     43,
@@ -3568,7 +3578,7 @@ fn cached_formula_scalar(
     )
     .unwrap()
     .unwrap();
-    BncCell::parse(&bytes)
+    BncCell::parse(&bytes, &crate::numbers::bnc_limits(&bytes))
         .unwrap()
         .cached_scalar()
         .unwrap()
@@ -10167,14 +10177,21 @@ fn test_package_with_comments(shared: bool) -> HostPackage {
             let tile_type = tile_object.messages[0].type_;
             let mut tile = Tile::decode(tile_object.messages[0].data.as_slice())?;
             let mut cells = split_row(&tile.row_infos[0])?;
-            let mut first = BncCell::parse(cells[1].as_deref().unwrap())?;
+            let mut first = BncCell::parse(
+                cells[1].as_deref().unwrap(),
+                &crate::numbers::bnc_limits(cells[1].as_deref().unwrap()),
+            )?;
             first.set_comment_identifier(Some(4));
-            cells[1] = Some(first.encode());
+            let first_limits = crate::numbers::bnc_limits(cells[1].as_deref().unwrap());
+            cells[1] = Some(crate::numbers::bnc_encode(&first, &first_limits)?);
             if shared {
                 let mut second = BncCell::minimal();
                 second.set_number(7.0)?;
                 second.set_comment_identifier(Some(4));
-                cells[2] = Some(second.encode());
+                cells[2] = Some(crate::numbers::bnc_encode(
+                    &second,
+                    &crate::numbers::bnc::Limits::DEFAULT,
+                )?);
             }
             rebuild_row(&mut tile.row_infos[0], &cells)?;
             tile_object.replace_message(
@@ -10941,7 +10958,9 @@ fn test_package() -> HostPackage {
     let mut cell = BncCell::minimal();
     cell.set_string(1);
     let mut cells = vec![None; 4];
-    cells[1] = Some(cell.encode());
+    cells[1] = Some(
+        crate::numbers::bnc_encode(&cell, &crate::numbers::bnc::Limits::DEFAULT).unwrap(),
+    );
     let (storage, offsets, wide) = encode_row(&cells, false).unwrap();
     let tile = Tile {
         max_column: 0,

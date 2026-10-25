@@ -26,12 +26,13 @@ use litchi::numbers::{
     },
 };
 use litchi_iwa_archive::package::Catalog;
-use litchi_numbers_wire::BncCell;
+use litchi_numbers_wire::{BncCell, Limits};
 
 #[path = "../../../litchi-numbers/tests/support/table_cell_data_format_fixture.rs"]
 mod fixture;
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
+const WIRE_LIMITS: Limits = Limits::DEFAULT;
 const MAX_ENTRIES: usize = 128;
 const MAX_ENTRY_BYTES: u64 = 1024 * 1024;
 const MAX_EXPANDED_BYTES: u64 = 4 * 1024 * 1024;
@@ -642,7 +643,8 @@ fn cell_format_ids(source: &[u8], index: usize) -> (Option<u32>, Option<u32>) {
     let cell = cells
         .get(index)
         .unwrap_or_else(|| panic!("Currency fixture cell {index} is missing"));
-    let cell = BncCell::parse(cell).unwrap_or_else(|error| panic!("Currency BNC cell: {error}"));
+    let cell = BncCell::parse(cell, &WIRE_LIMITS)
+        .unwrap_or_else(|error| panic!("Currency BNC cell: {error}"));
     (cell.format_identifier(), cell.secondary_format_identifier())
 }
 
@@ -938,9 +940,11 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) {
     assert_eq!(before.len(), after.len());
     for (left, right) in before.iter().zip(after.iter()) {
         let left_cell =
-            BncCell::parse(left).unwrap_or_else(|error| panic!("source BNC cell: {error}"));
+            BncCell::parse(left, &WIRE_LIMITS)
+                .unwrap_or_else(|error| panic!("source BNC cell: {error}"));
         let right_cell =
-            BncCell::parse(right).unwrap_or_else(|error| panic!("target BNC cell: {error}"));
+            BncCell::parse(right, &WIRE_LIMITS)
+                .unwrap_or_else(|error| panic!("target BNC cell: {error}"));
         assert_eq!(
             left_cell
                 .cached_scalar()
@@ -960,9 +964,12 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) {
 
 fn normalized_cell(cell: &[u8]) -> Vec<u8> {
     let mut parsed =
-        BncCell::parse(cell).unwrap_or_else(|error| panic!("BNC normalization: {error}"));
+        BncCell::parse(cell, &WIRE_LIMITS)
+            .unwrap_or_else(|error| panic!("BNC normalization: {error}"));
     parsed.clear_explicit_format();
-    parsed.encode()
+    parsed
+        .encode(&WIRE_LIMITS)
+        .unwrap_or_else(|error| panic!("BNC normalization encode: {error}"))
 }
 
 fn package_bytes(package: &Package) -> Vec<u8> {

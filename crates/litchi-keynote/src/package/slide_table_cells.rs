@@ -24,6 +24,7 @@ use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;
 use litchi_iwa_protos::{annotation_author_codec, comment_storage_codec, numbers_formula_codec};
+use litchi_numbers_wire::Limits as NumbersWireLimits;
 use litchi_numbers_wire::formula_envelope;
 use litchi_numbers_wire::formula_names;
 use litchi_numbers_wire::formula_render::{
@@ -52,6 +53,7 @@ pub(crate) struct SelectedSlideTableStorage<'source> {
     data_store: storage::DataStoreSnapshot<'source>,
     tile_size: u32,
     tiles: Vec<wire_cells::TileReference>,
+    limits: NumbersWireLimits,
 }
 
 impl<'source> SelectedSlideTableStorage<'source> {
@@ -88,6 +90,7 @@ impl<'source> SelectedSlideTableStorage<'source> {
     {
         wire_cells::read_table_cells(
             self.dimensions(),
+            &self.limits,
             self.tiles.iter().copied(),
             resolve_tile,
             budget,
@@ -161,11 +164,17 @@ pub(crate) fn selected_slide_table_storage<'source>(
             .ok_or(core::Error::InvalidSource)?,
     )?;
 
+    let limits = package
+        .semantic_wire_limits()
+        .map_err(|_error| core::Error::InvalidSource)?;
+    let limits = NumbersWireLimits::from_wire_limits(limits);
+
     Ok(SelectedSlideTableStorage {
         model,
         data_store,
         tile_size,
         tiles: routes.values,
+        limits,
     })
 }
 
@@ -1772,6 +1781,11 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
         wire_cells::TableCellIssue::Allocation { amount, .. } => Error::Allocation { amount },
         wire_cells::TableCellIssue::StorageDecode(error) => map_storage_error(error),
         wire_cells::TableCellIssue::CellValueDecode { error, .. } => map_cell_value_error(error),
+        wire_cells::TableCellIssue::RawLimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => limit_error(map_raw_limit_kind(kind), observed, maximum),
         wire_cells::TableCellIssue::CounterOverflow
         | wire_cells::TableCellIssue::MissingTile { .. }
         | wire_cells::TableCellIssue::MissingTilePayload { .. }
@@ -1782,6 +1796,17 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
         | wire_cells::TableCellIssue::TableRowOutOfBounds { .. }
         | wire_cells::TableCellIssue::DuplicateTileRow { .. }
         | wire_cells::TableCellIssue::CellStorageOutOfBounds { .. } => Error::InvalidSource,
+    }
+}
+
+const fn map_raw_limit_kind(kind: litchi_numbers_wire::LimitKind) -> LimitKind {
+    match kind {
+        litchi_numbers_wire::LimitKind::InputBytes
+        | litchi_numbers_wire::LimitKind::TailBytes => LimitKind::InputBytes,
+        litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+        litchi_numbers_wire::LimitKind::Items => LimitKind::PayloadItems,
+        _ => LimitKind::InputBytes,
     }
 }
 

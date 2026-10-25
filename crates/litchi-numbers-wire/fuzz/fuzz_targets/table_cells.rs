@@ -4,11 +4,11 @@ use std::hint::black_box;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::numbers_table_cell_storage_codec::{DecodeOptions, DecodeReport};
-use litchi_numbers_wire::BncCell;
 use litchi_numbers_wire::table_cells::{
     AllocationTarget, CellSource, CellValueSink, Message, TILE_MESSAGE_KIND, TableCellIssue,
     TableCellReadBudget, TableDimensions, TileReference, read_table_cells,
 };
+use litchi_numbers_wire::{BncCell, Limits};
 
 const MAX_INPUT_BYTES: usize = 1_024;
 const MAX_FIELDS: usize = 1_024;
@@ -19,6 +19,7 @@ const MAX_NESTING: u32 = 32;
 const MAX_MATERIALIZED_CELLS: usize = 64;
 const MAX_CELL_SOURCE_BYTES: usize = 4 * MAX_INPUT_BYTES;
 const MAX_ROW_ALLOCATIONS: usize = 64;
+const WIRE_LIMITS: Limits = Limits::DEFAULT;
 
 /// A small checked-in wire fixture with one actual BNC cell row.
 ///
@@ -188,9 +189,12 @@ fn bnc_number(seed: u8) -> Vec<u8> {
     let mut cell = BncCell::minimal();
     let value = f64::from(seed) + 0.5;
     if cell.set_plain_number(value).is_ok() {
-        cell.encode()
+        cell.encode(&WIRE_LIMITS)
+            .expect("fuzz fixture cell encodes")
     } else {
-        BncCell::minimal().encode()
+        BncCell::minimal()
+            .encode(&WIRE_LIMITS)
+            .expect("fuzz fixture cell encodes")
     }
 }
 
@@ -222,7 +226,9 @@ fn make_row(row_index: u32, seed: u8) -> Vec<u8> {
         pre_storage.extend_from_slice(&pre_cell);
 
         let modern_cell = if cell_seed & 2 == 0 {
-            BncCell::minimal().encode()
+            BncCell::minimal()
+                .encode(&WIRE_LIMITS)
+                .expect("fuzz fixture cell encodes")
         } else {
             bnc_number(cell_seed)
         };
@@ -310,6 +316,7 @@ fn run_route(source: &[u8], route: u8) {
     let mut sink = FuzzSink::new(source);
     let result = read_table_cells(
         TableDimensions::new(8, 4, 4),
+        &WIRE_LIMITS,
         [TileReference::new(0, 7)],
         |object_id, _budget| {
             let messages = match route % 4 {

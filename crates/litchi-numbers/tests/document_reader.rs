@@ -250,8 +250,12 @@ fn synthetic_formula_source() -> TestResult<Vec<u8>> {
     formula_cell.set_formula_reference(1);
     let mut rich_cell = BncCell::minimal();
     rich_cell.set_rich_text(1);
-    let formula_bytes = formula_cell.encode();
-    let rich_bytes = rich_cell.encode();
+    let formula_bytes = formula_cell
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap();
+    let rich_bytes = rich_cell
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap();
     let rich_offset = u16::try_from(formula_bytes.len())?.to_le_bytes();
     let mut row_storage = formula_bytes;
     row_storage.extend_from_slice(&rich_bytes);

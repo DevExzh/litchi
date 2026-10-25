@@ -2190,8 +2190,11 @@ fn resolve_comment_native_with_mode(
     let cell_source = storage_buffer
         .get(cell_range)
         .ok_or(Error::InvalidSource { path: target.path })?;
-    let cell = crate::cell::wire::BncCell::parse(cell_source)
-        .map_err(|_| Error::InvalidSource { path: target.path })?;
+    let cell = crate::cell::wire::BncCell::parse(
+        cell_source,
+        &crate::cell::wire::limits_for_source(cell_source),
+    )
+    .map_err(|_| Error::InvalidSource { path: target.path })?;
     let Some(comment_key) = cell.comment_identifier() else {
         let path = target.path;
         return Ok(Located {
@@ -2955,10 +2958,14 @@ fn prepare_root_clear(
         .cell_bytes
         .as_deref()
         .ok_or(Error::InvalidSource { path })?;
-    let cell = crate::cell::wire::BncCellView::parse(cell_source)
-        .map_err(|_| Error::InvalidSource { path })?
-        .clear_comment_with_limit(key, WireLimits::MAX_OUTPUT_BYTES)
-        .map_err(|_| Error::InvalidSource { path })?;
+    let limits = crate::cell::wire::limits_for_source(cell_source);
+    let cell = crate::cell::wire::BncCellView::parse(
+        cell_source,
+        &limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?
+    .clear_comment(key, &limits)
+    .map_err(|_| Error::InvalidSource { path })?;
     let tile_source = message_at_route(source, tile, path)?.data.as_slice();
     let maximum_wire = source.state.options.archive().max_iwa_stream_bytes();
     let tile_change = super::table_cell_edit::tile::TileChange {
@@ -4148,8 +4155,11 @@ fn scan_global_comment_cells(
                 // handwritten parser runs, rather than treating every cell
                 // as one unit regardless of payload size.
                 charge_scan_work(scan_work, cell_source.len(), path)?;
-                let cell = crate::cell::wire::BncCell::parse(cell_source)
-                    .map_err(|_| Error::InvalidSource { path })?;
+                let cell = crate::cell::wire::BncCell::parse(
+                    cell_source,
+                    &crate::cell::wire::limits_for_source(cell_source),
+                )
+                .map_err(|_| Error::InvalidSource { path })?;
                 let Some(comment_key) = cell.comment_identifier() else {
                     continue;
                 };

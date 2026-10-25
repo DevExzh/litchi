@@ -282,9 +282,9 @@ fn rewrite_native_text_format_identifier(source: &[u8], identifier: u32) -> Test
         let cell_source = storage
             .get(start..end)
             .ok_or_else(|| io::Error::other("native Text cell range is invalid"))?;
-        let mut cell = BncCell::parse(cell_source)?;
+        let mut cell = BncCell::parse(cell_source, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_data_format_identifier(identifier, CellDataFormatKind::Text, None)?;
-        let encoded = cell.encode();
+        let encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         if encoded.len() != cell_source.len() {
             return Err(io::Error::other("native Text index rewrite changed cell width").into());
         }

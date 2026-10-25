@@ -697,6 +697,17 @@ impl Package {
         self.state.source.source_bytes()
     }
 
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// retained physical and semantic ingress limits.
+    pub(crate) fn numbers_wire_limits(&self) -> PackageResult<litchi_numbers_wire::Limits> {
+        let maximum = self.state.source.limits().max_iwa_stream_bytes();
+        let wire = WireLimits::default()
+            .with_input_bytes(maximum)
+            .and_then(|limits| limits.with_output_bytes(maximum))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
+    }
+
     /// Write this exact immutable package artifact to a caller-owned sink.
     ///
     /// Unsupported ZIP members and unmodeled protobuf fields are emitted

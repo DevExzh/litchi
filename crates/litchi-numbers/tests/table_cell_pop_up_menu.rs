@@ -137,7 +137,7 @@ fn cell(format_identifier: Option<u32>, control_identifier: Option<u32>) -> Test
             Some(control_identifier),
         )?;
     }
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
@@ -146,7 +146,9 @@ fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
     let second = if matches!(mode, FixtureMode::NonPopupCell | FixtureMode::SinglePopup) {
         let mut number = BncCell::minimal();
         number.set_number(42.0)?;
-        number.encode()
+        number
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap()
     } else {
         cell(popup.then_some(FORMAT_KEY), popup.then_some(CONTROL_KEY))?
     };

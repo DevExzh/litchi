@@ -1169,7 +1169,7 @@ fn read_cell(
         .ok_or_else(|| Error::InvalidFormat(format!("Numbers tile object {tile_id} is missing")))?;
     read_tile_cell(package, archive_name, tile_id, tile_row, column as usize)?
         .as_deref()
-        .map(BncCell::parse)
+        .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
         .transpose()
         .map_err(Into::into)
 }

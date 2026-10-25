@@ -558,7 +558,11 @@ pub(super) fn rewrite_scalar_control(
         target.position.column(),
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(
+        cell_source,
+        &crate::cell::wire::limits_for_source(cell_source),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let old_format = cell.format_identifier();
     let old_control = cell.control_cell_spec_identifier();
     if old_format.is_none() && old_control.is_some()
@@ -800,7 +804,9 @@ pub(super) fn rewrite_scalar_control(
             new_format_key.ok_or(Error::InvalidSource { path })?,
             new_control_key.ok_or(Error::InvalidSource { path })?,
         );
-        let mut cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+        let limits = crate::cell::wire::limits_for_source(cell_source);
+        let mut cell =
+            BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource { path })?;
         let (kind, _control) = native_kind(after, path)?;
         cell.set_data_format_identifier(format_key, kind, Some(control_key))
             .map_err(|_| {
@@ -808,11 +814,13 @@ pub(super) fn rewrite_scalar_control(
                     crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
                 )
             })?;
-        cell.encode()
+        crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource { path })?
     } else {
-        let mut cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+        let limits = crate::cell::wire::limits_for_source(cell_source);
+        let mut cell =
+            BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource { path })?;
         cell.clear_explicit_format();
-        cell.encode()
+        crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource { path })?
     };
     let patched_tile = popup_native::patch_tile_cell(
         &tile_payload,
@@ -1327,7 +1335,8 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
 
 impl BncReferenceCensus<'_> {
     fn count_cell(&mut self, source: &[u8]) -> bool {
-        let Ok(cell) = BncCellView::parse(source) else {
+        let Ok(cell) = BncCellView::parse(source, &crate::cell::wire::limits_for_source(source))
+        else {
             return false;
         };
         if validate_bnc_format_metadata_kind(source, cell.cell_format_kind(), self.path).is_err() {

@@ -19,7 +19,9 @@ use litchi_numbers_wire::table_cells::{
     AllocationTarget, CellSource, CellValueSink, Message, TILE_MESSAGE_KIND, TableCellIssue,
     TableCellReadBudget, TableCellReadReport, TableDimensions, TileReference, read_table_cells,
 };
-use litchi_numbers_wire::{BncCell, BncCellView, StoredValue};
+use litchi_numbers_wire::{BncCell, BncCellView, Limits, StoredValue};
+
+const TEST_LIMITS: Limits = Limits::DEFAULT;
 
 fn varint(mut value: u64) -> Vec<u8> {
     let mut output = Vec::new();
@@ -106,14 +108,14 @@ fn tile(max_column: u32, max_row: u32, num_cells: u32, num_rows: u32, rows: &[Ve
 }
 
 fn bnc_empty() -> Vec<u8> {
-    BncCell::minimal().encode()
+    BncCell::minimal().encode(&TEST_LIMITS).unwrap()
 }
 
 fn bnc_number(value: f64) -> Vec<u8> {
     let mut cell = BncCell::minimal();
     cell.set_plain_number(value)
         .expect("finite test number is encodable");
-    cell.encode()
+    cell.encode(&TEST_LIMITS).unwrap()
 }
 
 fn pre_bnc_empty(version: u8) -> Vec<u8> {
@@ -373,6 +375,7 @@ fn read_one_tile(
 ) -> Result<TableCellReadReport, HarnessError> {
     read_table_cells(
         dimensions,
+        &TEST_LIMITS,
         [TileReference::new(tile_index, object_id)],
         |resolved_id, _budget| {
             Ok((resolved_id == object_id).then(|| vec![Message::new(TILE_MESSAGE_KIND, source)]))
@@ -384,6 +387,127 @@ fn read_one_tile(
 
 fn assert_cell_source_in(source: &[u8], fact: &CellFact) {
     assert!(contains_range(source, fact.pointer, fact.length));
+}
+
+#[test]
+fn raw_input_limits_are_checked_even_with_a_permissive_owner_budget() {
+    let storage = bnc_number(3.5);
+    let offsets = narrow_offsets(&[Some(0), None]);
+    let source_row = row(0, 1, &storage, &offsets, None, Some(false));
+    let source = tile(1, 0, 1, 1, std::slice::from_ref(&source_row));
+
+    let under = TEST_LIMITS
+        .with_input_bytes(source.len() - 1)
+        .expect("the one-under profile is valid");
+    let mut budget = HarnessBudget::permissive();
+    let mut sink = CellSink::default();
+    let error = read_table_cells(
+        TableDimensions::new(1, 2, 1),
+        &under,
+        [TileReference::new(0, 1)],
+        |_, _budget| Ok(Some(vec![Message::new(TILE_MESSAGE_KIND, &source)])),
+        &mut budget,
+        &mut sink,
+    )
+    .expect_err("the raw tile payload is one byte over the selected input cap");
+    assert_eq!(
+        error,
+        HarnessError::Issue(TableCellIssue::RawLimitExceeded {
+            kind: litchi_numbers_wire::LimitKind::InputBytes,
+            observed: source.len(),
+            maximum: source.len() - 1,
+        })
+    );
+    assert!(sink.cells.is_empty());
+
+    let exact = TEST_LIMITS
+        .with_input_bytes(source.len())
+        .expect("the exact profile is valid");
+    let mut budget = HarnessBudget::permissive();
+    let mut sink = CellSink::default();
+    let report = read_table_cells(
+        TableDimensions::new(1, 2, 1),
+        &exact,
+        [TileReference::new(0, 1)],
+        |_, _budget| Ok(Some(vec![Message::new(TILE_MESSAGE_KIND, &source)])),
+        &mut budget,
+        &mut sink,
+    )
+    .expect("the exact raw input cap admits the complete payload");
+    assert_eq!(report_facts(report), (1, 1, 1));
+}
+
+#[test]
+fn raw_item_limits_cover_tile_references_rows_and_cells_independently() {
+    let limits = TEST_LIMITS
+        .with_items(1)
+        .expect("the one-item profile is valid");
+    let first_storage = bnc_number(1.0);
+    let second_storage = bnc_number(2.0);
+    let first_offsets = narrow_offsets(&[Some(0), None]);
+    let second_offsets = narrow_offsets(&[Some(0), None]);
+    let first_row = row(0, 1, &first_storage, &first_offsets, None, Some(false));
+    let second_row = row(1, 1, &second_storage, &second_offsets, None, Some(false));
+    let one_cell_tile = tile(1, 0, 1, 1, std::slice::from_ref(&first_row));
+
+    let mut budget = HarnessBudget::permissive();
+    let mut sink = CellSink::default();
+    let report = read_table_cells(
+        TableDimensions::new(1, 2, 1),
+        &limits,
+        [TileReference::new(0, 1)],
+        |_, _budget| Ok(Some(vec![Message::new(TILE_MESSAGE_KIND, &one_cell_tile)])),
+        &mut budget,
+        &mut sink,
+    )
+    .expect("one tile reference, row, and cell each fit one item");
+    assert_eq!(report_facts(report), (1, 1, 1));
+
+    let mut budget = HarnessBudget::permissive();
+    let mut sink = CellSink::default();
+    let two_rows = tile(1, 1, 2, 2, &[first_row.clone(), second_row]);
+    let error = read_table_cells(
+        TableDimensions::new(2, 2, 2),
+        &limits,
+        [TileReference::new(0, 1)],
+        |_, _budget| Ok(Some(vec![Message::new(TILE_MESSAGE_KIND, &two_rows)])),
+        &mut budget,
+        &mut sink,
+    )
+    .expect_err("two selected rows exceed the independent raw item cap");
+    assert_eq!(
+        error,
+        HarnessError::Issue(TableCellIssue::RawLimitExceeded {
+            kind: litchi_numbers_wire::LimitKind::Items,
+            observed: 2,
+            maximum: 1,
+        })
+    );
+
+    let mut two_cells = first_storage;
+    two_cells.extend_from_slice(&second_storage);
+    let two_cell_offsets = narrow_offsets(&[Some(0), Some(1)]);
+    let two_cell_row = row(0, 2, &two_cells, &two_cell_offsets, None, Some(false));
+    let two_cells_tile = tile(1, 0, 2, 1, std::slice::from_ref(&two_cell_row));
+    let mut budget = HarnessBudget::permissive();
+    let mut sink = CellSink::default();
+    let error = read_table_cells(
+        TableDimensions::new(1, 2, 1),
+        &limits,
+        [TileReference::new(0, 1)],
+        |_, _budget| Ok(Some(vec![Message::new(TILE_MESSAGE_KIND, &two_cells_tile)])),
+        &mut budget,
+        &mut sink,
+    )
+    .expect_err("two selected cells exceed the independent raw item cap");
+    assert_eq!(
+        error,
+        HarnessError::Issue(TableCellIssue::RawLimitExceeded {
+            kind: litchi_numbers_wire::LimitKind::Items,
+            observed: 2,
+            maximum: 1,
+        })
+    );
 }
 
 fn report_facts(report: TableCellReadReport) -> (usize, usize, usize) {
@@ -418,6 +542,7 @@ fn selected_table_read_projects_bnc_and_pre_bnc_rows_without_copying_sources() {
     let mut sink = CellSink::default();
     let report = read_table_cells(
         TableDimensions::new(4, 4, 2),
+        &TEST_LIMITS,
         [TileReference::new(0, 41), TileReference::new(1, 42)],
         |object_id, _budget| {
             Ok(match object_id {
@@ -479,6 +604,7 @@ fn duplicate_payloads_and_duplicate_rows_are_structural_failures() {
     let mut sink = CellSink::default();
     let duplicate_payload = read_table_cells(
         TableDimensions::new(2, 2, 2),
+        &TEST_LIMITS,
         [TileReference::new(0, 90)],
         |_, _budget| {
             Ok(Some(vec![
@@ -527,6 +653,7 @@ fn unresolved_tiles_and_objects_without_tile_payloads_fail_before_row_decode() {
     let mut sink = CellSink::default();
     let missing = read_table_cells(
         TableDimensions::new(1, 1, 1),
+        &TEST_LIMITS,
         [TileReference::new(0, 70)],
         |_, _budget| Ok(None::<Vec<Message<'_>>>),
         &mut budget,
@@ -543,6 +670,7 @@ fn unresolved_tiles_and_objects_without_tile_payloads_fail_before_row_decode() {
     let mut sink = CellSink::default();
     let missing_payload = read_table_cells(
         TableDimensions::new(1, 1, 1),
+        &TEST_LIMITS,
         [TileReference::new(0, 71)],
         |_, _budget| Ok(Some(vec![Message::new(9999, &source)])),
         &mut budget,
@@ -816,6 +944,7 @@ fn materialized_cell_cap_is_cumulative_across_tiles() {
     let mut sink = CellSink::default();
     let error = read_table_cells(
         TableDimensions::new(2, 1, 1),
+        &TEST_LIMITS,
         [TileReference::new(0, 101), TileReference::new(1, 102)],
         |object_id, _budget| {
             Ok(match object_id {
@@ -906,13 +1035,13 @@ fn bnc_and_pre_bnc_rows_keep_sparse_missing_and_stored_empty_distinct() {
     assert_eq!(spans[0].column(), 0);
     assert_eq!(spans[2 - 1].column(), 2);
     assert_eq!(
-        BncCellView::parse(span_bytes(spans[0], bnc_storage_active))
+        BncCellView::parse(span_bytes(spans[0], bnc_storage_active), &TEST_LIMITS)
             .expect("empty BNC payload")
             .stored_value(),
         StoredValue::Empty
     );
     assert_eq!(
-        BncCellView::parse(span_bytes(spans[1], bnc_storage_active))
+        BncCellView::parse(span_bytes(spans[1], bnc_storage_active), &TEST_LIMITS)
             .expect("number BNC payload")
             .stored_value(),
         StoredValue::Number
@@ -930,10 +1059,10 @@ fn bnc_and_pre_bnc_rows_keep_sparse_missing_and_stored_empty_distinct() {
     assert_eq!(pre_spans.len(), 1);
     assert_eq!(pre_spans.get(1), None);
     assert_eq!(
-        PreBncCellView::parse(span_bytes(
-            pre_spans.get(0).expect("column zero"),
-            pre_storage_active
-        ))
+        PreBncCellView::parse(
+            span_bytes(pre_spans.get(0).expect("column zero"), pre_storage_active),
+            &TEST_LIMITS
+        )
         .expect("empty pre-BNC payload")
         .cell_type(),
         0
@@ -967,7 +1096,7 @@ fn modern_pair_is_selected_only_when_both_buffers_are_present() {
         .get(0)
         .expect("column zero");
     assert_eq!(
-        BncCellView::parse(span_bytes(span, storage))
+        BncCellView::parse(span_bytes(span, storage), &TEST_LIMITS)
             .expect("modern BNC number")
             .stored_value(),
         StoredValue::Number
@@ -993,7 +1122,7 @@ fn modern_pair_is_selected_only_when_both_buffers_are_present() {
         .get(0)
         .expect("column zero");
     assert_eq!(
-        PreBncCellView::parse(span_bytes(span, storage))
+        PreBncCellView::parse(span_bytes(span, storage), &TEST_LIMITS)
             .expect("pre-BNC empty")
             .version(),
         4
