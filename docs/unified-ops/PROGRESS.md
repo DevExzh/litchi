@@ -5019,3 +5019,70 @@ See [0063](0063-source-pptx-modern-comments.md).
   to formula; the other build slots remain VBA, PPTX properties and XLDM.
   Current-native validator return 0362ul75f passes independent source review
   and awaits merge after the tooling hold. Final acceptance remains open.
+
+- Coordinator ODF and VBA integration (2026-10-25):
+  ODF atomic `677093e42f` merges at `cbd0a7587e`. Independent review accepts
+  the final balanced-fragment, selected-limit and consumer corrections. Root
+  verifies all 104 intended changed paths and exact leaf blobs outside the
+  additive glossary merge. The five actual rows pass, including 2,135 library
+  tests; final receipts bind source `32253785a5`, all three approved locks,
+  logs, traces and empty terminal ownership. The captured runner's execution
+  and guard functions match the approved runner; its differences are other
+  plan rows. The record corrects decimal target units and explicitly accepts
+  compiled-target reuse for these compiler/test rows. Native/performance
+  freshness remains required.
+
+  VBA atomic `4a22c3c136` merges at `ebc7425644`. All six actual guarded rows
+  on `c68801c837` pass: 48 VBA tests, five PPT VBA writer tests, 1,268 PPT
+  library tests with one ignored, affected check/Clippy and the feature-boundary
+  check. Root verifies every log/trace, source and lock fence, target guard and
+  terminal ownership sample. The three earlier compile failures remain
+  recorded. Conflict resolution retains the reviewed public correctness
+  projection and all font/ODF/VBA glossary profiles; the glossary now has 66
+  profiles. The next composed performance-tool and native-tool compiler checks
+  are queued for the next available build slot.
+
+  Native-validator symlink repair 0362ul75f merges at `daf712bcc1` after
+  independent review and all 18 focused tests. The full tooling row on
+  earlier clean `0dc6c76634` finishes with 1,745 tests, two failures and one
+  error. Root verifies its failed receipt, unchanged source/locks, empty
+  Cargo trace, zero-byte target and terminal cleanup. The concrete returns
+  are intentional policy strings rejected by the fixture guard, a lease test
+  whose child event file is missing, and a fast-exit TMP test observing SIGTERM.
+  Record 0362ul80 repairs are undergoing independent review; the failed row
+  is preserved and must be rerun after integration. No full tooling pass is
+  claimed for the current source.
+
+  The final raw census plan covers every direct library package, but review
+  requires receipt-bound profile outputs and trusted source/lock identities.
+  Return 0362ul79a implements those checks and is under review; actual final
+  rustdoc capture and human dispositions remain required. Current build slots
+  are formula, Numbers wire, PPTX properties and XLDM. PPTX source replay and
+  content aggregate-limit returns remain engineering work. Integration is
+  clean with no source hold. Final gate/native/performance qualification and
+  the signed-batch contract choice remain open. Nothing is pushed.
+
+- Coordinator tooling repair and composed follow-up (2026-10-25):
+  Record 0362ul80 merges at `317f648242` after independent review and all
+  60 focused tests pass in the composed tree. The fixture guard uses exact
+  policy-line exceptions with decoy negatives; lease and fast-exit tests now
+  coordinate the intended paths deterministically. The actual complete
+  39-module row is assigned a fresh detached capture of that source. The old
+  1,745-test failure remains preserved; current full-row acceptance is pending.
+
+  Both standalone performance-tool and native-tool all-target checks pass
+  on clean `ebc7425644`, covering the ODF and VBA consumer composition. Root
+  verifies logs, target traces, source/lock identities and empty terminal
+  ownership; the target peaks at 3,095,985,461 bytes. Record 0362ul77 now binds
+  both composed captures. Slot 3 is released.
+
+  PPTX properties' nine guarded rows pass on `a75cf6419d`; root verifies the
+  complete receipt. Later core replay/profile repairs and their new strict
+  recipient regression remain source-only and require combined validation.
+  Further audit confirms metadata public raw codecs still use fixed resource
+  ceilings without required profiles. Active returns 0362ul81–82 cover those
+  structural/history families, including every consumer and recipient replay
+  policy; they are required work, not exceptions. Their source workers share
+  the existing 61–63 profile-carrier design and receive no build slot yet.
+  Census 0362ul79c is closing validator bytecode self-pollution after its
+  receipt/guard/lock binding review. No final census or acceptance is claimed.
