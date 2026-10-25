@@ -81,6 +81,27 @@ classification gaps, core tolerated-content refusal and stale canonical docs.
 These are required repairs. Source-only checks do not imply runtime or
 performance acceptance.
 
+The reviewed dead-helper composition is committed at `6517f7f5c1`
+(record 0362ul89m). Its fresh actual run finds only two unused imports,
+repaired at `2749ced58b` (0362ul89n). The next actual run progresses to
+integration tests and stops on two transition writer calls missing their
+required limits argument. A complete test/example consumer audit is active;
+the next compiler run will use `--keep-going` to collect all target failures.
+The `2749` capture is retained at
+`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-2749ced58b`:
+`result.json`, 33,304 bytes, SHA-256
+`f3440f8a2ef9788324e9613c6402e3c4aa73070dd82a0a2b77283d224ec19f01`.
+Formatting passes; all-target compiler acceptance remains open.
+
+Properties follow-up `2115ba1db4` resolves its five review findings. Private
+OOXML composition `0db7ff3a6a` joins it with the shared typed-error return
+through `9f01225fc8`. Eight conflicts preserve API removals and migrated
+consumers. The reviewed conversion now carries all five typed common errors
+into local properties errors; source chains, signed tests/docs, Custom XML
+stale-patch classification and XLSB sheet PatchConflict conversion are fixed.
+Records 0362ul94a/94b bind this source composition. A broader Custom XML
+producer/error audit (94c) and actual combined validation remain required.
+
 ## Cleanup wave 65
 
 The merged census registration worktree was removed without force. Its

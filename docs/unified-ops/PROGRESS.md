@@ -5376,3 +5376,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   Holds are released and the constructor probe is unchanged. Record 0362ul95
   binds these results. Final gate/docs, inventories/dispositions, corpus/native
   and quiet ABBA remain open. Only audit22 is deferred. Nothing is pushed.
+
+  Follow-up source composition: PPTX `6517f7f5c1` removes the reviewed
+  private helpers; `2749ced58b` fixes two subsequent unused imports. Its
+  actual check now reaches integration tests and reports missing limits in
+  two transition writer callers. The complete test/example audit is active;
+  no all-target success is claimed. OOXML `0db7ff3a6a` commits the reviewed
+  properties/shared-error composition, including eight conflict resolutions,
+  the five-variant properties bridge, source chains and typed patch errors.
+  Custom XML audit 94c and actual combined validation remain required.
