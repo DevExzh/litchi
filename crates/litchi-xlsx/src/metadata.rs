@@ -84,7 +84,7 @@ fn is_family_relationship(family: Family, relationship_type: &str) -> bool {
         ),
         Family::Custom => {
             relationship_type == litchi_opc::constants::relationship_type::CUSTOM_PROPERTIES
-        },
+        }
         _ => false,
     }
 }
@@ -100,7 +100,9 @@ fn owner_family(
             let part = package
                 .opc()
                 .part_metadata(part_name)
-                .ok_or_else(|| Error::Internal("metadata part disappeared during admission"))?;
+                .ok_or(Error::Internal(
+                    "metadata part disappeared during admission",
+                ))?;
             let relationship = match snapshot.relationship_id_value(family) {
                 Some(relationship_id) => package_relationships.get(relationship_id),
                 None => package_relationships.iter().find(|relationship| {
@@ -110,12 +112,14 @@ fn owner_family(
                         })
                 }),
             }
-            .ok_or_else(|| Error::Internal("metadata relationship disappeared during admission"))?;
+            .ok_or(Error::Internal(
+                "metadata relationship disappeared during admission",
+            ))?;
             (
                 Some(retained_part_metadata_bytes(part)),
                 Some(retained_relationship_bytes(relationship)),
             )
-        },
+        }
         None => (None, None),
     };
     let new_part = snapshot.new_part_name(family);
