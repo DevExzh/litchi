@@ -65,6 +65,13 @@ Both corrected rows passed. The iWork row reached a 369,331,620-byte target;
 the consumer row reached 1,026,071,993 bytes. The source commit and all three
 recorded Cargo lock hashes were unchanged after each row.
 
+The selected `run_step` fields captured in the terminal are persisted at
+`docs/unified-ops/results/0362ul48/pinned-clippy-receipts.json`. That file
+records the exact external log and Cargo-target TSV paths, exit/status values,
+source and lock identities, target guard measurements and provenance. It does
+not reconstruct the unavailable full `preflight` member or claim that a
+standalone `state.json` exists.
+
 The source/API checks also passed:
 
 ```text
@@ -86,11 +93,9 @@ cargo check --locked -p litchi-ops -p litchi --all-features --all-targets
 receipt: /home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025i/state/102-iwa-consumer-check-all-targets-attempt-1792888219123124194-278223.log
 receipt SHA-256: 883fa55f4eb83c790ea52708e82f2e97b105343e402a6a17443f5aa6b139b6b0
 
-```text
 cargo check --locked -p litchi-iwa --all-features --all-targets
 receipt: /home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025f/state/100-iwa-check-all-targets-attempt-1792887473862444114-4151089.log
 receipt SHA-256: f927d0a1979617ea1f3b22119d4450989c93fc5684923d9444a90f2de46e743a
-```
 ```
 
 ## Preserved setup and wrong-toolchain receipts
@@ -125,6 +130,14 @@ as wrong-toolchain diagnostics, not accepted project debt:
   SHA-256 85d3a4295b6bb3205daf40950bf06cd7f28ac8d3dcca3ad35b21aa88a2463790
   diagnostic: stable clippy's chunks_exact_to_as_chunks denies in litchi-ole-common
 ```
+
+There was also one pinned-toolchain consumer attempt before the sparse pattern
+was repaired. It failed at test compilation because
+`test-data/iwork/pages/body-table-catalog-native.pages` was absent from the
+sparse checkout; it was not a source diagnostic. Its structured selected
+receipt is the second row in
+`results/0362ul48/pinned-clippy-receipts.json`, with log SHA-256
+`340f94a4d3a361cd317d7825812b8f3862fb8580a48b8b79c6e31fe73a2f36ef`.
 
 The failed sparse consumer-check receipts remain preserved as well; they were
 missing-fixture setup failures, not rename diagnostics:
