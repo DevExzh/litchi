@@ -4,7 +4,10 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::codec::{add_anchor, load, put, remove, remove_anchor, scan_layout, selected_raw_span};
+use super::codec::{
+    add_anchor, load, put, remove, remove_anchor, scan_layout, selected_raw_span,
+    selected_raw_span_with_limits,
+};
 use super::validation::P14;
 use crate::tag::Tag;
 use crate::tag::{CONTENT_TYPE, Conformance, List};
@@ -102,11 +105,13 @@ fn maps_all_five_families_and_nested_groups_to_raw_source() {
         assert_eq!(by_name, by_index);
         assert!(xml[by_name].starts_with(opening));
 
-        let layout = scan_layout(&xml, by_index).expect("shape layout");
+        let layout =
+            scan_layout(&xml, by_index, crate::shape::Limits::DEFAULT).expect("shape layout");
         let staged = add_anchor(&xml, &layout, "rId9").expect("anchor insertion");
         let staged_span =
             selected_raw_span(&staged, crate::shape::Key::Name(name)).expect("staged shape maps");
-        let staged_layout = scan_layout(&staged, staged_span).expect("staged layout");
+        let staged_layout = scan_layout(&staged, staged_span, crate::shape::Limits::DEFAULT)
+            .expect("staged layout");
         assert_eq!(
             staged_layout
                 .anchor
@@ -118,12 +123,54 @@ fn maps_all_five_families_and_nested_groups_to_raw_source() {
         let removed_span =
             selected_raw_span(&removed, crate::shape::Key::Name(name)).expect("removed shape maps");
         assert!(
-            scan_layout(&removed, removed_span)
+            scan_layout(&removed, removed_span, crate::shape::Limits::DEFAULT)
                 .expect("removed layout")
                 .anchor
                 .is_none()
         );
     }
+}
+
+#[test]
+fn scan_layout_uses_the_selected_shape_node_profile() {
+    let xml = format!(
+        r#"<p:sld xmlns:p="{PML}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{}</p:spTree></p:cSld></p:sld>"#,
+        shape_xml("Profile", 2),
+    )
+    .into_bytes();
+    let span = selected_raw_span_with_limits(
+        &xml,
+        crate::shape::Key::Name("Profile"),
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("profile shape");
+    let defaults = crate::shape::Limits::DEFAULT;
+    let tight = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        1,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("tight profile");
+    assert!(matches!(
+        scan_layout(&xml, span.clone(), tight),
+        Err(crate::Error::Limit {
+            resource: "shape-tag owner XML nodes",
+            limit: 1,
+        })
+    ));
+    let larger = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        defaults.nodes() * 2,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("larger profile");
+    scan_layout(&xml, span, larger).expect("larger profile remains valid");
 }
 
 #[test]
@@ -135,7 +182,7 @@ fn preserves_customer_data_and_inserts_before_extensions() {
         )
         .into_bytes();
     let span = selected_raw_span(&xml, crate::shape::Key::Name("Ordered")).expect("shape");
-    let layout = scan_layout(&xml, span).expect("layout");
+    let layout = scan_layout(&xml, span, crate::shape::Limits::DEFAULT).expect("layout");
     let staged = add_anchor(&xml, &layout, "rIdTags").expect("insert");
     let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
     assert!(text.find("<p:custData ").unwrap() < text.find("<p:tags ").unwrap());
@@ -145,7 +192,8 @@ fn preserves_customer_data_and_inserts_before_extensions() {
 
     let staged_span =
         selected_raw_span(&staged, crate::shape::Key::Name("Ordered")).expect("shape");
-    let staged_layout = scan_layout(&staged, staged_span).expect("layout");
+    let staged_layout =
+        scan_layout(&staged, staged_span, crate::shape::Limits::DEFAULT).expect("layout");
     let removed = remove_anchor(&staged, &staged_layout).expect("remove");
     assert_eq!(removed, xml);
 }
@@ -174,7 +222,8 @@ fn mce_mapping_edits_only_the_active_raw_branch() {
             .windows(15)
             .any(|bytes| bytes == b"name=\"Inactive\"")
     );
-    let layout = scan_layout(&xml, active_span).expect("active layout");
+    let layout =
+        scan_layout(&xml, active_span, crate::shape::Limits::DEFAULT).expect("active layout");
     let staged = add_anchor(&xml, &layout, "rIdTags").expect("active insertion");
     let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
     assert_eq!(text.matches("<p:tags ").count(), 2);

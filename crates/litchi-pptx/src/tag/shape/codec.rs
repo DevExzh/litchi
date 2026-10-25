@@ -20,9 +20,9 @@ use super::model::{
     RawCandidateKind, RawFrame, RawMapFrame,
 };
 use super::validation::{
-    active_pml_offsets, bump_nodes, has_non_namespace_attrs, offset_u32, preserved_anchor_uses,
-    shape_mce_capabilities, take_active, try_push, validate_owner_content_type,
-    validate_staged_anchor, xml_error, xml_position,
+    active_pml_offsets, bump_nodes, enter_depth, has_non_namespace_attrs, leave_depth, offset_u32,
+    preserved_anchor_uses, shape_mce_capabilities, shape_offset_limits, take_active, try_push,
+    validate_owner_content_type, validate_staged_anchor, xml_error, xml_position,
 };
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::tag::{
@@ -32,7 +32,7 @@ use crate::tag::{
 };
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
-use litchi_ooxml_common::mce::{OffsetLimits, active_offsets};
+use litchi_ooxml_common::mce::active_offsets;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
@@ -40,8 +40,6 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::ops::Range;
 
-pub(super) const MAX_OWNER_BYTES: usize = 64 * 1024 * 1024;
-pub(super) const MAX_OWNER_NODES: usize = 1_000_000;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 4_096;
 
 /// Load the optional programmable-tag list attached to one semantic shape.
@@ -125,7 +123,7 @@ pub(crate) fn put_with_limits<'k>(
         let anchor_uses = layout
             .anchor
             .as_ref()
-            .map(|anchor| preserved_anchor_uses(owner.blob(), &anchor.id))
+            .map(|anchor| preserved_anchor_uses(owner.blob(), &anchor.id, shape_limits))
             .transpose()?
             .unwrap_or(0);
         (owner.partname().clone(), layout, attached, anchor_uses)
@@ -288,7 +286,8 @@ pub(crate) fn remove_with_limits<'k>(
             .ok_or_else(|| invalid("shape tag relationship disappeared during preflight"))?;
         let relationship_type = relationship.reltype().to_owned();
         let owner_name = owner.partname().clone();
-        let retain_relationship = preserved_anchor_uses(owner.blob(), &anchor.id)? > 1;
+        let retain_relationship =
+            preserved_anchor_uses(owner.blob(), &anchor.id, shape_limits)? > 1;
         let owner_xml = remove_anchor(owner.blob(), &layout)?;
         validate_staged_anchor(owner, &owner_xml, key, None, shape_limits)?;
         let orphan = !retain_relationship
@@ -340,7 +339,7 @@ fn selected_layout(
 ) -> Result<Layout> {
     validate_owner_content_type(owner.content_type())?;
     let span = selected_raw_span_with_limits(owner.blob(), key, shape_limits)?;
-    scan_layout(owner.blob(), span)
+    scan_layout(owner.blob(), span, shape_limits)
 }
 
 pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
@@ -370,15 +369,15 @@ pub(crate) fn selected_raw_span_for_shape(
     let family = selected_family(shape)?;
     let index = shape.common().index();
     if !scene_proves_unmarked_owner(scene, xml) {
-        return raw_shape_span(xml, index, scene.len(), family, false);
+        return raw_shape_span(xml, index, scene.len(), family, false, scene.limits());
     }
-    let span = raw_shape_span(xml, index, scene.len(), family, true);
+    let span = raw_shape_span(xml, index, scene.len(), family, true, scene.limits());
     // Test and debug builds re-run the separate offset pass and the MCE
     // offset selection, so the crate's suite proves the unmarked route
     // returns exactly the span, or exactly the refusal, of the full route.
     #[cfg(debug_assertions)]
     {
-        let full = raw_shape_span(xml, index, scene.len(), family, false);
+        let full = raw_shape_span(xml, index, scene.len(), family, false, scene.limits());
         debug_assert_eq!(
             format!("{span:?}"),
             format!("{full:?}"),
@@ -394,15 +393,11 @@ pub(crate) fn selected_raw_span_for_shape(
 /// The scene read these very bytes (the same allocation and length) and
 /// needed no markup-compatibility rewrite, so the MCE namespace occurs
 /// nowhere in them and the offset selection would keep every offset. The
-/// scene's reader has the configuration the raw passes use, so those bytes
-/// raise no reader error, and its element ceiling is no looser than the raw
-/// passes' node ceiling, so they count no more elements than that ceiling
-/// allows. Its input ceiling is likewise no looser than the raw owner limit.
+/// scene's reader has the selected configuration the raw passes use, so those
+/// bytes raise no reader error and the same input/node profile is applied to
+/// every raw projection pass.
 fn scene_proves_unmarked_owner(scene: &crate::shape::Scene<'_>, xml: &[u8]) -> bool {
-    !scene.is_rewritten()
-        && std::ptr::eq(scene.xml(), xml)
-        && scene.limits().nodes() <= MAX_OWNER_NODES
-        && scene.limits().input_bytes() <= MAX_OWNER_BYTES
+    !scene.is_rewritten() && std::ptr::eq(scene.xml(), xml)
 }
 
 /// Which shape-tree and candidate elements markup compatibility leaves
@@ -452,23 +447,24 @@ fn raw_shape_span(
     scene_len: usize,
     expected_family: Family,
     unmarked: bool,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Range<usize>> {
     let mut active = if unmarked {
         // The raw offset pass would refuse an oversized owner first.
-        if xml.len() > MAX_OWNER_BYTES {
+        if xml.len() > shape_limits.input_bytes() {
             return Err(Error::Limit {
                 resource: "shape-tag owner XML bytes",
-                limit: MAX_OWNER_BYTES,
+                limit: shape_limits.input_bytes(),
             });
         }
         ActiveShapes::Every
     } else {
-        let offsets = raw_shape_offsets(xml)?;
+        let offsets = raw_shape_offsets(xml, shape_limits)?;
         let active = active_offsets(
             xml,
             &offsets,
             &shape_mce_capabilities(),
-            &OffsetLimits::default(),
+            &shape_offset_limits(shape_limits),
         )?;
         ActiveShapes::Offsets(active.into_iter().peekable())
     };
@@ -476,6 +472,7 @@ fn raw_shape_span(
     let origin = ReaderOrigin::of(xml);
     let mut frames = Vec::new();
     let mut nodes = 0usize;
+    let mut depth = 0usize;
     let mut mapped = 0usize;
     let mut active_trees = 0usize;
     let mut selected = None;
@@ -494,7 +491,8 @@ fn raw_shape_span(
         let end = xml_position(&reader, origin)?;
         match event {
             Event::Start(_) => {
-                bump_nodes(&mut nodes)?;
+                bump_nodes(&mut nodes, shape_limits)?;
+                enter_depth(&mut depth, shape_limits)?;
                 let (shape_tree, candidate) = classification
                     .ok_or_else(|| invalid("raw shape start lost its classification"))?;
                 let active_event = (shape_tree || candidate.is_some()) && active.take(start)?;
@@ -520,7 +518,7 @@ fn raw_shape_span(
                         let index = mapped;
                         mapped = mapped.checked_add(1).ok_or(Error::Limit {
                             resource: "mapped active shapes",
-                            limit: MAX_OWNER_NODES,
+                            limit: shape_limits.nodes(),
                         })?;
                         (index == selected_index).then_some(start)
                     } else {
@@ -540,7 +538,9 @@ fn raw_shape_span(
                 )?;
             },
             Event::Empty(_) => {
-                bump_nodes(&mut nodes)?;
+                bump_nodes(&mut nodes, shape_limits)?;
+                enter_depth(&mut depth, shape_limits)?;
+                leave_depth(&mut depth)?;
                 let (shape_tree, candidate) = classification
                     .ok_or_else(|| invalid("raw empty shape lost its classification"))?;
                 let active_event = (shape_tree || candidate.is_some()) && active.take(start)?;
@@ -564,7 +564,7 @@ fn raw_shape_span(
                         let index = mapped;
                         mapped = mapped.checked_add(1).ok_or(Error::Limit {
                             resource: "mapped active shapes",
-                            limit: MAX_OWNER_NODES,
+                            limit: shape_limits.nodes(),
                         })?;
                         if index == selected_index {
                             selected = Some((start..end, kind));
@@ -573,6 +573,7 @@ fn raw_shape_span(
                 }
             },
             Event::End(_) => {
+                leave_depth(&mut depth)?;
                 let frame = frames
                     .pop()
                     .ok_or_else(|| invalid("raw shape-map stack underflow"))?;
@@ -613,23 +614,26 @@ fn raw_shape_span(
     Ok(span)
 }
 
-fn raw_shape_offsets(xml: &[u8]) -> Result<Vec<u32>> {
-    if xml.len() > MAX_OWNER_BYTES {
+fn raw_shape_offsets(xml: &[u8], shape_limits: crate::shape::Limits) -> Result<Vec<u32>> {
+    if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
             resource: "shape-tag owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            limit: shape_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut offsets = Vec::new();
     let mut nodes = 0usize;
+    let mut depth = 0usize;
     loop {
         let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        let is_empty = matches!(&event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                bump_nodes(&mut nodes)?;
+                bump_nodes(&mut nodes, shape_limits)?;
+                enter_depth(&mut depth, shape_limits)?;
                 if is_shape_tree(&namespace, &element)
                     || raw_candidate(&namespace, &element).is_some()
                 {
@@ -639,7 +643,11 @@ fn raw_shape_offsets(xml: &[u8]) -> Result<Vec<u32>> {
                         "raw shape-map MCE offsets",
                     )?;
                 }
+                if is_empty {
+                    leave_depth(&mut depth)?;
+                }
             },
+            Event::End(_) => leave_depth(&mut depth)?,
             Event::Eof => break,
             _ => {},
         }
@@ -666,18 +674,22 @@ fn raw_candidate(
     (local.as_ref() == b"contentPart").then_some(RawCandidateKind::Unsupported)
 }
 
-pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout> {
-    if xml.len() > MAX_OWNER_BYTES {
+pub(super) fn scan_layout(
+    xml: &[u8],
+    shape_span: Range<usize>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Layout> {
+    if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
             resource: "shape-tag owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            limit: shape_limits.input_bytes(),
         });
     }
     if shape_span.start >= shape_span.end || shape_span.end > xml.len() {
         return Err(invalid("selected shape span is outside its owner XML"));
     }
 
-    let active = active_pml_offsets(xml, &shape_span)?;
+    let active = active_pml_offsets(xml, &shape_span, shape_limits)?;
     let mut active = active.into_iter().peekable();
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -685,6 +697,7 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
     let mut raw = Vec::new();
     let mut semantic = Vec::new();
     let mut nodes = 0usize;
+    let mut depth = 0usize;
     let mut conformance = None;
     let mut root_family = None;
     let mut non_visual_seen = false;
@@ -705,7 +718,8 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
 
         match event {
             Event::Start(element) => {
-                bump_nodes(&mut nodes)?;
+                bump_nodes(&mut nodes, shape_limits)?;
+                enter_depth(&mut depth, shape_limits)?;
                 let in_shape = start >= shape_span.start && start < shape_span.end;
                 let is_active = in_shape && profile.is_some() && take_active(&mut active, start)?;
                 let semantic_node = if is_active {
@@ -729,6 +743,7 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
                         &mut conformance,
                         &mut root_family,
                         &mut non_visual_seen,
+                        shape_limits,
                     )?;
                     try_push(
                         &mut semantic,
@@ -754,7 +769,9 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
                 }
             },
             Event::Empty(element) => {
-                bump_nodes(&mut nodes)?;
+                bump_nodes(&mut nodes, shape_limits)?;
+                enter_depth(&mut depth, shape_limits)?;
+                leave_depth(&mut depth)?;
                 if start < shape_span.start || start >= shape_span.end || profile.is_none() {
                     continue;
                 }
@@ -781,6 +798,7 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
                     &mut conformance,
                     &mut root_family,
                     &mut non_visual_seen,
+                    shape_limits,
                 )?;
                 finish_node(
                     xml,
@@ -799,6 +817,7 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
                 )?;
             },
             Event::End(_) => {
+                leave_depth(&mut depth)?;
                 if raw.is_empty() {
                     continue;
                 }
@@ -910,6 +929,7 @@ fn start_node(
     conformance: &mut Option<Conformance>,
     root_family: &mut Option<Family>,
     non_visual_seen: &mut bool,
+    shape_limits: crate::shape::Limits,
 ) -> Result<NodeKind> {
     let local = element.local_name();
     if semantic.is_empty() {
@@ -968,7 +988,7 @@ fn start_node(
             observe_customer_child(local.as_ref(), tags_seen)?;
             *children = children.checked_add(1).ok_or(Error::Limit {
                 resource: "shape customer-data children",
-                limit: MAX_OWNER_NODES,
+                limit: shape_limits.nodes(),
             })?;
             if local.as_ref() == b"tags" {
                 let (id, id_value) = anchor_id(reader, xml, element, start..end, profile)?;

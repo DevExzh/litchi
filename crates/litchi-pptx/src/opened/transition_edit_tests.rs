@@ -160,6 +160,37 @@ fn eager_edit_retains_custom_shape_profile() -> Result<()> {
 }
 
 #[test]
+fn borrowed_designer_projection_retains_custom_shape_profile() -> Result<()> {
+    let mut builder = crate::builder::Builder::new()?;
+    builder
+        .presentation()?
+        .add_slide()?
+        .add_text_box("Designer", 0, 0, 914_400, 914_400)
+        .set_designer_properties(crate::shape::designer::DrawingProperties::new())?;
+    let bytes = builder.build()?.to_bytes()?;
+    let defaults = crate::shape::Limits::DEFAULT;
+    let shape_limits = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        1,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("tight shape profile");
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        crate::OpenOptions::default().shape_limits(shape_limits),
+    )?;
+    let slides = package.presentation()?.slides()?;
+    assert!(matches!(
+        slides[0].shape_designer_properties("Designer"),
+        Err(crate::Error::Limit { .. })
+    ));
+    Ok(())
+}
+
+#[test]
 fn shape_edits_work_after_an_extension_transition() -> Result<()> {
     // Markup compatibility after `cSld` (the Morph owner) leaves the scene
     // in source offsets, so byte-splicing shape edits stay available.

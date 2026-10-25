@@ -299,7 +299,13 @@ impl<'a> Slide<'a> {
         shape: impl Into<crate::shape::Key<'k>>,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::shape::designer::properties::Snapshot> {
-        package::slide_shape_designer_properties(self.package, &self.part, shape, limits)
+        package::slide_shape_designer_properties(
+            self.package,
+            &self.part,
+            shape,
+            limits,
+            self.shape_limits,
+        )
     }
 
     /// Read the source-bound Designer tags owned by this slide's stable ID.
