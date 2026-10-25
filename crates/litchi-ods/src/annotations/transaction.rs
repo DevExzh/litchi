@@ -2,13 +2,14 @@
 
 use super::{codec, model, validation};
 use litchi_core::{Error, Result};
-use litchi_odf_common::annotation::Annotation;
+use litchi_odf_common::{XmlStreamLimits, annotation::Annotation};
 
 /// An immutable, source-checked ODS cell-annotation snapshot.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     pub(super) source: String,
     pub(super) entries: Vec<model::Entry>,
+    pub(super) xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -16,13 +17,14 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(source: impl Into<String>) -> Result<Self> {
+    pub fn parse(source: impl Into<String>, limits: &XmlStreamLimits) -> Result<Self> {
         let source = source.into();
-        let parsed = codec::parse(&source)?;
+        let parsed = codec::parse(&source, limits)?;
         validation::validate_entries(&parsed.entries)?;
         Ok(Self {
             source,
             entries: parsed.entries,
+            xml_limits: *limits,
         })
     }
 
@@ -149,10 +151,10 @@ impl Edit {
                 cell.column().saturating_add(1)
             )));
         }
-        let parsed = codec::parse(self.draft.source_xml())?;
+        let parsed = codec::parse(self.draft.source_xml(), &self.draft.xml_limits)?;
         let site = codec::find_site(&parsed.sites, &cell).ok_or_else(|| model::not_found(&cell))?;
         ensure_unique_site(site, &cell)?;
-        let fragment = codec::serialize(&annotation)?;
+        let fragment = codec::serialize(&annotation, &self.draft.xml_limits)?;
         let source = codec::insert(self.draft.source_xml(), site, &fragment)?;
         self.publish(source, Some(&cell))
     }
@@ -203,10 +205,10 @@ impl Edit {
         self.draft
             .cell(cell.sheet(), cell.row(), cell.column())?
             .ok_or_else(|| model::not_found(&cell))?;
-        let parsed = codec::parse(self.draft.source_xml())?;
+        let parsed = codec::parse(self.draft.source_xml(), &self.draft.xml_limits)?;
         let site = codec::find_site(&parsed.sites, &cell).ok_or_else(|| model::not_found(&cell))?;
         ensure_unique_site(site, &cell)?;
-        let fragment = codec::serialize(&annotation)?;
+        let fragment = codec::serialize(&annotation, &self.draft.xml_limits)?;
         let span = annotation_span(&parsed, &cell)?;
         let source = codec::replace(self.draft.source_xml(), span, &fragment)?;
         self.publish(source, Some(&cell))
@@ -233,7 +235,7 @@ impl Edit {
             .cell(cell.sheet(), cell.row(), cell.column())?
             .ok_or_else(|| model::not_found(&cell))?
             .clone();
-        let parsed = codec::parse(self.draft.source_xml())?;
+        let parsed = codec::parse(self.draft.source_xml(), &self.draft.xml_limits)?;
         let span = annotation_span(&parsed, &cell)?;
         let source = codec::remove(self.draft.source_xml(), span)?;
         let annotation = entry.annotation().clone();
@@ -271,7 +273,7 @@ impl Edit {
     /// Adopt `source` as the candidate; an added or replaced annotation must
     /// read back at `written`.
     fn publish(&mut self, source: String, written: Option<&model::Cell>) -> Result<()> {
-        let draft = Snapshot::parse(source)?;
+        let draft = Snapshot::parse(source, &self.before.xml_limits)?;
         if let Some(cell) = written {
             draft
                 .cell(cell.sheet(), cell.row(), cell.column())?

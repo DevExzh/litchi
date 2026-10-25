@@ -12,6 +12,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+use litchi_odf_common::XmlStreamLimits;
 pub use litchi_odf_common::annotation::Annotation;
 pub use model::{Anchor, Info, Position};
 
@@ -24,6 +25,6 @@ pub(crate) use codec::{add, annotations, find, remove, replace};
 ///
 /// Returns an error when the XML is malformed or an annotation anchor is
 /// invalid.
-pub fn inventory(content_xml: &str) -> litchi_core::Result<Vec<Info>> {
-    annotations(content_xml)
+pub fn inventory(content_xml: &str, limits: &XmlStreamLimits) -> litchi_core::Result<Vec<Info>> {
+    annotations(content_xml, limits)
 }

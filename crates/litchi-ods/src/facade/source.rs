@@ -570,6 +570,7 @@ impl SourceBackedSpreadsheet {
         let computed = crate::protection::source_edit_protection(
             &self.content_xml,
             self.styles_xml.as_deref(),
+            &self.xml_limits,
         )?;
         Ok(self.edit_protection.get_or_init(|| computed))
     }

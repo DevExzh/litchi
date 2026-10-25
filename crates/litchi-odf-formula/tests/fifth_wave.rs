@@ -28,7 +28,7 @@ fn every_checked_constructor_family_builds_compact_reopenable_mathml() {
     for child in children {
         root.push_child(child);
     }
-    let xml = codec::serialize(&root);
+    let xml = codec::serialize(&root, &codec::Limits::default()).expect("serialize corpus");
 
     assert!(!xml.contains('\n'));
     assert!(!xml.contains("> <"));
@@ -56,7 +56,8 @@ fn deterministic_xml_property_corpus_covers_every_constructor_and_raw_ingress() 
         } else {
             authoring::document_root(element, Display::Inline)
         };
-        let baseline = codec::serialize(&root);
+        let baseline =
+            codec::serialize(&root, &codec::Limits::default()).expect("serialize baseline");
         let baseline_formula = create(&baseline).expect("constructor baseline");
         assert!(open(baseline_formula.as_bytes()).is_ok());
 
@@ -72,7 +73,7 @@ fn deterministic_xml_property_corpus_covers_every_constructor_and_raw_ingress() 
             let first = create(&candidate).is_ok();
             let second = create(&candidate).is_ok();
             let raw = open(raw_formula_package(&candidate, None)).is_ok();
-            let parsed = codec::parse(&candidate, codec::Limits::default()).is_ok();
+            let parsed = codec::parse(&candidate, &codec::Limits::default()).is_ok();
             assert_eq!(
                 first, second,
                 "document {document_index}, mutation {mutation}"
@@ -538,7 +539,8 @@ fn history_base() -> Package {
     root.push_child(presentation);
     root.push_child(content);
     root.push_child(semantics);
-    create(codec::serialize(&root)).expect("history base")
+    create(codec::serialize(&root, &codec::Limits::default()).expect("history XML"))
+        .expect("history base")
 }
 
 fn deterministic_state(document: usize, mutation: usize) -> u32 {

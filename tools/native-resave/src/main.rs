@@ -519,7 +519,7 @@ fn generate_odf(output: &Path) -> Result<()> {
 fn readback_odf(input: &Path) -> Result<()> {
     let package = litchi_odf_formula::Package::from_bytes(&fs::read(input)?)?;
     let formula = package.formula();
-    let xml = litchi_odf_formula::codec::serialize(formula.root());
+    let xml = litchi_odf_formula::codec::serialize(formula.root(), &formula.limits())?;
     if !xml.contains(">g<") {
         return Err("ODF Formula identifier g is absent after reopen".into());
     }

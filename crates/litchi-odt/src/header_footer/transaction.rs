@@ -47,7 +47,7 @@ impl Snapshot {
         }
         let masters = read(&source, limits).map_err(litchi_core::Error::from)?;
         let layouts = parse_page_layouts(&source)?;
-        let sections = section_layouts(&source)?;
+        let sections = section_layouts(&source, &limits)?;
         Ok(Self {
             source,
             masters,
@@ -634,8 +634,8 @@ fn remove_page_layout(
     super::replace_range(source, start, start + actual.len(), "")
 }
 
-fn section_layouts(source: &str) -> Result<Vec<SectionLayout>> {
-    let typed = parse_section_style_properties(source.as_bytes())?;
+fn section_layouts(source: &str, limits: &XmlStreamLimits) -> Result<Vec<SectionLayout>> {
+    let typed = parse_section_style_properties(source.as_bytes(), limits)?;
     let namespaces = root_namespace_declarations(source)?;
     let owners = section_style_owners(source)?;
     let mut names = BTreeSet::new();
@@ -820,7 +820,7 @@ fn insert_section_style(source: &str, fragment: &str, limits: XmlStreamLimits) -
     let wrapper = format!(
         "<office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"><office:styles>{closed}</office:styles></office:document-styles>"
     );
-    let parsed = section_layouts(&wrapper)?;
+    let parsed = section_layouts(&wrapper, &limits)?;
     if parsed.len() != 1 || parsed[0].xml != closed {
         return Err(bad(
             "section layout fragment is not exactly one section style",

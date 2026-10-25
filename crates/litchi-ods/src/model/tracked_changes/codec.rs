@@ -924,8 +924,8 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_tracked_changes(xml: &str) -> Result<Option<Changes>> {
-    Ok(inspect_tracked_changes_source(xml, &Limits::default())?.changes)
+pub fn parse_tracked_changes(xml: &str, limits: &Limits) -> Result<Option<Changes>> {
+    Ok(inspect_tracked_changes_source(xml, limits)?.changes)
 }
 
 fn parse_tracked_changes_semantic(xml: &str, limits: &Limits) -> Result<Option<Changes>> {
@@ -1911,18 +1911,21 @@ impl Changes {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn to_xml_fragment(&self) -> Result<String> {
-        write_tracked_changes_owner(self, Some(self.enabled), &Limits::default())
+    pub fn to_xml_fragment(&self, limits: &Limits) -> Result<String> {
+        write_tracked_changes_owner(self, Some(self.enabled), limits)
     }
 }
 
 /// # Errors
 ///
 /// Returns an error when the value cannot be serialized.
-pub fn write_tracked_changes(output: &mut String, changes: Option<&Changes>) -> Result<()> {
+pub fn write_tracked_changes(
+    output: &mut String,
+    changes: Option<&Changes>,
+    limits: &Limits,
+) -> Result<()> {
     if let Some(changes) = changes {
-        let fragment =
-            write_tracked_changes_owner(changes, Some(changes.enabled), &Limits::default())?;
+        let fragment = write_tracked_changes_owner(changes, Some(changes.enabled), limits)?;
         output
             .try_reserve(fragment.len())
             .map_err(allocation_error)?;

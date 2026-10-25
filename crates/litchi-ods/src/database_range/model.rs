@@ -20,10 +20,11 @@ pub struct Catalog<'source> {
 impl<'source> Catalog<'source> {
     pub(crate) fn load(source: &'source Archive) -> Result<Self> {
         let source_xml = source.content_xml();
-        let location = locate(source_xml)?;
+        let limits = source.xml_limits_value();
+        let location = locate(source_xml, &limits)?;
         let ranges = if let Some(container) = &location.container {
             let fragment = super::codec::owner_fragment(source_xml, container)?;
-            vocabulary::parse_database_ranges(&fragment)?
+            vocabulary::parse_database_ranges(&fragment, &limits)?
         } else {
             Vec::new()
         };

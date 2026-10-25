@@ -8,6 +8,7 @@ use super::validation::{
 };
 use crate::core::OwnedPackage;
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::annotation::{Annotation, Builder};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -83,8 +84,8 @@ enum NamespaceKind {
 }
 
 /// Read annotations in document order.
-pub(crate) fn annotations(content: &str) -> Result<Vec<Info>> {
-    let scan = scan(content)?;
+pub(crate) fn annotations(content: &str, limits: &XmlStreamLimits) -> Result<Vec<Info>> {
+    let scan = scan(content, limits)?;
     scan.records
         .into_iter()
         .enumerate()
@@ -99,11 +100,11 @@ pub(crate) fn annotations(content: &str) -> Result<Vec<Info>> {
 }
 
 /// Find a named annotation without exposing physical XML locations.
-pub(crate) fn find(content: &str, name: &str) -> Result<Option<Info>> {
+pub(crate) fn find(content: &str, name: &str, limits: &XmlStreamLimits) -> Result<Option<Info>> {
     if name.is_empty() {
         return invalid("annotation name cannot be empty");
     }
-    Ok(annotations(content)?
+    Ok(annotations(content, limits)?
         .into_iter()
         .find(|item| item.annotation.name() == Some(name)))
 }
@@ -114,20 +115,21 @@ pub(crate) fn add(
     content: &str,
     anchor: &Anchor,
     annotation: &Annotation,
+    limits: &XmlStreamLimits,
 ) -> Result<(Vec<u8>, usize)> {
     validate_anchor(anchor)?;
     validate_annotation(annotation)?;
-    let parsed = scan(content)?;
+    let parsed = scan(content, limits)?;
     validate_new_name(&parsed, annotation.name())?;
     let site = site_for(&parsed, anchor.position())?;
-    let fragment = serialize(annotation)?;
+    let fragment = serialize(annotation, limits)?;
     let updated = insert_child(content, site, &fragment)?;
     let index = parsed
         .records
         .iter()
         .filter(|record| record.span.start < site.span.start)
         .count();
-    scan(&updated)?;
+    scan(&updated, limits)?;
     rebuild(package, &updated).map(|bytes| (bytes, index))
 }
 
@@ -137,9 +139,10 @@ pub(crate) fn replace(
     content: &str,
     index: usize,
     annotation: &Annotation,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<u8>> {
     validate_annotation(annotation)?;
-    let parsed = scan(content)?;
+    let parsed = scan(content, limits)?;
     let record = parsed
         .records
         .get(index)
@@ -153,16 +156,21 @@ pub(crate) fn replace(
         vec![Edit {
             start: record.span.start,
             end: record.span.end,
-            replacement: serialize(annotation)?,
+            replacement: serialize(annotation, limits)?,
         }],
     )?;
-    scan(&updated)?;
+    scan(&updated, limits)?;
     rebuild(package, &updated)
 }
 
 /// Remove one annotation atomically.
-pub(crate) fn remove(package: &OwnedPackage, content: &str, index: usize) -> Result<Vec<u8>> {
-    let parsed = scan(content)?;
+pub(crate) fn remove(
+    package: &OwnedPackage,
+    content: &str,
+    index: usize,
+    limits: &XmlStreamLimits,
+) -> Result<Vec<u8>> {
+    let parsed = scan(content, limits)?;
     let record = parsed
         .records
         .get(index)
@@ -175,7 +183,7 @@ pub(crate) fn remove(package: &OwnedPackage, content: &str, index: usize) -> Res
             replacement: String::new(),
         }],
     )?;
-    scan(&updated)?;
+    scan(&updated, limits)?;
     rebuild(package, &updated)
 }
 
@@ -183,8 +191,10 @@ fn anchor(position: Position) -> Anchor {
     Anchor::from_position(position)
 }
 
-fn scan(xml: &str) -> Result<Scan> {
-    if xml.len() > MAX_XML_BYTES {
+fn scan(xml: &str, limits: &XmlStreamLimits) -> Result<Scan> {
+    if u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+        || xml.len() > MAX_XML_BYTES
+    {
         return invalid("presentation content.xml exceeds the annotation size limit");
     }
 
@@ -199,6 +209,7 @@ fn scan(xml: &str) -> Result<Scan> {
     let mut sites = Vec::<Site>::new();
     let mut next_page = 0usize;
     let mut events = 0usize;
+    let mut attributes = 0usize;
 
     loop {
         let start = position(&reader)?;
@@ -209,10 +220,11 @@ fn scan(xml: &str) -> Result<Scan> {
             (namespace(&resolved), event.into_owned())
         };
         let end = position(&reader)?;
+        check_event_budget(&event, start, end, &mut attributes, limits)?;
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid_error("presentation XML event count overflow"))?;
-        if events > MAX_EVENTS {
+        if events > MAX_EVENTS.min(limits.max_events()) {
             return invalid("presentation XML exceeds the event limit");
         }
         match event {
@@ -242,7 +254,12 @@ fn scan(xml: &str) -> Result<Scan> {
                     });
                     builders.push(ActiveBuilder {
                         record,
-                        builder: Builder::new(&element, reader.decoder(), namespaces.clone())?,
+                        builder: Builder::new(
+                            &element,
+                            reader.decoder(),
+                            namespaces.clone(),
+                            limits,
+                        )?,
                     });
                     frames.push(Frame {
                         kind: FrameKind::Annotation { record },
@@ -272,7 +289,7 @@ fn scan(xml: &str) -> Result<Scan> {
                         namespace_changes: changes,
                     });
                 }
-                if frames.len() > 256 {
+                if frames.len() > 256.min(limits.max_depth()) {
                     return invalid("presentation XML nesting exceeds the safety limit");
                 }
             },
@@ -288,7 +305,8 @@ fn scan(xml: &str) -> Result<Scan> {
                         return invalid("presentation exceeds the annotation limit");
                     }
                     let position = current_position(&frames, &sites)?;
-                    let builder = Builder::new(&element, reader.decoder(), namespaces.clone())?;
+                    let builder =
+                        Builder::new(&element, reader.decoder(), namespaces.clone(), limits)?;
                     records.push(Record {
                         span: Span {
                             start,
@@ -373,6 +391,35 @@ fn scan(xml: &str) -> Result<Scan> {
     validate_record_names(&records)?;
     sites.sort_by_key(|site| site.span.start);
     Ok(Scan { records, sites })
+}
+
+fn check_event_budget(
+    event: &Event<'_>,
+    start: usize,
+    end: usize,
+    attributes: &mut usize,
+    limits: &XmlStreamLimits,
+) -> Result<()> {
+    let token_bytes = end
+        .checked_sub(start)
+        .ok_or_else(|| invalid_error("presentation XML token position overflow"))?;
+    if token_bytes > limits.max_token_bytes() {
+        return invalid("presentation XML token exceeds the limit");
+    }
+    if let Event::Start(element) | Event::Empty(element) = event {
+        for attribute in element.attributes().with_checks(true) {
+            attribute.map_err(|error| {
+                invalid_error(format!("invalid presentation XML attribute: {error}"))
+            })?;
+            *attributes = (*attributes)
+                .checked_add(1)
+                .ok_or_else(|| invalid_error("presentation XML attribute count overflow"))?;
+            if *attributes > limits.max_attributes() {
+                return invalid("presentation XML exceeds the attribute limit");
+            }
+        }
+    }
+    Ok(())
 }
 
 #[allow(
@@ -531,7 +578,7 @@ fn validate_new_name_except(scan: &Scan, name: Option<&str>, except: usize) -> R
     Ok(())
 }
 
-pub(super) fn serialize(annotation: &Annotation) -> Result<String> {
+pub(super) fn serialize(annotation: &Annotation, limits: &XmlStreamLimits) -> Result<String> {
     let mut annotated = annotation.clone();
     for (prefix, uri) in [
         ("office", OFFICE),
@@ -548,8 +595,10 @@ pub(super) fn serialize(annotation: &Annotation) -> Result<String> {
     }
     validate_annotation(&annotated)?;
     let mut output = String::new();
-    annotated.write_xml(&mut output);
-    if output.len() > MAX_FRAGMENT_BYTES {
+    annotated.write_xml(&mut output, limits)?;
+    if output.len() > MAX_FRAGMENT_BYTES
+        || u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return invalid("annotation XML exceeds the fragment size limit");
     }
     Ok(output)

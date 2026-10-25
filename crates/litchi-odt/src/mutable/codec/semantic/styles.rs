@@ -55,7 +55,9 @@ impl MutableDocument {
     ) -> Result<Option<crate::font_face::Declarations>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
-            crate::font_face::parse_styles_font_face_declarations,
+            |styles| {
+                crate::font_face::parse_styles_font_face_declarations(styles, &self.xml_limits)
+            },
         )
     }
 
@@ -71,8 +73,11 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        let (updated, old) =
-            crate::font_face::set_styles_font_face_declarations_xml(&styles, declarations)?;
+        let (updated, old) = crate::font_face::set_styles_font_face_declarations_xml(
+            &styles,
+            declarations,
+            &self.xml_limits,
+        )?;
         self.styles_xml = Some(updated);
         Ok(old)
     }
@@ -87,7 +92,8 @@ impl MutableDocument {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        let (updated, old) = crate::font_face::remove_styles_font_face_declarations_xml(styles)?;
+        let (updated, old) =
+            crate::font_face::remove_styles_font_face_declarations_xml(styles, &self.xml_limits)?;
         self.styles_xml = Some(updated);
         Ok(old)
     }
@@ -200,9 +206,10 @@ impl MutableDocument {
     pub(crate) fn notes_configurations(
         &self,
     ) -> Result<crate::notes_configuration::Configurations> {
-        self.styles_xml
-            .as_deref()
-            .map_or_else(|| Ok(Default::default()), crate::notes_configuration::parse)
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::notes_configuration::parse(styles, &self.xml_limits),
+        )
     }
 
     /// Return stored outline numbering styles from current styles metadata.
@@ -267,7 +274,11 @@ impl MutableDocument {
             .styles_xml
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
-        self.styles_xml = Some(crate::notes_configuration::set_xml(&styles, configuration)?);
+        self.styles_xml = Some(crate::notes_configuration::set_xml(
+            &styles,
+            configuration,
+            &self.xml_limits,
+        )?);
         Ok(old)
     }
 
@@ -293,8 +304,12 @@ impl MutableDocument {
             .unwrap_or_else(Structure::default_styles_xml);
         for note_class in crate::notes_configuration::Class::ALL {
             styles = match configurations.get(note_class) {
-                Some(configuration) => crate::notes_configuration::set_xml(&styles, configuration)?,
-                None => crate::notes_configuration::remove_xml(&styles, note_class)?,
+                Some(configuration) => {
+                    crate::notes_configuration::set_xml(&styles, configuration, &self.xml_limits)?
+                },
+                None => {
+                    crate::notes_configuration::remove_xml(&styles, note_class, &self.xml_limits)?
+                },
             };
         }
         self.styles_xml = Some(styles);
@@ -313,7 +328,11 @@ impl MutableDocument {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml = Some(crate::notes_configuration::remove_xml(styles, note_class)?);
+        self.styles_xml = Some(crate::notes_configuration::remove_xml(
+            styles,
+            note_class,
+            &self.xml_limits,
+        )?);
         Ok(old)
     }
 

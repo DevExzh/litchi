@@ -204,7 +204,7 @@ fn reads_all_four_families_and_authors_odf_14_order_with_schema_prefixes() {
 
     let semantic = families.clone();
     let canonical_owner = semantic
-        .to_xml_fragment()
+        .to_xml_fragment(&Limits::default())
         .expect("test fixture or operation should succeed");
     let canonical = Snapshot::parse(content(&canonical_owner))
         .expect("test fixture or operation should succeed");

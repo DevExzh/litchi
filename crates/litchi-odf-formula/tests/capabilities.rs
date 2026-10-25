@@ -50,7 +50,7 @@ fn checked_in_libreoffice_mathml_samples_validate() {
     ];
     for sample in samples {
         let root =
-            codec::parse(sample, codec::Limits::default()).expect("checked-in MathML fixture");
+            codec::parse(sample, &codec::Limits::default()).expect("checked-in MathML fixture");
         codec::validate(&root).expect("schema projection");
     }
 }
@@ -139,7 +139,10 @@ fn malformed_and_fuzz_like_inputs_fail_without_panics() {
         deep = authoring::row(vec![deep]);
     }
     let deep_document = authoring::document_root(deep, Display::Inline);
-    assert!(create(codec::serialize(&deep_document)).is_err());
+    assert!(
+        create(codec::serialize(&deep_document, &codec::Limits::default()).expect("deep XML"))
+            .is_err()
+    );
 }
 
 #[test]

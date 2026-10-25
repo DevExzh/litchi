@@ -2,6 +2,7 @@
 
 use super::{model::Cell, model::Entry, validation};
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::annotation::{Annotation, Builder as AnnotationBuilder};
 use quick_xml::{
     Decoder, XmlVersion,
@@ -110,9 +111,14 @@ pub(crate) struct Parsed {
     pub(crate) annotation_spans: Vec<Span>,
 }
 
-pub(crate) fn parse(xml: &str) -> Result<Parsed> {
+pub(crate) fn parse(xml: &str, limits: &XmlStreamLimits) -> Result<Parsed> {
     validation::validate_source(xml)?;
     crate::authoring::validate_content_xml(xml)?;
+    if u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(Error::InvalidFormat(
+            "ODS annotation content.xml exceeds the configured byte limit".to_string(),
+        ));
+    }
 
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -128,6 +134,7 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
     let mut records = Vec::<Record>::new();
     let mut active: Option<Active> = None;
     let mut events = 0usize;
+    let mut attributes = 0usize;
 
     loop {
         let event_start = position(&reader)?;
@@ -141,8 +148,19 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid("ODS annotation event count overflow"))?;
-        if events > validation::MAX_EVENTS {
+        if events > validation::MAX_EVENTS.min(limits.max_events()) {
             return Err(invalid("ODS annotation XML exceeds the event limit"));
+        }
+        if event_end.saturating_sub(event_start) > limits.max_token_bytes() {
+            return Err(invalid(
+                "ODS annotation XML token exceeds the configured limit",
+            ));
+        }
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            validate_event_attributes(element, limits, &mut attributes)?;
+            if stack.len() >= validation::MAX_DEPTH.min(limits.max_depth()) {
+                return Err(invalid("ODS annotation XML exceeds the nesting limit"));
+            }
         }
         let event = event.into_owned();
 
@@ -200,6 +218,7 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
                             &mut records,
                             &mut active,
                             span.clone(),
+                            limits,
                         )?;
                     },
                     Kind::Root | Kind::Body | Kind::Workbook | Kind::Other => {},
@@ -255,8 +274,12 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
                     },
                     Kind::Annotation => {
                         let cell = cell_for_annotation(&current_cell)?;
-                        let builder =
-                            AnnotationBuilder::new(&element, reader.decoder(), namespaces.clone())?;
+                        let builder = AnnotationBuilder::new(
+                            &element,
+                            reader.decoder(),
+                            namespaces.clone(),
+                            limits,
+                        )?;
                         records.push(Record {
                             cell,
                             span,
@@ -357,6 +380,31 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
         sites,
         annotation_spans,
     })
+}
+
+fn validate_event_attributes(
+    element: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+    total: &mut usize,
+) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute
+            .map_err(|error| invalid(format!("invalid ODS annotation attribute: {error}")))?;
+        *total = (*total)
+            .checked_add(1)
+            .ok_or_else(|| invalid("ODS annotation attribute count overflow"))?;
+        if *total > limits.max_attributes() {
+            return Err(invalid(
+                "ODS annotation XML exceeds the configured attribute limit",
+            ));
+        }
+        if attribute.value.len() > limits.max_token_bytes() {
+            return Err(invalid(
+                "ODS annotation attribute exceeds the configured token limit",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn classify(namespace: NamespaceKind, local: &[u8], parent: Option<Kind>) -> Result<Kind> {
@@ -526,6 +574,7 @@ fn begin_annotation(
     records: &mut Vec<Record>,
     active: &mut Option<Active>,
     span: Span,
+    limits: &XmlStreamLimits,
 ) -> Result<()> {
     let cell = cell_for_annotation(current_cell)?;
     let current = current_cell
@@ -540,7 +589,7 @@ fn begin_annotation(
     if record >= validation::MAX_ANNOTATIONS {
         return Err(invalid("ODS annotation count exceeds the safety limit"));
     }
-    let builder = AnnotationBuilder::new(element, reader.decoder(), namespaces.clone())?;
+    let builder = AnnotationBuilder::new(element, reader.decoder(), namespaces.clone(), limits)?;
     records.push(Record {
         cell,
         span,
@@ -682,7 +731,7 @@ fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
         .map_err(|_error| invalid("ODS annotation XML position overflows usize"))
 }
 
-pub(crate) fn serialize(annotation: &Annotation) -> Result<String> {
+pub(crate) fn serialize(annotation: &Annotation, limits: &XmlStreamLimits) -> Result<String> {
     validation::validate_annotation(annotation)?;
     let mut annotation = annotation.clone();
     for (prefix, uri) in [
@@ -703,7 +752,7 @@ pub(crate) fn serialize(annotation: &Annotation) -> Result<String> {
         annotation.set_namespace(prefix, uri)?;
     }
     let mut output = String::new();
-    annotation.write_xml(&mut output);
+    annotation.write_xml(&mut output, limits)?;
     Ok(output)
 }
 
@@ -749,6 +798,6 @@ pub(crate) fn find_site<'a>(sites: &'a [Site], cell: &Cell) -> Option<&'a Site> 
     sites.iter().find(|site| site.contains(cell))
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(message.to_string())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
 }

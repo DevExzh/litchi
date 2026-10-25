@@ -352,7 +352,10 @@ impl Document {
 
     /// Inspects inert document script and macro metadata without executing it.
     pub fn document_scripts(&self) -> FamilyResult<Option<crate::document_scripts::Scripts>> {
-        Ok(crate::package::scripts::document_scripts(self.xml())?)
+        Ok(crate::package::scripts::document_scripts(
+            self.xml(),
+            &self.limits.options.xml_limits_value(),
+        )?)
     }
 
     /// The options this document was opened with, retained for its edits,

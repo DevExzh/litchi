@@ -585,6 +585,7 @@ fn apply_annotation_operation(
     use crate::package::annotation::AnnotationHost;
     let package = document.transaction_package();
     let content = document.transaction_content_xml();
+    let xml_limits = document.transaction_xml_limits();
     let (bytes, result) = match operation {
         AnnotationOperation::Add { anchor, annotation } => {
             let (bytes, index) = crate::package::annotation::add(
@@ -593,6 +594,7 @@ fn apply_annotation_operation(
                 AnnotationHost::Text,
                 anchor,
                 annotation,
+                &xml_limits,
             )?;
             (bytes, OperationResult::Index(index))
         },
@@ -603,6 +605,7 @@ fn apply_annotation_operation(
                 AnnotationHost::Text,
                 *index,
                 annotation,
+                &xml_limits,
             )?,
             OperationResult::Unit,
         ),
@@ -613,11 +616,18 @@ fn apply_annotation_operation(
                 AnnotationHost::Text,
                 *index,
                 update,
+                &xml_limits,
             )?,
             OperationResult::Unit,
         ),
         AnnotationOperation::Remove { index } => (
-            crate::package::annotation::remove(package, content, AnnotationHost::Text, *index)?,
+            crate::package::annotation::remove(
+                package,
+                content,
+                AnnotationHost::Text,
+                *index,
+                &xml_limits,
+            )?,
             OperationResult::Unit,
         ),
         AnnotationOperation::Reorder { from, to } => (
@@ -627,6 +637,7 @@ fn apply_annotation_operation(
                 AnnotationHost::Text,
                 *from,
                 *to,
+                &xml_limits,
             )?,
             OperationResult::Unit,
         ),
@@ -2645,6 +2656,7 @@ impl Edit {
                         document.transaction_package(),
                         document.transaction_content_xml(),
                         path,
+                        &document.transaction_xml_limits(),
                     )?;
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit

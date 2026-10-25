@@ -595,10 +595,6 @@ pub(super) fn missing(attribute: &str) -> Error {
     Error::InvalidFormat(format!("missing required {attribute}"))
 }
 
-pub(super) fn xml_error(error: quick_xml::Error) -> Error {
-    Error::InvalidFormat(format!("database-range XML parsing error: {error}"))
-}
-
 pub(super) fn unexpected_eof(element: &str) -> Error {
     Error::InvalidFormat(format!("unexpected end of XML inside {element}"))
 }

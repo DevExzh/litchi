@@ -10,13 +10,16 @@
 use crate::Error;
 use crate::limits::{LimitKind, RawXmlLimitKind};
 use quick_xml::{
-    events::{BytesStart, Event},
+    events::{BytesDecl, BytesStart, Event},
     name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult},
     reader::Reader,
 };
-use std::io;
+use std::{collections::HashSet, io, str};
 
-use super::stream_xml::XmlStreamLimits;
+use super::stream_xml::{
+    XmlStreamLimits, reject_unknown_namespace, validate_event_bytes, validate_name, validate_qname,
+    validate_references,
+};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -41,6 +44,18 @@ pub struct ResolvedReader<'a> {
     limits: XmlStreamLimits,
     check_attribute_errors: bool,
     allow_empty_prefixed_namespace: bool,
+    document: DocumentValidation,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct DocumentValidation {
+    enabled: bool,
+    allow_unknown_namespaces: bool,
+    depth: usize,
+    root_seen: bool,
+    root_closed: bool,
+    declaration_seen: bool,
+    saw_any_event: bool,
 }
 
 /// Preserve typed reader failures while adding a stable parser context to
@@ -83,7 +98,45 @@ impl<'a> ResolvedReader<'a> {
             limits,
             check_attribute_errors: true,
             allow_empty_prefixed_namespace: false,
+            document: DocumentValidation::default(),
         })
+    }
+
+    /// Construct a reader for one complete XML document.
+    ///
+    /// Unlike [`Self::from_xml`], this mode restores the bounded scanner's
+    /// document-level validation while retaining the source-backed, zero-copy
+    /// event stream. Callers that intentionally parse an XML fragment should
+    /// use [`Self::from_xml`] instead.
+    pub fn from_xml_document(source: &'a str, limits: XmlStreamLimits) -> Result<Self> {
+        let mut reader = Self::from_xml(source, limits)?;
+        reader.enable_document_validation();
+        Ok(reader)
+    }
+
+    /// Enable complete-document validation before reading the first event.
+    pub fn enable_document_validation(&mut self) {
+        self.document.enabled = true;
+        self.document.allow_unknown_namespaces = false;
+        self.reader.config_mut().check_end_names = true;
+        self.reader.config_mut().check_comments = true;
+    }
+
+    /// Enable complete XML structure validation while retaining opaque
+    /// prefixes inherited from the containing package owner.
+    ///
+    /// A typed reader for an extracted fragment must reject malformed XML,
+    /// duplicate roots, and malformed document-level declarations, but it
+    /// cannot reject a vendor prefix whose declaration lives on the package
+    /// owner's root.
+    /// This mode applies the same structural and resource checks as
+    /// [`Self::enable_document_validation`] while treating such prefixes as
+    /// opaque names.
+    pub fn enable_fragment_validation(&mut self) {
+        self.document.enabled = true;
+        self.document.allow_unknown_namespaces = true;
+        self.reader.config_mut().check_end_names = true;
+        self.reader.config_mut().check_comments = true;
     }
 
     /// Return the parser configuration.
@@ -109,6 +162,19 @@ impl<'a> ResolvedReader<'a> {
         self.reader.buffer_position()
     }
 
+    /// Return the number of events admitted by this reader, including EOF.
+    #[must_use]
+    pub const fn event_count(&self) -> usize {
+        self.events
+    }
+
+    /// Return the aggregate number of attributes admitted by this reader,
+    /// including XML declaration attributes when document validation is on.
+    #[must_use]
+    pub const fn attribute_count(&self) -> usize {
+        self.attributes
+    }
+
     /// Return the decoder selected by the XML reader.
     #[must_use]
     pub const fn decoder(&self) -> quick_xml::encoding::Decoder {
@@ -132,7 +198,7 @@ impl<'a> ResolvedReader<'a> {
             .read_event_into(buffer)
             .map_err(map_reader_error)?;
         self.check_token_bytes(start)?;
-        self.resolve_event(event)
+        self.resolve_event(event, start)
     }
 
     /// Read and resolve the next event directly from the borrowed XML input.
@@ -146,7 +212,7 @@ impl<'a> ResolvedReader<'a> {
         let start = self.reader.buffer_position();
         let event = self.reader.read_event().map_err(map_reader_error)?;
         self.check_token_bytes(start)?;
-        self.resolve_event(event)
+        self.resolve_event(event, start)
     }
 
     /// Return the policy carried by this reader.
@@ -209,6 +275,7 @@ impl<'a> ResolvedReader<'a> {
     fn resolve_event<'event>(
         &mut self,
         event: Event<'event>,
+        offset: u64,
     ) -> Result<(ResolveResult<'_>, Event<'event>)> {
         match &event {
             Event::Start(element) => self.push(element)?,
@@ -221,7 +288,21 @@ impl<'a> ResolvedReader<'a> {
             },
             _ => {},
         }
-        Ok(self.resolver.resolve_event(event))
+        let resolved = self.resolver.resolve_event(event);
+        if self.document.enabled {
+            let allow_unknown_namespaces = self.document.allow_unknown_namespaces;
+            validate_document_event(
+                &mut self.document,
+                &self.resolver,
+                &mut self.attributes,
+                self.limits,
+                allow_unknown_namespaces,
+                &resolved.0,
+                &resolved.1,
+                offset,
+            )?;
+        }
+        Ok(resolved)
     }
 
     fn push(&mut self, element: &BytesStart<'_>) -> Result<()> {
@@ -412,6 +493,319 @@ impl<'a> ResolvedReader<'a> {
     }
 }
 
+fn validate_document_event(
+    state: &mut DocumentValidation,
+    resolver: &NamespaceResolver,
+    attributes: &mut usize,
+    limits: XmlStreamLimits,
+    allow_unknown_namespaces: bool,
+    namespace: &ResolveResult<'_>,
+    event: &Event<'_>,
+    offset: u64,
+) -> Result<()> {
+    validate_event_bytes(event, offset)?;
+    match event {
+        Event::Start(element) => {
+            if state.root_closed {
+                return Err(invalid_xml(offset, "content appears after the XML root"));
+            }
+            if state.depth >= limits.max_depth() {
+                return Err(limit_error(
+                    RawXmlDimension::Depth,
+                    state.depth.saturating_add(1) as u64,
+                    limits.max_depth() as u64,
+                ));
+            }
+            if state.depth == 0 {
+                if state.root_seen {
+                    return Err(invalid_xml(offset, "XML document has more than one root"));
+                }
+                state.root_seen = true;
+            }
+            validate_start_event(
+                resolver,
+                namespace,
+                element,
+                offset,
+                allow_unknown_namespaces,
+            )?;
+            state.depth += 1;
+        },
+        Event::Empty(element) => {
+            if state.root_closed {
+                return Err(invalid_xml(offset, "content appears after the XML root"));
+            }
+            if state.depth >= limits.max_depth() {
+                return Err(limit_error(
+                    RawXmlDimension::Depth,
+                    state.depth.saturating_add(1) as u64,
+                    limits.max_depth() as u64,
+                ));
+            }
+            if state.depth == 0 {
+                if state.root_seen {
+                    return Err(invalid_xml(offset, "XML document has more than one root"));
+                }
+                state.root_seen = true;
+                state.root_closed = true;
+            }
+            validate_start_event(
+                resolver,
+                namespace,
+                element,
+                offset,
+                allow_unknown_namespaces,
+            )?;
+        },
+        Event::End(element) => {
+            if state.depth == 0 {
+                return Err(invalid_xml(offset, "XML document has an unmatched end tag"));
+            }
+            validate_qname(element.name().as_ref(), offset, "end element")?;
+            if !allow_unknown_namespaces {
+                reject_unknown_namespace(namespace, offset)?;
+            }
+            state.depth -= 1;
+            if state.depth == 0 {
+                state.root_closed = true;
+            }
+        },
+        Event::Decl(declaration) => {
+            if state.saw_any_event || state.declaration_seen || state.root_seen || state.depth != 0
+            {
+                return Err(invalid_xml(
+                    offset,
+                    "XML declaration is not the first document event",
+                ));
+            }
+            state.declaration_seen = true;
+            validate_declaration(resolver, declaration, attributes, limits, offset)?;
+        },
+        Event::DocType(_) => {
+            return Err(invalid_xml(
+                offset,
+                "DTD and DOCTYPE declarations are prohibited",
+            ));
+        },
+        Event::GeneralRef(reference) => {
+            if state.depth == 0 || state.root_closed {
+                return Err(invalid_xml(
+                    offset,
+                    "entity reference appears outside the XML root",
+                ));
+            }
+            if !crate::validation::valid_xml_reference(reference) {
+                return Err(invalid_xml(
+                    offset,
+                    "undeclared or invalid XML entity reference",
+                ));
+            }
+        },
+        Event::CData(_) => {
+            if state.depth == 0 || state.root_closed {
+                return Err(invalid_xml(offset, "CDATA appears outside the XML root"));
+            }
+        },
+        Event::Text(text) => {
+            let bytes: &[u8] = text;
+            if state.depth == 0
+                && !bytes
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+            {
+                return Err(invalid_xml(
+                    offset,
+                    "non-whitespace text appears outside the XML root",
+                ));
+            }
+        },
+        Event::Comment(_) | Event::PI(_) => {
+            if let Event::PI(instruction) = event {
+                let target = instruction.target();
+                validate_name(target, offset, "processing-instruction target")?;
+                if target.eq_ignore_ascii_case(b"xml") {
+                    return Err(invalid_xml(
+                        offset,
+                        "processing-instruction target 'xml' is reserved",
+                    ));
+                }
+            }
+        },
+        Event::Eof => {
+            if !state.root_seen || !state.root_closed || state.depth != 0 {
+                return Err(invalid_xml(
+                    offset,
+                    "XML document has no single complete root element",
+                ));
+            }
+            return Ok(());
+        },
+    }
+    state.saw_any_event = true;
+    Ok(())
+}
+
+fn validate_start_event(
+    resolver: &NamespaceResolver,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    offset: u64,
+    allow_unknown_namespaces: bool,
+) -> Result<()> {
+    validate_qname(element.name().as_ref(), offset, "element")?;
+    if element
+        .name()
+        .prefix()
+        .is_some_and(|prefix| prefix.as_ref() == b"xmlns")
+    {
+        return Err(invalid_xml(
+            offset,
+            "the xmlns prefix is reserved for namespace declarations",
+        ));
+    }
+    if !allow_unknown_namespaces {
+        reject_unknown_namespace(namespace, offset)?;
+    }
+
+    let mut expanded_names = HashSet::new();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute
+            .map_err(|error| invalid_xml(offset, format!("malformed XML attribute: {error}")))?;
+        validate_qname(attribute.key.as_ref(), offset, "attribute")?;
+        let value = attribute.value.as_ref();
+        str::from_utf8(value)
+            .map_err(|error| invalid_xml(offset, format!("XML attribute is not UTF-8: {error}")))?;
+        if value.contains(&b'<') {
+            return Err(invalid_xml(
+                offset,
+                "XML attribute values cannot contain an unescaped '<'",
+            ));
+        }
+        if value
+            .iter()
+            .any(|byte| !matches!(*byte, 0x09 | 0x0A | 0x0D | 0x20..=0x7F) && *byte < 0x80)
+        {
+            return Err(invalid_xml(
+                offset,
+                "XML attribute contains a forbidden control",
+            ));
+        }
+        validate_references(value, offset)?;
+        let (resolved, local) = resolver.resolve_attribute(attribute.key);
+        let namespace = match resolved {
+            ResolveResult::Bound(Namespace(uri)) => uri.to_vec(),
+            ResolveResult::Unbound => Vec::new(),
+            ResolveResult::Unknown(prefix) if allow_unknown_namespaces => {
+                // Keep unknown inherited prefixes in a separate key space so
+                // duplicate checking remains meaningful without pretending
+                // that an opaque prefix has a resolved URI.
+                let mut namespace = Vec::new();
+                namespace.try_reserve(prefix.len() + 1).map_err(|source| {
+                    Error::from(litchi_core::Error::Allocation {
+                        resource: "ODF expanded attribute namespace",
+                        source,
+                    })
+                })?;
+                namespace.push(0);
+                namespace.extend_from_slice(prefix.as_ref());
+                namespace
+            },
+            ResolveResult::Unknown(_) => {
+                reject_unknown_namespace(&resolved, offset)?;
+                unreachable!("unknown namespace was rejected")
+            },
+        };
+        let key = (namespace, local.as_ref().to_vec());
+        if !expanded_names.insert(key) {
+            return Err(invalid_xml(offset, "duplicate XML attribute expanded name"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_declaration(
+    resolver: &NamespaceResolver,
+    declaration: &BytesDecl<'_>,
+    attributes: &mut usize,
+    limits: XmlStreamLimits,
+    offset: u64,
+) -> Result<()> {
+    declaration
+        .xml_version()
+        .map_err(|error| invalid_xml(offset, format!("invalid XML declaration: {error}")))?;
+    if let Some(encoding) = declaration.encoding() {
+        let encoding = encoding.map_err(|error| {
+            invalid_xml(offset, format!("invalid XML declaration encoding: {error}"))
+        })?;
+        if !encoding.eq_ignore_ascii_case(b"utf-8") {
+            return Err(invalid_xml(
+                offset,
+                "XML declaration names an encoding other than UTF-8",
+            ));
+        }
+    }
+    if let Some(standalone) = declaration.standalone() {
+        let standalone = standalone.map_err(|error| {
+            invalid_xml(
+                offset,
+                format!("invalid XML declaration standalone: {error}"),
+            )
+        })?;
+        if !matches!(standalone.as_ref(), b"yes" | b"no") {
+            return Err(invalid_xml(
+                offset,
+                "XML declaration standalone must be 'yes' or 'no'",
+            ));
+        }
+    }
+
+    let content = str::from_utf8(declaration.as_ref())
+        .map_err(|error| invalid_xml(offset, format!("XML declaration is not UTF-8: {error}")))?;
+    let declaration_start = BytesStart::from_content(content, 3);
+    let mut order = 0u8;
+    for attribute in declaration_start.attributes().with_checks(true) {
+        let attribute = attribute
+            .map_err(|error| invalid_xml(offset, format!("malformed XML declaration: {error}")))?;
+        let observed = (*attributes).saturating_add(1);
+        *attributes = observed;
+        if observed > limits.max_attributes() {
+            return Err(limit_error(
+                RawXmlDimension::Attributes,
+                observed as u64,
+                limits.max_attributes() as u64,
+            ));
+        }
+        validate_qname(attribute.key.as_ref(), offset, "declaration attribute")?;
+        if attribute.key.prefix().is_some() {
+            return Err(invalid_xml(
+                offset,
+                "XML declaration attributes must be unprefixed",
+            ));
+        }
+        order = match (order, attribute.key.as_ref()) {
+            (0, b"version") => 1,
+            (1, b"encoding") => 2,
+            (1 | 2, b"standalone") => 3,
+            _ => {
+                return Err(invalid_xml(
+                    offset,
+                    "XML declaration attributes are missing, duplicated, or out of order",
+                ));
+            },
+        };
+        let (resolved, _) = resolver.resolve_attribute(attribute.key);
+        reject_unknown_namespace(&resolved, offset)?;
+        validate_references(attribute.value.as_ref(), offset)?;
+    }
+    if order == 0 {
+        return Err(invalid_xml(
+            offset,
+            "XML declaration is missing its version",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 enum RawXmlDimension {
     InputBytes,
@@ -464,4 +858,8 @@ fn map_reader_error(error: quick_xml::Error) -> Error {
             "XML parsing error: {other}"
         ))),
     }
+}
+
+fn invalid_xml(offset: u64, message: impl Into<String>) -> Error {
+    Error::from(super::stream_xml::invalid_xml(offset, message))
 }

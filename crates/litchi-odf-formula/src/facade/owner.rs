@@ -155,10 +155,8 @@ impl Package {
         options: OpenOptions,
     ) -> Result<Self, Error> {
         let archive = Archive::from_owned_checked(owned, options.semantic_limits_value())?;
-        Ok(Self::from_formula(Formula::from_archive(
-            archive,
-            codec::Limits::default(),
-        )?))
+        let limits = formula_limits(&options)?;
+        Ok(Self::from_formula(Formula::from_archive(archive, limits)?))
     }
 
     /// Reopen package bytes carried by a durable patch envelope.
@@ -261,6 +259,46 @@ impl Package {
     pub fn prepared_index_identity(&self) -> usize {
         self.formula.archive.prepared_index_identity()
     }
+}
+
+fn formula_limits(options: &OpenOptions) -> Result<codec::Limits, Error> {
+    let source = options.source_limits_value();
+    let xml = options.xml_limits_value();
+    let semantic = options.semantic_limits_value();
+    codec::Limits::default()
+        .with_package_bytes(cap_u64(
+            source.max_input_bytes(),
+            codec::HARD_MAX_PACKAGE_BYTES,
+        ))
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))?
+        .with_xml_bytes(cap_u64(
+            xml.max_bytes().min(semantic.max_content_bytes()),
+            codec::HARD_MAX_XML_BYTES,
+        ))
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))?
+        .with_depth(
+            xml.max_depth()
+                .min(cap_u64(semantic.max_depth(), codec::HARD_MAX_DEPTH)),
+        )
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))?
+        .with_nodes(xml.max_events().min(codec::HARD_MAX_NODES))
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))?
+        .with_attributes(xml.max_attributes().min(codec::HARD_MAX_ATTRIBUTES))
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))?
+        .with_attribute_bytes(xml.max_token_bytes().min(codec::HARD_MAX_ATTRIBUTE_BYTES))
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))?
+        .with_text_bytes(cap_u64(
+            xml.max_bytes().min(semantic.max_text_bytes()),
+            codec::HARD_MAX_TEXT_BYTES,
+        ))
+        .map_err(|error| Error::from(litchi_core::Error::InvalidFormat(error.to_string())))
+}
+
+/// OpenOptions may raise the historical codec defaults, but never its hard ceiling.
+fn cap_u64(requested: u64, hard_maximum: usize) -> usize {
+    usize::try_from(requested)
+        .unwrap_or(usize::MAX)
+        .min(hard_maximum)
 }
 
 fn check_input_bytes(length: usize, limits: SourceLimits) -> Result<(), Error> {

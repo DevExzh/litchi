@@ -305,6 +305,7 @@ impl Presentation {
     pub fn annotations(&self) -> FamilyResult<Vec<crate::annotation::Info>> {
         Ok(crate::annotation::annotations(
             self.inner.package.content_xml(),
+            &self.inner.package.xml_limits_value(),
         )?)
     }
 
@@ -316,6 +317,7 @@ impl Presentation {
         Ok(crate::annotation::find(
             self.inner.package.content_xml(),
             name,
+            &self.inner.package.xml_limits_value(),
         )?)
     }
 
@@ -333,6 +335,7 @@ impl Presentation {
             self.inner.package.content_xml(),
             anchor,
             annotation,
+            &self.inner.package.xml_limits_value(),
         )?;
         let replacement = Self::from_bytes(bytes)?;
         *self = replacement;
@@ -353,6 +356,7 @@ impl Presentation {
             self.inner.package.content_xml(),
             index,
             annotation,
+            &self.inner.package.xml_limits_value(),
         )?;
         let replacement = Self::from_bytes(bytes)?;
         *self = replacement;
@@ -368,6 +372,7 @@ impl Presentation {
             self.inner.package.package(),
             self.inner.package.content_xml(),
             index,
+            &self.inner.package.xml_limits_value(),
         )?;
         let replacement = Self::from_bytes(bytes)?;
         *self = replacement;

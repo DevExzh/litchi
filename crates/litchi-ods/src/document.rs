@@ -1283,7 +1283,10 @@ impl Edit {
         F: FnOnce(&mut crate::annotations::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
-        let snapshot = crate::annotations::Snapshot::parse(package.content_xml())?;
+        let snapshot = crate::annotations::Snapshot::parse(
+            package.content_xml(),
+            &package.xml_limits_value(),
+        )?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -1409,8 +1412,11 @@ impl Edit {
         F: FnOnce(&mut crate::protection::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
-        let snapshot =
-            crate::protection::Snapshot::parse(package.content_xml(), package.styles_xml())?;
+        let snapshot = crate::protection::Snapshot::parse(
+            package.content_xml(),
+            package.styles_xml(),
+            &package.xml_limits_value(),
+        )?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -4225,8 +4231,11 @@ fn enforce_security_policy(snapshot: &Package, policy: SecurityWritePolicy) -> C
     {
         return invalid("changed unified ODS transactions require explicit signature stripping");
     }
-    let protection =
-        crate::protection::Snapshot::parse(package.content_xml(), package.styles_xml())?;
+    let protection = crate::protection::Snapshot::parse(
+        package.content_xml(),
+        package.styles_xml(),
+        &package.xml_limits_value(),
+    )?;
     if protection.document().structure_protected == Some(true)
         || protection
             .sheets()

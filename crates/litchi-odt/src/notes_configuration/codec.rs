@@ -3,11 +3,11 @@
 use std::collections::HashSet;
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
     name::ResolveResult,
-    reader::NsReader,
 };
 
 use super::model::{
@@ -35,9 +35,11 @@ fn namespace_text(namespace: &[u8]) -> Result<&str> {
 
 impl Configuration {
     /// Serialize a namespace-complete notes configuration element.
-    pub fn to_xml(&self) -> Result<String> {
+    pub fn to_xml(&self, limits: &XmlStreamLimits) -> Result<String> {
         self.validate()?;
-        let mut output = String::with_capacity(512);
+        let capacity = configuration_size(self)?;
+        ensure_output_size(capacity, limits)?;
+        let mut output = String::with_capacity(capacity);
         output.push_str("<text:notes-configuration xmlns:text=\"");
         output.push_str(namespace_text(TEXT_NAMESPACE)?);
         output.push_str("\" xmlns:style=\"");
@@ -98,7 +100,7 @@ impl Configuration {
         if self.continuation_notice_forward.is_none() && self.continuation_notice_backward.is_none()
         {
             output.push_str("/>");
-            return Ok(output);
+            return ensure_output(output, limits);
         }
         output.push('>');
         write_notice(
@@ -112,43 +114,54 @@ impl Configuration {
             self.continuation_notice_backward.as_deref(),
         );
         output.push_str("</text:notes-configuration>");
-        Ok(output)
+        ensure_output(output, limits)
     }
 }
 
 impl Configurations {
     /// Serialize both configurations in canonical footnote/endnote order.
-    pub fn to_xml_fragment(&self) -> Result<String> {
+    pub fn to_xml_fragment(&self, limits: &XmlStreamLimits) -> Result<String> {
         self.validate()?;
-        let mut output = String::new();
+        let mut capacity = 0usize;
         if let Some(configuration) = &self.footnote {
-            output.push_str(&configuration.to_xml()?);
+            add_size(&mut capacity, configuration_size(configuration)?)?;
         }
         if let Some(configuration) = &self.endnote {
-            output.push_str(&configuration.to_xml()?);
+            add_size(&mut capacity, configuration_size(configuration)?)?;
         }
-        Ok(output)
+        ensure_output_size(capacity, limits)?;
+        let mut output = String::with_capacity(capacity);
+        if let Some(configuration) = &self.footnote {
+            output.push_str(&configuration.to_xml(limits)?);
+        }
+        if let Some(configuration) = &self.endnote {
+            output.push_str(&configuration.to_xml(limits)?);
+        }
+        ensure_output(output, limits)
     }
 }
 
 /// Parse footnote/endnote configurations from an ODF styles document.
-pub fn parse(xml: &str) -> Result<Configurations> {
-    if xml.len() > MAX_DOCUMENT_XML_BYTES {
+pub fn parse(xml: &str, limits: &XmlStreamLimits) -> Result<Configurations> {
+    if xml.len() > MAX_DOCUMENT_XML_BYTES
+        || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte notes limit"
         ));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml_document(xml, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid ODT notes XML")
+    })?;
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut styles_content_depth = None;
     let mut section_properties_depth = None;
     let mut result = Configurations::default();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODT notes XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element)
@@ -198,7 +211,7 @@ pub fn parse(xml: &str) -> Result<Configurations> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| Error::InvalidFormat("ODF XML depth overflow".to_string()))?;
-                if depth > MAX_XML_DEPTH {
+                if depth > MAX_XML_DEPTH.min(limits.max_depth()) {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
                 if namespace == NamespaceKind::Office
@@ -235,12 +248,14 @@ pub fn parse(xml: &str) -> Result<Configurations> {
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
     Ok(result)
 }
 
-fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Configuration> {
+fn parse_attributes(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<Configuration> {
     let mut note_class = None;
     let mut citation_style_name = None;
     let mut citation_body_style_name = None;
@@ -317,12 +332,11 @@ fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
     })
 }
 
-fn parse_notices(reader: &mut NsReader<&[u8]>, configuration: &mut Configuration) -> Result<()> {
-    let mut buffer = Vec::new();
+fn parse_notices(reader: &mut ResolvedReader<'_>, configuration: &mut Configuration) -> Result<()> {
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODT notes XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element)
@@ -387,18 +401,16 @@ fn parse_notices(reader: &mut NsReader<&[u8]>, configuration: &mut Configuration
             Event::Eof => return invalid("unterminated text:notes-configuration"),
             _ => return invalid("unsupported child in text:notes-configuration"),
         }
-        buffer.clear();
     }
     Ok(())
 }
 
-fn parse_notice(reader: &mut NsReader<&[u8]>, expected_local: &[u8]) -> Result<String> {
+fn parse_notice(reader: &mut ResolvedReader<'_>, expected_local: &[u8]) -> Result<String> {
     let mut output = String::new();
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODT notes XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Text(value) => append_text(&mut output, &value.decode().map_err(xml_error)?)?,
@@ -414,7 +426,6 @@ fn parse_notice(reader: &mut NsReader<&[u8]>, expected_local: &[u8]) -> Result<S
             Event::Eof => return invalid("unterminated note continuation notice"),
             _ => return invalid("note continuation notices may contain text only"),
         }
-        buffer.clear();
     }
     Ok(output)
 }
@@ -465,18 +476,23 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat("invalid notes XML event boundary".to_string()))
 }
 
-fn locate_configuration(xml: &str, note_class: Class) -> Result<(Option<XmlSpan>, StylesSite)> {
-    parse(xml)?;
-    let mut reader = NsReader::from_str(xml);
-    let mut buffer = Vec::new();
+fn locate_configuration(
+    xml: &str,
+    note_class: Class,
+    limits: &XmlStreamLimits,
+) -> Result<(Option<XmlSpan>, StylesSite)> {
+    parse(xml, limits)?;
+    let mut reader = ResolvedReader::from_xml_document(xml, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid ODT notes XML")
+    })?;
     let mut stack: Vec<(NamespaceKind, Vec<u8>)> = Vec::new();
     let mut target = None;
     let mut open_target = None::<(usize, usize)>;
     let mut styles_site = None;
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (resolved, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODT notes XML")
+        })?;
         let namespace = namespace_kind(&resolved);
         match event {
             Event::Start(ref element) => {
@@ -543,7 +559,6 @@ fn locate_configuration(xml: &str, note_class: Class) -> Result<(Option<XmlSpan>
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
     Ok((
         target,
@@ -553,49 +568,243 @@ fn locate_configuration(xml: &str, note_class: Class) -> Result<(Option<XmlSpan>
 }
 
 /// Insert or replace one note-class configuration without rewriting unrelated XML.
-pub fn set_xml(xml: &str, configuration: &Configuration) -> Result<String> {
+pub fn set_xml(
+    xml: &str,
+    configuration: &Configuration,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
     configuration.validate()?;
-    let (target, site) = locate_configuration(xml, configuration.note_class)?;
-    let fragment = configuration.to_xml()?;
+    let (target, site) = locate_configuration(xml, configuration.note_class, limits)?;
+    let fragment = configuration.to_xml(limits)?;
     if let Some(span) = target {
-        return Ok(format!(
-            "{}{}{}",
-            &xml[..span.start],
-            fragment,
-            &xml[span.end..]
-        ));
+        let output_len = replaced_size(xml.len(), span.end - span.start, fragment.len(), limits)?;
+        let mut output = String::with_capacity(output_len);
+        output.push_str(&xml[..span.start]);
+        output.push_str(&fragment);
+        output.push_str(&xml[span.end..]);
+        return ensure_output(output, limits);
     }
     match site {
-        StylesSite::Content(insertion) => Ok(format!(
-            "{}{}{}",
-            &xml[..insertion],
-            fragment,
-            &xml[insertion..]
-        )),
+        StylesSite::Content(insertion) => {
+            let output_len = replaced_size(xml.len(), 0, fragment.len(), limits)?;
+            let mut output = String::with_capacity(output_len);
+            output.push_str(&xml[..insertion]);
+            output.push_str(&fragment);
+            output.push_str(&xml[insertion..]);
+            ensure_output(output, limits)
+        },
         StylesSite::Empty(span, qname) => {
             let raw = &xml[span.start..span.end];
             let slash = raw
                 .rfind("/>")
                 .ok_or_else(|| Error::InvalidFormat("invalid empty office:styles".to_string()))?;
-            Ok(format!(
-                "{}{}>{}</{}>{}",
-                &xml[..span.start],
-                &raw[..slash],
-                fragment,
-                qname,
-                &xml[span.end..]
-            ))
+            let replacement_len = raw[..slash]
+                .len()
+                .checked_add(1)
+                .and_then(|length| length.checked_add(fragment.len()))
+                .and_then(|length| length.checked_add(2 + qname.len() + 1))
+                .ok_or_else(|| Error::InvalidFormat("notes output size overflow".to_string()))?;
+            let output_len = replaced_size(xml.len(), raw.len(), replacement_len, limits)?;
+            let mut output = String::with_capacity(output_len);
+            output.push_str(&xml[..span.start]);
+            output.push_str(&raw[..slash]);
+            output.push('>');
+            output.push_str(&fragment);
+            output.push_str("</");
+            output.push_str(&qname);
+            output.push('>');
+            output.push_str(&xml[span.end..]);
+            ensure_output(output, limits)
         },
     }
 }
 
 /// Remove one note-class configuration without rewriting unrelated XML.
-pub fn remove_xml(xml: &str, note_class: Class) -> Result<String> {
-    let (target, _) = locate_configuration(xml, note_class)?;
+pub fn remove_xml(xml: &str, note_class: Class, limits: &XmlStreamLimits) -> Result<String> {
+    let (target, _) = locate_configuration(xml, note_class, limits)?;
     let Some(span) = target else {
         return Ok(xml.to_string());
     };
-    Ok(format!("{}{}", &xml[..span.start], &xml[span.end..]))
+    let output_len = replaced_size(xml.len(), span.end - span.start, 0, limits)?;
+    let mut output = String::with_capacity(output_len);
+    output.push_str(&xml[..span.start]);
+    output.push_str(&xml[span.end..]);
+    ensure_output(output, limits)
+}
+
+fn ensure_output(output: String, limits: &XmlStreamLimits) -> Result<String> {
+    if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("serialized notes configuration exceeds the configured XML limit");
+    }
+    Ok(output)
+}
+
+fn replaced_size(
+    source_len: usize,
+    removed_len: usize,
+    replacement_len: usize,
+    limits: &XmlStreamLimits,
+) -> Result<usize> {
+    let size = source_len
+        .checked_sub(removed_len)
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(|| Error::InvalidFormat("notes output size overflow".to_string()))?;
+    ensure_output_size(size, limits)?;
+    Ok(size)
+}
+
+fn configuration_size(configuration: &Configuration) -> Result<usize> {
+    let mut size = 0usize;
+    add_size(&mut size, b"<text:notes-configuration xmlns:text=\"".len())?;
+    add_size(&mut size, namespace_text(TEXT_NAMESPACE)?.len())?;
+    add_size(&mut size, b"\" xmlns:style=\"".len())?;
+    add_size(&mut size, namespace_text(STYLE_NAMESPACE)?.len())?;
+    add_size(&mut size, 1)?;
+    add_attr_size(
+        &mut size,
+        "text:note-class",
+        Some(configuration.note_class.as_str()),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:citation-style-name",
+        configuration.citation_style_name.as_deref(),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:citation-body-style-name",
+        configuration.citation_body_style_name.as_deref(),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:default-style-name",
+        configuration.default_style_name.as_deref(),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:master-page-name",
+        configuration.master_page_name.as_deref(),
+    )?;
+    add_u64_attr_size(&mut size, "text:start-value", configuration.start_value)?;
+    add_attr_size(
+        &mut size,
+        "style:num-prefix",
+        configuration.number_prefix.as_deref(),
+    )?;
+    add_attr_size(
+        &mut size,
+        "style:num-suffix",
+        configuration.number_suffix.as_deref(),
+    )?;
+    add_attr_size(
+        &mut size,
+        "style:num-format",
+        configuration.number_format.as_ref().map(Format::as_str),
+    )?;
+    add_attr_size(
+        &mut size,
+        "style:num-letter-sync",
+        configuration
+            .letter_sync
+            .map(|value| if value { "true" } else { "false" }),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:start-numbering-at",
+        configuration.start_numbering_at.map(NumberingScope::as_str),
+    )?;
+    add_attr_size(
+        &mut size,
+        "text:footnotes-position",
+        configuration.footnotes_position.map(Position::as_str),
+    )?;
+    let notices = configuration.continuation_notice_forward.is_some()
+        || configuration.continuation_notice_backward.is_some();
+    if !notices {
+        add_size(&mut size, 2)?;
+        return Ok(size);
+    }
+    add_size(&mut size, 1)?;
+    add_notice_size(
+        &mut size,
+        "text:note-continuation-notice-forward",
+        configuration.continuation_notice_forward.as_deref(),
+    )?;
+    add_notice_size(
+        &mut size,
+        "text:note-continuation-notice-backward",
+        configuration.continuation_notice_backward.as_deref(),
+    )?;
+    add_size(&mut size, b"</text:notes-configuration>".len())?;
+    Ok(size)
+}
+
+fn add_notice_size(size: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    let Some(value) = value else { return Ok(()) };
+    add_size(size, 1)?;
+    add_size(size, name.len())?;
+    if value.is_empty() {
+        add_size(size, 2)
+    } else {
+        add_size(size, 1)?;
+        add_size(size, escaped_text_len(value)?)?;
+        add_size(size, 2 + name.len() + 1)
+    }
+}
+
+fn add_attr_size(size: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    let Some(value) = value else { return Ok(()) };
+    add_size(size, 1)?;
+    add_size(size, name.len())?;
+    add_size(size, 2)?;
+    add_size(size, escaped_attribute_len(value)?)?;
+    add_size(size, 1)
+}
+
+fn add_u64_attr_size(size: &mut usize, name: &str, value: Option<u64>) -> Result<()> {
+    let Some(value) = value else { return Ok(()) };
+    add_size(size, 1 + name.len() + 2 + value.to_string().len() + 1)
+}
+
+fn escaped_attribute_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |size, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' => 4,
+            '"' => 6,
+            '\r' | '\n' => 5,
+            '\t' => 4,
+            _ => character.len_utf8(),
+        };
+        size.checked_add(encoded)
+            .ok_or_else(|| Error::InvalidFormat("notes output size overflow".to_string()))
+    })
+}
+
+fn escaped_text_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |size, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            _ => character.len_utf8(),
+        };
+        size.checked_add(encoded)
+            .ok_or_else(|| Error::InvalidFormat("notes output size overflow".to_string()))
+    })
+}
+
+fn add_size(size: &mut usize, amount: usize) -> Result<()> {
+    *size = size
+        .checked_add(amount)
+        .ok_or_else(|| Error::InvalidFormat("notes output size overflow".to_string()))?;
+    Ok(())
+}
+
+fn ensure_output_size(size: usize, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(size).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("serialized notes configuration exceeds the configured XML limit");
+    }
+    Ok(())
 }
 
 fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {

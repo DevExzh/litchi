@@ -1,11 +1,11 @@
 //! Bounded XML codec for inert ODF document script declarations.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
     name::ResolveResult,
-    reader::NsReader,
 };
 
 use super::model::{
@@ -33,35 +33,12 @@ fn namespace_text(namespace: &[u8]) -> Result<&str> {
     })
 }
 
-pub(super) fn write_scripts(scripts: &Scripts) -> Result<String> {
-    scripts.validate()?;
-    let mut output = String::with_capacity(256 + scripts.total_payload_bytes());
-    output.push_str("<office:scripts");
-    namespace_attribute(
-        &mut output,
-        Some("office"),
-        namespace_text(OFFICE_NAMESPACE)?,
-    );
-    namespace_attribute(
-        &mut output,
-        Some("script"),
-        namespace_text(SCRIPT_NAMESPACE)?,
-    );
-    namespace_attribute(
-        &mut output,
-        Some("presentation"),
-        namespace_text(PRESENTATION_NAMESPACE)?,
-    );
-    namespace_attribute(&mut output, Some("xlink"), namespace_text(XLINK_NAMESPACE)?);
-    for declaration in &scripts.namespace_declarations {
-        if matches!(
-            declaration.prefix.as_deref(),
-            Some("office" | "script" | "presentation" | "xlink")
-        ) {
-            continue;
-        }
-        namespace_attribute(&mut output, declaration.prefix.as_deref(), &declaration.uri);
-    }
+pub(super) fn write_scripts(scripts: &Scripts, limits: &XmlStreamLimits) -> Result<String> {
+    scripts.validate_for_output(limits)?;
+    let capacity = scripts_size(scripts)?;
+    ensure_serialized_size(capacity, limits)?;
+    let mut output = String::with_capacity(capacity);
+    append_scripts_open(&mut output, &scripts.namespace_declarations)?;
     output.push('>');
 
     for script in &scripts.scripts {
@@ -104,27 +81,189 @@ pub(super) fn write_scripts(scripts: &Scripts) -> Result<String> {
         output.push_str("</office:event-listeners>");
     }
     output.push_str("</office:scripts>");
+    if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("serialized office:scripts exceeds the configured XML limit");
+    }
     Ok(output)
 }
 
-pub fn parse_scripts(xml: &str) -> Result<Option<Scripts>> {
-    if xml.len() > MAX_DOCUMENT_XML_BYTES {
+fn append_scripts_open(output: &mut String, declarations: &[NamespaceDeclaration]) -> Result<()> {
+    output.push_str("<office:scripts");
+    namespace_attribute(output, Some("office"), namespace_text(OFFICE_NAMESPACE)?);
+    namespace_attribute(output, Some("script"), namespace_text(SCRIPT_NAMESPACE)?);
+    namespace_attribute(
+        output,
+        Some("presentation"),
+        namespace_text(PRESENTATION_NAMESPACE)?,
+    );
+    namespace_attribute(output, Some("xlink"), namespace_text(XLINK_NAMESPACE)?);
+    for declaration in declarations {
+        if matches!(
+            declaration.prefix.as_deref(),
+            Some("office" | "script" | "presentation" | "xlink")
+        ) {
+            continue;
+        }
+        namespace_attribute(output, declaration.prefix.as_deref(), &declaration.uri);
+    }
+    Ok(())
+}
+
+pub(super) fn emitted_namespace_count(declarations: &[NamespaceDeclaration]) -> usize {
+    4 + declarations
+        .iter()
+        .filter(|declaration| {
+            !matches!(
+                declaration.prefix.as_deref(),
+                Some("office" | "script" | "presentation" | "xlink")
+            )
+        })
+        .count()
+}
+
+fn scripts_size(scripts: &Scripts) -> Result<usize> {
+    let mut size = b"<office:scripts".len();
+    add_size(
+        &mut size,
+        namespace_attribute_size(Some("office"), namespace_text(OFFICE_NAMESPACE)?)?,
+    )?;
+    add_size(
+        &mut size,
+        namespace_attribute_size(Some("script"), namespace_text(SCRIPT_NAMESPACE)?)?,
+    )?;
+    add_size(
+        &mut size,
+        namespace_attribute_size(
+            Some("presentation"),
+            namespace_text(PRESENTATION_NAMESPACE)?,
+        )?,
+    )?;
+    add_size(
+        &mut size,
+        namespace_attribute_size(Some("xlink"), namespace_text(XLINK_NAMESPACE)?)?,
+    )?;
+    for declaration in &scripts.namespace_declarations {
+        if matches!(
+            declaration.prefix.as_deref(),
+            Some("office" | "script" | "presentation" | "xlink")
+        ) {
+            continue;
+        }
+        add_size(
+            &mut size,
+            namespace_attribute_size(declaration.prefix.as_deref(), &declaration.uri)?,
+        )?;
+    }
+    add_size(&mut size, 1)?;
+
+    for script in &scripts.scripts {
+        add_size(&mut size, b"<office:script script:language=\"".len())?;
+        add_size(&mut size, escaped_attribute_len(&script.language)?)?;
+        if script.content_xml.is_empty() {
+            add_size(&mut size, b"\"/>".len())?;
+        } else {
+            add_size(&mut size, b"\">".len())?;
+            add_size(&mut size, script.content_xml.len())?;
+            add_size(&mut size, b"</office:script>".len())?;
+        }
+    }
+
+    if !scripts.event_listeners.is_empty() {
+        add_size(&mut size, b"<office:event-listeners>".len())?;
+        for listener in &scripts.event_listeners {
+            match listener {
+                EventListener::Script(listener) => {
+                    add_size(
+                        &mut size,
+                        b"<script:event-listener script:event-name=\"".len(),
+                    )?;
+                    add_size(&mut size, escaped_attribute_len(&listener.event_name)?)?;
+                    add_size(&mut size, b"\" script:language=\"".len())?;
+                    add_size(&mut size, escaped_attribute_len(&listener.language)?)?;
+                    match &listener.binding {
+                        ScriptBinding::MacroName(value) => {
+                            add_size(&mut size, b"\" script:macro-name=\"".len())?;
+                            add_size(&mut size, escaped_attribute_len(value)?)?;
+                            add_size(&mut size, b"\"/>".len())?;
+                        },
+                        ScriptBinding::Linked { href } => {
+                            add_size(&mut size, b"\" xlink:type=\"simple\" xlink:href=\"".len())?;
+                            add_size(&mut size, escaped_attribute_len(href)?)?;
+                            add_size(&mut size, b"\" xlink:actuate=\"onRequest\"/>".len())?;
+                        },
+                    }
+                },
+                EventListener::PresentationXml(xml) => add_size(&mut size, xml.len())?,
+            }
+        }
+        add_size(&mut size, b"</office:event-listeners>".len())?;
+    }
+    add_size(&mut size, b"</office:scripts>".len())?;
+    Ok(size)
+}
+
+fn namespace_attribute_size(prefix: Option<&str>, uri: &str) -> Result<usize> {
+    let mut size = b" xmlns".len();
+    if let Some(prefix) = prefix {
+        add_size(&mut size, 1)?;
+        add_size(&mut size, prefix.len())?;
+    }
+    add_size(&mut size, 2)?;
+    add_size(&mut size, escaped_attribute_len(uri)?)?;
+    add_size(&mut size, 1)?;
+    Ok(size)
+}
+
+fn escaped_attribute_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |size, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' => 4,
+            '"' => 6,
+            '\r' | '\n' => 5,
+            '\t' => 4,
+            _ => character.len_utf8(),
+        };
+        size.checked_add(encoded)
+            .ok_or_else(|| Error::InvalidFormat("script XML output size overflow".to_string()))
+    })
+}
+
+fn add_size(size: &mut usize, amount: usize) -> Result<()> {
+    *size = size
+        .checked_add(amount)
+        .ok_or_else(|| Error::InvalidFormat("script XML output size overflow".to_string()))?;
+    Ok(())
+}
+
+fn ensure_serialized_size(size: usize, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(size).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return invalid("serialized office:scripts exceeds the configured XML limit");
+    }
+    Ok(())
+}
+
+pub fn parse_scripts(xml: &str, limits: &XmlStreamLimits) -> Result<Option<Scripts>> {
+    if xml.len() > MAX_DOCUMENT_XML_BYTES
+        || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return invalid(format!(
             "ODF XML exceeds the {MAX_DOCUMENT_XML_BYTES} byte script-inventory limit"
         ));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml_document(xml, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid ODF script XML")
+    })?;
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut root_namespaces = Vec::new();
     let mut result = None;
 
     loop {
         let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODF script XML: {error}")))?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid ODF script XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -153,12 +292,13 @@ pub fn parse_scripts(xml: &str) -> Result<Option<Scripts>> {
                         xml,
                         &in_scope_namespaces,
                         event_end,
+                        limits,
                     )?);
                 } else {
                     depth = depth.checked_add(1).ok_or_else(|| {
                         Error::InvalidFormat("ODF XML depth overflow".to_string())
                     })?;
-                    if depth > MAX_XML_DEPTH {
+                    if depth > MAX_XML_DEPTH.min(limits.max_depth()) {
                         return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                     }
                 }
@@ -201,30 +341,26 @@ pub fn parse_scripts(xml: &str) -> Result<Option<Scripts>> {
         if event_start > event_end || event_end > xml.len() {
             return invalid("invalid ODF XML reader position");
         }
-        buffer.clear();
     }
     Ok(result)
 }
 
 fn parse_scripts_element(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     xml: &str,
     root_namespaces: &[NamespaceDeclaration],
     _content_start: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Scripts> {
     let mut scripts = Vec::new();
     let mut event_listeners = Vec::new();
     let mut listener_container_seen = false;
     let mut text_bytes = 0usize;
-    let mut buffer = Vec::new();
-
     loop {
         let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid office:scripts XML: {error}"))
-            })?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid office:scripts XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -241,7 +377,7 @@ fn parse_scripts_element(
                     ));
                 }
                 let language = required_script_language(reader, &element)?;
-                let content_xml = capture_inner_xml(reader, xml, event_end, b"script")?;
+                let content_xml = capture_inner_xml(reader, xml, event_end, b"script", limits)?;
                 text_bytes = checked_text_bytes(text_bytes, language.len())?;
                 text_bytes = checked_text_bytes(text_bytes, content_xml.len())?;
                 scripts.push(EmbeddedScript {
@@ -276,7 +412,7 @@ fn parse_scripts_element(
                     return invalid("office:scripts contains duplicate office:event-listeners");
                 }
                 listener_container_seen = true;
-                event_listeners = parse_event_listeners(reader, xml, &mut text_bytes)?;
+                event_listeners = parse_event_listeners(reader, xml, &mut text_bytes, limits)?;
             },
             Event::Empty(element)
                 if bound_to(&namespace, OFFICE_NAMESPACE)
@@ -309,7 +445,6 @@ fn parse_scripts_element(
         if event_start > event_end || event_end > xml.len() {
             return invalid("invalid office:scripts reader position");
         }
-        buffer.clear();
     }
 
     Ok(Scripts {
@@ -320,19 +455,17 @@ fn parse_scripts_element(
 }
 
 fn parse_event_listeners(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     xml: &str,
     text_bytes: &mut usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Vec<EventListener>> {
     let mut listeners = Vec::new();
-    let mut buffer = Vec::new();
     loop {
         let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid event-listener XML: {error}"))
-            })?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid event-listener XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -374,7 +507,7 @@ fn parse_event_listeners(
                     && element.local_name().as_ref() == b"event-listener" =>
             {
                 ensure_listener_capacity(listeners.len())?;
-                let raw = capture_full_xml(reader, xml, event_start, b"event-listener")?;
+                let raw = capture_full_xml(reader, xml, event_start, b"event-listener", limits)?;
                 *text_bytes = checked_text_bytes(*text_bytes, raw.len())?;
                 listeners.push(EventListener::PresentationXml(raw));
             },
@@ -397,13 +530,12 @@ fn parse_event_listeners(
             Event::Eof => return invalid("unterminated office:event-listeners element"),
             _ => return invalid("unsupported child in office:event-listeners"),
         }
-        buffer.clear();
     }
     Ok(listeners)
 }
 
 fn parse_script_listener(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<ScriptEventListener> {
     let mut event_name = None;
@@ -477,7 +609,10 @@ fn parse_script_listener(
     })
 }
 
-fn required_script_language(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
+fn required_script_language(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<String> {
     let mut language = None;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| {
@@ -505,25 +640,23 @@ fn required_script_language(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) 
 }
 
 fn capture_inner_xml(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     xml: &str,
     content_start: usize,
     expected_local: &[u8],
+    limits: &XmlStreamLimits,
 ) -> Result<String> {
     let mut depth = 0usize;
-    let mut buffer = Vec::new();
     loop {
         let event_start = reader.buffer_position() as usize;
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid embedded script XML: {error}"))
-            })?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid embedded script XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(_) => {
                 depth += 1;
-                if depth > MAX_XML_DEPTH {
+                if depth > MAX_XML_DEPTH.min(limits.max_depth()) {
                     return invalid(format!(
                         "embedded script XML exceeds the {MAX_XML_DEPTH} depth limit"
                     ));
@@ -547,30 +680,27 @@ fn capture_inner_xml(
             Event::Eof => return invalid("unterminated office:script element"),
             _ => {},
         }
-        buffer.clear();
     }
 }
 
 fn capture_full_xml(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     xml: &str,
     element_start: usize,
     expected_local: &[u8],
+    limits: &XmlStreamLimits,
 ) -> Result<String> {
     let mut depth = 0usize;
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid preserved listener XML: {error}"))
-            })?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid preserved listener XML")
+        })?;
         let namespace = namespace_kind(&namespace);
         let event_end = reader.buffer_position() as usize;
         match event {
             Event::Start(_) => {
                 depth += 1;
-                if depth > MAX_XML_DEPTH {
+                if depth > MAX_XML_DEPTH.min(limits.max_depth()) {
                     return invalid(format!(
                         "presentation listener exceeds the {MAX_XML_DEPTH} depth limit"
                     ));
@@ -592,22 +722,18 @@ fn capture_full_xml(
             Event::Eof => return invalid("unterminated presentation:event-listener"),
             _ => {},
         }
-        buffer.clear();
     }
 }
 
 fn require_empty_element(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     expected_local: &[u8],
     expected_namespace: &[u8],
 ) -> Result<()> {
-    let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid event-listener body: {error}"))
-            })?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid event-listener body")
+        })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::End(element)
@@ -628,12 +754,11 @@ fn require_empty_element(
             Event::Eof => return invalid("unterminated script:event-listener"),
             _ => return invalid("script:event-listener must not contain child elements"),
         }
-        buffer.clear();
     }
 }
 
 fn namespace_declarations(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<Vec<NamespaceDeclaration>> {
     let mut declarations: Vec<NamespaceDeclaration> = Vec::new();
@@ -685,49 +810,179 @@ fn merge_namespace_declarations(
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct FragmentReport {
+    pub(super) events: usize,
+    pub(super) attributes: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) enum FragmentContainer<'a> {
+    Script { language: &'a str },
+    Presentation,
+}
+
 pub(super) fn validate_fragment(
     fragment: &str,
     declarations: &[NamespaceDeclaration],
-) -> Result<()> {
-    if fragment.len() > MAX_TEXT_BYTES {
+    limits: &XmlStreamLimits,
+    container: FragmentContainer<'_>,
+) -> Result<FragmentReport> {
+    // Keep the real office:scripts envelope here so namespace and depth
+    // admission observes the same scopes and token boundaries as the writer.
+    if fragment.len() > MAX_TEXT_BYTES
+        || u64::try_from(fragment.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return invalid(format!(
             "preserved script XML exceeds the {MAX_TEXT_BYTES} byte limit"
         ));
     }
-    let mut wrapper = String::with_capacity(fragment.len() + 256);
-    wrapper.push_str("<litchi-root");
-    for declaration in declarations {
-        namespace_attribute(
-            &mut wrapper,
-            declaration.prefix.as_deref(),
-            &declaration.uri,
-        );
-    }
+    let capacity = fragment
+        .len()
+        .checked_add(512)
+        .ok_or_else(|| Error::InvalidFormat("preserved script XML size overflow".to_string()))?;
+    let mut wrapper = String::new();
+    wrapper
+        .try_reserve(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "preserved script XML validation",
+            source,
+        })?;
+    append_scripts_open(&mut wrapper, declarations)?;
     wrapper.push('>');
-    wrapper.push_str(fragment);
-    wrapper.push_str("</litchi-root>");
+    let wrapper_attributes = match container {
+        FragmentContainer::Script { language } => {
+            wrapper.push_str("<office:script script:language=\"");
+            escape_attribute(&mut wrapper, language);
+            wrapper.push_str("\">");
+            wrapper.push_str(fragment);
+            wrapper.push_str("</office:script>");
+            1
+        },
+        FragmentContainer::Presentation => {
+            wrapper.push_str("<office:event-listeners>");
+            wrapper.push_str(fragment);
+            wrapper.push_str("</office:event-listeners>");
+            0
+        },
+    };
+    wrapper.push_str("</office:scripts>");
 
-    let mut reader = NsReader::from_str(&wrapper);
-    let mut buffer = Vec::new();
+    let mut reader = ResolvedReader::from_xml_document(&wrapper, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid preserved script XML")
+    })?;
     let mut depth = 0usize;
     loop {
-        match reader.read_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid preserved script XML: {error}"))
-        })? {
+        match reader
+            .read_resolved_event()
+            .map_err(|error| {
+                litchi_odf_common::map_resolved_reader_error(error, "invalid preserved script XML")
+            })?
+            .1
+        {
             Event::Start(_) => {
                 depth += 1;
-                if depth > MAX_XML_DEPTH + 1 {
+                if depth > MAX_XML_DEPTH.min(limits.max_depth()) + 2 {
                     return invalid(format!(
                         "preserved script XML exceeds the {MAX_XML_DEPTH} depth limit"
                     ));
                 }
+            },
+            Event::Empty(_) => {
+                depth += 1;
+                if depth > MAX_XML_DEPTH.min(limits.max_depth()) + 2 {
+                    return invalid(format!(
+                        "preserved script XML exceeds the {MAX_XML_DEPTH} depth limit"
+                    ));
+                }
+                depth = depth.saturating_sub(1);
             },
             Event::End(_) => depth = depth.saturating_sub(1),
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in script metadata"),
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
+    }
+    Ok(FragmentReport {
+        events: reader.event_count().checked_sub(5).ok_or_else(|| {
+            Error::InvalidFormat("preserved script XML report is incomplete".to_string())
+        })?,
+        attributes: reader
+            .attribute_count()
+            .checked_sub(emitted_namespace_count(declarations) + wrapper_attributes)
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "preserved script XML attribute report is incomplete".to_string(),
+                )
+            })?,
+    })
+}
+
+pub(super) fn validate_static_output(
+    declarations: &[NamespaceDeclaration],
+    limits: &XmlStreamLimits,
+) -> Result<()> {
+    let mut output = String::new();
+    append_scripts_open(&mut output, declarations)?;
+    output.push('>');
+    output.push_str("</office:scripts>");
+    validate_generated_document(&output, limits)
+}
+
+pub(super) fn validate_empty_script(
+    language: &str,
+    declarations: &[NamespaceDeclaration],
+    limits: &XmlStreamLimits,
+) -> Result<()> {
+    let mut output = String::new();
+    append_scripts_open(&mut output, declarations)?;
+    output.push('>');
+    output.push_str("<office:script script:language=\"");
+    escape_attribute(&mut output, language);
+    output.push_str("\"/>");
+    output.push_str("</office:scripts>");
+    validate_generated_document(&output, limits)
+}
+
+pub(super) fn validate_script_listener(
+    listener: &ScriptEventListener,
+    declarations: &[NamespaceDeclaration],
+    limits: &XmlStreamLimits,
+) -> Result<()> {
+    let mut output = String::new();
+    append_scripts_open(&mut output, declarations)?;
+    output.push('>');
+    output.push_str("<office:event-listeners><script:event-listener script:event-name=\"");
+    escape_attribute(&mut output, &listener.event_name);
+    output.push_str("\" script:language=\"");
+    escape_attribute(&mut output, &listener.language);
+    match &listener.binding {
+        ScriptBinding::MacroName(value) => {
+            output.push_str("\" script:macro-name=\"");
+            escape_attribute(&mut output, value);
+            output.push_str("\"/>");
+        },
+        ScriptBinding::Linked { href } => {
+            output.push_str("\" xlink:type=\"simple\" xlink:href=\"");
+            escape_attribute(&mut output, href);
+            output.push_str("\" xlink:actuate=\"onRequest\"/>");
+        },
+    }
+    output.push_str("</office:event-listeners></office:scripts>");
+    validate_generated_document(&output, limits)
+}
+
+fn validate_generated_document(output: &str, limits: &XmlStreamLimits) -> Result<()> {
+    let mut reader = ResolvedReader::from_xml_document(output, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid emitted script XML")
+    })?;
+    loop {
+        let (_, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid emitted script XML")
+        })?;
+        if matches!(event, Event::Eof) {
+            break;
+        }
     }
     Ok(())
 }

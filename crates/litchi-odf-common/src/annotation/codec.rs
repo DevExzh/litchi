@@ -5,6 +5,7 @@ use super::package::{
     MAX_ANNOTATION_ATTRIBUTE_BYTES, MAX_ANNOTATION_ATTRIBUTES, MAX_ANNOTATION_ELEMENTS,
     MAX_ANNOTATION_NESTING, MAX_ANNOTATION_TEXT_BYTES,
 };
+use crate::core::XmlStreamLimits;
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     Decoder, XmlVersion,
@@ -18,6 +19,7 @@ pub struct Builder {
     stack: Vec<Element>,
     element_count: usize,
     text_bytes: usize,
+    limits: XmlStreamLimits,
 }
 
 impl Builder {
@@ -31,16 +33,18 @@ impl Builder {
         start: &BytesStart<'_>,
         decoder: Decoder,
         namespaces: BTreeMap<String, String>,
+        limits: &XmlStreamLimits,
     ) -> Result<Self> {
         Ok(Self {
             annotation: Annotation {
-                attributes: parse_attributes(start, decoder, false)?,
+                attributes: parse_attributes(start, decoder, false, limits)?,
                 children: Vec::new(),
                 namespaces,
             },
             stack: Vec::new(),
             element_count: 0,
             text_bytes: 0,
+            limits: *limits,
         })
     }
 
@@ -51,7 +55,7 @@ impl Builder {
     /// Returns an error when the element is malformed or exceeds a resource
     /// limit.
     pub fn start(&mut self, start: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let element = parse_element(start, decoder)?;
+        let element = parse_element(start, decoder, &self.limits)?;
         self.reserve_element()?;
         self.stack.push(element);
         Ok(())
@@ -64,7 +68,7 @@ impl Builder {
     /// Returns an error when the element is malformed or exceeds a resource
     /// limit.
     pub fn empty(&mut self, start: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let element = parse_element(start, decoder)?;
+        let element = parse_element(start, decoder, &self.limits)?;
         self.reserve_element()?;
         self.add_element(element);
         Ok(())
@@ -134,12 +138,12 @@ impl Builder {
     }
 
     fn reserve_element(&mut self) -> Result<()> {
-        if self.stack.len() >= MAX_ANNOTATION_NESTING {
+        if self.stack.len() >= MAX_ANNOTATION_NESTING.min(self.limits.max_depth()) {
             return Err(Error::InvalidFormat(
                 "annotation XML exceeds the nesting limit".to_string(),
             ));
         }
-        if self.element_count >= MAX_ANNOTATION_ELEMENTS {
+        if self.element_count >= MAX_ANNOTATION_ELEMENTS.min(self.limits.max_events()) {
             return Err(Error::InvalidFormat(
                 "annotation XML exceeds the element limit".to_string(),
             ));
@@ -156,7 +160,10 @@ impl Builder {
             .text_bytes
             .checked_add(value.len())
             .ok_or_else(|| Error::InvalidFormat("annotation text size overflow".to_string()))?;
-        if text_bytes > MAX_ANNOTATION_TEXT_BYTES {
+        let max_text_bytes = usize::try_from(self.limits.max_bytes())
+            .unwrap_or(usize::MAX)
+            .min(MAX_ANNOTATION_TEXT_BYTES);
+        if text_bytes > max_text_bytes {
             return Err(Error::InvalidFormat(
                 "annotation text exceeds the size limit".to_string(),
             ));
@@ -176,32 +183,37 @@ impl Builder {
 }
 
 impl Element {
-    pub fn write_xml(&self, output: &mut String) {
+    pub fn write_xml(&self, output: &mut String, limits: &XmlStreamLimits) -> Result<()> {
         output.push('<');
         output.push_str(&self.name);
-        write_attributes(output, &self.attributes);
+        write_attributes(output, &self.attributes, limits)?;
+        ensure_output(output, limits)?;
         if self.children.is_empty() {
             output.push_str("/>");
-            return;
+            return ensure_output(output, limits);
         }
 
         output.push('>');
         for child in &self.children {
             match child {
-                Node::Text(text) => output.push_str(&escape_xml(text)),
-                Node::Element(element) => element.write_xml(output),
+                Node::Text(text) => {
+                    output.push_str(&escape_xml(text));
+                    ensure_output(output, limits)?;
+                },
+                Node::Element(element) => element.write_xml(output, limits)?,
             }
         }
         output.push_str("</");
         output.push_str(&self.name);
         output.push('>');
+        ensure_output(output, limits)
     }
 }
 
 impl Annotation {
-    pub fn write_xml(&self, output: &mut String) {
+    pub fn write_xml(&self, output: &mut String, limits: &XmlStreamLimits) -> Result<()> {
         output.push_str("<office:annotation");
-        write_attributes(output, &self.attributes);
+        write_attributes(output, &self.attributes, limits)?;
 
         let mut used_prefixes = BTreeSet::new();
         for name in self.attributes.keys() {
@@ -217,26 +229,43 @@ impl Annotation {
                 output.push_str("=\"");
                 output.push_str(&escape_xml(uri));
                 output.push('"');
+                ensure_output(output, limits)?;
             }
         }
 
         output.push('>');
         for child in &self.children {
-            child.write_xml(output);
+            child.write_xml(output, limits)?;
         }
         output.push_str("</office:annotation>");
+        ensure_output(output, limits)
     }
 }
 
 /// Serialize XML attributes in deterministic map order.
-pub fn write_attributes(output: &mut String, attributes: &BTreeMap<String, String>) {
+pub fn write_attributes(
+    output: &mut String,
+    attributes: &BTreeMap<String, String>,
+    limits: &XmlStreamLimits,
+) -> Result<()> {
     for (name, value) in attributes {
         output.push(' ');
         output.push_str(name);
         output.push_str("=\"");
         output.push_str(&escape_xml(value));
         output.push('"');
+        ensure_output(output, limits)?;
     }
+    Ok(())
+}
+
+fn ensure_output(output: &str, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(Error::InvalidFormat(
+            "annotation XML exceeds the configured byte limit".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
@@ -260,7 +289,11 @@ pub(crate) fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     }
 }
 
-pub(crate) fn parse_element(start: &BytesStart<'_>, decoder: Decoder) -> Result<Element> {
+pub(crate) fn parse_element(
+    start: &BytesStart<'_>,
+    decoder: Decoder,
+    limits: &XmlStreamLimits,
+) -> Result<Element> {
     let name = std::str::from_utf8(start.name().as_ref())
         .map_err(|error| {
             Error::InvalidFormat(format!("invalid UTF-8 in annotation element name: {error}"))
@@ -269,7 +302,7 @@ pub(crate) fn parse_element(start: &BytesStart<'_>, decoder: Decoder) -> Result<
     validate_qname(&name)?;
     Ok(Element {
         name,
-        attributes: parse_attributes(start, decoder, true)?,
+        attributes: parse_attributes(start, decoder, true, limits)?,
         children: Vec::new(),
     })
 }
@@ -278,6 +311,7 @@ fn parse_attributes(
     start: &BytesStart<'_>,
     decoder: Decoder,
     keep_namespaces: bool,
+    limits: &XmlStreamLimits,
 ) -> Result<BTreeMap<String, String>> {
     let mut attributes = BTreeMap::new();
     let mut attribute_bytes = 0usize;
@@ -295,7 +329,7 @@ fn parse_attributes(
         if !keep_namespaces && (name == "xmlns" || name.starts_with("xmlns:")) {
             continue;
         }
-        if attributes.len() >= MAX_ANNOTATION_ATTRIBUTES {
+        if attributes.len() >= MAX_ANNOTATION_ATTRIBUTES.min(limits.max_attributes()) {
             return Err(Error::InvalidFormat(
                 "annotation attribute count exceeds the safety limit".to_string(),
             ));
@@ -312,7 +346,7 @@ fn parse_attributes(
             .ok_or_else(|| {
                 Error::InvalidFormat("annotation attribute size overflow".to_string())
             })?;
-        if attribute_bytes > MAX_ANNOTATION_ATTRIBUTE_BYTES {
+        if attribute_bytes > MAX_ANNOTATION_ATTRIBUTE_BYTES.min(limits.max_token_bytes()) {
             return Err(Error::InvalidFormat(
                 "annotation attributes exceed the size limit".to_string(),
             ));

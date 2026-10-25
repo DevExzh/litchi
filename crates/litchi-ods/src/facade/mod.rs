@@ -324,6 +324,7 @@ impl Workbook {
         Ok(crate::protection::Snapshot::parse(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
+            &self.inner.xml_limits,
         )?)
     }
 
@@ -361,6 +362,7 @@ impl Workbook {
     pub fn annotations(&self) -> FamilyResult<crate::annotations::Snapshot> {
         Ok(crate::annotations::Snapshot::parse(
             self.inner.package.content_xml(),
+            &self.inner.package.xml_limits_value(),
         )?)
     }
 

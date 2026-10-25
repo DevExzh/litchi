@@ -26,8 +26,12 @@ fn source() -> String {
 #[test]
 fn no_op_snapshot_retains_exact_content_xml() {
     let source = source();
-    let snapshot =
-        Snapshot::parse(source.clone(), None).expect("test fixture or operation should succeed");
+    let snapshot = Snapshot::parse(
+        source.clone(),
+        None,
+        &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )
+    .expect("test fixture or operation should succeed");
     let commit = snapshot
         .edit()
         .commit()
@@ -38,8 +42,12 @@ fn no_op_snapshot_retains_exact_content_xml() {
 
 #[test]
 fn document_and_sheet_edits_are_source_checked_and_atomic() {
-    let snapshot =
-        Snapshot::parse(source(), None).expect("test fixture or operation should succeed");
+    let snapshot = Snapshot::parse(
+        source(),
+        None,
+        &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )
+    .expect("test fixture or operation should succeed");
     assert_eq!(snapshot.document().structure_protected, Some(false));
     assert_eq!(
         snapshot
@@ -77,8 +85,12 @@ fn document_and_sheet_edits_are_source_checked_and_atomic() {
 
 #[test]
 fn style_edits_replace_only_managed_automatic_styles() {
-    let snapshot =
-        Snapshot::parse(source(), None).expect("test fixture or operation should succeed");
+    let snapshot = Snapshot::parse(
+        source(),
+        None,
+        &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )
+    .expect("test fixture or operation should succeed");
     let mut transaction = snapshot.edit();
     transaction
         .styles_mut()

@@ -2,9 +2,9 @@
 //!
 //! These tests exercise the adapter's namespace boundary: lexical event bytes
 //! stay available for source ranges while declaration values are normalized
-//! once before namespace resolution.  Generic document validation (root
-//! cardinality, matching end tags, and application vocabulary) belongs to the
-//! caller and is intentionally outside this fixture.
+//! once before namespace resolution.  Fragment callers keep the low-level
+//! mode; complete-document callers opt into root cardinality, declaration,
+//! and matching-end-tag validation with `from_xml_document`.
 
 use litchi_odf_common::namespace::MAX_NAMESPACE_URI_BYTES;
 use litchi_odf_common::{
@@ -673,6 +673,52 @@ fn retained_policy_preserves_raw_depth_and_declaration_kinds() -> litchi_core::R
         declaration_error,
         OdfError::Limit {
             kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceDeclarations),
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+    Ok(())
+}
+
+fn document_error(source: &str, limits: XmlStreamLimits) -> OdfError {
+    let mut reader = ResolvedReader::from_xml_document(source, limits)
+        .expect("document test source fits the explicit limits");
+    loop {
+        match reader.read_resolved_event() {
+            Ok((_, Event::Eof)) => panic!("invalid document was accepted: {source:?}"),
+            Ok(_) => {},
+            Err(error) => return error,
+        }
+    }
+}
+
+#[test]
+fn document_mode_restores_global_xml_validation() {
+    for source in [
+        r#"<root/><second/>"#,
+        r#"<root>"#,
+        r#"<?xml version="1.0" encoding="UTF-16"?><root/>"#,
+        r#"<?xml version="1.0" standalone="maybe"?><root/>"#,
+        r#"<!-- comment --><?xml version="1.0"?><root/>"#,
+        r#"<p:root/>"#,
+        "<root>\u{1}</root>",
+    ] {
+        let error = document_error(source, limits());
+        assert!(
+            error.to_string().contains("XML") || matches!(error, OdfError::Limit { .. }),
+            "unexpected document validation error for {source:?}: {error}"
+        );
+    }
+}
+
+#[test]
+fn document_mode_counts_xml_declaration_attributes() -> litchi_core::Result<()> {
+    let limits = XmlStreamLimits::new(256 << 20, 1_024, 4_000_000, 1, 64 * 1024 * 1024)?;
+    let error = document_error(r#"<?xml version="1.0"?><root attribute="1"/>"#, limits);
+    assert!(matches!(
+        error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::Attributes),
             observed: 2,
             maximum: 1,
         }

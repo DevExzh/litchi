@@ -1,11 +1,11 @@
 //! Shared XML boundary helpers for the data-pilot parser and writer.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::ResolvedReader;
 use quick_xml::{
     XmlVersion,
     events::{BytesEnd, BytesStart, Event},
     name::{Namespace, ResolveResult},
-    reader::NsReader,
 };
 
 use super::super::invalid_message;
@@ -62,12 +62,9 @@ pub(super) fn is_table_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE)
 }
 
-pub(super) fn consume_empty_extension(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
-    let mut buffer = Vec::new();
+pub(super) fn consume_empty_extension(reader: &mut ResolvedReader<'_>, local: &[u8]) -> Result<()> {
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::End(ref element) if is_table_ext(&namespace, element, local) => return Ok(()),
             Event::Text(ref text) if text_is_whitespace(text)? => {},
@@ -87,18 +84,17 @@ pub(super) fn consume_empty_extension(reader: &mut NsReader<&[u8]>, local: &[u8]
                 ));
             },
         }
-        buffer.clear();
     }
 }
 
 pub(super) fn skip_foreign_element(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     _start: &BytesStart<'_>,
 ) -> Result<()> {
     let mut depth = 1usize;
-    let mut buffer = Vec::new();
     while depth > 0 {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+        let (_namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
             Event::Start(_) => {
                 depth = depth
                     .checked_add(1)
@@ -124,13 +120,12 @@ pub(super) fn skip_foreign_element(
             | Event::PI(_)
             | Event::GeneralRef(_) => {},
         }
-        buffer.clear();
     }
     Ok(())
 }
 
 pub(super) fn optional_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<Option<String>> {
@@ -155,7 +150,7 @@ pub(super) fn optional_attr(
 }
 
 pub(super) fn optional_ns_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     wanted_namespace: &[u8],
     local: &[u8],
@@ -181,7 +176,7 @@ pub(super) fn optional_ns_attr(
 }
 
 pub(super) fn optional_ns_bool(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &[u8],
     local: &[u8],
@@ -192,7 +187,7 @@ pub(super) fn optional_ns_bool(
 }
 
 pub(super) fn required_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<String> {
@@ -202,7 +197,7 @@ pub(super) fn required_attr(
 }
 
 pub(super) fn optional_bool(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<Option<bool>> {
@@ -212,7 +207,7 @@ pub(super) fn optional_bool(
 }
 
 pub(super) fn required_bool(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<bool> {
@@ -220,7 +215,7 @@ pub(super) fn required_bool(
 }
 
 pub(super) fn optional_i64(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<Option<i64>> {
@@ -230,7 +225,7 @@ pub(super) fn optional_i64(
 }
 
 pub(super) fn required_u64(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<u64> {
@@ -241,7 +236,7 @@ pub(super) fn required_u64(
 }
 
 pub(super) fn required_f64(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<f64> {
@@ -277,6 +272,6 @@ fn invalid(kind: &str, value: &str) -> Error {
     invalid_message(&format!("invalid {kind} '{value}'"))
 }
 
-fn xml_error(error: quick_xml::Error) -> Error {
-    invalid_message(&format!("XML parsing error: {error}"))
+fn xml_error(error: litchi_odf_common::Error) -> Error {
+    litchi_odf_common::map_resolved_reader_error(error, "data-pilot XML parsing error")
 }

@@ -77,7 +77,7 @@ impl Builder {
     /// validation, or the package cannot be created.
     pub fn build(self) -> Result<crate::Package, crate::Error> {
         let xml = match self.source {
-            Source::Root(root) => root.to_xml(),
+            Source::Root(root) => root.to_xml(&self.limits)?,
             Source::Text(text) => text,
         };
         let formula = crate::Formula::from_mathml(&xml, self.template, self.limits)?;

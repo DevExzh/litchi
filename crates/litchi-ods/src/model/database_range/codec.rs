@@ -9,14 +9,13 @@ use super::{
         FilterParent, MAX_DATABASE_ITEMS, MAX_DATABASE_RANGES, MAX_DATABASE_VALUE_BYTES,
         MAX_FILTER_DEPTH, invalid, missing, unexpected_eof, validate_database_range_collection,
         validate_filter_for_output, validate_range_for_output, validate_source_for_output,
-        xml_error,
     },
 };
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 
@@ -132,21 +131,28 @@ impl DataType {
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
-    if xml.len() > 64 * 1_048_576 {
+pub fn parse_database_ranges(xml: &str, limits: &XmlStreamLimits) -> Result<Vec<Range>> {
+    if xml.len() > 64 * 1_048_576
+        || u64::try_from(xml.len()).unwrap_or(u64::MAX) > limits.max_bytes()
+    {
         return Err(Error::InvalidFormat(
             "database-range XML exceeds 64 MiB".to_string(),
         ));
     }
-    let mut reader = NsReader::from_str(xml);
-    reader.config_mut().check_end_names = true;
-    let mut buf = Vec::new();
+    // The contextual host scan has already validated the complete source and
+    // marked unknown vendor markup opaque. Keep this typed pass in fragment
+    // mode so a no-op can retain that markup byte-for-byte while changed
+    // publication still rejects the opaque owner.
+    let mut reader = ResolvedReader::from_xml(xml, *limits).map_err(|error| {
+        litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+    })?;
+    reader.enable_fragment_validation();
     let mut in_ranges = false;
     let mut ranges = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"database-ranges") => {
                 in_ranges = true;
@@ -159,7 +165,7 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
                         "database ranges exceed the supported resource limit".to_string(),
                     ));
                 }
-                let range = parse_database_range(&mut reader, element)?;
+                let range = parse_database_range(&mut reader, element, limits)?;
                 range.validate()?;
                 ranges.push(range);
             },
@@ -190,20 +196,22 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
     validate_database_range_collection(&ranges)?;
     Ok(ranges)
 }
 
-fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Range> {
+fn parse_database_range(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Range> {
     let mut range = database_range_from_start(reader, start)?;
     let mut child_stage = 0u8;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"database-source-sql") => {
                 if child_stage != 0 {
@@ -212,7 +220,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.source, "database source")?;
-                range.source = Some(parse_source_sql(reader, element)?);
+                range.source = Some(parse_source_sql(reader, element, limits)?);
                 reject_leaf_children(reader, b"database-source-sql")?;
                 child_stage = 1;
             },
@@ -223,7 +231,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.source, "database source")?;
-                range.source = Some(parse_source_sql(reader, element)?);
+                range.source = Some(parse_source_sql(reader, element, limits)?);
                 child_stage = 1;
             },
             Event::Start(ref element)
@@ -235,7 +243,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.source, "database source")?;
-                range.source = Some(parse_source_table(reader, element)?);
+                range.source = Some(parse_source_table(reader, element, limits)?);
                 reject_leaf_children(reader, b"database-source-table")?;
                 child_stage = 1;
             },
@@ -248,7 +256,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.source, "database source")?;
-                range.source = Some(parse_source_table(reader, element)?);
+                range.source = Some(parse_source_table(reader, element, limits)?);
                 child_stage = 1;
             },
             Event::Start(ref element)
@@ -260,7 +268,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.source, "database source")?;
-                range.source = Some(parse_source_query(reader, element)?);
+                range.source = Some(parse_source_query(reader, element, limits)?);
                 reject_leaf_children(reader, b"database-source-query")?;
                 child_stage = 1;
             },
@@ -273,7 +281,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.source, "database source")?;
-                range.source = Some(parse_source_query(reader, element)?);
+                range.source = Some(parse_source_query(reader, element, limits)?);
                 child_stage = 1;
             },
             Event::Start(ref element) if is_table(&namespace, element, b"filter") => {
@@ -283,7 +291,7 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
                     ));
                 }
                 ensure_absent(&range.filter, "database filter")?;
-                range.filter = Some(parse_filter(reader, element)?);
+                range.filter = Some(parse_filter(reader, element, limits)?);
                 child_stage = 2;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"filter") => {
@@ -349,12 +357,14 @@ fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) ->
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
     Ok(range)
 }
 
-fn database_range_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Range> {
+fn database_range_from_start(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<Range> {
     let target = required_attr(reader, element, b"target-range-address")?;
     Ok(Range {
         name: optional_attr(reader, element, b"name")?,
@@ -379,7 +389,12 @@ fn database_range_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>)
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_source_sql(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Source> {
+pub fn parse_source_sql(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Source> {
+    check_reader_limit(reader, limits)?;
     let parse_statement = optional_bool(reader, element, b"parse-sql-statement")?
         .or(optional_bool(reader, element, b"parse-sql-statements")?);
     Ok(Source::Sql {
@@ -392,7 +407,12 @@ pub fn parse_source_sql(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> R
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_source_table(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Source> {
+pub fn parse_source_table(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Source> {
+    check_reader_limit(reader, limits)?;
     Ok(Source::Table {
         database_name: required_attr(reader, element, b"database-name")?,
         table_name: optional_attr(reader, element, b"database-table-name")?
@@ -404,7 +424,12 @@ pub fn parse_source_table(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) ->
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_source_query(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Source> {
+pub fn parse_source_query(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Source> {
+    check_reader_limit(reader, limits)?;
     Ok(Source::Query {
         database_name: required_attr(reader, element, b"database-name")?,
         query_name: required_attr(reader, element, b"query-name")?,
@@ -415,13 +440,12 @@ pub fn parse_source_query(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) ->
 /// the source vocabulary cannot represent.  The source elements are leaves;
 /// silently walking over nested known elements would otherwise drop authored
 /// metadata before a later write.
-fn reject_leaf_children(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
-    let mut buf = Vec::new();
+fn reject_leaf_children(reader: &mut ResolvedReader<'_>, local: &[u8]) -> Result<()> {
     let mut unknown_depth = 0usize;
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::End(ref element)
                 if unknown_depth == 0 && is_table(&namespace, element, local) =>
@@ -471,7 +495,6 @@ fn reject_leaf_children(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()
                 }
             },
         }
-        buf.clear();
     }
 }
 
@@ -500,7 +523,12 @@ fn is_known_leaf_element(local: &[u8]) -> bool {
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
-pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
+pub fn parse_filter(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Filter> {
+    check_reader_limit(reader, limits)?;
     reader.config_mut().check_end_names = true;
     let target_range_address = optional_attr(reader, start, b"target-range-address")?;
     let condition_source = optional_attr(reader, start, b"condition-source")?
@@ -510,11 +538,11 @@ pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Res
         optional_attr(reader, start, b"condition-source-range-address")?;
     let display_duplicates = optional_bool(reader, start, b"display-duplicates")?;
     let mut expression = None;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        check_reader_limit(reader, limits)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
                 ensure_absent(&expression, "filter root expression")?;
@@ -528,11 +556,11 @@ pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Res
             },
             Event::Start(ref element) if is_table(&namespace, element, b"filter-and") => {
                 ensure_absent(&expression, "filter root expression")?;
-                expression = Some(parse_filter_group(reader, FilterParent::And, 1)?);
+                expression = Some(parse_filter_group(reader, FilterParent::And, 1, limits)?);
             },
             Event::Start(ref element) if is_table(&namespace, element, b"filter-or") => {
                 ensure_absent(&expression, "filter root expression")?;
-                expression = Some(parse_filter_group(reader, FilterParent::Or, 1)?);
+                expression = Some(parse_filter_group(reader, FilterParent::Or, 1, limits)?);
             },
             Event::End(ref element) if is_table(&namespace, element, b"filter") => break,
             Event::Eof => return Err(unexpected_eof("table:filter")),
@@ -547,8 +575,8 @@ pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Res
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
+    check_reader_limit(reader, limits)?;
     Ok(Filter {
         target_range_address,
         condition_source,
@@ -560,9 +588,10 @@ pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Res
 }
 
 fn parse_filter_group(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     kind: FilterParent,
     depth: usize,
+    limits: &XmlStreamLimits,
 ) -> Result<Expression> {
     if depth > MAX_FILTER_DEPTH {
         return Err(Error::InvalidFormat(
@@ -570,11 +599,11 @@ fn parse_filter_group(
         ));
     }
     let mut children = Vec::new();
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        check_reader_limit(reader, limits)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
                 if children.len() >= MAX_DATABASE_ITEMS {
@@ -602,7 +631,12 @@ fn parse_filter_group(
                         "filter expressions exceed the supported resource limit".to_string(),
                     ));
                 }
-                children.push(parse_filter_group(reader, FilterParent::Or, depth + 1)?);
+                children.push(parse_filter_group(
+                    reader,
+                    FilterParent::Or,
+                    depth + 1,
+                    limits,
+                )?);
             },
             Event::Start(ref element)
                 if kind == FilterParent::Or && is_table(&namespace, element, b"filter-and") =>
@@ -612,7 +646,12 @@ fn parse_filter_group(
                         "filter expressions exceed the supported resource limit".to_string(),
                     ));
                 }
-                children.push(parse_filter_group(reader, FilterParent::And, depth + 1)?);
+                children.push(parse_filter_group(
+                    reader,
+                    FilterParent::And,
+                    depth + 1,
+                    limits,
+                )?);
             },
             Event::Start(ref element)
                 if is_table(&namespace, element, b"filter-and")
@@ -641,8 +680,8 @@ fn parse_filter_group(
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
+    check_reader_limit(reader, limits)?;
     if children.is_empty() {
         return Err(Error::InvalidFormat(
             "filter boolean group cannot be empty".to_string(),
@@ -654,13 +693,12 @@ fn parse_filter_group(
     })
 }
 
-fn parse_condition(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Condition> {
+fn parse_condition(reader: &mut ResolvedReader<'_>, start: &BytesStart<'_>) -> Result<Condition> {
     let mut condition = condition_from_start(reader, start)?;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"filter-set-item") => {
                 if condition.set_items.len() >= MAX_DATABASE_ITEMS {
@@ -696,12 +734,14 @@ fn parse_condition(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
     Ok(condition)
 }
 
-fn condition_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Condition> {
+fn condition_from_start(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<Condition> {
     Ok(Condition {
         field_number: required_u64(reader, element, b"field-number")?,
         value: required_attr(reader, element, b"value")?,
@@ -714,7 +754,7 @@ fn condition_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> R
     })
 }
 
-fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Sort> {
+fn parse_sort(reader: &mut ResolvedReader<'_>, start: &BytesStart<'_>) -> Result<Sort> {
     let mut sort = Sort {
         bind_styles_to_content: optional_bool(reader, start, b"bind-styles-to-content")?,
         target_range_address: optional_attr(reader, start, b"target-range-address")?,
@@ -729,11 +769,10 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
             .transpose()?,
         keys: Vec::new(),
     };
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"sort-by") => {
                 if sort.keys.len() >= MAX_DATABASE_ITEMS {
@@ -777,7 +816,6 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
     if sort.keys.is_empty() {
         return Err(Error::InvalidFormat(
@@ -787,7 +825,7 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
     Ok(sort)
 }
 
-fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Rules> {
+fn parse_subtotals(reader: &mut ResolvedReader<'_>, start: &BytesStart<'_>) -> Result<Rules> {
     let mut subtotals = Rules {
         bind_styles_to_content: optional_bool(reader, start, b"bind-styles-to-content")?,
         case_sensitive: optional_bool(reader, start, b"case-sensitive")?,
@@ -796,11 +834,10 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
         rules: Vec::new(),
     };
     let mut saw_rule = false;
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"sort-groups") => {
                 if saw_rule {
@@ -865,21 +902,19 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
     Ok(subtotals)
 }
 
-fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Rule> {
+fn parse_subtotal_rule(reader: &mut ResolvedReader<'_>, start: &BytesStart<'_>) -> Result<Rule> {
     let mut rule = Rule {
         group_by_field_number: required_u64(reader, start, b"group-by-field-number")?,
         fields: Vec::new(),
     };
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            litchi_odf_common::map_resolved_reader_error(error, "invalid database-range XML")
+        })?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"subtotal-field") => {
                 if rule.fields.len() >= MAX_DATABASE_ITEMS {
@@ -917,7 +952,6 @@ fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> 
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buf.clear();
     }
     Ok(rule)
 }
@@ -1235,13 +1269,14 @@ fn size_database_range(range: &Range) -> Result<usize> {
     Ok(size)
 }
 
-fn reserve_output(output: &mut String, additional: usize) -> Result<()> {
+fn reserve_output(output: &mut String, additional: usize, limits: &XmlStreamLimits) -> Result<()> {
     let final_len = output.len().checked_add(additional).ok_or_else(|| {
         Error::InvalidFormat("database-range XML output size overflow".to_string())
     })?;
-    if final_len > MAX_DATABASE_XML_BYTES {
+    let max_bytes = limits.max_bytes().min(MAX_DATABASE_XML_BYTES as u64) as usize;
+    if final_len > max_bytes {
         return Err(Error::InvalidFormat(
-            "database-range XML output exceeds 64 MiB".to_string(),
+            "database-range XML output exceeds the configured XML limit".to_string(),
         ));
     }
     output
@@ -1274,12 +1309,16 @@ pub(crate) fn database_ranges_serialized_size(ranges: &[Range]) -> Result<usize>
 ///
 /// Returns an error when the value cannot be serialized within the bounded
 /// XML output budget. The complete output size is planned before mutation.
-pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
+pub fn write_database_ranges(
+    output: &mut String,
+    ranges: &[Range],
+    limits: &XmlStreamLimits,
+) -> Result<()> {
     let additional = database_ranges_serialized_size(ranges)?;
     if additional == 0 {
         return Ok(());
     }
-    reserve_output(output, additional)?;
+    reserve_output(output, additional, limits)?;
     output.push_str("<table:database-ranges>");
     for range in ranges {
         write_database_range(output, range);
@@ -1292,7 +1331,7 @@ pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()
 ///
 /// Returns an error when the value cannot be serialized within the bounded
 /// XML output budget.
-pub fn write_database_range_fragment(range: &Range) -> Result<String> {
+pub fn write_database_range_fragment(range: &Range, limits: &XmlStreamLimits) -> Result<String> {
     validate_range_for_output(range)?;
     let prefix =
         "<table:database-ranges xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">";
@@ -1302,7 +1341,7 @@ pub fn write_database_range_fragment(range: &Range) -> Result<String> {
     let mut additional = prefix.len();
     checked_size_add(&mut additional, range_size)?;
     checked_size_add(&mut additional, suffix.len())?;
-    reserve_output(&mut output, additional)?;
+    reserve_output(&mut output, additional, limits)?;
     output.push_str(prefix);
     write_database_range(&mut output, range);
     output.push_str(suffix);
@@ -1375,10 +1414,14 @@ fn write_database_range(output: &mut String, range: &Range) {
     output.push_str("</table:database-range>");
 }
 
-pub fn write_database_source(output: &mut String, source: &Source) -> Result<()> {
+pub fn write_database_source(
+    output: &mut String,
+    source: &Source,
+    limits: &XmlStreamLimits,
+) -> Result<()> {
     validate_source_for_output(source)?;
     let additional = size_source(source)?;
-    reserve_output(output, additional)?;
+    reserve_output(output, additional, limits)?;
     write_database_source_inner(output, source);
     Ok(())
 }
@@ -1415,10 +1458,10 @@ fn write_database_source_inner(output: &mut String, source: &Source) {
     output.push_str("/>");
 }
 
-pub fn write_filter(output: &mut String, filter: &Filter) -> Result<()> {
+pub fn write_filter(output: &mut String, filter: &Filter, limits: &XmlStreamLimits) -> Result<()> {
     validate_filter_for_output(filter)?;
     let additional = size_filter(filter)?;
-    reserve_output(output, additional)?;
+    reserve_output(output, additional, limits)?;
     write_filter_inner(output, filter);
     Ok(())
 }
@@ -1579,7 +1622,7 @@ fn write_subtotals(output: &mut String, subtotals: &Rules) {
 }
 
 fn optional_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<String>> {
@@ -1608,7 +1651,7 @@ fn optional_attr(
 }
 
 fn required_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<String> {
@@ -1617,7 +1660,7 @@ fn required_attr(
 }
 
 fn optional_bool(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<bool>> {
@@ -1634,7 +1677,7 @@ fn optional_bool(
 }
 
 fn required_u64(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<u64> {
@@ -1684,4 +1727,13 @@ fn u64_attr(output: &mut String, name: &str, value: u64) {
     output.push_str("=\"");
     output.push_str(&value.to_string());
     output.push('"');
+}
+
+fn check_reader_limit(reader: &ResolvedReader<'_>, limits: &XmlStreamLimits) -> Result<()> {
+    if reader.buffer_position() > limits.max_bytes() {
+        return Err(Error::InvalidFormat(
+            "database-range XML exceeds the configured XML limit".to_string(),
+        ));
+    }
+    Ok(())
 }
