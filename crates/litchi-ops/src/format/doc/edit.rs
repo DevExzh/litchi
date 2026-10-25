@@ -433,7 +433,7 @@ fn resolve_targets(
         if targets.len() >= maximum {
             return Err(TransactionError::Limit {
                 kind: LimitKind::ExpandedTargets,
-                observed: targets.len().saturating_add(1),
+                observed: targets.len().checked_add(1).unwrap_or(usize::MAX),
                 maximum,
             }
             .into());

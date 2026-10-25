@@ -306,7 +306,13 @@ pub(super) fn topology_patch_budget(max_patch_bytes: usize, shape_removals: bool
         } else {
             0
         })
-        .ok_or_else(|| limit("source-backed durable patch bytes", max_patch_bytes))
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                usize::MAX,
+                max_patch_bytes,
+            )
+        })
 }
 
 impl Revision {
@@ -343,10 +349,13 @@ impl Revision {
         // Admission must precede the owned copy.  The source PartData remains
         // attached to the prepared candidate; this extra reservation covers
         // the edit-owned payload that is handed to the public snapshot.
-        let mut amount = bytes
-            .len()
-            .checked_add(1024)
-            .ok_or_else(|| limit("source-backed snapshot bytes", usize::MAX))?;
+        let mut amount = bytes.len().checked_add(1024).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Snapshots,
+                usize::MAX,
+                usize::MAX,
+            )
+        })?;
         for size in [
             key.part_uri.as_str().len(),
             key.relationship_id.len(),
@@ -365,7 +374,13 @@ impl Revision {
             amount = size
                 .checked_mul(2)
                 .and_then(|size| amount.checked_add(size))
-                .ok_or_else(|| limit("source-backed snapshot bytes", usize::MAX))?;
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::Snapshots,
+                        usize::MAX,
+                        usize::MAX,
+                    )
+                })?;
         }
         let reservation = reserve_payload(package, amount)?;
         let copied = copy_bytes(bytes)?;
@@ -1143,8 +1158,13 @@ fn declared_bytes(package: &Package, spec: SourceSpec) -> Result<PlannedBytes> {
 }
 
 fn declared_bytes_with_length(spec: SourceSpec, length: u64) -> Result<PlannedBytes> {
-    let length = usize::try_from(length)
-        .map_err(|_| limit("source-backed primary retained patch bytes", usize::MAX))?;
+    let length = usize::try_from(length).map_err(|_| {
+        limit(
+            crate::error::CodecLimitKind::PatchBytes,
+            usize::MAX,
+            usize::MAX,
+        )
+    })?;
     Ok(PlannedBytes::Declared { spec, length })
 }
 
@@ -2512,8 +2532,13 @@ fn package_from_revision(package: &Package, revision: Revision) -> Result<Packag
         return package_as_physical(package);
     }
     let root = if let Some(context) = package.owner.package.execution_context() {
-        let amount = u64::try_from(revision.data.after.root.len())
-            .map_err(|_| limit("source-backed primary topology root bytes", usize::MAX))?;
+        let amount = u64::try_from(revision.data.after.root.len()).map_err(|_| {
+            limit(
+                crate::error::CodecLimitKind::SourceBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })?;
         let reservation = context.reserve(Resource::Memory, amount).map_err(|error| {
             Error::Opc(match error {
                 litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
@@ -2978,7 +3003,13 @@ fn recipe_bytes(
         total = total
             .checked_add(bytes)
             .filter(|n| *n <= MAXIMUM)
-            .ok_or_else(|| limit("source-backed topology recipe bytes", MAXIMUM))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::ProofBytes,
+                    usize::MAX,
+                    MAXIMUM,
+                )
+            })?;
         Ok(())
     };
     for key in order {
@@ -3027,8 +3058,13 @@ pub(super) fn reserve_payload(package: &Package, bytes: usize) -> Result<Option<
     let Some(context) = package.owner.package.execution_context() else {
         return Ok(None);
     };
-    let amount = u64::try_from(bytes)
-        .map_err(|_| limit("source-backed primary prepared slide bytes", usize::MAX))?;
+    let amount = u64::try_from(bytes).map_err(|_| {
+        limit(
+            crate::error::CodecLimitKind::SourceBytes,
+            usize::MAX,
+            usize::MAX,
+        )
+    })?;
     context
         .reserve(Resource::Memory, amount)
         .map(Some)

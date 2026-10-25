@@ -137,7 +137,7 @@ fn selected_authors_part(
 fn validate_unique_ids(
     comments: &ParsedList,
     mut check: impl FnMut() -> Result<()>,
-    resource: &'static str,
+    _resource: &'static str,
 ) -> Result<()> {
     let mut count = comments.comments.len();
     for comment in &comments.comments {
@@ -145,8 +145,11 @@ fn validate_unique_ids(
         count = count
             .checked_add(comment.replies.len())
             .ok_or(Error::Limit {
-                resource,
-                limit: codec::MAX_COMMENTS.saturating_add(codec::MAX_REPLIES),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::CommentEntries,
+                ),
+                observed: usize::MAX,
+                maximum: codec::MAX_COMMENTS.saturating_add(codec::MAX_REPLIES),
             })?;
     }
 

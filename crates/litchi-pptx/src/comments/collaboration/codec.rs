@@ -728,7 +728,11 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
         match event {
             Event::Start(element) => {
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("legacy comment collaboration XML depth", MAX_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().saturating_add(1),
+                        MAX_DEPTH,
+                    ));
                 }
                 let node = make_node(
                     &element,
@@ -741,7 +745,11 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                 )?;
                 nodes_seen = nodes_seen.saturating_add(1);
                 if nodes_seen > MAX_NODES {
-                    return Err(limit("legacy comment collaboration XML nodes", MAX_NODES));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes_seen,
+                        MAX_NODES,
+                    ));
                 }
                 let index = scan.nodes.len();
                 attach_node(&mut scan, node, &mut stack, index)?;
@@ -760,7 +768,11 @@ fn scan_raw(source: &[u8]) -> Result<Scan> {
                 node.span.empty = true;
                 nodes_seen = nodes_seen.saturating_add(1);
                 if nodes_seen > MAX_NODES {
-                    return Err(limit("legacy comment collaboration XML nodes", MAX_NODES));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes_seen,
+                        MAX_NODES,
+                    ));
                 }
                 let index = scan.nodes.len();
                 attach_node(&mut scan, node, &mut stack, index)?;
@@ -838,7 +850,11 @@ fn record_non_whitespace_text(
         ));
     };
     if scan.non_whitespace_text.len() >= MAX_NODES {
-        return Err(limit("legacy comment collaboration text nodes", MAX_NODES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            scan.non_whitespace_text.len().saturating_add(1),
+            MAX_NODES,
+        ));
     }
     scan.non_whitespace_text.push((owner, range));
     Ok(())
@@ -2338,10 +2354,11 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
         .ok_or_else(|| invalid("legacy comment collaboration XML offset does not fit usize"))
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 

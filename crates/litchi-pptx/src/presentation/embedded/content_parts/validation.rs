@@ -14,15 +14,20 @@ pub(crate) const MAX_TOTAL_PAYLOAD_BYTES: usize = 256 * 1024 * 1024;
 pub(crate) const MAX_PAYLOAD_RELATIONSHIPS: usize = 4_096;
 pub(crate) const MAX_RELATIONSHIP_FIELD_BYTES: usize = 16 * 1024;
 
-pub(crate) fn limit_xml() -> Error {
+pub(crate) fn limit_xml(observed: usize) -> Error {
     limit(
-        "content-part slide XML bytes",
+        crate::error::CodecLimitKind::XmlBytes,
+        observed,
         crate::presentation::embedded::MAX_XML_BYTES,
     )
 }
 
-pub(crate) fn limit_total_payloads() -> Error {
-    limit("total content-part payload bytes", MAX_TOTAL_PAYLOAD_BYTES)
+pub(crate) fn limit_total_payloads(observed: usize) -> Error {
+    limit(
+        crate::error::CodecLimitKind::PartBytes,
+        observed,
+        MAX_TOTAL_PAYLOAD_BYTES,
+    )
 }
 
 pub(crate) fn validate_id(value: &str, label: &'static str) -> Result<()> {
@@ -30,7 +35,11 @@ pub(crate) fn validate_id(value: &str, label: &'static str) -> Result<()> {
         return Err(invalid(format!("{label} cannot be empty")));
     }
     if value.len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit(label, MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::NameBytes,
+            value.len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     if value.chars().any(|character| {
         matches!(
@@ -100,15 +109,24 @@ pub(crate) fn validate_relationship(relationship: &Relationship) -> Result<()> {
 
 pub(crate) fn validate_payload(payload: &Payload) -> Result<()> {
     if payload.bytes().len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("content-part payload bytes", MAX_PAYLOAD_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PartBytes,
+            payload.bytes().len(),
+            MAX_PAYLOAD_BYTES,
+        ));
     }
     if payload.part_name().as_str().len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit("content-part payload part name", MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::NameBytes,
+            payload.part_name().as_str().len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     validate_field(payload.content_type(), "content-part payload content type")?;
     if payload.relationships().len() > MAX_PAYLOAD_RELATIONSHIPS {
         return Err(limit(
-            "content-part payload relationships",
+            crate::error::CodecLimitKind::Relationships,
+            payload.relationships().len(),
             MAX_PAYLOAD_RELATIONSHIPS,
         ));
     }
@@ -124,7 +142,11 @@ pub(crate) fn validate_payload(payload: &Payload) -> Result<()> {
 
 pub(crate) fn validate_parts(parts: &[ContentPart]) -> Result<()> {
     if parts.len() > 4_096 {
-        return Err(limit("content-part count", 4_096));
+        return Err(limit(
+            crate::error::CodecLimitKind::ContentParts,
+            parts.len(),
+            4_096,
+        ));
     }
     let mut ids = HashSet::with_capacity(parts.len());
     let mut payload_names = HashSet::new();
@@ -169,7 +191,11 @@ pub(crate) fn validate_parts(parts: &[ContentPart]) -> Result<()> {
 
 pub(crate) fn validate_field(value: &str, label: &'static str) -> Result<()> {
     if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
-        return Err(limit(label, MAX_RELATIONSHIP_FIELD_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::RelationshipBytes,
+            value.len(),
+            MAX_RELATIONSHIP_FIELD_BYTES,
+        ));
     }
     if value.chars().any(|character| {
         matches!(

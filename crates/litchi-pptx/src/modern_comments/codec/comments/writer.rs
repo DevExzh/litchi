@@ -205,7 +205,11 @@ impl List {
             close_tag(&mut out, &self.root_prefix, "cmLst");
         }
         if out.len() > MAX_BYTES {
-            return Err(limit("serialized modern Comment bytes", MAX_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                out.len(),
+                MAX_BYTES,
+            ));
         }
         parse_comment_list(&out)?;
         Ok(out)

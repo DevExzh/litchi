@@ -1082,8 +1082,9 @@ fn append_slide_master_reference(
 ) -> Result<()> {
     if references.len() >= MAX_SLIDE_MASTER_REFERENCES {
         return Err(Error::Limit {
-            resource: "presentation slide-master references",
-            limit: MAX_SLIDE_MASTER_REFERENCES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: references.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: MAX_SLIDE_MASTER_REFERENCES,
         });
     }
     let native_id = parse_native_id(element, reader.decoder())?;
@@ -1194,8 +1195,9 @@ fn append_slide_reference(
 ) -> Result<()> {
     if references.len() == MAX_SLIDES {
         return Err(Error::Limit {
-            resource: "presentation slide references",
-            limit: MAX_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: references.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: MAX_SLIDES,
         });
     }
     let id =

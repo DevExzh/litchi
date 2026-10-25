@@ -143,8 +143,9 @@ impl Edit {
         }
         let max_patch_bytes = self.source_ref()?.limits.max_patch_bytes();
         if resource.data.len() > max_patch_bytes {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: resource.data.len(),
                 maximum: max_patch_bytes,
             });
         }

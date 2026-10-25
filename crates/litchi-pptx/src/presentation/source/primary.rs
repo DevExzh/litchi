@@ -1546,8 +1546,13 @@ impl Slide {
             },
         };
         let scene = if let Some(reservation) = scene_reservation {
-            let retained = u64::try_from(scene.retained_bytes())
-                .map_err(|_| limit("source-backed primary scene bytes", usize::MAX))?;
+            let retained = u64::try_from(scene.retained_bytes()).map_err(|_| {
+                limit(
+                    crate::error::CodecLimitKind::SourceBytes,
+                    usize::MAX,
+                    usize::MAX,
+                )
+            })?;
             if retained > reservation.amount() {
                 return Err(limit(
                     "source-backed primary scene bytes",
@@ -2381,9 +2386,13 @@ impl Edit {
         shape_removals: bool,
     ) -> Result<usize> {
         let length = self.local_patch_wire_len(key, before, 0, shape_removals)?;
-        self.max_patch_bytes
-            .checked_sub(length)
-            .ok_or_else(|| limit("source-backed durable patch bytes", self.max_patch_bytes))
+        self.max_patch_bytes.checked_sub(length).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                usize::MAX,
+                self.max_patch_bytes,
+            )
+        })
     }
 
     fn check_local_patch_budget(
@@ -2641,7 +2650,13 @@ impl Patch {
                 } else {
                     0
                 })
-                .ok_or_else(|| limit("source-backed durable patch bytes", usize::MAX))?,
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::PatchBytes,
+                        usize::MAX,
+                        usize::MAX,
+                    )
+                })?,
             PatchData::Topology(data) => data
                 .encoded_len()?
                 .checked_add(if self.shape_removals {
@@ -2649,7 +2664,13 @@ impl Patch {
                 } else {
                     0
                 })
-                .ok_or_else(|| limit("source-backed durable patch bytes", usize::MAX))?,
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::PatchBytes,
+                        usize::MAX,
+                        usize::MAX,
+                    )
+                })?,
         };
         let _ = self.encoded_len_cache.set(length);
         Ok(length)
@@ -2770,12 +2791,22 @@ fn check_payload_budget_with_limit<'a>(
 ) -> Result<()> {
     let root_bytes = root.map_or(0, <[u8]>::len);
     if root_bytes > maximum {
-        return Err(limit("source-backed primary retained root bytes", maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::RetainedBytes,
+            root_bytes,
+            maximum,
+        ));
     }
     slides.try_fold(root_bytes, |sum, slide| {
         sum.checked_add(slide.xml.as_bytes().len())
             .filter(|total| *total <= maximum)
-            .ok_or_else(|| limit("source-backed primary retained slide bytes", maximum))
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::RetainedBytes,
+                    usize::MAX,
+                    maximum,
+                )
+            })
     })?;
     Ok(())
 }
@@ -2786,8 +2817,12 @@ fn allocation(source: std::collections::TryReserveError) -> Error {
         source,
     }
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 macro_rules! redacted_debug {
@@ -2819,7 +2854,13 @@ fn reserve_edit(
             .as_bytes()
             .len()
             .checked_mul(2)
-            .ok_or_else(|| limit("source-backed primary edit bytes", maximum))?,
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::SourceBytes,
+                    usize::MAX,
+                    maximum,
+                )
+            })?,
         |sum, replacement| {
             replacement
                 .text()
@@ -2828,11 +2869,22 @@ fn reserve_edit(
                 .and_then(|size| size.checked_add(256))
                 .and_then(|size| sum.checked_add(size))
                 .filter(|total| *total <= maximum)
-                .ok_or_else(|| limit("source-backed primary edit bytes", maximum))
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::SourceBytes,
+                        usize::MAX,
+                        maximum,
+                    )
+                })
         },
     )?;
-    let bytes =
-        u64::try_from(bytes).map_err(|_| limit("source-backed primary edit bytes", maximum))?;
+    let bytes = u64::try_from(bytes).map_err(|_| {
+        limit(
+            crate::error::CodecLimitKind::SourceBytes,
+            usize::MAX,
+            maximum,
+        )
+    })?;
     context
         .reserve(litchi_core::Resource::Memory, bytes)
         .map(Some)
@@ -2858,7 +2910,13 @@ fn reserve_scene(
         .checked_mul(64)
         .and_then(|bytes| bytes.checked_add(1024))
         .filter(|bytes| *bytes <= maximum)
-        .ok_or_else(|| limit("source-backed primary scene bytes", maximum))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::SourceBytes,
+                usize::MAX,
+                maximum,
+            )
+        })?;
     context
         .reserve(litchi_core::Resource::Memory, bytes as u64)
         .map(Some)

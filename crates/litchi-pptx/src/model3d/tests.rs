@@ -162,8 +162,8 @@ fn codec_write_refuses_output_before_retaining_an_opaque_copy() {
         codec::write(&scene, limits),
         Err(Error::Drawing(litchi_drawingml::Error::Limit {
             kind: litchi_drawingml::LimitKind::OutputBytes,
-            maximum: 64,
             observed,
+            maximum: 64,
         })) if observed > 64
     ));
 }
@@ -218,16 +218,21 @@ fn replay_validator_rejects_model_payload_above_recipient_profile() {
             limits,
         ),
         Err(Error::Limit {
-            resource: "model3d model bytes",
-            limit,
-        }) if limit == 8
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+            maximum,
+            ..
+        }) if maximum == 8
     ));
 }
 
 #[test]
 fn data_rejects_an_unbounded_payload() {
     let data = vec![0_u8; super::MAX_MODEL_BYTES.saturating_add(1)];
-    assert!(
-        matches!(Data::new(data), Err(Error::Limit { resource, .. }) if resource == "model3d payload bytes")
-    );
+    assert!(matches!(
+        Data::new(data),
+        Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+            ..
+        })
+    ));
 }

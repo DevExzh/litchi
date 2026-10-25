@@ -62,7 +62,7 @@ impl Snapshot {
         slide_relationships: Vec<RelationshipState>,
     ) -> Result<Self> {
         if source_xml.len() > super::super::MAX_XML_BYTES {
-            return Err(validation::limit_xml());
+            return Err(validation::limit_xml(source_xml.len()));
         }
         for (index, part) in parts.iter_mut().enumerate() {
             part.slide_index = slide_index;
@@ -694,9 +694,9 @@ fn unique_payloads(parts: &[ContentPart]) -> Result<Vec<Payload>> {
         } else {
             total = total
                 .checked_add(payload.bytes().len())
-                .ok_or_else(validation::limit_total_payloads)?;
+                .ok_or_else(|| validation::limit_total_payloads(usize::MAX))?;
             if total > validation::MAX_TOTAL_PAYLOAD_BYTES {
-                return Err(validation::limit_total_payloads());
+                return Err(validation::limit_total_payloads(total));
             }
             values.insert(payload.part_name().clone(), payload.clone());
         }

@@ -201,7 +201,11 @@ struct Attachment {
 
 fn inspect_graph(package: &OpcPackage) -> Result<Graph> {
     if package.part_count() > MAX_GRAPH_PARTS {
-        return Err(limit("table-style package parts", MAX_GRAPH_PARTS));
+        return Err(limit(
+            crate::error::CodecLimitKind::Parts,
+            package.part_count(),
+            MAX_GRAPH_PARTS,
+        ));
     }
     let mut main_relationship = None;
     for relationship in package.rels().iter().filter(|relationship| {
@@ -373,12 +377,17 @@ fn inspect_inbound(
 }
 
 fn checked_link_count(value: usize) -> Result<usize> {
-    let value = value
-        .checked_add(1)
-        .ok_or_else(|| limit("table-style package relationships", MAX_GRAPH_RELATIONSHIPS))?;
+    let value = value.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::Relationships,
+            usize::MAX,
+            MAX_GRAPH_RELATIONSHIPS,
+        )
+    })?;
     if value > MAX_GRAPH_RELATIONSHIPS {
         Err(limit(
-            "table-style package relationships",
+            crate::error::CodecLimitKind::Relationships,
+            value,
             MAX_GRAPH_RELATIONSHIPS,
         ))
     } else {
@@ -407,7 +416,11 @@ fn require_presentation_content_type(value: &str) -> Result<()> {
 
 fn presentation_conformance(xml: &[u8]) -> Result<Conformance> {
     if xml.len() > MAX_PRESENTATION_BYTES {
-        return Err(limit("presentation XML bytes", MAX_PRESENTATION_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_PRESENTATION_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
@@ -420,11 +433,19 @@ fn presentation_conformance(xml: &[u8]) -> Result<Conformance> {
         match event {
             Event::Start(element) => {
                 bump_presentation_node(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("presentation XML depth", MAX_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_DEPTH,
+                    )
+                })?;
                 if depth > MAX_DEPTH {
-                    return Err(limit("presentation XML depth", MAX_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     if profile.is_some() || element.local_name().as_ref() != b"presentation" {
@@ -492,11 +513,19 @@ fn presentation_namespace(namespace: &ResolveResult<'_>) -> Option<Conformance> 
 }
 
 fn bump_presentation_node(nodes: &mut usize) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("presentation XML nodes", MAX_NODES))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            MAX_NODES,
+        )
+    })?;
     if *nodes > MAX_NODES {
-        Err(limit("presentation XML nodes", MAX_NODES))
+        Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            MAX_NODES,
+        ))
     } else {
         Ok(())
     }
@@ -533,7 +562,8 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(limit(
-        "table-style part-name allocation attempts",
+        crate::error::CodecLimitKind::CandidateEntries,
+        PART_NAME_ATTEMPTS,
         PART_NAME_ATTEMPTS,
     ))
 }
@@ -546,7 +576,8 @@ fn available_relationship_id(owner: &dyn Part) -> Result<String> {
         }
     }
     Err(limit(
-        "table-style relationship-ID allocation attempts",
+        crate::error::CodecLimitKind::CandidateEntries,
+        RELATIONSHIP_ID_ATTEMPTS,
         RELATIONSHIP_ID_ATTEMPTS,
     ))
 }
@@ -561,7 +592,11 @@ fn own_blob(blob: &[u8], resource: &'static str) -> Result<Vec<u8>> {
 }
 pub(super) fn validate_parsed(parsed: &Parsed) -> Result<()> {
     if parsed.defs.len() > MAX_STYLES {
-        return Err(limit("table-style count", MAX_STYLES));
+        return Err(limit(
+            crate::error::CodecLimitKind::TableStyles,
+            parsed.defs.len(),
+            MAX_STYLES,
+        ));
     }
     let mut ids = HashSet::new();
     ids.try_reserve(parsed.defs.len())
@@ -577,7 +612,11 @@ pub(super) fn validate_parsed(parsed: &Parsed) -> Result<()> {
 
 pub(super) fn validate_list(list: &List) -> Result<()> {
     if list.defs.len() > MAX_STYLES {
-        return Err(limit("table-style count", MAX_STYLES));
+        return Err(limit(
+            crate::error::CodecLimitKind::TableStyles,
+            list.defs.len(),
+            MAX_STYLES,
+        ));
     }
     let mut ids = HashSet::new();
     ids.try_reserve(list.defs.len())
@@ -601,7 +640,11 @@ pub(super) fn validate_def(style: &Def) -> Result<()> {
 
 pub(super) fn validate_name(name: &str) -> Result<()> {
     if name.len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit("table-style name bytes", MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::NameBytes,
+            name.len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     if !name.chars().all(xml_char) {
         return Err(invalid(

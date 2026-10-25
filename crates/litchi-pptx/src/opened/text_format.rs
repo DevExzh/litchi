@@ -404,19 +404,27 @@ pub(crate) fn stage_text_properties_with_limits(
     }
     if edits.len() > super::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
         return Err(Error::Limit {
-            resource: "opened-presentation text property edits",
-            limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: edits.len(),
+            maximum: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
         });
     }
     let mut text_bytes = 0usize;
     for edit in edits {
         validate(edit)?;
-        text_bytes = text_bytes.saturating_add(edit.properties.text.map_or(0, str::len));
+        text_bytes = text_bytes
+            .checked_add(edit.properties.text.map_or(0, str::len))
+            .ok_or(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum: max_text_bytes,
+            })?;
     }
     if text_bytes > max_text_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation aggregate text property bytes",
-            limit: max_text_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text_bytes,
+            maximum: max_text_bytes,
         });
     }
     stage_admitted_text_edits(xml, edits, max_output_bytes, None, shape_limits)
@@ -461,35 +469,51 @@ pub(crate) fn stage_text_property_chunks_with_limits(
     }
     if chunks.len() > shape_limits.shapes() {
         return Err(Error::Limit {
-            resource: "opened-presentation text property chunks",
-            limit: shape_limits.shapes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: chunks.len(),
+            maximum: shape_limits.shapes(),
         });
     }
     let mut total = 0usize;
     for chunk in chunks {
         if chunk.len() > super::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
             return Err(Error::Limit {
-                resource: "opened-presentation text property edits",
-                limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ShapeProperties,
+                ),
+                observed: chunk.len(),
+                maximum: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
             });
         }
         let mut text_bytes = 0usize;
         for edit in *chunk {
             validate(edit)?;
-            text_bytes = text_bytes.saturating_add(edit.properties.text.map_or(0, str::len));
+            text_bytes = text_bytes
+                .checked_add(edit.properties.text.map_or(0, str::len))
+                .ok_or(Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                    observed: usize::MAX,
+                    maximum: max_text_bytes,
+                })?;
         }
         if text_bytes > max_text_bytes {
             return Err(Error::Limit {
-                resource: "opened-presentation aggregate text property bytes",
-                limit: max_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: text_bytes,
+                maximum: max_text_bytes,
             });
         }
-        total = total.saturating_add(chunk.len());
+        total = total.checked_add(chunk.len()).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: usize::MAX,
+            maximum: 100_000,
+        })?;
     }
     if total > 100_000 {
         return Err(Error::Limit {
-            resource: "opened-presentation text property edits",
-            limit: 100_000,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: total,
+            maximum: 100_000,
         });
     }
     if total == 0 {
@@ -740,11 +764,18 @@ fn stage_admitted_text_edits(
     }
     let removed: usize = elements.iter().map(|(_, span, _)| span.len()).sum();
     let added: usize = elements.iter().map(|(_, _, bytes)| bytes.len()).sum();
-    let length = (xml.len() - removed).saturating_add(added);
+    let length = (xml.len() - removed)
+        .checked_add(added)
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?;
     if length > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation text property output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length,
+            maximum: max_output_bytes,
         });
     }
     let mut candidate = Vec::new();

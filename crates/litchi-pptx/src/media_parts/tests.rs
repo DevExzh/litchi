@@ -385,9 +385,10 @@ fn escaped_media_output_is_preflighted_against_a_typed_budget() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "slide media serialized XML bytes",
-            limit,
-        } if limit == maximum
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            maximum: actual_maximum,
+            ..
+        } if actual_maximum == maximum
     ));
     assert!(output.bytes.len() <= maximum);
 }
@@ -407,9 +408,10 @@ fn media_output_budget_is_aggregate_across_pictures() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "slide media serialized XML bytes",
-            limit,
-        } if limit == maximum
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            maximum: actual_maximum,
+            ..
+        } if actual_maximum == maximum
     ));
     assert!(output.bytes.len() >= single_len);
     assert!(output.bytes.len() <= maximum);

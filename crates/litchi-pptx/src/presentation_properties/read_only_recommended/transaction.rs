@@ -41,8 +41,9 @@ impl Snapshot {
         let source = source.as_ref();
         if source.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
-                resource: "presentation-properties readonlyRecommended",
-                limit: limits.max_input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: source.len(),
+                maximum: limits.max_input_bytes(),
             });
         }
         Self::from_xml_owned(source.to_vec(), limits)

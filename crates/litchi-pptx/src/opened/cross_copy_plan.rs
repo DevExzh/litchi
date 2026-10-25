@@ -587,8 +587,9 @@ impl Patch {
             .ok_or_else(|| invalid("cross-slide durable patch limit overflow"))?;
         if reserve > limit {
             return Err(Error::Limit {
-                resource: "cross-slide durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: reserve,
+                maximum: limit,
             });
         }
         output
@@ -656,8 +657,9 @@ impl Patch {
             .ok_or_else(|| invalid("cross-slide durable patch limit overflow"))?;
         if bytes.len() > limit {
             return Err(Error::Limit {
-                resource: "cross-slide durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
+                maximum: limit,
             });
         }
         // See `crate::slide_removal::Patch::from_bytes`: a superseded magic
@@ -695,8 +697,9 @@ impl Patch {
         let copied_media = CopiedMedia::from_wire(input.u8()?)?;
         let payload_len = input.usize64("patch payload")?;
         if payload_len > limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: payload_len,
                 maximum: limits.max_patch_bytes(),
             });
         }
@@ -1273,22 +1276,29 @@ fn prepare_cross_slide_copy_for_slides(
     reject_slide_name_collisions(&source.slides, &destination.slides, &source_slide)?;
     if destination.slides.len() == crate::parts::MAX_SLIDES {
         return Err(Error::Limit {
-            resource: "cross-slide copy presentation slides",
-            limit: crate::parts::MAX_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: destination
+                .slides
+                .len()
+                .checked_add(1)
+                .unwrap_or(usize::MAX),
+            maximum: crate::parts::MAX_SLIDES,
         });
     }
     validate_slide_ids(&source.slides)?;
     validate_slide_ids(&destination.slides)?;
     let limits = intersect_limits(source.limits, destination.limits)?;
     if source.package.part_count() > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: source.package.part_count(),
             maximum: limits.max_parts(),
         });
     }
     if destination.package.part_count() > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: destination.package.part_count(),
             maximum: limits.max_parts(),
         });
     }
@@ -1365,14 +1375,16 @@ fn prepare_cross_slide_copy_for_slides(
         .checked_add(parts.len())
         .ok_or_else(|| invalid("cross-slide resulting part count overflow"))?;
     if resulting_parts > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: resulting_parts,
             maximum: limits.max_parts(),
         });
     }
     if planned_bytes > limits.max_patch_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
+            observed: planned_bytes,
             maximum: limits.max_patch_bytes(),
         });
     }
@@ -1403,8 +1415,13 @@ fn prepare_cross_slide_copy_for_slides(
             MediaPolicy::Classify => media = MediaTransfers::none(source),
             MediaPolicy::Recorded(_) => {
                 return Err(Error::Limit {
-                    resource: "cross-slide candidate patch bytes",
-                    limit: bound,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::PatchBytes,
+                    ),
+                    observed: estimate
+                        .checked_add(media.capture_bytes)
+                        .unwrap_or(usize::MAX),
+                    maximum: bound,
                 });
             },
         }
@@ -2092,8 +2109,9 @@ fn preflight_parts(
     estimate: usize,
 ) -> Result<()> {
     if estimate > destination.limits.max_patch_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
+            observed: estimate,
             maximum: destination.limits.max_patch_bytes(),
         });
     }
@@ -2358,8 +2376,9 @@ fn prove_inherited_part(
             .ok_or_else(|| invalid("cross-slide inheritance relationship count overflow"))?;
         if *traversed_relationships > relationship_limit {
             return Err(Error::Limit {
-                resource: "cross-slide inheritance relationships",
-                limit: relationship_limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                observed: *traversed_relationships,
+                maximum: relationship_limit,
             });
         }
         if left_relationship.r_id() != right_relationship.r_id()
@@ -2862,8 +2881,9 @@ fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<
     reject_unknown_non_part_members(package, "cross-slide physical authorization")?;
     if let Some(length) = package.exact_source_len() {
         if length > limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: length,
                 maximum: limits.max_patch_bytes(),
             });
         }
@@ -2887,8 +2907,9 @@ fn streamed_physical_revision(package: &OpcPackage, limits: Limits) -> Result<[u
     let mut sink = ArchiveHashWriter::new(limits.max_patch_bytes());
     let result = package.write_to(&mut sink);
     if sink.exceeded {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
+            observed: sink.observed,
             maximum: limits.max_patch_bytes(),
         });
     }
@@ -2988,6 +3009,7 @@ struct ArchiveHashWriter {
     length: usize,
     limit: usize,
     exceeded: bool,
+    observed: usize,
 }
 
 impl ArchiveHashWriter {
@@ -2997,6 +3019,7 @@ impl ArchiveHashWriter {
             length: 0,
             limit,
             exceeded: false,
+            observed: 0,
         }
     }
 }
@@ -3005,6 +3028,7 @@ impl Write for ArchiveHashWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let Some(next) = self.length.checked_add(bytes.len()) else {
             self.exceeded = true;
+            self.observed = usize::MAX;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide serialized archive length overflow",
@@ -3012,6 +3036,7 @@ impl Write for ArchiveHashWriter {
         };
         if next > self.limit {
             self.exceeded = true;
+            self.observed = next;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide serialized archive exceeds its bound",
@@ -3032,6 +3057,7 @@ struct BoundedVecWriter {
     digest: Sha256,
     limit: usize,
     exceeded: bool,
+    observed: usize,
     allocation_failure: Option<TryReserveError>,
 }
 
@@ -3042,6 +3068,7 @@ impl BoundedVecWriter {
             digest: Sha256::new(),
             limit,
             exceeded: false,
+            observed: 0,
             allocation_failure: None,
         }
     }
@@ -3071,6 +3098,7 @@ impl Write for BoundedVecWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let Some(next) = self.bytes.len().checked_add(bytes.len()) else {
             self.exceeded = true;
+            self.observed = usize::MAX;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide candidate archive length overflow",
@@ -3078,6 +3106,7 @@ impl Write for BoundedVecWriter {
         };
         if next > self.limit {
             self.exceeded = true;
+            self.observed = next;
             return Err(io::Error::new(
                 io::ErrorKind::WriteZero,
                 "cross-slide candidate archive exceeds its bound",
@@ -3127,8 +3156,9 @@ fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<(Vec<u8>,
     }
     if writer.exceeded {
         return Err(Error::Limit {
-            resource: "cross-slide serialized archive bytes",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ArchiveBytes),
+            observed: writer.observed,
+            maximum: limit,
         });
     }
     result?;

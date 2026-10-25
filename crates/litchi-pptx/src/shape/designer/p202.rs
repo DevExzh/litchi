@@ -85,7 +85,11 @@ pub(crate) fn write_properties(
     }
     if let Some(extension) = inner_extensions {
         if extension.len() > limits.xml_bytes() {
-            return Err(limit("designer inner extension bytes", limits.xml_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::ExtensionBytes,
+                extension.len(),
+                limits.xml_bytes(),
+            ));
         }
         output.push(extension)?;
     }
@@ -162,7 +166,11 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
         return Err(invalid("Designer payload is empty"));
     }
     if xml.len() > limits.xml_bytes() {
-        return Err(limit("Designer payload bytes", limits.xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            xml.len(),
+            limits.xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -189,11 +197,19 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let event = event.into_owned();
         if !matches!(event, Event::Eof) {
-            events = events
-                .checked_add(1)
-                .ok_or_else(|| limit("Designer XML events", limits.xml_nodes()))?;
+            events = events.checked_add(1).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlEvents,
+                    usize::MAX,
+                    limits.xml_nodes(),
+                )
+            })?;
             if events > limits.xml_nodes() {
-                return Err(limit("Designer XML events", limits.xml_nodes()));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlEvents,
+                    events,
+                    limits.xml_nodes(),
+                ));
             }
         }
         let namespace_ok = is_p202(namespace, proven_prefix);
@@ -263,7 +279,11 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
                     }
                 };
                 if frames.len() >= limits.xml_depth() {
-                    return Err(limit("Designer XML depth", limits.xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.xml_depth(),
+                    ));
                 }
                 if empty {
                     finish_frame(xml, frame, start..end, &mut parsed, &mut inner_start)?;
@@ -359,13 +379,21 @@ fn parse_editable(
                 return Err(invalid("designPr has duplicate edtDesignElem attributes"));
             }
             if attribute.value.len() > limits.attribute_bytes() {
-                return Err(limit("Designer attribute bytes", limits.attribute_bytes()));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    attribute.value.len(),
+                    limits.attribute_bytes(),
+                ));
             }
             let value = attribute
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
                 .map_err(xml_error)?;
             if value.len() > limits.attribute_bytes() {
-                return Err(limit("Designer attribute bytes", limits.attribute_bytes()));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    value.len(),
+                    limits.attribute_bytes(),
+                ));
             }
             editable = Some(parse_bool(&value)?);
         } else if name != b"xmlns" && !name.starts_with(b"xmlns:") {
@@ -394,13 +422,21 @@ fn parse_tag(
             ));
         }
         if attribute.value.len() > limits.attribute_bytes() {
-            return Err(limit("Designer attribute bytes", limits.attribute_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                limits.attribute_bytes(),
+            ));
         }
         let decoded = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(xml_error)?;
         if decoded.len() > limits.attribute_bytes() {
-            return Err(limit("Designer attribute bytes", limits.attribute_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                decoded.len(),
+                limits.attribute_bytes(),
+            ));
         }
         let slot = if key == b"name" {
             &mut name
@@ -428,7 +464,11 @@ fn validate_no_attributes(element: &BytesStart<'_>, limits: Limits) -> Result<()
             ));
         }
         if attribute.value.len() > limits.attribute_bytes() {
-            return Err(limit("Designer attribute bytes", limits.attribute_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                limits.attribute_bytes(),
+            ));
         }
     }
     Ok(())
@@ -474,13 +514,19 @@ impl Output {
     }
 
     fn push(&mut self, value: &[u8]) -> Result<()> {
-        let length = self
-            .bytes
-            .len()
-            .checked_add(value.len())
-            .ok_or_else(|| limit("Designer output bytes", self.limits.xml_bytes()))?;
+        let length = self.bytes.len().checked_add(value.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                self.limits.xml_bytes(),
+            )
+        })?;
         if length > self.limits.xml_bytes() {
-            return Err(limit("Designer output bytes", self.limits.xml_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                length,
+                self.limits.xml_bytes(),
+            ));
         }
         self.bytes
             .try_reserve(value.len())
@@ -515,8 +561,12 @@ impl Output {
     }
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn invalid(message: impl Into<String>) -> Error {

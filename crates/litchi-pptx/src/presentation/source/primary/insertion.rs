@@ -49,15 +49,17 @@ pub(super) fn plan(
     }
     if package.order.len() >= crate::parts::MAX_SLIDES {
         return Err(Error::Limit {
-            resource: "source-backed primary presentation slides",
-            limit: crate::parts::MAX_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: package.order.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: crate::parts::MAX_SLIDES,
         });
     }
     let selector_limit = crate::opened::Limits::default().max_text_bytes();
     if layout_name.len() > selector_limit {
         return Err(Error::Limit {
-            resource: "slide layout selector",
-            limit: selector_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+            observed: layout_name.len(),
+            maximum: selector_limit,
         });
     }
 
@@ -88,7 +90,7 @@ pub(super) fn plan(
             match (change.before.is_some(), change.after.is_some()) {
                 (false, true) => {
                     effective_parts = effective_parts.checked_add(1).ok_or_else(|| {
-                        limit("source-backed primary insertion parts", usize::MAX)
+                        limit(crate::error::CodecLimitKind::Parts, usize::MAX, usize::MAX)
                     })?;
                 },
                 (true, false) => {
@@ -99,8 +101,9 @@ pub(super) fn plan(
         }
     }
     if effective_parts >= package.owner.limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: effective_parts,
             maximum: package.owner.limits.max_parts(),
         });
     }
@@ -225,7 +228,13 @@ pub(super) fn plan(
             presentation_uri,
         )?)
         .and_then(|size| size.checked_add(identity_bytes))
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::MemoryBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })?;
     let managed_reservation = super::topology::reserve_payload(package, envelope)?.map(Arc::new);
     Ok((Arc::new(root), order.into(), change, managed_reservation))
 }
@@ -280,7 +289,13 @@ fn metadata_bytes(
         .as_bytes()
         .len()
         .checked_add(content_types.as_bytes().len())
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::MemoryBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })
 }
 
 fn insertion_workspace_bound(
@@ -321,17 +336,25 @@ fn insertion_workspace_bound(
     // Hash tables reserve spare buckets and the XML scanners retain one event
     // at a time. Doubling the measured strings/entries covers those capacities
     // while the fixed workspace covers the crate::builder::Slide and root splice.
-    bytes = bytes
-        .checked_mul(2)
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+    bytes = bytes.checked_mul(2).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::MemoryBytes,
+            usize::MAX,
+            usize::MAX,
+        )
+    })?;
     add_workspace_amount(&mut bytes, INSERTION_WORKSPACE_BYTES)?;
     Ok(bytes)
 }
 
 fn add_workspace_amount(total: &mut usize, amount: usize) -> Result<()> {
-    *total = total
-        .checked_add(amount)
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+    *total = total.checked_add(amount).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::MemoryBytes,
+            usize::MAX,
+            usize::MAX,
+        )
+    })?;
     Ok(())
 }
 

@@ -82,8 +82,9 @@ pub(super) fn stage_shape_properties_admitted_with_limits(
     }
     if replacements.len() > selection_limit {
         return Err(Error::Limit {
-            resource: "opened-presentation shape property replacements",
-            limit: selection_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: replacements.len(),
+            maximum: selection_limit,
         });
     }
     let aggregate_text_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
@@ -96,8 +97,9 @@ pub(super) fn stage_shape_properties_admitted_with_limits(
     })?;
     if aggregate_text_bytes > aggregate_text_limit {
         return Err(Error::Limit {
-            resource: "opened-presentation aggregate shape text bytes",
-            limit: aggregate_text_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: aggregate_text_bytes,
+            maximum: aggregate_text_limit,
         });
     }
 
@@ -111,8 +113,9 @@ pub(super) fn stage_shape_properties_admitted_with_limits(
     }
     if replacements.len() > scene.len() {
         return Err(Error::Limit {
-            resource: "opened-presentation selected shape properties",
-            limit: scene.len(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: replacements.len(),
+            maximum: scene.len(),
         });
     }
 

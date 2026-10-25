@@ -149,9 +149,12 @@ fn caller_output_limits_precede_managed_memory_admission() {
             assert!(matches!(
                 edit.add_text_box(0, &oversized, BOUNDS),
                 Err(Error::Limit {
-                    resource: "opened-presentation appended shape XML",
-                    limit,
-                }) if limit == ceiling
+                    kind: litchi_pptx::opened::LimitKind::Codec(
+                        litchi_pptx::opened::CodecLimitKind::OutputBytes
+                    ),
+                    maximum,
+                    ..
+                }) if maximum == ceiling
             ));
             assert_eq!(budget.used(Resource::Memory), MEMORY);
             drop(pressure);

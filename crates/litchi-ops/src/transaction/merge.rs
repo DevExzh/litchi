@@ -142,7 +142,7 @@ impl Edit {
             if index >= self.limits.max_operations() {
                 return Err(Error::Limit {
                     kind: LimitKind::Operations,
-                    observed: index.saturating_add(1),
+                    observed: index.checked_add(1).unwrap_or(usize::MAX),
                     maximum: self.limits.max_operations(),
                 }
                 .into());

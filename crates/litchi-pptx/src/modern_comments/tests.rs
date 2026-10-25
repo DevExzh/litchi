@@ -89,14 +89,18 @@ mod comment_tests {
         assert!(matches!(
             List::from_processed(&oversized),
             Err(Error::Limit {
-                limit: MAX_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+                observed: oversized.len(),
+                maximum: MAX_BYTES,
                 ..
             })
         ));
         assert!(matches!(
             Authors::from_processed(&oversized),
             Err(Error::Limit {
-                limit: MAX_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+                observed: oversized.len(),
+                maximum: MAX_BYTES,
                 ..
             })
         ));

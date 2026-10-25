@@ -1276,8 +1276,9 @@ impl Edit {
             ));
         }
         if resource.data.len() > self.source_ref()?.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: resource.data.len(),
                 maximum: self.source_ref()?.limits.max_patch_bytes(),
             });
         }
@@ -1458,8 +1459,9 @@ impl Edit {
                 continue;
             }
             if included_roots.len() > self.source_ref()?.limits.max_parts() {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: included_roots.len(),
                     maximum: self.source_ref()?.limits.max_parts(),
                 });
             }
@@ -1722,8 +1724,9 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let text = text.as_ref();
         if text.len() > self.source_ref()?.limits.max_text_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::TextBytes,
+                observed: text.len(),
                 maximum: self.source_ref()?.limits.max_text_bytes(),
             });
         }
@@ -3271,16 +3274,23 @@ pub(crate) fn text_box_output_bound(
         .checked_mul(ESCAPED_TEXT_MULTIPLIER)
         .and_then(|bytes| bytes.checked_add(FRAGMENT_OVERHEAD))
         .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
         })?;
-    input_bytes
-        .checked_add(fragment)
-        .filter(|bytes| *bytes <= max_output_bytes)
-        .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        })
+    let output = input_bytes.checked_add(fragment).ok_or(Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: max_output_bytes,
+    })?;
+    if output > max_output_bytes {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output,
+            maximum: max_output_bytes,
+        });
+    }
+    Ok(output)
 }
 
 /// Stage one plain text-box fragment against an already selected slide.
@@ -3314,20 +3324,23 @@ pub(crate) fn stage_text_box(
         conformance,
         super::Limits::default(),
     )?;
-    let output_len = xml
-        .len()
-        .checked_add(fragment.len())
-        .filter(|length| *length <= max_output_bytes)
-        .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        })?;
+    let output_len = xml.len().checked_add(fragment.len()).ok_or(Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: max_output_bytes,
+    })?;
+    if output_len > max_output_bytes {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
+        });
+    }
     let output = super::xml::append_shape_with_limit(xml, fragment.as_bytes(), max_output_bytes)?;
     if output.len() != output_len {
-        return Err(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        });
+        return Err(Error::Invalid(
+            "native text-box append changed the preflighted output size".into(),
+        ));
     }
     ensure_shape_id(&output, shape_id, "text box", shape_limits)?;
     Ok((output, shape_id))
@@ -3473,8 +3486,9 @@ pub(crate) fn validate_text_box_input(text: &str, bounds: (i64, i64, i64, i64)) 
 
 fn validate_shape_text(text: &str, limits: super::Limits, label: &str) -> Result<()> {
     if text.len() > limits.max_text_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::TextBytes,
+            observed: text.len(),
             maximum: limits.max_text_bytes(),
         });
     }
@@ -3658,8 +3672,9 @@ fn table_fragment(
         .try_fold(0usize, |total, cell| total.checked_add(cell.len()))
         .ok_or_else(|| invalid("opened-presentation table text size overflow"))?;
     if text_bytes > limits.max_text_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::TextBytes,
+            observed: text_bytes,
             maximum: limits.max_text_bytes(),
         });
     }
@@ -3739,8 +3754,9 @@ fn plan_transfer_roots(
         }
         if seen.len() > limit {
             return Err(Error::Limit {
-                resource: "opened-presentation transfer dependency parts",
-                limit,
+                kind: crate::opened::LimitKind::Parts,
+                observed: seen.len(),
+                maximum: limit,
             });
         }
         let part = source.get_part(&name)?;

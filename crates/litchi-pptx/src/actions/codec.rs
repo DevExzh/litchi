@@ -33,25 +33,46 @@ pub(super) struct Parsed {
 impl Limits {
     pub(super) fn add_slide_xml(&mut self, bytes: usize) -> Result<()> {
         if bytes > MAX_SLIDE_XML_BYTES {
-            return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                bytes,
+                MAX_SLIDE_XML_BYTES,
+            ));
         }
-        self.total_slide_xml_bytes = self
-            .total_slide_xml_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("total slide XML bytes", MAX_TOTAL_SLIDE_XML_BYTES))?;
+        self.total_slide_xml_bytes =
+            self.total_slide_xml_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlBytes,
+                        usize::MAX,
+                        MAX_TOTAL_SLIDE_XML_BYTES,
+                    )
+                })?;
         if self.total_slide_xml_bytes > MAX_TOTAL_SLIDE_XML_BYTES {
-            return Err(limit("total slide XML bytes", MAX_TOTAL_SLIDE_XML_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.total_slide_xml_bytes,
+                MAX_TOTAL_SLIDE_XML_BYTES,
+            ));
         }
         Ok(())
     }
 
     pub(super) fn add_action(&mut self) -> Result<()> {
-        self.action_count = self
-            .action_count
-            .checked_add(1)
-            .ok_or_else(|| limit("slide action-setting count", MAX_ACTION_SETTINGS))?;
+        self.action_count = self.action_count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::ActionSettings,
+                usize::MAX,
+                MAX_ACTION_SETTINGS,
+            )
+        })?;
         if self.action_count > MAX_ACTION_SETTINGS {
-            return Err(limit("slide action-setting count", MAX_ACTION_SETTINGS));
+            return Err(limit(
+                crate::error::CodecLimitKind::ActionSettings,
+                self.action_count,
+                MAX_ACTION_SETTINGS,
+            ));
         }
         Ok(())
     }
@@ -59,7 +80,11 @@ impl Limits {
 
 pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>> {
     if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml_bytes.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
 
     let capabilities = Capabilities::ooxml_baseline();
@@ -92,11 +117,19 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", MAX_XML_DEPTH))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     validate_slide_root(&namespace, element.name(), saw_root)?;
@@ -113,11 +146,19 @@ pub(super) fn scan(xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Parsed>>
             },
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     validate_slide_root(&namespace, element.name(), saw_root)?;
@@ -178,23 +219,12 @@ fn maybe_push(
     };
 
     limits.add_action()?;
-    let relationship_id = bounded_optional(
-        attribute_value(element, b"id", decoder, resolver)?,
-        "relationship ID",
-    )?
-    .filter(|value| !value.is_empty());
-    let action = bounded_optional(
-        unqualified_attribute_value(element, b"action", decoder)?,
-        "action string",
-    )?;
-    let tooltip = bounded_optional(
-        unqualified_attribute_value(element, b"tooltip", decoder)?,
-        "tooltip",
-    )?;
-    let target_frame = bounded_optional(
-        unqualified_attribute_value(element, b"tgtFrame", decoder)?,
-        "target frame",
-    )?;
+    let relationship_id = bounded_optional(attribute_value(element, b"id", decoder, resolver)?)?
+        .filter(|value| !value.is_empty());
+    let action = bounded_optional(unqualified_attribute_value(element, b"action", decoder)?)?;
+    let tooltip = bounded_optional(unqualified_attribute_value(element, b"tooltip", decoder)?)?;
+    let target_frame =
+        bounded_optional(unqualified_attribute_value(element, b"tgtFrame", decoder)?)?;
     actions.push(Parsed {
         trigger,
         action,
@@ -235,21 +265,33 @@ fn is_presentationml_name(
     }
 }
 
-fn bounded_optional(value: Option<String>, what: &'static str) -> Result<Option<String>> {
+fn bounded_optional(value: Option<String>) -> Result<Option<String>> {
     if let Some(value) = &value
         && value.len() > MAX_ATTRIBUTE_BYTES
     {
-        return Err(limit(what, MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributeBytes,
+            value.len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     Ok(value)
 }
 
 fn increment_nodes(nodes: &mut usize) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("slide XML node count", MAX_XML_NODES))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            MAX_XML_NODES,
+        )
+    })?;
     if *nodes > MAX_XML_NODES {
-        return Err(limit("slide XML node count", MAX_XML_NODES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            MAX_XML_NODES,
+        ));
     }
     Ok(())
 }

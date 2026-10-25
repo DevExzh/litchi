@@ -269,8 +269,9 @@ mod tests {
         assert!(matches!(
             insert_slide_binding(source.as_bytes(), std::iter::empty(), 0, 256, "rId9"),
             Err(crate::Error::Limit {
-                resource: "opened-presentation XML depth",
-                limit: 256
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: usize::MAX,
+                maximum: 256
             })
         ));
     }

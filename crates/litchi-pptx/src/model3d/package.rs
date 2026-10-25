@@ -61,14 +61,20 @@ pub(crate) fn validate_replay_part(
 ) -> Result<()> {
     match part.content_type() {
         ct::PML_SLIDE => load_all(package, part_name, limits).map(drop),
-        MODEL_CONTENT_TYPE if part.blob().len() > limits.max_model_bytes() => {
-            Err(limit("model3d model bytes", limits.max_model_bytes()))
-        },
+        MODEL_CONTENT_TYPE if part.blob().len() > limits.max_model_bytes() => Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            part.blob().len(),
+            limits.max_model_bytes(),
+        )),
         value
             if validation::is_image_content_type(value)
                 && part.blob().len() > limits.max_preview_bytes() =>
         {
-            Err(limit("model3d preview bytes", limits.max_preview_bytes()))
+            Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                part.blob().len(),
+                limits.max_preview_bytes(),
+            ))
         },
         _ => Ok(()),
     }
@@ -204,7 +210,8 @@ fn load_inventory(
             );
         if total_payload > limits.max_total_payload_bytes() {
             return Err(limit(
-                "model3d slide payload bytes",
+                crate::error::CodecLimitKind::PayloadBytes,
+                total_payload,
                 limits.max_total_payload_bytes(),
             ));
         }
@@ -231,13 +238,7 @@ fn load_location(
 
     if let Some(id) = scene.wire.reference.embedded.as_ref() {
         let relation = validation::relation_from_part(source, id)?;
-        let data = load_internal_data(
-            package,
-            source,
-            id,
-            limits.max_model_bytes(),
-            "model3d model bytes",
-        )?;
+        let data = load_internal_data(package, source, id, limits.max_model_bytes())?;
         asset.set_embedded(Some(data));
         origin.model_embedded = Some(relation);
     }
@@ -282,13 +283,7 @@ fn load_preview(
     let mut preview = None;
     if let Some(id) = blip.reference.embedded.as_ref() {
         let relation = validation::relation_from_part(source, id)?;
-        let data = load_internal_data(
-            package,
-            source,
-            id,
-            limits.max_preview_bytes(),
-            "model3d preview bytes",
-        )?;
+        let data = load_internal_data(package, source, id, limits.max_preview_bytes())?;
         let target = source
             .rels()
             .get(id.as_str())
@@ -316,7 +311,6 @@ fn load_internal_data(
     source: &dyn Part,
     id: &drawing::Id,
     payload_limit: usize,
-    resource: &'static str,
 ) -> Result<Data> {
     let relationship = source
         .rels()
@@ -331,7 +325,11 @@ fn load_internal_data(
     let part = package.get_part(&target)?;
     let data = part.blob_arc();
     if data.len() > payload_limit {
-        return Err(limit(resource, payload_limit));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            data.len(),
+            payload_limit,
+        ));
     }
     Data::from_shared(data)
 }
@@ -591,6 +589,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(format!("PPTX model3d {}", message.into()))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

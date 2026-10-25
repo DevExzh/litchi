@@ -58,8 +58,11 @@ fn shape_tree_children(xml: &[u8]) -> Result<Vec<Range<usize>>> {
                 depth += 1;
                 if depth > MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "slide shape-tree XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth,
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 let local = element.local_name();
@@ -184,8 +187,9 @@ pub(crate) fn stage_enclosed_shape_removal_with_limits(
     let span = children[index].clone();
     if xml.len() - span.len() > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation removed shape XML",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len() - span.len(),
+            maximum: max_output_bytes,
         });
     }
     let candidate = without(xml, std::slice::from_ref(&span))?;

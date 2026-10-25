@@ -78,7 +78,11 @@ pub(crate) fn store_slide_trace(
 
 fn slide_dialect(xml: &[u8], limits: &Limits) -> Result<&'static str> {
     if xml.len() > limits.max_slide_xml_bytes() {
-        return Err(limit("slide XML bytes", limits.max_slide_xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     loop {
@@ -114,7 +118,11 @@ fn slide_dialect(xml: &[u8], limits: &Limits) -> Result<&'static str> {
 
 fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Result<Vec<u8>> {
     if xml.len() > limits.max_slide_xml_bytes() {
-        return Err(limit("slide XML bytes", limits.max_slide_xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -135,11 +143,19 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
         match event {
             Event::Start(element) => {
                 add_node(&mut nodes, limits)?;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", limits.max_xml_depth()))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_xml_depth(),
+                    )
+                })?;
                 if depth > limits.max_xml_depth() {
-                    return Err(limit("slide XML depth", limits.max_xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_xml_depth(),
+                    ));
                 }
                 if depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -160,11 +176,19 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
             },
             Event::Empty(element) => {
                 add_node(&mut nodes, limits)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", limits.max_xml_depth()))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_xml_depth(),
+                    )
+                })?;
                 if child_depth > limits.max_xml_depth() {
-                    return Err(limit("slide XML depth", limits.max_xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        limits.max_xml_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -239,7 +263,13 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
             .checked_add(1)
             .and_then(|size| size.checked_add(fragment.len()))
             .and_then(|size| size.checked_add(b"</p:extLst>".len()))
-            .ok_or_else(|| limit("updated slide XML bytes", limits.max_slide_xml_bytes()))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::OutputBytes,
+                    usize::MAX,
+                    limits.max_slide_xml_bytes(),
+                )
+            })?;
         let size = checked_output_size(
             xml.len()
                 .checked_sub(removed)
@@ -319,11 +349,17 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
 }
 
 fn checked_output_size(size: Option<usize>, limits: &Limits) -> Result<usize> {
-    let size =
-        size.ok_or_else(|| limit("updated slide XML bytes", limits.max_slide_xml_bytes()))?;
+    let size = size.ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            usize::MAX,
+            limits.max_slide_xml_bytes(),
+        )
+    })?;
     if size > limits.max_slide_xml_bytes() {
         return Err(limit(
-            "updated slide XML bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            size,
             limits.max_slide_xml_bytes(),
         ));
     }
@@ -331,11 +367,19 @@ fn checked_output_size(size: Option<usize>, limits: &Limits) -> Result<usize> {
 }
 
 fn add_node(nodes: &mut usize, limits: &Limits) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("slide XML node count", limits.max_xml_nodes()))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            limits.max_xml_nodes(),
+        )
+    })?;
     if *nodes > limits.max_xml_nodes() {
-        return Err(limit("slide XML node count", limits.max_xml_nodes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            limits.max_xml_nodes(),
+        ));
     }
     Ok(())
 }
@@ -351,8 +395,12 @@ fn is_presentationml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local:
     }
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]
@@ -438,7 +486,7 @@ mod tests {
         assert!(matches!(
             store_slide_trace(&mut retained, &name, &[point()], Limits::DEFAULT),
             Err(Error::Limit {
-                resource: "updated slide XML bytes",
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 ..
             })
         ));

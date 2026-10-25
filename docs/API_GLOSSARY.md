@@ -282,8 +282,8 @@ audit deferral.
 | Raw CFB signature editor | `litchi_sign::cfb::Editor::open(bytes, format, Limits)` | `Editor::with_limits`; default `Editor::open(bytes, format)` | ✅ one raw constructor with caller-selected limits; no limit-less twin (0362za1) |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ keynote (0298) `SourceLimits::builder()`/`SemanticLimits::builder()`; ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · ✅ pages `SourceLimits::builder()`/`SemanticLimits::builder()` (0299) · ✅ Numbers `SourceLimits::builder()`, `SemanticLimits::builder()` (0297) |
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ keynote (0298) `Error::InvalidLimit { kind: LimitKind, value, maximum }`; ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); pages `PackageError::InvalidLimit` (0299); ✅ Numbers `limits::Error::InvalidLimit { kind: LimitKind, .. }` (`SemanticLimitsError`, `DocumentSourceLimitsError`, `DocumentLimitsError` deleted, 0297); other owners pending |
-| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
-| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ keynote (0298) `SourceLimitKind`/`SemanticLimitKind` with `as_str()` nouns and `LimitKind::{Source, Semantic}`; ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
+| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ PPTX root/codec dimensions (0362ul84); ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
+| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ keynote (0298) `SourceLimitKind`/`SemanticLimitKind` with `as_str()` nouns and `LimitKind::{Source, Semantic}`; ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ PPTX root/codec dimensions (0362ul84); ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
 | Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); ✅ ODT/ODS/ODP `Package`, source-backed and catalog ingress via `OpenOptions` with typed `Error::{Limit, InvalidLimit}` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package` ingress, `from_prepared_package` included (0282); ✅ ODF flat owners `flat::{Document, Workbook, Presentation, Drawing, Chart, Image}` and `generic::flat::Document` take `OpenOptions`; the ODC chart `Limits` fold into `SemanticLimits` (0358) |
 
@@ -1979,9 +1979,10 @@ See [record 0252](unified-ops/0252-pptx-w2-residue-and-p0-writes.md).
 `litchi_pptx::opened` now exports the complete family
 `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` and is registered in
 both PPTX glossary profiles. `opened::Error` is the crate `Error` re-exported
-(a focused split of the PPTX god-enum is deferred); the family's own resource
-refusals use the typed `Error::EditLimit { kind: opened::LimitKind, maximum }`
-instead of a resource string, and `Limits::maximum(LimitKind)` reads one bound.
+(a focused split of the PPTX god-enum is deferred). The crate-wide typed
+boundary uses `Error::Limit { kind, observed, maximum }` and
+`Error::InvalidLimit { kind, value, maximum }`; `opened::LimitKind` and
+`opened::CodecLimitKind` re-export the canonical dimensions (0362ul84).
 
 Rich formatting of existing text bodies uses one verb on every primary edit:
 `opened::Edit::set_text_properties(slide, &[TextEdit])`,

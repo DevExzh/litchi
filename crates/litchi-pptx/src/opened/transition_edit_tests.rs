@@ -127,9 +127,10 @@ fn eager_edit_retains_custom_transition_profile() -> Result<()> {
     assert!(matches!(
         edit.set_slide_transition(0_usize, Some(&push)),
         Err(crate::Error::Limit {
-            resource: "transition output bytes",
-            limit: 1,
-        })
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed,
+                maximum: 1,
+        }) if observed > 1
     ));
     Ok(())
 }

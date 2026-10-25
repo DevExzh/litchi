@@ -41,8 +41,9 @@ fn source_owner_retains_custom_shape_profile() {
     assert!(matches!(
         edit.add_text_box(0, "bounded", (0, 0, 914_400, 914_400)),
         Err(crate::Error::Limit {
-            resource: "shapes",
-            limit: 1,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
+            observed: 2,
+            maximum: 1,
         })
     ));
 }
@@ -63,9 +64,10 @@ fn source_owner_retains_custom_transition_profile() {
     assert!(matches!(
         edit.set_slide_transition(0, Some(&transition)),
         Err(crate::Error::Limit {
-            resource: "transition output bytes",
-            limit: 1,
-        })
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed,
+                maximum: 1,
+        }) if observed > 1
     ));
 }
 
@@ -423,7 +425,7 @@ fn changed_slide_limit_refuses_atomically_across_successive_commits() {
     assert!(matches!(
         edit.set_shape_text(MAX_SOURCE_BACKED_SLIDE_BATCH, 0_usize, "refused"),
         Err(Error::Limit {
-            resource: "source-backed primary changed slides",
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
             ..
         })
     ));

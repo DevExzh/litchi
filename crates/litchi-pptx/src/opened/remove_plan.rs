@@ -106,8 +106,9 @@ impl Patch {
             .ok_or_else(|| invalid("slide-removal durable patch limit overflow"))?;
         if length > limit {
             return Err(Error::Limit {
-                resource: "slide-removal durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: length,
+                maximum: limit,
             });
         }
         let payload_len = u64::try_from(payload.len())
@@ -148,8 +149,9 @@ impl Patch {
             .ok_or_else(|| invalid("slide-removal durable patch limit overflow"))?;
         if bytes.len() > limit {
             return Err(Error::Limit {
-                resource: "slide-removal durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
+                maximum: limit,
             });
         }
         // A patch serialized under the superseded magic carries revisions from
@@ -288,8 +290,9 @@ impl Snapshot {
             );
         }
         if self.package.part_count() > self.limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: self.package.part_count(),
                 maximum: self.limits.max_parts(),
             });
         }
@@ -374,8 +377,9 @@ impl Snapshot {
                 .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
         }
         if planned_bytes > self.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: planned_bytes,
                 maximum: self.limits.max_patch_bytes(),
             });
         }
@@ -714,8 +718,9 @@ fn checked_relationship_count(current: usize, limit: usize) -> Result<usize> {
         .ok_or_else(|| invalid("slide-removal relationship count overflow"))?;
     if next > limit {
         return Err(Error::Limit {
-            resource: "slide-removal relationship scan",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: next,
+            maximum: limit,
         });
     }
     Ok(next)

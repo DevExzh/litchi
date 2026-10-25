@@ -349,7 +349,7 @@ impl File {
                     edit.flush_pending()?;
                     return Err(Error::from(TransactionError::Limit {
                         kind: LimitKind::Operations,
-                        observed: index.saturating_add(1),
+                        observed: index.checked_add(1).unwrap_or(usize::MAX),
                         maximum: limits.max_operations(),
                     })
                     .with_item(index));

@@ -272,9 +272,13 @@ impl<'package> RelationshipIndex<'package> {
         // package root.  Reserve both maps before the first insertion so an
         // adversarial package cannot force an infallible growth during the
         // initial inventory pass.
-        let source_buckets = part_count
-            .checked_add(1)
-            .ok_or_else(|| limit("ink-action relationship source buckets", part_count))?;
+        let source_buckets = part_count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Relationships,
+                usize::MAX,
+                part_count,
+            )
+        })?;
         // Outbound buckets are keyed by relationship *sources*, so they are
         // bounded by the admitted part inventory rather than the OPC graph
         // node ceiling.  That ceiling counts unique internal target nodes;
@@ -452,7 +456,8 @@ impl<'package> RelationshipIndex<'package> {
         let mut source_edges = 0usize;
         let source_bucket_limit = self.package.part_count().checked_add(1).ok_or_else(|| {
             limit(
-                "ink-action relationship source buckets",
+                crate::error::CodecLimitKind::Parts,
+                usize::MAX,
                 self.package.part_count(),
             )
         })?;
@@ -592,7 +597,7 @@ fn add_edge<'package>(
             return Err(Error::Opc(OpcError::Limit {
                 kind: litchi_opc::SourceLimitKind::RelationshipGraphNodes,
                 observed: to_u64(
-                    index.len().saturating_add(1),
+                    index.len().checked_add(1).unwrap_or(usize::MAX),
                     "ink-action relationship graph node count",
                 )?,
                 maximum: to_u64(maximum_keys, "ink-action relationship graph node limit")?,
@@ -605,7 +610,7 @@ fn add_edge<'package>(
         return Err(Error::Opc(OpcError::Limit {
             kind: litchi_opc::SourceLimitKind::Parts,
             observed: to_u64(
-                index.len().saturating_add(1),
+                index.len().checked_add(1).unwrap_or(usize::MAX),
                 "ink-action relationship source bucket count",
             )?,
             maximum: to_u64(
@@ -620,7 +625,11 @@ fn add_edge<'package>(
     let edges = index.entry(key).or_default();
     if let Some(maximum_edges) = maximum_edges {
         if edges.len() >= maximum_edges {
-            return Err(limit(resource, maximum_edges));
+            return Err(limit(
+                crate::error::CodecLimitKind::Relationships,
+                edges.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum_edges,
+            ));
         }
     }
     edges
@@ -636,7 +645,11 @@ fn check_target_relationship_limit(
     resource: &'static str,
 ) -> Result<()> {
     if actual > maximum {
-        return Err(limit(resource, maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::Relationships,
+            actual,
+            maximum,
+        ));
     }
     Ok(())
 }
@@ -692,7 +705,11 @@ fn check_relationship_fields(
         ("relationship target", relationship.target_ref()),
     ] {
         if value.len() > field_limit {
-            return Err(limit("ink-action relationship metadata bytes", field_limit));
+            return Err(limit(
+                crate::error::CodecLimitKind::RelationshipBytes,
+                value.len(),
+                field_limit,
+            ));
         }
         if name == "relationship target"
             && value.len() > read_limits.max_relationship_target_bytes()
@@ -730,10 +747,11 @@ const fn target_mode_rank(mode: TargetMode) -> u8 {
     }
 }
 
-const fn limit(resource: &'static str, maximum: usize) -> Error {
+const fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 
@@ -1253,8 +1271,9 @@ mod tests {
         assert!(matches!(
             shared_result,
             Err(Error::Limit {
-                resource: "ink-action relationship edges",
-                limit: 1
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                observed: 2,
+                maximum: 1
             })
         ));
     }

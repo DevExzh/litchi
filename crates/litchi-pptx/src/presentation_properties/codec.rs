@@ -717,7 +717,11 @@ fn project(root: &Node) -> Result<Properties> {
                     out.recent_colors.push(parse_color(color)?);
                 }
                 if out.recent_colors.len() > limits.max_colors() {
-                    return Err(limit("presentation recent colors", limits.max_colors()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::Colors,
+                        out.recent_colors.len(),
+                        limits.max_colors(),
+                    ));
                 }
             },
             5 => {
@@ -1420,7 +1424,11 @@ fn write_opaque(x: &mut XmlSink, v: &[u8], _strict: bool, _limits: Limits) -> Re
 
 fn validate(v: &Properties, limits: Limits) -> Result<()> {
     if v.recent_colors.len() > limits.max_colors() {
-        return Err(limit("presentation recent colors", limits.max_colors()));
+        return Err(limit(
+            crate::error::CodecLimitKind::Colors,
+            v.recent_colors.len(),
+            limits.max_colors(),
+        ));
     }
     if v.extensions.len() > limits.max_extensions() {
         return Err(limit(
@@ -1431,7 +1439,11 @@ fn validate(v: &Properties, limits: Limits) -> Result<()> {
     if let Some(show) = &v.show
         && show.extensions.len() > limits.max_extensions()
     {
-        return Err(limit("slide-show extension count", limits.max_extensions()));
+        return Err(limit(
+            crate::error::CodecLimitKind::Extensions,
+            show.extensions.len(),
+            limits.max_extensions(),
+        ));
     }
     v.validate()?;
     for c in v
@@ -1782,10 +1794,11 @@ fn bounded_attribute(v: &str, limits: Limits) -> Result<()> {
     }
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 fn attr_write(x: &mut XmlSink, n: &str, v: &str) {
@@ -2104,11 +2117,11 @@ mod tests {
         let xml = format!(r#"<p:presentationPr xmlns:p="{P_NS}"/>"#);
         assert!(matches!(
             Properties::parse(xml.as_bytes(), limits),
-            Err(Error::Limit { limit: 1, .. })
+            Err(Error::Limit { maximum: 1, .. })
         ));
         assert!(matches!(
             Properties::default().to_xml(false, limits),
-            Err(Error::Limit { limit: 1, .. })
+            Err(Error::Limit { maximum: 1, .. })
         ));
     }
 

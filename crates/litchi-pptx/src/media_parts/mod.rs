@@ -73,10 +73,11 @@ pub(crate) fn limit(name: &str) -> Error {
     invalid(format!("slide media {name} limit exceeded"))
 }
 
-pub(crate) fn output_limit(maximum: usize) -> Error {
+pub(crate) fn output_limit(maximum: usize, observed: usize) -> Error {
     Error::Limit {
-        resource: "slide media serialized XML bytes",
-        limit: maximum,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed,
+        maximum: maximum,
     }
 }
 

@@ -69,8 +69,9 @@ pub(crate) fn store(
 ) -> Result<Project> {
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
         return Err(Error::Limit {
-            resource: "PPTX VBA payload bytes",
-            limit: MAX_PAYLOAD_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+            observed: payload.len(),
+            maximum: MAX_PAYLOAD_BYTES,
         });
     }
     store_project_graph(package, source, Host::PowerPoint, Arc::new(payload), None)
@@ -106,9 +107,14 @@ fn map_common(error: litchi_ooxml_common::Error) -> Error {
         },
         litchi_ooxml_common::Error::Relationship(message) => Error::Relationship(message),
         litchi_ooxml_common::Error::Invalid(message) => Error::Invalid(message),
-        litchi_ooxml_common::Error::Limit { kind, maximum, .. } => Error::Limit {
-            resource: kind.as_str(),
-            limit: maximum,
+        litchi_ooxml_common::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: crate::opened::LimitKind::Common(kind),
+            observed,
+            maximum,
         },
         litchi_ooxml_common::Error::Uri(message) => Error::Uri(message),
         litchi_ooxml_common::Error::Mce(error) => Error::MarkupCompatibility(error),

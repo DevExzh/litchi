@@ -309,8 +309,9 @@ impl PartPatch {
                 return Ok(());
             }
             if deltas.len() >= maximum {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: deltas.len().checked_add(1).unwrap_or(usize::MAX),
                     maximum,
                 });
             }
@@ -738,9 +739,11 @@ impl<'a> Staged<'a> {
 macro_rules! family {
     ($what:literal) => {
         pub use crate::Error;
-        /// The bounded dimension of this family: the number of parts one
-        /// commit may change, at most the package's source-limit part count.
-        pub use crate::opened::LimitKind;
+        /// The canonical typed dimension used by this family error. Part
+        /// edits currently emit the root `Parts` variant; the shared type is
+        /// re-exported from the crate boundary so this family does not expose
+        /// an unrelated `opened`-module alias.
+        pub use crate::LimitKind;
         pub use litchi_core::edit::Diagnostics;
 
         #[doc = concat!("The result of a ", $what, " edit's `commit`: the new package, the patch and the diagnostics.")]

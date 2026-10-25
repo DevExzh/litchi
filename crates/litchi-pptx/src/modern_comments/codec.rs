@@ -33,12 +33,17 @@ mod authors {
 
     fn parse_author_list(xml: &[u8]) -> Result<Authors> {
         if xml.len() > MAX_BYTES {
-            return Err(limit("modern Comment Author part bytes", MAX_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::PartBytes,
+                xml.len(),
+                MAX_BYTES,
+            ));
         }
         let selected = process_ooxml(xml)?;
         if selected.len() > MAX_BYTES {
             return Err(limit(
-                "MCE-processed modern Comment Author bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                selected.len(),
                 MAX_BYTES,
             ));
         }
@@ -76,14 +81,26 @@ mod authors {
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
-                    nodes = nodes
-                        .checked_add(1)
-                        .ok_or_else(|| limit("modern Comment Author nodes", MAX_NODES))?;
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            MAX_NODES,
+                        )
+                    })?;
                     if nodes > MAX_NODES {
-                        return Err(limit("modern Comment Author nodes", MAX_NODES));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            nodes,
+                            MAX_NODES,
+                        ));
                     }
                     if stack.len() + 1 > MAX_DEPTH {
-                        return Err(limit("modern Comment Author XML depth", MAX_DEPTH));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            stack.len() + 1,
+                            MAX_DEPTH,
+                        ));
                     }
                     let local = decode_name(element.local_name().as_ref())?;
                     let kind = if stack.is_empty() {
@@ -216,7 +233,11 @@ mod authors {
                     return Err(invalid("authorLst permits only p188:author children"));
                 }
                 if authors.len() >= MAX_AUTHORS {
-                    return Err(limit("modern Comment Authors", MAX_AUTHORS));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::Authors,
+                        authors.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_AUTHORS,
+                    ));
                 }
                 let declarations = namespace_declarations_from(element, decoder, None)?;
                 let attributes = known_attributes(
@@ -296,7 +317,11 @@ mod authors {
         validate_prefix(&value.root_prefix)?;
         validate_namespaces(&value.namespace_declarations, Some(&value.root_prefix))?;
         if value.authors.len() > MAX_AUTHORS {
-            return Err(limit("modern Comment Authors", MAX_AUTHORS));
+            return Err(limit(
+                crate::error::CodecLimitKind::Authors,
+                value.authors.len(),
+                MAX_AUTHORS,
+            ));
         }
         let mut ids = HashSet::new();
         for author in &value.authors {
@@ -316,7 +341,11 @@ mod authors {
                 .as_ref()
                 .is_some_and(|xml| xml.len() > MAX_BYTES)
             {
-                return Err(limit("modern Comment Author extension bytes", MAX_BYTES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::ExtensionBytes,
+                    author.extension_xml.as_ref().map_or(0, Vec::len),
+                    MAX_BYTES,
+                ));
             }
         }
         Ok(())
@@ -586,10 +615,11 @@ mod authors {
         Error::Invalid(message.into())
     }
 
-    fn limit(label: &'static str, limit: usize) -> Error {
+    fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
         Error::Limit {
-            resource: label,
-            limit,
+            kind: crate::error::LimitKind::Codec(kind),
+            observed,
+            maximum,
         }
     }
 
@@ -625,7 +655,11 @@ mod authors {
                 close_tag(&mut out, &self.root_prefix, "authorLst");
             }
             if out.len() > MAX_BYTES {
-                return Err(limit("serialized modern Comment Author bytes", MAX_BYTES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::OutputBytes,
+                    out.len(),
+                    MAX_BYTES,
+                ));
             }
             parse_author_list(&out)?;
             Ok(out)

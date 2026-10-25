@@ -195,7 +195,7 @@ impl Data {
     /// only after that preflight succeeds.
     pub(super) fn from_bytes(bytes: &[u8], limits: SourceLimits) -> Result<Self> {
         if bytes.len() > MAX_WIRE_BYTES {
-            return Err(wire_limit());
+            return Err(wire_limit(bytes.len()));
         }
         let body_len = bytes
             .len()
@@ -419,7 +419,7 @@ pub(super) fn encoded_len_from_lengths(
         }
     }
     if total > MAX_WIRE_BYTES {
-        return Err(wire_limit());
+        return Err(wire_limit(total));
     }
     Ok(total)
 }
@@ -1498,7 +1498,7 @@ fn check_payload_len(
     if u64::try_from(length).map_err(|_| invalid("payload length overflows"))?
         > MAX_WIRE_BYTES as u64
     {
-        return Err(wire_limit());
+        return Err(wire_limit(length));
     }
     if length as u64 > maximum {
         return Err(source_limit(kind, length as u64, maximum));
@@ -1518,7 +1518,7 @@ fn check_string_length(length: usize, maximum: u64, name: &'static str) -> Resul
         }));
     }
     if length as u64 > MAX_WIRE_BYTES as u64 {
-        return Err(wire_limit());
+        return Err(wire_limit(length));
     }
     if length as u64 > maximum {
         return Err(source_limit(
@@ -1538,8 +1538,12 @@ fn string_limit_u64(value: u64) -> u64 {
     value.min(MAX_WIRE_BYTES as u64)
 }
 
-fn wire_limit() -> Error {
-    limit("source-backed topology wire bytes", MAX_WIRE_BYTES)
+fn wire_limit(observed: usize) -> Error {
+    limit(
+        crate::error::CodecLimitKind::SourceBytes,
+        observed,
+        MAX_WIRE_BYTES,
+    )
 }
 
 fn source_limit(kind: SourceLimitKind, observed: u64, maximum: u64) -> Error {
@@ -1550,10 +1554,11 @@ fn source_limit(kind: SourceLimitKind, observed: u64, maximum: u64) -> Error {
     })
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 

@@ -487,8 +487,9 @@ impl Slide {
     fn ensure_positive_bounds(&self) -> Result<()> {
         if self.shapes.len() > u32::MAX as usize {
             return Err(Error::Limit {
-                resource: "mutable slide shapes",
-                limit: u32::MAX as usize,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
+                observed: self.shapes.len(),
+                maximum: u32::MAX as usize,
             });
         }
         Ok(())

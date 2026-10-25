@@ -42,8 +42,9 @@ pub fn write_to(value: &Transition, xml: &mut String, limits: Limits) -> Result<
     let output_len = count.finish()?;
     if output_len > limits.output_bytes() {
         return Err(Error::Limit {
-            resource: "transition output bytes",
-            limit: limits.output_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: limits.output_bytes(),
         });
     }
 
@@ -64,8 +65,11 @@ pub fn write_to(value: &Transition, xml: &mut String, limits: Limits) -> Result<
         result.and_then(|()| {
             if output.exceeded {
                 Err(Error::Limit {
-                    resource: "transition output bytes",
-                    limit: limits.output_bytes(),
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::OutputBytes,
+                    ),
+                    observed: output_len,
+                    maximum: limits.output_bytes(),
                 })
             } else if output.xml.len().saturating_sub(start) != output_len {
                 Err(Error::Invalid(
@@ -104,8 +108,9 @@ impl CountingXml {
     fn finish(self) -> Result<usize> {
         if self.overflowed {
             Err(Error::Limit {
-                resource: "transition output bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })
         } else {
             Ok(self.length)

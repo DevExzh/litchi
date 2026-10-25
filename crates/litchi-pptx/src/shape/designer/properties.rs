@@ -448,7 +448,11 @@ fn locate(xml: &[u8], shape: Range<usize>, limits: Limits) -> Result<Located> {
         ));
     }
     if xml.len() > limits.xml_bytes() {
-        return Err(limit("Designer slide XML bytes", limits.xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -472,17 +476,29 @@ fn locate(xml: &[u8], shape: Range<usize>, limits: Limits) -> Result<Located> {
         let empty = matches!(&event, Event::Empty(_));
         let end = position(&reader, origin)?;
         if !matches!(&event, Event::Eof) {
-            events = events
-                .checked_add(1)
-                .ok_or_else(|| limit("Designer slide XML events", limits.xml_nodes()))?;
+            events = events.checked_add(1).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlEvents,
+                    usize::MAX,
+                    limits.xml_nodes(),
+                )
+            })?;
             if events > limits.xml_nodes() {
-                return Err(limit("Designer slide XML events", limits.xml_nodes()));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlEvents,
+                    events,
+                    limits.xml_nodes(),
+                ));
             }
         }
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if stack.len() >= limits.xml_depth() {
-                    return Err(limit("Designer slide XML depth", limits.xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.xml_depth(),
+                    ));
                 }
                 let role = start_role(
                     &stack,
@@ -820,7 +836,13 @@ fn insert_inside(
             .and_then(|value| value.checked_add(child.len()))
             .and_then(|value| value.checked_add(qname.len()))
             .and_then(|value| value.checked_add(3))
-            .ok_or_else(|| limit("Designer properties output bytes", limits.xml_bytes()))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::OutputBytes,
+                    usize::MAX,
+                    limits.xml_bytes(),
+                )
+            })?;
         if length > limits.xml_bytes() {
             return Err(limit(
                 "Designer properties output bytes",
@@ -863,7 +885,13 @@ fn write_extension(payload: &[u8], host: &Element, limits: Limits) -> Result<Vec
         .and_then(|value| value.checked_add(payload.len()))
         .and_then(|value| value.checked_add(declaration_prefix_len))
         .and_then(|value| value.checked_add(21))
-        .ok_or_else(|| limit("Designer properties output bytes", limits.xml_bytes()))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                limits.xml_bytes(),
+            )
+        })?;
     if size > limits.xml_bytes() {
         return Err(limit(
             "Designer properties output bytes",
@@ -907,7 +935,13 @@ fn write_extension_list(extension: &[u8], host: &Element, limits: Limits) -> Res
         .and_then(|value| value.checked_add(extension.len()))
         .and_then(|value| value.checked_add(declaration_prefix_len))
         .and_then(|value| value.checked_add(14))
-        .ok_or_else(|| limit("Designer properties output bytes", limits.xml_bytes()))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                limits.xml_bytes(),
+            )
+        })?;
     if size > limits.xml_bytes() {
         return Err(limit(
             "Designer properties output bytes",
@@ -962,7 +996,13 @@ fn replace(
         .len()
         .checked_add(replacement.len())
         .and_then(|value| value.checked_add(after.len()))
-        .ok_or_else(|| limit("Designer properties output bytes", limits.xml_bytes()))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                usize::MAX,
+                limits.xml_bytes(),
+            )
+        })?;
     if len > limits.xml_bytes() {
         return Err(limit(
             "Designer properties output bytes",
@@ -1044,7 +1084,11 @@ fn validate_properties(value: &DrawingProperties, limits: Limits) -> Result<()> 
 
 fn copy_owner(value: &[u8], limits: Limits) -> Result<Arc<Vec<u8>>> {
     if value.len() > limits.xml_bytes() {
-        return Err(limit("Designer slide XML bytes", limits.xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            value.len(),
+            limits.xml_bytes(),
+        ));
     }
     Ok(Arc::new(fallible_copy_vec(value, "Designer slide source")?))
 }
@@ -1088,8 +1132,12 @@ fn is_p202(namespace: &ResolveResult<'_>) -> bool {
 fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]

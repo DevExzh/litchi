@@ -146,8 +146,9 @@ mod tests {
         assert!(matches!(
             edit.set(0_usize, &points),
             Err(crate::Error::Limit {
-                resource: "laser trace-point count",
-                limit: 1,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+                observed: 2,
+                maximum: 1,
             })
         ));
     }
@@ -173,8 +174,8 @@ mod tests {
         assert!(matches!(
             recipient.apply_laser_traces(&patch),
             Err(crate::Error::Limit {
-                resource: "slide XML bytes",
-                limit: 1,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                maximum: 1,
             })
         ));
         assert_eq!(recipient.to_bytes().unwrap(), before);

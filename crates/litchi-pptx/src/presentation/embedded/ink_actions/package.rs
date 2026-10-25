@@ -90,20 +90,26 @@ impl TargetCache {
             ))
         })?;
         if target.blob().len() > limits.target_bytes {
-            return Err(limit("ink-action target bytes", limits.target_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                target.blob().len(),
+                limits.target_bytes,
+            ));
         }
         let retained = self
             .retained_bytes
             .checked_add(target.blob().len())
             .ok_or_else(|| {
                 limit(
-                    "ink-action aggregate target bytes",
+                    crate::error::CodecLimitKind::RetainedBytes,
+                    usize::MAX,
                     limits.total_target_bytes,
                 )
             })?;
         if retained > limits.total_target_bytes {
             return Err(limit(
-                "ink-action aggregate target bytes",
+                crate::error::CodecLimitKind::RetainedBytes,
+                retained,
                 limits.total_target_bytes,
             ));
         }
@@ -360,9 +366,13 @@ fn load_slide_catalog_with_index(
             inbound,
             outbound,
         });
-        semantic_ordinal = semantic_ordinal
-            .checked_add(1)
-            .ok_or_else(|| limit("ink-action semantic ordinal", limits.anchors))?;
+        semantic_ordinal = semantic_ordinal.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Index,
+                usize::MAX,
+                limits.anchors,
+            )
+        })?;
     }
     if validate_shared_owners {
         validate_shared_slide_owners(
@@ -947,7 +957,11 @@ fn push_reference(
     maximum: usize,
 ) -> Result<()> {
     if output.len() >= maximum {
-        return Err(limit("ink-action relationship edges", maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::Relationships,
+            output.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum,
+        ));
     }
     output.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "ink-action relationship edges",
@@ -960,7 +974,8 @@ fn push_reference(
     ] {
         if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
             return Err(limit(
-                "ink-action relationship metadata bytes",
+                crate::error::CodecLimitKind::RelationshipBytes,
+                value.len(),
                 MAX_RELATIONSHIP_FIELD_BYTES,
             ));
         }

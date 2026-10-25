@@ -96,8 +96,9 @@ pub(crate) fn plan(layout_xml: &[u8], shape_limits: crate::shape::Limits) -> Res
         };
         if plan.len() >= MAX_PLACEHOLDERS {
             return Err(Error::Limit {
-                resource: "new-slide layout placeholders",
-                limit: MAX_PLACEHOLDERS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Placeholders),
+                observed: plan.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: MAX_PLACEHOLDERS,
             });
         }
         plan.push(Planned {
@@ -245,8 +246,9 @@ pub(crate) fn slide_xml_with_limits(
     if plan.is_empty() {
         if xml.len() > shape_limits.output_bytes() {
             return Err(Error::Limit {
-                resource: "shape output bytes",
-                limit: shape_limits.output_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: xml.len(),
+                maximum: shape_limits.output_bytes(),
             });
         }
         return Ok(xml);
@@ -296,8 +298,9 @@ pub(crate) fn slide_xml_with_limits(
     xml.insert_str(anchor, &shapes);
     if xml.len() > shape_limits.output_bytes() {
         return Err(Error::Limit {
-            resource: "shape output bytes",
-            limit: shape_limits.output_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: xml.len(),
+            maximum: shape_limits.output_bytes(),
         });
     }
     Ok(xml)

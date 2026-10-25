@@ -46,11 +46,11 @@ mod transition_edit_tests;
 /// The failure type of this transaction family.
 ///
 /// The family reports the crate's [`crate::Error`]; resource refusals of the
-/// family's own [`Limits`] use [`crate::Error::EditLimit`] with a
+/// family's own [`Limits`] use [`crate::Error::Limit`] with a
 /// [`LimitKind`]. Splitting a focused error out of the crate error is
 /// deferred (record 0252).
 pub use crate::Error;
-pub use limit::LimitKind;
+pub use limit::{CodecLimitKind, LimitKind};
 pub use model::{
     Limits, MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS,
     ShapePropertiesReplacement, ShapeTextReplacement, Slide, Snapshot,

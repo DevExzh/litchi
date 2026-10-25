@@ -50,8 +50,9 @@ pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>
         }
         if relationships.len() == MAX_TAG_PARTS {
             return Err(Error::Limit {
-                resource: "owner tag-list relationships",
-                limit: MAX_TAG_PARTS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                observed: relationships.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: MAX_TAG_PARTS,
             });
         }
         relationships.push(relationship);
@@ -363,8 +364,9 @@ pub(crate) fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option
 fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
     if xml.len() > MAX_OWNER_BYTES {
         return Err(Error::Limit {
-            resource: "tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_OWNER_BYTES,
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -771,8 +773,9 @@ fn scan_owner_source(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
 fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
     if xml.len() > MAX_OWNER_BYTES {
         return Err(Error::Limit {
-            resource: "tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_OWNER_BYTES,
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -828,8 +831,9 @@ fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
 fn collect_owner_map_elements(xml: &[u8], active: Option<&[u32]>) -> Result<Vec<OwnerMapElement>> {
     if xml.len() > MAX_OWNER_BYTES {
         return Err(Error::Limit {
-            resource: "tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_OWNER_BYTES,
         });
     }
     let mut active = active.map(|offsets| offsets.iter().copied().peekable());
@@ -849,8 +853,11 @@ fn collect_owner_map_elements(xml: &[u8], active: Option<&[u32]>) -> Result<Vec<
                 bump_owner_node(&mut nodes)?;
                 if frames.len() >= MAX_OWNER_DEPTH {
                     return Err(Error::Limit {
-                        resource: "tag-owner XML nesting depth",
-                        limit: MAX_OWNER_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_OWNER_DEPTH,
                     });
                 }
                 let name = conformance
@@ -1239,8 +1246,9 @@ pub(crate) fn replace_xml(xml: &[u8], range: Range<usize>, value: &[u8]) -> Resu
         .ok_or_else(|| invalid("patched tag-owner XML length overflow"))?;
     if len > MAX_OWNER_BYTES {
         return Err(Error::Limit {
-            resource: "patched tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: len,
+            maximum: MAX_OWNER_BYTES,
         });
     }
     let mut output = Vec::new();

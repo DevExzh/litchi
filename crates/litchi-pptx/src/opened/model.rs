@@ -290,6 +290,10 @@ impl Limits {
             super::LimitKind::HistoryBytes => self.max_history_bytes,
             super::LimitKind::RetainedCandidateBytes => self.max_retained_candidate_bytes,
             super::LimitKind::RetainedMceBytes => self.max_retained_mce_bytes,
+            // Codec and shared-service limits do not belong to the primary
+            // opened-presentation policy. They are carried by their owning
+            // codec policy and are never passed to this accessor.
+            super::LimitKind::Codec(_) | super::LimitKind::Common(_) => usize::MAX,
         }
     }
 }
@@ -909,8 +913,9 @@ fn capture_internal(
     let references = presentation.slide_references_strict()?;
     if references.len() > limits.max_parts {
         return Err(Error::Limit {
-            resource: "opened-presentation slides",
-            limit: limits.max_parts,
+            kind: crate::opened::LimitKind::Parts,
+            observed: references.len(),
+            maximum: limits.max_parts,
         });
     }
     let view = crate::presentation::Presentation::new_with_semantic_limits(

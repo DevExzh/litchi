@@ -44,8 +44,9 @@ fn password_hash(password: &str, salt: &[u8], spin_count: u32) -> Zeroizing<Sha5
 pub(crate) fn generate_verifier(password: &str) -> Result<Verifier> {
     if password.len() > 1 << 20 {
         return Err(Error::Limit {
-            resource: "protection password",
-            limit: 1 << 20,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PasswordBytes),
+            observed: password.len(),
+            maximum: 1 << 20,
         });
     }
 

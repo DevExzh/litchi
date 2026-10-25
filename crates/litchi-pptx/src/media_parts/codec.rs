@@ -1002,20 +1002,20 @@ impl BoundedXml {
     }
 
     fn escape(&mut self, value: &str) -> Result<()> {
-        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit))?;
+        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         self.reserve(escaped)?;
         write_escaped(&mut self.bytes, value);
         Ok(())
     }
 
     fn attr(&mut self, name: &str, value: &str) -> Result<()> {
-        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit))?;
+        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         let fixed = 4usize
             .checked_add(name.len())
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         let required = fixed
             .checked_add(escaped)
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         self.reserve(required)?;
         self.bytes.push(b' ');
         self.bytes.extend_from_slice(name.as_bytes());
@@ -1030,9 +1030,9 @@ impl BoundedXml {
             .bytes
             .len()
             .checked_add(additional)
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         if next > self.limit {
-            return Err(output_limit(self.limit));
+            return Err(output_limit(self.limit, next));
         }
         let spare = self.bytes.capacity().saturating_sub(self.bytes.len());
         if additional > spare {

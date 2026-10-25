@@ -53,7 +53,7 @@ pub(crate) fn refresh(
             if planned.len() >= limits.max_expanded_targets() {
                 return Err(TransactionError::Limit {
                     kind: LimitKind::ExpandedTargets,
-                    observed: planned.len().saturating_add(1),
+                    observed: planned.len().checked_add(1).unwrap_or(usize::MAX),
                     maximum: limits.max_expanded_targets(),
                 }
                 .into());

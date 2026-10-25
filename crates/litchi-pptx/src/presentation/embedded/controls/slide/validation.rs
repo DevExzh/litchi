@@ -22,7 +22,11 @@ pub(crate) fn validate_text(value: &str, label: &'static str, allow_empty: bool)
 
 pub(crate) fn validate_binary(bytes: &[u8]) -> Result<()> {
     if bytes.len() > MAX_BINARY_BYTES {
-        return Err(limit("control binary bytes", MAX_BINARY_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            bytes.len(),
+            MAX_BINARY_BYTES,
+        ));
     }
     Ok(())
 }

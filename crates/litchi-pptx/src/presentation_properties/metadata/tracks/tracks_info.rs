@@ -110,8 +110,9 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
     }
     if xml.len() > MAX_SLIDE_BYTES {
         return Err(Error::Limit {
-            resource: "slide XML bytes for media tracks",
-            limit: MAX_SLIDE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_SLIDE_BYTES,
         });
     }
 
@@ -140,8 +141,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                     .ok_or_else(|| invalid("slide XML node count overflow"))?;
                 if nodes > 1_000_000 {
                     return Err(Error::Limit {
-                        resource: "slide XML nodes for media tracks",
-                        limit: 1_000_000,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: 1_000_000,
                     });
                 }
                 let kind = classify(
@@ -209,8 +213,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             .ok_or_else(|| invalid("track is outside tracksInfo"))?;
                         if current.tracks.len() >= MAX_TRACKS {
                             return Err(Error::Limit {
-                                resource: "media caption track count",
-                                limit: MAX_TRACKS,
+                                kind: crate::opened::LimitKind::Codec(
+                                    crate::opened::CodecLimitKind::CaptionTracks,
+                                ),
+                                observed: current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                maximum: MAX_TRACKS,
                             });
                         }
                         let track = Track {
@@ -269,8 +276,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                     .ok_or_else(|| invalid("slide XML node count overflow"))?;
                 if nodes > 1_000_000 {
                     return Err(Error::Limit {
-                        resource: "slide XML nodes for media tracks",
-                        limit: 1_000_000,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: 1_000_000,
                     });
                 }
                 let kind = classify(
@@ -334,8 +344,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             .ok_or_else(|| invalid("track is outside tracksInfo"))?;
                         if current.tracks.len() >= MAX_TRACKS {
                             return Err(Error::Limit {
-                                resource: "media caption track count",
-                                limit: MAX_TRACKS,
+                                kind: crate::opened::LimitKind::Codec(
+                                    crate::opened::CodecLimitKind::CaptionTracks,
+                                ),
+                                observed: current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                maximum: MAX_TRACKS,
                             });
                         }
                         let track = parse_track(&element, decoder, start)?;
@@ -544,8 +557,9 @@ fn attr(
             .into_owned();
         if value.len() > MAX_STRING_BYTES {
             return Err(Error::Limit {
-                resource: "media track attribute",
-                limit: MAX_STRING_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: MAX_STRING_BYTES,
             });
         }
         let local_span = attribute_span(element.as_ref(), attribute.key.as_ref())?;

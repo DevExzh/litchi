@@ -766,10 +766,11 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
         .ok_or_else(|| invalid("presentation-properties XML offset does not fit usize"))
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 

@@ -455,8 +455,9 @@ fn emit_replacements(
         .ok_or_else(|| Error::Invalid("opened-presentation geometry size overflow".into()))?;
     if output_len > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation geometry output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
         });
     }
     let mut output = Vec::new();

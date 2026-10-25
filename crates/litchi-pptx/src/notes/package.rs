@@ -447,7 +447,11 @@ fn load_index_with_slide_root_proofs<'a>(
         ));
     }
     if presentation_scan.slide_ids.len() > MAX_NOTES_SLIDES {
-        return Err(limit("presentation slide count", MAX_NOTES_SLIDES));
+        return Err(limit(
+            crate::error::CodecLimitKind::Slides,
+            presentation_scan.slide_ids.len(),
+            MAX_NOTES_SLIDES,
+        ));
     }
     let proof_inventory_matches = slide_root_proofs
         .is_some_and(|(expected_len, _)| expected_len == presentation_scan.slide_ids.len());
@@ -659,7 +663,11 @@ fn load_index_with_slide_root_proofs<'a>(
         }
         total = checked_add(total, notes_part.blob().len(), "aggregate bytes")?;
         if total > MAX_TOTAL_BYTES {
-            return Err(limit("notes aggregate bytes", MAX_TOTAL_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                total,
+                MAX_TOTAL_BYTES,
+            ));
         }
         slides.push(SlideIndex {
             slide_part_name: slide_part.partname().clone(),
@@ -1018,7 +1026,11 @@ fn plan_owned_descendants(package: &OpcPackage, removals: &[Removal]) -> Result<
             let stored = package.get_part(&target)?.partname().clone();
             if !closure.contains(&stored) {
                 if closure.len().saturating_sub(roots.len()) >= MAX_OWNED_PARTS {
-                    return Err(limit("notes-owned related parts", MAX_OWNED_PARTS));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::Parts,
+                        closure.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_OWNED_PARTS,
+                    ));
                 }
                 closure.try_reserve(1).map_err(|reserve_error| {
                     allocation("notes-owned part closure", reserve_error)
@@ -1404,7 +1416,11 @@ pub(crate) fn put_changed(
 
 pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
     if graph.slides.len() > MAX_NOTES_SLIDES {
-        return Err(limit("notes-slide count", MAX_NOTES_SLIDES));
+        return Err(limit(
+            crate::error::CodecLimitKind::Slides,
+            graph.slides.len(),
+            MAX_NOTES_SLIDES,
+        ));
     }
     validate_id(&graph.master.presentation_relationship_id)?;
     validate_id(&graph.master.theme.relationship_id)?;
@@ -1473,7 +1489,11 @@ pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
         super::validation::validate_links(&slide.relationships)?;
         total = checked_add(total, slide.data.len(), "aggregate bytes")?;
         if total > MAX_TOTAL_BYTES {
-            return Err(limit("notes aggregate bytes", MAX_TOTAL_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                total,
+                MAX_TOTAL_BYTES,
+            ));
         }
     }
     Ok(())

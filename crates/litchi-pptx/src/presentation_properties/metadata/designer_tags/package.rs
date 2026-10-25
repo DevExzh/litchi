@@ -59,8 +59,9 @@ pub(crate) fn load_snapshot_with_limits(
     }
     if presentation.blob().len() > limits.xml_bytes() {
         return Err(Error::Limit {
-            resource: "Designer-tag owner XML bytes",
-            limit: limits.xml_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: presentation.blob().len(),
+            maximum: limits.xml_bytes(),
         });
     }
     let source = presentation.blob_arc();

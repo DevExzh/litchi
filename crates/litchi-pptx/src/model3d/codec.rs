@@ -316,7 +316,11 @@ pub fn write(scene: &Scene, limits: Limits) -> Result<Vec<u8>> {
 
 pub(crate) fn locate_with_limits(xml: &[u8], limits: Limits) -> Result<Inventory> {
     if xml.len() > limits.max_xml_bytes() {
-        return Err(limit("model3d slide XML bytes", limits.max_xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -340,25 +344,45 @@ pub(crate) fn locate_with_limits(xml: &[u8], limits: Limits) -> Result<Inventory
         let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        nodes = nodes
-            .checked_add(1)
-            .ok_or_else(|| limit("model3d slide XML nodes", limits.max_nodes()))?;
+        nodes = nodes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                usize::MAX,
+                limits.max_nodes(),
+            )
+        })?;
         if nodes > limits.max_nodes() {
-            return Err(limit("model3d slide XML nodes", limits.max_nodes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                limits.max_nodes(),
+            ));
         }
 
         match event {
             Event::Start(element) => {
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("model3d XML depth", limits.max_depth()))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
                 if depth > limits.max_depth() {
-                    return Err(limit("model3d XML depth", limits.max_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
 
                 if is_shape(&namespace, element.name()) {
                     if shape_names.len() >= limits.max_nodes() {
-                        return Err(limit("model3d slide shapes", limits.max_nodes()));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ModelEntries,
+                            shape_names.len().checked_add(1).unwrap_or(usize::MAX),
+                            limits.max_nodes(),
+                        ));
                     }
                     let index = shape_names.len();
                     shape_names.push(None);
@@ -390,17 +414,29 @@ pub(crate) fn locate_with_limits(xml: &[u8], limits: Limits) -> Result<Inventory
                         return Err(invalid("model3d element has no shape anchor"));
                     };
                     if locations.len() >= limits.max_children() {
-                        return Err(limit("model3d instances", limits.max_children()));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ModelEntries,
+                            locations.len().checked_add(1).unwrap_or(usize::MAX),
+                            limits.max_children(),
+                        ));
                     }
                     model_stack.push((start, depth, shape_index));
                 }
             },
             Event::Empty(element) => {
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("model3d XML depth", limits.max_depth()))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
                 if child_depth > limits.max_depth() {
-                    return Err(limit("model3d XML depth", limits.max_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if is_cnvpr(&namespace, element.name())
                     && let Some((index, _)) = shape_stack.last().copied()
@@ -410,7 +446,11 @@ pub(crate) fn locate_with_limits(xml: &[u8], limits: Limits) -> Result<Inventory
                 }
                 if is_shape(&namespace, element.name()) {
                     if shape_names.len() >= limits.max_nodes() {
-                        return Err(limit("model3d slide shapes", limits.max_nodes()));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::ModelEntries,
+                            shape_names.len().checked_add(1).unwrap_or(usize::MAX),
+                            limits.max_nodes(),
+                        ));
                     }
                     shape_names.push(None);
                 }
@@ -543,8 +583,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(format!("PPTX model3d {}", message.into()))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn drawing_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {

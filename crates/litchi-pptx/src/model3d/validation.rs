@@ -281,7 +281,11 @@ fn validate_asset(asset: &Asset, limits: Limits) -> Result<()> {
     if let Some(data) = asset.embedded_data()
         && data.len() > limits.max_model_bytes()
     {
-        return Err(limit("model3d model bytes", limits.max_model_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            data.len(),
+            limits.max_model_bytes(),
+        ));
     }
     if let Some(link) = asset.linked_target()
         && (link.as_str().is_empty() || link.as_str().len() > limits.max_link_bytes())
@@ -294,7 +298,11 @@ fn validate_asset(asset: &Asset, limits: Limits) -> Result<()> {
 fn validate_preview(preview: &Preview, limits: Limits) -> Result<()> {
     if let Some(data) = preview.data() {
         if data.len() > limits.max_preview_bytes() {
-            return Err(limit("model3d preview bytes", limits.max_preview_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                data.len(),
+                limits.max_preview_bytes(),
+            ));
         }
         let content_type = preview
             .content_type()
@@ -379,11 +387,8 @@ fn validate_reference(
         }
     {
         return Err(limit(
-            if field == "model" {
-                "model3d model bytes"
-            } else {
-                "model3d preview bytes"
-            },
+            crate::error::CodecLimitKind::PayloadBytes,
+            part.blob().len(),
             if field == "model" {
                 limits.max_model_bytes()
             } else {
@@ -447,6 +452,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(format!("PPTX model3d {}", message.into()))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

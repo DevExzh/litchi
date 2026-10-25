@@ -60,8 +60,9 @@ pub(super) fn active_pml_offsets(
 ) -> Result<Vec<u32>> {
     if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "shape-tag owner XML bytes",
-            limit: shape_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: shape_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -122,8 +123,9 @@ pub(super) fn preserved_anchor_uses(
 ) -> Result<usize> {
     if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "shape-tag owner XML bytes",
-            limit: shape_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: shape_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -160,8 +162,11 @@ pub(super) fn preserved_anchor_uses(
                 )?;
                 if id == relationship_id {
                     uses = uses.checked_add(1).ok_or(Error::Limit {
-                        resource: "preserved shape tag-anchor references",
-                        limit: shape_limits.nodes(),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::References,
+                        ),
+                        observed: usize::MAX,
+                        maximum: shape_limits.nodes(),
                     })?;
                 }
             },
@@ -238,13 +243,15 @@ pub(super) fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str)
 
 pub(super) fn bump_nodes(nodes: &mut usize, limits: crate::shape::Limits) -> Result<()> {
     *nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "shape-tag owner XML nodes",
-        limit: limits.nodes(),
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+        observed: usize::MAX,
+        maximum: limits.nodes(),
     })?;
     if *nodes > limits.nodes() {
         Err(Error::Limit {
-            resource: "shape-tag owner XML nodes",
-            limit: limits.nodes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: limits.nodes(),
         })
     } else {
         Ok(())
@@ -253,13 +260,15 @@ pub(super) fn bump_nodes(nodes: &mut usize, limits: crate::shape::Limits) -> Res
 
 pub(super) fn enter_depth(depth: &mut usize, limits: crate::shape::Limits) -> Result<()> {
     *depth = depth.checked_add(1).ok_or(Error::Limit {
-        resource: "shape-tag owner XML depth",
-        limit: limits.depth(),
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+        observed: usize::MAX,
+        maximum: limits.depth(),
     })?;
     if *depth > limits.depth() {
         return Err(Error::Limit {
-            resource: "shape-tag owner XML depth",
-            limit: limits.depth(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: *depth,
+            maximum: limits.depth(),
         });
     }
     Ok(())

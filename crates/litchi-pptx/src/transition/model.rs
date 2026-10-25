@@ -677,8 +677,9 @@ fn validate_owned_preset_name(name: String) -> PptxResult<Box<str>> {
 fn validate_preset_name_bytes(name: &str) -> PptxResult<()> {
     if name.len() > MAX_PRESET_NAME_BYTES {
         return Err(Error::Limit {
-            resource: "preset transition name bytes",
-            limit: MAX_PRESET_NAME_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+            observed: name.len(),
+            maximum: MAX_PRESET_NAME_BYTES,
         });
     }
     if name.chars().any(|character| {

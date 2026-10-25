@@ -209,8 +209,9 @@ fn notes_descendant_limit_rejects_n_plus_one_before_mutation() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "notes-owned related parts",
-            limit: MAX_OWNED_PARTS
+            kind: litchi_pptx::opened::LimitKind::Codec(litchi_pptx::opened::CodecLimitKind::Parts),
+            maximum: MAX_OWNED_PARTS,
+            ..
         }
     ));
     assert!(

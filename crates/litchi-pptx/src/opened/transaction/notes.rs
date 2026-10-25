@@ -56,8 +56,9 @@ impl Edit {
             return Err(refuse("the slide already relates a notes page"));
         }
         if self.working.part_count() >= max_parts {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: self.working.part_count(),
                 maximum: max_parts,
             });
         }

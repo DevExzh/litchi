@@ -27,8 +27,9 @@ pub(crate) fn validate_metadata(value: &MediaMetadata) -> Result<()> {
 pub(crate) fn validate_tracks(value: &TracksInfo) -> Result<()> {
     if value.captions.len() > MAX_TRACKS {
         return Err(Error::Limit {
-            resource: "media caption track count",
-            limit: MAX_TRACKS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::CaptionTracks),
+            observed: value.captions.len(),
+            maximum: MAX_TRACKS,
         });
     }
     let mut ids = std::collections::HashSet::with_capacity(value.captions.len());
@@ -102,8 +103,9 @@ pub(crate) fn parse_boolean(value: &str, label: &str) -> Result<bool> {
 fn bounded(value: &str, _label: &str) -> Result<()> {
     if value.len() > MAX_STRING_BYTES {
         return Err(Error::Limit {
-            resource: "media track string",
-            limit: MAX_STRING_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+            observed: value.len(),
+            maximum: MAX_STRING_BYTES,
         });
     }
     Ok(())

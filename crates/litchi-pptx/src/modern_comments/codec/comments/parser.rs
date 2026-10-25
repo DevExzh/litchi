@@ -71,18 +71,30 @@ struct Frame {
 
 pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
     if xml.len() > MAX_BYTES {
-        return Err(limit("modern Comment part bytes", MAX_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PartBytes,
+            xml.len(),
+            MAX_BYTES,
+        ));
     }
     let selected = process_ooxml(xml)?;
     if selected.len() > MAX_BYTES {
-        return Err(limit("MCE-processed modern Comment bytes", MAX_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            selected.len(),
+            MAX_BYTES,
+        ));
     }
     parse_processed_comment_list(selected.as_ref())
 }
 
 pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
     if bytes.len() > MAX_BYTES {
-        return Err(limit("MCE-processed modern Comment bytes", MAX_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            bytes.len(),
+            MAX_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(bytes);
     let origin = ReaderOrigin::of(bytes);
@@ -109,14 +121,26 @@ pub(super) fn parse_processed_comment_list(bytes: &[u8]) -> Result<List> {
         let empty = matches!(&event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit("modern Comment nodes", MAX_NODES))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        MAX_NODES,
+                    )
+                })?;
                 if nodes > MAX_NODES {
-                    return Err(limit("modern Comment nodes", MAX_NODES));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 if stack.len() + 1 > MAX_DEPTH {
-                    return Err(limit("modern Comment XML depth", MAX_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len() + 1,
+                        MAX_DEPTH,
+                    ));
                 }
                 let local = decode_name(element.local_name().as_ref())?;
                 let kind = if stack.is_empty() {
@@ -251,7 +275,11 @@ fn child_frame(
                 return Err(invalid("cmLst permits only p188:cm children"));
             }
             if comments.len() >= MAX_COMMENTS {
-                return Err(limit("modern comments", MAX_COMMENTS));
+                return Err(limit(
+                    crate::error::CodecLimitKind::CommentEntries,
+                    comments.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_COMMENTS,
+                ));
             }
             let declarations = namespace_declarations_from(element, decoder, None)?;
             let attributes = known_attributes(
@@ -367,11 +395,19 @@ fn child_frame(
             if namespace != P188 || local != "reply" {
                 return Err(invalid("replyLst permits only p188:reply children"));
             }
-            *reply_count = reply_count
-                .checked_add(1)
-                .ok_or_else(|| limit("modern comment replies", MAX_REPLIES))?;
+            *reply_count = reply_count.checked_add(1).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::CommentReplies,
+                    usize::MAX,
+                    MAX_REPLIES,
+                )
+            })?;
             if *reply_count > MAX_REPLIES {
-                return Err(limit("modern comment replies", MAX_REPLIES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::CommentReplies,
+                    *reply_count,
+                    MAX_REPLIES,
+                ));
             }
             let declarations = namespace_declarations_from(element, decoder, None)?;
             let attributes =

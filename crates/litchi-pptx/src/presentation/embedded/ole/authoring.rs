@@ -52,7 +52,11 @@ pub(crate) fn add(
         return Err(invalid("OLE frame extents must be positive"));
     }
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("OLE payload bytes", MAX_PAYLOAD_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            payload.len(),
+            MAX_PAYLOAD_BYTES,
+        ));
     }
     let slide_uri = PackURI::new(slide_part_name).map_err(Error::Uri)?;
     let slide = package.get_part(&slide_uri)?;
@@ -157,7 +161,11 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
             Event::Start(element) => {
                 depth += 1;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("OLE slide depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     crate::presentation::embedded::validate_root(
@@ -203,13 +211,15 @@ fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let position = insertion.ok_or_else(|| invalid("slide has no shape tree"))?;
     let size = xml.len().checked_add(fragment.len()).ok_or_else(|| {
         limit(
-            "updated slide XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
             crate::presentation::embedded::MAX_XML_BYTES,
         )
     })?;
     if size > crate::presentation::embedded::MAX_XML_BYTES {
         return Err(limit(
-            "updated slide XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            size,
             crate::presentation::embedded::MAX_XML_BYTES,
         ));
     }
@@ -262,7 +272,11 @@ fn next_part_index(package: &OpcPackage) -> Result<u32> {
             Err(error) => return Err(error.into()),
         }
     }
-    Err(limit("OLE embedding part namespace", 1_000_000))
+    Err(limit(
+        crate::error::CodecLimitKind::CandidateEntries,
+        1_000_000,
+        1_000_000,
+    ))
 }
 
 fn validate_program_id(value: &str) -> Result<()> {

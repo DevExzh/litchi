@@ -39,8 +39,9 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
     let max_depth = limits.max_depth().min(MAX_DEPTH);
     if xml.len() > max_bytes {
         return Err(Error::Limit {
-            resource: "presentation math XML",
-            limit: max_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: max_bytes,
         });
     }
 
@@ -63,19 +64,26 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "presentation math XML nodes",
-                    limit: max_nodes,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: max_nodes,
                 })?;
                 if nodes > max_nodes {
                     return Err(Error::Limit {
-                        resource: "presentation math XML nodes",
-                        limit: max_nodes,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: max_nodes,
                     });
                 }
                 if stack.len() >= max_depth {
                     return Err(Error::Limit {
-                        resource: "presentation math XML depth",
-                        limit: max_depth,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: max_depth,
                     });
                 }
                 if root_closed {
@@ -94,13 +102,17 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
             },
             Event::Empty(element) => {
                 nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "presentation math XML nodes",
-                    limit: max_nodes,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: max_nodes,
                 })?;
                 if nodes > max_nodes {
                     return Err(Error::Limit {
-                        resource: "presentation math XML nodes",
-                        limit: max_nodes,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: max_nodes,
                     });
                 }
                 if root_closed {

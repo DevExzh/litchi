@@ -132,12 +132,12 @@ impl BulkBudget {
     }
 
     fn remaining(&self) -> Result<usize> {
-        MAX_BULK_SOURCE_BYTES
-            .checked_sub(self.used)
-            .ok_or(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
-            })
+        MAX_BULK_SOURCE_BYTES.checked_sub(self.used).ok_or_else(|| {
+            Error::internal(
+                "bulk_source_budget_remaining",
+                "used source bytes exceed the bulk source budget",
+            )
+        })
     }
 
     fn charge(
@@ -153,17 +153,20 @@ impl BulkBudget {
             .and_then(|value| value.checked_add(scene.retained_bytes()))
             .and_then(|value| value.checked_add(name.map_or(0, str::len)))
             .ok_or(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: usize::MAX,
+                maximum: MAX_BULK_SOURCE_BYTES,
             })?;
         let next = self.used.checked_add(charge).ok_or(Error::Limit {
-            resource: "source presentation bulk snapshot bytes",
-            limit: MAX_BULK_SOURCE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+            observed: usize::MAX,
+            maximum: MAX_BULK_SOURCE_BYTES,
         })?;
         if next > MAX_BULK_SOURCE_BYTES {
             return Err(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: next,
+                maximum: MAX_BULK_SOURCE_BYTES,
             });
         }
         self.used = next;
@@ -293,8 +296,9 @@ fn master_targets(owner: &SourceInner, presentation: &SourcePart) -> Result<Vec<
     let relationship_ids = presentation_part.slide_master_references()?;
     if relationship_ids.len() > MAX_REFERENCES {
         return Err(Error::Limit {
-            resource: "source presentation master references",
-            limit: MAX_REFERENCES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len(),
+            maximum: MAX_REFERENCES,
         });
     }
     let (expected_type, conformance) = relationship_type_for(presentation, "presentation")?;
@@ -324,8 +328,9 @@ fn layout_targets(owner: &SourceInner, master: &SourcePart) -> Result<Vec<Target
     let relationship_ids = master_part.layout_references()?;
     if relationship_ids.len() > MAX_REFERENCES {
         return Err(Error::Limit {
-            resource: "source master layout references",
-            limit: MAX_REFERENCES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len(),
+            maximum: MAX_REFERENCES,
         });
     }
     let (expected_type, conformance) = relationship_type_for(master, "sldMaster")?;
@@ -358,13 +363,15 @@ fn preflight_bulk_targets(owner: &SourceInner, targets: &[Target]) -> Result<()>
         total = total
             .checked_add(view.declared_uncompressed_size()?)
             .ok_or(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: usize::MAX,
+                maximum: MAX_BULK_SOURCE_BYTES,
             })?;
         if total > MAX_BULK_SOURCE_BYTES as u64 {
             return Err(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: usize::try_from(total).unwrap_or(usize::MAX),
+                maximum: MAX_BULK_SOURCE_BYTES,
             });
         }
     }
@@ -385,8 +392,9 @@ fn load_bulk_part(
     );
     if semantic_maximum == 0 {
         return Err(Error::Limit {
-            resource: "source presentation bulk snapshot bytes",
-            limit: MAX_BULK_SOURCE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+            observed: 0,
+            maximum: MAX_BULK_SOURCE_BYTES,
         });
     }
     super::load_part(owner, &target.part_uri, content_type, semantic_maximum)

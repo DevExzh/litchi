@@ -221,8 +221,9 @@ pub fn equations(xml: &[u8]) -> Result<Vec<Equation>> {
         nodes += 1;
         if nodes > MAX_NODES {
             return Err(Error::Limit {
-                resource: "slide equation XML nodes",
-                limit: MAX_NODES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                observed: nodes,
+                maximum: MAX_NODES,
             });
         }
         match event {
@@ -331,8 +332,11 @@ pub fn equations(xml: &[u8]) -> Result<Vec<Equation>> {
                         root.text(&mut text);
                         if out.len() >= MAX_EQUATIONS {
                             return Err(Error::Limit {
-                                resource: "slide equations",
-                                limit: MAX_EQUATIONS,
+                                kind: crate::opened::LimitKind::Codec(
+                                    crate::opened::CodecLimitKind::Equations,
+                                ),
+                                observed: out.len().checked_add(1).unwrap_or(usize::MAX),
+                                maximum: MAX_EQUATIONS,
                             });
                         }
                         out.push(Equation {

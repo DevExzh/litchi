@@ -306,8 +306,9 @@ impl ThreeWayPlan {
                 .checked_add(1)
                 .ok_or_else(|| invalid("patch part count overflow"))?;
             if count > self.limits.max_parts() {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: count,
                     maximum: self.limits.max_parts(),
                 });
             }
@@ -338,8 +339,9 @@ impl ThreeWayPlan {
                 .ok_or_else(|| invalid("metadata count overflow"))?;
         }
         if groups > self.limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: groups,
                 maximum: self.limits.max_parts(),
             });
         }
@@ -414,12 +416,13 @@ impl Patch {
         let mut planned = Vec::new();
         visit_changed_parts(source, target, |name, before, after| {
             if planned.len() >= limits.max_parts() {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: planned.len().checked_add(1).unwrap_or(usize::MAX),
                     maximum: limits.max_parts(),
                 });
             }
-            require_wire_u32(planned.len().saturating_add(1))?;
+            require_wire_u32(planned.len().checked_add(1).unwrap_or(usize::MAX))?;
             require_wire_u32(name.as_str().len())?;
             add_len(&mut length, 4)?;
             add_len(&mut length, name.as_str().len())?;
@@ -468,8 +471,9 @@ impl Patch {
     ) -> Result<Self> {
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
         if deltas.len() > limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: deltas.len(),
                 maximum: limits.max_parts(),
             });
         }
@@ -513,8 +517,9 @@ impl Patch {
         };
         let wire_len = patch.encoded_len_uncached()?;
         if wire_len > patch.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: wire_len,
                 maximum: patch.limits.max_patch_bytes(),
             });
         }
@@ -708,8 +713,9 @@ impl Patch {
         for patch in [left, right] {
             require_capture_bytes(patch.encoded_len()?, limits)?;
             if patch.deltas.len() > limits.max_parts() {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: patch.deltas.len(),
                     maximum: limits.max_parts(),
                 });
             }
@@ -879,8 +885,9 @@ impl Patch {
         // serialization keeps the one-pass, cached fast path.
         let fresh_length = self.encoded_len_uncached()?;
         if fresh_length > self.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: fresh_length,
                 maximum: self.limits.max_patch_bytes(),
             });
         }
@@ -921,8 +928,9 @@ impl Patch {
     /// Returns an error for malformed or unbounded input.
     pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
                 maximum: limits.max_patch_bytes(),
             });
         }
@@ -937,8 +945,9 @@ impl Patch {
         let root = parse_optional_relationship_delta(&mut input, limits)?;
         let count = input.usize32()?;
         if count > limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: count,
                 maximum: limits.max_parts(),
             });
         }
@@ -988,8 +997,9 @@ impl Patch {
             add_len(&mut length, optional_state_len(delta.before.as_ref())?)?;
             add_len(&mut length, optional_state_len(delta.after.as_ref())?)?;
             if length > self.limits.max_patch_bytes() {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::PatchBytes,
+                    observed: length,
                     maximum: self.limits.max_patch_bytes(),
                 });
             }
@@ -1039,8 +1049,9 @@ fn optional_part<'a>(package: &'a OpcPackage, name: &PackURI) -> Result<Option<&
 
 fn require_capture_bytes(length: usize, limits: Limits) -> Result<()> {
     if length > limits.max_patch_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
+            observed: length,
             maximum: limits.max_patch_bytes(),
         });
     }
@@ -1071,8 +1082,9 @@ fn require_wire_u32(length: usize) -> Result<()> {
 
 fn require_relationship_count(count: usize, limits: Limits) -> Result<()> {
     if count > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: count,
             maximum: limits.max_parts(),
         });
     }
@@ -1267,8 +1279,9 @@ impl History {
         self.clear_redo();
         let length = patch.encoded_len()?;
         if length > self.limits.max_history_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::HistoryBytes,
+                observed: length,
                 maximum: self.limits.max_history_bytes(),
             });
         }
@@ -1924,8 +1937,9 @@ fn preflight_join(left: &Patch, right: &Patch, limits: Limits) -> Result<()> {
         )
         .ok_or_else(|| invalid("patch part count overflow"))?;
     if count > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: count,
             maximum: limits.max_parts(),
         });
     }
@@ -2185,8 +2199,9 @@ fn preflight_wire(bytes: &[u8], limits: Limits) -> Result<()> {
     }
     let count = input.usize32()?;
     if count > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: count,
             maximum: limits.max_parts(),
         });
     }
@@ -2237,8 +2252,9 @@ fn parse_optional_state(input: &mut Input<'_>, limits: Limits) -> Result<Option<
 fn parse_relationships(input: &mut Input<'_>, limits: Limits) -> Result<Vec<RelationshipState>> {
     let count = input.usize32()?;
     if count > limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: count,
             maximum: limits.max_parts(),
         });
     }
@@ -2370,8 +2386,9 @@ impl<'a> Input<'a> {
         let length = self.usize64()?;
         if length > limit {
             return Err(Error::Limit {
-                resource: "opened-presentation durable resource bytes",
-                limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: length,
+                maximum: limit,
             });
         }
         self.take(length)

@@ -132,8 +132,11 @@ fn validate_inner(
                 .ok_or_else(|| Error::Invalid("slide owner scan overflow".into()))?;
             if scanned > maximum {
                 return Err(Error::Limit {
-                    resource: "source slide removal relationships",
-                    limit: maximum,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::Relationships,
+                    ),
+                    observed: scanned,
+                    maximum: maximum,
                 });
             }
             if relationship.is_external() {

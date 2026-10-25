@@ -764,11 +764,18 @@ where
         .checked_add(after.len())
         .and_then(|bytes| bytes.checked_mul(16))
         .and_then(|bytes| bytes.checked_add(4096))
-        .filter(|bytes| *bytes <= MAX_PROOF_BYTES)
         .ok_or(Error::Limit {
-            resource: "source slide catalog proof bytes",
-            limit: MAX_PROOF_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ProofBytes),
+            observed: usize::MAX,
+            maximum: MAX_PROOF_BYTES,
         })?;
+    if amount > MAX_PROOF_BYTES {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ProofBytes),
+            observed: amount,
+            maximum: MAX_PROOF_BYTES,
+        });
+    }
     let _reservation = context
         .map(|context| {
             context
@@ -1065,8 +1072,9 @@ where
     // grammar. Bound and validate them before copying bytes into an attribute.
     if relationship_id.len() > crate::media_parts::MAX_STRING_BYTES {
         return Err(Error::Limit {
-            resource: "opened-presentation inserted relationship ID bytes",
-            limit: crate::media_parts::MAX_STRING_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RelationshipBytes),
+            observed: relationship_id.len(),
+            maximum: crate::media_parts::MAX_STRING_BYTES,
         });
     }
     crate::media_parts::validate_id(relationship_id)?;
@@ -1306,16 +1314,23 @@ pub(super) fn escape_character_data(
             _ => None,
         }
     }
-    let limit = || Error::Limit {
-        resource: "opened-presentation escaped text bytes",
-        limit: maximum,
-    };
-    let length = text.bytes().try_fold(0usize, |total, byte| {
-        total
+    let mut length = 0usize;
+    for byte in text.bytes() {
+        length = length
             .checked_add(entity(byte).map_or(1, str::len))
-            .filter(|size| *size <= maximum)
-            .ok_or_else(limit)
-    })?;
+            .ok_or(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum,
+            })?;
+        if length > maximum {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: length,
+                maximum,
+            });
+        }
+    }
     if length == text.len() {
         return Ok(std::borrow::Cow::Borrowed(text));
     }
@@ -1408,8 +1423,9 @@ pub(super) fn stage_shape_texts_admitted_with_limits(
     }
     if replacements.len() > selection_limit {
         return Err(Error::Limit {
-            resource: "opened-presentation shape text replacements",
-            limit: selection_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextReplacements),
+            observed: replacements.len(),
+            maximum: selection_limit,
         });
     }
     let aggregate_text_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
@@ -1419,8 +1435,9 @@ pub(super) fn stage_shape_texts_admitted_with_limits(
     })?;
     if aggregate_text_bytes > aggregate_text_limit {
         return Err(Error::Limit {
-            resource: "opened-presentation aggregate shape text bytes",
-            limit: aggregate_text_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: aggregate_text_bytes,
+            maximum: aggregate_text_limit,
         });
     }
 
@@ -1434,8 +1451,9 @@ pub(super) fn stage_shape_texts_admitted_with_limits(
     }
     if replacements.len() > scene.len() {
         return Err(Error::Limit {
-            resource: "opened-presentation selected shape texts",
-            limit: scene.len(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextReplacements),
+            observed: replacements.len(),
+            maximum: scene.len(),
         });
     }
     let mut selected = HashSet::new();
@@ -1510,8 +1528,9 @@ fn rewrite_shape_texts(
     for edit in edits {
         if edit.text.len() > max_text_bytes {
             return Err(Error::Limit {
-                resource: "opened-presentation shape text bytes",
-                limit: max_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: edit.text.len(),
+                maximum: max_text_bytes,
             });
         }
         if !edit.text.chars().all(is_xml_char) {
@@ -1611,8 +1630,9 @@ fn rewrite_shape_texts(
         .ok_or_else(|| invalid("opened-presentation shape text output size overflow"))?;
     if output_len > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation shape text output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
         });
     }
     let mut output = Vec::new();
@@ -1749,8 +1769,11 @@ fn shape_tree_insertion(xml: &[u8]) -> Result<usize> {
                 bump(&mut nodes)?;
                 if depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "opened-presentation XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth.checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 depth += 1;
@@ -1824,20 +1847,23 @@ pub(crate) fn append_shape_with_limit(
     fragment: &[u8],
     max_output_bytes: usize,
 ) -> Result<Vec<u8>> {
-    let output_len = xml
-        .len()
-        .checked_add(fragment.len())
-        .filter(|length| *length <= max_output_bytes)
-        .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        })?;
+    let output_len = xml.len().checked_add(fragment.len()).ok_or(Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: max_output_bytes,
+    })?;
+    if output_len > max_output_bytes {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
+        });
+    }
     let output = append_shape(xml, fragment)?;
     if output.len() != output_len {
-        return Err(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        });
+        return Err(invalid(
+            "native shape append changed the preflighted output size",
+        ));
     }
     Ok(output)
 }
@@ -2222,8 +2248,9 @@ pub(crate) fn stage_shape_removal_with_limits(
         .ok_or_else(|| invalid("opened-presentation removed shape span underflows"))?;
     if retained > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation removed shape XML",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: retained,
+            maximum: max_output_bytes,
         });
     }
     let mut candidate = Vec::new();
@@ -2588,8 +2615,11 @@ fn slide_id_elements(
                 }
                 if depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "opened-presentation XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth.checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
@@ -2878,8 +2908,11 @@ fn drawing_text_elements_for_owners(
                 bump(&mut nodes)?;
                 if depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "opened-presentation XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth.checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 depth += 1;
@@ -3038,8 +3071,9 @@ pub(super) fn bump(nodes: &mut usize) -> Result<()> {
         .ok_or_else(|| invalid("opened-presentation XML node count overflow"))?;
     if *nodes > MAX_XML_NODES {
         return Err(Error::Limit {
-            resource: "opened-presentation XML nodes",
-            limit: MAX_XML_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: MAX_XML_NODES,
         });
     }
     Ok(())

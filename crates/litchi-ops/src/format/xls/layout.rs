@@ -262,7 +262,7 @@ fn resolve_layout_targets(
             if nodes.len() >= limits.max_expanded_targets() {
                 return Err(Error::from(TransactionError::Limit {
                     kind: LimitKind::ExpandedTargets,
-                    observed: nodes.len().saturating_add(1),
+                    observed: nodes.len().checked_add(1).unwrap_or(usize::MAX),
                     maximum: limits.max_expanded_targets(),
                 })
                 .with_format(FileFormat::Xls));

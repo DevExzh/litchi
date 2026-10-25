@@ -7,6 +7,295 @@ use thiserror::Error;
 /// Result of a PPTX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A bounded resource dimension used by a PresentationML error.
+///
+/// The primary opened-presentation edit dimensions remain direct variants so
+/// callers can select them through [`crate::opened::Limits`].  Codec and
+/// shared-OOXML dimensions are nested to keep their ownership explicit: a
+/// codec limit is not an edit limit, and a shared service keeps its own
+/// vocabulary.  No untyped resource string crosses the public error boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Changed parts in one primary patch.
+    Parts,
+    /// Encoded durable-patch bytes.
+    PatchBytes,
+    /// Replacement text bytes.
+    TextBytes,
+    /// Retained history entries.
+    HistoryEntries,
+    /// Aggregate encoded history bytes.
+    HistoryBytes,
+    /// Retained candidate bytes.
+    RetainedCandidateBytes,
+    /// Retained markup-compatibility bytes.
+    RetainedMceBytes,
+    /// A bounded PresentationML codec dimension.
+    Codec(CodecLimitKind),
+    /// A bounded host-neutral OOXML service dimension.
+    Common(litchi_ooxml_common::LimitKind),
+}
+
+/// Semantic resource dimensions used by the PPTX codecs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CodecLimitKind {
+    /// Bytes admitted from an input buffer.
+    InputBytes,
+    /// Bytes produced by a codec or writer.
+    OutputBytes,
+    /// PresentationML or DrawingML XML bytes.
+    XmlBytes,
+    /// XML nesting depth.
+    XmlDepth,
+    /// XML elements, nodes, or frames.
+    XmlNodes,
+    /// XML parser events.
+    XmlEvents,
+    /// XML attributes.
+    XmlAttributes,
+    /// XML attribute bytes.
+    XmlAttributeBytes,
+    /// Decoded string bytes.
+    StringBytes,
+    /// Text bytes.
+    TextBytes,
+    /// OPC part bytes.
+    PartBytes,
+    /// OPC part count.
+    Parts,
+    /// Relationship count or relationship graph edges.
+    Relationships,
+    /// Relationship identifier or target bytes.
+    RelationshipBytes,
+    /// XML entity-reference bytes.
+    ReferenceBytes,
+    /// Names or name-bearing selectors.
+    Names,
+    /// Name bytes.
+    NameBytes,
+    /// Slides or slide references.
+    Slides,
+    /// Shapes or shape records.
+    Shapes,
+    /// Placeholder shape records in a newly authored slide.
+    Placeholders,
+    /// Shape-property replacement selections.
+    ShapeProperties,
+    /// Office Math equations discovered in a slide.
+    Equations,
+    /// Text-box shape records in a streaming slide.
+    TextBoxes,
+    /// Text replacement selections staged in one edit.
+    TextReplacements,
+    /// Ink annotation records.
+    Annotations,
+    /// Ink trace records.
+    Traces,
+    /// Ink trace groups.
+    TraceGroups,
+    /// Ink trace points.
+    TracePoints,
+    /// Ink action anchors.
+    InkAnchors,
+    /// Ink action picture children.
+    PictureChildren,
+    /// Embedded chart series.
+    ChartSeries,
+    /// Embedded chart points.
+    ChartPoints,
+    /// Embedded controls.
+    Controls,
+    /// Embedded OLE objects.
+    OleObjects,
+    /// Content-part anchors.
+    ContentParts,
+    /// Table rows.
+    TableRows,
+    /// Table cells.
+    TableCells,
+    /// Table style definitions.
+    TableStyles,
+    /// Modern comment records and replies.
+    CommentEntries,
+    /// Modern comment replies.
+    CommentReplies,
+    /// Modern comment author records.
+    Authors,
+    /// Action setting records.
+    ActionSettings,
+    /// Shape designer tag records.
+    DesignerTags,
+    /// Candidate entries considered while constructing a package graph.
+    CandidateEntries,
+    /// Text objects in a slide.
+    TextObjects,
+    /// Text runs in a slide.
+    TextRuns,
+    /// Zoom entries.
+    ZoomEntries,
+    /// Caption tracks.
+    CaptionTracks,
+    /// Presentation tags.
+    Tags,
+    /// References or identities.
+    References,
+    /// Payload bytes.
+    PayloadBytes,
+    /// Serialized archive bytes.
+    ArchiveBytes,
+    /// Durable patch bytes.
+    PatchBytes,
+    /// Source bytes.
+    SourceBytes,
+    /// Retained bytes.
+    RetainedBytes,
+    /// A bounded index or position.
+    Index,
+    /// A bounded namespace byte sequence.
+    NamespaceBytes,
+    /// Namespace bindings or declarations.
+    NamespaceBindings,
+    /// Namespace prefixes.
+    NamespacePrefixes,
+    /// Extension count or extension list.
+    Extensions,
+    /// Extension payload bytes.
+    ExtensionBytes,
+    /// Aggregate Designer tag name and value bytes.
+    DesignerTagBytes,
+    /// Password/verifier bytes.
+    PasswordBytes,
+    /// Shape identifier values.
+    ShapeIds,
+    /// Slide identifier values.
+    SlideIds,
+    /// Snapshot entries or their bounded aggregate.
+    Snapshots,
+    /// Proof bytes used by a source-backed plan.
+    ProofBytes,
+    /// Bounded transient memory admission bytes.
+    MemoryBytes,
+    /// Embedded font count.
+    Fonts,
+    /// Presentation view guide entries.
+    Guides,
+    /// Presentation property recent-color entries.
+    Colors,
+    /// Model3D child entries.
+    ModelEntries,
+    /// One embedded font payload.
+    FontBytes,
+    /// Aggregate embedded-font payload bytes.
+    TotalFontBytes,
+}
+
+impl CodecLimitKind {
+    /// A content-free diagnostic label.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
+            Self::XmlBytes => "XML bytes",
+            Self::XmlDepth => "XML depth",
+            Self::XmlNodes => "XML nodes",
+            Self::XmlEvents => "XML events",
+            Self::XmlAttributes => "XML attributes",
+            Self::XmlAttributeBytes => "XML attribute bytes",
+            Self::StringBytes => "string bytes",
+            Self::TextBytes => "text bytes",
+            Self::PartBytes => "part bytes",
+            Self::Parts => "parts",
+            Self::Relationships => "relationships",
+            Self::RelationshipBytes => "relationship bytes",
+            Self::ReferenceBytes => "reference bytes",
+            Self::Names => "names",
+            Self::NameBytes => "name bytes",
+            Self::Slides => "slides",
+            Self::Shapes => "shapes",
+            Self::Placeholders => "placeholders",
+            Self::ShapeProperties => "shape properties",
+            Self::Equations => "equations",
+            Self::TextBoxes => "text boxes",
+            Self::TextReplacements => "text replacements",
+            Self::Annotations => "annotations",
+            Self::Traces => "traces",
+            Self::TraceGroups => "trace groups",
+            Self::TracePoints => "trace points",
+            Self::InkAnchors => "ink anchors",
+            Self::PictureChildren => "picture children",
+            Self::ChartSeries => "chart series",
+            Self::ChartPoints => "chart points",
+            Self::Controls => "controls",
+            Self::OleObjects => "OLE objects",
+            Self::ContentParts => "content parts",
+            Self::TableRows => "table rows",
+            Self::TableCells => "table cells",
+            Self::TableStyles => "table styles",
+            Self::CommentEntries => "comment entries",
+            Self::CommentReplies => "comment replies",
+            Self::Authors => "authors",
+            Self::ActionSettings => "action settings",
+            Self::DesignerTags => "designer tags",
+            Self::CandidateEntries => "candidate entries",
+            Self::TextObjects => "text objects",
+            Self::TextRuns => "text runs",
+            Self::ZoomEntries => "zoom entries",
+            Self::CaptionTracks => "caption tracks",
+            Self::Tags => "tags",
+            Self::References => "references",
+            Self::PayloadBytes => "payload bytes",
+            Self::ArchiveBytes => "archive bytes",
+            Self::PatchBytes => "patch bytes",
+            Self::SourceBytes => "source bytes",
+            Self::RetainedBytes => "retained bytes",
+            Self::Index => "index",
+            Self::NamespaceBytes => "namespace bytes",
+            Self::NamespaceBindings => "namespace bindings",
+            Self::NamespacePrefixes => "namespace prefixes",
+            Self::Extensions => "extensions",
+            Self::ExtensionBytes => "extension bytes",
+            Self::DesignerTagBytes => "Designer tag bytes",
+            Self::PasswordBytes => "password bytes",
+            Self::ShapeIds => "shape identifiers",
+            Self::SlideIds => "slide identifiers",
+            Self::Snapshots => "snapshots",
+            Self::ProofBytes => "proof bytes",
+            Self::MemoryBytes => "memory bytes",
+            Self::Fonts => "fonts",
+            Self::Guides => "guides",
+            Self::Colors => "colors",
+            Self::ModelEntries => "model entries",
+            Self::FontBytes => "font bytes",
+            Self::TotalFontBytes => "total font bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for CodecLimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parts => formatter.write_str("changed parts"),
+            Self::PatchBytes => formatter.write_str("durable patch bytes"),
+            Self::TextBytes => formatter.write_str("replacement text bytes"),
+            Self::HistoryEntries => formatter.write_str("history entries"),
+            Self::HistoryBytes => formatter.write_str("history bytes"),
+            Self::RetainedCandidateBytes => formatter.write_str("retained candidate bytes"),
+            Self::RetainedMceBytes => formatter.write_str("retained markup-compatibility bytes"),
+            Self::Codec(kind) => kind.fmt(formatter),
+            Self::Common(kind) => kind.fmt(formatter),
+        }
+    }
+}
+
 /// Stable classification for a shape-transfer refusal that would otherwise
 /// publish a lossy or dangling shape graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -332,22 +621,28 @@ pub enum Error {
     #[error("invalid PresentationML: {0}")]
     Invalid(String),
 
-    /// A bounded codec resource was exhausted.
-    #[error("PresentationML {resource} exceeds the limit of {limit}")]
+    /// A bounded PresentationML resource was exhausted.
+    ///
+    /// `observed` is the measured charge.  Arithmetic overflow is represented
+    /// by `usize::MAX`, never by a fabricated `maximum + 1` value.
+    #[error("PresentationML {kind} exceeds the limit of {maximum} (observed {observed})")]
     Limit {
-        /// Resource that exceeded its configured limit.
-        resource: &'static str,
+        /// Dimension that exceeded its configured limit.
+        kind: LimitKind,
+        /// Measured charge, or `usize::MAX` when the charge overflowed.
+        observed: usize,
         /// Active upper bound.
-        limit: usize,
+        maximum: usize,
     },
 
-    /// A primary presentation transaction exceeded one dimension of its
-    /// [`crate::opened::Limits`].
-    #[error("PresentationML edit exceeds its {kind} limit of {maximum}")]
-    EditLimit {
-        /// The refused dimension.
-        kind: crate::opened::LimitKind,
-        /// Active upper bound.
+    /// A caller-selected PresentationML limit was invalid.
+    #[error("invalid PresentationML {kind} limit: {value} (maximum {maximum})")]
+    InvalidLimit {
+        /// Dimension whose value was invalid.
+        kind: LimitKind,
+        /// Supplied value.
+        value: usize,
+        /// Hard maximum permitted for this dimension.
         maximum: usize,
     },
 
@@ -752,5 +1047,52 @@ impl Error {
 impl From<quick_xml::Error> for Error {
     fn from(error: quick_xml::Error) -> Self {
         Self::Xml(error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CodecLimitKind, Error, LimitKind};
+
+    #[test]
+    fn typed_limit_keeps_dimension_and_exact_observation() {
+        let error = Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::TracePoints),
+            observed: 17,
+            maximum: 16,
+        };
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Codec(CodecLimitKind::TracePoints),
+                observed: 17,
+                maximum: 16,
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "PresentationML trace points exceeds the limit of 16 (observed 17)"
+        );
+    }
+
+    #[test]
+    fn invalid_limit_reports_the_supplied_value_without_resource_strings() {
+        let error = Error::InvalidLimit {
+            kind: LimitKind::Codec(CodecLimitKind::Annotations),
+            value: 0,
+            maximum: 4096,
+        };
+        assert!(matches!(
+            error,
+            Error::InvalidLimit {
+                kind: LimitKind::Codec(CodecLimitKind::Annotations),
+                value: 0,
+                maximum: 4096,
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "invalid PresentationML annotations limit: 0 (maximum 4096)"
+        );
     }
 }
