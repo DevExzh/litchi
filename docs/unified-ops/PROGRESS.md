@@ -5923,3 +5923,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   bytes under the existing exclusions. Final tooling coverage adds two new
   test modules to the existing forty. Native135d/136c and final qualification
   remain open; nothing is pushed.
+
+  Reviewed current-native135e composes at bc5162cc97 without conflicts (143).
+  The combined protocol/no-3rdparty suite passes 77 tests. Genuine baseline
+  consumers, separate source builds and strict replay/output checks are in
+  place; actual guarded builds and measurements remain pending. Integration's
+  generated overlays are cleared after external preservation, with all three
+  locks unchanged. The conservative allocated ledger reaches 800,926,519,296
+  bytes under prior exclusions. Signed136d remains under repair; final source
+  binding, qualification and trunk integration are still open. No push.
