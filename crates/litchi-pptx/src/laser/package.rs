@@ -43,6 +43,7 @@ pub(crate) fn store_slide_trace(
     slide_name: &PackURI,
     points: &[TracePoint],
     semantic_limits: Limits,
+    usage: &mut Usage,
 ) -> Result<()> {
     let limits = semantic_limits.constrained_by_source(package.read_limits());
     validate(points, &limits)?;
@@ -53,8 +54,13 @@ pub(crate) fn store_slide_trace(
             actual: slide.content_type().to_owned(),
         });
     }
-    let mut usage = Usage::default();
-    if !load_slide_traces(0, slide, &limits, &mut usage)?.is_empty() {
+    // The preflight read is deliberately local: the operation's aggregate
+    // scope is the set of successfully published replacement slides, and a
+    // slide that already owns a trace is rejected before it can contribute to
+    // that scope.  The final read-back below charges the candidate exactly
+    // once, matching patch replay's changed-part walk.
+    let mut source_usage = Usage::default();
+    if !load_slide_traces(0, slide, &limits, &mut source_usage)?.is_empty() {
         return Err(Error::Invalid(
             "slide already contains a laser-trace extension; replacement is not supported"
                 .to_owned(),
@@ -65,14 +71,15 @@ pub(crate) fn store_slide_trace(
     let fragment = write(points, conformance, limits)?;
     let updated = insert_extension_fragment(slide.blob(), &fragment, &limits)?;
     let probe = BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
-    let mut usage = Usage::default();
-    let traces = load_slide_traces(0, &probe, &limits, &mut usage)?;
+    let mut next_usage = *usage;
+    let traces = load_slide_traces(0, &probe, &limits, &mut next_usage)?;
     if traces.len() != 1 || traces[0].points().len() != points.len() {
         return Err(Error::Invalid(
             "laser-trace storage failed read-back validation".to_owned(),
         ));
     }
     package.get_part_mut(slide_name)?.set_blob(updated);
+    *usage = next_usage;
     Ok(())
 }
 
@@ -396,7 +403,14 @@ mod tests {
         ] {
             let xml = format!(r#"<p:sld xmlns:p="{pml}"><p:cSld/><p:spTree/>{tail}</p:sld>"#);
             let (mut package, name) = package(&xml);
-            store_slide_trace(&mut package, &name, &[point()], Limits::DEFAULT).unwrap();
+            store_slide_trace(
+                &mut package,
+                &name,
+                &[point()],
+                Limits::DEFAULT,
+                &mut Usage::default(),
+            )
+            .unwrap();
             let slide = package.get_part(&name).unwrap();
             let mut usage = Usage::default();
             let traces = load_slide_traces(0, slide, &Limits::DEFAULT, &mut usage).unwrap();
@@ -410,11 +424,27 @@ mod tests {
         let strict = "http://purl.oclc.org/ooxml/presentationml/main";
         let xml = format!(r#"<p:sld xmlns:p="{strict}"><p:cSld/></p:sld>"#);
         let (mut package, name) = package(&xml);
-        store_slide_trace(&mut package, &name, &[point()], Limits::DEFAULT).unwrap();
+        store_slide_trace(
+            &mut package,
+            &name,
+            &[point()],
+            Limits::DEFAULT,
+            &mut Usage::default(),
+        )
+        .unwrap();
         let slide = package.get_part(&name).unwrap();
         let output = std::str::from_utf8(slide.blob()).unwrap();
         assert!(output.contains(strict));
-        assert!(store_slide_trace(&mut package, &name, &[point()], Limits::DEFAULT).is_err());
+        assert!(
+            store_slide_trace(
+                &mut package,
+                &name,
+                &[point()],
+                Limits::DEFAULT,
+                &mut Usage::default(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -436,7 +466,13 @@ mod tests {
         let before = retained.get_part(&name).unwrap().blob().to_vec();
 
         assert!(matches!(
-            store_slide_trace(&mut retained, &name, &[point()], Limits::DEFAULT),
+            store_slide_trace(
+                &mut retained,
+                &name,
+                &[point()],
+                Limits::DEFAULT,
+                &mut Usage::default(),
+            ),
             Err(Error::Limit {
                 resource: "updated slide XML bytes",
                 ..

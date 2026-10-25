@@ -27,6 +27,11 @@ family!("laser-pointer trace");
 #[derive(Debug)]
 pub struct Edit<'a> {
     staged: Staged<'a>,
+    /// Aggregate usage for the slides successfully changed by this staged
+    /// operation.  Keeping it beside the staged graph makes a failed verb
+    /// retry-safe: the ledger advances only when `Staged::update` publishes
+    /// its candidate.
+    usage: Usage,
 }
 
 impl Package {
@@ -39,6 +44,7 @@ impl Package {
     pub fn edit_laser_traces(&self) -> Result<Edit<'_>> {
         Ok(Edit {
             staged: Staged::new(self, "edit_laser_traces")?,
+            usage: Usage::default(),
         })
     }
 
@@ -86,13 +92,20 @@ impl Edit<'_> {
     ) -> Result<()> {
         let slide_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let limits = self.staged.laser_limits();
-        self.staged
-            .update(move |opc| raw::store_slide_trace(opc, &slide_name, points, limits))
+        let mut next_usage = self.usage;
+        let result = self.staged.update(|opc| {
+            raw::store_slide_trace(opc, &slide_name, points, limits, &mut next_usage)
+        });
+        if result.is_ok() {
+            self.usage = next_usage;
+        }
+        result
     }
 
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
+        self.usage = Usage::default();
     }
 
     /// Publish the staged changes to a new package.
@@ -111,6 +124,7 @@ mod tests {
     use crate::laser::Limits;
     use crate::time::Offset;
     use litchi_drawingml::coordinate::Coordinate;
+    use litchi_opc::{PackURI, Part};
 
     fn point() -> TracePoint {
         TracePoint::new(
@@ -186,5 +200,70 @@ mod tests {
             .unwrap()
             .into_package();
         assert_eq!(replayed.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn owning_edit_charges_changed_slides_once_and_rolls_back_failed_set() {
+        let mut builder = crate::builder::Builder::new().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
+
+        // Derive an exact one-slide output bound from the ordinary profile;
+        // the bounded edit below must admit the first changed slide and
+        // refuse the second without charging or publishing it.
+        let source = Package::from_bytes(&bytes).unwrap();
+        let mut baseline_edit = source.edit_laser_traces().unwrap();
+        baseline_edit.set(0_usize, &[point()]).unwrap();
+        let baseline = baseline_edit.commit().unwrap().into_package();
+        let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let one_slide_bytes = baseline
+            .opc
+            .get_part(&slide_name)
+            .unwrap()
+            .payload_len()
+            .unwrap();
+        let default = Limits::DEFAULT;
+        let profile = Limits::new(
+            one_slide_bytes,
+            one_slide_bytes,
+            2,
+            2,
+            default.max_xml_nodes(),
+            default.max_xml_depth(),
+            default.max_output_bytes(),
+        )
+        .unwrap();
+        let limited = Package::from_bytes_with_options(
+            &bytes,
+            crate::OpenOptions::default().laser_limits(profile),
+        )
+        .unwrap();
+
+        let mut edit = limited.edit_laser_traces().unwrap();
+        edit.set(0_usize, &[point()]).unwrap();
+        let charged = edit.usage;
+        assert_eq!(charged.total_slide_xml_bytes(), one_slide_bytes);
+        assert_eq!(charged.trace_count(), 1);
+        assert_eq!(charged.point_count(), 1);
+
+        let error = edit.set(1_usize, &[point()]).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::Error::Limit {
+                resource: "total slide XML bytes",
+                ..
+            }
+        ));
+        assert_eq!(edit.usage, charged);
+        assert!(edit.set(1_usize, &[point()]).is_err());
+
+        edit.reset();
+        assert_eq!(edit.usage, Usage::default());
+        assert!(edit.commit().unwrap().patch().is_noop());
+
+        let mut retry = limited.edit_laser_traces().unwrap();
+        retry.set(0_usize, &[point()]).unwrap();
+        assert!(!retry.commit().unwrap().patch().is_noop());
     }
 }

@@ -414,8 +414,7 @@ impl Revision {
                 "slide_snapshot",
                 semantic.shape(),
                 semantic.transition(),
-            )
-            .unwrap_or(crate::presentation::transition::SlideMce::Plain),
+            )?,
         })
     }
 }
