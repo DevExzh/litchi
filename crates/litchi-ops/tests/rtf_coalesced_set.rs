@@ -457,8 +457,8 @@ fn atomic_batch_coalesces_ordered_sets_while_best_effort_keeps_item_boundaries()
         let atomic = source
             .batch(commands(), BatchMode::Atomic)
             .expect("atomic ordered batch");
-        assert_eq!(atomic.results().len(), 3);
-        assert!(atomic.results().iter().all(|result| {
+        assert_eq!(atomic.value().len(), 3);
+        assert!(atomic.value().iter().all(|result| {
             matches!(result, litchi_ops::ItemResult::Applied(applied) if applied.changed)
         }));
         assert_eq!(atomic.diagnostics().operations(), 3);
@@ -471,7 +471,7 @@ fn atomic_batch_coalesces_ordered_sets_while_best_effort_keeps_item_boundaries()
         let best = source
             .batch(commands(), BatchMode::BestEffort)
             .expect("best-effort ordered batch");
-        assert_eq!(best.results().len(), 3);
+        assert_eq!(best.value().len(), 3);
         assert_eq!(best.diagnostics().operations(), 3);
         assert_eq!(best.diagnostics().commits(), 3);
         assert_eq!(text(best.file(), "/body/p[1]"), "first batch");
@@ -495,11 +495,11 @@ fn noops_keep_exact_bytes_and_batch_result_order() {
     assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(commit.diagnostics().commits(), 1);
     assert!(matches!(
-        &commit.results()[0],
+        &commit.value()[0],
         litchi_ops::ItemResult::Applied(applied) if !applied.changed
     ));
     assert!(matches!(
-        &commit.results()[1],
+        &commit.value()[1],
         litchi_ops::ItemResult::Applied(applied) if applied.changed
     ));
     assert_eq!(text(commit.file(), "/body/p[2]"), "changed");
@@ -538,18 +538,18 @@ fn atomic_and_best_effort_batches_preserve_failure_indices_and_rollback() {
     let commit = source
         .batch(commands(), BatchMode::BestEffort)
         .expect("best-effort invalid item");
-    assert_eq!(commit.results().len(), 3);
+    assert_eq!(commit.value().len(), 3);
     assert!(matches!(
-        &commit.results()[0],
+        &commit.value()[0],
         litchi_ops::ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &commit.results()[1],
+        &commit.value()[1],
         litchi_ops::ItemResult::Failed(error)
             if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
     ));
     assert!(matches!(
-        &commit.results()[2],
+        &commit.value()[2],
         litchi_ops::ItemResult::Applied(applied) if applied.changed
     ));
     assert_eq!(commit.diagnostics().commits(), 2);

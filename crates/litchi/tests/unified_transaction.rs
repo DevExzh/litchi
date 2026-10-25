@@ -53,8 +53,8 @@ fn facade_exposes_command_results_for_atomic_and_best_effort_batches() {
     )
     .unwrap();
     let commit: BatchCommit = file.batch(&items, BatchMode::BestEffort).unwrap();
-    assert!(matches!(commit.results()[0], ItemResult::Applied(_)));
-    assert!(matches!(commit.results()[1], ItemResult::Failed(_)));
+    assert!(matches!(commit.value()[0], ItemResult::Applied(_)));
+    assert!(matches!(commit.value()[1], ItemResult::Failed(_)));
     let applied: litchi::transaction::Commit<litchi::Applied> = file.apply(&items[0]).unwrap();
     assert!(applied.value().path.is_some());
 }

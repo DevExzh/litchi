@@ -426,7 +426,7 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
         },
     };
     let mut warned = false;
-    for result in commit.results() {
+    for result in commit.value() {
         if let ItemResult::Applied(applied) = result {
             warned |= !applied.warnings.is_empty();
             if !json {
@@ -437,7 +437,7 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
     let changed = commit.diagnostics().changed();
     let saved = publish(commit.file(), changed, &args.output)?;
     let results: Vec<ItemJson<'_>> = commit
-        .results()
+        .value()
         .iter()
         .enumerate()
         .map(|(index, result)| ItemJson::of(index, result, items.get(index)))

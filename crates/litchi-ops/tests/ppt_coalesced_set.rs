@@ -245,8 +245,8 @@ fn edit_and_batch_coalesce_one_thousand_distinct_direct_text_sets_for_both_owner
         assert!(commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().operations(), DIRECT_COUNT);
         assert_eq!(commit.diagnostics().commits(), 1);
-        assert_eq!(commit.results().len(), DIRECT_COUNT);
-        assert!(commit.results().iter().all(
+        assert_eq!(commit.value().len(), DIRECT_COUNT);
+        assert!(commit.value().iter().all(
             |result| matches!(result, litchi_ops::ItemResult::Applied(applied) if applied.changed)
         ));
         assert_eq!(text(commit.file(), "/slide[1]/shape[1]"), "after-1");
@@ -423,11 +423,11 @@ fn batch_reports_exact_noop_and_changed_results_without_mutating_input() {
         assert_eq!(commit.diagnostics().operations(), 2);
         assert_eq!(commit.diagnostics().commits(), 1);
         assert!(matches!(
-            &commit.results()[0],
+            &commit.value()[0],
             litchi_ops::ItemResult::Applied(applied) if !applied.changed
         ));
         assert!(matches!(
-            &commit.results()[1],
+            &commit.value()[1],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(text(commit.file(), FIRST), "first");
@@ -457,18 +457,18 @@ fn atomic_and_best_effort_batches_keep_their_public_failure_contract() {
         let commit = source
             .batch(make_items(), BatchMode::BestEffort)
             .expect("best effort invalid item");
-        assert_eq!(commit.results().len(), 3);
+        assert_eq!(commit.value().len(), 3);
         assert!(matches!(
-            &commit.results()[0],
+            &commit.value()[0],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &commit.results()[1],
+            &commit.value()[1],
             litchi_ops::ItemResult::Failed(error) if error.item() == Some(1)
                 && error.code() == Code::UnsupportedProperty
         ));
         assert!(matches!(
-            &commit.results()[2],
+            &commit.value()[2],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(commit.diagnostics().commits(), 2);

@@ -652,15 +652,15 @@ fn atomic_and_best_effort_batches_keep_item_attribution_and_rollback() {
             )
             .expect("best-effort batch");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(result) if result.changed
         ));
         assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("best"));

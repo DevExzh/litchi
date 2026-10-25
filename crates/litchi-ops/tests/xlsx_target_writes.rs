@@ -688,11 +688,11 @@ fn best_effort_keeps_a_successful_range_before_a_failed_selector() {
         )
         .expect("best-effort retains a valid range item");
     assert!(matches!(
-        &result.results()[0],
+        &result.value()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &result.results()[1],
+        &result.value()[1],
         ItemResult::Failed(error) if error.item() == Some(1)
     ));
     assert_eq!(cell_text(result.file(), A1).as_deref(), Some("kept"));

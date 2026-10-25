@@ -10,7 +10,7 @@
 //! - `capabilities --json`: `litchi_ops::capabilities::Capabilities`.
 //! - writes (`set`, `add`, `remove`, `move`, `swap`, `batch`): OfficeCLI's
 //!   batch rendering, `{"results": [...], "summary": {...}}`, built by
-//!   [`Report`] from the public fields of `litchi_ops::BatchCommit`.
+//!   [`Report`] from the public accessors of `litchi_ops::BatchCommit`.
 //! - errors, on stderr: OfficeCLI's `ErrorResult`, `{"error": message,
 //!   "code": code, "suggestion": ...}`, plus `item` and `property` when the
 //!   error names them.

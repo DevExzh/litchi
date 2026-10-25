@@ -198,7 +198,7 @@ fn doc_batch_noop_and_limits_keep_exact_source() {
     let batch = file
         .batch([first, second], BatchMode::Atomic)
         .expect("atomic DOC text batch");
-    assert_eq!(batch.results().len(), 2);
+    assert_eq!(batch.value().len(), 2);
     assert_eq!(batch.diagnostics().commits(), 1);
     assert_eq!(paragraph_text(batch.file(), "/body/p[1]"), "batch second");
 

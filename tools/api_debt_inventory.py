@@ -43,7 +43,9 @@ OWNERS = {"Package", "Workbook", "Document", "Presentation", "Drawing", "Chart",
 CORE_COMMIT = ("litchi_core", "edit", "Commit")
 CORE_COMMIT_METHODS = frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"})
 FACADE_COMMIT_PATHS = gate.FACADE_COMMIT_PATHS
-FACADE_COMMIT_METHODS = frozenset({"file", "into_file", "patch", "diagnostics", "into_parts"})
+FACADE_COMMIT_METHODS = frozenset({
+    "file", "into_file", "patch", "diagnostics", "value", "into_value", "into_parts",
+})
 DRAFT_NAMES = {"Reader", "Workbook", "Spreadsheet", "Presentation", "Document"}
 OUTPUT_PREFIXES = ("save", "to_", "write_to")
 SIGNATURE = {"sign", "sign_with", "resign", "resign_with", "unsign"}
@@ -361,7 +363,8 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                 if missing or extra:
                     detail = ",".join(sorted(members & {"package", "into_package", "file",
                                                         "into_file", "patch", "diagnostics",
-                                                        "into_parts", *extra}))
+                                                        "value", "into_value", "into_parts",
+                                                        *extra}))
                     target = "; ".join(filter(None, (
                         "add " + ",".join(missing) if missing else "",
                         "delete " + ",".join(extra) if extra else "")))

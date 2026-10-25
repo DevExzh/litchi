@@ -181,7 +181,7 @@ fn atomic_and_best_effort_batches_attribute_swap_failures() {
         ["Second", "Fourth", "Third", "First"]
     );
     assert!(
-        matches!(&best.results()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
+        matches!(&best.value()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }

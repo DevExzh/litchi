@@ -219,7 +219,9 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
         )
 
     def test_file_accessors_are_scoped_to_the_unified_facade(self):
-        methods = ("file", "into_file", "patch", "diagnostics", "into_parts")
+        methods = (
+            "file", "into_file", "patch", "diagnostics", "value", "into_value", "into_parts",
+        )
         format_document = commit_shape_fixture("fixture", ("format",), methods)
         findings = list(inventory.rows(
             format_document, "fixture", result_rules=[], immutable_owners=set(),
@@ -245,6 +247,43 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
                 ("litchi_ops", "transaction", "Commit")
             )
         )
+
+    def test_facade_commit_requires_both_value_accessors_and_rejects_legacy_results(self):
+        required = (
+            "file", "into_file", "patch", "diagnostics", "value", "into_value", "into_parts",
+        )
+        path = ("litchi_ops", "transaction", "Commit")
+        for missing in required:
+            with self.subTest(missing=missing):
+                methods = tuple(method for method in required if method != missing)
+                document = commit_shape_fixture("litchi_ops", ("transaction",), methods)
+                return_types = inventory.gate.ReturnTypes(
+                    inventory.Inventory(document, "litchi_ops")
+                )
+                self.assertFalse(return_types.is_commit(path))
+                rows = list(inventory.rows(
+                    document, "litchi_ops", result_rules=[], immutable_owners=set(),
+                    delegated_globs=set(),
+                ))
+                commit_rows = [row for row in rows if row[0] == "commit_type"]
+                self.assertEqual(len(commit_rows), 1, rows)
+                self.assertIn("add " + missing, commit_rows[0][3])
+
+        legacy = (
+            "file", "into_file", "patch", "diagnostics", "results", "into_results", "into_parts",
+        )
+        document = commit_shape_fixture("litchi_ops", ("transaction",), legacy)
+        return_types = inventory.gate.ReturnTypes(
+            inventory.Inventory(document, "litchi_ops")
+        )
+        self.assertFalse(return_types.is_commit(path))
+        rows = list(inventory.rows(
+            document, "litchi_ops", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+        ))
+        commit_rows = [row for row in rows if row[0] == "commit_type"]
+        self.assertEqual(len(commit_rows), 1, rows)
+        self.assertIn("add into_value,value", commit_rows[0][3])
 
     def test_policy_owner_name_outside_heuristic_covers_alias_once(self):
         document = owner_fixture()

@@ -185,7 +185,7 @@ fn batches_attribute_failure_and_continue_from_successful_moves() {
         paragraphs(best.file()),
         ["Third", "Second", "Fourth", "First"]
     );
-    assert!(matches!(&best.results()[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
+    assert!(matches!(&best.value()[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 

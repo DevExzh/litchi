@@ -218,11 +218,11 @@ fn ordering_is_atomic_across_set_move_and_swap_batches() {
             )
             .expect("best-effort ordering batch");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             litchi_ops::ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));

@@ -54,9 +54,9 @@ Every failure is one `litchi::Error` with a stable `litchi::Code`.
 OPC package-ingestion policy. Ordinary constructors use bounded defaults.
 Construct a profile from those defaults with `SourceLimits::builder()` and supply
 it through the format's `OpenOptions` (`Package::open_with_options`,
-`from_bytes_with_options`, …), or to the unified layer through
-`litchi::OpenOptions::ooxml_limits` (`open_with`, `open_bytes_with`, and the
-detection functions, which take the `OpenOptions` they would be opened with).
+`from_bytes_with_options`, …). The unified owner passes its
+`litchi::OpenOptions::ooxml_limits` policy to `open_with` and `open_bytes_with`;
+the direct detection functions take the required `&SourceLimits` explicitly.
 
 The policy bounds compressed input, ZIP member counts, names, directory
 metadata, compressed and uncompressed member sizes, materialized OPC parts,

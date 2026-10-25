@@ -221,12 +221,12 @@ fn order_boundaries_batches_and_source_owner_keep_original_snapshot() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&result.results()[1], ItemResult::Failed(e) if e.item()==Some(1)));
+    assert!(matches!(&result.value()[1], ItemResult::Failed(e) if e.item()==Some(1)));
     assert_eq!(texts(result.file()), ["C", "B", "A"]);
     assert_eq!(source.to_bytes().unwrap(), before);
 
     let source_result = deferred.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&source_result.results()[1], ItemResult::Failed(e) if e.item()==Some(1)));
+    assert!(matches!(&source_result.value()[1], ItemResult::Failed(e) if e.item()==Some(1)));
     assert_eq!(texts(source_result.file()), ["C", "B", "A"]);
     assert_eq!(deferred.to_bytes().unwrap(), before);
 }

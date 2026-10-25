@@ -2655,17 +2655,17 @@ fn xlsx_batches_are_atomic_or_best_effort_by_mode() {
                 BatchMode::BestEffort,
             )
             .expect("best-effort batches retain successful items");
-        assert_eq!(best_effort.results().len(), 3);
+        assert_eq!(best_effort.value().len(), 3);
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(result) if result.changed
         ));
         assert_eq!(

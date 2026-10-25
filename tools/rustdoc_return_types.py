@@ -183,7 +183,10 @@ class ReturnTypes:
         owner_getters = ({"file", "into_file"}
                          if path in FACADE_COMMIT_PATHS
                          else {"package", "into_package"})
-        return owner_getters | {"patch", "diagnostics", "into_parts"} <= members
+        required = owner_getters | {"patch", "diagnostics", "into_parts"}
+        if path in FACADE_COMMIT_PATHS:
+            required |= {"value", "into_value"}
+        return required <= members
 
     def commit_package(self, path: tuple[str, ...], args=()):
         """Resolve the published owner without trusting a Commit's spelling."""

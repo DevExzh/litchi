@@ -246,15 +246,15 @@ fn unified_once(file: &File, commands: Vec<BatchItem<'static>>) -> Result<litchi
 }
 
 fn validate_batch(commit: &litchi_ops::BatchCommit, count: usize) -> Result<()> {
-    if commit.results().len() != count || commit.diagnostics().operations() != count {
+    if commit.value().len() != count || commit.diagnostics().operations() != count {
         return Err(format!(
             "unified batch accounting mismatch: results={}, operations={}, expected={count}",
-            commit.results().len(),
+            commit.value().len(),
             commit.diagnostics().operations()
         )
         .into());
     }
-    if commit.results().iter().any(
+    if commit.value().iter().any(
         |result| !matches!(result, litchi_ops::ItemResult::Applied(applied) if applied.changed),
     ) {
         return Err("unified batch did not apply every direct shape command".into());

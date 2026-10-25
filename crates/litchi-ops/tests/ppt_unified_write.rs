@@ -305,7 +305,7 @@ fn edit_history_batch_modes_and_rollback_are_atomic() {
         assert_eq!(text(best_effort.file(), FIRST), "batch changed");
         assert_eq!(text(best_effort.file(), SECOND), "batch later");
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             litchi_ops::ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert_eq!(text(&source, FIRST), "first");

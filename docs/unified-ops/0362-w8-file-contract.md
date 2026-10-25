@@ -36,11 +36,11 @@
 - **Commit accessors.** `transaction::Commit<T>` and `BatchCommit` have no
   public fields. `Commit`: `file()`, `into_file()`, `patch()`,
   `diagnostics()`, `value()`, `into_value()`, `into_parts() -> (File, Patch,
-  T)`. `BatchCommit`: the same with `results()`/`into_results()` for the
-  per-item outcomes (its value) and `into_parts() -> (File, Patch,
-  Vec<ItemResult>)`. `Diagnostics` is `Copy`, so `into_parts` leaves it to
-  `diagnostics()`. `file()` is the facade's spelling of the triad's
-  `package()` (0351 §2.5 rule 7).
+  T)`. `BatchCommit` uses the same `value()`/`into_value()` accessors for its
+  per-item outcomes and `into_parts() -> (File, Patch, Vec<ItemResult>)`.
+  `Diagnostics` is `Copy`, so `into_parts` leaves it to `diagnostics()`.
+  `file()` is the facade's spelling of the triad's `package()` (0351 §2.5
+  rule 7).
 - **Detection.** Every public raw path, byte and reader detector in
   `detect::*`, including the `_with_tail` variants, takes a required
   `&detect::SourceLimits`. This detection-owned type is available wherever detection is enabled
@@ -86,11 +86,11 @@
    returned that deviation. The current candidate applies the detection
    portion of `84a64e8285`: its own feature-independent `detect::SourceLimits`
    satisfies the required raw API without a feature-dependent signature.
-2. **`BatchCommit::results`.** The brief lists `value()` among the
-   accessors. A batch commit's value is its per-item results; the noun
-   `results` is what the CLI JSON, the Python `Commit.results` property and
-   every caller use, so `BatchCommit` exposes `results()`/`into_results()`
-   and no second `value()` spelling (no aliases).
+2. **`BatchCommit::value`.** A batch commit's value is its per-item results;
+   `value()`/`into_value()` therefore follow the same canonical accessor shape
+   as `transaction::Commit<T>`. The CLI JSON and Python `Commit.results`
+   property retain their semantic `results` spelling over this Rust value;
+   there is no Rust alias.
 3. **`into_parts` returns the value.** The core triad's
    `into_parts() -> (P, T)` has no closure value; the `File` commit returns
    `(File, Patch, T)` so a caller can take every result without cloning, as
@@ -122,13 +122,12 @@ Leftovers by variant:
   report `unsupported_type` (was `unsupported_capability`), as the DOCX and
   PPTX `UnsupportedTarget` refusals do. The OfficeCLI corpus and the CRUD
   checklist are unchanged by it.
-- **RTF** (`edit::Error`): no `Refused(Refusal)` variant yet;
-  `UnsupportedSource(&'static str)` (719 sites) and the four
-  `*Conflict`/`OperationAlreadyStaged` variants all report
-  `unsupported_capability`, the code of their kind, and
-  `ProtectedDocument` reports `document_protected`. The codes are already
-  the kind codes; moving RTF onto `Refused(Refusal)` is a W5 residual for
-  the Part B sweep (§6).
+- **RTF** (`edit::Error`): unsupported well-formed requests now use
+  `Refused(Refusal)` and classify through `RefusalKind`, alongside the typed
+  limit, positional, parse, publication and `PatchConflict` variants.
+  Protected requests retain `RefusalKind::Protected` and therefore report
+  `document_protected`; non-refusal validation failures keep their specific
+  codes. The same refusal shape is used by RTF tail-append edits.
 - **PPTX** `SlideOrderRefusal::AmbiguousBindings` → `corrupt_file` remains the
   documented exception; `SlideRemovalRefusal::FinalSlide` now follows its
   shared `InvalidValue` kind as `invalid_value`. XLSX/XLSB arms are W4's.

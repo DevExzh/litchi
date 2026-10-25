@@ -534,10 +534,10 @@ fn worksheet_batches_cover_structural_atomic_and_best_effort_routes() {
                 BatchMode::Atomic,
             )
             .expect("atomic structural commands");
-        assert_eq!(atomic.results().len(), 5);
+        assert_eq!(atomic.value().len(), 5);
         assert!(
             atomic
-                .results()
+                .value()
                 .iter()
                 .all(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
         );
@@ -566,19 +566,19 @@ fn worksheet_batches_cover_structural_atomic_and_best_effort_routes() {
                 BatchMode::BestEffort,
             )
             .expect("best-effort structural commands");
-        assert_eq!(best_effort.results().len(), 6);
+        assert_eq!(best_effort.value().len(), 6);
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::DuplicateName
         ));
         assert!(
             best_effort
-                .results()
+                .value()
                 .iter()
                 .skip(2)
                 .all(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))

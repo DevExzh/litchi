@@ -136,7 +136,7 @@ fn warn_batches_report_per_item_and_stay_atomic() {
     .unwrap();
     let commit = file.batch_with(&items, &warn()).unwrap();
     let warnings: Vec<Vec<(Option<&str>, Option<usize>)>> = commit
-        .results()
+        .value()
         .iter()
         .map(|result| match result {
             ItemResult::Applied(applied) => applied
@@ -171,9 +171,9 @@ fn warn_batches_report_per_item_and_stay_atomic() {
         .batch_with(&items, &warn().mode(BatchMode::BestEffort))
         .unwrap();
     assert!(
-        matches!(&commit.results()[0], ItemResult::Applied(applied) if applied.warnings.len() == 1)
+        matches!(&commit.value()[0], ItemResult::Applied(applied) if applied.warnings.len() == 1)
     );
-    assert!(matches!(commit.results()[1], ItemResult::Failed(_)));
+    assert!(matches!(commit.value()[1], ItemResult::Failed(_)));
 }
 
 #[cfg(feature = "xlsx")]
@@ -217,7 +217,7 @@ fn warn_batches_keep_the_native_runs() {
     let mut sequential = file.clone();
     for (index, item) in items.iter().enumerate() {
         let step = sequential.apply_with(item, &warn()).unwrap();
-        let ItemResult::Applied(applied) = &commit.results()[index] else {
+        let ItemResult::Applied(applied) = &commit.value()[index] else {
             panic!("item {index} failed");
         };
         assert_eq!(applied.changed, step.value().changed, "item {index}");
@@ -297,7 +297,7 @@ fn warn_docx_formatting_runs_match_sequential_application() {
         commit.file().to_bytes().unwrap(),
         sequential.to_bytes().unwrap()
     );
-    let ItemResult::Applied(applied) = &commit.results()[1] else {
+    let ItemResult::Applied(applied) = &commit.value()[1] else {
         panic!("item 1 failed");
     };
     assert_eq!(applied.warnings.len(), 1);

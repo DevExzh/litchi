@@ -70,11 +70,11 @@ fn verify_unified(
     expected: &[u8],
 ) -> Result<()> {
     let changed = candidate
-        .results()
+        .value()
         .iter()
         .filter(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
         .count();
-    if candidate.results().len() != workload.count
+    if candidate.value().len() != workload.count
         || changed != workload.count
         || candidate.diagnostics().operations() != workload.count
         || candidate.diagnostics().leaf_operations() != workload.count
@@ -83,7 +83,7 @@ fn verify_unified(
         return Err(format!(
             "unified accounting mismatch for {} cells: results={}, changed={}, operations={}, leaf_operations={}, commits={}",
             workload.count,
-            candidate.results().len(),
+            candidate.value().len(),
             changed,
             candidate.diagnostics().operations(),
             candidate.diagnostics().leaf_operations(),

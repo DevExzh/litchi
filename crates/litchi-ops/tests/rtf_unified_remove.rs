@@ -151,7 +151,7 @@ fn atomic_and_best_effort_batches_keep_sequential_addressing() {
     let best = source.batch(items(), BatchMode::BestEffort).unwrap();
     assert_eq!(paragraphs(best.file()), ["First", "Fourth"]);
     assert!(
-        matches!(&best.results()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
+        matches!(&best.value()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }

@@ -682,7 +682,7 @@ impl File {
         let mode = write::mode(mode)?;
         let items = Items::extract(&items)?;
         let commit = py.detach(|| items.run(&file, mode))?;
-        let results = write::results(py, commit.results())?;
+        let results = write::results(py, commit.value())?;
         let diagnostics = *commit.diagnostics();
         let (file, patch, _) = commit.into_parts();
         Commit::new(

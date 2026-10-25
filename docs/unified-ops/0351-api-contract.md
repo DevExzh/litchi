@@ -341,7 +341,8 @@ module keeps its own non-exhaustive `Error` (ADR 0034 §6). The litchi-ops
    `&SourceLimits` as a required argument. `transaction::Commit` and
    `BatchCommit` replace their public fields with the triad accessors
    (`file()`, `into_file()`, `patch()`, `diagnostics()`, `into_parts()`,
-   `value()`), the facade's spelling of `package()` for a `File`.
+   `value()`, `into_value()`), the facade's spelling of `package()` for a
+   `File`.
 
 ### 2.6 Consumers, fidelity, performance
 

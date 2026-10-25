@@ -102,10 +102,10 @@ fn ordered_five_command_batches_match_single_operation_bytes_and_invert() {
             .unwrap();
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch(&input, mode).unwrap();
-            assert_eq!(commit.results().len(), 6);
-            assert!(!applied(&commit.results()[0]).changed);
+            assert_eq!(commit.value().len(), 6);
+            assert!(!applied(&commit.value()[0]).changed);
             assert_eq!(
-                applied(&commit.results()[1])
+                applied(&commit.value()[1])
                     .path
                     .as_ref()
                     .unwrap()
@@ -113,7 +113,7 @@ fn ordered_five_command_batches_match_single_operation_bytes_and_invert() {
                 "/body/p[3]"
             );
             assert!(
-                commit.results()[1..]
+                commit.value()[1..]
                     .iter()
                     .all(|result| applied(result).changed)
             );
@@ -178,10 +178,10 @@ fn best_effort_discards_failed_candidates_and_keeps_original_item_indices() {
           {"command":"remove","path":"/body/p[99]"},
           {"command":"set","path":"/body/p[3]/r[1]","props":{"bold":true}}
         ]"#), BatchMode::BestEffort).unwrap();
-        assert_eq!(commit.results().len(), 7);
-        failed(&commit.results()[0], 0, Code::UnsupportedCommand);
-        failed(&commit.results()[3], 3, Code::UnsupportedProperty);
-        failed(&commit.results()[5], 5, Code::PathNotFound);
+        assert_eq!(commit.value().len(), 7);
+        failed(&commit.value()[0], 0, Code::UnsupportedCommand);
+        failed(&commit.value()[3], 3, Code::UnsupportedProperty);
+        failed(&commit.value()[5], 5, Code::PathNotFound);
         assert_eq!(commit.diagnostics().operations(), 3);
         assert_eq!(text(commit.file()), "staged");
         let oracle = file
@@ -206,7 +206,7 @@ fn best_effort_discards_failed_candidates_and_keeps_original_item_indices() {
                 .unwrap(),
             bytes()
         );
-        assert!(!format!("{commit:?} {:?}", commit.results()).contains("PRIVATE"));
+        assert!(!format!("{commit:?} {:?}", commit.value()).contains("PRIVATE"));
     }
 }
 
@@ -329,7 +329,7 @@ fn metadata_outcomes_preserve_indices_and_unsupported_versions_abort_both_modes(
     let input = items(r#"[{"command":"meta","dumpVersion":2},{"command":"meta","dumpVersion":2}]"#);
     let commit = file.batch(input, BatchMode::Atomic).unwrap();
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.results().len(), 2);
+    assert_eq!(commit.value().len(), 2);
     assert_eq!(commit.diagnostics().operations(), 0);
     for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
         for version in [None, Some(-1), Some(0), Some(1), Some(3)] {
@@ -352,7 +352,7 @@ fn all_failed_empty_and_cancelling_batches_preserve_exact_input() {
     let empty = file
         .batch(Vec::<BatchItem<'_>>::new(), BatchMode::Atomic)
         .unwrap();
-    assert!(empty.results().is_empty());
+    assert!(empty.value().is_empty());
     assert!(empty.patch().is_noop());
     let failed = file
         .batch(
@@ -373,7 +373,7 @@ fn all_failed_empty_and_cancelling_batches_preserve_exact_input() {
             BatchMode::Atomic,
         )
         .unwrap();
-    assert!(cancel.results().iter().all(|r| applied(r).changed));
+    assert!(cancel.value().iter().all(|r| applied(r).changed));
     assert!(cancel.patch().is_noop());
     assert!(!cancel.diagnostics().changed());
     for commit in [empty, failed, cancel] {
@@ -491,9 +491,9 @@ fn selectors_resolve_against_prior_successes_and_failed_fanout_is_atomic() {
           {"command":"remove","path":"/body/p[text='Drop']"},
           {"command":"set","path":"r","props":{"bold":true}}
         ]"#),BatchMode::BestEffort).unwrap();
-        failed(&commit.results()[2], 2, Code::UnsupportedProperty);
-        failed(&commit.results()[4], 4, Code::BareSelectorRejected);
-        assert!(applied(&commit.results()[3]).changed);
+        failed(&commit.value()[2], 2, Code::UnsupportedProperty);
+        failed(&commit.value()[4], 4, Code::BareSelectorRejected);
+        assert!(applied(&commit.value()[3]).changed);
         let oracle = file
             .add("/body", NewNode::new("paragraph").prop("text", "Drop"))
             .unwrap()
@@ -636,7 +636,7 @@ fn atomic_formatting_runs_match_sequential_bytes_and_preserve_item_changes() {
         assert_eq!(oracle.diagnostics().commits(), 4);
         assert_eq!(
             grouped
-                .results()
+                .value()
                 .iter()
                 .map(|r| applied(r).changed)
                 .collect::<Vec<_>>(),
@@ -862,7 +862,7 @@ fn command_run_add_normalizes_inline_controls_without_splitting_paragraphs() {
             );
             let commit = file.batch([add], mode).unwrap();
             assert!(
-                matches!(&commit.results()[0], ItemResult::Applied(result) if result.path.as_ref().unwrap().to_string() == "/body/p[1]/r[3]")
+                matches!(&commit.value()[0], ItemResult::Applied(result) if result.path.as_ref().unwrap().to_string() == "/body/p[1]/r[3]")
             );
             let saved = commit.file().to_bytes().unwrap();
             let package = litchi_docx::Package::from_bytes(&saved).unwrap();
@@ -911,9 +911,9 @@ fn run_add_controls_preserve_atomic_and_best_effort_failure_boundaries() {
             .unwrap_err();
         assert_eq!(error.item(), Some(1));
         let commit = file.batch([add, invalid], BatchMode::BestEffort).unwrap();
-        assert!(matches!(commit.results()[0], ItemResult::Applied(_)));
+        assert!(matches!(commit.value()[0], ItemResult::Applied(_)));
         assert!(
-            matches!(&commit.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+            matches!(&commit.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
         );
         assert_eq!(
             commit
@@ -1021,7 +1021,7 @@ fn direct_paragraph_command_controls_normalize_and_preserve_transaction_boundari
                     .batch([commands[1].clone(), invalid], BatchMode::BestEffort)
                     .unwrap();
                 assert!(
-                    matches!(&partial.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+                    matches!(&partial.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
                 );
             }
         }
@@ -1183,7 +1183,7 @@ fn command_run_literal_text_obeys_selector_and_failure_boundaries() {
         let commit = file.batch(&commands, BatchMode::BestEffort).unwrap();
         assert_eq!(text(commit.file()), "literal\r\nline\tend");
         assert!(
-            matches!(&commit.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+            matches!(&commit.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
         );
         assert_eq!(
             commit
@@ -1345,7 +1345,7 @@ fn paragraph_add_commands_split_blocks_copy_formatting_and_return_first_path() {
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch(&commands, mode).unwrap();
             assert_eq!(
-                applied(&commit.results()[0])
+                applied(&commit.value()[0])
                     .path
                     .as_ref()
                     .unwrap()
@@ -1445,7 +1445,7 @@ fn paragraph_split_is_one_atomic_item_and_later_paths_see_all_insertions() {
         );
         let partial = file.batch(&invalid, BatchMode::BestEffort).unwrap();
         assert!(
-            matches!(&partial.results()[0], ItemResult::Failed(error) if error.item() == Some(0))
+            matches!(&partial.value()[0], ItemResult::Failed(error) if error.item() == Some(0))
         );
         assert!(partial.file().get("/body/p[3]").is_err());
         assert_eq!(text(partial.file()), "survives");
@@ -1590,7 +1590,7 @@ fn cached_field_marker_and_text_rollback_together() {
         );
         let partial = file.batch(&commands, BatchMode::BestEffort).unwrap();
         assert!(
-            matches!(&partial.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+            matches!(&partial.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
         );
         assert_eq!(
             partial
@@ -1722,7 +1722,7 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
             let commit = file.batch(&input, mode).unwrap();
             assert!(
                 commit
-                    .results()
+                    .value()
                     .iter()
                     .all(|result| applied(result).changed)
             );
@@ -1768,9 +1768,9 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
             .code();
         assert_eq!(error.code(), code);
         let commit = file.batch(&refused, BatchMode::BestEffort).unwrap();
-        applied(&commit.results()[0]);
-        failed(&commit.results()[1], 1, code);
-        applied(&commit.results()[2]);
+        applied(&commit.value()[0]);
+        failed(&commit.value()[1], 1, code);
+        applied(&commit.value()[2]);
         let expected = file
             .set("/body/p[1]", props! {"text"=>"kept"})
             .unwrap()

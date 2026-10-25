@@ -356,7 +356,7 @@ fn batch_and_sequential_adds_keep_paths_and_atomic_history() {
     let best = source.batch([item], BatchMode::BestEffort).unwrap();
     assert_eq!(text(best.file(), "/body/p[1]"), "FirstItalicBoldnew");
     assert!(matches!(
-        best.results()[0],
+        best.value()[0],
         litchi_ops::ItemResult::Applied(_)
     ));
 

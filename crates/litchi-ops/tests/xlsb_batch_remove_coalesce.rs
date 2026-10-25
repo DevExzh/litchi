@@ -61,10 +61,10 @@ fn atomic_batch_coalesces_thousand_direct_removals_and_reports_virtual_noop() {
 
     assert_eq!(commit.diagnostics().operations(), 1_000);
     assert_eq!(commit.diagnostics().commits(), 1);
-    assert_eq!(commit.results().len(), 1_000);
+    assert_eq!(commit.value().len(), 1_000);
     assert!(
         commit
-            .results()
+            .value()
             .iter()
             .all(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
     );
@@ -74,7 +74,7 @@ fn atomic_batch_coalesces_thousand_direct_removals_and_reports_virtual_noop() {
         .expect("removing a virtual cell is an exact no-op");
     assert!(!missing.diagnostics().changed());
     assert!(matches!(
-        &missing.results()[0],
+        &missing.value()[0],
         ItemResult::Applied(applied) if !applied.changed
     ));
 }
