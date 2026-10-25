@@ -67,8 +67,8 @@
     "unsign": "new_unsigned_output_signature_parts_absent_stream_bounded"
   },
   "signed_batch": {
-    "status": "pending_owner_choice",
-    "selection": null
+    "status": "owner_confirmed",
+    "selection": "immediate_refusal"
   },
   "candidate": {
     "status": "pending_final_source_freeze",

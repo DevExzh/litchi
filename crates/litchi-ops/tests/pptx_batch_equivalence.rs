@@ -1,6 +1,9 @@
-//! Batch equivalence for PPTX (record 0348, the rule of records 0015 and
-//! 0314): a batch of sets publishes exactly what its items publish when
-//! applied one at a time, or refuses with the same code at the same item.
+//! Batch equivalence for unsigned PPTX (record 0348, the rule of records
+//! 0015 and 0314): a batch of sets publishes exactly what its items publish
+//! when applied one at a time, or refuses with the same code at the same item.
+//! A signed batch is an admission-level protected write: it refuses before
+//! consuming its stream and therefore has no item scope.  Its behavior is
+//! checked separately below rather than being forced into per-item equality.
 //!
 //! Coalesced PPTX runs plan table-cell and notes items against one-pass
 //! indexes and take each item's change from the leaf; this checks that the
@@ -103,13 +106,10 @@ fn closure(file: &File, sets: &[Set]) -> Outcome {
     }
 }
 
-/// A refusal of the whole edit before its first item (a signed package's
-/// admission) carries no item; one `set` at a time refuses at item 0.
+/// Preserve the API's item scope.  A whole-batch admission refusal carries no
+/// item; a refusal raised while reading an item carries that item's index.
 fn admission(error: &litchi_ops::Error) -> Outcome {
-    Outcome::Refused(
-        Some(error.item().unwrap_or(0)),
-        format!("{:?}", error.code()),
-    )
+    Outcome::Refused(error.item(), format!("{:?}", error.code()))
 }
 
 fn batch(file: &File, sets: &[Set]) -> Outcome {
@@ -235,6 +235,33 @@ fn corpus_batches_equal_their_items_one_at_a_time() {
         checked += check(&path.display().to_string(), &bytes, random_sets);
     }
     assert!(checked >= 100, "{checked}");
+}
+
+#[test]
+fn signed_batch_refuses_before_item_admission() {
+    let bytes = std::fs::read(
+        "../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx",
+    )
+    .expect("signed PPTX fixture");
+    let signed = litchi_ops::open_bytes(bytes.clone()).expect("open signed PPTX");
+    assert!(signed.is_signed());
+
+    let sets = vec![Set {
+        path: "/slide[1]/shape[1]".to_owned(),
+        props: vec![("text", PropValue::from("changed"))],
+    }];
+
+    assert_eq!(
+        batch(&signed, &sets),
+        Outcome::Refused(None, "DocumentProtected".to_owned()),
+        "signed batch admission must retain its no-item scope",
+    );
+    assert_eq!(
+        sequential(&signed, &sets),
+        Outcome::Refused(Some(0), "DocumentProtected".to_owned()),
+        "single-set refusal remains item-scoped",
+    );
+    assert_eq!(signed.to_bytes().expect("publish signed source"), bytes);
 }
 
 /// `bytes` with the slide and notes parts rewritten by `edit`.

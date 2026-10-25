@@ -41,6 +41,10 @@ FIXTURE_MANIFEST = REPOSITORY / "docs/unified-ops/results/0362ul24/fixtures.json
 SCHEMA = "litchi.signed-native.policy.v2"
 PREPARATION_SCHEMA = "litchi.signed-native.preparation.v2"
 POLICY_VERSION = 2
+SIGNED_BATCH_POLICY = {
+    "status": "owner_confirmed",
+    "selection": "immediate_refusal",
+}
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -658,7 +662,7 @@ def _validate_policy_document(value: Mapping[str, Any], *, execution: bool) -> d
         {"package": "flate2", "version": "1.1.10", "baseline_source": "registry", "candidate_source": "path", "candidate_path": "vendor/flate2"},
         {"package": "zlib-rs", "version": "0.6.8", "baseline_source": "registry", "candidate_source": "path", "candidate_path": "vendor/zlib-rs"},
     ], "dependency path policy changed")
-    _expect(value.get("signed_batch") == {"status": "pending_owner_choice", "selection": None}, "signed-batch owner choice was resolved here")
+    _expect(value.get("signed_batch") == SIGNED_BATCH_POLICY, "signed-batch owner choice changed")
     status = candidate.get("status")
     _expect(status in {"pending_final_source_freeze", "bound"}, "candidate policy status is invalid")
     source = candidate.get("source")

@@ -95,8 +95,17 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
             "cancelled_intermediate_edit_remains_signed_and_does_not_publish",
         )
         self.assertEqual(
-            document["signed_batch"], {"status": "pending_owner_choice", "selection": None}
+            document["signed_batch"], policy.SIGNED_BATCH_POLICY
         )
+
+    def test_signed_batch_choice_cannot_be_overridden_by_policy_input(self) -> None:
+        document = copy.deepcopy(policy.load_policy())
+        document["signed_batch"] = {
+            "status": "owner_confirmed",
+            "selection": "resolve_like_edit",
+        }
+        with self.assertRaisesRegex(policy.PolicyError, "signed-batch owner choice changed"):
+            policy._validate_policy_document(document, execution=False)
 
     def test_fixture_manifest_payloads_and_signature_claims_are_bound(self) -> None:
         result = policy._fixture_policy()
