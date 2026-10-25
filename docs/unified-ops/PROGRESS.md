@@ -5882,3 +5882,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   required engineering proceeds in separate protocol leaves137/136/135.
   Final gates, measurements, reviewed composition and trunk integration
   remain open. Nothing is pushed.
+
+  C glossary passes nine rows, then returns fifteen DOCX minimal-profile
+  MCE limits identity checks (138). Source signatures use the required public
+  type; return138a investigates nominal/reexport proof without weakening the
+  gate. Root verifies the failed capture and starts the separate 26-row PPTX
+  full-feature runtime tail. Readonly134a is source-reviewed and ready; C
+  stays frozen during diagnostics. Final qualification remains open.
