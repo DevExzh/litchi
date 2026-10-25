@@ -2485,6 +2485,91 @@ impl OpcPackage {
         self.try_add_owned_xml_part(source)
     }
 
+    /// Add caller-authored XML while retaining its exact bytes as publication
+    /// provenance.
+    ///
+    /// This is for format-owned opaque XML whose semantics have already been
+    /// validated by the format codec. It performs the ordinary bounded XML
+    /// publication audit, but does not issue an [`OwnedXmlPart`] source-splice
+    /// token: source-splice tokens require literal namespace declarations so
+    /// expanded-name edits cannot be ambiguous, while a whole-part authored
+    /// replacement preserves the caller's namespace spelling byte-for-byte.
+    /// The shared payload is retained without copying and is published through
+    /// the same source-preserving writer as an exact source part.
+    pub fn try_add_authored_xml_part_bytes(
+        &mut self,
+        name: PackURI,
+        content_type: String,
+        bytes: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if !xml_minifier::audit::package::is_xml_part(name.as_str(), &content_type) {
+            return Err(OpcError::XmlError(
+                "authored XML part content type is not XML".to_owned(),
+            ));
+        }
+        let limits = self.read_limits.min(limits);
+        self.validate_new_part_name(&name)?;
+        crate::OwnedXmlPart::check_capture_size(&name, bytes.len(), limits)?;
+        let verified =
+            verified_source_payload_with_source_limits(&name, Arc::clone(&bytes), limits)?;
+        crate::xml_splice::validate_authored_xml_bytes(&name, &bytes, limits)?;
+        let mut part = BlobPart::new_shared(name, content_type, bytes);
+        part.set_blob_verified(verified);
+        self.try_add_source_part(Box::new(part))
+    }
+
+    /// Replace one exact XML payload with caller-authored bytes while
+    /// retaining those bytes as publication provenance.
+    ///
+    /// The expected payload is an exact stale-source guard. The replacement
+    /// is admitted by the bounded publication audit rather than the stricter
+    /// source-splice namespace proof, because the format owner is replacing
+    /// the whole opaque XML member and does not splice its internals.
+    pub fn try_replace_authored_xml_part_bytes(
+        &mut self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        if self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let content_type = self.get_part(partname)?.content_type().to_owned();
+        if !xml_minifier::audit::package::is_xml_part(partname.as_str(), &content_type) {
+            return Err(OpcError::XmlError(
+                "authored XML part content type is not XML".to_owned(),
+            ));
+        }
+        let current = self.get_part(partname)?;
+        current.ensure_payload()?;
+        if current.blob() != expected {
+            return Err(OpcError::XmlError(
+                "stale authored XML part replacement".to_owned(),
+            ));
+        }
+        let limits = self.read_limits.min(limits);
+        crate::OwnedXmlPart::check_capture_size(partname, replacement.len(), limits)?;
+        let verified =
+            verified_source_payload_with_source_limits(partname, Arc::clone(&replacement), limits)?;
+        crate::xml_splice::validate_authored_xml_bytes(partname, &replacement, limits)?;
+        self.source_xml_parts
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "owned authored XML provenance",
+                source,
+            })?;
+        let part = self.get_part_mut(partname)?;
+        part.set_blob_verified(verified);
+        let payload = part.payload_handle().payload().clone();
+        self.source_xml_parts.insert(partname.clone(), payload);
+        Ok(())
+    }
+
     /// Get a reference to the main document part.
     ///
     /// For Word documents, this is the document.xml part.
@@ -4176,6 +4261,37 @@ fn verified_source_payload_with_limits(
             source,
         }
     })
+}
+
+fn verified_source_payload_with_source_limits(
+    name: &PackURI,
+    bytes: Arc<Vec<u8>>,
+    limits: SourceLimits,
+) -> Result<xml_minifier::audit::VerifiedSource> {
+    let audit_limits = xml_minifier::audit::Limits::default()
+        .narrow(
+            xml_minifier::audit::Resource::Bytes,
+            as_usize(limits.max_part_bytes()),
+        )
+        .narrow(xml_minifier::audit::Resource::Depth, limits.max_depth())
+        .narrow(xml_minifier::audit::Resource::Events, limits.max_events())
+        .narrow(
+            xml_minifier::audit::Resource::TokenBytes,
+            as_usize(limits.max_part_bytes()),
+        )
+        .narrow(
+            xml_minifier::audit::Resource::TextBytes,
+            as_usize(limits.max_part_bytes()),
+        );
+    verified_source_payload_with_limits(name, bytes, audit_limits)
+}
+
+const fn as_usize(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
 }
 
 /// Audit a `[Content_Types].xml` or `.rels` token the package is about to

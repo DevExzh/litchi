@@ -1062,6 +1062,16 @@ fn validate_source_xml(
     limits: SourceLimits,
     context: Option<&ExecutionContext>,
 ) -> Result<()> {
+    validate_source_xml_with_policy(partname, bytes, limits, context, true)
+}
+
+fn validate_source_xml_with_policy(
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: SourceLimits,
+    context: Option<&ExecutionContext>,
+    require_literal_namespace_bindings: bool,
+) -> Result<()> {
     limits.check(
         SourceLimitKind::PartBytes,
         bytes.len() as u64,
@@ -1107,7 +1117,13 @@ fn validate_source_xml(
         }
         match event {
             Event::Start(element) => {
-                validate_source_element(&reader, &element, limits, partname)?;
+                validate_source_element(
+                    &reader,
+                    &element,
+                    limits,
+                    partname,
+                    require_literal_namespace_bindings,
+                )?;
                 if depth == 0 {
                     roots = roots
                         .checked_add(1)
@@ -1127,7 +1143,13 @@ fn validate_source_xml(
                     element_depth as u64,
                     xml_depth_limit as u64,
                 )?;
-                validate_source_element(&reader, &element, limits, partname)?;
+                validate_source_element(
+                    &reader,
+                    &element,
+                    limits,
+                    partname,
+                    require_literal_namespace_bindings,
+                )?;
                 if depth == 0 {
                     roots = roots
                         .checked_add(1)
@@ -1215,6 +1237,20 @@ pub fn validate_source_xml_bytes(
     limits: SourceLimits,
 ) -> Result<()> {
     validate_source_xml(partname, bytes, limits, None)
+}
+
+/// Validate one whole authored XML member under the bounded OPC policy.
+///
+/// Whole-member format edits preserve the caller's bytes and do not splice
+/// expanded names. They therefore accept escaped namespace URI spellings that
+/// the source-splice proof intentionally rejects, while retaining the same
+/// XML, event, depth, attribute, and allocation ceilings.
+pub(crate) fn validate_authored_xml_bytes(
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: SourceLimits,
+) -> Result<()> {
+    validate_source_xml_with_policy(partname, bytes, limits, None, false)
 }
 
 fn consume_work_from_context(context: Option<&ExecutionContext>, bytes: usize) -> Result<()> {
@@ -1316,6 +1352,7 @@ fn validate_source_element(
     element: &BytesStart<'_>,
     limits: SourceLimits,
     partname: &PackURI,
+    require_literal_namespace_bindings: bool,
 ) -> Result<()> {
     validate_source_qname(reader, element.name().as_ref(), "element")?;
     let mut attribute_count = 0usize;
@@ -1381,7 +1418,7 @@ fn validate_source_element(
             // quick-xml's resolver retains raw namespace URI bytes. Refuse
             // bindings requiring normalization so expanded-name comparisons
             // cannot miss aliases expressed with character references.
-            if attribute.value.as_ref() != value.as_bytes() {
+            if require_literal_namespace_bindings && attribute.value.as_ref() != value.as_bytes() {
                 return Err(invalid_source(
                     "source XML requires literal namespace bindings",
                 ));

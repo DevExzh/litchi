@@ -662,10 +662,11 @@ fn apply_graph_state(
         match find_part(&before.parts, &target.name) {
             None => {
                 if is_xml_part_content_type(&target.content_type) {
-                    package.try_add_owned_xml_part_bytes(
+                    package.try_add_authored_xml_part_bytes(
                         target.name.clone(),
                         target.content_type.clone(),
                         Arc::clone(&target.bytes),
+                        source_limits,
                     )?;
                 } else {
                     // Relationship closures may contain opaque binary assets
@@ -684,10 +685,11 @@ fn apply_graph_state(
                     return Err(Error::PatchConflict);
                 }
                 if source.bytes.as_slice() != target.bytes.as_slice() {
-                    package.try_replace_owned_xml_part_bytes(
+                    package.try_replace_authored_xml_part_bytes(
                         &target.name,
                         source.bytes.as_slice(),
                         Arc::clone(&target.bytes),
+                        source_limits,
                     )?;
                 }
             },
