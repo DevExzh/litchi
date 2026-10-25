@@ -1553,6 +1553,10 @@ impl OpcPackage {
             ));
         }
         let same_bytes = current.bytes() == replacement.bytes();
+        let signed = self.is_signed() || self.requires_signature_edit_policy();
+        if same_bytes && signed {
+            return Ok(false);
+        }
         let source_token_matches = same_bytes
             && self
                 .source_content_types_xml
@@ -1561,8 +1565,7 @@ impl OpcPackage {
             && self
                 .source_content_types_source()?
                 .is_some_and(|(source, _)| source == replacement.bytes());
-        let signed = self.is_signed() || self.requires_signature_edit_policy();
-        if same_bytes && (source_token_matches || signed) {
+        if same_bytes && source_token_matches {
             return Ok(false);
         }
         if signed {
