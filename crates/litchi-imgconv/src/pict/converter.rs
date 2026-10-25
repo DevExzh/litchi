@@ -455,7 +455,7 @@ mod tests {
     fn empty_parser() -> PictParser {
         let mut pict = vec![0; 10];
         pict.extend_from_slice(&0x00ff_u16.to_be_bytes());
-        PictParser::new(&pict).unwrap()
+        PictParser::new(&pict, &crate::Limits::default()).unwrap()
     }
 
     #[test]

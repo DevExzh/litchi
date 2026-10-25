@@ -61,7 +61,10 @@ impl WmfConverter {
     }
 
     fn svg(&self) -> Result<String> {
-        crate::wmf::convert_wmf_to_svg(self.parser.data())
+        crate::wmf::convert_wmf_to_svg_with_options(
+            self.parser.data(),
+            crate::Options::default().limits(self.parser.limits()),
+        )
     }
 
     /// Renders WMF content to an in-memory image without using a placeholder.
@@ -133,4 +136,24 @@ fn proportional(other: u32, target: u32, source: u32) -> u32 {
     u32::try_from(u64::from(other) * u64::from(target) / u64::from(source.max(1)))
         .unwrap_or(u32::MAX)
         .max(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compatibility_converter_retains_parser_output_limit() {
+        let data = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/images/wmf/santa.wmf"
+        ));
+        let limits = crate::Limits {
+            max_output_bytes: 1,
+            ..crate::Limits::default()
+        };
+        let parser = WmfParser::new(data, &limits).expect("parse santa WMF");
+        let converter = WmfConverter::new(parser, WmfToRasterOptions::default());
+        assert!(converter.convert_to_png().is_err());
+    }
 }

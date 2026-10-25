@@ -24370,6 +24370,124 @@
       "families": []
     },
     {
+      "id": "imgconv",
+      "package": "litchi-imgconv",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "new_bounded",
+          "scope": "litchi_imgconv::pict::PictParser",
+          "replacement": "use PictParser::new(data, limits) (record 0362ul47)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_imgconv",
+          "match": "suffix",
+          "replacement": "raw parser and record APIs take litchi_imgconv::Limits as a required argument (record 0362ul47)"
+        }
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_imgconv::pict::PictParser::new",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfParser::new",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfParser::new_compatible",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfParser::from_owned",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfParser::from_owned_compatible",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfParser::new_lazy",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfRecord::parse",
+          "inputs": ["data", "offset", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfRecordRef::parse_ref",
+          "inputs": ["data", "offset", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::EmfRecordRef::to_owned",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::parse_pointl_array",
+          "inputs": ["data", "count", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::parse_points_array",
+          "inputs": ["data", "count", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::parse_poly_counts",
+          "inputs": ["data", "num_polys", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::emf::parse_dib",
+          "inputs": ["data", "bmi_offset", "bmi_size", "px_offset", "px_size", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::wmf::WmfParser::new",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::wmf::WmfParser::from_owned",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        },
+        {
+          "method": "litchi_imgconv::wmf::parser::WmfRecord::parse",
+          "inputs": ["data", "offset", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_imgconv::Limits"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "odraw",
       "package": "litchi-odraw",
       "default_features": false,
