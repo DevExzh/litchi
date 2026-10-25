@@ -4748,3 +4748,36 @@ See [0063](0063-source-pptx-modern-comments.md).
   query and is under source review; no lock refresh or final performance
   acceptance is claimed. Four bounded validation slots remain active, and
   nothing is pushed.
+
+- Coordinator XLS and SpreadsheetDrawing integration (2026-10-25):
+  XLS atomic `2ffacb16e9` merges at `517029ec66`. Root verifies all scoped
+  checks and the complete-corpus library run: 1,334 tests pass, with unchanged
+  locks and completed process cleanup. The prior sparse-fixture failures
+  remain recorded. Its canonical validation type and the explicit historical
+  DrawingML benchmark adapter migrate together; reviewed adapter ancestry
+  merges at `6510c215ba`. The composed standalone harness check remains queued.
+
+  SpreadsheetDrawing atomic `9f43932dd0` merges at `d14f3613e5` after
+  independent source review and eleven passing actual f5 rows. Root verifies
+  all command logs and Cargo traces, source and lock identities, final target
+  size of 826,790,824 bytes and empty terminal owned-process lists. Record
+  0362ul51 corrects the earlier runner-availability report and keeps the
+  diagnostic TMP disappearance unexplained. The composed glossary/matrix/
+  historical-adapter checks pass all 81 tests; 62 glossary profiles validate.
+
+  Cleanup wave 58 retires the merged DOC/OLE and RTF worktrees while retaining
+  branches and all six ignored payload files. Actual sparse restoration and
+  root identity checks pass. Record 0362ul60 reports 7,592,120,320 bytes of
+  net checkout-allocation reduction after the complete quarantines. External
+  validation evidence and the protected constructor probe remain intact.
+
+  The font leaf now assembles cumulative staging charges, typed refusal
+  snapshots, DOCX error preservation and the reviewed distinction between
+  structural failure and policy refusal. A direct dependency path keeps the
+  Allsorts allocation query and decoder on the same vendored zlib-rs instance
+  for standalone consumers. New root and standalone lock identities still
+  require explicit review and guarded validation; no font acceptance is
+  claimed. ODF, DOCX and PPT continue actual validation and finite repairs;
+  crypto's final encrypted-consumer checks pass and await atomic composition.
+  Fresh integrated capture, full gate, the pending signed-batch contract choice
+  and actual native/performance qualification remain required. Nothing is pushed.
