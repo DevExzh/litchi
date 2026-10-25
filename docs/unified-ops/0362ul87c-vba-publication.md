@@ -206,3 +206,15 @@ for package-wide names, sizes, payload, and opaque-entry checks. It validates
 only the prospective target graph entries after composition, so store, remove,
 and replay do not repeat the package-wide scan or hydrate unrelated deferred
 payloads before publication.
+
+## 87ci review repair
+
+Retained archive metadata now accounts for the canonical `_rels/.rels` member
+name when an accepted source archive omitted the package-level relationships
+member. The ordinary writer emits that generated member on its fallback path,
+so the recipient projection now charges its variable central-directory metadata
+exactly once while still avoiding a duplicate charge for sources that carried
+the member. A no-root source regression checks the exact and one-byte-under
+metadata limits and verifies that publication emits the generated root member.
+The equal-payload and mutate-then-revert relationship cases also cover the
+same tight metadata boundary.

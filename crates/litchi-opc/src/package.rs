@@ -1061,6 +1061,29 @@ impl OpcPackage {
                 "ZIP preservation member count differs from central directory".to_owned(),
             ));
         }
+        // The ordinary writer always emits the package-level relationships
+        // member, even when the source archive omitted `_rels/.rels` and the
+        // targeted preservation path therefore falls back to ordinary
+        // publication.  Charge the generated member name exactly once.  A
+        // source member that was present is already in `known_metadata`, so
+        // this also keeps the projection aligned with the writer's central
+        // directory without double-counting it.
+        let package_relationship_name = package_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        if !known_metadata
+            .iter()
+            .any(|(name, _)| name == package_relationship_name.membername())
+        {
+            metadata_bytes = metadata_bytes
+                .checked_add(package_relationship_name.membername().len() as u64)
+                .ok_or_else(|| {
+                    OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
+                })?;
+            limits.check(
+                crate::SourceLimitKind::ArchiveMetadataBytes,
+                metadata_bytes,
+                limits.max_archive_metadata_bytes(),
+            )?;
+        }
         limits.check(
             crate::SourceLimitKind::ArchiveTotalEntries,
             preserved_entries as u64,
@@ -4377,6 +4400,19 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn create_source_without_package_relationships() -> Vec<u8> {
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.write_stored("document.xml", b"<document/>").unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn create_two_part_source() -> Vec<u8> {
         let mut package =
             OpcPackage::from_bytes(&create_minimal_docx(), SourceLimits::default()).unwrap();
@@ -4586,6 +4622,72 @@ mod tests {
         let pkg = OpcPackage::from_reader(cursor, SourceLimits::default()).unwrap();
 
         assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn source_without_package_relationships_charges_generated_root_metadata() {
+        let source = create_source_without_package_relationships();
+        let source_archive = soapberry_zip::office::ArchiveReader::new(
+            &source,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            !source_archive
+                .file_names()
+                .any(|name| name == "_rels/.rels")
+        );
+
+        let package = OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap();
+        let metrics = package
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .expect("owned source metrics");
+        let source_zip = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+        let source_entry_metadata: u64 = source_zip
+            .entries()
+            .map(|entry| entry.unwrap().metadata_size_hint())
+            .sum();
+        let expected_metadata = archive_tail_metadata_bytes(&source_zip).unwrap()
+            + source_entry_metadata
+            + "_rels/.rels".len() as u64;
+        assert_eq!(metrics.metadata_bytes(), expected_metadata);
+
+        let exact = SourceLimits::builder()
+            .max_archive_metadata_bytes(metrics.metadata_bytes())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(package.retained_archive_metrics(exact).is_ok());
+
+        let under = SourceLimits::builder()
+            .max_archive_metadata_bytes(metrics.metadata_bytes() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.retained_archive_metrics(under),
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ArchiveMetadataBytes,
+                ..
+            })
+        ));
+
+        // A graph-only reopen exercises the ordinary writer path that must
+        // synthesize the missing root member; the owned package above is kept
+        // intact so the metrics cover its retained source archive.
+        let authored = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
+        let output = crate::PackageWriter::to_bytes(&authored).unwrap();
+        let output_archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            output_archive
+                .file_names()
+                .any(|name| name == "_rels/.rels")
+        );
     }
 
     #[test]

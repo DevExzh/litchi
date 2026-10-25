@@ -2715,6 +2715,27 @@ mod tests {
             equal_metrics.metadata_bytes(),
             baseline_metrics.metadata_bytes()
         );
+        let assert_metadata_boundary = |package: &OpcPackage, exact: u64| {
+            let exact_limits = SourceLimits::builder()
+                .max_archive_metadata_bytes(exact)
+                .unwrap()
+                .build()
+                .unwrap();
+            assert!(package.retained_archive_metrics(exact_limits).is_ok());
+            let under_limits = SourceLimits::builder()
+                .max_archive_metadata_bytes(exact - 1)
+                .unwrap()
+                .build()
+                .unwrap();
+            assert!(matches!(
+                package.retained_archive_metrics(under_limits),
+                Err(crate::OpcError::Limit {
+                    kind: crate::SourceLimitKind::ArchiveMetadataBytes,
+                    ..
+                })
+            ));
+        };
+        assert_metadata_boundary(&equal, baseline_metrics.metadata_bytes());
         assert_eq!(PackageWriter::to_bytes(&equal).unwrap(), source);
 
         let mut authored = OpcPackage::new();
@@ -2758,6 +2779,7 @@ mod tests {
             reverted_metrics.metadata_bytes(),
             baseline_relationship_metrics.metadata_bytes()
         );
+        assert_metadata_boundary(&reverted, baseline_relationship_metrics.metadata_bytes());
         assert_eq!(
             PackageWriter::to_bytes(&reverted).unwrap(),
             relationship_source
