@@ -6230,8 +6230,10 @@ mod source_tests {
         let plain = br"{\rtf1\ansi\pard plain\par}".to_vec();
         let mut cp1252 = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
         cp1252.extend_from_slice(&[0xe9, b'}']);
-        let lzfu = crate::compress(&plain, true).expect("compress LZFu RTF");
-        let mela = crate::compress(&plain, false).expect("compress MELA RTF");
+        let lzfu = crate::compress(&plain, true, crate::CompressionLimits::default())
+            .expect("compress LZFu RTF");
+        let mela = crate::compress(&plain, false, crate::CompressionLimits::default())
+            .expect("compress MELA RTF");
 
         for (label, bytes) in [
             ("plain", plain.as_slice()),
@@ -6266,8 +6268,10 @@ mod source_tests {
         let plain = br"{\rtf1\ansi\pard plain owned\par}".to_vec();
         let mut cp1252 = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
         cp1252.extend_from_slice(&[0xe9, b'}']);
-        let lzfu = crate::compress(&plain, true).expect("compress LZFu RTF");
-        let mela = crate::compress(&plain, false).expect("compress MELA RTF");
+        let lzfu = crate::compress(&plain, true, crate::CompressionLimits::default())
+            .expect("compress LZFu RTF");
+        let mela = crate::compress(&plain, false, crate::CompressionLimits::default())
+            .expect("compress MELA RTF");
 
         for source in [plain, cp1252, lzfu, mela] {
             let expected = source.clone();
@@ -6291,7 +6295,8 @@ mod source_tests {
     #[test]
     fn owned_open_preserves_source_and_decompression_error_boundaries() {
         let raw = br"{\rtf1\ansi bounded compressed source}";
-        let compressed = crate::compress(raw, true).expect("compress RTF");
+        let compressed = crate::compress(raw, true, crate::CompressionLimits::default())
+            .expect("compress RTF");
         let source_limit = compressed.len() - 1;
         let source_file = TempRtf::new("source-limit", &compressed);
         assert!(matches!(

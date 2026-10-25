@@ -54,7 +54,12 @@ fn compressed_transports_open_through_the_same_route() {
     let expected = open_detected(plain.clone()).text().expect("plain text");
     assert!(expected.contains("Plain owned route"));
     for use_lzfu in [true, false] {
-        let compressed = litchi_rtf::transport::compress(&plain, use_lzfu).expect("compress RTF");
+        let compressed = litchi_rtf::transport::compress(
+            &plain,
+            use_lzfu,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .expect("compress RTF");
         assert_eq!(open_detected(compressed).text().expect("text"), expected);
     }
 }

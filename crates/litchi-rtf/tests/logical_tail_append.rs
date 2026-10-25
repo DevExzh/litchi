@@ -579,7 +579,12 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
         Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
-    let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
+    let compressed = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi A}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
     let compressed = Package::from_bytes(&compressed).unwrap();
     let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();
@@ -813,7 +818,12 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
         Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
-    let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
+    let compressed = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi A}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
     let compressed = Package::from_bytes(&compressed).unwrap();
     let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();

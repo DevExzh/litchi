@@ -1254,8 +1254,18 @@ mod rtf {
         let plain = br#"{\rtf1\ansi Plain owned route\par Second paragraph}"#.to_vec();
         let mut cp1252 = br#"{\rtf1\ansi\ansicpg1252 caf"#.to_vec();
         cp1252.extend_from_slice(&[0xe9, b'}']);
-        let lzfu = litchi_rtf::transport::compress(&plain, true).unwrap();
-        let mela = litchi_rtf::transport::compress(&plain, false).unwrap();
+        let lzfu = litchi_rtf::transport::compress(
+            &plain,
+            true,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .unwrap();
+        let mela = litchi_rtf::transport::compress(
+            &plain,
+            false,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .unwrap();
         for source in [plain, cp1252, lzfu, mela] {
             let file = crate::open_bytes(source).expect("owned RTF route");
             assert!(!file.text().unwrap().is_empty());
@@ -1280,7 +1290,12 @@ mod rtf {
             native.paragraph_count()
         );
         for use_lzfu in [true, false] {
-            let compressed = litchi_rtf::transport::compress(&source, use_lzfu).unwrap();
+            let compressed = litchi_rtf::transport::compress(
+                &source,
+                use_lzfu,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )
+            .unwrap();
             let file = crate::open_bytes(compressed).unwrap();
             assert_eq!(file.text().unwrap(), native.text());
             assert_eq!(
@@ -1293,8 +1308,12 @@ mod rtf {
     #[test]
     fn unified_rtf_malformed_compressed_frame_is_a_typed_error() {
         let mut compressed =
-            litchi_rtf::transport::compress(br#"{\rtf1\ansi malformed compressed frame}"#, true)
-                .unwrap();
+            litchi_rtf::transport::compress(
+                br#"{\rtf1\ansi malformed compressed frame}"#,
+                true,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )
+            .unwrap();
         compressed.truncate(15);
         let error = crate::open_bytes(compressed).expect_err("a truncated frame fails");
         assert_eq!(error.code(), Code::CorruptFile);

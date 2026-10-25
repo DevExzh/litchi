@@ -369,7 +369,14 @@ fn exact_noops_bypass_changed_source_closure_after_target_validation() {
         br"{\rtf1\ansi{\stylesheet{\s1 Style;}}\s1 Text}".to_vec(),
     ];
     for lzfu in [false, true] {
-        inputs.push(litchi_rtf::transport::compress(plain, lzfu).unwrap());
+        inputs.push(
+            litchi_rtf::transport::compress(
+                plain,
+                lzfu,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )
+            .unwrap(),
+        );
     }
     for bytes in inputs {
         let source = open_bytes(bytes.as_slice()).unwrap();

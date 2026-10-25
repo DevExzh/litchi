@@ -150,8 +150,8 @@ pub mod write {
 /// Bounded Outlook/MAPI compressed-RTF transport codec.
 pub mod transport {
     pub use crate::codec::compressed::{
-        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
-        is_compressed_rtf,
+        CompressionLimits, DEFAULT_MAX_COMPRESSED_RTF_BYTES, DEFAULT_MAX_DECOMPRESSED_RTF_BYTES,
+        DecompressionLimits, compress, decompress, is_compressed_rtf,
     };
 }
 
@@ -244,8 +244,8 @@ mod native {
         MAX_CHARACTER_KERNING_HALF_POINTS, MAX_CHARACTER_SCALE_PERCENT,
     };
     pub use compressed::{
-        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
-        is_compressed_rtf,
+        CompressionLimits, DEFAULT_MAX_COMPRESSED_RTF_BYTES, DEFAULT_MAX_DECOMPRESSED_RTF_BYTES,
+        DecompressionLimits, compress, decompress, is_compressed_rtf,
     };
     pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
     pub use data_store::DocumentDataStore;

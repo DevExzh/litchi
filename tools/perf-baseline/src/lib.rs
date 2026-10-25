@@ -16716,7 +16716,11 @@ fn semantic_rtf_bytes(
         },
         RtfSemanticVariant::Lzfu => {
             let plain = semantic_rtf_plain_bytes(shape)?;
-            let compressed = litchi_rtf::transport::compress(&plain, true)?;
+            let compressed = litchi_rtf::transport::compress(
+                &plain,
+                true,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )?;
             if !litchi_rtf::transport::is_compressed_rtf(&compressed)
                 || litchi_rtf::transport::decompress(
                     &compressed,
@@ -34805,7 +34809,10 @@ fn run_rtf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_rtf::ValidationReport::from_bytes(bytes)?),
+        |bytes| Ok(litchi_rtf::ValidationReport::from_bytes(
+            bytes,
+            litchi_rtf::OpenOptions::default(),
+        )?),
         rtf_validation_summary,
     )
 }

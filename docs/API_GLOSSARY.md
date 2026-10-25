@@ -298,6 +298,14 @@ Zero explicitly denies a dimension. Values above `isize::MAX` are invalid.
 `OpenOptions::{source_limits, leniency}` carries the profile and explicit repair
 policy, including through unified `OpenOptions::rtf_options`.
 
+Raw validation is explicit: `validation::{validate, validate_str}` and
+`ValidationReport::{from_bytes, from_str}` require a caller-selected
+`read::OpenOptions`; no default validation twins remain. Transport encoding is
+similarly bounded: `transport::compress(data, compress, CompressionLimits)`
+checks the complete framed output before each fallible growth and final frame
+allocation. `transport::decompress` retains its required
+`DecompressionLimits` argument.
+
 This migration does not rename the separate semantic edit limits or structural
 `LimitExceeded` errors. Record 0223 adds the concrete immutable `Package` and owned read-only
 `Document` projection. Record 0224 aligns primary transaction vocabulary, and

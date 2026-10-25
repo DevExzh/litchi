@@ -38,6 +38,9 @@ const COUNTED_HEADER_SIZE: usize = HEADER_SIZE - size_of::<u32>();
 /// Default finite ceiling for a decompressed compressed-RTF payload (256 MiB).
 pub const DEFAULT_MAX_DECOMPRESSED_RTF_BYTES: usize = 256 * 1_048_576;
 
+/// Default finite ceiling for one compressed-RTF output frame (256 MiB).
+pub const DEFAULT_MAX_COMPRESSED_RTF_BYTES: usize = 256 * 1_048_576;
+
 /// Initial dictionary for compression/decompression
 const INIT_DICT: &[u8] = b"{\\rtf1\\ansi\\mac\\deff0\\deftab720{\\fonttbl;}\
 {\\f0\\fnil \\froman \\fswiss \\fmodern \\fscript \\fdecor MS Sans SerifSymbolArial\
@@ -78,11 +81,26 @@ fn reserve_exact_bytes(
         .map_err(|_err| allocation_failed(resource, capacity))
 }
 
-fn extend_bytes(output: &mut Vec<u8>, bytes: &[u8], resource: &'static str) -> RtfResult<()> {
+fn extend_bytes(
+    output: &mut Vec<u8>,
+    bytes: &[u8],
+    limits: CompressionLimits,
+    resource: &'static str,
+) -> RtfResult<()> {
     let requested = output
         .len()
         .checked_add(bytes.len())
         .ok_or_else(|| codec_invariant("output size overflow"))?;
+    let frame_size = HEADER_SIZE
+        .checked_add(requested)
+        .ok_or_else(|| codec_invariant("compressed RTF frame size overflow"))?;
+    if frame_size > limits.max_output_bytes {
+        return Err(RtfError::LimitExceeded {
+            resource: "compressed RTF output",
+            observed: frame_size,
+            limit: limits.max_output_bytes,
+        });
+    }
     output
         .try_reserve(bytes.len())
         .map_err(|_err| allocation_failed(resource, requested))?;
@@ -117,6 +135,32 @@ impl DecompressionLimits {
 impl Default for DecompressionLimits {
     fn default() -> Self {
         Self::new(DEFAULT_MAX_DECOMPRESSED_RTF_BYTES)
+    }
+}
+
+/// Resource limits used while producing one compressed-RTF frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompressionLimits {
+    max_output_bytes: usize,
+}
+
+impl CompressionLimits {
+    /// Create a limit profile with a caller-selected output ceiling.
+    #[must_use]
+    pub const fn new(max_output_bytes: usize) -> Self {
+        Self { max_output_bytes }
+    }
+
+    /// Maximum number of bytes the encoder may produce, including its header.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+}
+
+impl Default for CompressionLimits {
+    fn default() -> Self {
+        Self::new(DEFAULT_MAX_COMPRESSED_RTF_BYTES)
     }
 }
 
@@ -701,16 +745,16 @@ fn next_position(
 ///
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
-pub fn compress(data: &[u8], compress: bool) -> RtfResult<Vec<u8>> {
+pub fn compress(data: &[u8], compress: bool, limits: CompressionLimits) -> RtfResult<Vec<u8>> {
     if compress {
-        compress_lzfu(data)
+        compress_lzfu(data, limits)
     } else {
-        compress_uncompressed(data)
+        compress_uncompressed(data, limits)
     }
 }
 
 /// Compress data using `LZFu` algorithm
-fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
+fn compress_lzfu(data: &[u8], limits: CompressionLimits) -> RtfResult<Vec<u8>> {
     checked_u32_size(data.len(), "uncompressed RTF")?;
     let mut dictionary = EncodeDictionary::new()?;
     let mut output = Vec::new();
@@ -722,7 +766,12 @@ fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
         let mut run = EncodeRun::new();
         run.push_literal(0)?;
         run.push_reference(1, dictionary_reference(dictionary.ring.write_offset, 0)?)?;
-        extend_bytes(&mut output, run.as_bytes()?, "compressed RTF output")?;
+        extend_bytes(
+            &mut output,
+            run.as_bytes()?,
+            limits,
+            "compressed RTF output",
+        )?;
     } else {
         let mut input_offset = 0usize;
         'runs: loop {
@@ -733,7 +782,12 @@ fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
                         bit,
                         dictionary_reference(dictionary.ring.write_offset, 0)?,
                     )?;
-                    extend_bytes(&mut output, run.as_bytes()?, "compressed RTF output")?;
+                    extend_bytes(
+                        &mut output,
+                        run.as_bytes()?,
+                        limits,
+                        "compressed RTF output",
+                    )?;
                     break 'runs;
                 }
 
@@ -756,17 +810,22 @@ fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
                         .ok_or_else(|| codec_invariant("compressor input offset overflow"))?;
                 }
             }
-            extend_bytes(&mut output, run.as_bytes()?, "compressed RTF output")?;
+            extend_bytes(
+                &mut output,
+                run.as_bytes()?,
+                limits,
+                "compressed RTF output",
+            )?;
         }
     }
 
     let crc32 = crc32(&output)?;
-    build_frame(data.len(), &output, *COMPRESSED_SIGNATURE, crc32)
+    build_frame(data.len(), &output, *COMPRESSED_SIGNATURE, crc32, limits)
 }
 
 /// Compress data without compression (just add header)
-fn compress_uncompressed(data: &[u8]) -> RtfResult<Vec<u8>> {
-    build_frame(data.len(), data, *UNCOMPRESSED_SIGNATURE, 0)
+fn compress_uncompressed(data: &[u8], limits: CompressionLimits) -> RtfResult<Vec<u8>> {
+    build_frame(data.len(), data, *UNCOMPRESSED_SIGNATURE, 0, limits)
 }
 
 fn dictionary_reference(offset: usize, length: usize) -> RtfResult<[u8; 2]> {
@@ -802,6 +861,7 @@ fn build_frame(
     contents: &[u8],
     compression_type: [u8; 4],
     crc32: u32,
+    limits: CompressionLimits,
 ) -> RtfResult<Vec<u8>> {
     let raw_size = checked_u32_size(raw_len, "uncompressed RTF")?;
     let counted_size = contents
@@ -812,6 +872,13 @@ fn build_frame(
     let total_size = HEADER_SIZE
         .checked_add(contents.len())
         .ok_or_else(|| RtfError::InvalidStructure("compressed-RTF size overflow".to_string()))?;
+    if total_size > limits.max_output_bytes {
+        return Err(RtfError::LimitExceeded {
+            resource: "compressed RTF output",
+            observed: total_size,
+            limit: limits.max_output_bytes,
+        });
+    }
     let header = CompressedRtfHeader::new(compressed_size, raw_size, compression_type, crc32);
     let mut result = Vec::new();
     reserve_exact_bytes(&mut result, total_size, "compressed RTF frame")?;
@@ -875,7 +942,7 @@ mod tests {
     #[test]
     fn test_round_trip_uncompressed() {
         let original = b"{\\rtf1\\ansi Hello World!\\par}";
-        let compressed = compress(original, false).unwrap();
+        let compressed = compress(original, false, CompressionLimits::default()).unwrap();
         let decompressed = decompress(&compressed, DecompressionLimits::default()).unwrap();
         assert_eq!(original, decompressed.as_slice());
     }
@@ -886,9 +953,14 @@ mod tests {
             decompress(SPEC_COMPRESSED, DecompressionLimits::default()).unwrap(),
             SPEC_RAW
         );
-        assert_eq!(compress(SPEC_RAW, true).unwrap(), SPEC_COMPRESSED);
         assert_eq!(
-            crate::Tree::from_bytes(SPEC_COMPRESSED, crate::read::OpenOptions::default()).unwrap().text(),
+            compress(SPEC_RAW, true, CompressionLimits::default()).unwrap(),
+            SPEC_COMPRESSED
+        );
+        assert_eq!(
+            crate::Tree::from_bytes(SPEC_COMPRESSED, crate::read::OpenOptions::default())
+                .unwrap()
+                .text(),
             "hello world"
         );
     }
@@ -900,7 +972,7 @@ mod tests {
             original.push(((index * 37 + index / 17 * 11) % 251) as u8);
         }
 
-        let encoded = compress(&original, true).unwrap();
+        let encoded = compress(&original, true, CompressionLimits::default()).unwrap();
         assert!(encoded.len() < original.len());
         assert_eq!(
             decompress(&encoded, DecompressionLimits::default()).unwrap(),
@@ -932,7 +1004,7 @@ mod tests {
                     original.push(byte);
                 }
 
-                let encoded = compress(&original, true).unwrap();
+                let encoded = compress(&original, true, CompressionLimits::default()).unwrap();
                 assert_eq!(
                     decompress(&encoded, DecompressionLimits::default()).unwrap(),
                     original,
@@ -944,7 +1016,7 @@ mod tests {
 
     #[test]
     fn canonical_empty_compressed_stream_round_trips() {
-        let encoded = compress(&[], true).unwrap();
+        let encoded = compress(&[], true, CompressionLimits::default()).unwrap();
         assert_eq!(&encoded[HEADER_SIZE..], &[0x02, 0x00, 0x0d, 0x00]);
         assert!(
             decompress(&encoded, DecompressionLimits::default())
@@ -955,20 +1027,34 @@ mod tests {
 
     #[test]
     fn declared_frame_and_raw_sizes_are_exact() {
-        let mut stored = compress(b"abc", false).unwrap();
+        let mut stored = compress(b"abc", false, CompressionLimits::default()).unwrap();
         stored[0..4].copy_from_slice(&14u32.to_le_bytes());
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("COMPSIZE")
         ));
 
-        let stored = build_frame(4, b"abc", *UNCOMPRESSED_SIGNATURE, 0).unwrap();
+        let stored = build_frame(
+            4,
+            b"abc",
+            *UNCOMPRESSED_SIGNATURE,
+            0,
+            CompressionLimits::default(),
+        )
+        .unwrap();
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
 
-        let stored = build_frame(2, b"abc", *UNCOMPRESSED_SIGNATURE, 0).unwrap();
+        let stored = build_frame(
+            2,
+            b"abc",
+            *UNCOMPRESSED_SIGNATURE,
+            0,
+            CompressionLimits::default(),
+        )
+        .unwrap();
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
@@ -977,7 +1063,7 @@ mod tests {
 
     #[test]
     fn declared_output_is_budgeted_before_allocation() {
-        let mut stored = compress(&[], false).unwrap();
+        let mut stored = compress(&[], false, CompressionLimits::default()).unwrap();
         stored[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
         let limits = DecompressionLimits::new(1024);
         assert_eq!(limits.max_output_bytes(), 1024);
@@ -1027,6 +1113,7 @@ mod tests {
             &[0x00, b'A'],
             *COMPRESSED_SIGNATURE,
             crc32(&[0x00, b'A']).unwrap(),
+            CompressionLimits::default(),
         )
         .unwrap();
         assert!(matches!(
@@ -1039,6 +1126,7 @@ mod tests {
             &[0x01, 0x0c],
             *COMPRESSED_SIGNATURE,
             crc32(&[0x01, 0x0c]).unwrap(),
+            CompressionLimits::default(),
         )
         .unwrap();
         assert!(matches!(
@@ -1051,6 +1139,7 @@ mod tests {
             &[0x01, 0x12, 0xc0],
             *COMPRESSED_SIGNATURE,
             crc32(&[0x01, 0x12, 0xc0]).unwrap(),
+            CompressionLimits::default(),
         )
         .unwrap();
         assert!(matches!(
@@ -1063,6 +1152,7 @@ mod tests {
             &[0x02, b'A', 0x0d, 0x00],
             *COMPRESSED_SIGNATURE,
             crc32(&[0x02, b'A', 0x0d, 0x00]).unwrap(),
+            CompressionLimits::default(),
         )
         .unwrap();
         assert!(matches!(
@@ -1076,6 +1166,7 @@ mod tests {
             &duplicate_artificial_literal_contents,
             *COMPRESSED_SIGNATURE,
             crc32(&duplicate_artificial_literal_contents).unwrap(),
+            CompressionLimits::default(),
         )
         .unwrap();
         assert!(matches!(
@@ -1092,6 +1183,7 @@ mod tests {
             &contents,
             *COMPRESSED_SIGNATURE,
             crc32(&contents).unwrap(),
+            CompressionLimits::default(),
         )
         .unwrap();
         assert_eq!(
@@ -1109,7 +1201,14 @@ mod tests {
             Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
         ));
 
-        let stored = build_frame(3, b"abc", *UNCOMPRESSED_SIGNATURE, 1).unwrap();
+        let stored = build_frame(
+            3,
+            b"abc",
+            *UNCOMPRESSED_SIGNATURE,
+            1,
+            CompressionLimits::default(),
+        )
+        .unwrap();
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
@@ -1134,7 +1233,33 @@ mod tests {
     fn wire_size_helpers_reject_unrepresentable_lengths() {
         if usize::BITS > u32::BITS {
             assert!(checked_u32_size(u32::MAX as usize + 1, "test").is_err());
-            assert!(build_frame(u32::MAX as usize + 1, &[], *UNCOMPRESSED_SIGNATURE, 0).is_err());
+            assert!(
+                build_frame(
+                    u32::MAX as usize + 1,
+                    &[],
+                    *UNCOMPRESSED_SIGNATURE,
+                    0,
+                    CompressionLimits::default(),
+                )
+                .is_err()
+            );
         }
+    }
+
+    #[test]
+    fn compression_limits_bound_the_complete_frame_before_reserving() {
+        let encoded = compress(SPEC_RAW, false, CompressionLimits::default()).unwrap();
+        let exact = CompressionLimits::new(encoded.len());
+        assert_eq!(compress(SPEC_RAW, false, exact).unwrap(), encoded);
+
+        let one_under = CompressionLimits::new(encoded.len() - 1);
+        assert!(matches!(
+            compress(SPEC_RAW, false, one_under),
+            Err(RtfError::LimitExceeded {
+                resource: "compressed RTF output",
+                observed,
+                limit,
+            }) if observed == encoded.len() && limit == encoded.len() - 1
+        ));
     }
 }

@@ -13798,6 +13798,38 @@
       "package": "litchi-rtf",
       "default_features": false,
       "features": [],
+      "required_signatures": [
+        {
+          "method": "litchi_rtf::transport::compress",
+          "inputs": ["data", "compress", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_rtf::transport::CompressionLimits"
+        },
+        {
+          "method": "litchi_rtf::validation::ValidationReport::from_str",
+          "inputs": ["input", "options"],
+          "limits_argument": "options",
+          "limits_type": "litchi_rtf::read::OpenOptions"
+        },
+        {
+          "method": "litchi_rtf::validation::ValidationReport::from_bytes",
+          "inputs": ["input", "options"],
+          "limits_argument": "options",
+          "limits_type": "litchi_rtf::read::OpenOptions"
+        },
+        {
+          "method": "litchi_rtf::validation::validate",
+          "inputs": ["input", "options"],
+          "limits_argument": "options",
+          "limits_type": "litchi_rtf::read::OpenOptions"
+        },
+        {
+          "method": "litchi_rtf::validation::validate_str",
+          "inputs": ["input", "options"],
+          "limits_argument": "options",
+          "limits_type": "litchi_rtf::read::OpenOptions"
+        }
+      ],
       "banned_names": [
         {
           "name": "ParseLimits",

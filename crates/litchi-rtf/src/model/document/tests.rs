@@ -39,7 +39,7 @@ fn retains_only_proven_uncompressed_ascii_body_spans() {
         assert!(document.ordinary_body_source_span().is_none());
     }
 
-    let compressed = crate::compress(source, true).unwrap();
+    let compressed = crate::compress(source, true, crate::CompressionLimits::default()).unwrap();
     let document = Tree::parse_bytes(&compressed, OpenOptions::default()).unwrap();
     assert!(document.ordinary_body_source_span().is_none());
 }

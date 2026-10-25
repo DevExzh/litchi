@@ -71,7 +71,7 @@ fn binary_and_compressed_expansion_limits_flow_through_document_parsing() {
     ));
 
     let raw = br"{\rtf1\ansi bounded expansion}";
-    let compressed = compress(raw, true).unwrap();
+    let compressed = compress(raw, true, litchi_rtf::CompressionLimits::default()).unwrap();
     let limits = SourceLimits::builder()
         .max_decompressed_bytes(raw.len() - 1)
         .expect("decompression limit is representable")

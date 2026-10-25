@@ -71,6 +71,14 @@ impl Rtf {
         }))
     }
 
+    /// Build the bounded validation inventory from the opened package.
+    ///
+    /// The package retains the caller's native [`litchi_rtf::OpenOptions`],
+    /// so this owner route never replaces its limits with a fresh default.
+    pub(crate) fn validation_report(&self) -> litchi_rtf::ValidationReport {
+        self.0.package.validation_report()
+    }
+
     /// Whether two handles retain the same immutable native snapshot.
     pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
         self.0.package.same_snapshot(&other.0.package)

@@ -9,7 +9,7 @@ use litchi_rtf::{
     EditOptions, HeaderFooterType, OpenOptions, Package, SemanticLimitKind, SemanticLimits,
     SourceLimits,
     edit::{Error, HeaderFooterParagraph, ParagraphTextReplacement, TextSpan, TransferPlan},
-    transport::compress,
+    transport::{CompressionLimits, compress},
 };
 use std::io::{self, Write};
 
@@ -361,7 +361,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
     );
 
     let raw = br"{\rtf1\ansi First\par Second}";
-    let compressed = compress(raw, true).unwrap();
+    let compressed = compress(raw, true, CompressionLimits::default()).unwrap();
     let compressed = Package::from_bytes(&compressed).unwrap();
     let mut compressed_edit = compressed.edit();
     compressed_edit

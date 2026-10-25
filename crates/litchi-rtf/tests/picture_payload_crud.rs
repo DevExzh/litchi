@@ -320,8 +320,12 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
-    let compressed_bytes =
-        litchi_rtf::transport::compress(two_picture_source().as_bytes(), true).unwrap();
+    let compressed_bytes = litchi_rtf::transport::compress(
+        two_picture_source().as_bytes(),
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
     let compressed = Package::from_bytes(&compressed_bytes).unwrap();
     assert!(matches!(
         compressed.edit().replace_picture_payload(0, PNG_C),

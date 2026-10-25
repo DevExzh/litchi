@@ -930,7 +930,12 @@ mod short_signature_tests {
     #[test]
     fn compressed_rtf_signature_is_retained_without_overriding_zip_precedence() {
         let source = br#"{\rtf1\ansi Compressed RTF\par}"#;
-        let compressed = litchi_rtf::transport::compress(source, true).unwrap();
+        let compressed = litchi_rtf::transport::compress(
+            source,
+            true,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .unwrap();
 
         match detect_format_smart(compressed.clone()) {
             Some(super::DetectedFormat::Rtf(bytes)) => assert_eq!(bytes, compressed),

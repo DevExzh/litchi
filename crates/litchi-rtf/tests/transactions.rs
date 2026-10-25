@@ -1039,7 +1039,12 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "italic edits refuse non-ASCII transport encodings"
     ));
 
-    let compressed_bytes = litchi_rtf::transport::compress(br"{\rtf1\ansi Alpha}", true).unwrap();
+    let compressed_bytes = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi Alpha}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
     let compressed = Package::from_bytes(&compressed_bytes).unwrap();
     let mut compressed_edit = compressed.edit();
     compressed_edit
