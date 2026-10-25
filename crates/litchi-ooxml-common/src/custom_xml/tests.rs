@@ -160,8 +160,11 @@ fn mce_schema_rewrite_maps_the_selected_source_branch() {
     let source = format!(
         r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:unsupported"><mc:Choice Requires="x"><ds:datastoreItem ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs><ds:schemaRef ds:uri="urn:inactive"/></ds:schemaRefs></ds:datastoreItem></mc:Choice><mc:Fallback><ds:datastoreItem ds:itemID="{{22222222-2222-2222-2222-222222222222}}"><ds:schemaRefs><ds:schemaRef ds:uri="urn:active"/></ds:schemaRefs></ds:datastoreItem></mc:Fallback></mc:AlternateContent>"#
     );
+    // The selected branch is admitted at the source size, but the edit adds
+    // one schemaRef.  Keep the profile tight while allowing that bounded
+    // output growth; the exact-output test below covers the one-byte fence.
     let mce_limits = litchi_opc::SourceLimits::builder()
-        .max_part_bytes(source.len() as u64)
+        .max_part_bytes((source.len() + 64) as u64)
         .unwrap()
         .build()
         .unwrap();
@@ -266,7 +269,10 @@ fn failed_add_is_transactional() {
         },
     )
     .unwrap_err();
-    assert!(matches!(error, Error::Opc(_)));
+    assert!(matches!(
+        error,
+        Error::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedTarget
+    ));
     assert_eq!(package.part_count(), before_parts);
     assert_eq!(package.get_part(&source).unwrap().rels().len(), before_rels);
 
@@ -735,7 +741,7 @@ fn schema_edits_retain_noncanonical_markup_and_expanded_attribute_identity() {
     let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
     assert!(xml.contains("<p:datastoreItem"));
     assert!(xml.contains("xmlns:x='urn:future'"));
-    assert!(xml.contains("x:itemID='foreign'"));
+    assert!(xml.contains("x:itemID='{foreign}'"));
     assert!(xml.contains("x:marker='keep'"));
     assert!(xml.contains("<!-- p:itemID='{fake}' -->"));
     assert!(xml.contains("x:uri='foreign' p:uri='urn:changed'"));
@@ -869,7 +875,7 @@ fn lexical_schema_rewrite_admits_exact_output_limit_and_rejects_one_under() {
     let before = sample_props();
     let source = write_props(&before, Conformance::Transitional, &source_limits()).unwrap();
     let mut after = before.clone();
-    after.schemas = vec!["urn:longer".into()];
+    after.schemas = vec!["urn:customer-longer".into()];
     let unrestricted = codec::rewrite_props(
         &source,
         &before,
