@@ -215,7 +215,7 @@ def target_family(method: str) -> str:
     if method in SIGNATURE:
         return "signature verb: &self -> Result<Package>"
     if method == "custom_props_mut":
-        return "delete: metadata::Edit::set_custom_props (0342)"
+        return "delete: metadata::Edit::{set_custom_props, remove_custom_props} (0362ac)"
     if method == "edit_opc":
         return "raw escape: edit_opc(&self) -> opc::Edit committing a Package"
     if method in ("undo_document", "redo_document", "publish_document_commit_with_history"):

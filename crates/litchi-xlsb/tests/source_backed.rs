@@ -13,6 +13,8 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
     OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
 };
+use litchi_ooxml_common::Error as OoxmlError;
+use litchi_ooxml_common::properties::Error as MetadataError;
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, Part, SourceBackedPackage, SourceCacheLimits,
@@ -812,6 +814,40 @@ fn stale_source_preflight_remains_source_changed_without_cancellation() {
     assert!(matches!(
         selected.state(),
         Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+}
+
+#[test]
+fn metadata_noop_commit_rechecks_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let edit = workbook.edit_metadata().unwrap();
+    source.change();
+
+    assert!(matches!(
+        edit.commit(),
+        Err(MetadataError::Package(OoxmlError::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
+}
+
+#[test]
+fn metadata_revised_noop_replay_rechecks_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let no_op = revised.edit_metadata().unwrap().commit().unwrap();
+    source.change();
+
+    assert!(matches!(
+        revised.apply_metadata(no_op.patch()),
+        Err(MetadataError::Package(OoxmlError::Opc(
+            OpcError::SourceChanged { .. }
+        )))
     ));
 }
 

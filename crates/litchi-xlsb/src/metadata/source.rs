@@ -191,14 +191,19 @@ impl Edit {
         } = self;
         let (current, patch, diagnostics) = inner.finish()?;
         enforce_snapshot_limit(&patch, options)?;
+        let source = workbook.source_backed_package();
         if patch.is_noop() {
+            // Even an exact no-op must authenticate the retained source. The
+            // edit captured a source version when it started; publishing the
+            // unchanged owner after that source changed would otherwise make
+            // the stale edit look valid.
+            source.source_version()?;
             return Ok(Commit {
                 package: workbook,
                 patch,
                 diagnostics,
             });
         }
-        let source = workbook.source_backed_package();
         let (base, composed) = match &workbook.metadata {
             Some(revision) => (revision.base.clone(), revision.patch.compose(&patch)?),
             None => (start, patch.clone()),
@@ -344,6 +349,10 @@ impl SourceBackedWorkbook {
         let source = self.source_backed_package();
         if patch.is_noop() {
             if let Some(revision) = &self.metadata {
+                // Composing an empty patch only authenticates the retained
+                // property revision. It cannot observe a change to the
+                // external source, so fence that source independently.
+                source.source_version()?;
                 revision.patch.compose(patch)?;
             } else {
                 patch.check_source_backed(source)?;
