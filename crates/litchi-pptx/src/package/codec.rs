@@ -315,8 +315,7 @@ impl Package {
         // a report; their repairs are recorded here, advisorily, like the
         // metadata above.
         let presentation_limits = crate::presentation_properties::Limits::from_source_limits(
-            opc.source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            opc.source_read_limits().unwrap_or_default(),
         );
         let _deferred_presentation_properties_error =
             crate::presentation_properties::load_from_package_with_tolerance(

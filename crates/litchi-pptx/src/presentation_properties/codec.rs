@@ -149,7 +149,7 @@ impl Limits {
 
     /// Derive the presentation-properties policy from the retained OPC source
     /// profile.
-    #[must_use]
+    #[must_use = "the derived presentation-properties bounds must be retained for the operation"]
     pub fn from_source_limits(source: SourceLimits) -> Self {
         let default = Self::DEFAULT;
         let part_bytes = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
@@ -416,6 +416,10 @@ struct Attr {
     value: String,
 }
 #[derive(Clone, Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the parser keeps Node inline to avoid an allocation for every XML element"
+)]
 enum Content {
     Node(Node),
     Text(String),

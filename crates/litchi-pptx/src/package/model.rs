@@ -671,9 +671,7 @@ impl Package {
         &self,
     ) -> Result<Option<crate::presentation_properties::math::Properties>> {
         let limits = crate::presentation_properties::Limits::from_source_limits(
-            self.opc
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.opc.source_read_limits().unwrap_or_default(),
         );
         crate::presentation_properties::load_math_from_package(&self.opc, limits)
     }
@@ -811,9 +809,7 @@ impl Package {
     ) -> Result<Vec<crate::model3d::Model>> {
         let slide_name = self.resolve_slide(slide.into())?;
         let limits = crate::model3d::codec::Limits::from_source_limits(
-            self.opc
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.opc.source_read_limits().unwrap_or_default(),
         );
         crate::model3d::package::load_all(&self.opc, &slide_name, limits)
     }
@@ -830,9 +826,7 @@ impl Package {
     ) -> Result<Option<crate::model3d::Model>> {
         let slide_name = self.resolve_slide(slide.into())?;
         let limits = crate::model3d::codec::Limits::from_source_limits(
-            self.opc
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.opc.source_read_limits().unwrap_or_default(),
         );
         crate::model3d::package::load(&self.opc, &slide_name, shape.into(), limits)
     }

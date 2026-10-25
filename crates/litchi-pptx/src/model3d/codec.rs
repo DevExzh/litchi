@@ -78,7 +78,7 @@ impl Limits {
     /// The semantic ceilings are never widened beyond the format defaults;
     /// a tighter owner profile is carried through every package and slide
     /// projection that reads or writes a model3d fragment.
-    #[must_use]
+    #[must_use = "the derived model3d bounds must be retained for the operation"]
     pub fn from_source_limits(source: SourceLimits) -> Self {
         let default = Self::DEFAULT;
         let part_bytes = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);

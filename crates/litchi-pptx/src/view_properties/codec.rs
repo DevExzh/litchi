@@ -149,7 +149,7 @@ impl Limits {
     };
 
     /// Derive the view-properties policy from the retained OPC source profile.
-    #[must_use]
+    #[must_use = "the derived view-properties bounds must be retained for the operation"]
     pub fn from_source_limits(source: SourceLimits) -> Self {
         let default = Self::DEFAULT;
         let part_bytes = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);

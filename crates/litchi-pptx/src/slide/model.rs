@@ -338,9 +338,7 @@ impl<'a> Slide<'a> {
     /// Returns an error if the operation fails.
     pub fn model3ds(&self) -> Result<Vec<crate::model3d::Model>> {
         let limits = crate::model3d::codec::Limits::from_source_limits(
-            self.package
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.package.source_read_limits().unwrap_or_default(),
         );
         crate::model3d::package::load_all(self.package, self.part.part().partname(), limits)
     }
@@ -355,9 +353,7 @@ impl<'a> Slide<'a> {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
         let limits = crate::model3d::codec::Limits::from_source_limits(
-            self.package
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.package.source_read_limits().unwrap_or_default(),
         );
         crate::model3d::package::load(
             self.package,

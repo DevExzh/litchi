@@ -68,10 +68,7 @@ impl Edit<'_> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
         let limits = super::codec::Limits::from_source_limits(
-            self.staged
-                .opc()
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.staged.opc().source_read_limits().unwrap_or_default(),
         );
         self.staged
             .update(move |opc| super::package::put(opc, &slide, shape, model, limits))
@@ -91,10 +88,7 @@ impl Edit<'_> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
         let limits = super::codec::Limits::from_source_limits(
-            self.staged
-                .opc()
-                .source_read_limits()
-                .unwrap_or_else(litchi_opc::SourceLimits::default),
+            self.staged.opc().source_read_limits().unwrap_or_default(),
         );
         self.staged
             .update(move |opc| super::package::remove(opc, &slide, shape, limits))
