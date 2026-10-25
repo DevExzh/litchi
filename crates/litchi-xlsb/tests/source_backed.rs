@@ -898,6 +898,54 @@ fn metadata_revised_noop_replay_checks_cancellation_before_stale_source() {
 }
 
 #[test]
+fn metadata_revised_undo_rechecks_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let original = workbook.metadata().unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let mut undo = revised.edit_metadata().unwrap();
+    undo.set(original);
+    source.change();
+
+    assert!(matches!(
+        undo.commit(),
+        Err(MetadataError::Package(OoxmlError::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
+}
+
+#[test]
+fn metadata_revised_undo_checks_cancellation_before_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let original = workbook.metadata().unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let mut undo = revised.edit_metadata().unwrap();
+    undo.set(original);
+    source.change();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        undo.commit(),
+        Err(MetadataError::Package(OoxmlError::Opc(OpcError::Cancelled)))
+    ));
+}
+
+#[test]
 fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
     let (cancellation_source, context) = managed_context();
     let source = Arc::new(CancelOnArmedRead::new(fixture(), cancellation_source));

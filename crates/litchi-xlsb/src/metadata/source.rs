@@ -49,6 +49,12 @@ use crate::SourceBackedWorkbook;
 
 type Result<T> = std::result::Result<T, Error>;
 
+fn preflight_noop_source(source: &litchi_opc::SourceBackedPackage) -> Result<()> {
+    source.check_execution()?;
+    source.source_version()?;
+    Ok(())
+}
+
 /// The document-property state a source owner publishes over its source.
 pub(crate) struct Revision {
     /// The properties read from the source.
@@ -197,8 +203,7 @@ impl Edit {
             // edit captured a source version when it started; publishing the
             // unchanged owner after that source changed would otherwise make
             // the stale edit look valid.
-            source.check_execution()?;
-            source.source_version()?;
+            preflight_noop_source(source)?;
             return Ok(Commit {
                 package: workbook,
                 patch,
@@ -211,7 +216,9 @@ impl Edit {
         };
         // The plan itself is prepared on first publication; its preconditions
         // are checked now, so a stale or signed source fails the commit.
-        if !composed.is_noop() {
+        if composed.is_noop() {
+            preflight_noop_source(source)?;
+        } else {
             composed.check_source_backed(source)?;
             if source.has_signature_infrastructure() {
                 return Err(Error::Signed);
@@ -349,12 +356,11 @@ impl SourceBackedWorkbook {
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
         let source = self.source_backed_package();
         if patch.is_noop() {
+            preflight_noop_source(source)?;
             if let Some(revision) = &self.metadata {
                 // Composing an empty patch only authenticates the retained
                 // property revision. It cannot observe a change to the
                 // external source, so fence that source independently.
-                source.check_execution()?;
-                source.source_version()?;
                 revision.patch.compose(patch)?;
             } else {
                 patch.check_source_backed(source)?;
