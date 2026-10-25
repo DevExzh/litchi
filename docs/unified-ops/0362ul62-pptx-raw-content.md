@@ -1,7 +1,7 @@
 # 0362ul62 — PPTX raw-content limits and source propagation
 
 Status: source-ready implementation packet, based on the current source tip
-`68576a5283`. The earlier coordinator replay integration tip `a942320908` is
+`9badfd8acf`. The earlier coordinator replay integration tip `a942320908` is
 historical context only, not the current source basis. Native Cargo
 validation, the workspace gate and ABBA qualification remain coordinator work
 because this wave was run without a build slot.
