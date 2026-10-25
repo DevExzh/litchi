@@ -5,11 +5,13 @@ use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
-use quick_xml::events::Event;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{Field, MAX_TEXT_BYTES, MAX_XML_BYTES, NAMESPACE, Props, STRICT_NAMESPACE, Value};
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml::decode_xml_reference;
 use crate::{Error, Result};
 
@@ -567,35 +569,48 @@ fn scan(xml: &[u8]) -> Result<Layout> {
                 },
             };
             match event {
-                Event::Start(element) => Scanned::Element {
-                    empty: false,
-                    namespace,
-                    local: element.local_name().as_ref().to_vec(),
-                    name: element.name().as_ref().to_vec(),
+                Event::Start(element) => {
+                    validate_source_attributes(&element, reader.decoder())?;
+                    Scanned::Element {
+                        empty: false,
+                        namespace,
+                        local: element.local_name().as_ref().to_vec(),
+                        name: element.name().as_ref().to_vec(),
+                    }
                 },
-                Event::Empty(element) => Scanned::Element {
-                    empty: true,
-                    namespace,
-                    local: element.local_name().as_ref().to_vec(),
-                    name: element.name().as_ref().to_vec(),
+                Event::Empty(element) => {
+                    validate_source_attributes(&element, reader.decoder())?;
+                    Scanned::Element {
+                        empty: true,
+                        namespace,
+                        local: element.local_name().as_ref().to_vec(),
+                        name: element.name().as_ref().to_vec(),
+                    }
                 },
                 Event::End(_) => Scanned::End,
                 Event::Text(text) => {
                     let decoded = text
                         .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|error| Error::Xml(error.to_string()))?;
-                    Scanned::Text(
-                        quick_xml::escape::unescape(&decoded)
-                            .map_err(|error| Error::Xml(error.to_string()))?
-                            .into_owned(),
-                    )
+                    let decoded = quick_xml::escape::unescape(&decoded)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    let decoded = decoded.into_owned();
+                    validate_source_chars(&decoded, "extended properties XML text")?;
+                    Scanned::Text(decoded)
                 },
-                Event::CData(text) => Scanned::Text(
-                    text.xml_content(XmlVersion::Explicit1_0)
+                Event::CData(text) => {
+                    let decoded = text
+                        .xml_content(XmlVersion::Explicit1_0)
                         .map_err(|error| Error::Xml(error.to_string()))?
-                        .into_owned(),
-                ),
-                Event::GeneralRef(reference) => Scanned::Text(decode_xml_reference(&reference)?),
+                        .into_owned();
+                    validate_source_chars(&decoded, "extended properties XML text")?;
+                    Scanned::Text(decoded)
+                },
+                Event::GeneralRef(reference) => {
+                    let decoded = decode_xml_reference(&reference)?;
+                    validate_source_chars(&decoded, "extended properties XML text")?;
+                    Scanned::Text(decoded)
+                },
                 Event::DocType(_) => Scanned::DocType,
                 Event::Eof => Scanned::Eof,
                 Event::Comment(_) | Event::Decl(_) | Event::PI(_) => Scanned::Other,
@@ -681,7 +696,6 @@ fn scan(xml: &[u8]) -> Result<Layout> {
             },
             Scanned::End => {
                 if let Some((field, element_start, content_start, name, text)) = active.take() {
-                    validate_source_text(field, &text)?;
                     field.set_lexical(&mut props, text)?;
                     elements.push(Element {
                         field,
@@ -735,6 +749,27 @@ fn scan(xml: &[u8]) -> Result<Layout> {
     })
 }
 
+fn validate_source_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_source_chars(&value, "extended properties XML attribute")?;
+    }
+    Ok(())
+}
+
+fn validate_source_chars(value: &str, context: &str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| !is_xml_char(*character)) {
+        return Err(Error::Invalid(format!(
+            "{context} contains XML 1.0-forbidden character U+{:04X}",
+            u32::from(character)
+        )));
+    }
+    Ok(())
+}
+
 fn push_text(value: &mut String, text: &str) -> Result<()> {
     if value.len().saturating_add(text.len()) > MAX_TEXT_BYTES {
         return Err(Error::Limit {
@@ -744,17 +779,6 @@ fn push_text(value: &mut String, text: &str) -> Result<()> {
         });
     }
     value.push_str(text);
-    Ok(())
-}
-
-fn validate_source_text(field: Field, value: &str) -> Result<()> {
-    if let Some(character) = value.chars().find(|character| !is_xml_char(*character)) {
-        return Err(Error::Invalid(format!(
-            "extended property {} contains XML 1.0-forbidden character U+{:04X}",
-            field.local_name(),
-            u32::from(character)
-        )));
-    }
     Ok(())
 }
 

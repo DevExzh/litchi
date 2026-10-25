@@ -150,11 +150,24 @@ fn values_xml_cannot_carry_are_refused() {
 
 #[test]
 fn source_xml_controls_are_rejected_at_the_decode_boundary() {
-    let source = r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>&#x1;</Company></Properties>"#;
-    assert!(matches!(
-        decode(source.as_bytes()),
-        Err(Error::Invalid(message)) if message.contains("U+0001")
-    ));
+    let sources = [
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" data="&#x1;"/>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:opaque="urn:opaque&#x1;"/>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><Nested>&#x1;</Nested></Unknown></Properties>"#,
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>&#x1;</Company></Properties>"#,
+    ];
+    for source in sources {
+        assert!(
+            matches!(decode(source.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+            "source control was not rejected: {source}"
+        );
+    }
+
+    let cdata = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><![CDATA[{}]]></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(decode(cdata.as_bytes()).is_err());
 }
 
 fn package_with(xml: &[u8]) -> OpcPackage {

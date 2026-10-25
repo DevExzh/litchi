@@ -222,8 +222,27 @@ pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
 /// failure in an authored value an invalid value, while failures from the
 /// retained source remain package corruption.
 pub(super) fn validate_target(target: &Metadata) -> Result<()> {
-    let target = Core::merged(None, target)?;
-    encoded_len(&target, Dialect::Transitional).map(|_| ())
+    for (property, value) in [
+        ("dc:title", target.title.as_deref()),
+        ("dc:subject", target.subject.as_deref()),
+        ("dc:creator", target.author.as_deref()),
+        ("dc:description", target.description.as_deref()),
+        ("dc:identifier", target.identifier.as_deref()),
+        ("cp:lastModifiedBy", target.last_modified_by.as_deref()),
+        ("cp:category", target.category.as_deref()),
+        ("cp:contentStatus", target.content_status.as_deref()),
+        ("cp:revision", target.revision.as_deref()),
+        ("cp:version", target.version.as_deref()),
+        ("dc:language", target.language.as_deref()),
+    ] {
+        if let Some(value) = value {
+            validate_text(value, property)?;
+        }
+    }
+    for value in &target.keywords {
+        validate_text(value, "cp:keywords")?;
+    }
+    Ok(())
 }
 
 fn preflight(props: &Core, dialect: Dialect) -> Result<usize> {
