@@ -296,6 +296,18 @@ use litchi_core::id::generate_guid_bytes;
 use litchi_fonts::CollectGlyphs;
 
 #[cfg(feature = "automatic-fonts")]
+fn map_font_preparation_error(error: litchi_fonts::FontError) -> Error {
+    match error {
+        litchi_fonts::FontError::LimitExceeded { limit, actual, .. } => Error::FontLimit {
+            kind: font::LimitKind::FontPreparation,
+            actual,
+            maximum: limit,
+        },
+        error => Error::Other(error.to_string()),
+    }
+}
+
+#[cfg(feature = "automatic-fonts")]
 impl Package {
     pub(super) fn embed_fonts_for_document(
         &mut self,
@@ -317,8 +329,9 @@ impl Package {
         glyphs: litchi_fonts::GlyphMap,
         mode: litchi_fonts::embedding::Mode,
     ) -> Result<()> {
-        let prepared = litchi_fonts::embedding::prepare(glyphs, mode)
-            .map_err(|error| Error::Other(error.to_string()))?;
+        let prepared =
+            litchi_fonts::embedding::prepare(glyphs, mode, self.semantic_limits.fonts_value())
+                .map_err(map_font_preparation_error)?;
         if prepared.is_empty() {
             return Ok(());
         }
@@ -935,12 +948,30 @@ impl Package {
 
 #[cfg(all(test, feature = "automatic-fonts"))]
 mod font_settings_tests {
+    use litchi_fonts::FontError;
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::*;
 
     const SETTINGS_PAYLOAD: &[u8] =
         br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+
+    #[test]
+    fn automatic_font_limits_remain_typed_at_the_docx_boundary() {
+        let error = map_font_preparation_error(FontError::LimitExceeded {
+            resource: "font subsetting output bytes",
+            limit: 7,
+            actual: 8,
+        });
+        assert!(matches!(
+            error,
+            Error::FontLimit {
+                kind: font::LimitKind::FontPreparation,
+                actual: 8,
+                maximum: 7,
+            }
+        ));
+    }
 
     /// A lazily opened package with a stored `/word/settings.xml`, owned by a
     /// settings relationship or not, and optionally corrupted so that only a

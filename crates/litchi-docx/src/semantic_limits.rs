@@ -39,6 +39,8 @@ pub struct SemanticLimits {
     tail_append: crate::source_backed::tail_append::Limits,
     embedded: litchi_ooxml_common::embedded::Limits,
     glossary: crate::glossary::Limits,
+    #[cfg(feature = "automatic-fonts")]
+    fonts: litchi_fonts::PreparationLimits,
 }
 
 macro_rules! copy_limit {
@@ -154,6 +156,13 @@ impl SemanticLimits {
         glossary_value,
         crate::glossary::Limits,
         "glossary and building-block reads and edits"
+    );
+    #[cfg(feature = "automatic-fonts")]
+    copy_limit!(
+        fonts,
+        fonts_value,
+        litchi_fonts::PreparationLimits,
+        "automatic font preparation"
     );
 
     /// Bound task-pane and web-extension reads by `limits`.

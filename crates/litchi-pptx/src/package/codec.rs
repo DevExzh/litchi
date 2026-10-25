@@ -372,6 +372,8 @@ impl Package {
         mut self,
         presentation: &crate::builder::Presentation,
         embed_fonts: bool,
+        #[cfg(feature = "automatic-fonts")] preparation_limits: litchi_fonts::PreparationLimits,
+        #[cfg(feature = "automatic-fonts")] eot_limits: litchi_fonts::embedding::powerpoint::Limits,
     ) -> Result<Self> {
         let _ = embed_fonts;
         let presentation_modified = presentation.is_modified();
@@ -387,7 +389,7 @@ impl Package {
             self.materialize_presentation(presentation)?;
         }
         #[cfg(feature = "automatic-fonts")]
-        self.embed_fonts_for_presentation(presentation)?;
+        self.embed_fonts_for_presentation(presentation, preparation_limits, eot_limits)?;
         Ok(self)
     }
 

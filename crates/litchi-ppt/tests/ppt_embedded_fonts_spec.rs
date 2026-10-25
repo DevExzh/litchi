@@ -102,8 +102,11 @@ fn base_collection_uses_ordinal_refs_and_accepts_all_four_facets() {
 
     #[cfg(feature = "fonts")]
     for facet in &fonts.fonts[0].embedded_fonts {
-        let view = litchi_fonts::embedding::powerpoint::View::parse(&facet.data)
-            .expect("fixture facet is canonical uncompressed EOT 1.0");
+        let view = litchi_fonts::embedding::powerpoint::View::parse(
+            &facet.data,
+            litchi_fonts::embedding::powerpoint::Limits::default(),
+        )
+        .expect("fixture facet is canonical uncompressed EOT 1.0");
         assert_eq!(view.family_name().decode().unwrap(), "Fixture");
     }
 }
@@ -319,22 +322,22 @@ fn eot_parser_rejects_malformed_utf16_sizes_and_explicit_limit_overflow() {
     use litchi_fonts::embedding::powerpoint::{Limits, View};
 
     let eot = valid_eot();
-    assert!(View::parse(&eot).is_ok());
+    assert!(View::parse(&eot, Limits::default()).is_ok());
 
     let mut wrong_size = eot.clone();
     wrong_size[0..4].copy_from_slice(&0_u32.to_le_bytes());
-    assert!(View::parse(&wrong_size).is_err());
+    assert!(View::parse(&wrong_size, Limits::default()).is_err());
 
     let mut malformed_name = eot.clone();
     // The first name begins after the 82-byte fixed header and its u16 size.
     malformed_name[84..86].copy_from_slice(&0xd800_u16.to_le_bytes());
-    assert!(View::parse(&malformed_name).is_err());
+    assert!(View::parse(&malformed_name, Limits::default()).is_err());
 
     let limits = Limits {
         max_input_bytes: eot.len() - 1,
         ..Limits::default()
     };
-    assert!(View::parse_with(&eot, limits).is_err());
+    assert!(View::parse(&eot, limits).is_err());
 }
 
 #[test]

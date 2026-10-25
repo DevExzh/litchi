@@ -11,14 +11,16 @@
 //!   2. Implements `CollectGlyphs` on a tiny in-memory document type to
 //!      show how callers integrate with the trait,
 //!   3. Builds a typed `Glyphs` set from the sample's Unicode scalars,
-//!   4. Maps a handful of code points to glyph IDs and runs the
-//!      concrete `Allsorts` subsetter to produce a smaller font blob.
+//!   4. Sends the code points through the canonical bounded preparation API,
+//!      which maps them and runs the checked subsetter to produce a smaller
+//!      font blob.
 //!
 //! Like `load_font.rs`, the example exits cleanly when no candidate font
 //! is available on the host so it remains usable in CI.
 
 use litchi_fonts::{
-    Allsorts, CollectGlyphs, FontData, FontError, GlyphMap, Loader, Request, Subsetter,
+    CollectGlyphs, FontData, FontError, GlyphMap, Loader, Request,
+    embedding::{Mode, PreparationLimits, prepare_with},
 };
 
 const CANDIDATE_FAMILIES: &[&str] = &[
@@ -100,24 +102,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("Original font data: {} bytes", font.data.len());
 
-    // 3. Build a small set of glyph IDs to keep. We pick a tiny set
-    //    deliberately so the size reduction is obvious.
-    //    Glyph 0 is always `.notdef` and must be present in a valid font;
-    //    keep a handful of low IDs that exist in essentially every font.
-    let glyph_ids: Vec<u16> = (0u16..16).collect();
+    // 3. Build a small set of code points to keep. The canonical preparation
+    // path maps these to glyph IDs and retains `.notdef` automatically.
+    let mut used_glyphs = GlyphMap::new();
+    used_glyphs.insert(
+        Request::regular(font.name.clone()),
+        "The quick brown fox jumps over the lazy dog."
+            .chars()
+            .collect(),
+    );
 
-    // 4. Run the concrete subsetter. The `Pdf` subset profile inside the
-    //    impl is permissive enough to work with most TrueType/OpenType
-    //    fonts; if it fails we report and exit gracefully.
-    let subsetter = Allsorts::new();
-    match subsetter.subset(&font, &glyph_ids) {
-        Ok(subset_bytes) => {
-            println!(
-                "Subset font ({} glyph IDs): {} bytes ({:.1}% of original)",
-                glyph_ids.len(),
-                subset_bytes.len(),
-                100.0 * (subset_bytes.len() as f64) / (font.data.len() as f64),
-            );
+    // 4. Run the canonical preparation API. Its selected limits scope source
+    // parsing, mapping, and subset output in one checked operation.
+    match prepare_with(
+        &loader,
+        used_glyphs,
+        Mode::Subset,
+        PreparationLimits::default(),
+    ) {
+        Ok(prepared) => {
+            for subset_font in prepared {
+                println!(
+                    "Subset font: {} bytes ({:.1}% of original)",
+                    subset_font.data.len(),
+                    100.0 * (subset_font.data.len() as f64) / (font.data.len() as f64),
+                );
+            }
         },
         Err(err) => {
             println!("Subsetting failed (this can happen with CFF or unusual fonts): {err}");
