@@ -35,9 +35,9 @@ impl Reader<File> {
 
     /// Open a `.ppt` package under explicit open options.
     ///
-    /// The reader keeps the options' source limits and leniency; every
-    /// projection it returns ([`Self::presentation`], the font and
-    /// picture-bullet readers) inherits them.
+    /// The reader keeps the options' source limits, leniency, and VBA
+    /// inspection profile; every projection it returns ([`Self::presentation`],
+    /// the font and picture-bullet readers) inherits them.
     ///
     /// # Errors
     ///
@@ -75,8 +75,8 @@ impl<R: Read + Seek> Reader<R> {
 
     /// Create a reader under explicit open options.
     ///
-    /// The reader keeps the options' source limits and leniency; every
-    /// projection it returns inherits them.
+    /// The reader keeps the options' source limits, leniency, and VBA
+    /// inspection profile; every projection it returns inherits them.
     ///
     /// # Errors
     ///
@@ -108,6 +108,8 @@ impl<R: Read + Seek> Reader<R> {
             ole,
             source_limits,
             leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
         })
     }
 
@@ -166,6 +168,8 @@ impl<R: Read + Seek> Reader<R> {
             ole,
             source_limits,
             leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
         })
     }
 
@@ -188,11 +192,10 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if the operation fails.
     pub fn presentation(&mut self) -> Result<Presentation> {
-        Presentation::from_ole_with_options(
-            &mut self.ole,
-            OpenOptions::default().leniency(self.leniency),
-            self.source_limits,
-        )
+        let options = OpenOptions::default().leniency(self.leniency);
+        #[cfg(feature = "vba-inspection")]
+        let options = options.vba_project_limits(self.vba_project_limits);
+        Presentation::from_ole_with_options(&mut self.ole, options, self.source_limits)
     }
 
     /// Get the main presentation with per-call open options, such as the
@@ -205,6 +208,8 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if the operation fails.
     pub fn presentation_with_options(&mut self, options: OpenOptions<'_>) -> Result<Presentation> {
+        #[cfg(feature = "vba-inspection")]
+        let options = options.inherit_vba_project_limits(self.vba_project_limits);
         let source_limits = if options.has_explicit_source_limits() {
             self.source_limits
                 .constrained_by(options.source_limits_value())

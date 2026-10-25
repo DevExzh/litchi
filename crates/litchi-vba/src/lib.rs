@@ -138,6 +138,22 @@ pub(crate) fn check_limit(kind: LimitKind, actual: usize, maximum: usize) -> Res
     Ok(())
 }
 
+/// Derive the physical CFB reader policy from the selected VBA limits.
+///
+/// The MS-OVBA limits own the standalone CFB byte budget.  Reusing the CFB
+/// reader's defaults here would silently replace that caller-selected budget
+/// at the nested allocation boundary, so the directory and allocation-table
+/// ceilings are constrained by the same finite input ceiling.
+pub(crate) fn cfb_limits(limits: &Limits) -> Result<litchi_cfb::OleFileLimits, Error> {
+    let maximum = u64::try_from(limits.max_cfb_bytes)
+        .map_err(|_| invalid("VBA CFB byte limit does not fit in u64"))?;
+    let directory_maximum = maximum.min(litchi_cfb::OleFileLimits::MAX_DIRECTORY_BYTES);
+    let allocation_maximum = maximum.min(litchi_cfb::OleFileLimits::MAX_ALLOCATION_TABLE_BYTES);
+    Ok(litchi_cfb::OleFileLimits::new(maximum)?
+        .with_max_directory_bytes(directory_maximum)?
+        .with_max_allocation_table_bytes(allocation_maximum)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +164,20 @@ mod tests {
     fn owned_outputs_are_send_and_sync() {
         assert_send_sync::<Payload>();
         assert_send_sync::<project::Project>();
+    }
+
+    #[test]
+    fn nested_cfb_limits_follow_the_selected_vba_input_budget() {
+        let limits = Limits {
+            max_cfb_bytes: 8 * 1024 * 1024,
+            ..Limits::default()
+        };
+        let cfb = cfb_limits(&limits).expect("finite CFB policy");
+        assert_eq!(cfb.max_input_bytes(), limits.max_cfb_bytes as u64);
+        assert_eq!(cfb.max_directory_bytes(), limits.max_cfb_bytes as u64);
+        assert_eq!(
+            cfb.max_allocation_table_bytes(),
+            limits.max_cfb_bytes as u64
+        );
     }
 }

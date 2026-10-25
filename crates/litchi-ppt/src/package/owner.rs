@@ -410,6 +410,13 @@ impl Package {
         self.inner.leniency
     }
 
+    /// Return the VBA inspection profile retained by this package.
+    #[cfg(feature = "vba-inspection")]
+    #[must_use]
+    pub(crate) fn vba_project_limits(&self) -> crate::VbaProjectLimits {
+        self.inner.presentation.vba_project_limits()
+    }
+
     /// Check and return the current source identity.
     pub fn source_version(&self) -> Result<SourceVersion> {
         Ok(self.inner.shared.source_version()?)

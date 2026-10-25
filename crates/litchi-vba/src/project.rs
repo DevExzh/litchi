@@ -904,18 +904,6 @@ pub struct Project {
 }
 
 impl Project {
-    /// Parse a standalone `vbaProject.bin` payload with safe default limits.
-    ///
-    /// The CFB bytes are borrowed and never copied.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the payload is not a readable CFB file, the project
-    /// structures are malformed, or the default resource limits are exceeded.
-    pub fn read(bytes: &[u8]) -> Result<Self, Error> {
-        Self::read_with(bytes, &Limits::default())
-    }
-
     /// Parse a standalone `vbaProject.bin` payload with explicit limits.
     ///
     /// This is the container-independent entry point for OOXML hosts. The
@@ -926,9 +914,9 @@ impl Project {
     ///
     /// Returns an error if the payload is not a readable CFB file, the project
     /// structures are malformed, or `limits` are exceeded.
-    pub fn read_with(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
+    pub fn read(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
         check_limit(LimitKind::CfbBytes, bytes.len(), limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
+        let mut ole = OleFile::open(Cursor::new(bytes), crate::cfb_limits(limits)?)?;
         Self::open(&mut ole, &[], limits)
     }
 
@@ -1344,7 +1332,7 @@ impl Project {
     }
 }
 
-fn read_limited_stream<R: Read + Seek>(
+pub(crate) fn read_limited_stream<R: Read + Seek>(
     ole: &mut OleFile<R>,
     path: &[&str],
     maximum: usize,
@@ -2785,7 +2773,7 @@ mod tests {
     fn reads_borrowed_standalone_project_with_a_preparse_size_bound() {
         let source = b"Attribute VB_Name = \"Module1\"\r\nSub Main()\r\nEnd Sub\r\n";
         let bytes = sample_project_bytes(source);
-        let project = Project::read(&bytes).expect("borrowed project");
+        let project = Project::read(&bytes, &Limits::default()).expect("borrowed project");
 
         assert_eq!(project.name(), "Sample");
         assert_eq!(project.modules()[0].source().raw(), source);
@@ -2795,7 +2783,7 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            Project::read_with(&bytes, &limits),
+            Project::read(&bytes, &limits),
             Err(Error::Limit { kind: LimitKind::CfbBytes, observed: actual, maximum }) if actual == bytes.len() && maximum == limits.max_cfb_bytes
         ));
 
@@ -2804,7 +2792,7 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            Project::read_with(&bytes, &limits),
+            Project::read(&bytes, &limits),
             Err(Error::Limit {
                 kind: LimitKind::TotalSourceBytes,
                 maximum: 1,
@@ -2816,7 +2804,7 @@ mod tests {
     #[test]
     fn borrowed_standalone_reader_returns_typed_cfb_errors() {
         assert!(matches!(
-            Project::read(b"not a compound file"),
+            Project::read(b"not a compound file", &Limits::default()),
             Err(Error::Cfb(_))
         ));
     }

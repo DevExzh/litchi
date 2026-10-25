@@ -261,10 +261,12 @@ impl Builder {
             .map_err(crate::package::Error::Authoring)?;
         #[cfg(feature = "encryption")]
         let options = if let Some(password) = self.encryption_password() {
-            crate::OpenOptions::new()
+            let options = crate::OpenOptions::new()
                 .source_limits(options.source_limits_value())
-                .leniency(options.leniency_value())
-                .password(Some(password))
+                .leniency(options.leniency_value());
+            #[cfg(feature = "vba-inspection")]
+            let options = options.vba_project_limits(options.vba_project_limits_value());
+            options.password(Some(password))
         } else {
             options
         };

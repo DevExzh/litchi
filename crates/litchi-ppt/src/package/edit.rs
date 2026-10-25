@@ -1186,9 +1186,12 @@ fn encode_atom(record: &crate::Record) -> Result<Vec<u8>> {
 }
 
 fn open_options(source: &Package) -> OpenOptions<'static> {
-    OpenOptions::new()
+    let options = OpenOptions::new()
         .source_limits(source.source_limits())
-        .leniency(source.leniency())
+        .leniency(source.leniency());
+    #[cfg(feature = "vba-inspection")]
+    let options = options.vba_project_limits(source.vba_project_limits());
+    options
 }
 
 /// Hand the shapes a batch text publication proved for its output to the

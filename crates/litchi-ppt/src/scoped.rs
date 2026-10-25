@@ -780,9 +780,12 @@ fn publish_patched(
 }
 
 fn open_options(package: &Package) -> OpenOptions<'static> {
-    OpenOptions::new()
+    let options = OpenOptions::new()
         .source_limits(package.source_limits())
-        .leniency(package.leniency())
+        .leniency(package.leniency());
+    #[cfg(feature = "vba-inspection")]
+    let options = options.vba_project_limits(package.vba_project_limits());
+    options
 }
 
 #[cfg(test)]

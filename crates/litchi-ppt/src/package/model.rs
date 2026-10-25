@@ -529,6 +529,12 @@ pub struct OpenOptions<'a> {
     pub(crate) source_limits: SourceLimits,
     /// Whether the caller selected the source profile explicitly.
     pub(crate) source_limits_explicit: bool,
+    /// Limits retained by presentations for inert VBA inspection.
+    #[cfg(feature = "vba-inspection")]
+    pub(crate) vba_project_limits: crate::VbaProjectLimits,
+    /// Whether the caller explicitly selected the VBA inspection profile.
+    #[cfg(feature = "vba-inspection")]
+    pub(crate) vba_project_limits_explicit: bool,
     /// Password used for password-to-open encryption.
     pub(crate) password: Option<&'a str>,
     /// How opt-in repairs are treated.
@@ -544,10 +550,14 @@ pub struct OpenOptions<'a> {
 impl<'a> OpenOptions<'a> {
     /// Construct strict options without a password.
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             source_limits: SourceLimits::DEFAULT,
             source_limits_explicit: false,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: crate::VbaProjectLimits::default(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits_explicit: false,
             password: None,
             leniency: crate::leniency::Leniency::Strict,
         }
@@ -565,6 +575,33 @@ impl<'a> OpenOptions<'a> {
     #[must_use]
     pub const fn source_limits_value(&self) -> SourceLimits {
         self.source_limits
+    }
+
+    /// Select the limits retained by a presentation for inert VBA inspection.
+    #[cfg(feature = "vba-inspection")]
+    #[must_use]
+    pub const fn vba_project_limits(mut self, limits: crate::VbaProjectLimits) -> Self {
+        self.vba_project_limits = limits;
+        self.vba_project_limits_explicit = true;
+        self
+    }
+
+    /// Return the limits retained by a presentation for inert VBA inspection.
+    #[cfg(feature = "vba-inspection")]
+    #[must_use]
+    pub const fn vba_project_limits_value(&self) -> crate::VbaProjectLimits {
+        self.vba_project_limits
+    }
+
+    #[cfg(feature = "vba-inspection")]
+    pub(crate) const fn inherit_vba_project_limits(
+        mut self,
+        limits: crate::VbaProjectLimits,
+    ) -> Self {
+        if !self.vba_project_limits_explicit {
+            self.vba_project_limits = limits;
+        }
+        self
     }
 
     pub(crate) const fn has_explicit_source_limits(&self) -> bool {
@@ -916,6 +953,9 @@ pub struct Reader<R: Read + Seek = File> {
     pub(super) ole: OleFile<R>,
     /// Limits inherited by [`Reader::presentation`](super::Reader::presentation).
     pub(super) source_limits: SourceLimits,
+    /// VBA limits inherited by [`Reader::presentation`](super::Reader::presentation).
+    #[cfg(feature = "vba-inspection")]
+    pub(super) vba_project_limits: crate::VbaProjectLimits,
     /// Leniency inherited by [`Reader::presentation`](super::Reader::presentation).
     pub(super) leniency: crate::leniency::Leniency,
 }

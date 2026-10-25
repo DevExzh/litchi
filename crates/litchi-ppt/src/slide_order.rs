@@ -677,6 +677,8 @@ pub struct Snapshot {
     document_persist_id: u32,
     limits: SourceLimits,
     leniency: crate::leniency::Leniency,
+    #[cfg(feature = "vba-inspection")]
+    vba_project_limits: crate::VbaProjectLimits,
     chain_repaired: bool,
     has_review_history: bool,
     has_signature: bool,
@@ -738,6 +740,8 @@ impl Snapshot {
         bytes: Arc<[u8]>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
+        #[cfg(feature = "vba-inspection")]
+        let options = options.inherit_vba_project_limits(package.vba_project_limits());
         let presentation = package.presentation()?;
         let has_signature = package
             .exact()
@@ -824,6 +828,8 @@ impl Snapshot {
             document_persist_id,
             limits,
             leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
             chain_repaired,
             has_review_history,
             has_signature,
@@ -875,6 +881,8 @@ impl Snapshot {
             document_persist_id: self.document_persist_id,
             limits: self.limits,
             leniency: self.leniency,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: self.vba_project_limits,
             chain_repaired: self.chain_repaired,
             has_review_history: self.has_review_history,
             has_signature: self.has_signature,
@@ -915,6 +923,8 @@ impl Snapshot {
             document_persist_id: self.document_persist_id,
             limits: self.limits,
             leniency: self.leniency,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: self.vba_project_limits,
             chain_repaired: self.chain_repaired,
             has_review_history: self.has_review_history,
             has_signature: self.has_signature,
@@ -981,6 +991,8 @@ impl Snapshot {
                 document_persist_id: self.document_persist_id,
                 limits: self.limits,
                 leniency: self.leniency,
+                #[cfg(feature = "vba-inspection")]
+                vba_project_limits: self.vba_project_limits,
                 chain_repaired: self.chain_repaired,
                 has_review_history: self.has_review_history,
                 has_signature: self.has_signature,
@@ -1100,9 +1112,12 @@ impl Snapshot {
     }
 
     fn open_options(&self) -> OpenOptions<'static> {
-        OpenOptions::new()
+        let options = OpenOptions::new()
             .source_limits(self.limits)
-            .leniency(self.leniency)
+            .leniency(self.leniency);
+        #[cfg(feature = "vba-inspection")]
+        let options = options.vba_project_limits(self.vba_project_limits);
+        options
     }
 
     /// Starts an isolated source-bound order edit.

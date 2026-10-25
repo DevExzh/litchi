@@ -43,13 +43,8 @@ impl Project {
         &self.project_part_name
     }
 
-    /// Parse the `vbaProject.bin` payload with default resource limits.
-    pub fn project(&self, package: &OpcPackage) -> Result<ParsedProject> {
-        self.project_with(package, &Limits::default())
-    }
-
     /// Parse the `vbaProject.bin` payload with explicit resource limits.
-    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<ParsedProject> {
+    pub fn project(&self, package: &OpcPackage, limits: &Limits) -> Result<ParsedProject> {
         Ok(read_project_part(package, &self.project_part_name, limits)?)
     }
 }
@@ -332,7 +327,7 @@ mod tests {
         let metadata = discover(&package, package.main_document_part().unwrap())
             .unwrap()
             .unwrap();
-        let parsed = metadata.project(&package).unwrap();
+        let parsed = metadata.project(&package, &Limits::default()).unwrap();
         assert_eq!(parsed.name(), "ExcelProject");
         assert_eq!(parsed.modules().len(), 1);
 
@@ -341,7 +336,7 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            metadata.project_with(&package, &too_small),
+            metadata.project(&package, &too_small),
             Err(Error::Common(litchi_ooxml_common::Error::Vba(
                 litchi_vba::Error::Limit { .. },
             )))

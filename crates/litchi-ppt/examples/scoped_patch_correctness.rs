@@ -7,16 +7,40 @@
 //! inverse source bytes. Checksums and all publication serialization happen
 //! only in this correctness mode.
 
-use std::{env, fs};
+use std::{env, fmt::Write as _, fs};
 
-use litchi_ppt::{slide_order, Package};
+use litchi_ppt::{Package, external_media::Object};
 use sha2::{Digest, Sha256};
 
 const MEDIA_ID: u32 = 1;
 const EXPECTED_PATH: &str = "clip-0000.avi";
 
 fn sha256(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    let mut digest = String::with_capacity(64);
+    for byte in Sha256::digest(bytes) {
+        write!(&mut digest, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    digest
+}
+
+fn external_media_path(
+    package: &Package,
+    id: u32,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let presentation = package.presentation()?;
+    let collection = presentation
+        .external_media()?
+        .ok_or("presentation has no external-media collection")?;
+    let object = collection
+        .get(id)
+        .ok_or_else(|| format!("external media ID {id} was not found"))?;
+    match object {
+        Object::Movie(movie) => Ok(movie.video.path.clone()),
+        Object::LinkedAudio(audio) => Ok(audio.path.clone()),
+        Object::CdAudio(_) | Object::EmbeddedWav(_) => {
+            Err("external media object does not own a linked path".into())
+        },
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,19 +57,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source_bytes = fs::read(&fixture)?;
     let source = Package::from_bytes(&source_bytes)?;
-    let source_view = slide_order::Snapshot::from_bytes(source_bytes.clone())?;
-    let before_path = source_view.external_media_path(MEDIA_ID)?;
+    let before_path = external_media_path(&source, MEDIA_ID)?;
 
     let mut edit = source.edit_external_media()?;
     edit.set_path(MEDIA_ID, Some(EXPECTED_PATH.to_owned()))?;
     let commit = edit.commit()?;
     let (target, patch) = commit.into_parts();
     let target_bytes = target.to_bytes()?;
-    let target_view = slide_order::Snapshot::from_bytes(target_bytes.clone())?;
-    let external_media_path = target_view.external_media_path(MEDIA_ID)?;
-    if external_media_path.as_deref() != Some(EXPECTED_PATH) {
+    let target_media_path = external_media_path(&target, MEDIA_ID)?;
+    if target_media_path.as_deref() != Some(EXPECTED_PATH) {
         return Err(format!(
-            "external-media path mismatch: expected {EXPECTED_PATH:?}, got {external_media_path:?}"
+            "external-media path mismatch: expected {EXPECTED_PATH:?}, got {target_media_path:?}"
         )
         .into());
     }
@@ -71,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "media_id": MEDIA_ID,
         "requested_external_media_path": EXPECTED_PATH,
         "before_external_media_path": before_path,
-        "external_media_path": external_media_path,
+        "external_media_path": target_media_path,
         "source_len": source_bytes.len(),
         "target_len": target_bytes.len(),
         "source_sha256": sha256(&source_bytes),

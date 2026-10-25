@@ -109,6 +109,125 @@
       "families": []
     },
     {
+      "id": "vba",
+      "package": "litchi-vba",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_vba",
+          "replacement": "raw VBA parsers and codecs take a required Limits argument on their canonical name (record 0362ul67)",
+          "match": "suffix"
+        },
+        {
+          "name": "read_with",
+          "scope": "litchi_vba::project::Project",
+          "replacement": "use Project::read(bytes, limits); the default twin is removed (record 0362ul67)"
+        }
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_vba::codec::encode",
+          "inputs": ["decompressed", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::codec::decode",
+          "inputs": ["compressed", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::dir::Reference::edit_name_source_bound",
+          "inputs": ["self", "name", "encoding", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::dir::Dir::parse",
+          "inputs": ["compressed", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::DesignerFrame::from_raw",
+          "inputs": ["module_name", "raw", "page", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::ProjectText::parse",
+          "inputs": ["text", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::ProjectText::encode",
+          "inputs": ["self", "page", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::read",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::open",
+          "inputs": ["ole", "project_root_path", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::encode_dir_with_references",
+          "inputs": ["self", "references", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::project_text",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::encode_project_text",
+          "inputs": ["self", "text", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::project_wm",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::project::Project::encode_project_wm",
+          "inputs": ["self", "maps", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::build::Project::finish",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
+          "method": "litchi_vba::build::Payload::read",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        }
+      ],
+      "immutable_owners": ["litchi_vba::build::Payload"],
+      "families": []
+    },
+    {
       "id": "docx-minimal",
       "package": "litchi-docx",
       "default_features": false,
@@ -884,6 +1003,12 @@
         "vba-inspection"
       ],
       "required_signatures": [
+        {
+          "method": "litchi_docx::vba_project::VbaProject::project",
+          "inputs": ["self", "package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
         {
           "method": "litchi_docx::mail_merge::parse_settings_mail_merge",
           "inputs": ["xml", "limits"],
@@ -2255,6 +2380,12 @@
         "vba-inspection"
       ],
       "required_signatures": [
+        {
+          "method": "litchi_ooxml_common::vba::read_project_part",
+          "inputs": ["package", "part_name", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
         {
           "method": "litchi_ooxml_common::custom_xml::read_props",
           "inputs": ["xml", "source_limits"],
@@ -7350,6 +7481,12 @@
       "family_methods": true,
       "required_signatures": [
         {
+          "method": "litchi_xlsx::active_x::Project::project",
+          "inputs": ["self", "package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
           "method": "litchi_xlsx::drawing::parse",
           "inputs": [
             "xml",
@@ -8276,6 +8413,14 @@
       "features": [
         "sign",
         "vba-inspection"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_xlsb::host::VbaProject::project",
+          "inputs": ["self", "package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        }
       ],
       "banned_names": [
         {
@@ -9433,6 +9578,12 @@
       "features": [],
       "required_signatures": [
         {
+          "method": "litchi_doc::raw::Reader::vba",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
+        {
           "method": "litchi_doc::parts::annotation_bookmarks::parse",
           "inputs": ["fib", "table_stream", "limits"],
           "limits_argument": "limits",
@@ -10161,6 +10312,12 @@
         "performance-diagnostics"
       ],
       "required_signatures": [
+        {
+          "method": "litchi_doc::raw::Reader::vba",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
         {
           "method": "litchi_doc::parts::route_slip::Recipient::parse_bytes",
           "inputs": ["data", "limits"],
@@ -11423,6 +11580,12 @@
         {"path": "litchi_xls::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "required_signatures": [
+        {
+          "method": "litchi_xls::raw::Reader::vba",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_vba::Limits"
+        },
         {
           "method": "litchi_xls::formula_metadata::shared::parse",
           "inputs": ["data", "limits"],
@@ -12800,6 +12963,12 @@
       ],
       "required_signatures": [
         {
+          "method": "litchi_ppt::OpenOptions::vba_project_limits",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::VbaProjectLimits"
+        },
+        {
           "method": "litchi_ppt::Record::parse",
           "inputs": ["data", "offset", "limits"],
           "limits_argument": "limits",
@@ -12871,6 +13040,11 @@
         {"method":"litchi_ppt::hyperlink::Interaction::parse_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::hyperlink::InteractionLimits"}
       ],
       "banned_names": [
+        {
+          "name": "vba_with",
+          "scope": "litchi_ppt::Presentation",
+          "replacement": "select VbaProjectLimits on OpenOptions before creating the immutable projection"
+        },
         {
           "name": "RecordLimits",
           "scope": "litchi_ppt",

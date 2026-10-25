@@ -206,7 +206,7 @@ fn explicit_plaintext_copy_allows_vba_changes() {
             .vba()
             .unwrap()
             .unwrap()
-            .project(plaintext.opc_package())
+            .project(plaintext.opc_package(), &Limits::default())
             .unwrap()
             .name(),
         "Replacement"

@@ -87,7 +87,7 @@ impl Presentation {
             let _ = options;
             if let Some(parsed_current_user) = current_user_data
                 .as_deref()
-                .map(CurrentUser::parse)
+                .map(|data| CurrentUser::parse(data, &source_limits))
                 .transpose()?
                 && parsed_current_user.is_encrypted()
             {
@@ -190,6 +190,8 @@ impl Presentation {
             pictures_data,
             pictures_source: None,
             source_limits,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
             tolerance,
             source: None,
             #[cfg(feature = "encryption")]
@@ -280,7 +282,7 @@ impl Presentation {
             let _ = options;
             if let Some(parsed_current_user) = current_user_data
                 .as_deref()
-                .map(CurrentUser::parse)
+                .map(|data| CurrentUser::parse(data, &source_limits))
                 .transpose()?
                 && parsed_current_user.is_encrypted()
             {
@@ -377,6 +379,8 @@ impl Presentation {
             pictures_data: None,
             pictures_source,
             source_limits,
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
             tolerance,
             source: Some(shared),
             #[cfg(feature = "encryption")]
