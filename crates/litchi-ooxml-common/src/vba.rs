@@ -82,6 +82,10 @@ pub enum LimitKind {
     ArchiveTotalEntries,
     /// ZIP member-name bytes.
     ArchiveMemberNameBytes,
+    /// ZIP central-directory metadata bytes.
+    ArchiveMetadataBytes,
+    /// One ZIP member's compressed bytes.
+    ArchiveCompressedBytes,
     /// Aggregate ZIP uncompressed bytes.
     AggregateBytes,
     /// One ZIP entry's uncompressed bytes.
@@ -116,6 +120,8 @@ impl LimitKind {
             Self::ArchiveMembers => "VBA archive members",
             Self::ArchiveTotalEntries => "VBA archive total entries",
             Self::ArchiveMemberNameBytes => "VBA archive member-name bytes",
+            Self::ArchiveMetadataBytes => "VBA archive metadata bytes",
+            Self::ArchiveCompressedBytes => "VBA archive compressed bytes",
             Self::AggregateBytes => "VBA aggregate bytes",
             Self::EntryBytes => "VBA entry bytes",
             Self::SourcePolicy => "VBA source policy",
@@ -373,16 +379,16 @@ impl GraphSnapshot {
         host: Host,
         limits: SourceLimits,
     ) -> Result<Self> {
-        let source = package.get_part(source_part)?;
         let existing = inspect_existing_graph(package, source_part, host)?;
+        let source = admit_selected_part(package, source_part, limits)?;
         let project = existing
             .as_ref()
-            .map(|graph| package.get_part(&graph.project_part))
+            .map(|graph| admit_selected_part(package, &graph.project_part, limits))
             .transpose()?;
         let supplemental = existing
             .as_ref()
             .and_then(|graph| graph.supplemental.as_ref().map(|(part, _)| part))
-            .map(|part| package.get_part(part))
+            .map(|part| admit_selected_part(package, part, limits))
             .transpose()?;
         let source = PartState::capture(package, source, limits)?;
         let project = project
@@ -450,7 +456,7 @@ impl GraphProof {
         let mut digest = Sha256::new();
         proof_field(&mut digest, host_name(host).as_bytes());
         proof_field(&mut digest, source_part.as_str().as_bytes());
-        let source = package.get_part(source_part)?;
+        let source = admit_selected_part(package, source_part, limits)?;
         hash_proof_part(&mut digest, package, source, limits)?;
         let existing = inspect_existing_graph(package, source_part, host)?;
         let content_types = package.source_content_types(limits)?;
@@ -458,12 +464,12 @@ impl GraphProof {
         match existing {
             Some(graph) => {
                 digest.update([1]);
-                let project = package.get_part(&graph.project_part)?;
+                let project = admit_selected_part(package, &graph.project_part, limits)?;
                 hash_proof_part(&mut digest, package, project, limits)?;
                 proof_content_type(&mut digest, &content_types, &graph.project_part);
                 if let Some((supplemental_name, _)) = graph.supplemental {
                     digest.update([1]);
-                    let supplemental = package.get_part(&supplemental_name)?;
+                    let supplemental = admit_selected_part(package, &supplemental_name, limits)?;
                     hash_proof_part(&mut digest, package, supplemental, limits)?;
                     proof_content_type(&mut digest, &content_types, &supplemental_name);
                 } else {
@@ -614,9 +620,13 @@ fn store_project_graph_in_place(
         options,
     )?;
     let macro_content_type = {
-        let source = package.get_part(source_part)?;
+        let source = package.part_metadata(source_part).ok_or_else(|| {
+            Error::Opc(litchi_opc::OpcError::PartNotFound(source_part.to_string()))
+        })?;
         host.macro_content_type(source.content_type())?
     };
+    let limits = options.effective(package).source_limits;
+    let _ = admit_selected_part(package, source_part, limits)?;
     if host == Host::Word && word_supplemental_xml.is_none() {
         return Err(Error::Invalid(
             "Word VBA project storage requires supplemental-data XML".to_string(),
@@ -628,7 +638,6 @@ fn store_project_graph_in_place(
         ));
     }
 
-    let limits = options.effective(package).source_limits;
     let source_content_types = package.source_content_types(limits)?;
     let existing = inspect_existing_graph(package, source_part, host)?;
     ensure_replacement_targets_available(package, host, existing.as_ref())?;
@@ -807,8 +816,11 @@ fn store_is_noop(
     host: Host,
     project_payload: &[u8],
     supplemental_xml: Option<&[u8]>,
+    limits: SourceLimits,
 ) -> Result<bool> {
-    let source = package.get_part(source_part)?;
+    let source = package
+        .part_metadata(source_part)
+        .ok_or_else(|| Error::Opc(litchi_opc::OpcError::PartNotFound(source_part.to_string())))?;
     let macro_content_type = host.macro_content_type(source.content_type())?;
     if source.content_type() != macro_content_type {
         return Ok(false);
@@ -816,13 +828,13 @@ fn store_is_noop(
     let Some(graph) = inspect_existing_graph(package, source_part, host)? else {
         return Ok(false);
     };
-    let project = package.get_part(&graph.project_part)?;
+    let project = admit_selected_part(package, &graph.project_part, limits)?;
     if project.blob() != project_payload {
         return Ok(false);
     }
     match (host, supplemental_xml, graph.supplemental.as_ref()) {
         (Host::Word, Some(expected), Some((part, _))) => {
-            Ok(package.get_part(part)?.blob() == expected)
+            Ok(admit_selected_part(package, part, limits)?.blob() == expected)
         },
         (Host::Word, _, _) => Ok(false),
         (_, None, None) => Ok(true),
@@ -837,7 +849,9 @@ fn remove_project_graph_on_candidate(
     limits: SourceLimits,
 ) -> Result<bool> {
     let non_macro_content_type = {
-        let source = package.get_part(source_part)?;
+        let source = package.part_metadata(source_part).ok_or_else(|| {
+            Error::Opc(litchi_opc::OpcError::PartNotFound(source_part.to_string()))
+        })?;
         host.non_macro_content_type(source.content_type())?
     };
     let existing = inspect_existing_graph(package, source_part, host)?;
@@ -871,6 +885,7 @@ fn remove_project_graph_in_place(
     non_macro_content_type: &str,
     limits: SourceLimits,
 ) -> Result<()> {
+    let _ = admit_selected_part(package, source_part, limits)?;
     let source_content_types = package.source_content_types(limits)?;
     let replacement_content_types = content_types_after_graph_removal(
         &source_content_types,
@@ -1037,6 +1052,7 @@ impl<'a> Edit<'a> {
             self.host,
             &project_payload,
             word_supplemental_xml.as_deref(),
+            self.options.source_limits,
         )? {
             return Ok(());
         }
@@ -1153,7 +1169,13 @@ impl<'a> Edit<'a> {
             .after
             .as_ref()
             .expect("changed VBA patch has a graph target");
-        validate_snapshot_limits(self.source, before, after, self.options)?;
+        validate_snapshot_limits(
+            self.source,
+            before,
+            after,
+            self.options,
+            &after.content_types,
+        )?;
         refuse_signed_change(self.source)?;
         Ok(Commit::new(candidate, patch, Diagnostics::CHANGED))
     }
@@ -1240,7 +1262,24 @@ impl Patch {
             return Err(Error::PatchConflict);
         }
         let preserve_content_types = current.content_types.bytes() == before.content_types.bytes();
-        validate_snapshot_limits(package, &current, after, self.options)?;
+        let projected_content_types = if preserve_content_types {
+            after.content_types.clone()
+        } else {
+            let existing = inspect_existing_graph(package, &after.source.name, after.host)?;
+            content_types_after_graph_replace(
+                &current.content_types,
+                after,
+                existing.as_ref(),
+                recipient_limits,
+            )?
+        };
+        validate_snapshot_limits(
+            package,
+            &current,
+            after,
+            self.options,
+            &projected_content_types,
+        )?;
         if self.is_noop() {
             return Ok(Commit::new(
                 package.clone(),
@@ -1304,6 +1343,29 @@ fn check_vba_limit(kind: LimitKind, observed: u64, maximum: u64) -> Result<()> {
     Ok(())
 }
 
+/// Admit one selected graph payload from its retained source metadata before
+/// asking the OPC package to decode it. A deferred package must not inflate a
+/// payload under the wider open-time policy and discover a tighter edit policy
+/// only afterwards. The second check also covers a decoder-reported length
+/// that differs from its central-directory hint.
+fn admit_selected_part<'a>(
+    package: &'a OpcPackage,
+    part_name: &PackURI,
+    limits: SourceLimits,
+) -> Result<&'a dyn Part> {
+    let metadata = package
+        .part_metadata(part_name)
+        .ok_or_else(|| Error::Opc(litchi_opc::OpcError::PartNotFound(part_name.to_string())))?;
+    let declared = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
+    check_vba_limit(LimitKind::PartBytes, declared, limits.max_part_bytes())?;
+    check_vba_limit(LimitKind::EntryBytes, declared, limits.max_entry_bytes())?;
+    let part = package.get_part(part_name)?;
+    let actual = u64::try_from(part.blob().len()).unwrap_or(u64::MAX);
+    check_vba_limit(LimitKind::PartBytes, actual, limits.max_part_bytes())?;
+    check_vba_limit(LimitKind::EntryBytes, actual, limits.max_entry_bytes())?;
+    Ok(part)
+}
+
 fn map_source_limit_error(error: Error) -> Error {
     let Error::Opc(litchi_opc::OpcError::Limit {
         kind,
@@ -1336,6 +1398,8 @@ fn map_source_limit_error(error: Error) -> Error {
         litchi_opc::SourceLimitKind::Members => LimitKind::ArchiveMembers,
         litchi_opc::SourceLimitKind::ArchiveTotalEntries => LimitKind::ArchiveTotalEntries,
         litchi_opc::SourceLimitKind::ArchiveMemberNameBytes => LimitKind::ArchiveMemberNameBytes,
+        litchi_opc::SourceLimitKind::ArchiveMetadataBytes => LimitKind::ArchiveMetadataBytes,
+        litchi_opc::SourceLimitKind::ArchiveCompressedBytes => LimitKind::ArchiveCompressedBytes,
         litchi_opc::SourceLimitKind::EntryBytes => LimitKind::EntryBytes,
         litchi_opc::SourceLimitKind::AggregateBytes => LimitKind::AggregateBytes,
         _ => LimitKind::SourcePolicy,
@@ -1494,53 +1558,121 @@ fn graph_relationship_totals(
 
 fn validate_archive_structural_limits(
     package: &OpcPackage,
+    current: &GraphSnapshot,
     target: &GraphSnapshot,
     projected_parts: usize,
     projected_relationship_parts: usize,
     projected_part_bytes: u64,
     projected_relationship_bytes: u64,
+    projected_content_types: &OwnedContentTypes,
     limits: SourceLimits,
 ) -> Result<()> {
-    // `NonPartMember` also records directory markers.  They consume central
-    // directory entries but are not ZIP file members for `max_members`.
-    let non_part_files = package
-        .non_part_members()
-        .iter()
-        .filter(|member| !member.name().ends_with('/'))
-        .count();
-    let physical_members = 1_u64
-        .saturating_add(u64::try_from(projected_parts).unwrap_or(u64::MAX))
-        .saturating_add(u64::try_from(projected_relationship_parts).unwrap_or(u64::MAX))
-        .saturating_add(u64::try_from(non_part_files).unwrap_or(u64::MAX));
-    check_vba_limit(
-        LimitKind::ArchiveMembers,
-        physical_members,
-        limits.max_members() as u64,
-    )?;
-    // Directory records, when an input archive carried them, are retained as
-    // non-part members and therefore belong in the central-directory count.
-    let archive_entries = physical_members.saturating_add(
-        u64::try_from(
-            package
-                .non_part_members()
-                .iter()
-                .filter(|member| member.name().ends_with('/'))
-                .count(),
-        )
-        .unwrap_or(u64::MAX),
-    );
-    check_vba_limit(
-        LimitKind::ArchiveTotalEntries,
-        archive_entries,
-        limits.max_archive_total_entries() as u64,
-    )?;
-    check_vba_limit(
-        LimitKind::AggregateBytes,
-        projected_part_bytes
-            .saturating_add(u64::try_from(target.content_types.bytes().len()).unwrap_or(u64::MAX))
-            .saturating_add(projected_relationship_bytes),
-        limits.max_aggregate_bytes(),
-    )?;
+    // Re-admit every retained physical entry first. This checks opaque ZIP
+    // payloads and names that the OPC projection intentionally does not expose
+    // without inflating them. The selected graph's prospective aggregate is
+    // checked below after replacing its known members.
+    let retained = package.retained_archive_metrics(limits)?;
+    let current_graph_relationships = graph_relationship_totals(current, limits)?;
+    let target_graph_relationships = graph_relationship_totals(target, limits)?;
+    let projected_content_type_bytes =
+        u64::try_from(projected_content_types.bytes().len()).unwrap_or(u64::MAX);
+    if let Some(metrics) = retained {
+        let current_physical_relationship_parts = metrics
+            .members()
+            .saturating_sub(metrics.opaque_members())
+            .saturating_sub(1)
+            .saturating_sub(package.part_count());
+        let current_graph_non_source_relationships = current_graph_relationships
+            .members
+            .saturating_sub(usize::from(
+                relationship_token_metrics(&current.source.relationships_source, limits)?
+                    .member_present,
+            ));
+        let target_graph_non_source_relationships = target_graph_relationships
+            .members
+            .saturating_sub(usize::from(
+                relationship_token_metrics(&target.source.relationships_source, limits)?
+                    .member_present,
+            ));
+        let projected_physical_relationship_parts = current_physical_relationship_parts
+            .saturating_sub(current_graph_non_source_relationships)
+            .saturating_add(target_graph_non_source_relationships);
+        let physical_members = metrics
+            .opaque_members()
+            .saturating_add(1)
+            .saturating_add(projected_parts)
+            .saturating_add(projected_physical_relationship_parts);
+        check_vba_limit(
+            LimitKind::ArchiveMembers,
+            physical_members as u64,
+            limits.max_members() as u64,
+        )?;
+        let current_physical_members = metrics.members();
+        let archive_entries = if physical_members >= current_physical_members {
+            metrics
+                .entries()
+                .saturating_add(physical_members - current_physical_members)
+        } else {
+            metrics
+                .entries()
+                .saturating_sub(current_physical_members - physical_members)
+        };
+        check_vba_limit(
+            LimitKind::ArchiveTotalEntries,
+            archive_entries as u64,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        let projected_aggregate = metrics
+            .opaque_bytes()
+            .saturating_add(projected_part_bytes)
+            .saturating_add(projected_relationship_bytes)
+            .saturating_add(projected_content_type_bytes);
+        check_vba_limit(
+            LimitKind::AggregateBytes,
+            projected_aggregate,
+            limits.max_aggregate_bytes(),
+        )?;
+    } else {
+        // Authored packages have no retained physical directory. Their
+        // publication shape is the ordinary OPC projection plus any opaque
+        // member names recorded by an ingress adapter.
+        let non_part_files = package
+            .non_part_members()
+            .iter()
+            .filter(|member| !member.name().ends_with('/'))
+            .count();
+        let physical_members = 1_u64
+            .saturating_add(u64::try_from(projected_parts).unwrap_or(u64::MAX))
+            .saturating_add(u64::try_from(projected_relationship_parts).unwrap_or(u64::MAX))
+            .saturating_add(u64::try_from(non_part_files).unwrap_or(u64::MAX));
+        check_vba_limit(
+            LimitKind::ArchiveMembers,
+            physical_members,
+            limits.max_members() as u64,
+        )?;
+        let archive_entries = physical_members.saturating_add(
+            u64::try_from(
+                package
+                    .non_part_members()
+                    .iter()
+                    .filter(|member| member.name().ends_with('/'))
+                    .count(),
+            )
+            .unwrap_or(u64::MAX),
+        );
+        check_vba_limit(
+            LimitKind::ArchiveTotalEntries,
+            archive_entries,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        check_vba_limit(
+            LimitKind::AggregateBytes,
+            projected_part_bytes
+                .saturating_add(projected_content_type_bytes)
+                .saturating_add(projected_relationship_bytes),
+            limits.max_aggregate_bytes(),
+        )?;
+    }
     for part in graph_part_states(target) {
         check_vba_limit(
             LimitKind::ArchiveMemberNameBytes,
@@ -1562,6 +1694,32 @@ fn validate_archive_structural_limits(
         u64::try_from("[Content_Types].xml".len()).unwrap_or(u64::MAX),
         limits.max_archive_member_name_bytes(),
     )?;
+    for metadata in package.iter_parts() {
+        check_vba_limit(
+            LimitKind::ArchiveMemberNameBytes,
+            u64::try_from(metadata.partname().membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        let relationships = metadata
+            .partname()
+            .rels_uri()
+            .map_err(|error| Error::Uri(error.clone()))?;
+        check_vba_limit(
+            LimitKind::ArchiveMemberNameBytes,
+            u64::try_from(relationships.membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        let bytes = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
+        check_vba_limit(LimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+        check_vba_limit(LimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+    }
+    for member in package.non_part_members() {
+        check_vba_limit(
+            LimitKind::ArchiveMemberNameBytes,
+            u64::try_from(member.name().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+    }
     Ok(())
 }
 
@@ -1738,6 +1896,7 @@ fn validate_snapshot_limits(
     current: &GraphSnapshot,
     target: &GraphSnapshot,
     options: EditOptions,
+    projected_content_types: &OwnedContentTypes,
 ) -> Result<()> {
     let project_bytes = target.project.as_ref().map_or(0, |part| part.data.len());
     let supplemental_bytes = target
@@ -1791,16 +1950,15 @@ fn validate_snapshot_limits(
     }
     check_vba_limit(
         LimitKind::ContentTypesBytes,
-        u64::try_from(target.content_types.bytes().len()).unwrap_or(u64::MAX),
+        u64::try_from(projected_content_types.bytes().len()).unwrap_or(u64::MAX),
         effective.source_limits.max_content_types_bytes() as u64,
     )?;
     check_vba_limit(
         LimitKind::ContentTypeMappings,
-        u64::try_from(target.content_types.mapping_count()).unwrap_or(u64::MAX),
+        u64::try_from(projected_content_types.mapping_count()).unwrap_or(u64::MAX),
         effective.source_limits.max_content_type_mappings() as u64,
     )?;
-    target
-        .content_types
+    projected_content_types
         .preflight_under(effective.source_limits)
         .map_err(|error| map_source_limit_error(Error::from(error)))?;
 
@@ -1900,11 +2058,13 @@ fn validate_snapshot_limits(
     }
     validate_archive_structural_limits(
         package,
+        current,
         target,
         projected_parts,
         projected_members,
         projected_part_bytes,
         projected_relationship_bytes,
+        projected_content_types,
         effective.source_limits,
     )?;
     Ok(())
@@ -2008,7 +2168,9 @@ fn inspect_existing_graph(
     source_part: &PackURI,
     host: Host,
 ) -> Result<Option<ExistingGraph>> {
-    let source = package.get_part(source_part)?;
+    let source = package
+        .part_metadata(source_part)
+        .ok_or_else(|| Error::Opc(litchi_opc::OpcError::PartNotFound(source_part.to_string())))?;
     let mut matches = source
         .rels()
         .iter()
@@ -2028,7 +2190,9 @@ fn inspect_existing_graph(
     }
     let relationship_id = relationship.r_id().to_string();
     let project_part = relationship.target_partname()?;
-    let project = package.get_part(&project_part)?;
+    let project = package
+        .part_metadata(&project_part)
+        .ok_or_else(|| Error::Opc(litchi_opc::OpcError::PartNotFound(project_part.to_string())))?;
     if project.content_type() != ct::OFC_VBA_PROJECT {
         return Err(Error::ContentType {
             expected: ct::OFC_VBA_PROJECT.to_string(),
@@ -2062,7 +2226,9 @@ fn inspect_existing_graph(
             ));
         }
         let part_name = relationship.target_partname()?;
-        let part = package.get_part(&part_name)?;
+        let part = package
+            .part_metadata(&part_name)
+            .ok_or_else(|| Error::Opc(litchi_opc::OpcError::PartNotFound(part_name.to_string())))?;
         if part.content_type() != ct::WML_VBA_DATA {
             return Err(Error::ContentType {
                 expected: ct::WML_VBA_DATA.to_string(),
@@ -2898,6 +3064,39 @@ mod tests {
                 .unwrap(),
             LimitKind::ArchiveTotalEntries,
         );
+    }
+
+    #[test]
+    fn deferred_graph_payload_is_rejected_before_hydration_under_tighter_policy() {
+        let package = excel_package();
+        let mut initial = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        initial.store(b"project".to_vec(), None).unwrap();
+        let stored = initial.commit().unwrap().into_package();
+        let bytes = PackageWriter::to_bytes(&stored).unwrap();
+        let opened = OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap();
+        assert_eq!(opened.deferred_decode_counters(), Some((0, 0)));
+
+        let tighter = SourceLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .max_entry_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let result = Edit::new(
+            &opened,
+            Host::Excel,
+            EditOptions::new().source_limits(tighter),
+        )
+        .and_then(|mut edit| edit.store(vec![0], None));
+        assert!(matches!(
+            result,
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::PartBytes),
+                ..
+            })
+        ));
+        assert_eq!(opened.deferred_decode_counters(), Some((0, 0)));
     }
 
     #[test]

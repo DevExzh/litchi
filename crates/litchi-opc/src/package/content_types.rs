@@ -9,7 +9,8 @@ use crate::source_backed::content_types_plan::collapse_xml_token;
 use crate::source_backed::escaped_xml_attribute_len;
 use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::sync::Arc as SharedArc;
 
@@ -430,7 +431,7 @@ fn without_part_overrides_inner(
         })?;
     loop {
         let start = content_types_offset(&reader, origin)?;
-        let event = reader.read_event()?;
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
         let end = content_types_offset(&reader, origin)?;
         if end < start || end > source.bytes().len() {
             return Err(OpcError::InvalidContentTypesManifest(
@@ -439,7 +440,9 @@ fn without_part_overrides_inner(
         }
         match event {
             Event::Start(element) => {
-                if depth == 1 && element.local_name().as_ref() == b"Override" {
+                if depth == 1
+                    && is_opc_content_types_element(&resolved_namespace, &element, b"Override")
+                {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "non-empty content-type Overrides are unsupported for source removal"
                             .into(),
@@ -451,13 +454,21 @@ fn without_part_overrides_inner(
                     )
                 })?;
             },
-            Event::Empty(element) if depth == 1 && element.local_name().as_ref() == b"Override" => {
+            Event::Empty(element)
+                if depth == 1
+                    && is_opc_content_types_element(&resolved_namespace, &element, b"Override") =>
+            {
                 let mut part_name = None;
                 for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| {
                         OpcError::InvalidContentTypesManifest(error.to_string())
                     })?;
-                    if attribute.key.as_ref() == b"PartName" {
+                    if attribute.key.as_ref() == b"PartName"
+                        && matches!(
+                            reader.resolver().resolve_attribute(attribute.key).0,
+                            ResolveResult::Unbound
+                        )
+                    {
                         let value = attribute
                             .decoded_and_normalized_value(
                                 quick_xml::XmlVersion::Implicit1_0,
@@ -505,6 +516,19 @@ fn without_part_overrides_inner(
         return Ok(source.clone());
     }
     source.update_elements(&updates, maximum)
+}
+
+fn is_opc_content_types_element(
+    resolved_namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> bool {
+    element.local_name().as_ref() == local_name
+        && matches!(
+            resolved_namespace,
+            ResolveResult::Bound(Namespace(value))
+                if *value == crate::constants::namespace::OPC_CONTENT_TYPES.as_bytes()
+        )
 }
 
 pub(crate) fn preflight_part_overrides(
@@ -607,11 +631,11 @@ pub(crate) fn with_part_overrides(
     let mut root_empty = false;
     loop {
         let start = content_types_offset(&reader, origin)?;
-        let event = reader.read_event()?;
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
         let end = content_types_offset(&reader, origin)?;
         match event {
             Event::Start(element) if depth == 0 => {
-                if element.local_name().as_ref() != b"Types" {
+                if !is_opc_content_types_element(&resolved_namespace, &element, b"Types") {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content-types root must be Types".into(),
                     ));
@@ -621,7 +645,7 @@ pub(crate) fn with_part_overrides(
                 depth = 1;
             },
             Event::Empty(element) if depth == 0 => {
-                if element.local_name().as_ref() != b"Types" {
+                if !is_opc_content_types_element(&resolved_namespace, &element, b"Types") {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content-types root must be Types".into(),
                     ));
@@ -856,6 +880,23 @@ mod tests {
             without_part_overrides(&nonempty, &[PackURI::new("/word/drop.xml").unwrap()], 1024,)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn foreign_override_namespace_is_opaque_to_source_removal() {
+        let bytes = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types" xmlns:x="urn:vendor"><x:Override PartName="/word/drop.xml" ContentType="application/x-vendor"/><Override PartName="/word/drop.xml" ContentType="application/xml"/></Types>"#;
+        let source = OwnedXmlPart::capture(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".into(),
+            std::sync::Arc::new(bytes.to_vec()),
+        )
+        .unwrap();
+        let output =
+            without_part_overrides_only(&source, &[PackURI::new("/word/drop.xml").unwrap()], 1024)
+                .unwrap();
+        let output = std::str::from_utf8(output.bytes()).unwrap();
+        assert!(output.contains("<x:Override PartName=\"/word/drop.xml\""));
+        assert!(!output.contains("ContentType=\"application/xml\""));
     }
 
     #[test]

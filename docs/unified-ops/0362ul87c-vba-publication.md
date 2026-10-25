@@ -1,7 +1,7 @@
 # 0362ul87c — shared OOXML VBA publication boundary
 
 Status: source-only implementation on `uo2/ooxml-vba-publication-0362ul87c`;
-87cc repair is included in the follow-up commit.
+87cc and 87cd review repairs are included in the follow-up commit.
 This slice follows the boundary audit in 0362ul87. It has not run Cargo,
 rustdoc, native qualification, or performance measurements; those require a
 coordinator validation slot after the four OOXML consumers are composed.
@@ -86,3 +86,30 @@ Consumers migrated in this commit:
 No public semantic helper in this slice takes `&mut OpcPackage`. The physical
 OPC graph methods and explicit-limit VBA reader remain codec/substrate APIs;
 no alias or deprecated forwarding entry point was added.
+
+## 87cd review repair
+
+The selected graph capture path now admits retained part lengths from
+`PartMetadata` before any deferred payload is decoded. Graph inspection uses
+relationships and content types only; source, project, and Word supplemental
+payloads are decoded only after the effective operation/recipient policy has
+accepted their declared lengths, with a post-decode length check for corrupt
+or inconsistent source metadata. This keeps untouched proof replay and
+candidate staging content-based without an up-front full-owner clone.
+
+Recipient validation re-admits every retained OPC part, relationship member,
+opaque ZIP member, central-directory name, metadata budget, compressed-size
+ceiling, and per-entry ceiling. `OpcPackage::retained_archive_metrics` keeps
+the retained opaque-member count and aggregate bytes in the physical source
+boundary, so divergent replay charges the actual recipient-composed
+`[Content_Types].xml` and preserves unknown ZIP payload capability. The
+prospective archive member/entry and aggregate checks replace the old
+projection-only estimate; the scan is intentionally `O(package parts)`.
+
+The source content-types and relationships splicers now select elements by
+expanded OPC namespace, matching the ingress parsers. A vendor namespace
+element with the local name `Override` or `Relationship` is opaque: it is not
+removed, counted, or used for a selector, and foreign attributes with the
+same local name do not become OPC attributes. The review regression set covers
+foreign namespace preservation, pre-hydration refusal, opaque aggregate
+accounting, and recipient-composed manifest limits.

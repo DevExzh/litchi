@@ -37,6 +37,52 @@ pub use relationships::{
     RelationshipSourcePlan, RelationshipsEditPlan,
 };
 
+/// Physical dimensions of an immutable source ZIP retained by an OPC package.
+///
+/// The metrics are collected from central-directory metadata only. They let a
+/// targeted source edit account for opaque non-part members that the writer
+/// carries forward without inflating or exposing their payloads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetainedArchiveMetrics {
+    members: usize,
+    entries: usize,
+    aggregate_bytes: u64,
+    opaque_members: usize,
+    opaque_bytes: u64,
+}
+
+impl RetainedArchiveMetrics {
+    /// Number of non-directory physical members.
+    #[must_use]
+    pub const fn members(self) -> usize {
+        self.members
+    }
+
+    /// Number of central-directory entries, including directory markers.
+    #[must_use]
+    pub const fn entries(self) -> usize {
+        self.entries
+    }
+
+    /// Aggregate declared uncompressed bytes of non-directory members.
+    #[must_use]
+    pub const fn aggregate_bytes(self) -> u64 {
+        self.aggregate_bytes
+    }
+
+    /// Number of retained non-directory members outside the OPC projection.
+    #[must_use]
+    pub const fn opaque_members(self) -> usize {
+        self.opaque_members
+    }
+
+    /// Aggregate declared bytes of retained opaque non-directory members.
+    #[must_use]
+    pub const fn opaque_bytes(self) -> u64 {
+        self.opaque_bytes
+    }
+}
+
 fn same_optional_manifest_bytes(left: Option<&[u8]>, right: Option<&[u8]>) -> bool {
     match (left, right) {
         (None, None) => true,
@@ -693,6 +739,134 @@ impl OpcPackage {
     #[must_use]
     pub fn non_part_members(&self) -> &[NonPartMember] {
         &self.non_part_members
+    }
+
+    /// Re-admit the retained source archive's physical structure under a
+    /// tighter operation policy without decoding any member. Per-entry name,
+    /// metadata, compressed-size, and uncompressed-size ceilings are checked
+    /// here; callers use the returned aggregate when composing a prospective
+    /// recipient archive after replacing selected parts.
+    pub fn retained_archive_metrics(
+        &self,
+        limits: SourceLimits,
+    ) -> Result<Option<RetainedArchiveMetrics>> {
+        let Some(source) = self.source_archive.as_ref() else {
+            return Ok(None);
+        };
+        let archive = soapberry_zip::ZipArchive::from_slice(source.bytes().as_slice())
+            .map_err(OpcError::from)?;
+        let declared_entries = usize::try_from(archive.entries_hint()).map_err(|_| {
+            OpcError::ZipError("ZIP total entry count does not fit this platform".to_owned())
+        })?;
+        limits.check(
+            crate::SourceLimitKind::ArchiveTotalEntries,
+            declared_entries as u64,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        let mut entries = 0usize;
+        let mut members = 0usize;
+        let mut metadata_bytes = 0u64;
+        let mut aggregate_bytes = 0u64;
+        let mut opaque_members = 0usize;
+        let mut opaque_bytes = 0u64;
+        let mut known_names = HashSet::new();
+        known_names
+            .try_reserve(self.parts.len().saturating_mul(2).saturating_add(2))
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC retained archive known member names",
+                source,
+            })?;
+        known_names.insert("[content_types].xml".to_owned());
+        let root = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        if self.source_relationships_member_present(&root) {
+            known_names.insert("_rels/.rels".to_owned());
+        }
+        for metadata in self.iter_parts() {
+            known_names.insert(metadata.partname().membername().to_ascii_lowercase());
+            if self.source_relationships_member_present(metadata.partname()) {
+                let relationships = metadata
+                    .partname()
+                    .rels_uri()
+                    .map_err(OpcError::InvalidPackUri)?;
+                known_names.insert(relationships.membername().to_ascii_lowercase());
+            }
+        }
+        for entry_result in archive.entries() {
+            let entry = entry_result.map_err(OpcError::from)?;
+            entries = entries.checked_add(1).ok_or_else(|| {
+                OpcError::ZipError("ZIP central-directory entry count overflows".to_owned())
+            })?;
+            limits.check(
+                crate::SourceLimitKind::ArchiveTotalEntries,
+                entries as u64,
+                limits.max_archive_total_entries() as u64,
+            )?;
+            limits.check(
+                crate::SourceLimitKind::ArchiveMemberNameBytes,
+                entry.file_path().as_ref().len() as u64,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let entry_metadata = entry.metadata_size_hint().checked_add(46).ok_or_else(|| {
+                OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
+            })?;
+            metadata_bytes = metadata_bytes.checked_add(entry_metadata).ok_or_else(|| {
+                OpcError::ZipError("ZIP central-directory metadata total overflows".to_owned())
+            })?;
+            limits.check(
+                crate::SourceLimitKind::ArchiveMetadataBytes,
+                metadata_bytes,
+                limits.max_archive_metadata_bytes(),
+            )?;
+            if entry.is_dir() {
+                continue;
+            }
+            members = members
+                .checked_add(1)
+                .ok_or_else(|| OpcError::ZipError("ZIP member count overflows".to_owned()))?;
+            limits.check(
+                crate::SourceLimitKind::Members,
+                members as u64,
+                limits.max_members() as u64,
+            )?;
+            limits.check(
+                crate::SourceLimitKind::ArchiveCompressedBytes,
+                entry.compressed_size_hint(),
+                limits.max_archive_compressed_bytes(),
+            )?;
+            limits.check(
+                crate::SourceLimitKind::EntryBytes,
+                entry.uncompressed_size_hint(),
+                limits.max_entry_bytes(),
+            )?;
+            aggregate_bytes = aggregate_bytes
+                .checked_add(entry.uncompressed_size_hint())
+                .ok_or_else(|| {
+                    OpcError::ZipError("ZIP aggregate uncompressed bytes overflow".to_owned())
+                })?;
+            let name = String::from_utf8_lossy(entry.file_path().as_ref()).to_ascii_lowercase();
+            if !known_names.contains(name.as_str()) {
+                opaque_members = opaque_members.checked_add(1).ok_or_else(|| {
+                    OpcError::ZipError("ZIP opaque member count overflows".to_owned())
+                })?;
+                opaque_bytes = opaque_bytes
+                    .checked_add(entry.uncompressed_size_hint())
+                    .ok_or_else(|| {
+                        OpcError::ZipError("ZIP opaque member bytes overflow".to_owned())
+                    })?;
+            }
+        }
+        if entries != declared_entries {
+            return Err(OpcError::ZipError(
+                "ZIP central-directory entry count differs from EOCD".to_owned(),
+            ));
+        }
+        Ok(Some(RetainedArchiveMetrics {
+            members,
+            entries,
+            aggregate_bytes,
+            opaque_members,
+            opaque_bytes,
+        }))
     }
 
     /// Replace the reader-reported ZIP members that are not OPC parts.
