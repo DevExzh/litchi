@@ -33,8 +33,16 @@ per crate when one coordinated target fits; run the captures sequentially.
 Keep `litchi-iwa-protos` isolated from other rustdoc jobs because its prior
 kill was load-related.
 
-Use the memory-capped Cargo shim and the single-job settings for every build
-or rustdoc capture:
+Use the approved F5 capture policy and the single-job settings for every build
+or rustdoc capture. The runner, cap wrapper, underlying Cargo identity,
+environment and guards are the values recorded in
+`tools/raw_api_coverage.json` under `coverage.capture_policy`; a PATH shim
+alone is not an accepted capture boundary. A worker `env.sh` only provisions
+that already-approved wrapper and must not substitute another Cargo path. The
+approved `run_safe_gate.py` driver is the outer process boundary: it owns the
+child process tree, records the runner/cap-wrapper identities, and supplies
+the target and free-space guards. The environment below is the payload's
+expected environment, not a replacement for that outer receipt:
 
 ```sh
 source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
@@ -46,49 +54,28 @@ export CARGO_TARGET_DIR="$OUT/target"
 export TMPDIR="$OUT/tmp"
 ```
 
-Before each Cargo command, perform the 19,200,000,000-byte decimal target
-preflight; after each command enforce the 20,000,000,000-byte decimal hard
-ceiling using apparent bytes:
-
-```sh
-target_bytes() {
-  if test -d "$CARGO_TARGET_DIR"; then
-    du -sb "$CARGO_TARGET_DIR" | awk '{print $1}'
-  else
-    echo 0
-  fi
-}
-preflight_target() {
-  bytes=$(target_bytes)
-  test "$bytes" -lt 19200000000 || {
-    echo "target preflight failed: $bytes bytes" >&2
-    exit 1
-  }
-}
-postflight_target() {
-  bytes=$(target_bytes)
-  test "$bytes" -lt 20000000000 || {
-    echo "target hard cap failed: $bytes bytes" >&2
-    exit 1
-  }
-}
-preflight_target
-```
-
-Every Cargo invocation is explicitly `--offline --locked`; no concurrent
-Cargo jobs are allowed. Call `postflight_target` immediately after each one.
+Do not replace the outer driver's resource policy with ad-hoc shell guards.
+The reviewed F5 boundary requires apparent target bytes below 18,000,000,000
+before a command, below 19,000,000,000 while it is live, and below
+20,000,000,000 after it exits, with at least 12,000,000,000 free bytes on the
+filesystem. It also requires one build job, no unrelated builders, and
+process ownership/global-isolation evidence. A payload receipt without those
+outer checks is diagnostic only. Every Cargo invocation remains explicitly
+`--offline --locked`; the driver schedules them sequentially.
 
 ## JSON inventory
 
-For every direct library package not covered by a glossary profile, and for
-every package lacking a receipt-proven all-features capture, run sequentially:
-
-```sh
-cargo rustdoc -p <package> --lib --all-features --offline --locked \
-  --target-dir "$CARGO_TARGET_DIR" -- \
-  -Zunstable-options --output-format json --document-hidden-items
-postflight_target
-```
+The final all-features inventory is a payload selected by a frozen, reviewed
+F5 driver step. The approved `run_safe_gate.py` remains the outer boundary;
+`tools/final_api_inventory.py` does not replace it. The payload verifies the
+resolved coordinator Cargo cap wrapper, source/lock/toolchain identity,
+target observations and per-command resource receipt, while the outer driver
+must additionally provide the target 18/19/20 GB, free-12 GB, ownership and
+global-isolation receipt. Do not treat an ad-hoc direct `cargo rustdoc`
+invocation, even when it happens to use a memory-capped shim, as a capture
+receipt. The payload constructs and records the equivalent locked, offline
+rustdoc command for each direct library package; do not substitute a
+hand-written command for that step.
 
 Copy the generated crate JSON immediately to `$OUT/inventory/` and record its
 crate name, source commit, command and SHA-256. The inventory is then produced
@@ -105,10 +92,10 @@ and matching toolchain. A feature-specific output from
 `check_api_glossary.py` is not an all-features inventory substitute merely
 because the file has the right rustdoc schema.
 
-The executable wrapper enumerates the direct library manifests itself and
-requires the expected 68-package count. Run it only after the final candidate
-is frozen; the command below keeps all generated output external and reuses a
-single existing target cache when Cargo can fingerprint it safely:
+The executable payload enumerates the direct library manifests itself and
+requires the expected 68-package count. Select it only after the final
+candidate is frozen. The following is the payload argv recorded by the
+reviewed F5 driver; do not run it directly from an unowned shell:
 
 ```sh
 source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
