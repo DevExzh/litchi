@@ -13098,9 +13098,9 @@ impl SourceBackedPackage {
                 limits.max_relationship_xml_bytes() as u64,
             )?;
         }
-        let mut archive_total = self.catalog.declared_archive_bytes;
-        let mut part_total = self.catalog.declared_part_bytes;
-        let mut relationship_total = self.catalog.declared_relationship_xml_bytes;
+        let archive_total = self.catalog.declared_archive_bytes;
+        let part_total = self.catalog.declared_part_bytes;
+        let relationship_total = self.catalog.declared_relationship_xml_bytes;
         let mut adjusted_archive = archive_total;
         let mut adjusted_parts = part_total;
         let mut adjusted_relationships = relationship_total;
