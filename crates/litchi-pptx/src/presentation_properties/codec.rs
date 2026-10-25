@@ -302,6 +302,20 @@ impl Properties {
         Self::parse_inner(xml, None, limits)
     }
 
+    /// Parse markup that this crate has already admitted and processed through
+    /// MCE.  The processed stream is bounded by output bytes, not ingress
+    /// bytes, and must not be sent back through the public ingress contract.
+    pub(crate) fn parse_processed_mce(xml: &[u8], limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_output_bytes() {
+            return Err(limit(
+                "processed presentation properties bytes",
+                limits.max_output_bytes(),
+            ));
+        }
+        let root = parse_dom_processed(xml, limits)?;
+        project(&root)
+    }
+
     fn parse_inner(
         xml: &[u8],
         tolerance: Option<&mut crate::leniency::ToleranceReport>,
@@ -340,7 +354,7 @@ impl Properties {
                 limits.max_output_bytes(),
             ));
         }
-        let root = parse_dom(processed.as_ref(), limits)?;
+        let root = parse_dom_processed(processed.as_ref(), limits)?;
         project(&root)
     }
     /// # Errors
@@ -421,13 +435,20 @@ struct Node {
     capture_raw: bool,
     raw: Option<Box<[u8]>>,
 }
-fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
-    if xml.len() > limits.max_input_bytes() {
+/// Parse markup already emitted by the bounded MCE processor.  The processor
+/// admitted its output against `max_output_bytes`; this pass must retain that
+/// distinction and apply only the selected structural limits.
+fn parse_dom_processed(xml: &[u8], limits: Limits) -> Result<Node> {
+    if xml.len() > limits.max_output_bytes() {
         return Err(limit(
-            "presentation-properties XML bytes",
-            limits.max_input_bytes(),
+            "processed presentation-properties bytes",
+            limits.max_output_bytes(),
         ));
     }
+    parse_dom_inner(xml, limits)
+}
+
+fn parse_dom_inner(xml: &[u8], limits: Limits) -> Result<Node> {
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
@@ -1353,11 +1374,15 @@ fn write_bool_extension(x: &mut XmlSink, uri: &str, prefix: &str, local: &str, v
 fn write_unknown_extension(
     x: &mut XmlSink,
     v: &OpaqueExtension,
-    strict: bool,
+    _strict: bool,
     limits: Limits,
 ) -> Result<()> {
+    write_opaque(x, &v.xml, false, limits)
+}
+
+fn validate_unknown_extension(v: &OpaqueExtension, limits: Limits) -> Result<()> {
     bounded(&v.uri, limits)?;
-    let node = parse_dom(&v.xml, limits)?;
+    let node = parse_dom_processed(&v.xml, limits)?;
     let uri = extension_uri(&node)?;
     if uri != v.uri {
         return Err(invalid("opaque extension uri does not match its XML"));
@@ -1367,7 +1392,7 @@ fn write_unknown_extension(
             "known presentation extension cannot be stored as opaque",
         ));
     }
-    write_opaque(x, &v.xml, strict, limits)
+    Ok(())
 }
 fn known_extension_uri(uri: &str) -> bool {
     matches!(
@@ -1382,8 +1407,7 @@ fn known_extension_uri(uri: &str) -> bool {
             | SHOW_MEDIA_CONTROLS_URI
     )
 }
-fn write_opaque(x: &mut XmlSink, v: &[u8], _strict: bool, limits: Limits) -> Result<()> {
-    validate_fragment(v, limits)?;
+fn write_opaque(x: &mut XmlSink, v: &[u8], _strict: bool, _limits: Limits) -> Result<()> {
     let text = std::str::from_utf8(v).map_err(xml_error)?;
     x.push_str(text);
     x.check()?;
@@ -1451,9 +1475,7 @@ fn validate(v: &Properties, limits: Limits) -> Result<()> {
                 }),
         )
     {
-        let mut sink = XmlSink::count(limits.max_output_bytes());
-        write_unknown_extension(&mut sink, e, false, limits)?;
-        sink.check()?;
+        validate_unknown_extension(e, limits)?;
     }
     if let Some(h) = &v.html_publish {
         bounded(&h.target.relationship_id, limits)?;
@@ -1467,35 +1489,23 @@ fn validate(v: &Properties, limits: Limits) -> Result<()> {
 }
 
 fn validate_fragment(v: &[u8], limits: Limits) -> Result<()> {
-    if v.len() > limits.max_input_bytes() {
+    if v.len() > limits.max_output_bytes() {
         return Err(limit(
-            "opaque presentation-properties XML bytes",
-            limits.max_input_bytes(),
+            "processed presentation-properties bytes",
+            limits.max_output_bytes(),
         ));
     }
-    parse_dom(v, limits).map(|_| ())
+    parse_dom_processed(v, limits).map(|_| ())
 }
 fn node_xml(n: &Node, _strict: bool, limits: Limits) -> Result<Vec<u8>> {
     if let Some(raw) = &n.raw {
-        let bindings = n
-            .bindings
-            .iter()
-            .map(|(prefix, namespace)| {
-                (
-                    prefix.as_bytes().to_vec().into_boxed_slice(),
-                    namespace.as_bytes().to_vec().into_boxed_slice(),
-                )
-            })
-            .collect();
+        let bindings = in_scope_bindings(n)?;
         let in_scope = litchi_ooxml_common::mce::InScopeNamespaces::from_declarations(bindings);
         let fragment = in_scope.make_self_contained(raw, &fragment_mce_limits(limits))?;
-        if fragment.len() > limits.max_output_bytes() {
-            return Err(limit(
-                "serialized presentation-properties fragment bytes",
-                limits.max_output_bytes(),
-            ));
-        }
-        return Ok(fragment.into_owned());
+        return match fragment {
+            std::borrow::Cow::Borrowed(value) => clone_fragment(value, limits),
+            std::borrow::Cow::Owned(value) => Ok(value),
+        };
     }
     let mut count = XmlSink::count(limits.max_output_bytes());
     write_node(&mut count, n)?;
@@ -1503,6 +1513,56 @@ fn node_xml(n: &Node, _strict: bool, limits: Limits) -> Result<Vec<u8>> {
     let mut output = XmlSink::output(count.len(), limits.max_output_bytes())?;
     write_node(&mut output, n)?;
     output.finish()
+}
+
+fn in_scope_bindings(n: &Node) -> Result<Vec<(Box<[u8]>, Box<[u8]>)>> {
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(n.bindings.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation-properties opaque namespace bindings",
+            source,
+        })?;
+    for (prefix, namespace) in &n.bindings {
+        bindings.push((
+            boxed_copy(
+                prefix.as_bytes(),
+                "presentation-properties opaque namespace prefix",
+            )?,
+            boxed_copy(
+                namespace.as_bytes(),
+                "presentation-properties opaque namespace URI",
+            )?,
+        ));
+    }
+    Ok(bindings)
+}
+
+fn boxed_copy(value: &[u8], resource: &'static str) -> Result<Box<[u8]>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    bytes.extend_from_slice(value);
+    Ok(bytes.into_boxed_slice())
+}
+
+fn clone_fragment(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    if value.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized presentation-properties fragment bytes",
+            limits.max_output_bytes(),
+        ));
+    }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation-properties opaque fragment",
+            source,
+        })?;
+    bytes.extend_from_slice(value);
+    Ok(bytes)
 }
 
 fn fragment_mce_limits(limits: Limits) -> MceLimits {
@@ -2051,11 +2111,50 @@ mod tests {
     #[test]
     fn opaque_fragment_preserves_namespace_uri_text_and_attributes() {
         let xml = format!(
-            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:u="urn:opaque"><p:extLst><p:ext uri="urn:opaque"><u:fragment note="{A_NS}">literal {A_NS}</u:fragment></p:ext></p:extLst></p:presentationPr>"#
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:u="urn:opaque"><p:extLst>
+  <p:ext uri="urn:opaque"><u:fragment  note='urn:opaque' data="urn:opaque"><!-- keep -->literal urn:opaque</u:fragment></p:ext>
+</p:extLst></p:presentationPr>"#
         );
         let value = Properties::parse(xml.as_bytes(), Limits::default()).unwrap();
+        let expected = format!(
+            r#"<p:ext uri="urn:opaque" xmlns:p="{P_NS}" xmlns:u="urn:opaque"><u:fragment  note='urn:opaque' data="urn:opaque"><!-- keep -->literal urn:opaque</u:fragment></p:ext>"#
+        );
+        let Extension::Unknown(extension) = &value.extensions[0] else {
+            panic!("opaque extension was projected as a typed extension");
+        };
+        assert_eq!(extension.xml.as_slice(), expected.as_bytes());
         let output = String::from_utf8(value.to_xml(true, Limits::default()).unwrap()).unwrap();
-        assert!(output.contains(&format!(r#"note="{A_NS}""#)));
-        assert!(output.contains(&format!("literal {A_NS}")));
+        assert!(
+            output
+                .as_bytes()
+                .windows(expected.len())
+                .any(|window| window == expected.as_bytes())
+        );
+    }
+
+    #[test]
+    fn mce_expansion_uses_output_budget_for_processed_parse() {
+        let xml = format!(
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:extLst><p:ext uri="urn:opaque"><a value="&amp;"><b/><c/><d/></a></p:ext></p:extLst></p:presentationPr>"#
+        );
+        let processed = process_markup_compatibility(
+            xml.as_bytes(),
+            &Capabilities::ooxml_baseline(),
+            &MceLimits::default(),
+        )
+        .unwrap()
+        .xml;
+        assert!(processed.len() > xml.len());
+        let limits = Limits::new(
+            xml.len(),
+            processed.len(),
+            Limits::DEFAULT.max_depth(),
+            Limits::DEFAULT.max_nodes(),
+            Limits::DEFAULT.max_string_bytes(),
+            Limits::DEFAULT.max_extensions(),
+            Limits::DEFAULT.max_colors(),
+        )
+        .unwrap();
+        assert!(Properties::parse(xml.as_bytes(), limits).is_ok());
     }
 }

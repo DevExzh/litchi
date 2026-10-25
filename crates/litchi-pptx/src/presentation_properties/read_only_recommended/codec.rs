@@ -347,7 +347,7 @@ pub(crate) fn rewrite(
 }
 
 fn semantic_value(xml: &[u8], limits: Limits) -> Result<Option<bool>> {
-    let properties = Properties::parse(xml, limits)?;
+    let properties = Properties::parse_processed_mce(xml, limits)?;
     let mut value = None;
     for extension in &properties.extensions {
         if let crate::presentation_properties::Extension::ReadOnlyRecommended(candidate) = extension

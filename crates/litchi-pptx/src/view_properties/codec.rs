@@ -351,7 +351,7 @@ impl ViewProperties {
                 limits.max_output_bytes(),
             ));
         }
-        project(&parse_dom(x.as_ref(), limits)?, tol)
+        project(&parse_dom_processed(x.as_ref(), limits)?, tol)
     }
     /// # Errors
     ///
@@ -444,10 +444,21 @@ struct Node {
     capture_raw: bool,
     raw: Option<Box<[u8]>>,
 }
-fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
-    if xml.len() > limits.max_input_bytes() {
-        return Err(limit("view-properties XML bytes", limits.max_input_bytes()));
+/// Parse markup emitted by the bounded MCE processor.  Its byte budget has
+/// already been admitted against `max_output_bytes`; only structural limits
+/// are applied here because valid namespace-context repair can expand the
+/// processed stream beyond the original ingress budget.
+fn parse_dom_processed(xml: &[u8], limits: Limits) -> Result<Node> {
+    if xml.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "processed view-properties bytes",
+            limits.max_output_bytes(),
+        ));
     }
+    parse_dom_inner(xml, limits)
+}
+
+fn parse_dom_inner(xml: &[u8], limits: Limits) -> Result<Node> {
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut rd = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
@@ -1092,7 +1103,7 @@ fn validate(v: &ViewProperties, limits: Limits) -> Result<()> {
     .into_iter()
     .flatten()
     {
-        parse_dom(ext, limits)?;
+        parse_dom_processed(ext, limits)?;
     }
     for common in v
         .slide
@@ -1113,8 +1124,7 @@ fn validate(v: &ViewProperties, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn opaque(x: &mut XmlSink, b: &[u8], _strict: bool, limits: Limits) -> Result<()> {
-    parse_dom(b, limits)?;
+fn opaque(x: &mut XmlSink, b: &[u8], _strict: bool, _limits: Limits) -> Result<()> {
     let s = std::str::from_utf8(b).map_err(xml_error)?;
     x.push_str(s);
     x.check()?;
@@ -1122,25 +1132,13 @@ fn opaque(x: &mut XmlSink, b: &[u8], _strict: bool, limits: Limits) -> Result<()
 }
 fn node_xml(n: &Node, _strict: bool, limits: Limits) -> Result<Vec<u8>> {
     if let Some(raw) = &n.raw {
-        let bindings = n
-            .bindings
-            .iter()
-            .map(|(prefix, namespace)| {
-                (
-                    prefix.as_bytes().to_vec().into_boxed_slice(),
-                    namespace.as_bytes().to_vec().into_boxed_slice(),
-                )
-            })
-            .collect();
+        let bindings = in_scope_bindings(n)?;
         let in_scope = litchi_ooxml_common::mce::InScopeNamespaces::from_declarations(bindings);
         let fragment = in_scope.make_self_contained(raw, &fragment_mce_limits(limits))?;
-        if fragment.len() > limits.max_output_bytes() {
-            return Err(limit(
-                "serialized view-properties fragment bytes",
-                limits.max_output_bytes(),
-            ));
-        }
-        return Ok(fragment.into_owned());
+        return match fragment {
+            std::borrow::Cow::Borrowed(value) => clone_fragment(value, limits),
+            std::borrow::Cow::Owned(value) => Ok(value),
+        };
     }
     let mut count = XmlSink::count(limits.max_output_bytes());
     node_write(&mut count, n)?;
@@ -1148,6 +1146,50 @@ fn node_xml(n: &Node, _strict: bool, limits: Limits) -> Result<Vec<u8>> {
     let mut output = XmlSink::output(count.len(), limits.max_output_bytes())?;
     node_write(&mut output, n)?;
     output.finish()
+}
+
+fn in_scope_bindings(n: &Node) -> Result<Vec<(Box<[u8]>, Box<[u8]>)>> {
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(n.bindings.len())
+        .map_err(|source| Error::Allocation {
+            resource: "view-properties opaque namespace bindings",
+            source,
+        })?;
+    for (prefix, namespace) in &n.bindings {
+        bindings.push((
+            boxed_copy(prefix.as_bytes(), "view-properties opaque namespace prefix")?,
+            boxed_copy(namespace.as_bytes(), "view-properties opaque namespace URI")?,
+        ));
+    }
+    Ok(bindings)
+}
+
+fn boxed_copy(value: &[u8], resource: &'static str) -> Result<Box<[u8]>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    bytes.extend_from_slice(value);
+    Ok(bytes.into_boxed_slice())
+}
+
+fn clone_fragment(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    if value.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized view-properties fragment bytes",
+            limits.max_output_bytes(),
+        ));
+    }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "view-properties opaque fragment",
+            source,
+        })?;
+    bytes.extend_from_slice(value);
+    Ok(bytes)
 }
 
 fn fragment_mce_limits(limits: Limits) -> litchi_ooxml_common::mce::Limits {
@@ -1507,11 +1549,49 @@ mod tests {
     #[test]
     fn opaque_fragment_preserves_namespace_uri_text_and_attributes() {
         let xml = format!(
-            r#"<p:viewPr xmlns:p="{P}" xmlns:u="urn:opaque"><p:extLst><u:fragment note="{A}">literal {A}</u:fragment></p:extLst></p:viewPr>"#
+            r#"<p:viewPr xmlns:p="{P}" xmlns:u="urn:opaque"><p:extLst>
+  <u:fragment  note='urn:opaque' data="urn:opaque"><!-- keep -->literal urn:opaque</u:fragment>
+</p:extLst></p:viewPr>"#
         );
         let value = ViewProperties::parse(xml.as_bytes(), Limits::default()).unwrap();
+        let expected = format!(
+            r#"<p:extLst xmlns:p="{P}" xmlns:u="urn:opaque">
+  <u:fragment  note='urn:opaque' data="urn:opaque"><!-- keep -->literal urn:opaque</u:fragment>
+</p:extLst>"#
+        );
+        assert_eq!(value.extension_xml.as_deref(), Some(expected.as_bytes()));
         let output = String::from_utf8(value.to_xml(true, Limits::default()).unwrap()).unwrap();
-        assert!(output.contains(&format!(r#"note="{A}""#)));
-        assert!(output.contains(&format!("literal {A}")));
+        assert!(
+            output
+                .as_bytes()
+                .windows(expected.len())
+                .any(|window| window == expected.as_bytes())
+        );
+    }
+
+    #[test]
+    fn mce_expansion_uses_output_budget_for_processed_parse() {
+        let xml = format!(
+            r#"<p:viewPr xmlns:p="{P}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:extLst><u:fragment xmlns:u="urn:opaque"><a value="&amp;"><b/><c/><d/></a></u:fragment></p:extLst></p:viewPr>"#
+        );
+        let processed = litchi_ooxml_common::mce::process_markup_compatibility(
+            xml.as_bytes(),
+            &litchi_ooxml_common::mce::Capabilities::ooxml_baseline(),
+            &litchi_ooxml_common::mce::Limits::default(),
+        )
+        .unwrap()
+        .xml;
+        assert!(processed.len() > xml.len());
+        let limits = Limits::new(
+            xml.len(),
+            processed.len(),
+            Limits::DEFAULT.max_depth(),
+            Limits::DEFAULT.max_nodes(),
+            Limits::DEFAULT.max_guides(),
+            Limits::DEFAULT.max_slides(),
+            Limits::DEFAULT.max_string_bytes(),
+        )
+        .unwrap();
+        assert!(ViewProperties::parse(xml.as_bytes(), limits).is_ok());
     }
 }

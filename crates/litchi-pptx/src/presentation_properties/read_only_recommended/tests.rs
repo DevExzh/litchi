@@ -167,6 +167,35 @@ fn mce_choice_selects_p1710_and_inverse_restores_fallback() {
 }
 
 #[test]
+fn mce_expansion_uses_output_budget_for_readonly_semantic_parse() {
+    let original = format!(
+        r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:webPr><p:extLst><p:ext uri="urn:opaque"><a value="&amp;"><b/><c/><d/></a></p:ext></p:extLst></p:webPr></p:presentationPr>"#
+    )
+    .into_bytes();
+    let processed = litchi_ooxml_common::mce::process_markup_compatibility(
+        &original,
+        &litchi_ooxml_common::mce::Capabilities::ooxml_baseline(),
+        &litchi_ooxml_common::mce::Limits::default(),
+    )
+    .unwrap()
+    .xml;
+    assert!(processed.len() > original.len());
+    let limits = Limits::new(
+        original.len(),
+        processed.len(),
+        Limits::DEFAULT.max_depth(),
+        Limits::DEFAULT.max_nodes(),
+        Limits::DEFAULT.max_string_bytes(),
+        Limits::DEFAULT.max_extensions(),
+        Limits::DEFAULT.max_colors(),
+    )
+    .unwrap();
+    let snapshot = Snapshot::from_xml(&original, limits).unwrap();
+    assert_eq!(snapshot.value(), None);
+    assert_eq!(snapshot.source_xml(), original.as_slice());
+}
+
+#[test]
 fn namespace_and_required_attribute_validation_is_fail_closed() {
     let missing = source(r#"<p1710:readonlyRecommended/>"#);
     assert!(Snapshot::from_xml(missing, Limits::default()).is_err());
