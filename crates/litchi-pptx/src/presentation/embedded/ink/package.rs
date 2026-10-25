@@ -161,7 +161,7 @@ fn allocate_part(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Parts,
         1_000_000,
         1_000_000,
     ))
@@ -175,7 +175,7 @@ fn allocate_relationship(slide: &dyn Part) -> Result<String> {
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Relationships,
         1_000_000,
         1_000_000,
     ))

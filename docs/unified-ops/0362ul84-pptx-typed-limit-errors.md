@@ -73,3 +73,33 @@ Python glossary/no-3rdparty unit checks             PASS
 
 The final composed PPTX wave must rerun the glossary, compile/test, and
 transcript regeneration checks against the coordinator's integrated tip.
+
+## 84a source audit
+
+The follow-up audit repaired every two-argument local `limit` call in the
+changed PresentationML helper families, including presentation properties,
+readonlyRecommended, view properties, designer tags, comments, model3d, and
+the source-backed primary topology/durable/insertion paths. Each call now
+supplies its finite dimension and the measured attempted charge. Input,
+output, XML, text, attribute, name, relationship, part, slide, and proof
+charges are kept distinct.
+
+The former `CandidateEntries` catch-all was removed. Font, ink, OLE, table,
+tag, SVG, and other allocation loops now report their concrete part,
+relationship, or family dimension. Tag owner references use the configured
+node budget; mapped tag shapes use the configured shape budget. Slide event
+bytes and decoded text bytes use byte/text dimensions rather than event
+counts.
+
+Admission checks now report prospective added parts and the two-copy
+presentation XML patch charge. Source-backed budgets preserve a finite total
+when it exceeds its bound; `usize::MAX` remains reserved for checked
+arithmetic or conversion overflow. Depth and incoming-item observations are
+reported as the actual prospective count. `opened::Limits::maximum` returns
+`Option<usize>` for dimensions owned by that policy, so foreign codec/common
+dimensions no longer use a sentinel maximum.
+
+This audit remains source-only. Rustfmt and static repository checks were run;
+Cargo, rustdoc, native fixture execution, and performance measurement remain
+for the coordinator's composed-tip gate. The historical cross-copy transcript
+still awaits exact regeneration on that composed tip.

@@ -163,7 +163,7 @@ pub(super) fn preserved_anchor_uses(
                 if id == relationship_id {
                     uses = uses.checked_add(1).ok_or(Error::Limit {
                         kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::References,
+                            crate::opened::CodecLimitKind::XmlNodes,
                         ),
                         observed: usize::MAX,
                         maximum: shape_limits.nodes(),

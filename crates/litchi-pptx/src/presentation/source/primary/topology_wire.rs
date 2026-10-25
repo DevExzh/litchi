@@ -561,7 +561,8 @@ fn read_header(input: &mut Input<'_>, limits: SourceLimits, version: Version) ->
     }
     if change_count > MAX_SOURCE_BACKED_SLIDE_BATCH {
         return Err(limit(
-            "source-backed topology resource changes",
+            crate::error::CodecLimitKind::Slides,
+            change_count,
             MAX_SOURCE_BACKED_SLIDE_BATCH,
         ));
     }
@@ -662,7 +663,8 @@ fn preflight_body(
         let count = input.count()?;
         if count > MAX_DEPENDENTS {
             return Err(limit(
-                "source-backed topology dependent Parts",
+                crate::error::CodecLimitKind::Parts,
+                count,
                 MAX_DEPENDENTS,
             ));
         }
@@ -922,7 +924,8 @@ fn read_dependents(input: &mut Input<'_>, limits: SourceLimits) -> Result<Vec<De
     let count = input.count()?;
     if count > MAX_DEPENDENTS {
         return Err(limit(
-            "source-backed topology dependent Parts",
+            crate::error::CodecLimitKind::Parts,
+            count,
             MAX_DEPENDENTS,
         ));
     }
@@ -1004,7 +1007,8 @@ fn read_image(input: &mut Input<'_>, limits: SourceLimits) -> Result<Option<Part
 fn validate_data(data: &Data, limits: SourceLimits) -> Result<()> {
     if data.changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
         return Err(limit(
-            "source-backed topology resource changes",
+            crate::error::CodecLimitKind::Slides,
+            data.changes.len(),
             MAX_SOURCE_BACKED_SLIDE_BATCH,
         ));
     }
@@ -1095,7 +1099,8 @@ fn validate_dependents(
 ) -> Result<()> {
     if data.dependents.len() > MAX_DEPENDENTS {
         return Err(limit(
-            "source-backed topology dependent Parts",
+            crate::error::CodecLimitKind::Parts,
+            data.dependents.len(),
             MAX_DEPENDENTS,
         ));
     }

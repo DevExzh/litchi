@@ -273,7 +273,7 @@ fn next_part_index(package: &OpcPackage) -> Result<u32> {
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Parts,
         1_000_000,
         1_000_000,
     ))

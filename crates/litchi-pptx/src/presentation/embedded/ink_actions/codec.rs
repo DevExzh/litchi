@@ -489,7 +489,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
                     )? {
                         if candidates.len() >= maximum {
                             return Err(limit(
-                                crate::error::CodecLimitKind::CandidateEntries,
+                                crate::error::CodecLimitKind::InkAnchors,
                                 candidates.len().checked_add(1).unwrap_or(usize::MAX),
                                 maximum,
                             ));

@@ -523,11 +523,19 @@ pub(crate) fn replace(
     }
     let new_len = xml
         .len()
-        .saturating_sub(range.end.saturating_sub(range.start))
-        .saturating_add(replacement.len());
+        .checked_sub(range.end - range.start)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                limits.max_xml_bytes(),
+            )
+        })?;
     if new_len > limits.max_xml_bytes() {
         return Err(limit(
-            "model3d updated slide XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            new_len,
             limits.max_xml_bytes(),
         ));
     }

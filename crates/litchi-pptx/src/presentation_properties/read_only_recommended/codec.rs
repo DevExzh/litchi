@@ -74,7 +74,8 @@ pub(crate) fn locate(source: &[u8], limits: Limits) -> Result<Located> {
     let max_nodes = limits.max_nodes().min(MAX_NODES);
     if source.len() > max_bytes {
         return Err(limit(
-            "presentation-properties readonlyRecommended bytes",
+            crate::error::CodecLimitKind::InputBytes,
+            source.len(),
             max_bytes,
         ));
     }
@@ -99,16 +100,18 @@ pub(crate) fn locate(source: &[u8], limits: Limits) -> Result<Located> {
     for element in &raw.ext_lists {
         offsets.push(u32::try_from(element.range.start).map_err(|_| {
             limit(
-                "presentation-properties readonlyRecommended offsets",
-                max_bytes,
+                crate::error::CodecLimitKind::Index,
+                element.range.start,
+                u32::MAX as usize,
             )
         })?);
     }
     for candidate in &raw.candidates {
         offsets.push(u32::try_from(candidate.start).map_err(|_| {
             limit(
-                "presentation-properties readonlyRecommended offsets",
-                max_bytes,
+                crate::error::CodecLimitKind::Index,
+                candidate.start,
+                u32::MAX as usize,
             )
         })?);
     }
@@ -209,7 +212,8 @@ pub(crate) fn rewrite(
 ) -> Result<Vec<u8>> {
     if source.len() > limits.max_output_bytes() {
         return Err(limit(
-            "serialized presentation-properties readonlyRecommended bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            source.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -331,7 +335,8 @@ pub(crate) fn rewrite(
     }
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "serialized presentation-properties readonlyRecommended bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            output_len,
             limits.max_output_bytes(),
         ));
     }
@@ -339,7 +344,8 @@ pub(crate) fn rewrite(
     let max_bytes = limits.max_output_bytes().min(MAX_BYTES);
     if updated.len() > max_bytes {
         return Err(limit(
-            "serialized presentation-properties readonlyRecommended bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            updated.len(),
             max_bytes,
         ));
     }
@@ -376,10 +382,17 @@ fn scan_raw(source: &[u8], max_nodes: usize, max_depth: usize) -> Result<RawScan
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                raw.nodes = raw.nodes.saturating_add(1);
+                raw.nodes = raw.nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        max_nodes,
+                    )
+                })?;
                 if raw.nodes > max_nodes {
                     return Err(limit(
-                        "presentation-properties readonlyRecommended XML nodes",
+                        crate::error::CodecLimitKind::XmlNodes,
+                        raw.nodes,
                         max_nodes,
                     ));
                 }
@@ -404,10 +417,17 @@ fn scan_raw(source: &[u8], max_nodes: usize, max_depth: usize) -> Result<RawScan
                 raw.frames.push(frame);
             },
             Event::Empty(element) => {
-                raw.nodes = raw.nodes.saturating_add(1);
+                raw.nodes = raw.nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        max_nodes,
+                    )
+                })?;
                 if raw.nodes > max_nodes {
                     return Err(limit(
-                        "presentation-properties readonlyRecommended XML nodes",
+                        crate::error::CodecLimitKind::XmlNodes,
+                        raw.nodes,
                         max_nodes,
                     ));
                 }
@@ -468,7 +488,8 @@ fn start_frame(
 ) -> Result<(Frame, Option<Candidate>)> {
     if stack.len() >= max_depth {
         return Err(limit(
-            "presentation-properties readonlyRecommended XML depth",
+            crate::error::CodecLimitKind::XmlDepth,
+            stack.len().checked_add(1).unwrap_or(usize::MAX),
             max_depth,
         ));
     }
@@ -737,7 +758,8 @@ fn apply_replacements(
 fn clone_bounded(source: &[u8], maximum: usize) -> Result<Vec<u8>> {
     if source.len() > maximum {
         return Err(limit(
-            "serialized presentation-properties readonlyRecommended bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            source.len(),
             maximum,
         ));
     }

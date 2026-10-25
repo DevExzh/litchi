@@ -183,7 +183,8 @@ impl Patch {
         let change_count = input.count()?;
         if before_count > crate::parts::MAX_SLIDES || after_count > crate::parts::MAX_SLIDES {
             return Err(limit(
-                "source-backed durable catalog slides",
+                crate::error::CodecLimitKind::Slides,
+                before_count.max(after_count),
                 crate::parts::MAX_SLIDES,
             ));
         }
@@ -192,7 +193,8 @@ impl Patch {
             .ok_or_else(|| invalid("root order count overflows"))?;
         if change_count > MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(limit(
-                "source-backed durable patch slides",
+                crate::error::CodecLimitKind::Slides,
+                change_count,
                 MAX_SOURCE_BACKED_SLIDE_BATCH,
             ));
         }
@@ -339,7 +341,8 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
         }
         if change.after.len() > current.max_output_bytes {
             return Err(limit(
-                "source-backed primary slide output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                change.after.len(),
                 current.max_output_bytes,
             ));
         }
@@ -450,7 +453,6 @@ pub(super) fn validate_pair_with_limits(
                 .checked_add(after.len())
                 .and_then(|bytes| bytes.checked_mul(64))
                 .and_then(|bytes| bytes.checked_add(1024))
-                .filter(|bytes| *bytes <= maximum)
                 .ok_or_else(|| {
                     limit(
                         crate::error::CodecLimitKind::ProofBytes,
@@ -458,8 +460,22 @@ pub(super) fn validate_pair_with_limits(
                         maximum,
                     )
                 })?;
+            if bytes > maximum {
+                return Err(limit(
+                    crate::error::CodecLimitKind::ProofBytes,
+                    bytes,
+                    maximum,
+                ));
+            }
+            let amount = u64::try_from(bytes).map_err(|_| {
+                limit(
+                    crate::error::CodecLimitKind::ProofBytes,
+                    usize::MAX,
+                    maximum,
+                )
+            })?;
             context
-                .reserve(litchi_core::Resource::Memory, bytes as u64)
+                .reserve(litchi_core::Resource::Memory, amount)
                 .map_err(|error| {
                     Error::Opc(match error {
                         litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
@@ -583,7 +599,6 @@ fn validate_property_surface(
                     .checked_add(right.len())
                     .and_then(|size| size.checked_mul(64))
                     .and_then(|size| size.checked_add(1024))
-                    .filter(|size| *size <= maximum)
                     .ok_or_else(|| {
                         limit(
                             crate::error::CodecLimitKind::ProofBytes,
@@ -591,8 +606,22 @@ fn validate_property_surface(
                             maximum,
                         )
                     })?;
+                if bytes > maximum {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::ProofBytes,
+                        bytes,
+                        maximum,
+                    ));
+                }
+                let amount = u64::try_from(bytes).map_err(|_| {
+                    limit(
+                        crate::error::CodecLimitKind::ProofBytes,
+                        usize::MAX,
+                        maximum,
+                    )
+                })?;
                 context
-                    .reserve(litchi_core::Resource::Memory, bytes as u64)
+                    .reserve(litchi_core::Resource::Memory, amount)
                     .map_err(|error| {
                         Error::Opc(match error {
                             litchi_core::ExecutionError::Cancelled => {
@@ -782,7 +811,8 @@ pub(super) fn data_wire_len(data: &Data) -> Result<usize> {
     }
     if data.changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
         return Err(limit(
-            "source-backed durable patch slides",
+            crate::error::CodecLimitKind::Slides,
+            data.changes.len(),
             MAX_SOURCE_BACKED_SLIDE_BATCH,
         ));
     }

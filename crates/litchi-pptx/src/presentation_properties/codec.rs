@@ -30,7 +30,7 @@ pub(crate) struct XmlSink {
 }
 
 enum SinkFailure {
-    Limit,
+    Limit(usize),
     Overflow,
     Allocation(TryReserveError),
 }
@@ -75,7 +75,7 @@ impl XmlSink {
             return;
         };
         if new_len > self.limit {
-            self.failure = Some(SinkFailure::Limit);
+            self.failure = Some(SinkFailure::Limit(new_len));
             return;
         }
         if let Some(out) = self.value.as_mut() {
@@ -96,8 +96,9 @@ impl XmlSink {
     pub(crate) fn check(&mut self) -> Result<()> {
         match self.failure.take() {
             None => Ok(()),
-            Some(SinkFailure::Limit) => Err(limit(
-                "serialized presentation properties bytes",
+            Some(SinkFailure::Limit(observed)) => Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                observed,
                 self.limit,
             )),
             Some(SinkFailure::Overflow) => Err(Error::CapacityOverflow {
@@ -308,7 +309,8 @@ impl Properties {
     pub(crate) fn parse_processed_mce(xml: &[u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_output_bytes() {
             return Err(limit(
-                "processed presentation properties bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                xml.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -323,7 +325,8 @@ impl Properties {
     ) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
             return Err(limit(
-                "presentation properties input bytes",
+                crate::error::CodecLimitKind::InputBytes,
+                xml.len(),
                 limits.max_input_bytes(),
             ));
         }
@@ -350,7 +353,8 @@ impl Properties {
         let processed = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
         if processed.len() > limits.max_output_bytes() {
             return Err(limit(
-                "processed presentation properties bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                processed.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -445,7 +449,8 @@ struct Node {
 fn parse_dom_processed(xml: &[u8], limits: Limits) -> Result<Node> {
     if xml.len() > limits.max_output_bytes() {
         return Err(limit(
-            "processed presentation-properties bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            xml.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -464,16 +469,24 @@ fn parse_dom_inner(xml: &[u8], limits: Limits) -> Result<Node> {
         let d = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(e)) => {
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_nodes() {
                     return Err(limit(
-                        "presentation-properties XML nodes",
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
                         limits.max_nodes(),
                     ));
                 }
                 if stack.len() >= limits.max_depth() {
                     return Err(limit(
-                        "presentation-properties XML depth",
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
                         limits.max_depth(),
                     ));
                 }
@@ -482,16 +495,24 @@ fn parse_dom_inner(xml: &[u8], limits: Limits) -> Result<Node> {
                 stack.push(node);
             },
             Ok(Event::Empty(e)) => {
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_nodes() {
                     return Err(limit(
-                        "presentation-properties XML nodes",
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
                         limits.max_nodes(),
                     ));
                 }
                 if stack.len() >= limits.max_depth() {
                     return Err(limit(
-                        "presentation-properties XML depth",
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
                         limits.max_depth(),
                     ));
                 }
@@ -970,7 +991,8 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
     let extensions = children(n)?;
     if extensions.len() > n.limits.max_extensions() {
         return Err(limit(
-            "presentation extension count",
+            crate::error::CodecLimitKind::Extensions,
+            extensions.len(),
             n.limits.max_extensions(),
         ));
     }
@@ -1048,7 +1070,8 @@ fn parse_show_extensions(n: &Node) -> Result<Vec<ShowExtension>> {
     let extensions = children(n)?;
     if extensions.len() > n.limits.max_extensions() {
         return Err(limit(
-            "slide-show extension count",
+            crate::error::CodecLimitKind::Extensions,
+            extensions.len(),
             n.limits.max_extensions(),
         ));
     }
@@ -1432,7 +1455,8 @@ fn validate(v: &Properties, limits: Limits) -> Result<()> {
     }
     if v.extensions.len() > limits.max_extensions() {
         return Err(limit(
-            "presentation extension count",
+            crate::error::CodecLimitKind::Extensions,
+            v.extensions.len(),
             limits.max_extensions(),
         ));
     }
@@ -1507,7 +1531,8 @@ fn validate(v: &Properties, limits: Limits) -> Result<()> {
 fn validate_fragment(v: &[u8], limits: Limits) -> Result<()> {
     if v.len() > limits.max_output_bytes() {
         return Err(limit(
-            "processed presentation-properties bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            v.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -1566,7 +1591,8 @@ fn boxed_copy(value: &[u8], resource: &'static str) -> Result<Box<[u8]>> {
 fn clone_fragment(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     if value.len() > limits.max_output_bytes() {
         return Err(limit(
-            "serialized presentation-properties fragment bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            value.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -1771,7 +1797,8 @@ fn resolve(bindings: &[(String, String)], p: &str) -> Result<String> {
 fn bounded(v: &str, limits: Limits) -> Result<()> {
     if v.len() > limits.max_string_bytes() {
         Err(limit(
-            "presentation property string bytes",
+            crate::error::CodecLimitKind::StringBytes,
+            v.len(),
             limits.max_string_bytes(),
         ))
     } else {
@@ -1786,7 +1813,8 @@ fn bounded_string(v: &str, limits: Limits) -> Result<()> {
 fn bounded_attribute(v: &str, limits: Limits) -> Result<()> {
     if v.len() > limits.max_attribute_bytes {
         Err(limit(
-            "presentation property attribute bytes",
+            crate::error::CodecLimitKind::XmlAttributeBytes,
+            v.len(),
             limits.max_attribute_bytes,
         ))
     } else {

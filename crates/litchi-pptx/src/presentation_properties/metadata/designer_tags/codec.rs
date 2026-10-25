@@ -528,7 +528,8 @@ fn attributes(
             || attribute.value.len() > limits.attribute_bytes()
         {
             return Err(limit(
-                "Designer-tag owner XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.key.as_ref().len().max(attribute.value.len()),
                 limits.attribute_bytes(),
             ));
         }
@@ -548,7 +549,8 @@ fn attributes(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.attribute_bytes() {
             return Err(limit(
-                "Designer-tag owner XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                value.len(),
                 limits.attribute_bytes(),
             ));
         }
@@ -678,7 +680,8 @@ fn designer_namespace_proof(
         proof.extend_from_slice(prefix);
         if proof.len() > limits.xml_bytes() {
             return Err(limit(
-                "Designer-tag namespace proof bytes",
+                crate::error::CodecLimitKind::ProofBytes,
+                proof.len(),
                 limits.xml_bytes(),
             ));
         }
@@ -807,7 +810,8 @@ fn replace_unbounded(source: &[u8], range: Range<usize>, value: &[u8]) -> Result
 fn copy_name(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     if value.is_empty() || value.len() > limits.attribute_bytes() {
         return Err(limit(
-            "Designer-tag owner XML name bytes",
+            crate::error::CodecLimitKind::NameBytes,
+            value.len(),
             limits.attribute_bytes(),
         ));
     }
@@ -851,7 +855,8 @@ impl Output {
         })?;
         if length > self.limits.xml_bytes() {
             return Err(limit(
-                "Designer-tag output XML bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                length,
                 self.limits.xml_bytes(),
             ));
         }

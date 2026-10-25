@@ -878,7 +878,7 @@ fn allocate_svg_identity(
         })
         .find(|candidate| view.rels().get(candidate).is_none())
         .ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::CandidateEntries),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
             observed: MAX_GENERATED_NAME_ATTEMPTS,
             maximum: MAX_GENERATED_NAME_ATTEMPTS,
         })?;
@@ -919,7 +919,7 @@ fn allocate_svg_identity(
         }
     }
     Err(Error::Limit {
-        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::CandidateEntries),
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
         observed: MAX_GENERATED_NAME_ATTEMPTS,
         maximum: MAX_GENERATED_NAME_ATTEMPTS,
     })

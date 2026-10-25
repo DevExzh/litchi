@@ -281,19 +281,19 @@ impl Limits {
 
     /// The maximum of one typed dimension.
     #[must_use]
-    pub const fn maximum(self, kind: super::LimitKind) -> usize {
+    pub const fn maximum(self, kind: super::LimitKind) -> Option<usize> {
         match kind {
-            super::LimitKind::Parts => self.max_parts,
-            super::LimitKind::PatchBytes => self.max_patch_bytes,
-            super::LimitKind::TextBytes => self.max_text_bytes,
-            super::LimitKind::HistoryEntries => self.max_history_entries,
-            super::LimitKind::HistoryBytes => self.max_history_bytes,
-            super::LimitKind::RetainedCandidateBytes => self.max_retained_candidate_bytes,
-            super::LimitKind::RetainedMceBytes => self.max_retained_mce_bytes,
+            super::LimitKind::Parts => Some(self.max_parts),
+            super::LimitKind::PatchBytes => Some(self.max_patch_bytes),
+            super::LimitKind::TextBytes => Some(self.max_text_bytes),
+            super::LimitKind::HistoryEntries => Some(self.max_history_entries),
+            super::LimitKind::HistoryBytes => Some(self.max_history_bytes),
+            super::LimitKind::RetainedCandidateBytes => Some(self.max_retained_candidate_bytes),
+            super::LimitKind::RetainedMceBytes => Some(self.max_retained_mce_bytes),
             // Codec and shared-service limits do not belong to the primary
             // opened-presentation policy. They are carried by their owning
             // codec policy and are never passed to this accessor.
-            super::LimitKind::Codec(_) | super::LimitKind::Common(_) => usize::MAX,
+            super::LimitKind::Codec(_) | super::LimitKind::Common(_) => None,
         }
     }
 }

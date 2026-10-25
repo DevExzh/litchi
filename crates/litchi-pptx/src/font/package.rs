@@ -564,7 +564,7 @@ pub(super) fn next_font_relationship_id(used: &HashSet<String>) -> Result<String
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Relationships,
         u32::MAX as usize,
         u32::MAX as usize,
     ))
@@ -582,7 +582,7 @@ pub(super) fn next_font_part_name(used: &HashSet<String>, format: Format) -> Res
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Parts,
         u32::MAX as usize,
         u32::MAX as usize,
     ))

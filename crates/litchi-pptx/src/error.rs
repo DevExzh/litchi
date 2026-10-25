@@ -127,8 +127,6 @@ pub enum CodecLimitKind {
     ActionSettings,
     /// Shape designer tag records.
     DesignerTags,
-    /// Candidate entries considered while constructing a package graph.
-    CandidateEntries,
     /// Text objects in a slide.
     TextObjects,
     /// Text runs in a slide.
@@ -239,7 +237,6 @@ impl CodecLimitKind {
             Self::Authors => "authors",
             Self::ActionSettings => "action settings",
             Self::DesignerTags => "designer tags",
-            Self::CandidateEntries => "candidate entries",
             Self::TextObjects => "text objects",
             Self::TextRuns => "text runs",
             Self::ZoomEntries => "zoom entries",

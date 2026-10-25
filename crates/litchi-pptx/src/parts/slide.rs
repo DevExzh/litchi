@@ -603,7 +603,7 @@ impl SemanticTextXmlBudget {
         }
         if event_bytes > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlEvents),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 observed: event_bytes,
                 maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
@@ -841,7 +841,7 @@ impl RawTextScan {
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
                         kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::XmlEvents,
+                            crate::opened::CodecLimitKind::TextBytes,
                         ),
                         observed: decoded.len(),
                         maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
@@ -863,7 +863,7 @@ impl RawTextScan {
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
                         kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::XmlEvents,
+                            crate::opened::CodecLimitKind::TextBytes,
                         ),
                         observed: decoded.len(),
                         maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
@@ -1223,7 +1223,7 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlEvents),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
                 observed: decoded.len(),
                 maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
@@ -1238,7 +1238,7 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlEvents),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
                 observed: decoded.len(),
                 maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
@@ -1351,7 +1351,7 @@ impl<'a> SemanticTextParser<'a> {
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
                         kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::XmlEvents,
+                            crate::opened::CodecLimitKind::TextBytes,
                         ),
                         observed: decoded.len(),
                         maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
@@ -1369,7 +1369,7 @@ impl<'a> SemanticTextParser<'a> {
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
                         kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::XmlEvents,
+                            crate::opened::CodecLimitKind::TextBytes,
                         ),
                         observed: decoded.len(),
                         maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
@@ -1394,7 +1394,7 @@ impl<'a> SemanticTextParser<'a> {
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
                         kind: crate::opened::LimitKind::Codec(
-                            crate::opened::CodecLimitKind::XmlEvents,
+                            crate::opened::CodecLimitKind::TextBytes,
                         ),
                         observed: decoded.len(),
                         maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
@@ -2202,7 +2202,7 @@ mod tests {
                     if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                         return Err(Error::Limit {
                             kind: crate::opened::LimitKind::Codec(
-                                crate::opened::CodecLimitKind::XmlEvents,
+                                crate::opened::CodecLimitKind::TextBytes,
                             ),
                             observed: decoded.len(),
                             maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
@@ -2224,7 +2224,7 @@ mod tests {
                     if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                         return Err(Error::Limit {
                             kind: crate::opened::LimitKind::Codec(
-                                crate::opened::CodecLimitKind::XmlEvents,
+                                crate::opened::CodecLimitKind::TextBytes,
                             ),
                             observed: decoded.len(),
                             maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,

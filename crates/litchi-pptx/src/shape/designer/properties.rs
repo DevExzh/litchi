@@ -288,7 +288,8 @@ pub(crate) fn apply_properties(package: &mut OpcPackage, commit: Prepared) -> Re
         .and_then(|value| value.checked_sub(original.len()))
         .ok_or_else(|| {
             limit(
-                "Designer properties shape bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
                 snapshot.limits.xml_bytes(),
             )
         })?;
@@ -845,7 +846,8 @@ fn insert_inside(
             })?;
         if length > limits.xml_bytes() {
             return Err(limit(
-                "Designer properties output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                length,
                 limits.xml_bytes(),
             ));
         }
@@ -894,7 +896,8 @@ fn write_extension(payload: &[u8], host: &Element, limits: Limits) -> Result<Vec
         })?;
     if size > limits.xml_bytes() {
         return Err(limit(
-            "Designer properties output bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            size,
             limits.xml_bytes(),
         ));
     }
@@ -944,7 +947,8 @@ fn write_extension_list(extension: &[u8], host: &Element, limits: Limits) -> Res
         })?;
     if size > limits.xml_bytes() {
         return Err(limit(
-            "Designer properties output bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            size,
             limits.xml_bytes(),
         ));
     }
@@ -1005,7 +1009,8 @@ fn replace(
         })?;
     if len > limits.xml_bytes() {
         return Err(limit(
-            "Designer properties output bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            len,
             limits.xml_bytes(),
         ));
     }
@@ -1041,7 +1046,8 @@ fn extension_uri(
                 .map_err(xml_error)?;
             if value.len() > limits.attribute_bytes() {
                 return Err(limit(
-                    "Designer properties extension URI bytes",
+                    crate::error::CodecLimitKind::ExtensionBytes,
+                    value.len(),
                     limits.attribute_bytes(),
                 ));
             }

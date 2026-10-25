@@ -524,8 +524,8 @@ fn raw_shape_span(
                             kind: crate::opened::LimitKind::Codec(
                                 crate::opened::CodecLimitKind::Shapes,
                             ),
-                            observed: usize::MAX,
-                            maximum: shape_limits.nodes(),
+                            observed: mapped.checked_add(1).unwrap_or(usize::MAX),
+                            maximum: shape_limits.shapes(),
                         })?;
                         (index == selected_index).then_some(start)
                     } else {
@@ -576,8 +576,8 @@ fn raw_shape_span(
                             kind: crate::opened::LimitKind::Codec(
                                 crate::opened::CodecLimitKind::Shapes,
                             ),
-                            observed: active_trees,
-                            maximum: shape_limits.nodes(),
+                            observed: mapped.checked_add(1).unwrap_or(usize::MAX),
+                            maximum: shape_limits.shapes(),
                         })?;
                         if index == selected_index {
                             selected = Some((start..end, kind));

@@ -103,7 +103,7 @@ pub(super) fn plan(
     if effective_parts >= package.owner.limits.max_parts() {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
-            observed: effective_parts,
+            observed: effective_parts.checked_add(1).unwrap_or(usize::MAX),
             maximum: package.owner.limits.max_parts(),
         });
     }
@@ -162,7 +162,8 @@ pub(super) fn plan(
     };
     if root.len() > package.owner.limits.max_part_bytes() as usize {
         return Err(limit(
-            "source-backed primary presentation output bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            root.len(),
             package.owner.limits.max_part_bytes() as usize,
         ));
     }

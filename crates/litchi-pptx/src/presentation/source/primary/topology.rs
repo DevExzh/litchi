@@ -300,19 +300,19 @@ impl PatchPlan {
 /// candidate retains any source payload.  The marker is outside the topology
 /// body, so topology wire planning receives only the remaining budget.
 pub(super) fn topology_patch_budget(max_patch_bytes: usize, shape_removals: bool) -> Result<usize> {
-    max_patch_bytes
-        .checked_sub(if shape_removals {
-            super::durable::REMOVAL_MARKER_BYTES
-        } else {
-            0
-        })
-        .ok_or_else(|| {
-            limit(
-                crate::error::CodecLimitKind::PatchBytes,
-                usize::MAX,
-                max_patch_bytes,
-            )
-        })
+    let marker = if shape_removals {
+        super::durable::REMOVAL_MARKER_BYTES
+    } else {
+        0
+    };
+    if marker > max_patch_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::PatchBytes,
+            marker,
+            max_patch_bytes,
+        ));
+    }
+    Ok(max_patch_bytes - marker)
 }
 
 impl Revision {
@@ -341,7 +341,8 @@ impl Revision {
         crate::source_limits::validate_xml_limits(bytes, limits)?;
         if bytes.len() > limits.max_part_bytes() as usize {
             return Err(limit(
-                "source-backed primary prepared slide bytes",
+                crate::error::CodecLimitKind::PartBytes,
+                bytes.len(),
                 limits.max_part_bytes() as usize,
             ));
         }
@@ -684,7 +685,8 @@ pub(super) fn replace_snapshot(
     )?;
     if candidate_wire > max_patch_bytes {
         return Err(limit(
-            "source-backed primary retained patch bytes",
+            crate::error::CodecLimitKind::PatchBytes,
+            candidate_wire,
             max_patch_bytes,
         ));
     }
@@ -736,9 +738,11 @@ pub(super) fn replace_snapshot(
         Some(&revision.data.after),
         seed,
     )?;
-    if Data::encoded_len_from_data(&revision.data)? > max_patch_bytes {
+    let encoded = Data::encoded_len_from_data(&revision.data)?;
+    if encoded > max_patch_bytes {
         return Err(limit(
-            "source-backed primary retained patch bytes",
+            crate::error::CodecLimitKind::PatchBytes,
+            encoded,
             max_patch_bytes,
         ));
     }
@@ -792,12 +796,14 @@ pub(super) fn replacement_after_budget(
         &content_type,
         &relationship_type,
     )?;
-    max_patch_bytes.checked_sub(baseline).ok_or_else(|| {
-        limit(
-            "source-backed primary retained patch bytes",
+    if baseline > max_patch_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::PatchBytes,
+            baseline,
             max_patch_bytes,
-        )
-    })
+        ));
+    }
+    Ok(max_patch_bytes - baseline)
 }
 
 fn plan_patch(source: &Package, target: &Package) -> Result<PatchPlan> {
@@ -861,7 +867,8 @@ fn preflight_candidate(
     let encoded = plan.encoded_len()?;
     if encoded > max_patch_bytes {
         return Err(limit(
-            "source-backed primary retained patch bytes",
+            crate::error::CodecLimitKind::PatchBytes,
+            encoded,
             max_patch_bytes,
         ));
     }
@@ -1681,7 +1688,8 @@ pub(super) fn patch_from_packages(
     let encoded = plan.encoded_len()?;
     if encoded > max_patch_bytes {
         return Err(limit(
-            "source-backed primary retained patch bytes",
+            crate::error::CodecLimitKind::PatchBytes,
+            encoded,
             max_patch_bytes,
         ));
     }
@@ -1717,7 +1725,8 @@ pub(super) fn patch_from_packages(
     }
     if encoded > max_patch_bytes {
         return Err(limit(
-            "source-backed primary retained patch bytes",
+            crate::error::CodecLimitKind::PatchBytes,
+            encoded,
             max_patch_bytes,
         ));
     }
@@ -2994,22 +3003,28 @@ fn recipe_bytes(
     const MAXIMUM: usize = 128 * 1024 * 1024;
     if changes.len() > super::super::MAX_SOURCE_BACKED_SLIDE_BATCH {
         return Err(limit(
-            "source-backed topology resource changes",
+            crate::error::CodecLimitKind::Slides,
+            changes.len(),
             super::super::MAX_SOURCE_BACKED_SLIDE_BATCH,
         ));
     }
     let mut total = root.len();
     let mut add = |bytes: usize| -> Result<()> {
-        total = total
-            .checked_add(bytes)
-            .filter(|n| *n <= MAXIMUM)
-            .ok_or_else(|| {
-                limit(
-                    crate::error::CodecLimitKind::ProofBytes,
-                    usize::MAX,
-                    MAXIMUM,
-                )
-            })?;
+        let next = total.checked_add(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::ProofBytes,
+                usize::MAX,
+                MAXIMUM,
+            )
+        })?;
+        if next > MAXIMUM {
+            return Err(limit(
+                crate::error::CodecLimitKind::ProofBytes,
+                next,
+                MAXIMUM,
+            ));
+        }
+        total = next;
         Ok(())
     };
     for key in order {

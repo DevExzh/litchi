@@ -7996,7 +7996,7 @@ mod tests {
             ),
             Err(Error::Opc(litchi_opc::OpcError::Limit {
                 kind: SourceLimitKind::PartBytes,
-                observed: usize::MAX,
+                observed: 131326,
                 maximum: 1024,
                 ..
             }))

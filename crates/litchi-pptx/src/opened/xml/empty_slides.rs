@@ -270,7 +270,7 @@ mod tests {
             insert_slide_binding(source.as_bytes(), std::iter::empty(), 0, 256, "rId9"),
             Err(crate::Error::Limit {
                 kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
-                observed: usize::MAX,
+                observed: 257,
                 maximum: 256
             })
         ));

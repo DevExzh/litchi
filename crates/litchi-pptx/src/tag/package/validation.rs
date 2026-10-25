@@ -228,7 +228,7 @@ pub(super) fn owner_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usi
                     if candidate.value == relationship_id {
                         uses = uses.checked_add(1).ok_or(Error::Limit {
                             kind: crate::opened::LimitKind::Codec(
-                                crate::opened::CodecLimitKind::References,
+                                crate::opened::CodecLimitKind::XmlNodes,
                             ),
                             observed: usize::MAX,
                             maximum: MAX_OWNER_NODES,
@@ -327,7 +327,7 @@ pub(crate) fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(Error::Limit {
-        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::CandidateEntries),
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
         observed: PART_NAME_ATTEMPTS,
         maximum: PART_NAME_ATTEMPTS,
     })

@@ -562,7 +562,7 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Parts,
         PART_NAME_ATTEMPTS,
         PART_NAME_ATTEMPTS,
     ))
@@ -576,7 +576,7 @@ fn available_relationship_id(owner: &dyn Part) -> Result<String> {
         }
     }
     Err(limit(
-        crate::error::CodecLimitKind::CandidateEntries,
+        crate::error::CodecLimitKind::Relationships,
         RELATIONSHIP_ID_ATTEMPTS,
         RELATIONSHIP_ID_ATTEMPTS,
     ))
