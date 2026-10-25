@@ -1046,6 +1046,8 @@ impl<'a> Edit<'a> {
             word_supplemental_xml.as_ref().map_or(0, Vec::len),
             self.options,
         )?;
+        let current_limits = self.options.effective(self.current()).source_limits;
+        validate_recipient_metadata_limits(self.current(), current_limits)?;
         if store_is_noop(
             self.current(),
             &self.source_part,
@@ -1086,6 +1088,8 @@ impl<'a> Edit<'a> {
     }
 
     fn remove_inner(&mut self) -> Result<bool> {
+        let current_limits = self.options.effective(self.current()).source_limits;
+        validate_recipient_metadata_limits(self.current(), current_limits)?;
         if inspect_existing_graph(self.current(), &self.source_part, self.host)?.is_none() {
             return Ok(false);
         }
@@ -1483,6 +1487,11 @@ fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits
         u64::try_from("_rels/.rels".len()).unwrap_or(u64::MAX),
         limits.max_archive_member_name_bytes(),
     )?;
+    check_vba_limit(
+        LimitKind::ArchiveMemberNameBytes,
+        u64::try_from("_rels/.rels".len()).unwrap_or(u64::MAX),
+        limits.max_archive_member_name_bytes(),
+    )?;
     for member in package.non_part_members() {
         check_vba_limit(
             LimitKind::ArchiveMemberNameBytes,
@@ -1513,7 +1522,38 @@ fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits
         limits.max_total_relationships() as u64,
     )?;
 
-    if retained.is_none() {
+    if let Some(metrics) = retained {
+        let relationship_members = relationship_member_count(package)?;
+        let physical_members = metrics
+            .opaque_members()
+            .saturating_add(2)
+            .saturating_add(parts)
+            .saturating_add(relationship_members);
+        check_vba_limit(
+            LimitKind::ArchiveMembers,
+            physical_members as u64,
+            limits.max_members() as u64,
+        )?;
+        check_vba_limit(
+            LimitKind::ArchiveTotalEntries,
+            metrics
+                .opaque_entries()
+                .saturating_add(2)
+                .saturating_add(parts)
+                .saturating_add(relationship_members) as u64,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        let aggregate = metrics
+            .opaque_bytes()
+            .saturating_add(part_bytes)
+            .saturating_add(relationships.xml_bytes)
+            .saturating_add(content_type_bytes);
+        check_vba_limit(
+            LimitKind::AggregateBytes,
+            aggregate,
+            limits.max_aggregate_bytes(),
+        )?;
+    } else {
         let non_part_files = package
             .non_part_members()
             .iter()
@@ -1576,9 +1616,7 @@ fn add_relationship_totals(
 ) -> Result<()> {
     let member_present = owner.as_str() == "/"
         || !relationships.is_empty()
-        || package
-            .retained_relationships_xml(owner)?
-            .is_some_and(|(_, present)| present);
+        || package.has_retained_relationship_member(owner);
     let metrics = if member_present {
         relationship_token_metrics(
             &package
@@ -1691,12 +1729,25 @@ fn graph_relationship_totals(
     Ok(totals)
 }
 
+/// Count the relationships members the OPC writer emits for the recipient's
+/// current known parts. The retained-source query deliberately reports empty
+/// source `.rels` members as present, while newly authored parts contribute a
+/// member only when their relationship collection is non-empty.
+fn relationship_member_count(package: &OpcPackage) -> Result<usize> {
+    package.iter_parts().try_fold(0usize, |count, metadata| {
+        let retained = package.has_retained_relationship_member(metadata.partname());
+        let present = retained || !metadata.rels().is_empty();
+        count
+            .checked_add(usize::from(present))
+            .ok_or_else(|| Error::Invalid("OPC relationship member count overflows".to_owned()))
+    })
+}
+
 fn validate_archive_structural_limits(
     package: &OpcPackage,
     current: &GraphSnapshot,
     target: &GraphSnapshot,
     projected_parts: usize,
-    projected_relationship_parts: usize,
     projected_part_bytes: u64,
     projected_relationship_bytes: u64,
     projected_content_types: &OwnedContentTypes,
@@ -1709,32 +1760,27 @@ fn validate_archive_structural_limits(
     let retained = package.retained_archive_metrics(limits)?;
     let current_graph_relationships = graph_relationship_totals(current, limits)?;
     let target_graph_relationships = graph_relationship_totals(target, limits)?;
+    let current_physical_relationship_parts = relationship_member_count(package)?;
+    let projected_physical_relationship_parts = current_physical_relationship_parts
+        .checked_sub(current_graph_relationships.members)
+        .ok_or_else(|| {
+            Error::Invalid(
+                "selected graph relationship members exceed the recipient physical namespace"
+                    .to_owned(),
+            )
+        })?
+        .saturating_add(target_graph_relationships.members);
     let projected_content_type_bytes =
         u64::try_from(projected_content_types.bytes().len()).unwrap_or(u64::MAX);
     if let Some(metrics) = retained {
-        let current_physical_relationship_parts = metrics
-            .members()
-            .saturating_sub(metrics.opaque_members())
-            .saturating_sub(1)
-            .saturating_sub(package.part_count());
-        let current_graph_non_source_relationships = current_graph_relationships
-            .members
-            .saturating_sub(usize::from(
-                relationship_token_metrics(&current.source.relationships_source, limits)?
-                    .member_present,
-            ));
-        let target_graph_non_source_relationships = target_graph_relationships
-            .members
-            .saturating_sub(usize::from(
-                relationship_token_metrics(&target.source.relationships_source, limits)?
-                    .member_present,
-            ));
-        let projected_physical_relationship_parts = current_physical_relationship_parts
-            .saturating_sub(current_graph_non_source_relationships)
-            .saturating_add(target_graph_non_source_relationships);
+        // The targeted writer always has one content-types member and one
+        // package-level `.rels` member. Everything else comes from the
+        // current known part map, its retained/created part `.rels` members,
+        // and immutable opaque source entries. No historical source count is
+        // used to infer a relationship member.
         let physical_members = metrics
             .opaque_members()
-            .saturating_add(1)
+            .saturating_add(2)
             .saturating_add(projected_parts)
             .saturating_add(projected_physical_relationship_parts);
         check_vba_limit(
@@ -1742,19 +1788,13 @@ fn validate_archive_structural_limits(
             physical_members as u64,
             limits.max_members() as u64,
         )?;
-        let current_physical_members = metrics.members();
-        let archive_entries = if physical_members >= current_physical_members {
-            metrics
-                .entries()
-                .saturating_add(physical_members - current_physical_members)
-        } else {
-            metrics
-                .entries()
-                .saturating_sub(current_physical_members - physical_members)
-        };
         check_vba_limit(
             LimitKind::ArchiveTotalEntries,
-            archive_entries as u64,
+            metrics
+                .opaque_entries()
+                .saturating_add(2)
+                .saturating_add(projected_parts)
+                .saturating_add(projected_physical_relationship_parts) as u64,
             limits.max_archive_total_entries() as u64,
         )?;
         let projected_aggregate = metrics
@@ -1777,8 +1817,11 @@ fn validate_archive_structural_limits(
             .filter(|member| !member.name().ends_with('/'))
             .count();
         let physical_members = 1_u64
+            .saturating_add(1)
             .saturating_add(u64::try_from(projected_parts).unwrap_or(u64::MAX))
-            .saturating_add(u64::try_from(projected_relationship_parts).unwrap_or(u64::MAX))
+            .saturating_add(
+                u64::try_from(projected_physical_relationship_parts).unwrap_or(u64::MAX),
+            )
             .saturating_add(u64::try_from(non_part_files).unwrap_or(u64::MAX));
         check_vba_limit(
             LimitKind::ArchiveMembers,
@@ -2196,7 +2239,6 @@ fn validate_snapshot_limits(
         current,
         target,
         projected_parts,
-        projected_members,
         projected_part_bytes,
         projected_relationship_bytes,
         projected_content_types,
@@ -3424,6 +3466,124 @@ mod tests {
                 .content_type(),
             ct::SML_SHEET_MAIN
         );
+    }
+
+    #[test]
+    fn replay_projects_serialized_source_namespace_after_unrelated_remove_add() {
+        let old_name = PackURI::new("/custom/old.bin").unwrap();
+        let new_name = PackURI::new("/custom/new.bin").unwrap();
+        let mut source = excel_package();
+        let mut old = BlobPart::new(
+            old_name.clone(),
+            "application/octet-stream".to_owned(),
+            vec![0; 4096],
+        );
+        old.rels_mut()
+            .try_add_relationship(
+                "urn:unrelated".to_owned(),
+                "../xl/workbook.xml".to_owned(),
+                "oldEdge".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        source.try_add_part(Box::new(old)).unwrap();
+
+        // Reopen a real source archive so the recipient retains immutable
+        // provenance for the part and its relationships. Then replace that
+        // known source part with a new known part carrying its own `.rels`.
+        let source_bytes = PackageWriter::to_bytes(&source).unwrap();
+        let mut recipient = OpcPackage::from_vec(source_bytes, SourceLimits::default()).unwrap();
+        assert!(recipient.remove_part(&old_name));
+        let mut replacement = BlobPart::new(
+            new_name,
+            "application/octet-stream".to_owned(),
+            b"new".to_vec(),
+        );
+        replacement
+            .rels_mut()
+            .try_add_relationship(
+                "urn:unrelated".to_owned(),
+                "../xl/workbook.xml".to_owned(),
+                "newEdge".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        recipient.try_add_part(Box::new(replacement)).unwrap();
+        assert!(recipient.source_read_limits().is_some());
+
+        let package = excel_package();
+        let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        edit.store(b"project".to_vec(), None).unwrap();
+        let patch = edit.commit().unwrap().patch().clone();
+
+        let broad = patch.apply(&recipient).unwrap();
+        let broad_bytes = PackageWriter::to_bytes(broad.package()).unwrap();
+        let reopened = OpcPackage::from_vec(broad_bytes, SourceLimits::default()).unwrap();
+        let projected = reopened
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .unwrap();
+        let final_members = projected.members();
+        let final_entries = projected.entries();
+        let final_aggregate = projected.aggregate_bytes();
+        assert!(final_members > 1);
+        assert!(final_entries >= final_members);
+        assert!(final_aggregate > 0);
+
+        let limits = |members, entries, aggregate| {
+            SourceLimits::builder()
+                .max_members(members)
+                .unwrap()
+                .max_archive_total_entries(entries)
+                .unwrap()
+                .max_entry_bytes(1024)
+                .unwrap()
+                .max_archive_compressed_bytes(1024)
+                .unwrap()
+                .max_aggregate_bytes(aggregate)
+                .unwrap()
+                .build()
+                .unwrap()
+        };
+        let exact_limits = limits(final_members, final_entries, final_aggregate);
+        let mut exact_patch = patch.clone();
+        exact_patch.options = EditOptions::new().source_limits(exact_limits);
+        let exact = exact_patch.apply(&recipient).unwrap();
+        assert!(exact.diagnostics().changed());
+
+        let before = PackageWriter::to_bytes(&recipient).unwrap();
+        let members_under = limits(final_members - 1, final_entries, final_aggregate);
+        exact_patch.options = EditOptions::new().source_limits(members_under);
+        assert!(matches!(
+            exact_patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::ArchiveMembers),
+                ..
+            })
+        ));
+        assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
+
+        let entries_under = limits(final_members, final_entries - 1, final_aggregate);
+        exact_patch.options = EditOptions::new().source_limits(entries_under);
+        assert!(matches!(
+            exact_patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::ArchiveTotalEntries),
+                ..
+            })
+        ));
+        assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
+
+        let aggregate_under = limits(final_members, final_entries, final_aggregate - 1);
+        exact_patch.options = EditOptions::new().source_limits(aggregate_under);
+        assert!(matches!(
+            exact_patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::AggregateBytes),
+                ..
+            })
+        ));
+        assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
     }
 
     #[test]

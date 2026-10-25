@@ -1,7 +1,8 @@
 # 0362ul87c — shared OOXML VBA publication boundary
 
 Status: source-only implementation on `uo2/ooxml-vba-publication-0362ul87c`;
-87cc, 87cd, and 87ce review repairs are included in the follow-up commit.
+87cc, 87cd, 87ce, and 87cf review repairs are included in the follow-up
+commit.
 This slice follows the boundary audit in 0362ul87. It has not run Cargo,
 rustdoc, native qualification, or performance measurements; those require a
 coordinator validation slot after the four OOXML consumers are composed.
@@ -134,3 +135,25 @@ oversized member proves the refusal is atomic and leaves the selected deferred
 decode counter at zero. The divergent content-types replay test also derives
 the composed archive aggregate and covers both the exact limit and one-byte
 under boundary.
+
+## 87cf review repair
+
+The source archive admission pass now charges only the immutable source
+members the targeted writer will copy for the recipient's current graph.
+Removed known parts and their `.rels` entries are omitted before name,
+metadata, compressed-size, entry-size, and aggregate checks; unknown source
+members, including directory markers, remain retained according to their
+original `SourceMemberKind`. Regenerated known members are admitted through
+the current metadata and prospective graph checks instead of their historical
+central-directory sizes. Missing preservation provenance is a typed refusal,
+not an historical-source fallback.
+
+Final archive member and entry counts are composed from the actual current
+known parts, retained empty relationships members, the two mandatory
+content-types/package-relationships members, and immutable opaque entries.
+The former source-count-minus-current-part-count estimate is gone. Store and
+remove staging use the same metadata-only recipient admission as replay before
+selected graph capture. A serialized/reopened recipient regression removes a
+known unrelated part with a relationship, adds a new unrelated part with its
+own relationship, and checks exact and one-byte-under member, entry, and
+aggregate limits atomically.
