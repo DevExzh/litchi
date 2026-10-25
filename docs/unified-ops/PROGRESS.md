@@ -5932,3 +5932,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   locks unchanged. The conservative allocated ledger reaches 800,926,519,296
   bytes under prior exclusions. Signed136d remains under repair; final source
   binding, qualification and trunk integration are still open. No push.
+
+  The final format audit returns one PPT adapter import; 135f fixes it and
+  migrates exact pins, with 33 focused tests passing (144). Final coverage is
+  full53 plus seven compiler and five runtime supplements. Cleanup105 retires
+  the merged current-native leaf, reaching 272 removed worktrees and 434 refs;
+  the conservative ledger is 801,001,271,296 bytes under prior exclusions.
+  The overwritten worker preflight failure is disclosed without attributing
+  its unknown cause. Signed136d is reviewed; its identity label is being
+  normalized. Final qualification and trunk integration remain open. No push.

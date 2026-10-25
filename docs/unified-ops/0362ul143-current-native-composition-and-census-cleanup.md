@@ -57,5 +57,6 @@ this is not a filesystem free-space measurement.
 The signed protocol's136d return must keep `after` bound exclusively to the
 future final candidate, restore all three role-lock/graph bindings and use
 real pinned probe/fixture inputs. Historical472b is harness provenance, not
-a substitute for current-source qualification. Final source bindings, gates,+census, actual native builds/fidelity/performance and trunk integration remain
+a substitute for current-source qualification. Final source bindings, gates,
+census, actual native builds/fidelity/performance and trunk integration remain
 open. Nothing is pushed.
