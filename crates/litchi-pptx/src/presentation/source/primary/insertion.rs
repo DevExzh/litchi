@@ -81,23 +81,82 @@ pub(super) fn plan(
 
     let strict = strict_presentation(physical_root)?;
 
-    let source_parts = source.iter_parts().count();
-    let mut effective_parts = source_parts;
-    if let Some(revision) = &package.topology {
-        for change in revision.data.changes.iter() {
-            match (change.before.is_some(), change.after.is_some()) {
-                (false, true) => {
-                    effective_parts = effective_parts.checked_add(1).ok_or_else(|| {
-                        limit("source-backed primary insertion parts", usize::MAX)
-                    })?;
-                },
-                (true, false) => {
-                    effective_parts = effective_parts.checked_sub(1).ok_or(Error::PatchConflict)?;
-                },
-                _ => {},
+    // A structural revision can remove a slide and the exclusive dependent
+    // Parts it owns.  Admission is about the final materialized OPC catalog,
+    // so fold both namespaces into one case-insensitive presence set before
+    // checking the slot for the newly authored slide.  Applying all removals
+    // before additions makes a duplicated URI count once and gives a restored
+    // Part its final presence even if an old slide/dependent entry overlaps.
+    let effective_parts = if let Some(revision) = &package.topology {
+        let mut present = HashSet::new();
+        present
+            .try_reserve(source.iter_parts().count())
+            .map_err(allocation)?;
+        present
+            .try_reserve(
+                revision
+                    .data
+                    .changes
+                    .len()
+                    .checked_add(revision.data.dependents.len())
+                    .ok_or_else(|| limit("source-backed primary insertion parts", usize::MAX))?,
+            )
+            .map_err(allocation)?;
+        for part in source.iter_parts() {
+            present.insert(part.partname().as_str().to_ascii_lowercase());
+        }
+        let mut seen_before = HashSet::new();
+        seen_before
+            .try_reserve(
+                revision
+                    .data
+                    .changes
+                    .len()
+                    .checked_add(revision.data.dependents.len())
+                    .ok_or_else(|| limit("source-backed primary insertion parts", usize::MAX))?,
+            )
+            .map_err(allocation)?;
+        for (before, name) in revision
+            .data
+            .changes
+            .iter()
+            .map(|change| (&change.before, change.key.part_uri.as_str()))
+            .chain(
+                revision
+                    .data
+                    .dependents
+                    .iter()
+                    .map(|dependent| (&dependent.before, dependent.part_uri.as_str())),
+            )
+        {
+            if before.is_some() {
+                let name = name.to_ascii_lowercase();
+                if seen_before.insert(name.clone()) && !present.remove(&name) {
+                    return Err(Error::PatchConflict);
+                }
             }
         }
-    }
+        for (after, name) in revision
+            .data
+            .changes
+            .iter()
+            .map(|change| (&change.after, change.key.part_uri.as_str()))
+            .chain(
+                revision
+                    .data
+                    .dependents
+                    .iter()
+                    .map(|dependent| (&dependent.after, dependent.part_uri.as_str())),
+            )
+        {
+            if after.is_some() {
+                present.insert(name.to_ascii_lowercase());
+            }
+        }
+        present.len()
+    } else {
+        source.iter_parts().count()
+    };
     if effective_parts >= package.owner.limits.max_parts() {
         return Err(Error::EditLimit {
             kind: crate::opened::LimitKind::Parts,
