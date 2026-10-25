@@ -5696,3 +5696,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   checkout's signed invalid-target coverage is now preserved by composed102a.
   Remaining validation worktrees receive explicit disposition review; the
   protected probe is unchanged. Completed changes are committed; no push.
+
+
+  Further diagnostic runtime rows expose DOCX web-extension consumer and
+  conformance failures, ten PPTX library failures (1,386 pass, one ignored),
+  and one signed ops ordering assertion. Seven repair chains pass source
+  review: 104e, 107, 108a, 110, 111a, 112 and 113. The proposed 111 aggregate
+  relaxation is returned; 111a preserves production limits and corrects the
+  stale fixture boundaries. Signed batch zero-read refusal remains settled;
+  113 tests the distinct closure/individual error order explicitly. The
+  next continuation passes ten XLSX/XLSB rows, then ops metadata reports five
+  passes and two missing-property-context failures, returned as 114. The last
+  four diagnostic rows run on frozen e130. Composition and full repaired-source
+  qualification remain required.
+
+  Cleanup80–82 brings fully verified removals to 106 worktrees. Another 21
+  are removed in cleanup83; its scope-hash difference is proved comment-only,
+  but the failed ignored-payload inventory prevents a complete preservation
+  claim. All committed source remains reachable, and local ref deletions
+  total 370. Cleanup85 then removes three more verified leaves and their refs:
+  totals are 373 refs and 109 fully verified removals, plus cleanup83's 21 with
+  the recorded inventory gap. The measured allocated ledger reaches
+  228,248,707,072 bytes with the recorded exclusions; cleanup83 allocation is
+  unknown. Further leaf cleanup continues. The protected probe and active
+  baselines remain intact. Final acceptance stays open; nothing is pushed.
