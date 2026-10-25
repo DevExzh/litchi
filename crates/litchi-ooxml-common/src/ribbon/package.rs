@@ -359,7 +359,7 @@ impl Patch {
             return Ok(Commit::new(
                 package.clone(),
                 self.clone(),
-                litchi_core::edit::Diagnostics::UNCHANGED,
+                Diagnostics::UNCHANGED,
             ));
         }
         refuse_signed_change(package)?;
@@ -372,11 +372,7 @@ impl Patch {
             ));
         }
         settle_unsigned_change(&mut candidate)?;
-        Ok(Commit::new(
-            candidate,
-            self.clone(),
-            litchi_core::edit::Diagnostics::CHANGED,
-        ))
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
 
     fn new(before: GraphState, after: GraphState, limits: Limits) -> Self {
@@ -601,10 +597,7 @@ fn destination_matches(actual: &GraphState, expected: &GraphState) -> bool {
         || actual.root != expected.root
         || actual.content_types != expected.content_types
         || !retained_destination_matches(&actual.retained_root, &expected.retained_root)
-        || !retained_destination_matches(
-            &actual.retained_content_types,
-            &expected.retained_content_types,
-        )
+        || actual.retained_content_types != expected.retained_content_types
         || actual.parts.len() != expected.parts.len()
     {
         return false;

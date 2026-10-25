@@ -209,7 +209,7 @@ impl Patch {
             return Ok(Commit::new(
                 package.clone(),
                 self.clone(),
-                litchi_core::edit::Diagnostics::UNCHANGED,
+                Diagnostics::UNCHANGED,
             ));
         }
         self.validate_source(package)?;
@@ -223,11 +223,7 @@ impl Patch {
         // including a late lexical replacement, is atomic.
         let mut candidate = package.clone();
         self.apply_to_candidate(&mut candidate)?;
-        Ok(Commit::new(
-            candidate,
-            self.clone(),
-            litchi_core::edit::Diagnostics::CHANGED,
-        ))
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
 
     pub(in crate::web) fn has_changes(&self) -> bool {

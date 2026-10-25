@@ -68,35 +68,45 @@ impl Limits {
     #[must_use]
     pub(crate) const fn bounded_by_source(self, source: SourceLimits) -> Self {
         Self {
-            xml_bytes: self.xml_bytes.min(as_usize(source.max_part_bytes())),
-            total_xml_bytes: self
-                .total_xml_bytes
-                .min(as_usize(source.max_total_part_bytes())),
-            depth: self.depth.min(source.max_depth()),
-            nodes: self.nodes.min(source.max_events()),
-            items: self.items.min(source.max_parts()),
-            string_bytes: self
-                .string_bytes
-                .min(as_usize(source.max_total_part_bytes())),
-            total_string_bytes: self
-                .total_string_bytes
-                .min(as_usize(source.max_total_part_bytes())),
-            image_bytes: self.image_bytes.min(as_usize(source.max_part_bytes())),
-            total_image_bytes: self
-                .total_image_bytes
-                .min(as_usize(source.max_total_part_bytes())),
-            package_parts: self.package_parts.min(source.max_parts()),
-            package_relationships: self
-                .package_relationships
-                .min(source.max_total_relationships()),
-            part_allocations: self.part_allocations.min(source.max_parts()),
-            part_deletions: self.part_deletions.min(source.max_parts()),
+            xml_bytes: min_usize(self.xml_bytes, as_usize(source.max_part_bytes())),
+            total_xml_bytes: min_usize(
+                self.total_xml_bytes,
+                as_usize(source.max_total_part_bytes()),
+            ),
+            depth: min_usize(self.depth, source.max_depth()),
+            nodes: min_usize(self.nodes, source.max_events()),
+            items: min_usize(self.items, source.max_parts()),
+            string_bytes: min_usize(self.string_bytes, as_usize(source.max_total_part_bytes())),
+            total_string_bytes: min_usize(
+                self.total_string_bytes,
+                as_usize(source.max_total_part_bytes()),
+            ),
+            image_bytes: min_usize(self.image_bytes, as_usize(source.max_part_bytes())),
+            total_image_bytes: min_usize(
+                self.total_image_bytes,
+                as_usize(source.max_total_part_bytes()),
+            ),
+            package_parts: min_usize(self.package_parts, source.max_parts()),
+            package_relationships: min_usize(
+                self.package_relationships,
+                source.max_total_relationships(),
+            ),
+            part_allocations: min_usize(self.part_allocations, source.max_parts()),
+            part_deletions: min_usize(self.part_deletions, source.max_parts()),
         }
     }
 }
 
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
 const fn as_usize(value: u64) -> usize {
-    value.min(usize::MAX as u64) as usize
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
 }
 
 impl Default for Limits {

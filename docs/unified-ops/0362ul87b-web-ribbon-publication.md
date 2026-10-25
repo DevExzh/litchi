@@ -38,3 +38,29 @@ The implementation migrates DOCX, PPTX, XLSX and XLSB owner routes and the
 shared/common tests in the same change. It does not add aliases or deprecated
 forwarders. Cargo, rustdoc, native qualification and performance validation
 remain coordinator work after the complete source tree is frozen.
+
+## F5 compile receipt and source repair
+
+The first serialized F5 retry was intentionally stopped at the first failed
+row and its evidence is preserved outside the checkout. It ran the exact
+source commit `e06bc961fc88110d229a5312be95946f9b452015` with the 33-row
+plan and the approved isolated runner. The formatter row passed. The next
+`check-common` row failed before any later row could run:
+
+* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-e06bc961fc/result.json`
+  (SHA-256 `1b5c2fb2a8c763d9bd4d1070ed0c1e418fd42913e6d4a5d21e360c3622a83e85`);
+* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-e06bc961fc/01-check-common-attempt-actual-f5-01.log`
+  (SHA-256 `8c9c059f8bbbfdce72f9e4cd139362918c05aae46cb22918d18ab2642020ee04`);
+* row 1 exited `101` after 38.72 seconds, with a 158,643,465-byte target;
+  the runner recorded no live-target or ownership violation.
+
+The diagnostics were confined to the shared common crate: Ribbon replay
+passed a content-types byte proof to the relationship-token comparator,
+four diagnostics paths were unnecessarily qualified, and both Ribbon and
+Web `const` limit intersections called the non-const `Ord::min` methods on
+the pinned toolchain. This repair keeps relationship token tuples, compares
+the content-types retained bytes directly beside its semantic token, uses
+the existing module diagnostics re-exports, and implements the intersections
+with const-safe `min_usize` and saturating `as_usize` helpers. The next F5
+freeze must use the new repair commit and a fresh empty target; this failed
+receipt remains bound to the pre-repair source and is not overwritten.

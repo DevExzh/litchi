@@ -239,19 +239,27 @@ impl Limits {
     #[must_use]
     pub(crate) const fn bounded_by_source(self, source: SourceLimits) -> Self {
         Self {
-            xml_bytes: self.xml_bytes.min(as_usize(source.max_part_bytes())),
-            depth: self.depth.min(source.max_depth()),
-            nodes: self.nodes.min(source.max_events()),
-            images: self
-                .images
-                .min(source.max_total_relationships())
-                .min(source.max_parts()),
+            xml_bytes: min_usize(self.xml_bytes, as_usize(source.max_part_bytes())),
+            depth: min_usize(self.depth, source.max_depth()),
+            nodes: min_usize(self.nodes, source.max_events()),
+            images: min_usize(
+                min_usize(self.images, source.max_total_relationships()),
+                source.max_parts(),
+            ),
         }
     }
 }
 
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
 const fn as_usize(value: u64) -> usize {
-    value.min(usize::MAX as u64) as usize
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
 }
 
 impl Default for Limits {
