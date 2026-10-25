@@ -386,7 +386,14 @@ fn invalid_global_configuration_does_not_touch_sink() {
         Ok(_) => panic!("the public output budget must not exceed the physical ZIP budget"),
         Err(error) => error,
     };
-    assert!(matches!(error, Error::Limit { .. }));
+    assert!(matches!(
+        error,
+        Error::InvalidLimit {
+            kind: litchi_pptx::LimitKind::Codec(litchi_pptx::CodecLimitKind::OutputBytes),
+            value,
+            maximum,
+        } if value == 512 * 1024 * 1024 + 1 && maximum == 512 * 1024 * 1024
+    ));
     assert!(sink.is_empty());
 }
 
