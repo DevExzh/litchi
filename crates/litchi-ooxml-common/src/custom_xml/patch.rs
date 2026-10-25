@@ -56,11 +56,10 @@ impl Patch {
     /// [`OpcPackage::unsign`] or the format facade's `unsign`.
     /// # Errors
     ///
-    /// Returns [`crate::Error::Opc`] with
-    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// for a change to a signed package, and an error when the package does
-    /// not hold the source graph, input violates OOXML constraints, exceeds a
-    /// configured bound, or an underlying XML or package operation fails.
+    /// Returns [`crate::Error::Signed`] for a change to a signed package, and
+    /// an error when the package does not hold the source graph, input
+    /// violates OOXML constraints, exceeds a configured bound, or an
+    /// underlying XML or package operation fails.
     pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
         let current = Snapshot::load_scoped(package, &self.before.scope_names())?;
         if !self.before.same_source(&current) {

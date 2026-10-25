@@ -403,11 +403,9 @@ pub fn read_prepared_with_report(
 ///
 /// Returns [`crate::Error::Invalid`] when `metadata` sets a field core
 /// properties cannot store (application, custom and format-only fields are
-/// written through the package's metadata transaction), [`crate::Error::Opc`]
-/// with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when a value violates
-/// OOXML constraints or a bound.
+/// written through the package's metadata transaction),
+/// [`crate::Error::Signed`] for a change to a signed package, and an error
+/// when a value violates OOXML constraints or a bound.
 pub fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
     ensure_core_only(metadata)?;
     let base = match graph::inspect(package)?.part {
@@ -527,11 +525,9 @@ impl Slot {
     /// # Errors
     ///
     /// Returns [`crate::Error::Invalid`] for a field core properties cannot
-    /// store, [`crate::Error::Opc`] with
-    /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// for a change to a signed package, and an error when input violates
-    /// OOXML constraints, exceeds a configured bound, or an underlying XML or
-    /// package operation fails.
+    /// store, [`crate::Error::Signed`] for a change to a signed package, and
+    /// an error when input violates OOXML constraints, exceeds a configured
+    /// bound, or an underlying XML or package operation fails.
     pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();

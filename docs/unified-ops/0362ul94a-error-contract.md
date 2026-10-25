@@ -40,8 +40,8 @@ transaction implementation remains outside this lane.
 
 The review follow-up also migrated the remaining signed-error assertions in
 custom-properties, extended-properties, and core-properties writer tests,
-updated the writer documentation for `Error::Signed`, and retained source
-chains through common and leaf error wrappers.
+updated all canonical producer documentation to describe `Error::Signed`, and
+retained source chains through common and leaf error wrappers.
 
 ## Source-only validation
 

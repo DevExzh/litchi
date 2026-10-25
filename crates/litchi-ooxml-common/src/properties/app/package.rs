@@ -193,8 +193,7 @@ pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>
 ///
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// Returns [`Error::Signed`]
 /// for a change to a signed package, the errors of [`read`], and an error
 /// when a value cannot be written.
 pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
@@ -244,8 +243,7 @@ pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// Returns [`Error::Signed`]
 /// for a signed package, [`Error::Relationship`] for a shared part, and the
 /// graph errors of [`read`].
 pub fn clear(package: &mut OpcPackage) -> Result<bool> {

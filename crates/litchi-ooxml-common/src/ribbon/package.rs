@@ -178,11 +178,9 @@ fn replace_root_relationship(
 /// `unsign`.
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
 fn remove_mut(package: &mut OpcPackage, family: Family, limits: &Limits) -> Result<bool> {
     let (relationship_id, ribbon_part, images) = {
         let ribbons = load(package, limits)?;
