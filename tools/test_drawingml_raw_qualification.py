@@ -469,16 +469,9 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         for relative, expected in preparation.STATIC_REVIEWED_ADAPTER_SHA256.items():
             path = ROOT / relative
             if path.is_file():
-                source = path.read_bytes()
-                if relative == preparation.CONSUMER_API_ADAPTER_PATH:
-                    # 94c7bc is deliberately pre-XLS composition.  Model the
-                    # reviewed one-spelling XLS merge in memory; production
-                    # lib.rs is not edited by this preparation leaf.
-                    current, historical = preparation.CONSUMER_API_REPLACEMENTS[2]
-                    self.assertEqual(source.count(historical), 1)
-                    self.assertEqual(source.count(current), 0)
-                    source = source.replace(historical, current)
-                self.assertEqual(hashlib.sha256(source).hexdigest(), expected, relative)
+                self.assertEqual(
+                    hashlib.sha256(path.read_bytes()).hexdigest(), expected, relative
+                )
 
     def test_adapter_locks_bind_each_source_role(self) -> None:
         baseline = preparation._reviewed_adapter_hashes(
@@ -504,10 +497,6 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
     def test_historical_consumer_adapter_changes_only_three_spellings(self) -> None:
         path = ROOT / preparation.CONSUMER_API_ADAPTER_PATH
         source = path.read_bytes()
-        xls_current, xls_historical = preparation.CONSUMER_API_REPLACEMENTS[2]
-        self.assertEqual(source.count(xls_historical), 1)
-        self.assertEqual(source.count(xls_current), 0)
-        source = source.replace(xls_historical, xls_current)
         self.assertEqual(
             hashlib.sha256(source).hexdigest(), preparation.CONSUMER_API_CURRENT_SHA256
         )

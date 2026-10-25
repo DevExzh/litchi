@@ -34694,7 +34694,7 @@ fn run_xls_validation_report(
         |source| {
             Ok(litchi_xls::validation::validate_source(
                 source,
-                litchi_xls::validation::XlsValidationLimits::default(),
+                litchi_xls::validation::Limits::default(),
             )?)
         },
     )

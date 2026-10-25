@@ -61,9 +61,8 @@ CONSUMER_API_REPLACEMENTS = (
     ),
 )
 CONSUMER_API_TRANSFORM_COUNT = len(CONSUMER_API_REPLACEMENTS)
-# 94c7bc is pre-composition: the XLS leaf's one spelling is applied to this
-# file by the coordinator before this preparer is run. This is the resulting
-# candidate hash; production lib.rs is intentionally not edited in this leaf.
+# This hash is the checked-in composed candidate identity. The historical
+# baseline adapter below reverses these spellings only in the baseline copy.
 CONSUMER_API_CURRENT_SHA256 = "c28d436cdbd6c1746fc0be31b7b1ca28d46526143d6186ceb2c7bf5dbcdecf02"
 CONSUMER_API_HISTORICAL_SHA256 = "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"
 CONSUMER_API_TRANSFORM_BYTES = sum(
