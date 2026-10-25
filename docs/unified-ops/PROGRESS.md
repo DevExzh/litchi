@@ -6073,3 +6073,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   mandatory API defect. Historical OfficeCLI v3 passes its source review and
   correctly refuses the stale source identity. PPT158 review and the complete
   corrected-source qualification remain open; no final acceptance or push.
+
+  Candidate86a12758 includes coordinator records through159. Independent PPT
+  review returns158 for a record/body unit mismatch, dropped payload limits
+  and remaining default-policy resets (160); source-only158a repair proceeds.
+  Earlier direct-Cargo observations lack retained approved-runner receipts
+  and are not accepted validation. Root starts isolated, source-bound Rust
+  checks for the merged IWA graph/index and owned PPT record changes. C stays
+  fixed for that run; final source freeze, full gates and measurements remain
+  open. Nothing is pushed.
