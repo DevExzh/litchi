@@ -5508,3 +5508,22 @@ See [0063](0063-source-pptx-modern-comments.md).
   remain open. Performance harness review and cleanup70 audit continue.
   Record 0362ul99 retains the evidence. Final gates, census/dispositions,
   corpus/native and ABBA remain open; only audit22 is deferred. Nothing is pushed.
+
+  Subsequent PPTX runtime result: 1,374 library tests pass, 12 fail and one is
+  ignored. Root verifies the terminal capture and returns notes/presence/writer
+  repairs as 89aq/89ar/89as. Reviewed 89as fixes the slide-sync opening quote
+  and is fast-forwarded privately; other repairs remain active. OOXML 94o's
+  fresh scoped Clippy capture is running. No runtime acceptance is claimed.
+
+  Cleanup70 removes two retired PPTX worktrees without force, preserving
+  refs and all four restored blobs. Root verification passes and holds are
+  released. Net recovery is 15,133,167,616 bytes, or 52,964,249,600 bytes across
+  cleanup68–70. The protected probe, all targets and evidence remain intact.
+
+  OOXML `3774fe4374` now passes all four scoped format/leaf/ops/facade Clippy
+  rows with complete root verification. Its 38-row runtime packet is active;
+  the 13 glossary profiles remain separate. PPTX merge `437da0c7f5` composes
+  reviewed notes 89aq and downstream consumers 89at without conflicts.
+  Presence 89ar is returned for allocation, date-time, inactive-threading and
+  physical-attribute defects; 89ara is active. No performance acceptance is
+  claimed, and all final acceptance obligations remain open.
