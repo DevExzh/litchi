@@ -29,6 +29,7 @@ pub(crate) use package::{
     update_presentation_comment_author_with_limits, update_presentation_comment_with_limits,
     validate_replay_part,
 };
+pub(crate) use codec::{parse_comment_authors_processed, parse_slide_comments_processed};
 pub use package::{
     find_presentation_comment, find_presentation_comment_author, load_presentation_comments,
     load_presentation_comments_strict, load_presentation_comments_with_tolerance,

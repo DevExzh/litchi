@@ -158,10 +158,6 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
             limits.max_input_bytes,
         ));
     }
-    let capabilities = capabilities();
-    let mce_limits = mce_limits(limits);
-    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
-    validate_processed_part(processed.as_ref(), kind, limits, false)?;
     let scan = scan_raw(source, limits)?;
     let root_index = scan
         .root
@@ -176,6 +172,10 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
             "legacy comment collaboration owner has the wrong root",
         ));
     }
+    let capabilities = capabilities();
+    let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
+    validate_processed_part(processed.as_ref(), kind, limits, false)?;
 
     // The common MCE selector intentionally rejects processing instructions.
     // They are inert in this owner, so remove them only from the temporary
@@ -370,14 +370,10 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
 }
 
 /// Validate the ordinary comment grammar after MCE has selected the semantic
-/// branches.  This has two deliberately separate stages:
-///
-/// * `preflight_processed_strings` walks borrowed quick-XML events and charges
-///   the parser's aggregate decoded-string policy, plus the ordinary model's
-///   per-field policy, before any `String` or `Vec` can be built for the
-///   selected projection; and
-/// * the established parser then checks the complete comment grammar and
-///   stores only values that have already passed those bounds.
+/// branches.  The processed parser admits each borrowed event's aggregate
+/// decoded-string bytes before it owns that event's attribute or text value,
+/// then checks the complete comment grammar and stores only values that have
+/// already passed those bounds.
 ///
 /// The aggregate includes every selected attribute name/value and text byte,
 /// including extension and namespace markup, while the per-field checks cover
@@ -391,16 +387,16 @@ fn validate_processed_part(
     limits: Limits,
     strict_threading: bool,
 ) -> Result<()> {
-    let _ = preflight_processed_strings(source, kind, limits)?;
     match kind {
-        Kind::Presence => crate::comments::parse_comment_authors(source, limits).map(drop),
-        Kind::Threading if strict_threading => {
-            crate::comments::parse_slide_comments_strict(source, limits).map(drop)
+        Kind::Presence => crate::comments::parse_comment_authors_processed(source, limits).map(drop),
+        Kind::Threading => {
+            crate::comments::parse_slide_comments_processed(source, limits, strict_threading)
+                .map(drop)
         },
-        Kind::Threading => crate::comments::parse_slide_comments(source, limits).map(drop),
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SemanticElement {
     Author,
@@ -409,11 +405,13 @@ enum SemanticElement {
     Other,
 }
 
+#[cfg(test)]
 struct SemanticFrame {
     element: SemanticElement,
     text_bytes: usize,
 }
 
+#[cfg(test)]
 fn preflight_processed_strings(source: &[u8], kind: Kind, limits: Limits) -> Result<usize> {
     if source.len() > limits.max_input_bytes {
         return Err(limit(
@@ -531,6 +529,7 @@ pub(super) fn selected_string_budget(
     preflight_processed_strings(processed.as_ref(), kind, limits)
 }
 
+#[cfg(test)]
 fn preflight_element_attributes(
     element: &BytesStart<'_>,
     semantic: SemanticElement,
@@ -568,6 +567,7 @@ fn preflight_element_attributes(
     Ok(())
 }
 
+#[cfg(test)]
 fn semantic_element(namespace: &ResolveResult<'_>, local: &[u8]) -> SemanticElement {
     let ResolveResult::Bound(Namespace(value)) = namespace else {
         return SemanticElement::Other;
@@ -583,6 +583,7 @@ fn semantic_element(namespace: &ResolveResult<'_>, local: &[u8]) -> SemanticElem
     }
 }
 
+#[cfg(test)]
 fn checked_preflight_count(
     current: usize,
     maximum: usize,
@@ -596,6 +597,7 @@ fn checked_preflight_count(
     }
 }
 
+#[cfg(test)]
 fn add_preflight_strings(current: &mut usize, amount: usize, maximum: usize) -> Result<()> {
     *current = current
         .checked_add(amount)
@@ -603,6 +605,7 @@ fn add_preflight_strings(current: &mut usize, amount: usize, maximum: usize) -> 
     ensure_preflight_string(*current, maximum)
 }
 
+#[cfg(test)]
 fn ensure_preflight_string(observed: usize, maximum: usize) -> Result<()> {
     if observed > maximum {
         Err(limit_string(observed, maximum))
@@ -611,6 +614,7 @@ fn ensure_preflight_string(observed: usize, maximum: usize) -> Result<()> {
     }
 }
 
+#[cfg(test)]
 fn limit_string(observed: usize, maximum: usize) -> Error {
     limit(
         crate::error::CodecLimitKind::StringBytes,
@@ -622,6 +626,7 @@ fn limit_string(observed: usize, maximum: usize) -> Error {
 /// Count the bytes produced by XML entity decoding without constructing the
 /// decoded value.  Attribute whitespace normalization does not change its
 /// byte length, so the same bounded scanner covers attributes and text.
+#[cfg(test)]
 fn decoded_xml_len(value: &[u8]) -> Result<usize> {
     let mut length = 0usize;
     let mut start = 0usize;
@@ -650,6 +655,7 @@ fn decoded_xml_len(value: &[u8]) -> Result<usize> {
     Ok(length)
 }
 
+#[cfg(test)]
 fn entity_value_len(value: &[u8]) -> Result<usize> {
     match value {
         b"amp" | b"lt" | b"gt" | b"apos" | b"quot" => Ok(1),
@@ -695,10 +701,6 @@ fn validate_replay_extensions(
             limits.max_input_bytes,
         ));
     }
-    let capabilities = capabilities();
-    let mce_limits = mce_limits(limits);
-    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
-    validate_processed_part(processed.as_ref(), kind, limits, strict_threading)?;
     let scan = scan_raw(source, limits)?;
     let root_index = scan
         .root
@@ -713,6 +715,10 @@ fn validate_replay_extensions(
             "legacy comment collaboration owner has the wrong root",
         ));
     }
+    let capabilities = capabilities();
+    let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
+    validate_processed_part(processed.as_ref(), kind, limits, strict_threading)?;
     let mce_source = MceSource::new(source, &scan.processing_instructions)?;
 
     let mut candidate_items = Vec::new();
