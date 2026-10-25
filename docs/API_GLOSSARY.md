@@ -3475,3 +3475,20 @@ additional default entry points.
 | `litchi_pptx::presentation_properties::metadata::events::store` and slide extension splice | adopted (0362ul82a); checked exact sizing and fallible reservation use the selected output ceiling |
 
 See [0362ul82a](unified-ops/0362ul82a-pptx-metadata-history-admission.md).
+
+## Public support projections and owned record views (record 0362ul157)
+
+The support leaves publish one spelling for each read projection. The PPT
+record parser's owned traversal is explicitly named for its cloning behavior;
+the borrowed traversal remains the zero-copy alternative. The iWork reference
+graph accepts only validated `ObjectId` values, so the protobuf null sentinel
+(`0`) is rejected at conversion rather than silently ignored by a raw-ID
+forwarder. `ObjectIndex` exposes the complete immutable graph as a borrowed
+typed snapshot; cloning that snapshot remains available without publishing
+mutable state.
+
+| Name | Status |
+|---|---|
+| `litchi_ppt::RecordParser::find_records_owned()` | adopted (0362ul157; corrected 0362ul157a); preserves the complete owned-clone traversal without a misleading unused filter argument, while `find_records_ref` remains the borrowed zero-copy view; the deprecated `find_records` spelling is deleted |
+| `litchi_iwa_graph::ReferenceGraph::{add_object_reference, incoming, outgoing, all_object_ids, has_cycle, reachable, statistics}` | adopted (0362ul157); all public identities are `ObjectId`, `ObjectId::try_from(0)` is rejected, and the former raw-`u64` wrappers are deleted |
+| `litchi_iwa_index::ObjectIndex::reference_snapshot` | adopted (0362ul157); borrows the complete immutable `ReferenceGraphSnapshot`, retaining its typed `Clone` capability; the deprecated `reference_graph` spelling is deleted |

@@ -13061,6 +13061,11 @@
       ],
       "banned_names": [
         {
+          "name": "find_records",
+          "scope": "litchi_ppt::RecordParser",
+          "replacement": "use find_records_owned for the explicit owned-clone view (record 0362ul157)"
+        },
+        {
           "name": "RecordLimits",
           "scope": "litchi_ppt",
           "replacement": "use checked SourceLimits"
@@ -14073,6 +14078,11 @@
         {"method":"litchi_ppt::hyperlink::Interaction::parse_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::hyperlink::InteractionLimits"}
       ],
       "banned_names": [
+        {
+          "name": "find_records",
+          "scope": "litchi_ppt::RecordParser",
+          "replacement": "use find_records_owned for the explicit owned-clone view (record 0362ul157)"
+        },
         {
           "name": "vba_with",
           "scope": "litchi_ppt::Presentation",
@@ -20337,6 +20347,64 @@
       "immutable_owners": [
         "litchi_iwa_structured::StructuredData"
       ]
+    },
+    {
+      "id": "iwa-graph",
+      "package": "litchi-iwa-graph",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "add_reference",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use add_object_reference(ObjectId, ObjectId); raw zero identities are rejected (record 0362ul157)"
+        },
+        {
+          "name": "get_incoming_refs",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use incoming(ObjectId) for the typed allocation-free view (record 0362ul157)"
+        },
+        {
+          "name": "get_outgoing_refs",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use outgoing(ObjectId) for the typed allocation-free view (record 0362ul157)"
+        },
+        {
+          "name": "all_objects",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use all_object_ids() for the validated typed identity view (record 0362ul157)"
+        },
+        {
+          "name": "has_cycle_from",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use has_cycle(ObjectId); typed identity validation happens before traversal (record 0362ul157)"
+        },
+        {
+          "name": "get_reachable",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use reachable(ObjectId) for typed traversal (record 0362ul157)"
+        },
+        {
+          "name": "stats",
+          "scope": "litchi_iwa_graph::ReferenceGraph",
+          "replacement": "use statistics() with named fields (record 0362ul157)"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "iwa-index",
+      "package": "litchi-iwa-index",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "reference_graph",
+          "scope": "litchi_iwa_index::ObjectIndex",
+          "replacement": "use reference_snapshot() for the complete immutable typed graph view (record 0362ul157)"
+        }
+      ],
+      "families": []
     },
     {
       "id": "iwa",

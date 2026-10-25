@@ -576,17 +576,13 @@ impl ObjectIndex {
         })))
     }
 
-    /// Borrow the immutable graph snapshot used for low-level reference queries.
+    /// Borrow the complete immutable typed graph snapshot.
     ///
-    /// This method is retained for source compatibility with the original
-    /// index API. It exposes the graph-identity view and is therefore not part
-    /// of the archive-free semantic projection; new semantic callers should
-    /// use [`crate::SemanticIndex`] and its opaque handles.
-    #[deprecated(
-        note = "use ObjectIndex::references, outgoing, incoming, reachable, or has_cycle; the graph snapshot is a low-level compatibility view"
-    )]
+    /// The returned snapshot is the same immutable graph view used by the
+    /// index's typed reference projections. Cloning it is cheap and preserves
+    /// the complete object and edge catalog without exposing mutable state.
     #[must_use]
-    pub fn reference_graph(&self) -> &ReferenceGraphSnapshot {
+    pub fn reference_snapshot(&self) -> &ReferenceGraphSnapshot {
         &self.graph
     }
 
@@ -1040,11 +1036,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(
-        deprecated,
-        reason = "the test exercises the documented compatibility bridge"
-    )]
-    fn legacy_graph_snapshot_bridge_retains_the_original_view() {
+    fn graph_snapshot_projection_retains_the_original_view() {
         let fragment = fragment(1);
         let source = object(1);
         let target = object(2);
@@ -1059,7 +1051,7 @@ mod tests {
         builder.add_reference(source, target).expect("reference");
 
         let index = builder.build().expect("valid index");
-        let snapshot: ReferenceGraphSnapshot = index.reference_graph().clone();
+        let snapshot: ReferenceGraphSnapshot = index.reference_snapshot().clone();
         assert_eq!(snapshot.object_ids(), [source, target]);
         assert_eq!(
             snapshot.outgoing(source).map(Iterator::collect),
