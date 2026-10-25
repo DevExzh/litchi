@@ -11,7 +11,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[cfg(test)]
 use std::cell::Cell;
@@ -58,6 +58,7 @@ thread_local! {
     static SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS: Cell<usize> = const { Cell::new(0) };
     static SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS: Cell<usize> = const { Cell::new(0) };
     static SOURCE_PICTURE_TARGET_RESOLUTIONS: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_LASER_SCANS: Cell<usize> = const { Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -102,6 +103,16 @@ fn source_picture_descriptor_reserve_items() -> usize {
 #[cfg(test)]
 fn source_picture_target_resolutions() -> usize {
     SOURCE_PICTURE_TARGET_RESOLUTIONS.get()
+}
+
+#[cfg(test)]
+fn reset_source_laser_scans() {
+    SOURCE_LASER_SCANS.set(0);
+}
+
+#[cfg(test)]
+fn source_laser_scans() -> usize {
+    SOURCE_LASER_SCANS.get()
 }
 
 /// Maximum number of existing slides in one source-backed batch edit.
@@ -443,6 +454,8 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
 }
 
 fn capture_laser_usage(xml: &[u8], limits: crate::laser::Limits) -> Result<crate::laser::Usage> {
+    #[cfg(test)]
+    SOURCE_LASER_SCANS.set(SOURCE_LASER_SCANS.get().saturating_add(1));
     let mut usage = crate::laser::Usage::default();
     crate::laser::read(0, xml, &limits, &mut usage)?;
     Ok(usage)
@@ -1180,10 +1193,11 @@ pub(crate) struct SourceBackedSlideSnapshot {
     source_version: SourceVersion,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
-    /// Laser usage captured with this slide's existing source admission. A
-    /// batch can merge unchanged snapshots into its shared ledger without
-    /// re-admitting their opaque XML under a recipient policy.
-    laser_usage: crate::laser::Usage,
+    /// The source-selected laser policy. Usage is parsed only when a laser
+    /// aggregate or replay boundary needs it, not for unrelated snapshots.
+    laser_limits: crate::laser::Limits,
+    /// Lazily cached laser usage for this exact XML under `laser_limits`.
+    laser_usage: Arc<OnceLock<crate::laser::Usage>>,
     /// Markup compatibility enclosed in shape-tree children admits only
     /// whole top-level shape removal (record 0303).
     mce: crate::presentation::transition::SlideMce,
@@ -2323,10 +2337,7 @@ impl SourceBackedPresentationEditor {
             },
         };
         let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
-        let laser_usage = capture_laser_usage(
-            raw.as_bytes(),
-            semantic.laser().constrained_by_source(self.limits),
-        )?;
+        let laser_limits = semantic.laser().constrained_by_source(self.limits);
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
@@ -2345,7 +2356,8 @@ impl SourceBackedPresentationEditor {
             source_version,
             lineage,
             context,
-            laser_usage,
+            laser_limits,
+            laser_usage: Arc::new(OnceLock::new()),
             // Read and publication snapshots are never edited.
             mce: crate::presentation::transition::SlideMce::Plain,
         })
@@ -2566,10 +2578,7 @@ impl SourceBackedPresentationEditor {
         let SourcePart { data: raw, .. } = part;
         self.package.check_execution()?;
         let source_version = self.package.source_version()?;
-        let laser_usage = capture_laser_usage(
-            raw.as_bytes(),
-            semantic.laser().constrained_by_source(self.limits),
-        )?;
+        let laser_limits = semantic.laser().constrained_by_source(self.limits);
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
@@ -2588,7 +2597,8 @@ impl SourceBackedPresentationEditor {
             source_version,
             lineage,
             context,
-            laser_usage,
+            laser_limits,
+            laser_usage: Arc::new(OnceLock::new()),
             mce,
         })
     }
@@ -2666,6 +2676,15 @@ impl SourceBackedSlideSnapshot {
         check_execution_context(self.context.as_ref())
     }
 
+    fn laser_usage(&self) -> Result<crate::laser::Usage> {
+        if let Some(usage) = self.laser_usage.get() {
+            return Ok(*usage);
+        }
+        let usage = capture_laser_usage(self.xml.as_bytes(), self.laser_limits)?;
+        let _ = self.laser_usage.set(usage);
+        Ok(usage)
+    }
+
     fn same_source(&self, other: &Self) -> bool {
         self.position == other.position
             && self.part_uri == other.part_uri
@@ -2692,11 +2711,17 @@ impl SourceBackedSlideSnapshot {
         let mut target = self.clone();
         // A replayed candidate always belongs to the recipient's execution
         // scope, even when its semantic and output profiles compare equal.
-        // A managed reservation belongs to the source edit's budget and must
-        // never be charged to the recipient.
+        // A managed reservation belongs to the source edit's budget until the
+        // recipient admits the replay. Rehome an equivalent token below so
+        // the published candidate is charged to the recipient instead.
         target.context = recipient.context.clone();
         target.max_output_bytes = recipient.max_output_bytes;
         target.semantic_limits = recipient.semantic_limits.clone();
+        let same_laser_policy = target.laser_limits == recipient.laser_limits;
+        target.laser_limits = recipient.laser_limits;
+        if !same_laser_policy {
+            target.laser_usage = Arc::new(OnceLock::new());
+        }
         target.xml = rebase_payload_reservation(target.xml, recipient.context.as_ref())?;
         if target.xml.as_bytes().len() > recipient.max_output_bytes {
             return Err(Error::Limit {
@@ -2711,15 +2736,12 @@ impl SourceBackedSlideSnapshot {
             semantic.shape(),
             semantic.transition(),
         )?;
-        let mut slide_usage = crate::laser::Usage::default();
-        crate::laser::read(
-            target.position,
-            target.xml.as_bytes(),
-            &semantic.laser(),
-            &mut slide_usage,
-        )?;
-        merge_laser_usage(usage, slide_usage, semantic.laser())?;
-        target.laser_usage = slide_usage;
+        let slide_usage = if same_laser_policy {
+            self.laser_usage()?
+        } else {
+            capture_laser_usage(target.xml.as_bytes(), recipient.laser_limits)?
+        };
+        merge_laser_usage(usage, slide_usage, recipient.laser_limits)?;
         Ok(target)
     }
 }
@@ -3300,20 +3322,23 @@ impl SourceBackedSlideEdit {
     fn into_commit(self) -> SourceBackedSlideCommit {
         let mut source = self.source;
         source.max_output_bytes = self.source_max_output_bytes;
+        let working = self.working;
+        let unchanged = working.as_bytes() == source.xml.as_bytes();
         let snapshot = SourceBackedSlideSnapshot {
             position: source.position,
             part_uri: source.part_uri.clone(),
-            xml: self.working,
+            xml: working,
             closure: source.closure.clone(),
             max_output_bytes: self.source_max_output_bytes,
             semantic_limits: source.semantic_limits.clone(),
             source_version: source.source_version,
             lineage: source.lineage.clone(),
             context: source.context.clone(),
-            laser_usage: if self.working.as_bytes() == source.xml.as_bytes() {
-                source.laser_usage
+            laser_limits: source.laser_limits,
+            laser_usage: if unchanged {
+                Arc::clone(&source.laser_usage)
             } else {
-                crate::laser::Usage::default()
+                Arc::new(OnceLock::new())
             },
             mce: source.mce,
         };
@@ -3913,8 +3938,7 @@ impl SourceBackedSlideBatchPatch {
                 // recipient snapshot without re-admitting opaque XML under a
                 // possibly tighter semantic profile, but charge its source
                 // admission ledger to the same selected batch scope.
-                let semantic = crate::open_options::selected(recipient.semantic_limits.as_ref());
-                merge_laser_usage(&mut usage, recipient.laser_usage, semantic.laser())?;
+                merge_laser_usage(&mut usage, recipient.laser_usage()?, recipient.laser_limits)?;
                 slides.push(recipient.clone());
             } else {
                 // One usage ledger covers every selected slide in this batch;
@@ -6070,8 +6094,8 @@ mod tests {
         SourceBackedPresentation, SourceBackedPresentationEditor, SourceBackedSlideBatchCommit,
         SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
         SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImageTarget, SourcePayload,
-        reset_source_catalog_builds, reset_source_picture_query_counters,
-        reset_test_semantic_scene_reads, source_catalog_builds,
+        reset_source_catalog_builds, reset_source_laser_scans, reset_source_picture_query_counters,
+        reset_test_semantic_scene_reads, source_catalog_builds, source_laser_scans,
         source_picture_descriptor_reserve_calls, source_picture_descriptor_reserve_items,
         source_picture_query_all, source_picture_query_selected, source_picture_target_resolutions,
         test_semantic_scene_reads, test_semantic_slide_part_reads,
@@ -6333,7 +6357,8 @@ mod tests {
             source_version: before.source_version,
             lineage: before.lineage.clone(),
             context: before.context.clone(),
-            laser_usage: crate::laser::Usage::default(),
+            laser_limits: before.laser_limits,
+            laser_usage: Arc::new(OnceLock::new()),
             mce: before.mce,
         };
         (before, after)
@@ -6804,7 +6829,7 @@ mod tests {
         let (recipient_budget, _recipient_cancel, recipient_context) =
             source_backed_context(u64::MAX);
         let recipient = SourceBackedPresentationEditor::from_read_at_with_options(
-            Arc::new(CountingSource::new(archive)),
+            Arc::new(CountingSource::new(archive.clone())),
             crate::OpenOptions::default().execution_context(recipient_context),
         )
         .unwrap();
@@ -6816,6 +6841,46 @@ mod tests {
         assert!(recipient_budget.used(Resource::Memory) > before_apply);
         drop(applied);
         assert_eq!(recipient_budget.used(Resource::Memory), before_apply);
+
+        let memory_limit = (archive.len() as u64).checked_mul(1024).unwrap();
+        let (limited_budget, _limited_cancel, limited_context) =
+            source_backed_context(memory_limit);
+        let limited_recipient = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive.clone())),
+            crate::OpenOptions::default().execution_context(limited_context.clone()),
+        )
+        .unwrap();
+        let limited_slide = limited_recipient.slide_snapshot(0).unwrap();
+        let required = match &patch.after.xml {
+            SourcePayload::ReservedEdit { reservation, .. } => reservation.amount(),
+            _ => panic!("the source property edit must retain its reservation"),
+        };
+        let used_before_blocker = limited_budget.used(Resource::Memory);
+        let available = memory_limit.checked_sub(used_before_blocker).unwrap();
+        assert!(available >= required);
+        let blocker_amount = available - required + 1;
+        let blocker = limited_context
+            .reserve(Resource::Memory, blocker_amount)
+            .unwrap();
+        let source_before_failure = source_budget.used(Resource::Memory);
+        let recipient_before_failure = limited_budget.used(Resource::Memory);
+        assert!(matches!(
+            patch.apply(&limited_slide),
+            Err(Error::Opc(litchi_opc::OpcError::Execution(
+                ExecutionError::ResourceLimit(_)
+            )))
+        ));
+        assert_eq!(source_budget.used(Resource::Memory), source_before_failure);
+        assert_eq!(
+            limited_budget.used(Resource::Memory),
+            recipient_before_failure
+        );
+        drop(blocker);
+        let retried = patch.apply(&limited_slide).unwrap();
+        drop(retried);
+        drop(limited_slide);
+        drop(limited_recipient);
+        assert_eq!(limited_budget.used(Resource::Memory), 0);
 
         drop(recipient_slide);
         drop(recipient);
@@ -7066,7 +7131,30 @@ mod tests {
     }
 
     #[test]
+    fn source_laser_usage_is_lazy_and_cached_for_same_policy_replay() {
+        reset_source_laser_scans();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before, after) = changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        assert_eq!(source_laser_scans(), 0);
+
+        let patch = SourceBackedSlidePatch {
+            before: before.clone(),
+            after,
+        };
+        let first = patch.apply(&before).unwrap();
+        assert_eq!(source_laser_scans(), 1);
+        drop(first);
+        let second = patch.apply(&before).unwrap();
+        assert_eq!(source_laser_scans(), 1);
+        drop(second);
+    }
+
+    #[test]
     fn batch_replay_charges_unchanged_laser_usage_in_selected_scope() {
+        reset_source_laser_scans();
         let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
             source_backed_pptx(),
         )))
@@ -7075,9 +7163,10 @@ mod tests {
             changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
         let before_second = editor.slide_snapshot(1).unwrap();
         let total = before_first
-            .laser_usage
-            .total_slide_xml_bytes()
-            .checked_add(before_second.laser_usage.total_slide_xml_bytes())
+            .xml
+            .as_bytes()
+            .len()
+            .checked_add(before_second.xml.as_bytes().len())
             .unwrap();
         let defaults = crate::laser::Limits::DEFAULT;
         let profile = crate::laser::Limits::new(
@@ -7114,6 +7203,7 @@ mod tests {
                 limit,
             }) if limit == total - 1
         ));
+        assert_eq!(source_laser_scans(), 2);
     }
 
     #[test]

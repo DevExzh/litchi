@@ -340,10 +340,7 @@ impl Revision {
             ));
         }
         let semantic = crate::open_options::selected(package.owner.semantic_limits.as_ref());
-        let laser_usage = super::super::capture_laser_usage(
-            bytes,
-            semantic.laser().constrained_by_source(limits),
-        )?;
+        let laser_limits = semantic.laser().constrained_by_source(limits);
 
         // Admission must precede the owned copy.  The source PartData remains
         // attached to the prepared candidate; this extra reservation covers
@@ -403,7 +400,8 @@ impl Revision {
             source_version,
             lineage: package.owner.package.source_lineage(),
             context,
-            laser_usage,
+            laser_limits,
+            laser_usage: Arc::new(std::sync::OnceLock::new()),
             // A prepared slide that encloses markup compatibility in shape
             // children admits only whole-shape removal (record 0303); other
             // slides keep the edit-time guards of each operation.
