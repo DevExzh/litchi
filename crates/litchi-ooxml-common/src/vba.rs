@@ -3063,6 +3063,13 @@ mod tests {
         package
     }
 
+    fn excel_source_package_with_directory_entries() -> OpcPackage {
+        const SOURCE: &[u8] = include_bytes!(
+            "../../../test-data/poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx"
+        );
+        OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap()
+    }
+
     fn word_package() -> OpcPackage {
         let source_name = PackURI::new("/word/document.xml").unwrap();
         let mut package = OpcPackage::new();
@@ -3079,13 +3086,14 @@ mod tests {
 
     // This fixture starts with one authored workbook override.  The expected
     // Excel VBA edit is deliberately spelled out here instead of reusing the
-    // production content-types composer: replace that known plain-main
-    // declaration with the required macro-main and VBA-project declarations,
-    // leaving every other source byte untouched.
+    // production content-types composer: remove that known plain-main
+    // declaration and insert the required macro-main and VBA-project
+    // declarations at the manifest close, leaving every other source byte
+    // untouched.
     fn expected_excel_vba_content_types(source: &[u8]) -> Vec<u8> {
         const PLAIN_WORKBOOK_OVERRIDE: &[u8] = br#"<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>"#;
         const VBA_WORKBOOK_OVERRIDES: &[u8] = br#"<Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/><Override PartName="/xl/vbaProject.bin" ContentType="application/vnd.ms-office.vbaProject"/>"#;
-        let offset = source
+        let old_offset = source
             .windows(PLAIN_WORKBOOK_OVERRIDE.len())
             .position(|window| window == PLAIN_WORKBOOK_OVERRIDE)
             .expect("plain Excel workbook content-type override");
@@ -3098,8 +3106,14 @@ mod tests {
             "Excel fixture must contain one plain workbook override"
         );
         let mut expected = source.to_vec();
+        expected.drain(old_offset..old_offset + PLAIN_WORKBOOK_OVERRIDE.len());
+        let close = b"</Types>";
+        let close_offset = expected
+            .windows(close.len())
+            .position(|window| window == close)
+            .expect("content-types close tag");
         expected.splice(
-            offset..offset + PLAIN_WORKBOOK_OVERRIDE.len(),
+            close_offset..close_offset,
             VBA_WORKBOOK_OVERRIDES.iter().copied(),
         );
         expected
@@ -3522,7 +3536,7 @@ mod tests {
 
     #[test]
     fn edit_rejects_tighter_structural_limits_before_publication() {
-        let package = excel_package();
+        let package = excel_source_package_with_directory_entries();
         let limits = package.read_limits();
         let content_types = package.source_content_types(limits).unwrap();
         let relationships = relationship_totals(&package, limits).unwrap();
@@ -3535,7 +3549,25 @@ mod tests {
                 .bytes()
                 .len() as u64
         );
-        let archive_members = 1 + package.part_count() + relationships.members;
+        let projected = {
+            let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+            edit.store(b"project".to_vec(), None).unwrap();
+            let candidate = edit.commit().unwrap().into_package();
+            let bytes = PackageWriter::to_bytes(&candidate).unwrap();
+            OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap()
+        };
+        let projected_metrics = projected
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .unwrap();
+        let projected_relationships =
+            relationship_totals(&projected, SourceLimits::default()).unwrap();
+        let projected_members = projected_metrics.members();
+        let projected_entries = projected_metrics.entries();
+        assert!(
+            projected_entries > projected_members,
+            "the structural fixture must retain directory entries"
+        );
         let before = PackageWriter::to_bytes(&package).unwrap();
 
         let assert_refused = |operation_limits: SourceLimits, expected: LimitKind| {
@@ -3573,11 +3605,13 @@ mod tests {
         );
         assert_refused(
             SourceLimits::builder()
-                .max_parts(archive_members)
+                .max_parts(projected.part_count())
                 .unwrap()
-                .max_relationship_parts(archive_members)
+                .max_relationship_parts(projected_relationships.members)
                 .unwrap()
-                .max_members(archive_members)
+                .max_members(projected_members - 1)
+                .unwrap()
+                .max_archive_total_entries(projected_entries)
                 .unwrap()
                 .build()
                 .unwrap(),
@@ -3585,7 +3619,13 @@ mod tests {
         );
         assert_refused(
             SourceLimits::builder()
-                .max_archive_total_entries(archive_members)
+                .max_parts(projected.part_count())
+                .unwrap()
+                .max_relationship_parts(projected_relationships.members)
+                .unwrap()
+                .max_members(projected_members)
+                .unwrap()
+                .max_archive_total_entries(projected_entries - 1)
                 .unwrap()
                 .build()
                 .unwrap(),
@@ -3762,7 +3802,7 @@ mod tests {
     fn replay_projects_serialized_source_namespace_after_unrelated_remove_add() {
         let old_name = PackURI::new("/custom/old.bin").unwrap();
         let new_name = PackURI::new("/custom/new.bin").unwrap();
-        let mut source = excel_package();
+        let mut source = excel_source_package_with_directory_entries();
         let mut old = BlobPart::new(
             old_name.clone(),
             "application/octet-stream".to_owned(),
@@ -3818,7 +3858,7 @@ mod tests {
         let final_aggregate = projected.aggregate_bytes();
         let final_metadata = projected.metadata_bytes();
         assert!(final_members > 1);
-        assert!(final_entries >= final_members);
+        assert!(final_entries > final_members);
         assert!(final_aggregate > 0);
         assert!(final_metadata > 0);
         let final_relationships = relationship_totals(&reopened, SourceLimits::default()).unwrap();
