@@ -8,7 +8,7 @@ use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -80,6 +80,18 @@ pub fn load_math_from_package(
     limits: Limits,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
     Ok(load_from_package(package, limits)?.and_then(|value| value.math().cloned()))
+}
+
+/// Validate one presentation-properties payload changed by a typed patch
+/// under the recipient's selected policy. The replay engine already checks
+/// the exact before image and relationship graph; only the changed XML part
+/// is parsed here.
+pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()> {
+    if part.content_type() == CONTENT_TYPE {
+        Properties::parse_strict(part.blob(), limits).map(drop)
+    } else {
+        Ok(())
+    }
 }
 
 /// Replace the typed document-level math defaults as one package transaction.

@@ -45,4 +45,4 @@ pub(crate) const CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml";
 pub(crate) const MAX_STRING: usize = 1024 * 1024;
 pub(crate) const MAX_EXTENSIONS: usize = 1024;
-pub(crate) use package::{put_math_to_package, remove_math_from_package};
+pub(crate) use package::{put_math_to_package, remove_math_from_package, validate_replay_part};

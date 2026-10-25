@@ -48,6 +48,32 @@ fn empty_math_properties_use_schema_defaults() {
 }
 
 #[test]
+fn replay_validator_uses_recipient_presentation_profile() {
+    let xml = format!(
+        r#"<p:presentationPr xmlns:p="{P_NS}"><p:extLst><p:ext uri="urn:future"/></p:extLst></p:presentationPr>"#
+    );
+    let name = litchi_opc::PackURI::new("/ppt/presProps.xml").unwrap();
+    let part = litchi_opc::part::BlobPart::new(
+        name,
+        crate::presentation_properties::CONTENT_TYPE.to_owned(),
+        xml.into_bytes(),
+    );
+    assert!(
+        crate::presentation_properties::validate_replay_part(
+            &part,
+            crate::presentation_properties::Limits::default(),
+        )
+        .is_ok()
+    );
+    let tight =
+        crate::presentation_properties::Limits::new(1024, 1024, 128, 1, 1024, 1, 1).unwrap();
+    assert!(
+        crate::presentation_properties::validate_replay_part(&part, tight).is_err(),
+        "the recipient's tighter node profile must be enforced during replay"
+    );
+}
+
+#[test]
 fn strict_math_payload_accepts_strict_omml_closing_names() {
     let xml = format!(
         r#"<a14:m xmlns:a14="{A14_NS}" xmlns:m="{STRICT_OMML_NS}"><m:mathPr><m:brkBin m:val="after"/></m:mathPr></a14:m>"#

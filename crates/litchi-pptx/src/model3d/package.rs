@@ -1,7 +1,7 @@
 //! Atomic slide-level package ownership for `PresentationML` model3d frames.
 
 use litchi_drawingml::model3d as drawing;
-use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -47,6 +47,31 @@ pub(crate) fn load(
                 .get(location.range.clone())
                 .is_some()
     }))
+}
+
+/// Validate one payload changed by a model3d patch under the recipient's
+/// selected policy. Replay already authenticates the before image and
+/// relationship graph; this hook parses only changed slide XML and bounds
+/// changed model or preview payloads.
+pub(crate) fn validate_replay_part(
+    package: &OpcPackage,
+    part_name: &PackURI,
+    part: &dyn Part,
+    limits: Limits,
+) -> Result<()> {
+    match part.content_type() {
+        ct::PML_SLIDE => load_all(package, part_name, limits).map(drop),
+        MODEL_CONTENT_TYPE if part.blob().len() > limits.max_model_bytes() => {
+            Err(limit("model3d model bytes", limits.max_model_bytes()))
+        },
+        value
+            if validation::is_image_content_type(value)
+                && part.blob().len() > limits.max_preview_bytes() =>
+        {
+            Err(limit("model3d preview bytes", limits.max_preview_bytes()))
+        },
+        _ => Ok(()),
+    }
 }
 
 /// Replace one existing model3d frame transactionally.

@@ -195,6 +195,36 @@ fn owner_source_limits_tighten_xml_tree_and_payload_budgets() {
 }
 
 #[test]
+fn replay_validator_rejects_model_payload_above_recipient_profile() {
+    let source = litchi_opc::SourceLimits::builder()
+        .max_part_bytes(8)
+        .unwrap()
+        .max_total_part_bytes(16)
+        .unwrap()
+        .build()
+        .unwrap();
+    let limits = codec::Limits::from_source_limits(source);
+    let name = litchi_opc::PackURI::new("/ppt/media/model3d.glb").unwrap();
+    let part = litchi_opc::part::BlobPart::new(
+        name.clone(),
+        super::MODEL_CONTENT_TYPE.to_owned(),
+        vec![0; limits.max_model_bytes() + 1],
+    );
+    assert!(matches!(
+        super::package::validate_replay_part(
+            &litchi_opc::OpcPackage::new(),
+            &name,
+            &part,
+            limits,
+        ),
+        Err(Error::Limit {
+            resource: "model3d model bytes",
+            limit,
+        }) if limit == 8
+    ));
+}
+
+#[test]
 fn data_rejects_an_unbounded_payload() {
     let data = vec![0_u8; super::MAX_MODEL_BYTES.saturating_add(1)];
     assert!(

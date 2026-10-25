@@ -45,10 +45,16 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_model3d(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_model3d")?,
-            patch.0.clone(),
-        )))
+        let package =
+            patch
+                .0
+                .apply_with_replay_validation(self, "apply_model3d", |_, target, patch| {
+                    let limits = super::codec::Limits::from_source_limits(target.read_limits());
+                    patch.validate_changed_parts(target, |name, part| {
+                        super::package::validate_replay_part(target, name, part, limits)
+                    })
+                })?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
