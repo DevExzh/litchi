@@ -89,8 +89,6 @@ def fidelity(case: str) -> dict[str, object]:
         },
         "changed_commit_reported": case != validator.CASES[0],
         "output_reopened": True,
-        "output_bytes_verified": True,
-        "output_digest_verified": True,
         "changed_slide_index": 0 if changed_slide else None,
         "untouched_slide_root_count": 2 if changed_slide else 3,
         "raw": raw,
@@ -141,6 +139,9 @@ def report(revision: str, binary_sha: str) -> dict[str, object]:
         "source_revision": revision,
         "instrumentation": "none",
         "allocator": "Rust system allocator",
+        "allocator_counter_revision": None,
+        "timing_claim": "native_wall_clock_samples; compare only under the approved quiet ABBA protocol",
+        "allocation_scope": "one non-nested operation-scoped global-allocator region around each timed API operation",
         "fixture": {
             "generator": "pptx-notes-memo-three-slide-v1",
             "slides": 3,
@@ -153,8 +154,8 @@ def report(revision: str, binary_sha: str) -> dict[str, object]:
         "samples": 16,
         "warmup": 2,
         "checked_iteration_count": 18,
-        "memo_scope": "synthetic",
-        "fidelity_scope": "synthetic",
+        "memo_scope": "synthetic memo scope",
+        "fidelity_scope": "synthetic fidelity scope",
         "results": rows,
     }
 
@@ -201,6 +202,36 @@ class NotesMemoAbbaTests(unittest.TestCase):
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(wrong_pair)
 
+    def test_control_and_candidate_binary_hashes_must_differ(self) -> None:
+        same_binary = copy.deepcopy(self.reports)
+        for leg in ("b1", "b2"):
+            same_binary[leg]["binary_identity"]["binary_sha256"] = "1" * 64
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(same_binary)
+
+    def test_unknown_keys_are_rejected_at_each_fixed_layer(self) -> None:
+        paths = (
+            (),
+            ("binary_identity",),
+            ("fixture",),
+            ("results", 0),
+            ("results", 0, "elapsed_ns"),
+            ("results", 0, "elapsed_ns", "confidence_interval_95"),
+            ("results", 0, "observations", 0),
+            ("results", 0, "observations", 0, "fidelity"),
+            ("results", 0, "observations", 0, "fidelity", "semantic"),
+            ("results", 0, "observations", 0, "fidelity", "raw"),
+            ("results", 0, "observations", 0, "allocation"),
+        )
+        for path in paths:
+            candidate = copy.deepcopy(self.reports)
+            target: object = candidate["a1"]
+            for key in path:
+                target = target[key]  # type: ignore[index]
+            target["unexpected"] = True  # type: ignore[index]
+            with self.subTest(path=path), self.assertRaises(validator.ValidationError):
+                validator.validate_abba(candidate)
+
     def test_scope_and_fidelity_identity_are_required(self) -> None:
         wrong_scope = copy.deepcopy(self.reports)
         wrong_scope["a1"]["results"][0]["timing_scope"] = "Package::from_bytes plus opened_presentation"
@@ -224,6 +255,8 @@ class NotesMemoAbbaTests(unittest.TestCase):
         for packet in allocator.values():
             packet["instrumentation"] = "system_allocator_operation_scoped"
             packet["allocator"] = "CountingSystemAllocator(std::alloc::System)"
+            packet["allocator_counter_revision"] = "serialized_region_peak_v3"
+            packet["timing_claim"] = "allocator-instrumented wall-clock samples; not a latency claim"
             for row in packet["results"]:
                 for observation in row["observations"]:
                     observation["allocation"] = copy.deepcopy(measured)

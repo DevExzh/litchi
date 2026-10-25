@@ -150,8 +150,6 @@ struct Fidelity {
     source_immutable: Option<bool>,
     changed_commit_reported: bool,
     output_reopened: bool,
-    output_bytes_verified: bool,
-    output_digest_verified: bool,
     changed_slide_index: Option<usize>,
     untouched_slide_root_count: usize,
     raw: RawOracle,
@@ -673,18 +671,11 @@ fn one_iteration(
         return Err("notes memo output failed the independent semantic reopen oracle".into());
     }
     let raw = check_raw_oracle(source, &output, operation)?;
-    let output_bytes_verified = !output.is_empty() && raw.output_member_count > 0;
-    let output_digest_verified = crate::sha256_hex(&output) == output_sha256;
-    if !output_bytes_verified || !output_digest_verified {
-        return Err("notes memo output byte or digest oracle failed".into());
-    }
     let fidelity = Fidelity {
         semantic,
         source_immutable: timed.source_immutable,
         changed_commit_reported: timed.changed_commit_reported,
         output_reopened: true,
-        output_bytes_verified,
-        output_digest_verified,
         changed_slide_index: raw.changed_slide_index,
         untouched_slide_root_count: raw.untouched_slide_root_count,
         raw,
@@ -784,7 +775,7 @@ where
         warmup: config.warmup,
         checked_iteration_count: total,
         memo_scope: "source-audited SlideRootMemo eligibility; runtime proved-root counters remain internal and are covered by the focused crate test",
-        fidelity_scope: "untimed exact three-slide text and three-notes-slide text oracle after every retained operation",
+        fidelity_scope: "untimed semantic reopen plus exact three-slide/notes and raw ZIP member, relationship, master/theme, and root oracle after every retained operation",
         results,
     };
     let bytes = serde_json::to_vec_pretty(&report)?;

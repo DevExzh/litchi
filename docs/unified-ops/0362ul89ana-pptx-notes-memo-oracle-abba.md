@@ -28,20 +28,23 @@ three-notes-slide semantic text oracle. A ZIP inventory independently checks:
   slide-root count.
 
 The report records independent source/output payload digests, output reopen,
-byte/digest gates, and the raw oracle fields. The changed-root and untouched
-counts are derived from the inventory rather than asserted constants.
+and the raw oracle fields. The changed-root and untouched counts are derived
+from the inventory rather than asserted constants; no same-buffer hash or
+non-empty-buffer assertion is presented as an independent byte verification.
 
 ## Dedicated ABBA validator
 
 `tools/pptx_notes_memo_abba.py` validates the local probe envelope in the
 fixed `A1, B1, B2, A2` order. It requires the pinned timing-scope strings,
 matching fixture/sample/warmup identity, paired A/B source revisions and
-binary identities, complete elapsed statistics/sample-index alignment,
-deterministic output and fidelity evidence for every retained sample, all
-semantic/raw fidelity gates, and either native unavailable allocation samples
-or measured allocator-region vectors. It rejects fewer than four samples per
-round or fewer than four rounds, and writes a create-new descriptive summary
-without inferring a speedup. Native invocation:
+binary identities with distinct control/candidate binary hashes, complete
+elapsed statistics/sample-index alignment, deterministic output and fidelity
+evidence for every retained sample, all semantic/raw fidelity gates, and either
+native unavailable allocation samples
+or measured allocator-region vectors. It rejects unknown fields at every
+fixed report-object layer, fewer than four samples per round or fewer than
+four rounds, and writes a create-new descriptive summary without inferring a
+speedup. Native invocation:
 
 ```text
 python3 tools/pptx_notes_memo_abba.py --output SUMMARY.json A1.json B1.json B2.json A2.json
