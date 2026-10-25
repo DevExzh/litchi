@@ -2737,11 +2737,20 @@ impl SourceBackedSlideSnapshot {
             semantic.transition(),
         )?;
         let slide_usage = if same_laser_policy {
-            self.laser_usage()?
+            match self.laser_usage.get().copied() {
+                Some(usage) => usage,
+                None => capture_laser_usage(target.xml.as_bytes(), recipient.laser_limits)?,
+            }
         } else {
             capture_laser_usage(target.xml.as_bytes(), recipient.laser_limits)?
         };
         merge_laser_usage(usage, slide_usage, recipient.laser_limits)?;
+        if same_laser_policy && self.laser_usage.get().is_none() {
+            let _ = self.laser_usage.set(slide_usage);
+        }
+        if !same_laser_policy {
+            let _ = target.laser_usage.set(slide_usage);
+        }
         Ok(target)
     }
 }
@@ -7153,6 +7162,40 @@ mod tests {
     }
 
     #[test]
+    fn source_laser_usage_caches_different_policy_result_after_admission() {
+        reset_source_laser_scans();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before, after) = changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        let defaults = crate::laser::Limits::DEFAULT;
+        let profile = crate::laser::Limits::new(
+            defaults.max_slide_xml_bytes(),
+            defaults.max_total_slide_xml_bytes() - 1,
+            defaults.max_trace_count(),
+            defaults.max_point_count(),
+            defaults.max_xml_nodes(),
+            defaults.max_xml_depth(),
+            defaults.max_output_bytes(),
+        )
+        .unwrap();
+        let options = crate::OpenOptions::default().laser_limits(profile);
+        let mut recipient = before.clone();
+        recipient.semantic_limits = options.semantic_limits.clone();
+        recipient.laser_limits = profile.constrained_by_source(SourceLimits::default());
+        let patch = SourceBackedSlidePatch { before, after };
+
+        let published = patch.apply(&recipient).unwrap();
+        assert_eq!(source_laser_scans(), 1);
+        assert_eq!(
+            published.laser_usage().unwrap().total_slide_xml_bytes(),
+            published.xml.as_bytes().len()
+        );
+        assert_eq!(source_laser_scans(), 1);
+    }
+
+    #[test]
     fn batch_replay_charges_unchanged_laser_usage_in_selected_scope() {
         reset_source_laser_scans();
         let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
@@ -7180,10 +7223,13 @@ mod tests {
         )
         .unwrap();
         let options = crate::OpenOptions::default().laser_limits(profile);
+        let retained_profile = profile.constrained_by_source(SourceLimits::default());
         let mut recipient_first = before_first.clone();
         recipient_first.semantic_limits = options.semantic_limits.clone();
+        recipient_first.laser_limits = retained_profile;
         let mut recipient_second = before_second.clone();
         recipient_second.semantic_limits = options.semantic_limits.clone();
+        recipient_second.laser_limits = retained_profile;
         let patch = SourceBackedSlideBatchPatch {
             before: SourceBackedSlideBatchSnapshot {
                 slides: vec![before_first, before_second].into_boxed_slice(),
