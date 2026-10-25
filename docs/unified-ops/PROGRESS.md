@@ -5479,3 +5479,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   independently reviewed final notes-proof chain and aggregate repair (89al).
   Fresh compiler/Clippy, actual golden generation/review and runtime/performance
   qualification remain required.
+
+  Later compiler follow-ups: reviewed PPTX 89am clears the three production/
+  library-test findings, and reviewed 89ao `e10039df1c` clears 18 integration
+  test qualifications. Both actual failed captures are retained and verified.
+  OOXML 94l clears the OPC findings, then common Clippy reports 16 more;
+  reviewed 94m `305a7c0ee6` fixes them and its fresh six-row run is active.
+  The PPTX compiler/Clippy/raw-golden run is queued; no golden is changed.
+
+  Cleanup69 removes three retired OOXML author worktrees, preserving refs,
+  all ten changed blobs and the ignored lock through actual restoration.
+  Root verification passes and holds are released. Net recovery is
+  22,698,254,336 bytes, or 37,831,081,984 bytes across cleanup68/69. The
+  separate notes-memo performance harness proposal is under source review.
+  Runtime, performance and final acceptance remain open; nothing is pushed.

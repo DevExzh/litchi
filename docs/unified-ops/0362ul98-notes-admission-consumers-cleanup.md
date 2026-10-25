@@ -110,3 +110,65 @@ Rust paths apply without conflict or formatter changes. Record 89al retains
 the source and consumer scope, returned intermediate findings, patch identities
 and required cold/warm performance qualification. The golden transcript remains
 unchanged; actual isolated generation and complete comparison are being prepared.
+
+## Compiler follow-ups and cleanup wave 69
+
+Three subsequent captures are terminal and root-verified, including exact
+commands, source/three-lock fences, logs/traces, live guards and terminal
+ownership. Every one exits 1; unexecuted rows remain unclaimed.
+
+- PPTX `3377583e2b-v2`: formatting passes (2.837 seconds), then minimal
+  all-target compilation fails (57.708 seconds) on an unnecessary qualifier,
+  a test-only constructor present in production, and an unnecessary `Debug`
+  requirement in a test. Strict Clippy and golden generation do not run.
+- PPTX `e80fcebe6b`: the reviewed 89am repair clears those issues. Formatting
+  passes (2.883 seconds); minimal all-target compilation reaches an integration
+  test and fails on 18 redundant qualifications (63.241 seconds). Reviewed
+  89ao `e10039df1c54e5815c6d02805a0f5921e6841a67` removes those prefixes,
+  preserving every assertion; root fast-forwards the private candidate.
+- OOXML `53761f3b-clippy`: formatting passes (2.218 seconds), then common
+  strict Clippy fails on 16 findings across properties, VBA and web planning
+  (43.870 seconds). Reviewed 94m `305a7c0ee6d7b84680232a49d4eb92392dce8fe1`
+  fixes all 16, preserving literal error variants, messages and allocation
+  behavior; root fast-forwards the private candidate.
+
+Capture roots retain the prefixes `.coord/pptx-combined-0362ul89-f5-qualification-`
+and `.coord/ooxml-combined-0362ul94-f5-final-`, respectively.
+
+| Capture | Artifact | Bytes | SHA-256 |
+|---|---|---:|---|
+| PPTX `3377583e2b-v2` | `rows.json` | 31,999 | `bb6ff9e45145bfb0fd12a08f315c0930af9cf0b75511055b0763e149797d9ef9` |
+| PPTX `3377583e2b-v2` | `result.json` | 33,686 | `478a3de15f49faa68b0e6bc3b359660cc6cef4d694274e4deed63bd243e15b7f` |
+| PPTX `e80fcebe6b` | `rows.json` | 31,977 | `f19e78cac4bdb50830f20c4d1dbe3072423c6428a685e1382e62fa04b1e75bcc` |
+| PPTX `e80fcebe6b` | `result.json` | 33,664 | `4a3200c595437e556442b4c8afbe257b0999fab14155cafe7d9e71cebb2e0b48` |
+| OOXML `53761f3b-clippy` | `rows.json` | 12,619 | `123157509c8848be10c686400f2369fc996789ffa3dd72d1891aeff07d3e6cc1` |
+| OOXML `53761f3b-clippy` | `result.json` | 13,723 | `cfa413d01b872e8caacf215127e5360920811984ae4ca2da50a36c5c8f2ff864` |
+
+Cleanup69 removes the three retired OOXML author worktrees 94j, 94k and 94l
+without force, keeping all branch refs and the active 94m author. Their tips
+are ancestors of the composed source; root verifies all ten changed blobs,
+actual same-device sparse restoration, held heads and the protected probe.
+The ignored 94k `Cargo.lock` is moved to quarantine and round-trip restored
+with its inode, mode and hash preserved. All paths/registry entries are absent,
+the removal audit reports no holders, and cleanup holds are released.
+
+Evidence root:
+`.coord/worktree-cleanup-2026-10-25/quarantine/wave69-ooxml-94j-94k-94l`.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `manifest.json` | 5,861 | `1913095be66a6c20c154d1fb49f76a9becc4db416ec5747693b3bf6e8e9b17e4` |
+| `restore-proof.json` | 4,541 | `7fe2b4c52461281df762b6816a1a175b360d7694f5427b9953b9e6e2120555b6` |
+| `receipt.json` | 4,610 | `87ebdf11da6400edfc370b101ad251e7c38dfb4fecc371d2d839c7948df6fc14` |
+
+Full-wave net recovery is 22,698,254,336 bytes after subtracting all 176,128
+bytes of quarantine/evidence. Combined with cleanup68 this recovers
+37,831,081,984 bytes. No external validation target or capture is removed.
+
+A fresh six-row OOXML format/Clippy run is active on `305a7c0ee6`; the new
+four-row PPTX compiler/Clippy/generator packet for `e10039df1c` is queued.
+The generator captures raw stdout outside Git and unsets blessing variables;
+root returned an earlier inert parser that could drop the first transcript row.
+The golden remains unchanged. Performance harness proposal 89an `712fcabf64`
+is committed separately and under independent review; it is not composed or
+measured. Final acceptance obligations remain open.
