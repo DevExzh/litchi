@@ -5950,3 +5950,126 @@ See [0063](0063-source-pptx-modern-comments.md).
   are accounted for: three unified controls, main/office and 68 independent
   office refs. Required detached baselines remain. Final binding, qualification
   and trunk integration are open; nothing is pushed.
+
+  Final candidate C=f8cd398a77 is frozen after the coordinator documentation
+  merge and matrix refresh (145a/146). Its three locks and all 84 profiles
+  remain unchanged. The reviewed raw-census v9 packet is bound to C and
+  launched; the first two rustc identity steps pass. Capture, callable review
+  and strict finalization remain open. Full65 qualification awaits its
+  corrected executable driver. A separate sparse protocol worktree holds
+  further native qualification fixes while C stays immutable. No acceptance
+  or performance result is inferred; nothing is pushed.
+
+  The C-bound raw census stops at inventory preflight after its two rustc
+  identity steps pass (147). It supplied the outer tracing wrapper where
+  inventory requires the coordinator cap shim; no profiles are captured.
+  Root verifies the failed terminal receipts, unchanged source/locks and
+  empty owned processes. Adapter v10 must repair the actual admission seam;
+  the failed packet stays preserved and C stays frozen. All final gates and
+  acceptance work remain open. Nothing is pushed.
+
+  Reviewed135g commits on protocol P at 53451cc8d2; all 29 focused tests pass
+  and Cargo outputs now match the recorded external binary paths (148).
+  Full-gate v6-final passes independent review after command/path binding
+  returns. Root starts its 65-step run on immutable C=f8cd398a77; changed-Rust
+  formatting passes and the remaining rows are running or pending. Rawv10
+  stays source-only while this build slot is occupied. Native measurements,
+  census review, final trunk merge and cleanup remain open. Nothing is pushed.
+
+  The first final65 attempt is incomplete: its driver is absent after three
+  verified passing compiler rows, with no terminal result or known cause
+  (149). Root preserves it and starts the same reviewed 65 checks from fresh
+  state under a durable systemd user service. C and P remain unchanged.
+  Notes and replay-scan126 packets now bind C, with 16 and eight focused
+  tests passing; actual measurements remain unrun. Rawv11 source review
+  passes, but its capture binding is still being prepared. Current-nativev3
+  is returned for common-P admission; DrawingML repair continues. Final
+  qualification, trunk integration and cleanup remain open. Nothing is pushed.
+
+  Protocol137f commits at 4ab42bb967 with DrawingML's current candidate lock
+  migrated across its policy and manifest; 26 integrated tests and six
+  external mutation checks pass (150). The complete rawv11 C binding passes
+  independent/root source preflight and remains inert behind the live gate.
+  The gate's first four compiler checks pass. Native installer/driver returns
+  remain under repair, and a capped source-archive job runs outside Git.
+  Actual native measurements, final gates, census review, trunk integration
+  and cleanup remain open. Nothing is pushed.
+
+  Root verifies nine final65 rows: seven compiler supplements, workspace
+  formatting and all-feature Clippy (151). DrawingML's C binding is generated;
+  the exact 461,401-file C archive passes the reviewed verifier. Current-native
+  v6 passes 22 focused tests and starts source binding against P4ab42bb.
+  Signed v3 stops before archive generation on a lock permission assumption;
+  reviewed v4 preserves C permissions, passes eight tests and starts fresh.
+  Binding test migrations and DrawingML baseline preparation continue.
+  The census remains 55 worktrees/74 heads, with four active unified controls.
+  Native measurements, remaining gates, census review, final merge and cleanup
+  remain required. Nothing is pushed.
+
+  DrawingML's literal binding and consumer migration pass all 27 focused tests
+  in an isolated P checkout (152); root verifies the exact combined patch.
+  The signed test successor now requires production binding without a skip
+  and keeps explicit pending negatives. Eleven tracked fixtures are restored
+  in P, with unchanged content identities; its existing 14 policy tests pass.
+  DrawingML v5 admits only the exact reviewed baseline overlays. Independent
+  source checks and root's positive eleven-input check pass; the approved
+  lock changes only the recorded VBA dependency edge. Seventeen final65 rows
+  are verified; the gate and two source-generation services remain live.
+  Common-P installation, actual measurements, final census, merge and cleanup
+  remain open. Nothing is pushed.
+
+  The signed v4 source-generation service subsequently dies at its 4G memory
+  cap (152a); the journal confirms a kernel OOM kill. Its constructed tar is
+  preserved but unverified. The protocol's whole-archive/member reads are
+  returned for streaming repair, with a fresh verifier allowed to reuse the
+  tar only after complete source checks. The current-native emitter and gate
+  remain live. The baseline materializer is returned before real execution
+  for full/sparse checkout metadata, unrelated-ref and completion-order fixes.
+  P stays frozen until the live emitter finishes. No acceptance or push.
+
+  The signed streaming repair passes independent review and 16 focused tests
+  (153); it waits for P installation. The archive-reuse v5 recipe is returned
+  for standalone finalizer path containment and immediate reuse identity
+  checks. DrawingML materializer v5a passes 13 source/seam checks and root's
+  actual read-only ten-profile plan. Its capped source-only execution starts;
+  terminal verification is pending. P/C remain frozen during both source jobs.
+  Root verifies 32 passing final65 rows; the gate remains live. Common-P
+  installation, final gates, measurements, census review, merge and cleanup
+  remain required. Nothing is pushed.
+
+  Completion audit 154 returns C=f8cd398a77 for a mandatory BatchCommit
+  accessor mismatch and 22 public deprecated format/support routes. Three
+  isolated repair leaves (155–157) must preserve capabilities and migrate
+  every consumer; stale detection/RTF prose also needs correction. The
+  current-native binding and ten DrawingML baseline roots finish and pass
+  root verification, but C's binding is held as evidence for that revision.
+  Signed streaming repair 154a passes 25 integrated tests in P, with candidate
+  bindings still pending. The live C gate remains useful reference evidence;
+  final gates/census/native acceptance must bind the corrected candidate.
+  No additional deferral, capability-loss waiver or push.
+
+  The C gate then terminates with a real PPT hyperlink-add failure (154b):
+  row 25's CRUD matrix reports corrupt_file; six later hyperlink cells are
+  unreached. The same chunk's 13 DOC tests pass. Root verifies terminal logs,
+  unchanged C/locks, target bounds and empty owned processes. Repair 158 has
+  the single build slot for focused diagnosis. The three contract leaves and
+  their follow-ups are committed and entering candidate integration, with
+  compiler/fidelity/performance acceptance still required. Old-C packets
+  remain historical; final qualification must bind the corrected candidate.
+
+  The three contract repairs and their review follow-ups merge into candidate
+  f17dda6e6f (154c), together with bounded signed-archive verification. All
+  151 combined Python contract/protocol tests pass. Root retires the three
+  merged leaves and refs after preserving their ignored locks, reaching
+  276 worktrees and 438 refs removed; 62 worktrees and 75 heads remain.
+  The 71-profile glossary requires a matrix refresh. PPT repair 158 retains
+  the build slot; Rust, native and final acceptance remain open. C1 evidence
+  stays historical, and the corrected candidate is not yet frozen or pushed.
+
+  Census preparation 159 commits at ec478ed84f: all 68 packages remain covered
+  by 84 profiles, now split into 71 glossary and 13 package-only profiles.
+  All eight preparation tests pass, including checked-in determinism; capture
+  evidence remains empty. The post-repair source audit finds no further
+  mandatory API defect. Historical OfficeCLI v3 passes its source review and
+  correctly refuses the stale source identity. PPT158 review and the complete
+  corrected-source qualification remain open; no final acceptance or push.
