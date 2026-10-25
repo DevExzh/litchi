@@ -70,7 +70,7 @@ impl Package {
         if patch.is_empty() {
             let commit = patch.apply(&self.opc)?;
             let changed = commit.diagnostics().changed();
-            self.opc = commit.into_package();
+            self.opc = commit.into_package().into();
             return Ok(changed);
         }
         self.edit_semantic_opc("apply_task_panes_patch", |candidate| {

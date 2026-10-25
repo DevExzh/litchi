@@ -840,7 +840,7 @@ impl Package {
     ) -> Result<&mut Self> {
         let mut edit = ribbon::Edit::new(&self.opc)?;
         edit.put(version, xml)?;
-        self.opc = edit.commit()?.into_package();
+        self.opc = edit.commit()?.into_package().into();
         Ok(self)
     }
 
@@ -857,7 +857,7 @@ impl Package {
     pub(crate) fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
         let mut edit = ribbon::Edit::new(&self.opc)?;
         let changed = edit.remove(family)?;
-        self.opc = edit.commit()?.into_package();
+        self.opc = edit.commit()?.into_package().into();
         Ok(changed)
     }
 

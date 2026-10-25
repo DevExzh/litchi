@@ -103,3 +103,27 @@ to unit at its public boundary. DOCX task-pane `put`/`remove` and durable
 routes, PPTX task-pane `set`/`remove`, and XLSB task-pane `replace`/`clear`
 were audited; their public boolean results and all consumers intentionally
 retain the changed signal and required no migration.
+
+The repaired source `fe767f2285ea2c5a328ac76ef45af4dd8673ee12` was then
+validated in the sole serialized slot and stopped at the first remaining
+compiler diagnostic. The fe767 capture is preserved outside the checkout:
+
+* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-fe767f2285/result.json`
+  (SHA-256 `4480421547f3afa44fa251fc662d4b8534a7322d6c2d212576a56950423ec036`);
+* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-fe767f2285/rows.json`
+  (SHA-256 `d4048e4290868f3bc8a35e3c933f6ca7241c1e5d03cf23e2d209f8bad92ffeea`);
+* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-fe767f2285/02-check-leaves-attempt-actual-f5-02.log`
+  (SHA-256 `1abe0a9524a9e77b60fd72c632f802091700aa381235bb9c94ccff6ee3b1cfd0`);
+* `fmt-scoped` and `check-common` passed; row 2 `check-leaves` exited `101`
+  after 63.64 seconds with a 306,737,160-byte target. No later row ran.
+
+The remaining diagnostics were three DOCX typed-owner assignments: the
+shared `Package::opc` field is `SharedOpc`, while the shared Web/Ribbon
+commit publishes an `OpcPackage`. The assignments in
+`package/model.rs` (Ribbon put/remove) and `package/package/task_panes.rs`
+(empty-patch replay) now use the existing `From<OpcPackage> for SharedOpc`
+conversion, retaining Arc-backed package sharing and all package policies.
+All other Web/Ribbon Commit consumers in the four leaves were audited:
+common candidates and PPTX/XLSX/XLSB staged OPC values already assign the
+published `OpcPackage`, while DOCX tests and typed wrappers assign the
+published DOCX `Package`; no additional shape mismatch was found.
