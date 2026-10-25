@@ -15455,7 +15455,33 @@
           "replacement": "use SourceMemberReaderError::into_callback (record 0362rda)"
         }
       ],
-      "families": []
+      "families": [],
+      "required_signatures": [
+        {
+          "method": "litchi_odf_common::annotation::Builder::new",
+          "inputs": ["start", "decoder", "namespaces", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odf_common::annotation::Element::write_xml",
+          "inputs": ["self", "output", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odf_common::annotation::Annotation::write_xml",
+          "inputs": ["self", "output", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odf_common::annotation::write_attributes",
+          "inputs": ["output", "attributes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        }
+      ]
     },
     {
       "id": "odt",
@@ -15846,6 +15872,80 @@
         "litchi_odt::generic",
         "litchi_odt::generic::flat",
         "litchi_odt::odc"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_odt::document_scripts::parse_scripts",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::document_scripts::Scripts::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::font_face::parse",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::font_face::Declarations::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::list_style::parse",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::list_style::Style::to_xml_fragment",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::notes_configuration::parse",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::notes_configuration::Configuration::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::notes_configuration::Configurations::to_xml_fragment",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::notes_configuration::set_xml",
+          "inputs": ["xml", "configuration", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::notes_configuration::remove_xml",
+          "inputs": ["xml", "note_class", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_odt::section_properties::parse_section_style_properties",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        }
       ],
       "immutable_owners": [
         "litchi_odt::Package",
@@ -16344,6 +16444,134 @@
         "litchi_ods::source_backed::dde",
         "litchi_ods::source_backed::sheet_metadata"
       ],
+      "required_signatures": [
+        {
+          "method": "litchi_ods::data_pilot::Snapshot::from_bytes",
+          "inputs": ["source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::database_range::Snapshot::from_bytes",
+          "inputs": ["source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::annotations::Snapshot::parse",
+          "inputs": ["source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::protection::Snapshot::parse",
+          "inputs": ["content_xml", "styles_xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::data_pilot::write_data_pilot_table_fragment",
+          "inputs": ["table", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::parse_database_ranges",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::parse_source_sql",
+          "inputs": ["reader", "element", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::parse_source_table",
+          "inputs": ["reader", "element", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::parse_source_query",
+          "inputs": ["reader", "element", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::parse_filter",
+          "inputs": ["reader", "start", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::write_database_ranges",
+          "inputs": ["output", "ranges", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::write_database_range_fragment",
+          "inputs": ["range", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::write_database_source",
+          "inputs": ["output", "source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::database_range::write_filter",
+          "inputs": ["output", "filter", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::style_protection::rewrite_conditional_styles",
+          "inputs": ["fragment", "styles", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::style_protection::rewrite_managed_cell_styles",
+          "inputs": ["fragment", "conditional_styles", "protection_styles", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::style_protection::extract_automatic_styles",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::style_protection::extract_font_face_decls",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
+        },
+        {
+          "method": "litchi_ods::model::tracked_changes::parse_tracked_changes",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ods::model::tracked_changes::Limits"
+        },
+        {
+          "method": "litchi_ods::model::tracked_changes::Changes::to_xml_fragment",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ods::model::tracked_changes::Limits"
+        },
+        {
+          "method": "litchi_ods::model::tracked_changes::write_tracked_changes",
+          "inputs": ["output", "changes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ods::model::tracked_changes::Limits"
+        }
+      ],
       "immutable_owners": [
         "litchi_ods::Package",
         "litchi_ods::Workbook",
@@ -16827,6 +17055,14 @@
           "name": "with_limits",
           "scope": "litchi_odp::tail_append::Edit",
           "replacement": "use Edit::set_limits (record 0358a)"
+        }
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_odp::annotation::inventory",
+          "inputs": ["content_xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_common::XmlStreamLimits"
         }
       ],
       "families": [
@@ -18693,6 +18929,26 @@
       "families": [
         "litchi_odf_formula",
         "litchi_odf_formula::metadata"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_odf_formula::codec::parse",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_formula::codec::Limits"
+        },
+        {
+          "method": "litchi_odf_formula::codec::serialize",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_formula::codec::Limits"
+        },
+        {
+          "method": "litchi_odf_formula::model::Element::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_odf_formula::codec::Limits"
+        }
       ],
       "immutable_owners": [
         "litchi_odf_formula::Package",

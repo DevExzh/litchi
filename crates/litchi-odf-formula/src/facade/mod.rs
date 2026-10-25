@@ -196,7 +196,7 @@ impl Formula {
         template: bool,
         limits: codec::Limits,
     ) -> CoreResult<Self> {
-        let root = codec::parse(mathml, limits)?;
+        let root = codec::parse(mathml, &limits)?;
         let archive = crate::package::Archive::create(mathml.as_bytes(), template)?;
         Self::from_validated_parts(archive, root, limits)
     }
@@ -206,7 +206,7 @@ impl Formula {
         limits: codec::Limits,
     ) -> CoreResult<Self> {
         check_package_bytes(archive.as_bytes().len(), limits)?;
-        let root = codec::parse(&archive.content_xml()?, limits)?;
+        let root = codec::parse(&archive.content_xml()?, &limits)?;
         Self::from_validated_parts(archive, root, limits)
     }
 
@@ -638,7 +638,7 @@ impl Edit<'_> {
             )));
         }
         let source = &self.source.formula;
-        let xml = codec::serialize(&replacement);
+        let xml = codec::serialize(&replacement, &source.limits)?;
         let archive = source.archive.replace_content(xml.as_bytes())?;
         let reopened = Formula::from_archive(archive, source.limits)?;
         if reopened.root() != replacement.as_ref() {
@@ -1115,7 +1115,7 @@ impl Patch {
         writer.write_blob(self.target.as_bytes())?;
         writer.write_usize(self.changes.len())?;
         for change in &self.changes {
-            writer.write_change(change)?;
+            writer.write_change(change, &self.source.formula.limits)?;
         }
         Ok(writer.bytes)
     }
@@ -1486,7 +1486,7 @@ impl<'bytes> WireReader<'bytes> {
                 let xml = std::str::from_utf8(bytes).map_err(|_error| {
                     invalid("Formula patch element is not encoded as UTF-8 XML")
                 })?;
-                codec::parse_fragment_with_limits(xml, limits).map(Some)
+                codec::parse_fragment_with_limits(xml, &limits).map(Some)
             },
             _ => Err(invalid("Formula patch has an invalid optional-element tag")),
         }
@@ -1537,7 +1537,7 @@ impl WireWriter {
         Ok(())
     }
 
-    fn write_change(&mut self, change: &SemanticChange) -> CoreResult<()> {
+    fn write_change(&mut self, change: &SemanticChange, limits: &codec::Limits) -> CoreResult<()> {
         self.bytes.push(match change.kind {
             ChangeKind::Insert => 0,
             ChangeKind::Remove => 1,
@@ -1550,15 +1550,16 @@ impl WireWriter {
         for index in change.path.indices() {
             self.write_usize(*index)?;
         }
-        self.write_element(change.before())?;
-        self.write_element(change.after())?;
+        self.write_element(change.before(), limits)?;
+        self.write_element(change.after(), limits)?;
         Ok(())
     }
 
-    fn write_element(&mut self, value: Option<&Element>) -> CoreResult<()> {
+    fn write_element(&mut self, value: Option<&Element>, limits: &codec::Limits) -> CoreResult<()> {
         if let Some(element) = value {
             self.bytes.push(1);
-            self.write_blob(codec::serialize(element).as_bytes())?;
+            let xml = codec::serialize(element, limits)?;
+            self.write_blob(xml.as_bytes())?;
         } else {
             self.bytes.push(0);
         }
@@ -1793,8 +1794,8 @@ fn transform_at(
 }
 
 fn validate_candidate(root: &Element, limits: codec::Limits) -> CoreResult<Arc<Element>> {
-    let xml = codec::serialize(root);
-    let parsed = codec::parse(&xml, limits)?;
+    let xml = codec::serialize(root, &limits)?;
+    let parsed = codec::parse(&xml, &limits)?;
     validate_starmath_boundaries(&parsed)?;
     Ok(Arc::new(parsed))
 }

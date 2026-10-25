@@ -3,14 +3,16 @@
 use super::{codec, model, validation};
 use crate::model::protection as wire;
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 
 /// Return the compact protection state needed by source-backed cell edits
 /// without retaining a second copy of `content.xml`.
 pub(crate) fn source_edit_protection(
     content_xml: &str,
     styles_xml: Option<&str>,
+    limits: &XmlStreamLimits,
 ) -> Result<(bool, Vec<String>)> {
-    let (location, document, sheets, styles) = codec::parse(content_xml, styles_xml)?;
+    let (location, document, sheets, styles) = codec::parse(content_xml, styles_xml, limits)?;
     validation::validate_snapshot(content_xml, &location, &document, &sheets, &styles)?;
     let mut protected = Vec::new();
     protected
@@ -37,6 +39,7 @@ pub struct Snapshot {
     pub(super) document: model::Document,
     pub(super) sheets: Vec<model::Sheet>,
     pub(super) styles: model::Styles,
+    pub(super) xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -44,10 +47,15 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(content_xml: impl Into<String>, styles_xml: Option<&str>) -> Result<Self> {
+    pub fn parse(
+        content_xml: impl Into<String>,
+        styles_xml: Option<&str>,
+        limits: &XmlStreamLimits,
+    ) -> Result<Self> {
         let source = content_xml.into();
         let styles_xml = styles_xml.map(str::to_owned);
-        let (location, document, sheets, styles) = codec::parse(&source, styles_xml.as_deref())?;
+        let (location, document, sheets, styles) =
+            codec::parse(&source, styles_xml.as_deref(), limits)?;
         validation::validate_snapshot(&source, &location, &document, &sheets, &styles)?;
         Ok(Self {
             source,
@@ -56,11 +64,16 @@ impl Snapshot {
             document,
             sheets,
             styles,
+            xml_limits: *limits,
         })
     }
 
-    pub(crate) fn from_parts(content_xml: &str, styles_xml: Option<&str>) -> Result<Self> {
-        Self::parse(content_xml.to_owned(), styles_xml)
+    pub(crate) fn from_parts(
+        content_xml: &str,
+        styles_xml: Option<&str>,
+        limits: &XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::parse(content_xml.to_owned(), styles_xml, limits)
     }
 
     /// Document-level protection, including inert password-verifier metadata.
@@ -195,7 +208,11 @@ impl Edit {
             &self.draft.styles,
             styles_changed,
         )?;
-        let snapshot = Snapshot::from_parts(&content_xml, self.before.styles_xml.as_deref())?;
+        let snapshot = Snapshot::from_parts(
+            &content_xml,
+            self.before.styles_xml.as_deref(),
+            &self.before.xml_limits,
+        )?;
         Ok(Commit {
             snapshot,
             changed: true,

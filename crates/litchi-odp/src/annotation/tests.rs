@@ -5,6 +5,7 @@
 
 use super::codec::{annotations, apply_edits, serialize};
 use super::{Anchor, Annotation, Position};
+use litchi_odf_common::XmlStreamLimits;
 
 const NS: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:foo="urn:example:foreign""#;
 
@@ -20,7 +21,7 @@ fn inventories_page_and_nested_shape_anchors() {
         r#"<draw:page><draw:frame draw:name="title"><office:annotation office:name="shape"><text:p>shape</text:p><foo:foreign foo:value="1">opaque</foo:foreign></office:annotation></draw:frame><office:annotation office:name="page"><text:p>page</text:p></office:annotation></draw:page>"#,
     );
 
-    let items = annotations(&xml).unwrap();
+    let items = annotations(&xml, &XmlStreamLimits::owner_default_value()).unwrap();
     assert_eq!(items.len(), 2);
     assert_eq!(
         items[0].anchor.position(),
@@ -38,7 +39,7 @@ fn nested_office_annotation_is_retained_as_body_content() {
     let xml = document(
         r#"<draw:page><office:annotation office:name="outer"><text:p>before<office:annotation><text:p>nested</text:p></office:annotation>after</text:p></office:annotation></draw:page>"#,
     );
-    let items = annotations(&xml).unwrap();
+    let items = annotations(&xml, &XmlStreamLimits::owner_default_value()).unwrap();
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].annotation.text(), "beforenestedafter");
 }
@@ -54,7 +55,7 @@ fn serialization_adds_standard_namespace_bindings_and_keeps_foreign_content() {
         .unwrap();
     annotation.push_element(foreign);
 
-    let xml = serialize(&annotation).unwrap();
+    let xml = serialize(&annotation, &XmlStreamLimits::owner_default_value()).unwrap();
     assert!(xml.contains("xmlns:foo=\"urn:example:foreign\""));
     assert!(xml.contains("foo:value=\"x&amp;y\""));
     assert!(xml.contains("hello &amp; goodbye"));
@@ -71,8 +72,12 @@ fn edits_preserve_unselected_xml_byte_for_byte() {
     let xml = document(
         r#"<draw:page><office:annotation office:name="first"><text:p>one</text:p></office:annotation><draw:rect draw:name="keep" foo:unknown="yes"><foo:opaque/></draw:rect><office:annotation office:name="second"><text:p>two</text:p></office:annotation></draw:page>"#,
     );
-    let items = annotations(&xml).unwrap();
-    let replacement = serialize(&Annotation::new("changed")).unwrap();
+    let items = annotations(&xml, &XmlStreamLimits::owner_default_value()).unwrap();
+    let replacement = serialize(
+        &Annotation::new("changed"),
+        &XmlStreamLimits::owner_default_value(),
+    )
+    .unwrap();
     let edited = apply_edits(
         &xml,
         vec![super::codec::Edit {

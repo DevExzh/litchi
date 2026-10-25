@@ -257,7 +257,10 @@ fn serializer_assigns_foreign_prefixes_in_first_use_order() {
 
     let expected = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" xmlns:ns1="urn:vendor:first" xmlns:ns2="urn:vendor:second" display="inline"><mi>x</mi><ns1:one/><ns2:two/></math>"#;
     for _ in 0..16 {
-        assert_eq!(codec::serialize(&root), expected);
+        assert_eq!(
+            codec::serialize(&root, &Limits::default()).expect("serialize root"),
+            expected
+        );
     }
 }
 

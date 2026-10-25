@@ -13,7 +13,9 @@
 //! well-formed without a DTD, at the cost of no longer spelling the original
 //! reference literally.
 
+use crate::codec::Limits;
 use crate::model::{Content, Element, MATHML_NAMESPACE};
+use litchi_core::{Error, Result};
 
 /// Generated prefixes for foreign namespaces, in first-use document order.
 #[derive(Default)]
@@ -71,12 +73,11 @@ impl NamespaceMap {
 }
 
 /// Serialize a `MathML` subtree to a well-formed, self-contained XML string.
-#[must_use]
-pub fn serialize(root: &Element) -> String {
-    write_mathml(root)
+pub fn serialize(root: &Element, limits: &Limits) -> Result<String> {
+    write_mathml(root, limits)
 }
 
-pub(crate) fn write_mathml(root: &Element) -> String {
+pub(crate) fn write_mathml(root: &Element, limits: &Limits) -> Result<String> {
     let mut namespaces = NamespaceMap::default();
     namespaces.collect(root);
     let mut output = String::new();
@@ -86,11 +87,14 @@ pub(crate) fn write_mathml(root: &Element) -> String {
             Write::Element(element, is_root) => {
                 let name = namespaces.qualify(element.namespace_uri(), element.local_name());
                 write_start(element, is_root, &name, &namespaces, &mut output);
+                ensure_output(&output, limits)?;
                 if element.content().is_empty() {
                     output.push_str("/>");
+                    ensure_output(&output, limits)?;
                     continue;
                 }
                 output.push('>');
+                ensure_output(&output, limits)?;
                 pending.push(Write::End(name));
                 for content in element.content().iter().rev() {
                     pending.push(match content {
@@ -99,15 +103,29 @@ pub(crate) fn write_mathml(root: &Element) -> String {
                     });
                 }
             },
-            Write::Text(value) => escape_text(value, &mut output),
+            Write::Text(value) => {
+                escape_text(value, &mut output);
+                ensure_output(&output, limits)?;
+            },
             Write::End(name) => {
                 output.push_str("</");
                 output.push_str(&name);
                 output.push('>');
+                ensure_output(&output, limits)?;
             },
         }
     }
-    output
+    Ok(output)
+}
+
+fn ensure_output(output: &str, limits: &Limits) -> Result<()> {
+    if output.len() > limits.xml_bytes() {
+        return Err(Error::InvalidFormat(format!(
+            "serialized formula exceeds the {} byte limit",
+            limits.xml_bytes()
+        )));
+    }
+    Ok(())
 }
 
 fn write_start(

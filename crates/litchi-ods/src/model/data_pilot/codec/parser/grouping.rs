@@ -1,7 +1,8 @@
 //! Parser for data-pilot grouping declarations.
 
 use litchi_core::Result;
-use quick_xml::{events::BytesStart, events::Event, reader::NsReader};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
+use quick_xml::{events::BytesStart, events::Event};
 
 use crate::model::data_pilot::model::{Group, GroupBoundary, GroupBy, Groups};
 
@@ -9,18 +10,24 @@ use super::super::xml::{is_table, optional_attr, required_attr, required_f64, te
 use super::support::{invalid, parse_empty_children, xml_error};
 use crate::model::data_pilot::invalid_message;
 
-pub(super) fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Groups> {
+pub(super) fn parse_groups(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Groups> {
     let start_boundary = parse_boundary(reader, start, b"start", b"date-start")?;
     let end_boundary = parse_boundary(reader, start, b"end", b"date-end")?;
     let mut groups = Vec::new();
-    let mut buf = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-group") => {
-                groups.push(parse_group(reader, element)?);
+                if groups.len() >= limits.max_events() {
+                    return Err(invalid_message(
+                        "data-pilot group collection exceeds the configured event limit",
+                    ));
+                }
+                groups.push(parse_group(reader, element, limits)?);
             },
             Event::End(ref element) if is_table(&namespace, element, b"data-pilot-groups") => {
                 break;
@@ -40,7 +47,6 @@ pub(super) fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>)
                 return Err(invalid_message("invalid child in table:data-pilot-groups"));
             },
         }
-        buf.clear();
     }
     Ok(Groups {
         source_field_name: required_attr(reader, start, b"source-field-name")?,
@@ -52,7 +58,11 @@ pub(super) fn parse_groups(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>)
     })
 }
 
-fn parse_group(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Group> {
+fn parse_group(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Group> {
     Ok(Group {
         name: required_attr(reader, start, b"name")?,
         members: parse_empty_children(
@@ -60,12 +70,13 @@ fn parse_group(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<G
             b"data-pilot-group",
             b"data-pilot-group-member",
             b"name",
+            limits,
         )?,
     })
 }
 
 fn parse_boundary(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     numeric: &[u8],
     date: &[u8],

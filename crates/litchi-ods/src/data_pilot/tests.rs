@@ -1,5 +1,6 @@
 use super::{Field, Orientation, Table};
 use crate::{Builder, Workbook, builder::Workbook as Draft};
+use litchi_odf_common::XmlStreamLimits;
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:v="urn:example:vendor"><office:body><office:spreadsheet><t:table t:name="Input"/><t:data-pilot-tables><t:data-pilot-table t:name="Pivot" t:target-range-address="Output.A1:B4"><t:source-cell-range t:cell-range-address="Input.A1:B20"/><t:data-pilot-field t:source-field-name="Region" t:orientation="row"/><v:future v:flag="retain"><v:value>opaque</v:value></v:future></t:data-pilot-table></t:data-pilot-tables><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -157,7 +158,10 @@ fn failed_typed_update_does_not_change_the_staged_catalog() {
 
 #[test]
 fn owned_snapshot_commit_adds_the_owner() -> litchi_core::Result<()> {
-    let snapshot = crate::data_pilot::Snapshot::from_bytes(package(XML_WITHOUT_OWNER))?;
+    let snapshot = crate::data_pilot::Snapshot::from_bytes(
+        package(XML_WITHOUT_OWNER),
+        &XmlStreamLimits::owner_default_value(),
+    )?;
     let mut edit = snapshot.edit();
     edit.editor().add(table("Pivot"))?;
     let commit = edit.commit()?;
@@ -165,4 +169,28 @@ fn owned_snapshot_commit_adds_the_owner() -> litchi_core::Result<()> {
     assert!(commit.snapshot().has_owner());
     assert_eq!(commit.snapshot().tables()[0].name, "Pivot");
     Ok(())
+}
+
+#[test]
+fn raw_data_pilot_limits_cover_nested_location_and_exact_output() {
+    let nested = XmlStreamLimits::new(XML.len() as u64 + 64, 2, 100_000, 100_000, 64 * 1024)
+        .expect("finite nested policy");
+    assert!(super::codec::locate(XML, &nested).is_err());
+
+    let default_limits = XmlStreamLimits::owner_default_value();
+    let fragment =
+        crate::model::data_pilot::write_data_pilot_table_fragment(&table("Pivot"), &default_limits)
+            .expect("default output");
+    let exact = XmlStreamLimits::new(fragment.len() as u64, 512, 100_000, 100_000, 64 * 1024)
+        .expect("finite exact output policy");
+    assert_eq!(
+        crate::model::data_pilot::write_data_pilot_table_fragment(&table("Pivot"), &exact)
+            .expect("exact output"),
+        fragment
+    );
+    let tiny = XmlStreamLimits::new(1, 512, 100_000, 100_000, 64 * 1024)
+        .expect("finite tiny output policy");
+    assert!(
+        crate::model::data_pilot::write_data_pilot_table_fragment(&table("Pivot"), &tiny).is_err()
+    );
 }

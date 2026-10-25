@@ -63,7 +63,8 @@ fn complete_content_model_and_checked_constructor_families_full_reopen() {
     }
     codec::validate(&root).expect("complete checked tree");
 
-    let formula = create(codec::serialize(&root)).expect("authored formula");
+    let formula = create(codec::serialize(&root, &codec::Limits::default()).expect("formula XML"))
+        .expect("authored formula");
     let reopened = open(formula.as_bytes()).expect("full package reopen");
     let kinds: Vec<_> = reopened
         .formula()
@@ -115,7 +116,8 @@ fn recognized_starmath_is_opaque_at_open_authoring_read_and_edit_boundaries() {
         semantics,
         litchi_odf_formula::authoring::Display::Block,
     );
-    let source = create(codec::serialize(&root)).expect("opaque authored source");
+    let source = create(codec::serialize(&root, &codec::Limits::default()).expect("formula XML"))
+        .expect("opaque authored source");
     assert_eq!(
         source.formula().starmath().expect("StarMath").opaque(),
         &opaque

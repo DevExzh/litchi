@@ -2,6 +2,11 @@
 
 use super::model::MAX_CONDITIONAL_ATTRIBUTE_BYTES;
 use super::*;
+use litchi_odf_common::XmlStreamLimits;
+
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::owner_default_value()
+}
 use crate::model::names::formula;
 use std::collections::{BTreeMap, HashSet};
 
@@ -24,7 +29,7 @@ fn conditional_editor_preserves_unrelated_automatic_styles_with_arbitrary_prefix
     let common = HashSet::from(["Red".to_string()]);
     validate_conditional_style_collection(std::slice::from_ref(&style), &common)
         .expect("test fixture or operation should succeed");
-    let rewritten = rewrite_conditional_styles(Some(&fragment), &[style])
+    let rewritten = rewrite_conditional_styles(Some(&fragment), &[style], &limits())
         .expect("test fixture or operation should succeed");
     assert!(rewritten.xml.contains(
             r#"<draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep&amp;exact"/>"#
@@ -45,8 +50,9 @@ fn managed_protection_editor_preserves_unrelated_xml_and_merges_maps() {
     };
     let conditional = ConditionalStyle::new("combo", vec![Rule::new("cell-content()>0", "Red")]);
     let protection = TableStyle::new("combo", Protection::HiddenAndProtected);
-    let rewritten = rewrite_managed_cell_styles(Some(&fragment), &[conditional], &[protection])
-        .expect("test fixture or operation should succeed");
+    let rewritten =
+        rewrite_managed_cell_styles(Some(&fragment), &[conditional], &[protection], &limits())
+            .expect("test fixture or operation should succeed");
     assert!(rewritten.xml.contains(
             r#"<draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep"/>"#
         ));
@@ -103,7 +109,7 @@ fn rejects_invalid_values_missing_parents_and_cycles() {
 #[test]
 fn extracts_automatic_styles_and_required_namespace_bindings() {
     let xml = r##"<?xml version="1.0"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><o:font-face-decls/><o:automatic-styles><s:style s:name="ce1" s:family="table-cell"><s:table-cell-properties f:background-color="#fff"/></s:style></o:automatic-styles><o:body/></o:document-content>"##;
-    let fragment = extract_automatic_styles(xml)
+    let fragment = extract_automatic_styles(xml, &limits())
         .expect("test fixture or operation should succeed")
         .expect("test fixture or operation should succeed");
     assert!(fragment.xml.starts_with("<o:automatic-styles>"));
@@ -113,7 +119,7 @@ fn extracts_automatic_styles_and_required_namespace_bindings() {
     assert!(!declarations.contains("xmlns:o="));
     assert!(declarations.contains("xmlns:s="));
     assert!(declarations.contains("xmlns:f="));
-    let font_faces = extract_font_face_decls(xml)
+    let font_faces = extract_font_face_decls(xml, &limits())
         .expect("test fixture or operation should succeed")
         .expect("test fixture or operation should succeed");
     assert!(font_faces.xml.starts_with("<o:font-face-decls"));

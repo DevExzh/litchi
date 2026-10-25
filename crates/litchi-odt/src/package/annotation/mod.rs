@@ -13,9 +13,14 @@ pub use model::{
 pub(crate) use package::{add, remove, reorder, replace, update};
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 
-pub(crate) fn annotations(content: &str, host: AnnotationHost) -> Result<Vec<AnnotationInfo>> {
-    let scan = scan::scan(content, host)?;
+pub(crate) fn annotations(
+    content: &str,
+    host: AnnotationHost,
+    limits: &XmlStreamLimits,
+) -> Result<Vec<AnnotationInfo>> {
+    let scan = scan::scan(content, host, limits)?;
     scan.records
         .into_iter()
         .enumerate()
@@ -39,11 +44,12 @@ pub(crate) fn find_annotation(
     content: &str,
     host: AnnotationHost,
     name: &str,
+    limits: &XmlStreamLimits,
 ) -> Result<Option<AnnotationInfo>> {
     if name.is_empty() {
         return invalid("annotation name cannot be empty");
     }
-    Ok(annotations(content, host)?
+    Ok(annotations(content, host, limits)?
         .into_iter()
         .find(|item| item.annotation.name() == Some(name)))
 }
@@ -69,6 +75,7 @@ macro_rules! annotation_facade_methods {
             crate::package::annotation::annotations(
                 self.state.content.xml_content(),
                 crate::package::annotation::AnnotationHost::$host,
+                &self.state.xml_limits,
             )
         }
 
@@ -81,6 +88,7 @@ macro_rules! annotation_facade_methods {
                 self.state.content.xml_content(),
                 crate::package::annotation::AnnotationHost::$host,
                 name,
+                &self.state.xml_limits,
             )
         }
     };

@@ -470,7 +470,8 @@ pub(super) fn definition_reference(definition: &Definition) -> &str {
 
 /// The snapshot's annotation owner, parsed once.
 pub(super) fn annotations(file: &Ods) -> Result<&litchi_ods::annotations::Snapshot> {
-    file.cache().annotations(|| file.content_xml())
+    let limits = file.odf_options().xml_limits_value();
+    file.cache().annotations(|| file.content_xml(), &limits)
 }
 
 /// The content index of the worksheet at `position`.

@@ -428,8 +428,11 @@ impl Odp {
         if let Some(annotations) = self.0.annotations.get() {
             return Ok(annotations);
         }
-        let annotations =
-            litchi_odp::annotation::inventory(self.content_xml()?).map_err(core_error)?;
+        let annotations = litchi_odp::annotation::inventory(
+            self.content_xml()?,
+            &self.odf_options().xml_limits_value(),
+        )
+        .map_err(core_error)?;
         Ok(self.0.annotations.get_or_init(|| annotations))
     }
 

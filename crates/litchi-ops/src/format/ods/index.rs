@@ -15,6 +15,7 @@
 use std::sync::OnceLock;
 
 use litchi_core::FileFormat;
+use litchi_odf_common::XmlStreamLimits;
 use litchi_ods::{Cell, CellValue, Merge, Sheet};
 
 use crate::error::{Code, Error, Result};
@@ -373,12 +374,13 @@ impl Cache {
     pub(crate) fn annotations<'c>(
         &'c self,
         xml: impl FnOnce() -> Result<&'c str>,
+        limits: &XmlStreamLimits,
     ) -> Result<&'c litchi_ods::annotations::Snapshot> {
         if let Some(result) = self.annotations.get() {
             return result.as_ref().map_err(Clone::clone);
         }
         let parsed = xml().and_then(|xml| {
-            litchi_ods::annotations::Snapshot::parse(xml)
+            litchi_ods::annotations::Snapshot::parse(xml, limits)
                 .map_err(|error| Error::from(error).with_format(FileFormat::Ods))
         });
         self.annotations

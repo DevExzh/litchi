@@ -19,8 +19,8 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_xml_limits(source, XmlStreamLimits::owner_default_value())
+    pub fn from_bytes(source: Vec<u8>, limits: &XmlStreamLimits) -> Result<Self> {
+        Self::from_bytes_with_xml_limits(source, *limits)
     }
 
     pub(crate) fn from_bytes_with_xml_limits(
@@ -147,6 +147,7 @@ impl Edit {
                 catalog.source_xml,
                 &catalog.location,
                 self.draft.as_deref(),
+                &self.before.xml_limits,
             )?;
             let target = Snapshot::from_bytes_with_xml_limits(bytes, self.before.xml_limits)?;
             if target.has_owner != self.draft.is_some()

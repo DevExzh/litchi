@@ -1,6 +1,7 @@
 //! Unit tests for the font-face model and XML codec.
 
 use super::*;
+use litchi_odf_common::XmlStreamLimits;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -20,7 +21,9 @@ fn parses_and_round_trips_complete_font_face_metadata() {
     let xml = document(
         r#"<o:font-face-decls><s:font-face s:name="Body &amp; Text" s:font-adornments="Regular" s:font-family-generic="swiss" s:font-pitch="variable" s:font-charset="UTF-8" v:font-family="'Liberation Sans'" v:font-style="italic" v:font-variant="small-caps" v:font-weight="700" v:font-stretch="semi-expanded" v:font-size="10.5pt" v:unicode-range="U+0-10FFFF" v:units-per-em="2048" v:ascent="1854" v:descent="-434" v:panose-1="2 11 6 4" v:widths="1 2" v:bbox="0 -434 2000 1854"><v:font-face-src><v:font-face-uri x:type="simple" x:href="Fonts/body.ttf" x:actuate="onRequest"><v:font-face-format v:string="truetype"/><v:font-face-format/></v:font-face-uri><v:font-face-name v:name="Liberation Sans"/></v:font-face-src><v:definition-src x:type="simple" x:href="Fonts/body.svg"/></s:font-face><s:font-face s:name="Empty"/></o:font-face-decls>"#,
     );
-    let declarations = parse(&xml).unwrap().unwrap();
+    let declarations = parse(&xml, &XmlStreamLimits::owner_default_value())
+        .unwrap()
+        .unwrap();
     assert_eq!(declarations.faces.len(), 2);
     let face = declarations.face("Body & Text").unwrap();
     assert_eq!(face.generic_family, Some(Family::Swiss));
@@ -33,10 +36,12 @@ fn parses_and_round_trips_complete_font_face_metadata() {
         Source::Uri { formats, .. } if formats == &[Some("truetype".to_string()), None]
     ));
 
-    let serialized = declarations.to_xml().unwrap();
+    let serialized = declarations
+        .to_xml(&XmlStreamLimits::owner_default_value())
+        .unwrap();
     let reparsed = parse(&format!(
         r#"<office:document-content xmlns:office="{OFFICE}">{serialized}<office:body/></office:document-content>"#
-    ))
+    ), &XmlStreamLimits::owner_default_value())
     .unwrap()
     .unwrap();
     assert_eq!(reparsed, declarations);
@@ -53,12 +58,47 @@ fn rejects_malformed_font_face_grammar() {
         r#"<o:font-face-decls><s:font-face s:name="A"><v:font-face-src><v:font-face-uri x:type="extended" x:href="x"/></v:font-face-src></s:font-face></o:font-face-decls>"#,
         r#"<o:font-face-decls><s:font-face s:name="A">active text</s:font-face></o:font-face-decls>"#,
     ] {
-        assert!(parse(&document(body)).is_err(), "{body}");
+        assert!(
+            parse(&document(body), &XmlStreamLimits::owner_default_value()).is_err(),
+            "{body}"
+        );
     }
 }
 
 #[test]
 fn rejects_misplaced_or_duplicate_containers() {
-    assert!(parse(&document(r"<o:body><o:font-face-decls/></o:body>")).is_err());
-    assert!(parse(&document(r"<o:font-face-decls/><o:font-face-decls/>")).is_err());
+    assert!(
+        parse(
+            &document(r"<o:body><o:font-face-decls/></o:body>"),
+            &XmlStreamLimits::owner_default_value()
+        )
+        .is_err()
+    );
+    assert!(
+        parse(
+            &document(r"<o:font-face-decls/><o:font-face-decls/>"),
+            &XmlStreamLimits::owner_default_value()
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn font_face_reader_and_writer_honor_nested_and_output_budgets() {
+    let xml = document(
+        r#"<o:font-face-decls><s:font-face s:name="A"><v:font-face-src><v:font-face-uri x:type="simple" x:href="x"><v:font-face-format v:string="truetype"/></v:font-face-uri></v:font-face-src></s:font-face></o:font-face-decls>"#,
+    );
+    let shallow =
+        XmlStreamLimits::new(xml.len() as u64 + 1, 4, 100_000, 100_000, 64 * 1024).unwrap();
+    assert!(parse(&xml, &shallow).is_err());
+
+    let declarations = Declarations::default();
+    let expected = declarations
+        .to_xml(&XmlStreamLimits::owner_default_value())
+        .unwrap();
+    let exact =
+        XmlStreamLimits::new(expected.len() as u64, 256, 100_000, 100_000, 64 * 1024).unwrap();
+    assert_eq!(declarations.to_xml(&exact).unwrap(), expected);
+    let tiny = XmlStreamLimits::new(1, 256, 100_000, 100_000, 64 * 1024).unwrap();
+    assert!(declarations.to_xml(&tiny).is_err());
 }

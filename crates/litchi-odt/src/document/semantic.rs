@@ -314,7 +314,10 @@ impl Document {
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
     pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
-        crate::font_face::parse_content_font_face_declarations(self.state.content.xml_content())
+        crate::font_face::parse_content_font_face_declarations(
+            self.state.content.xml_content(),
+            &self.state.xml_limits,
+        )
     }
 
     /// Return font-face declarations stored in `styles.xml`.
@@ -324,7 +327,12 @@ impl Document {
     pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
         self.state.styles.as_ref().map_or_else(
             || Ok(None),
-            |styles| crate::font_face::parse_styles_font_face_declarations(styles.xml_content()),
+            |styles| {
+                crate::font_face::parse_styles_font_face_declarations(
+                    styles.xml_content(),
+                    &self.state.xml_limits,
+                )
+            },
         )
     }
 
@@ -489,7 +497,9 @@ impl Document {
     pub fn notes_configurations(&self) -> Result<crate::notes_configuration::Configurations> {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::notes_configuration::parse(styles.xml_content()),
+            |styles| {
+                crate::notes_configuration::parse(styles.xml_content(), &self.state.xml_limits)
+            },
         )
     }
 

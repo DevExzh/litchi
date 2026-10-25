@@ -207,6 +207,24 @@ fn caller_selected_limits_are_typed_at_every_ingress() {
 }
 
 #[test]
+fn owned_ingress_preserves_the_caller_xml_profile_for_formula_codec() {
+    let bytes = fixture();
+    let xml_limits = litchi_odf_common::XmlStreamLimits::new(
+        64 * 1024 * 1024,
+        256,
+        131_072,
+        512,
+        2 * 1024 * 1024,
+    )
+    .unwrap();
+    let package =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().xml_limits(xml_limits))
+            .unwrap();
+    assert_eq!(package.formula().limits().depth(), 256);
+    assert_eq!(package.formula().limits().nodes(), 131_072);
+}
+
+#[test]
 fn a_prepared_package_is_adopted_and_another_family_is_refused() {
     let bytes = fixture();
     let prepared = litchi_odf_common::detect::prepared(bytes.clone(), SourceLimits::default())

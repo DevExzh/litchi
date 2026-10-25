@@ -8,6 +8,7 @@ mod model;
 mod range;
 mod validation;
 
+use litchi_odf_common::XmlStreamLimits;
 pub use model::{
     DisplayInfo, DisplayMemberMode, Field, FieldReference, GrandTotal, GrandTotalElement,
     GrandTotalOrientation, Group, GroupBoundary, GroupBy, Groups, LayoutInfo, LayoutMode, Level,
@@ -15,22 +16,29 @@ pub use model::{
     Table,
 };
 
-pub(crate) fn parse_data_pilot_tables(xml: &str) -> litchi_core::Result<Vec<Table>> {
-    codec::parse_data_pilot_tables(xml)
+pub(crate) fn parse_data_pilot_tables(
+    xml: &str,
+    limits: &XmlStreamLimits,
+) -> litchi_core::Result<Vec<Table>> {
+    codec::parse_data_pilot_tables(xml, limits)
 }
 
 pub(crate) fn write_data_pilot_tables(
     output: &mut String,
     tables: &[Table],
+    limits: &XmlStreamLimits,
 ) -> litchi_core::Result<()> {
-    codec::write_data_pilot_tables(output, tables)
+    codec::write_data_pilot_tables(output, tables, limits)
 }
 
 /// # Errors
 ///
 /// Returns an error when the value cannot be serialized.
-pub fn write_data_pilot_table_fragment(table: &Table) -> litchi_core::Result<String> {
-    codec::write_data_pilot_table_fragment(table)
+pub fn write_data_pilot_table_fragment(
+    table: &Table,
+    limits: &XmlStreamLimits,
+) -> litchi_core::Result<String> {
+    codec::write_data_pilot_table_fragment(table, limits)
 }
 
 pub(crate) fn parse_data_pilot_range(value: &str) -> litchi_core::Result<range::ParsedRange> {

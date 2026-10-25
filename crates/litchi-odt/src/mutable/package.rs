@@ -416,7 +416,11 @@ impl MutableDocument {
             .source_package
             .as_ref()
             .map(|source| {
-                crate::font_face::content_font_face_splice_publication(source, content_xml)
+                crate::font_face::content_font_face_splice_publication(
+                    source,
+                    content_xml,
+                    &self.xml_limits,
+                )
             })
             .transpose()?
             .flatten();
@@ -438,7 +442,11 @@ impl MutableDocument {
                 .source_package
                 .as_ref()
                 .map(|source| {
-                    crate::font_face::styles_font_face_splice_publication(source, styles_xml)
+                    crate::font_face::styles_font_face_splice_publication(
+                        source,
+                        styles_xml,
+                        &self.xml_limits,
+                    )
                 })
                 .transpose()?
                 .flatten();

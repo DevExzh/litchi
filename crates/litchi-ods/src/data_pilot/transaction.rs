@@ -16,6 +16,7 @@ pub(crate) struct Transaction<'source> {
     pub(crate) location: Location,
     pub(crate) original: Option<Vec<Table>>,
     pub(crate) draft: Option<Vec<Table>>,
+    pub(crate) xml_limits: litchi_odf_common::XmlStreamLimits,
 }
 
 impl<'source> Transaction<'source> {
@@ -27,6 +28,7 @@ impl<'source> Transaction<'source> {
             location: catalog.location.clone(),
             draft: original.clone(),
             original,
+            xml_limits: catalog.xml_limits,
         }
     }
 
@@ -81,6 +83,7 @@ impl<'source> Transaction<'source> {
             self.source_xml,
             &self.location,
             self.draft.as_deref(),
+            &self.xml_limits,
         )?;
         Ok(Commit {
             bytes: Cow::Owned(bytes),

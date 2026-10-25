@@ -379,7 +379,9 @@ impl Builder {
             || self.notes_configurations.endnote.is_some()
         {
             let insertion = find_required(&xml, "</office:styles>")?;
-            let fragments = self.notes_configurations.to_xml_fragment()?;
+            let fragments = self
+                .notes_configurations
+                .to_xml_fragment(&litchi_odf_common::XmlStreamLimits::owner_default_value())?;
             xml.insert_str(insertion, &fragments);
         }
         if !self.ruby_styles.is_empty() {

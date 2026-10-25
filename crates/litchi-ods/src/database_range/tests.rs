@@ -1,5 +1,6 @@
 use super::{Condition, ConditionSource, Expression, Key, Order, Range, Rule, Rules, Sort, Source};
 use crate::{Builder, Workbook, builder::Workbook as Draft};
+use litchi_odf_common::XmlStreamLimits;
 use std::io::{Cursor, Read, Write};
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:v="urn:example:vendor"><office:body><office:spreadsheet><t:table t:name="Input"/><t:database-ranges><t:database-range t:name="Sales" t:target-range-address="Input.A1:Input.B20"><t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/><t:filter t:condition-source="self"><t:filter-condition t:field-number="0" t:value="East" t:operator="="/></t:filter><t:sort><t:sort-by t:field-number="1" t:order="descending"/></t:sort><t:subtotal-rules><t:subtotal-rule t:group-by-field-number="0"><t:subtotal-field t:field-number="1" t:function="sum"/></t:subtotal-rule></t:subtotal-rules></t:database-range></t:database-ranges><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
@@ -108,7 +109,8 @@ fn known_parent_fixture(parent: &str, child: &str) -> String {
 }
 
 fn assert_contextual_change_is_refused(xml: &str) {
-    let location = super::codec::locate(xml).expect("context fixture should be well formed");
+    let location = super::codec::locate(xml, &XmlStreamLimits::owner_default_value())
+        .expect("context fixture should be well formed");
     assert!(
         location.opaque,
         "known child context must be admitted as opaque"
@@ -253,7 +255,8 @@ fn explicit_empty_owner_is_distinct_from_absence() {
 #[test]
 fn inherited_namespace_on_empty_owner_is_injected_before_close_token() {
     let xml = WITHOUT_OWNER.replace("<t:shapes/>", "<t:database-ranges/><t:shapes/>");
-    let location = super::codec::locate(&xml).expect("host should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("host should be located");
     let owner = location
         .container
         .as_ref()
@@ -264,9 +267,12 @@ fn inherited_namespace_on_empty_owner_is_injected_before_close_token() {
         "<t:database-ranges xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"/>"
     );
     assert!(
-        crate::model::database_range::parse_database_ranges(&fragment)
-            .unwrap()
-            .is_empty()
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .unwrap()
+        .is_empty()
     );
 }
 
@@ -276,14 +282,21 @@ fn owner_fragment_ignores_quoted_greater_than_in_attributes() {
         "<t:shapes/>",
         r#"<t:database-ranges t:future="quoted > marker"/><t:shapes/>"#,
     );
-    let location = super::codec::locate(&xml).expect("host should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("host should be located");
     let owner = location
         .container
         .as_ref()
         .expect("owner should be located");
     let fragment = super::codec::owner_fragment(&xml, owner).expect("owner should be sliced");
     assert!(fragment.contains("quoted > marker"));
-    assert!(crate::model::database_range::parse_database_ranges(&fragment).is_ok());
+    assert!(
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -292,14 +305,21 @@ fn owner_fragment_does_not_treat_quoted_namespace_text_as_a_declaration() {
         "<t:shapes/>",
         r#"<t:database-ranges t:future="value xmlns:t=not-a-declaration"/><t:shapes/>"#,
     );
-    let location = super::codec::locate(&xml).expect("host should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("host should be located");
     let owner = location
         .container
         .as_ref()
         .expect("owner should be located");
     let fragment = super::codec::owner_fragment(&xml, owner).expect("owner should be sliced");
     assert!(fragment.contains("xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\""));
-    assert!(crate::model::database_range::parse_database_ranges(&fragment).is_ok());
+    assert!(
+        crate::model::database_range::parse_database_ranges(
+            &fragment,
+            &XmlStreamLimits::owner_default_value(),
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -387,7 +407,8 @@ fn every_known_parent_context_marks_wrong_table_children_opaque() {
     ];
     for (parent, child) in cases {
         let xml = known_parent_fixture(parent, child);
-        let location = super::codec::locate(&xml).expect("context fixture should be located");
+        let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+            .expect("context fixture should be located");
         assert!(
             location.opaque,
             "wrong table:{child} under table:{parent} was not opaque"
@@ -401,7 +422,8 @@ fn valid_expanded_name_parent_contexts_remain_editable() {
         r#"<t:filter-condition t:field-number="0" t:value="East" t:operator="="/>"#,
         r#"<t:filter-and><t:filter-condition t:field-number="0" t:value="East" t:operator="="><t:filter-set-item t:value="East"/></t:filter-condition><t:filter-or><t:filter-condition t:field-number="1" t:value="West" t:operator="="/></t:filter-or></t:filter-and>"#,
     );
-    let location = super::codec::locate(&xml).expect("valid context fixture should be located");
+    let location = super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
+        .expect("valid context fixture should be located");
     assert!(!location.opaque);
     let spreadsheet = Workbook::from_bytes(package(&xml)).expect("valid package should open");
     assert!(spreadsheet.database_ranges().is_ok());
@@ -442,7 +464,7 @@ fn known_children_in_wrong_parents_never_silently_drop_on_public_edit() {
     for (label, xml) in cases {
         assert_contextual_change_is_refused(&xml);
         assert!(
-            super::codec::locate(&xml)
+            super::codec::locate(&xml, &XmlStreamLimits::owner_default_value())
                 .expect("context fixture should be located")
                 .opaque,
             "{label} should be opaque"
@@ -492,7 +514,10 @@ fn facade_rejects_overbudget_owner_before_materializing_snapshot_graph() {
 
 #[test]
 fn owned_snapshot_commit_adds_the_owner() -> litchi_core::Result<()> {
-    let snapshot = crate::database_range::Snapshot::from_bytes(package(WITHOUT_OWNER))?;
+    let snapshot = crate::database_range::Snapshot::from_bytes(
+        package(WITHOUT_OWNER),
+        &XmlStreamLimits::owner_default_value(),
+    )?;
     let mut edit = snapshot.edit();
     edit.editor().add(range("Sales"))?;
     let commit = edit.commit()?;

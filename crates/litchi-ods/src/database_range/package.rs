@@ -23,7 +23,7 @@ pub(crate) fn replace(
                 .to_string(),
         ));
     }
-    let content_xml = codec::replace(source_xml, location, ranges)?;
+    let content_xml = codec::replace(source_xml, location, ranges, &package.xml_limits_value())?;
     package
         .replace_content_xml(&content_xml)
         .map(Archive::into_bytes)

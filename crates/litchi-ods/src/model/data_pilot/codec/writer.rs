@@ -4,13 +4,18 @@ use crate::model::database_range::{
     validate_filter_for_output, validate_source_for_output, write_database_source, write_filter,
 };
 use litchi_core::{Result, xml::escape_xml};
+use litchi_odf_common::XmlStreamLimits;
 
 use super::super::{
     MAX_DATA_PILOT_TABLES, invalid_message,
     model::{Field, GrandTotal, GroupBoundary, Groups, Level, Source, Table},
 };
 
-pub(crate) fn write_data_pilot_tables(output: &mut String, tables: &[Table]) -> Result<()> {
+pub(crate) fn write_data_pilot_tables(
+    output: &mut String,
+    tables: &[Table],
+    limits: &XmlStreamLimits,
+) -> Result<()> {
     if tables.is_empty() {
         return Ok(());
     }
@@ -19,21 +24,37 @@ pub(crate) fn write_data_pilot_tables(output: &mut String, tables: &[Table]) -> 
             "data-pilot table count exceeds safety limit",
         ));
     }
-    output.push_str("<table:data-pilot-tables>");
+    let mut scratch = String::new();
+    scratch.push_str("<table:data-pilot-tables>");
+    ensure_output(&scratch, limits)?;
     for table in tables {
-        write_table(output, table)?;
+        write_table(&mut scratch, table, limits)?;
+        ensure_output(&scratch, limits)?;
     }
-    output.push_str("</table:data-pilot-tables>");
+    scratch.push_str("</table:data-pilot-tables>");
+    ensure_output(&scratch, limits)?;
+    ensure_output_append(output, &scratch, limits)?;
+    output
+        .try_reserve(scratch.len())
+        .map_err(|source| litchi_core::Error::Allocation {
+            resource: "ODS DataPilot XML output",
+            source,
+        })?;
+    output.push_str(&scratch);
     Ok(())
 }
 
-pub(crate) fn write_data_pilot_table_fragment(table: &Table) -> Result<String> {
+pub(crate) fn write_data_pilot_table_fragment(
+    table: &Table,
+    limits: &XmlStreamLimits,
+) -> Result<String> {
     let mut output = String::new();
-    write_table(&mut output, table)?;
+    write_table(&mut output, table, limits)?;
+    ensure_output(&output, limits)?;
     Ok(output)
 }
 
-fn write_table(out: &mut String, table: &Table) -> Result<()> {
+fn write_table(out: &mut String, table: &Table, limits: &XmlStreamLimits) -> Result<()> {
     table.validate()?;
     if let Some(source) = &table.source {
         match source {
@@ -83,18 +104,18 @@ fn write_table(out: &mut String, table: &Table) -> Result<()> {
         out.push_str("/>");
     }
     if let Some(source) = &table.source {
-        write_source(out, source)?;
+        write_source(out, source, limits)?;
     }
     for field in &table.fields {
-        write_field(out, field)?;
+        write_field(out, field, limits)?;
     }
     out.push_str("</table:data-pilot-table>");
     Ok(())
 }
 
-fn write_source(out: &mut String, source: &Source) -> Result<()> {
+fn write_source(out: &mut String, source: &Source, limits: &XmlStreamLimits) -> Result<()> {
     match source {
-        Source::Database(source) => write_database_source(out, source)?,
+        Source::Database(source) => write_database_source(out, source, limits)?,
         Source::Service {
             name,
             source_name,
@@ -120,7 +141,7 @@ fn write_source(out: &mut String, source: &Source) -> Result<()> {
             attr(out, "table:cell-range-address", Some(cell_range_address));
             if let Some(filter) = filter {
                 out.push('>');
-                write_filter(out, filter)?;
+                write_filter(out, filter, limits)?;
                 out.push_str("</table:source-cell-range>");
             } else {
                 out.push_str("/>");
@@ -130,7 +151,7 @@ fn write_source(out: &mut String, source: &Source) -> Result<()> {
     Ok(())
 }
 
-fn write_field(out: &mut String, field: &Field) -> Result<()> {
+fn write_field(out: &mut String, field: &Field, limits: &XmlStreamLimits) -> Result<()> {
     field.validate()?;
     out.push_str("<table:data-pilot-field");
     attr(
@@ -153,7 +174,7 @@ fn write_field(out: &mut String, field: &Field) -> Result<()> {
     }
     out.push('>');
     if let Some(level) = &field.level {
-        write_level(out, level);
+        write_level(out, level, limits)?;
     }
     if let Some(reference) = &field.reference {
         out.push_str("<table:data-pilot-field-reference");
@@ -168,13 +189,13 @@ fn write_field(out: &mut String, field: &Field) -> Result<()> {
         out.push_str("/>");
     }
     if let Some(groups) = &field.groups {
-        write_groups(out, groups);
+        write_groups(out, groups, limits)?;
     }
     out.push_str("</table:data-pilot-field>");
     Ok(())
 }
 
-fn write_level(out: &mut String, level: &Level) {
+fn write_level(out: &mut String, level: &Level, limits: &XmlStreamLimits) -> Result<()> {
     out.push_str("<table:data-pilot-level");
     bool_attr(out, "table:show-empty", level.show_empty);
     if level.repeat_item_labels.is_some() {
@@ -188,7 +209,7 @@ fn write_level(out: &mut String, level: &Level) {
         && level.layout.is_none()
     {
         out.push_str("/>");
-        return;
+        return Ok(());
     }
     out.push('>');
     if !level.subtotals.is_empty() {
@@ -233,9 +254,11 @@ fn write_level(out: &mut String, level: &Level) {
         out.push_str("/>");
     }
     out.push_str("</table:data-pilot-level>");
+    ensure_output(out, limits)?;
+    Ok(())
 }
 
-fn write_groups(out: &mut String, groups: &Groups) {
+fn write_groups(out: &mut String, groups: &Groups, limits: &XmlStreamLimits) -> Result<()> {
     out.push_str("<table:data-pilot-groups");
     attr(
         out,
@@ -259,6 +282,8 @@ fn write_groups(out: &mut String, groups: &Groups) {
         out.push_str("</table:data-pilot-group>");
     }
     out.push_str("</table:data-pilot-groups>");
+    ensure_output(out, limits)?;
+    Ok(())
 }
 
 fn write_boundary(out: &mut String, suffix: &str, boundary: &GroupBoundary) {
@@ -302,4 +327,26 @@ fn i64_attr(out: &mut String, name: &str, value: Option<i64>) {
 
 fn u64_attr(out: &mut String, name: &str, value: u64) {
     attr(out, name, Some(&value.to_string()));
+}
+
+fn ensure_output(output: &str, limits: &XmlStreamLimits) -> Result<()> {
+    if u64::try_from(output.len()).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(invalid_message(
+            "data-pilot XML output exceeds the configured XML limit",
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_output_append(output: &str, addition: &str, limits: &XmlStreamLimits) -> Result<()> {
+    let length = output
+        .len()
+        .checked_add(addition.len())
+        .ok_or_else(|| invalid_message("data-pilot XML output size overflow"))?;
+    if u64::try_from(length).unwrap_or(u64::MAX) > limits.max_bytes() {
+        return Err(invalid_message(
+            "data-pilot XML output exceeds the configured XML limit",
+        ));
+    }
+    Ok(())
 }

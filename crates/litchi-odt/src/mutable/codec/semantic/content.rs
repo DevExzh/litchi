@@ -191,7 +191,10 @@ impl MutableDocument {
     pub(crate) fn content_font_face_declarations(
         &self,
     ) -> Result<Option<crate::font_face::Declarations>> {
-        self.with_content_xml(crate::font_face::parse_content_font_face_declarations)
+        let limits = self.xml_limits;
+        self.with_content_xml(|xml| {
+            crate::font_face::parse_content_font_face_declarations(xml, &limits)
+        })
     }
 
     /// Replace content-part font-face declarations and return the old value.
@@ -203,7 +206,11 @@ impl MutableDocument {
         declarations: &crate::font_face::Declarations,
     ) -> Result<Option<crate::font_face::Declarations>> {
         let (updated, old) = self.with_content_xml(|xml| {
-            crate::font_face::set_content_font_face_declarations_xml(xml, declarations)
+            crate::font_face::set_content_font_face_declarations_xml(
+                xml,
+                declarations,
+                &self.xml_limits,
+            )
         })?;
         self.content_xml = Some(updated);
         Ok(old)
@@ -216,8 +223,9 @@ impl MutableDocument {
     pub(crate) fn clear_content_font_face_declarations(
         &mut self,
     ) -> Result<Option<crate::font_face::Declarations>> {
-        let (updated, old) =
-            self.with_content_xml(crate::font_face::remove_content_font_face_declarations_xml)?;
+        let (updated, old) = self.with_content_xml(|xml| {
+            crate::font_face::remove_content_font_face_declarations_xml(xml, &self.xml_limits)
+        })?;
         self.content_xml = Some(updated);
         Ok(old)
     }

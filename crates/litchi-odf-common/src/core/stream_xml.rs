@@ -1380,7 +1380,7 @@ pub(crate) fn validate_end_element(
     reject_unknown_namespace(&resolved_element.0, offset)
 }
 
-fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
+pub(crate) fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
     let Some(colon) = bytes.iter().position(|byte| *byte == b':') else {
         return validate_name(bytes, offset, kind);
     };
@@ -1407,7 +1407,7 @@ pub(crate) fn validate_name(bytes: &[u8], offset: u64, kind: &str) -> Result<()>
     Ok(())
 }
 
-fn validate_references(bytes: &[u8], offset: u64) -> Result<()> {
+pub(crate) fn validate_references(bytes: &[u8], offset: u64) -> Result<()> {
     let mut remaining = bytes;
     while let Some(index) = memchr::memchr(b'&', remaining) {
         let after_ampersand = &remaining[index + 1..];
@@ -1428,7 +1428,7 @@ fn validate_references(bytes: &[u8], offset: u64) -> Result<()> {
     Ok(())
 }
 
-fn reject_unknown_namespace(result: &ResolveResult<'_>, offset: u64) -> Result<()> {
+pub(crate) fn reject_unknown_namespace(result: &ResolveResult<'_>, offset: u64) -> Result<()> {
     if matches!(result, ResolveResult::Unknown(_)) {
         return Err(invalid_xml(offset, "unknown namespace prefix"));
     }
@@ -1504,7 +1504,7 @@ fn invalid_memory_bound_with_label(label: &str) -> Error {
     ))
 }
 
-fn invalid_xml(offset: u64, message: impl Into<String>) -> Error {
+pub(super) fn invalid_xml(offset: u64, message: impl Into<String>) -> Error {
     Error::InvalidFormat(format!(
         "malformed XML at byte {offset}: {}",
         message.into()

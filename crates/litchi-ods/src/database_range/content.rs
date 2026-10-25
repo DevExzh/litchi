@@ -23,11 +23,15 @@ pub struct Draft {
 
 impl Draft {
     pub(crate) fn from_source(source: &str) -> Result<Self> {
-        let location = codec::locate(source)?;
+        let location = codec::locate(
+            source,
+            &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )?;
         let original = if let Some(container) = &location.container {
             let fragment = codec::owner_fragment(source, container)?;
             Some(crate::model::database_range::parse_database_ranges(
                 &fragment,
+                &litchi_odf_common::XmlStreamLimits::owner_default_value(),
             )?)
         } else {
             None
@@ -82,7 +86,12 @@ impl Draft {
                 changed: false,
             });
         }
-        let source_xml = codec::replace(&self.source, &self.location, self.draft.as_deref())?;
+        let source_xml = codec::replace(
+            &self.source,
+            &self.location,
+            self.draft.as_deref(),
+            &litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )?;
         Ok(DraftCommit {
             source_xml,
             changed: true,

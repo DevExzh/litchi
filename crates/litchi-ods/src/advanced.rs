@@ -2350,8 +2350,11 @@ fn audit_plain_scalar_transfer_package(package: &Archive, label: &str) -> Result
             ));
         }
     }
-    let protection =
-        crate::protection::Snapshot::parse(package.content_xml(), package.styles_xml())?;
+    let protection = crate::protection::Snapshot::parse(
+        package.content_xml(),
+        package.styles_xml(),
+        &package.xml_limits_value(),
+    )?;
     if protection.document().structure_protected == Some(true)
         || protection
             .sheets()
