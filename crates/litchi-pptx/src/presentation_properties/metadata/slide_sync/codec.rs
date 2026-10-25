@@ -314,7 +314,7 @@ impl Properties {
         let server_modified_time = self.server_modified_time.to_lexical();
         let client_inserted_time = self.client_inserted_time.to_lexical();
         let prefix = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
-        let root = br#"<p:sldSyncPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" serverSldId="#;
+        let root = br#"<p:sldSyncPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" serverSldId=""#;
         let server_time = br#"" serverSldModifiedTime=""#;
         let client_time = br#"" clientInsertedTime=""#;
         let suffix = if self.has_extension_list {
