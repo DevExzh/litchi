@@ -469,7 +469,16 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         for relative, expected in preparation.STATIC_REVIEWED_ADAPTER_SHA256.items():
             path = ROOT / relative
             if path.is_file():
-                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), expected, relative)
+                source = path.read_bytes()
+                if relative == preparation.CONSUMER_API_ADAPTER_PATH:
+                    # 94c7bc is deliberately pre-XLS composition.  Model the
+                    # reviewed one-spelling XLS merge in memory; production
+                    # lib.rs is not edited by this preparation leaf.
+                    current, historical = preparation.CONSUMER_API_REPLACEMENTS[2]
+                    self.assertEqual(source.count(historical), 1)
+                    self.assertEqual(source.count(current), 0)
+                    source = source.replace(historical, current)
+                self.assertEqual(hashlib.sha256(source).hexdigest(), expected, relative)
 
     def test_adapter_locks_bind_each_source_role(self) -> None:
         baseline = preparation._reviewed_adapter_hashes(
@@ -484,53 +493,60 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertEqual(baseline["tools/perf-baseline/Cargo.lock"], "a" * 64)
         self.assertEqual(candidate["tools/perf-baseline/Cargo.lock"], "b" * 64)
         self.assertEqual(
-            baseline[preparation.RTF_STREAMING_ADAPTER_PATH],
-            preparation.RTF_STREAMING_HISTORICAL_SHA256,
+            baseline[preparation.CONSUMER_API_ADAPTER_PATH],
+            preparation.CONSUMER_API_HISTORICAL_SHA256,
         )
         self.assertEqual(
-            candidate[preparation.RTF_STREAMING_ADAPTER_PATH],
-            preparation.RTF_STREAMING_CURRENT_SHA256,
+            candidate[preparation.CONSUMER_API_ADAPTER_PATH],
+            preparation.CONSUMER_API_CURRENT_SHA256,
         )
 
-    def test_historical_rtf_consumer_adapter_changes_only_two_spellings(self) -> None:
-        path = ROOT / preparation.RTF_STREAMING_ADAPTER_PATH
+    def test_historical_consumer_adapter_changes_only_three_spellings(self) -> None:
+        path = ROOT / preparation.CONSUMER_API_ADAPTER_PATH
         source = path.read_bytes()
-        adapted = preparation._adapt_baseline_adapter(
-            preparation.RTF_STREAMING_ADAPTER_PATH, source
+        xls_current, xls_historical = preparation.CONSUMER_API_REPLACEMENTS[2]
+        self.assertEqual(source.count(xls_historical), 1)
+        self.assertEqual(source.count(xls_current), 0)
+        source = source.replace(xls_historical, xls_current)
+        self.assertEqual(
+            hashlib.sha256(source).hexdigest(), preparation.CONSUMER_API_CURRENT_SHA256
+        )
+        adapted = preparation._adapt_baseline_consumer_adapter(
+            preparation.CONSUMER_API_ADAPTER_PATH, source
         )
         expected = source
-        for current, historical in preparation.RTF_STREAMING_REPLACEMENTS:
+        for current, historical in preparation.CONSUMER_API_REPLACEMENTS:
             self.assertEqual(source.count(current), 1)
             self.assertEqual(source.count(historical), 0)
             expected = expected.replace(current, historical)
         self.assertEqual(adapted, expected)
         self.assertEqual(
             hashlib.sha256(adapted).hexdigest(),
-            preparation.RTF_STREAMING_HISTORICAL_SHA256,
+            preparation.CONSUMER_API_HISTORICAL_SHA256,
         )
-        self.assertEqual(preparation.RTF_STREAMING_TRANSFORM_COUNT, 2)
-        self.assertEqual(preparation.RTF_STREAMING_TRANSFORM_BYTES, 16)
+        self.assertEqual(preparation.CONSUMER_API_TRANSFORM_COUNT, 3)
+        self.assertEqual(preparation.CONSUMER_API_TRANSFORM_BYTES, 29)
         self.assertEqual(
-            preparation._rtf_streaming_adapter_receipt(),
+            preparation._consumer_api_adapter_receipt(),
             {
-                "path": preparation.RTF_STREAMING_ADAPTER_PATH,
-                "candidate_sha256": preparation.RTF_STREAMING_CURRENT_SHA256,
-                "baseline_sha256": preparation.RTF_STREAMING_HISTORICAL_SHA256,
-                "replacement_count": 2,
-                "changed_bytes": 16,
+                "path": preparation.CONSUMER_API_ADAPTER_PATH,
+                "candidate_sha256": preparation.CONSUMER_API_CURRENT_SHA256,
+                "baseline_sha256": preparation.CONSUMER_API_HISTORICAL_SHA256,
+                "replacement_count": 3,
+                "changed_bytes": 29,
                 "replacements": [
                     {
                         "candidate": current.decode("ascii"),
                         "baseline": historical.decode("ascii"),
                         "count": 1,
                     }
-                    for current, historical in preparation.RTF_STREAMING_REPLACEMENTS
+                    for current, historical in preparation.CONSUMER_API_REPLACEMENTS
                 ],
             },
         )
         with self.assertRaises(preparation.PreparationError):
-            preparation._adapt_baseline_adapter(
-                preparation.RTF_STREAMING_ADAPTER_PATH,
+            preparation._adapt_baseline_consumer_adapter(
+                preparation.CONSUMER_API_ADAPTER_PATH,
                 adapted,
             )
 
