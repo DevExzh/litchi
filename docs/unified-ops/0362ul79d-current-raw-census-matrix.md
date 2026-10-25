@@ -216,50 +216,70 @@ Those are expected source drift from the provisional ef1 pin, not evidence
 that the old captures match a574. They must be re-anchored only after the
 coordinator freezes the final source.
 
-## Confirmed non-draft boundary work outside the active PPTX/Numbers returns
+## Current boundary verification outside the active PPTX/Numbers returns
 
-The source-only scope review in 0362rd remains the applicable classification;
-the following are concrete boundaries, not generic name matches or semantic
-exemptions:
+The earlier version of this section repeated pre-migration findings from
+0362rd. The current a574 source was checked directly. The following are
+closures of the raw-limit findings, with exact current signatures and source
+identities; they are not new engineering returns:
 
-* ODF's public raw package surface still includes the documented
-  litchi_odf_common::package::{Archive::new, Archive::read_manifest_xml,
-  read_manifest, parse_manifest} default/limit-less paths. Public ODF writer
-  defaults also need the retained-owner versus raw-output decision. These
-  rows require a caller-selected ODF policy or an explicitly justified owner
-  policy, plus all consumers, before inventory closure.
-* CFB's public OleFile/SharedOleFile default and _with_limits ingress,
-  validation and writer paths, and OleWriter::update_stream, remain the
-  separate CFB substrate follow-up identified in 0362rd. DOC/PPT/XLS use does
-  not turn the substrate into an accepted exception, but its scope must be an
-  atomic CFB consumer migration rather than a name-only change in one format.
-* soapberry-zip still has the public reader/writer with_limits families and
-  aliases listed by 0362rd. Its generic transport lane is separate, while
-  the public ODF re-exports/error boundary are immediately format-facing and
-  cannot be hidden behind that classification.
-* The 0362rd source audit found the old OPC limit/alias debt closed in the
-  assembled source and found only typed causal foreign sources in owned
-  OpcError. That does not waive a fresh OPC rustdoc profile, nor the new
-  PPTX 61/62/63/81/82 aggregate/getter rows. Conversely, it does not justify
-  treating every OpcPackage physical method as a second format owner.
+| surface | current canonical signatures and source identity | closure record |
+|---|---|---|
+| ODF package codec | package/codec.rs blob SHA-1 6afb1bc006bffc0d9f1e123694c2fd58b0b7e720: Archive::new(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> at line 126; Archive::read_manifest_xml(&self, limits: XmlStreamLimits) -> Result<String> at 223; read_manifest(archive: &Archive<'_>, limits: XmlStreamLimits) at 284; parse_manifest(xml: &str, limits: XmlStreamLimits) at 592 | 0362ro/source commit 49b447f673986863ee5dacd23d13d1d8aae2089e: old default constructor, fixed manifest ceiling, and read_manifest_xml_with_limit are gone |
+| ODF writer | core/writer.rs blob SHA-1 68941b901e2779a12dd7f83c08ae5db31319fd30: PackageWriter::new(limits: StreamingArchiveLimits) at 727; new_bounded(limit: usize, limits: StreamingArchiveLimits) at 750; with_writer(writer: W, limits: StreamingArchiveLimits) at 763 | 0362ro/source commit 49b447f673986863ee5dacd23d13d1d8aae2089e: only explicit-policy constructors remain; old PackageWriterLimits and default twins are absent |
+| CFB ingress and writers | file.rs blob SHA-1 f5798a420ba961c7ffca3c456969e154fdd699d2, OleFile::open(reader, limits: OleFileLimits) at 1048; shared.rs blob SHA-1 88f09a1f69ec2242434f3802a01437a5c0f54667, SharedOleFile::open(source, limits), open_owned(source, version, limits), open_owned_vec(source, version, limits) at 634–681; validation.rs blob SHA-1 784c49f28cb8577d8ed41b08ee255babcd90fbf4, validate_source(source, source_limits, report_limits) at 76; writer/core.rs blob SHA-1 413d9e9e25bcb19e40cd36a5be48792a3750d06e, move_storage(..., limits: StorageMoveLimits) at 1282 and adopt_source_layout(..., limits: OleFileLimits) at 466; writer/sequential.rs blob SHA-1 379867bc442067bd5048e98edbf0fb440acce7f9, consuming limits(limits: SequentialWriterLimits) and limits_value() at 198–205 | 0362zad/source commit bf7f48741bc02d1f5e736a7a732c25808d28af36: default twins, public _with_limits names, and OleWriter::update_stream are removed; no public CFB _with_limits, with_limits, or update_stream declaration remains in the current source scan |
+| generic ZIP raw readers/writers | office.rs blob SHA-1 0166220513e005779bd6e979e5c8ee1f729b0f96: ArchiveReader::new(data, limits: ArchiveLimits) at 2893; IndexedArchive::preservation_index(..., limits), from_reader(..., limits), from_reader_with_policy(..., limits, policy), from_zip_archive(..., limits), and from_zip_archive_with_policy(..., limits, policy) at 3972–4019; LocatedArchive::index(limits) and index_with_policy(limits, policy) at 5744–5755; StreamingArchiveWriter::new(limits: StreamingArchiveLimits), with_writer(writer, limits), with_writer_and_spool(..., limits, ...), and with_writer_and_spool_and_name_plan(..., limits, ...) at 7235, 7263, 7302 and 7342; LazyArchiveReader::new(data, limits: ArchiveLimits, cache_limits: LazyArchiveCacheLimits) at 8757; preserve.rs blob SHA-1 42b0d399b151ab20e396d97293688055282d8fec, PreservationIndex::new(..., limits: ArchiveLimits) at 776 | 0362zae/source commit 0e3cfc0e1cb0efe8c371623e42c347aa90640461 and 0362zaea: raw ZIP defaults and public _with_limits/with_limits twins are removed; lazy cache constructors/setters use their canonical explicit policies |
+
+The limit-closure statements above are narrower than an assertion that every
+historical alias spelling in ZIP has disappeared. The current writer.rs blob
+SHA-1 is 1787c62b5cf891af784034ada81ebf7435b7b7d0 and still contains
+documented entry-oriented start_entry_owned/start_entry_owned_zip64 methods;
+the current errors.rs blob SHA-1 is
+6ff49eada6a333e28a310c372e883df708b6712b and still contains ErrorKind::Io
+alongside ErrorKind::IO. Those are separate callable/alias surfaces for the
+final rustdoc and glossary disposition, not remaining limit-less constructors.
+This record neither waives nor closes those names.
+
+The OPC boundary is likewise current-source checked, not copied from the
+older scope note. package.rs blob SHA-1
+db4365c323f4338e9df916916500456894f39459 has public
+OpcPackage::{open,from_reader,from_vec,from_shared_vec,from_bytes} with
+SourceLimits at lines 1382–1541; phys_pkg.rs blob SHA-1
+02df68f316e0902dea4193f71b18781d575fed7d has
+OwnedPhysPkgReader::{open,from_bytes,from_reader} and PhysPkgReader::new
+with SourceLimits at lines 93–256. source_backed.rs blob SHA-1
+cc8f9cf38c7c7dd4e0c49af52bae8ec55c5275ba has the deferred source-owner
+constructors, while the remaining _with_limits helpers are crate-private.
+The public package publication methods take &OpcPackage; the &mut OpcPackage
+helpers found by the source scan are private or crate-private. 0362rl is the
+closure record for this source policy and alias migration. A fresh rustdoc
+profile is still required, but raw OpcPackage physical methods are not a
+second format owner merely because their names describe physical mutation.
+The PPTX 61/62/63/81/82 aggregate/getter rows still require fresh
+profile-level census and disposition.
 
 The historical 0362ul1 diagnostic contains 440 inventory rows from source
 49c25ef67f62a8bb943e7c6a0bf464e49ae87d07, and the 84-row reviewed
 disposition files are anchored to 082fbeafe8. Both are stale relative to
 this candidate. With no current rustdoc inputs in this source-only worktree,
 there is no evidence-backed current row list to close or to reclassify as a
-semantic exemption. The final run must regenerate all 68 all-feature inventory
-inputs and review every non-draft row with a current source anchor; the only
-permitted deferral remains the redaction audit.
+semantic exemption. The final run must separately regenerate the 68
+all-feature inventory inputs and the 84 raw-census profile inputs, then review
+every non-draft row with a current source anchor; the only permitted deferral
+remains the redaction audit.
 
 ## Exact prerequisites before final capture
 
 1. Freeze a clean candidate and bind the current 68-row glossary, 68-package
    direct set, 16 package-only profiles, exact root lock, toolchain, runner,
    environment and external target/TMP identities.
-2. Capture 84 distinct rustdoc JSON inputs and receipts. The current 15
-   provisional profiles have no usable input/receipt; no old artifact can be
-   substituted merely because its package name matches.
+2. Capture 84 distinct feature-profile rustdoc JSON inputs and receipts for
+   the raw census. Separately run the 68-package all-feature capture required
+   by api_debt_inventory. The 84 profile captures do not prove the 68
+   all-feature inventory, and an all-feature artifact cannot silently
+   substitute for a feature-profile input. The current 15 provisional profiles
+   have no usable input/receipt; no old artifact can be substituted merely
+   because its package name matches.
 3. Rebind the expected source blobs, every callable anchor and every
    provisional lane anchor to the frozen commit. Migrate Formula, VBA, XLDM,
    fonts and Markdown entries to their canonical profile IDs, and add the
