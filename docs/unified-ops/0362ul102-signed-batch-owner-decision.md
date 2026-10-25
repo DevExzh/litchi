@@ -26,6 +26,13 @@ admission contract explicitly:
 * one sequential signed setter: `DocumentProtected`, `item = Some(0)`;
 * a one-shot iterator supplied to the signed batch is not advanced at all.
 
+The corpus branch does not force every individual signed setter to be a
+protected-document error: an invalid target still resolves through the
+ordinary route first.  The focused `/slide[1]/notes/paragraph[1]` case proves
+that a signed batch remains `DocumentProtected`/`None` without path resolution,
+while both sequential `set` and closure `edit` retain their `PathNotFound` /
+`Some(0)` result.
+
 The iWork equivalence consumer already preserved `None` through its
 `error.item().or(fallback)` helper and required no change.  No production
 crate, facade admission path, or frozen qualification probe is changed.

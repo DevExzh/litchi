@@ -130,6 +130,21 @@ fn batch(file: &File, sets: &[Set]) -> Outcome {
     }
 }
 
+fn signed_batch_error_without_reading(file: &File, item: BatchItem<'static>) -> litchi_ops::Error {
+    let reads = Cell::new(0usize);
+    let error = file
+        .batch(
+            std::iter::once_with(|| {
+                reads.set(reads.get() + 1);
+                item.clone()
+            }),
+            BatchMode::Atomic,
+        )
+        .expect_err("signed batch must refuse before consuming its stream");
+    assert_eq!(reads.get(), 0, "signed preflight consumed a batch item");
+    error
+}
+
 fn owners(bytes: &[u8]) -> Vec<File> {
     [SourceMode::Auto, SourceMode::Eager]
         .into_iter()
@@ -204,10 +219,11 @@ fn check(name: &str, bytes: &[u8], sets_for: impl Fn(&File, u64) -> Vec<Set>) ->
                     Outcome::Refused(None, "DocumentProtected".to_owned()),
                     "{name} seed {seed} signed batch admission: {sets:?}",
                 );
+                let one = sequential(&file, &sets);
                 assert_eq!(
-                    sequential(&file, &sets),
-                    Outcome::Refused(Some(0), "DocumentProtected".to_owned()),
-                    "{name} seed {seed} signed sequential admission: {sets:?}",
+                    closure(&file, &sets),
+                    one,
+                    "{name} seed {seed} signed edit/set: {sets:?}",
                 );
                 assert_eq!(
                     file.to_bytes().expect("republish signed source"),
@@ -274,19 +290,9 @@ fn signed_batch_refuses_before_item_admission() {
     let mut item = BatchItem::new("set");
     item.path = Some("/slide[1]/shape[1]".into());
     item.props = Some(Props::new().with("text", "changed"));
-    let reads = Cell::new(0usize);
-    let error = signed
-        .batch(
-            std::iter::once_with(|| {
-                reads.set(reads.get() + 1);
-                item.clone()
-            }),
-            BatchMode::Atomic,
-        )
-        .expect_err("signed batch must refuse before consuming its stream");
+    let error = signed_batch_error_without_reading(&signed, item);
     assert_eq!(error.code(), litchi_ops::Code::DocumentProtected);
     assert_eq!(error.item(), None);
-    assert_eq!(reads.get(), 0, "signed preflight consumed a batch item");
 
     assert_eq!(
         batch(&signed, &sets),
@@ -299,6 +305,40 @@ fn signed_batch_refuses_before_item_admission() {
         "single-set refusal remains item-scoped",
     );
     assert_eq!(signed.to_bytes().expect("publish signed source"), bytes);
+}
+
+#[test]
+fn signed_batch_admission_precedes_invalid_path_resolution() {
+    let bytes = std::fs::read("../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx")
+        .expect("signed PPTX fixture");
+    let sets = vec![Set {
+        path: "/slide[1]/notes/paragraph[1]".to_owned(),
+        props: vec![("align", PropValue::from("left"))],
+    }];
+
+    let mut owners_checked = 0;
+    for file in owners(&bytes) {
+        assert!(file.is_signed(), "fixture must remain signed");
+        let before = file.to_bytes().expect("publish signed source");
+        assert_eq!(
+            batch(&file, &sets),
+            Outcome::Refused(None, "DocumentProtected".to_owned()),
+            "batch admission must protect the signed stream before path resolution",
+        );
+        let mut item = BatchItem::new("set");
+        item.path = Some("/slide[1]/notes/paragraph[1]".into());
+        item.props = Some(Props::new().with("align", "left"));
+        let error = signed_batch_error_without_reading(&file, item);
+        assert_eq!(error.code(), litchi_ops::Code::DocumentProtected);
+        assert_eq!(error.item(), None);
+
+        let single = Outcome::Refused(Some(0), "PathNotFound".to_owned());
+        assert_eq!(sequential(&file, &sets), single);
+        assert_eq!(closure(&file, &sets), single);
+        assert_eq!(file.to_bytes().expect("republish signed source"), before);
+        owners_checked += 1;
+    }
+    assert_eq!(owners_checked, 2, "Auto and Eager signed owners");
 }
 
 /// `bytes` with the slide and notes parts rewritten by `edit`.
