@@ -61,7 +61,7 @@ impl EmfConverter {
     }
 
     fn svg(&self) -> Result<String> {
-        crate::emf::EmfSvgConverter::new(&self.parser).convert()
+        crate::emf::EmfSvgConverter::with_limits(&self.parser, self.parser.limits()).convert()
     }
 
     /// Renders EMF content to an in-memory image without using a placeholder.
@@ -133,4 +133,24 @@ fn proportional(other: u32, target: u32, source: u32) -> u32 {
     u32::try_from(u64::from(other) * u64::from(target) / u64::from(source.max(1)))
         .unwrap_or(u32::MAX)
         .max(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compatibility_converter_retains_parser_output_limit() {
+        let data = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/images/emf/wrench.emf"
+        ));
+        let limits = crate::Limits {
+            max_output_bytes: 1,
+            ..crate::Limits::default()
+        };
+        let parser = EmfParser::new(data, &limits).expect("parse wrench EMF");
+        let converter = EmfConverter::new(parser, EmfToRasterOptions::default());
+        assert!(converter.convert_to_png().is_err());
+    }
 }

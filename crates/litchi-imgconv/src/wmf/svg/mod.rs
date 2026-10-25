@@ -302,7 +302,7 @@ mod tests {
             "/../../test-data/images/wmf/santa.wmf"
         );
         let data = std::fs::read(path).expect("santa test WMF");
-        let parser = WmfParser::new(&data).expect("parse santa WMF");
+        let parser = WmfParser::new(&data, &crate::Limits::default()).expect("parse santa WMF");
         let svg = WmfConverter::new(parser)
             .to_svg()
             .expect("render santa WMF");

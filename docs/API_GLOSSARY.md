@@ -133,6 +133,7 @@ below.
 | Options accessors | consuming setter named by the noun (`source_limits(self, ..)`); getter `<noun>_value()` | `get_source_limits`, `get_leniency`, `get_password`, `get_compatibility_profile`; `with_*` setters on option types | ✅ DOCX/PPT/W5/W7/W4 noun setters and `<noun>_value()` accessors (0355, 0357, 0359, 0360, 0360b, 0361); ✅ W6 ODF raw archive/manifest and writer paths use required typed limits (`0362ro`, source closure `49b447f673`); ✅ signature `Policy::{limits, limits_value}` (0362za1); ✅ CFB `SequentialWriterOptions::{limits, limits_value}` (0362zad). |
 | Raw CFB ingress, source-layout adoption and storage moves | `OleFile::open(reader, OleFileLimits)`; `SharedOleFile::{open, open_owned, open_owned_vec}(..., SharedOleFileLimits)`; `validate_source(source, SharedOleFileLimits, ValidationLimits)`; `OleWriter::adopt_source_layout(source, OleFileLimits)`; `OleWriter::move_storage(..., StorageMoveLimits)`; `SequentialWriterOptions::{limits, limits_value}`; `OleWriter::create_stream` (the former `update_stream` alias is removed) | public `*_with_limits` methods, limit-less twins and `update_stream` alias | ✅ every public CFB raw ingress and source-layout adoption path requires caller-selected finite typed limits; former default consumers pass their prior defaults explicitly, retained object/PPT profiles flow through adoption, custom bounds remain unchanged, and duplicate writer aliases are removed (0362zad) |
 | Generic ZIP transport limits | `soapberry_zip::PreservationIndex::new`, `office::{ArchiveReader::new, IndexedArchive::{from_reader, from_zip_archive, preservation_index}, LazyArchiveReader::new(data, archive_limits, cache_limits), LocatedArchive::index, StreamingArchiveWriter::{new, with_writer, with_writer_and_spool*}}`; `LazyArchiveCacheLimits::new` takes all four cache/flight values and exposes `active_flight_limits` plus `*_value()` getters | the former limit-less twins, `new_with_cache_limits`, cache `new_with_*_flight_limits`/`with_*_flight_limits`, `max_active_key_bytes`, and `*_with_limits`/`with_limits` spellings | ✅ every tracked ZIP consumer, test, fuzz target, example and performance tool migrated with prior defaults or custom profiles retained; policy variants keep their required limits (`0362zaea`) |
+| Imgconv raw metafile limits | `litchi_imgconv::{pict::PictParser::new, emf::{EmfParser::{new, new_compatible, from_owned, from_owned_compatible, new_lazy}, EmfRecord::parse, EmfRecordRef::{parse_ref, to_owned}, parse_pointl_array, parse_points_array, parse_poly_counts, parse_dib}, wmf::{WmfParser::{new, from_owned}, parser::WmfRecord::parse}}(..., &Limits)` | `pict::PictParser::new_bounded`; public limit-less raw parser/record twins and any `_with_limits` suffix | ✅ input/record/path-array admission uses the caller-selected `litchi_imgconv::Limits` before copying or reserving; fixed-width metafile headers and scalar readers remain unchanged; every imgconv codec/SVG/test consumer passes its retained `Options::limits` or explicit facade default, including compatibility converters (0362ul47) |
 
 Gate rules added by record 0351 (`tools/api_glossary.json`, §11): affix bans
 (`"match": "prefix" | "suffix"`), `immutable_owners` and `family_methods`.
@@ -143,6 +144,14 @@ crates when it removes the last use.
 Record 0362b also inventories the exact name `with_limits`; each migrated
 profile bans that name alongside the suffix. Raw and record constructors take
 their limits as a required argument.
+
+Record 0362ul47 registers the `litchi-imgconv` raw profile: variable PICT,
+EMF, and WMF parser/record boundaries and allocating EMF fragment helpers take
+the required `litchi_imgconv::Limits` argument.  `new_bounded` is retired;
+there is no public compatibility twin.  The high-level conversion facades may
+select their documented default owner policy, but pass that profile into the
+raw parser.  Boundary tests cover exact input, record-count, record-byte and
+path-array admission; no native or full-workspace qualification is implied.
 
 Record 0362d registers the ODraw picture family: `picture::Package` owns the
 record, `View` is read-only, and both edit commit and `Package::apply` return

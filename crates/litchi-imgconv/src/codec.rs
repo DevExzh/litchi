@@ -314,7 +314,7 @@ fn raw_metafile_svg(
     match input {
         InputFormat::Emf => {
             preflight_emf_header(data, limits)?;
-            let parser = crate::emf::EmfParser::new_compatible(data)?;
+            let parser = crate::emf::EmfParser::new_compatible(data, limits)?;
             check_record_count(parser.records.len(), limits)?;
             check_emf_playback_limits(&parser, limits)?;
             let width = positive(parser.width());
@@ -358,7 +358,7 @@ fn raw_metafile_svg(
         },
         InputFormat::Wmf => {
             preflight_wmf_records(data, limits)?;
-            let parser = crate::wmf::WmfParser::new(data)?;
+            let parser = crate::wmf::WmfParser::new(data, limits)?;
             check_record_count(parser.records.len(), limits)?;
             check_wmf_playback_limits(&parser, limits)?;
             let width = positive(parser.width());
@@ -896,11 +896,7 @@ fn render_wmf(meta: &Meta<'_>, format: ImageFormat, options: Options) -> Result<
 
 fn render_pict(meta: &Meta<'_>, options: Options) -> Result<DynamicImage> {
     let data = inflate_checked(meta, &options.limits)?;
-    let parser = crate::pict::PictParser::new_bounded(
-        &data,
-        options.limits.max_records,
-        options.limits.max_uncompressed_bytes,
-    )?;
+    let parser = crate::pict::PictParser::new(&data, &options.limits)?;
     let (width, height) = target_dimensions(
         positive(parser.width()),
         positive(parser.height()),
