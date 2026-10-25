@@ -43,6 +43,7 @@ diagnosis through the approved capped runner. Other leaves remain source-only.
 The completed accessor and public-alias leaves (155–157 and their review
 follow-ups) are being integrated into the candidate branch with the pending
 protocol fixes. This branch remains an unqualified candidate until the PPT
-repair, combined checks and complete final gates pass. Final source bindings,+census and native measurements must use the corrected frozen revision.
+repair, combined checks and complete final gates pass. Final source bindings,
+census and native measurements must use the corrected frozen revision.
 The old source archives and receipts remain evidence for their recorded
 revisions. Nothing is pushed.

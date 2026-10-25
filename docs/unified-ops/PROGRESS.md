@@ -6056,3 +6056,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   their follow-ups are committed and entering candidate integration, with
   compiler/fidelity/performance acceptance still required. Old-C packets
   remain historical; final qualification must bind the corrected candidate.
+
+  The three contract repairs and their review follow-ups merge into candidate
+  f17dda6e6f (154c), together with bounded signed-archive verification. All
+  151 combined Python contract/protocol tests pass. Root retires the three
+  merged leaves and refs after preserving their ignored locks, reaching
+  276 worktrees and 438 refs removed; 62 worktrees and 75 heads remain.
+  The 71-profile glossary requires a matrix refresh. PPT repair 158 retains
+  the build slot; Rust, native and final acceptance remain open. C1 evidence
+  stays historical, and the corrected candidate is not yet frozen or pushed.
