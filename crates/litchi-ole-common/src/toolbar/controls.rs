@@ -110,6 +110,22 @@ impl<'a> GeneralInfo<'a> {
         }
         Ok(())
     }
+
+    pub(crate) fn encoded_len(&self) -> usize {
+        1 + self
+            .custom_text
+            .as_ref()
+            .map_or(0, |value| 1 + value.encoded_len())
+            + self
+                .description
+                .as_ref()
+                .map_or(0, |value| 1 + value.encoded_len())
+            + self
+                .tooltip
+                .as_ref()
+                .map_or(0, |value| 1 + value.encoded_len())
+            + self.extra.as_ref().map_or(0, ExtraInfo::encoded_len)
+    }
 }
 
 /// Lossless `TBCData` payload.
@@ -156,6 +172,12 @@ impl<'a> Data<'a> {
     #[must_use]
     pub fn specific(&self) -> &[u8] {
         &self.specific
+    }
+
+    /// Return the exact serialized data length without allocating.
+    #[must_use]
+    pub fn encoded_len(&self) -> usize {
+        self.general.encoded_len() + self.specific.len()
     }
 
     #[must_use]

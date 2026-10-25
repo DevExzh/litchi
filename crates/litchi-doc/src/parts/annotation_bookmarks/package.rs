@@ -11,7 +11,7 @@ use super::transaction::{
     Edit as RecordEdit, Error as TransactionError, Patch, Snapshot as TransactionSnapshot,
 };
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
 use litchi_ole_common::object::{
@@ -87,6 +87,7 @@ impl Commit {
 pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
+    source_limits: SourceLimits,
     original: TransactionSnapshot,
     tags: TransactionSnapshot,
     protection: EditProtection,
@@ -97,20 +98,30 @@ pub(crate) struct Editor {
 impl Editor {
     /// Open a DOC package from complete CFB bytes.
     pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
+        Self::open_bounded(
+            bytes,
+            SourceLimits::default(),
+            Limits::default(),
+            ProtectionPolicy::default(),
+        )
     }
 
     /// Open a package with an explicit policy for changed protected content.
     pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
-        Self::open_bounded(bytes, Limits::default(), policy)
+        Self::open_bounded(bytes, SourceLimits::default(), Limits::default(), policy)
     }
 
     /// Opens a package under one edit profile: its revision limits bound the
     /// compound-file parse and its protection policy governs changed
     /// protected content.
-    pub(crate) fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+    pub(crate) fn open_with_options(
+        bytes: Vec<u8>,
+        source_limits: SourceLimits,
+        options: &crate::EditOptions,
+    ) -> Result<Self> {
         Self::open_bounded(
             bytes,
+            source_limits,
             options.revision_limits_value(),
             options.protection_policy_value(),
         )
@@ -119,6 +130,7 @@ impl Editor {
     /// Open a package with both bounded resources and an explicit protection policy.
     fn open_bounded(
         bytes: Vec<u8>,
+        source_limits: SourceLimits,
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
@@ -146,10 +158,11 @@ impl Editor {
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
         let protection = classify(&fib, table)?;
-        let tags = TransactionSnapshot::from_option(codec::parse(&fib, table)?)?;
+        let tags = TransactionSnapshot::from_option(codec::parse(&fib, table, &source_limits)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
+            source_limits,
             original: tags.clone(),
             tags,
             protection,
@@ -323,7 +336,7 @@ impl Editor {
         let fib = FileInformationBlock::parse(&word)?;
         let pointer = validation::pointer_location(&fib)?;
         if let Some(tags) = snapshot.tags() {
-            let payload = codec::to_bytes(tags)?;
+            let payload = codec::to_bytes(tags, &self.source_limits)?;
             let offset = u32::try_from(table.len())
                 .map_err(|_| PackageError::Corrupted("table stream exceeds u32::MAX".into()))?;
             let length = u32::try_from(payload.len()).map_err(|_| {
@@ -337,7 +350,7 @@ impl Editor {
         }
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
-        let reparsed = codec::parse(&reparsed_fib, &table)?;
+        let reparsed = codec::parse(&reparsed_fib, &table, &self.source_limits)?;
         if reparsed.as_ref() != snapshot.tags() {
             return Err(PackageError::Corrupted(
                 "SttbfAtnBkmk snapshot failed FIB/table-stream round-trip validation".into(),

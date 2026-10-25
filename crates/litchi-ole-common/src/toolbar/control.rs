@@ -57,6 +57,14 @@ impl<'a> Body<'a> {
         }
     }
 
+    pub(crate) fn encoded_len(&self) -> usize {
+        match self {
+            Self::Empty => 0,
+            Self::Data(value) => value.encoded_len(),
+            Self::Opaque(value) => value.len(),
+        }
+    }
+
     /// Return the exact serialized body bytes.
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -187,6 +195,12 @@ impl<'a> Control<'a> {
         output.extend_from_slice(&self.prefix);
         output.extend_from_slice(&body);
         output
+    }
+
+    /// Return the exact serialized control length without allocating.
+    #[must_use]
+    pub fn encoded_len(&self) -> usize {
+        self.header.encoded_len() + self.prefix.len() + self.body.encoded_len()
     }
 
     /// Move all borrowed projections into an owned control.

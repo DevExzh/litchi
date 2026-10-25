@@ -162,6 +162,12 @@ impl Base {
         &self.options
     }
 
+    /// The physical source policy retained by the immutable package captured
+    /// for this edit.
+    pub(crate) const fn source_limits(&self) -> crate::package::SourceLimits {
+        self.package.source_limits()
+    }
+
     /// Publish whole candidate package bytes.
     pub(crate) fn publish(self, after: Vec<u8>) -> Result<Published, Failure> {
         let before = self.bytes().map_err(Failure::Package)?;

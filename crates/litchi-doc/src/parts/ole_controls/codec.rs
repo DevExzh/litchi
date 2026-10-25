@@ -2,7 +2,7 @@
 
 use super::model::{Format, Metadata, OcxInfo, Persist1, Persist2, RgxOcxInfo, Story};
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 
 /// The fixed serialized size of one `OcxInfo` record.
 pub(super) const OCX_INFO_SIZE: usize = 20;
@@ -11,7 +11,8 @@ const ODT_MIN_SIZE: usize = 4;
 const ODT_MAX_SIZE: usize = 6;
 
 /// Decode one complete `RgxOcxInfo` payload.
-pub fn parse_bytes(data: &[u8]) -> Result<RgxOcxInfo> {
+pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<RgxOcxInfo> {
+    crate::parts::enforce_source_entry_limit(data, limits)?;
     let count = usize::try_from(read_u32(data, 0, "RgxOcxInfo cOcxInfo")?)
         .map_err(|_| corrupted("RgxOcxInfo count exceeds usize"))?;
     validation::table_size(count, data.len(), OCX_INFO_SIZE)?;
@@ -31,7 +32,7 @@ pub fn parse_bytes(data: &[u8]) -> Result<RgxOcxInfo> {
 }
 
 /// Encode one complete `RgxOcxInfo` payload.
-pub fn to_bytes(table: &RgxOcxInfo) -> Result<Vec<u8>> {
+pub fn to_bytes(table: &RgxOcxInfo, limits: &SourceLimits) -> Result<Vec<u8>> {
     table.validate()?;
     let count =
         u32::try_from(table.len()).map_err(|_| corrupted("RgxOcxInfo count exceeds u32::MAX"))?;
@@ -40,6 +41,7 @@ pub fn to_bytes(table: &RgxOcxInfo) -> Result<Vec<u8>> {
         .checked_mul(OCX_INFO_SIZE)
         .and_then(|size| size.checked_add(ARRAY_HEADER_SIZE))
         .ok_or_else(|| corrupted("RgxOcxInfo size overflows"))?;
+    crate::parts::enforce_source_entry_size(capacity, limits)?;
     let mut data = Vec::with_capacity(capacity);
     data.extend_from_slice(&count.to_le_bytes());
     for info in table.infos() {
@@ -77,13 +79,13 @@ pub fn to_metadata_bytes(metadata: &Metadata) -> Result<Vec<u8>> {
 
 impl RgxOcxInfo {
     /// Decode one complete `RgxOcxInfo` payload.
-    pub fn parse_bytes(data: &[u8]) -> Result<Self> {
-        parse_bytes(data)
+    pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<Self> {
+        parse_bytes(data, limits)
     }
 
     /// Encode one complete `RgxOcxInfo` payload.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        to_bytes(self)
+    pub fn to_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        to_bytes(self, limits)
     }
 }
 

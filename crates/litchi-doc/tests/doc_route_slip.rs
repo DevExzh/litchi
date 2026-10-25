@@ -41,7 +41,7 @@ use litchi_doc::route_slip::{
     DeliveryOption, EditKind, Error, Metadata, NarrowString, Protection, Recipient,
     RecipientSelectionError, RecipientSelector, parse, to_bytes,
 };
-use litchi_doc::{Builder, Package, raw::Reader};
+use litchi_doc::{Builder, Package, SourceLimits, raw::Reader};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
@@ -109,7 +109,10 @@ fn package_edit_round_trips_document_facade_and_exact_fib_payload() {
     let mut reader = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     let document = reader.document().unwrap();
     assert_eq!(document.route_slip().unwrap(), Some(&source));
-    assert_eq!(route_payload(&bytes), to_bytes(&source).unwrap());
+    assert_eq!(
+        route_payload(&bytes),
+        to_bytes(&source, &SourceLimits::default()).unwrap()
+    );
 
     // The patch replays onto its source and its inverse restores it.
     let replayed = package.apply_route_slip(commit.patch()).unwrap();
@@ -281,5 +284,7 @@ fn parse_bytes_from_fib(bytes: &[u8]) -> Metadata {
         "0Table"
     };
     let table = ole.open_stream(&[table_name]).unwrap();
-    parse(&fib, &table).unwrap().unwrap()
+    parse(&fib, &table, &SourceLimits::default())
+        .unwrap()
+        .unwrap()
 }

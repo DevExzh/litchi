@@ -45,9 +45,12 @@ impl Document {
     ) -> Result<Option<&crate::parts::annotation_bookmarks::Tags>> {
         match self.0.annotation_bookmarks.get_or_init(|| {
             match &self.0.annotation_bookmarks_source {
-                Ok(Some(source)) => crate::parts::annotation_bookmarks::Tags::parse_bytes(source)
-                    .map(Some)
-                    .map_err(|error| error.to_string()),
+                Ok(Some(source)) => crate::parts::annotation_bookmarks::Tags::parse_bytes(
+                    source,
+                    &self.0.source_limits,
+                )
+                .map(Some)
+                .map_err(|error| error.to_string()),
                 Ok(None) => Ok(None),
                 Err(error) => Err(error.clone()),
             }

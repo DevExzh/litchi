@@ -69,6 +69,9 @@ use std::sync::{Arc, OnceLock};
 /// The public [`Document`] handle keeps this state behind an `Arc`, so package
 /// projections and caller handles never deep-copy the parsed tables.
 pub(in crate::document) struct DocumentState {
+    /// Physical source policy retained from package ingress for deferred raw
+    /// fragment codecs.
+    pub(in crate::document) source_limits: crate::package::SourceLimits,
     /// File Information Block from `WordDocument` stream
     pub(in crate::document) fib: FileInformationBlock,
     /// The `WordDocument` stream - main document binary data

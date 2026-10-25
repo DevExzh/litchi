@@ -68,9 +68,10 @@ impl Edit {
     /// Returns an error if `index` is absent, `xml` is malformed, or the
     /// resulting store violates its source limits.
     pub fn set_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
+        let limits = self.source.limits();
         self.stage(|store| {
             let item = item_mut(store, index)?;
-            item.set_xml(xml)
+            item.set_xml_with_limits(xml, &limits)
         })
     }
 

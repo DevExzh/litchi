@@ -51,7 +51,11 @@ impl Edit {
         if self.inner.is_none() {
             let bytes = self.base.to_vec()?;
             let options = self.base.options();
-            self.inner = Some(Editor::open_with_options(bytes, options)?);
+            self.inner = Some(Editor::open_with_options(
+                bytes,
+                self.base.source_limits(),
+                options,
+            )?);
         }
         self.inner.as_mut().ok_or_else(|| {
             Error::Package(crate::Error::InvalidFormat(
