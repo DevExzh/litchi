@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import tarfile
+from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
 
@@ -46,6 +47,24 @@ TOOLCHAIN_SHA256 = "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2a
 TOOLCHAIN_BYTES = 86
 CARGO_CONFIG_SHA256 = "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
 CARGO_CONFIG_BYTES = 470
+
+# A current-source run has three independent dependency consumers.  Keeping
+# their locks in one ordered tuple makes the policy immutable while still
+# allowing every consumer to select its own role without accepting a path or
+# digest from a receipt.
+ROLE_NAMES = ("workspace", "perf", "native")
+ROLE_LOCK_PATHS = MappingProxyType({
+    "workspace": "Cargo.lock",
+    "perf": "tools/perf-baseline/Cargo.lock",
+    "native": "tools/native-resave/Cargo.lock",
+})
+SOURCE_MANIFEST_PATHS = (
+    "Cargo.toml",
+    "tools/perf-baseline/Cargo.toml",
+    "tools/native-resave/Cargo.toml",
+)
+PPT_PROBE_PATH = "crates/litchi-ppt/examples/scoped_patch_probe.rs"
+LEGACY_PROBE_PATH = "tools/perf-baseline/examples/refusal_contract_bench.rs"
 
 # These are intentionally not hashes.  They identify the three source
 # transitions discussed by the current-font candidate work and must not be
@@ -155,10 +174,11 @@ class SourcePin:
     commit: str | None
     git_tree: str | None
     tree_sha256: str | None
-    lock: ArtifactPin
+    role_locks: tuple[ArtifactPin, ...]
+    source_manifests: tuple[ArtifactPin, ...]
     toolchain: ArtifactPin
     cargo_config: ArtifactPin
-    probe: ArtifactPin
+    probes: tuple[ArtifactPin, ...]
     fixtures: tuple[ArtifactPin, ...]
     archive: ArtifactPin
     target: str
@@ -173,10 +193,20 @@ class SourcePin:
             and FULL_SHA.fullmatch(self.git_tree) is not None
             and isinstance(self.tree_sha256, str)
             and SHA256.fullmatch(self.tree_sha256) is not None
-            and self.lock.complete()
+            and len(self.role_locks) == len(ROLE_NAMES)
+            and all(
+                item.complete() and item.relative_path == ROLE_LOCK_PATHS[role]
+                for role, item in zip(ROLE_NAMES, self.role_locks)
+            )
+            and len(self.source_manifests) == len(SOURCE_MANIFEST_PATHS)
+            and all(
+                item.complete() and item.relative_path == path
+                for item, path in zip(self.source_manifests, SOURCE_MANIFEST_PATHS)
+            )
             and self.toolchain.complete()
             and self.cargo_config.complete()
-            and self.probe.complete()
+            and bool(self.probes)
+            and all(item.complete() for item in self.probes)
             and bool(self.fixtures)
             and all(item.complete() for item in self.fixtures)
             and self.archive.complete()
@@ -190,16 +220,36 @@ class SourcePin:
             "commit": self.commit,
             "git_tree": self.git_tree,
             "tree_sha256": self.tree_sha256,
-            "lock": self.lock.json(),
+            "role_locks": {
+                role: item.json()
+                for role, item in zip(ROLE_NAMES, self.role_locks)
+            },
+            "source_manifests": [item.json() for item in self.source_manifests],
             "toolchain": self.toolchain.json(),
             "cargo_config": self.cargo_config.json(),
-            "probe": self.probe.json(),
+            "probes": [item.json() for item in self.probes],
             "fixtures": [item.json() for item in self.fixtures],
             "archive": self.archive.json(),
             "target": self.target,
             "profile": self.profile,
             "features": list(self.features),
         }
+
+    def probe_for(self, relative_path: str) -> ArtifactPin:
+        for item in self.probes:
+            if item.relative_path == relative_path:
+                return item
+        raise PolicyIncomplete(f"source pin has no probe for {relative_path}")
+
+    def lock_for_role(self, role: str) -> ArtifactPin:
+        try:
+            index = ROLE_NAMES.index(role)
+        except ValueError as error:
+            raise PolicyError(f"unknown source role: {role}") from error
+        try:
+            return self.role_locks[index]
+        except IndexError as error:
+            raise PolicyIncomplete(f"{role} lock pin is not present") from error
 
 
 PPT_ROUTES = (
@@ -229,10 +279,21 @@ _BASELINE_PIN = SourcePin(
     commit=BASELINE_COMMIT,
     git_tree=BASELINE_GIT_TREE,
     tree_sha256=BASELINE_TREE_SHA256,
-    lock=_artifact("Cargo.lock", BASELINE_LOCK_SHA256, BASELINE_LOCK_BYTES),
+    role_locks=(
+        _artifact("Cargo.lock", BASELINE_LOCK_SHA256, BASELINE_LOCK_BYTES),
+        _artifact("tools/perf-baseline/Cargo.lock", "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", 57_227),
+        _artifact("tools/native-resave/Cargo.lock", "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378", 56_975),
+    ),
+    source_manifests=(
+        _artifact("Cargo.toml", "66a8f4d2b0ffb6b9ba4eb87d84fee8a3049e8ef7e4380b6ee48acaaf372dd7b5", 10_608),
+        _artifact("tools/perf-baseline/Cargo.toml", "9e9d64678dafa5e96034f9f6b5cdb1fca28a65cc7a30adb83c42d6d4ad8b34cd", 3_478),
+        _artifact("tools/native-resave/Cargo.toml", "14a3b0fbf2da037af795d4dc820ed5d91ccbc2d4f5f009f7bb2182c25849fa8b", 1_425),
+    ),
     toolchain=_artifact("rust-toolchain.toml", TOOLCHAIN_SHA256, TOOLCHAIN_BYTES),
     cargo_config=_artifact(".cargo/config.toml", CARGO_CONFIG_SHA256, CARGO_CONFIG_BYTES),
-    probe=_artifact("crates/litchi-ppt/examples/scoped_patch_probe.rs", "0350fc1696688e576613bc8b2c2ccb3d39c12b4b8ad890c5dcd14e3e7b4138ca", 5158),
+    probes=(
+        _artifact("crates/litchi-ppt/examples/scoped_patch_probe.rs", "0350fc1696688e576613bc8b2c2ccb3d39c12b4b8ad890c5dcd14e3e7b4138ca", 5_158),
+    ),
     fixtures=(
         _artifact("test-data/unified-ops/0294/video.ppt", "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a", 43_520),
     ),
@@ -250,11 +311,18 @@ _CANDIDATE_PIN = SourcePin(
     commit=None,
     git_tree=None,
     tree_sha256=None,
-    lock=_artifact("Cargo.lock", None, None),
+    role_locks=tuple(_artifact(ROLE_LOCK_PATHS[role], None, None) for role in ROLE_NAMES),
+    source_manifests=tuple(_artifact(path, None, None) for path in SOURCE_MANIFEST_PATHS),
     toolchain=_artifact("rust-toolchain.toml", TOOLCHAIN_SHA256, TOOLCHAIN_BYTES),
     cargo_config=_artifact(".cargo/config.toml", CARGO_CONFIG_SHA256, CARGO_CONFIG_BYTES),
-    probe=_artifact("crates/litchi-ppt/examples/scoped_patch_probe.rs", None, None),
-    fixtures=(),
+    probes=(
+        _artifact(PPT_PROBE_PATH, None, None),
+        _artifact(LEGACY_PROBE_PATH, None, None),
+    ),
+    # The path is reviewed even while the payload identity is pending.  This
+    # lets manifests and diagnostics name the only admitted fixture without
+    # making the candidate executable.
+    fixtures=(_artifact("test-data/unified-ops/0294/video.ppt", None, None),),
     archive=_artifact("source-archive.tar.zst", None, None),
     target=TARGET,
     profile=PROFILE,
@@ -306,6 +374,53 @@ class CurrentNativePolicyV2:
 
     def digest(self) -> str:
         return hashlib.sha256(_canonical(self.json())).hexdigest()
+
+    def manifest_binding(self) -> dict[str, Any]:
+        """Return the fixed manifest-side identity projection.
+
+        The manifests intentionally carry no candidate source identity while
+        the freeze is pending.  This projection is derived from the trusted
+        code object, not from manifest or command-line fields, and therefore
+        makes a copied or caller-rewritten route manifest fail closed.
+        """
+
+        baseline_locks = {
+            role: {
+                "baseline": {
+                    "bytes": self.baseline.lock_for_role(role).bytes,
+                    "sha256": self.baseline.lock_for_role(role).sha256,
+                },
+                "candidate": (
+                    {
+                        "bytes": self.candidate.lock_for_role(role).bytes,
+                        "sha256": self.candidate.lock_for_role(role).sha256,
+                    }
+                    if self.candidate.lock_for_role(role).complete()
+                    else None
+                ),
+                "path": ROLE_LOCK_PATHS[role],
+            }
+            for role in ROLE_NAMES
+        }
+        return {
+            "candidate_status": "bound" if self.status == "ready" else "pending_final_source_freeze",
+            "fixture_paths": [item.relative_path for item in self.candidate.fixtures],
+            "role_locks": baseline_locks,
+            "probe_paths": [item.relative_path for item in self.candidate.probes],
+            "source": {
+                "archive": self.candidate.archive.json() if self.candidate.archive.complete() else None,
+                "commit": self.candidate.commit if self.candidate.complete() else None,
+                "git_tree": self.candidate.git_tree if self.candidate.complete() else None,
+                "tree_sha256": self.candidate.tree_sha256 if self.candidate.complete() else None,
+            },
+            "source_manifests": list(SOURCE_MANIFEST_PATHS),
+            "toolchain": {
+                "features": list(self.candidate.features),
+                "paths": [self.candidate.toolchain.relative_path, self.candidate.cargo_config.relative_path],
+                "profile": self.candidate.profile,
+                "target": self.candidate.target,
+            },
+        }
 
     def require_execution_ready(self) -> None:
         if self.status != "ready":
@@ -629,16 +744,33 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
     entries = _git_tree_entries(root)
     listing = _git_tree_payload(root)
     pin = TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate
-    tracked_tree = _tracked_materialization(root, entries, (pin.lock,))
+    # Only the ignored workspace lock may be admitted as an overlay, and only
+    # when this side has a complete reviewed identity for that exact path.
+    workspace_lock = pin.lock_for_role("workspace")
+    tracked_tree = _tracked_materialization(root, entries, (workspace_lock,))
     artifacts: dict[str, Any] = {}
-    # The candidate may have no frozen probe/fixture pins.  We still report
-    # the paths, but do not call _pin_file with a missing expected identity.
-    for name, item in (
-        ("lock", pin.lock),
-        ("toolchain", pin.toolchain),
-        ("cargo_config", pin.cargo_config),
-        ("probe", pin.probe),
-    ):
+    # The candidate may have no frozen identities.  We still report every
+    # reviewed path, but never turn an observation into a trusted pin.
+    role_locks: dict[str, Any] = {}
+    for role in ROLE_NAMES:
+        item = pin.lock_for_role(role)
+        path = root / item.relative_path
+        if path.is_file() and not path.is_symlink():
+            digest, size = _hash_file(path, f"{side} {role} lock")
+            role_locks[role] = {
+                "relative_path": item.relative_path,
+                "path": str(path),
+                "sha256": digest,
+                "bytes": size,
+            }
+        else:
+            role_locks[role] = {"relative_path": item.relative_path, "path": str(path), "missing": True}
+    artifacts["role_locks"] = role_locks
+    # Preserve a workspace-lock view in the observation for consumers of the
+    # earlier diagnostic receipt shape; it is derived from the role map and is
+    # never used as a caller-selected identity.
+    artifacts["lock"] = role_locks["workspace"]
+    for name, item in (("toolchain", pin.toolchain), ("cargo_config", pin.cargo_config)):
         path = root / item.relative_path
         if path.is_file() and not path.is_symlink():
             digest, size = _hash_file(path, f"{side} {name}")
@@ -650,6 +782,28 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
             }
         else:
             artifacts[name] = {"relative_path": item.relative_path, "path": str(path), "missing": True}
+    manifests: list[dict[str, Any]] = []
+    for item in pin.source_manifests:
+        path = root / item.relative_path
+        if path.is_file() and not path.is_symlink():
+            digest, size = _hash_file(path, f"{side} source manifest")
+            manifests.append({"relative_path": item.relative_path, "path": str(path), "sha256": digest, "bytes": size})
+        else:
+            manifests.append({"relative_path": item.relative_path, "path": str(path), "missing": True})
+    artifacts["source_manifests"] = manifests
+    probes: list[dict[str, Any]] = []
+    for item in pin.probes:
+        path = root / item.relative_path
+        if path.is_file() and not path.is_symlink():
+            digest, size = _hash_file(path, f"{side} probe")
+            probes.append({"relative_path": item.relative_path, "path": str(path), "sha256": digest, "bytes": size})
+        else:
+            probes.append({"relative_path": item.relative_path, "path": str(path), "missing": True})
+    artifacts["probes"] = probes
+    # Keep the old singular diagnostic key only as a projection of the first
+    # fixed probe.  All admission checks below iterate the complete tuple.
+    if probes:
+        artifacts["probe"] = probes[0]
     fixtures: list[dict[str, Any]] = []
     for item in pin.fixtures:
         path = root / item.relative_path
@@ -696,13 +850,15 @@ def validate_source(source: Path, side: str, archive: Path | None = None) -> dic
         raise PolicyMismatch(f"{side} source tree differs from the trusted policy")
     if not observed["clean"]:
         raise PolicyMismatch(f"{side} source checkout is dirty")
-    for name, item in (
-        ("lock", policy_pin.lock),
-        ("toolchain", policy_pin.toolchain),
-        ("cargo_config", policy_pin.cargo_config),
-        ("probe", policy_pin.probe),
-    ):
-        _pin_file(Path(observed["source_root"]), item, f"{side} {name}")
+    source_root = Path(observed["source_root"])
+    for role in ROLE_NAMES:
+        _pin_file(source_root, policy_pin.lock_for_role(role), f"{side} {role} lock")
+    for item in policy_pin.source_manifests:
+        _pin_file(source_root, item, f"{side} source manifest {item.relative_path}")
+    for name, item in (("toolchain", policy_pin.toolchain), ("cargo_config", policy_pin.cargo_config)):
+        _pin_file(source_root, item, f"{side} {name}")
+    for item in policy_pin.probes:
+        _pin_file(source_root, item, f"{side} probe {item.relative_path}")
     for item in policy_pin.fixtures:
         _pin_file(Path(observed["source_root"]), item, f"{side} fixture {item.relative_path}")
     if archive is None:
@@ -727,17 +883,25 @@ def validate_source(source: Path, side: str, archive: Path | None = None) -> dic
     return observed
 
 
-def validate_lock(path: Path, side: str = "candidate") -> dict[str, Any]:
-    """Validate a lock using only the fixed policy (never a caller digest)."""
+def validate_lock(path: Path, side: str = "candidate", role: str = "workspace") -> dict[str, Any]:
+    """Validate one role lock using only the fixed policy.
+
+    ``role`` selects one of the three reviewed lock pins; neither the path nor
+    a digest is accepted as policy input from a caller.  The default preserves
+    the historical workspace-lock command spelling while all new consumers
+    pass their explicit role.
+    """
 
     if side not in {"baseline", "candidate"}:
         raise PolicyError(f"unknown lock side: {side}")
     TRUSTED_POLICY.require_execution_ready()
-    pin = TRUSTED_POLICY.baseline.lock if side == "baseline" else TRUSTED_POLICY.candidate.lock
+    if role not in ROLE_NAMES:
+        raise PolicyError(f"unknown lock role: {role}")
+    pin = (TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate).lock_for_role(role)
     digest, size = _hash_file(Path(path), f"{side} Cargo.lock")
     if digest != pin.sha256 or size != pin.bytes:
-        raise PolicyMismatch(f"{side} Cargo.lock differs from the trusted current-source policy")
-    return {"path": str(Path(path).resolve()), "sha256": digest, "bytes": size, "side": side}
+        raise PolicyMismatch(f"{side} {role} lock differs from the trusted current-source policy")
+    return {"path": str(Path(path).resolve()), "sha256": digest, "bytes": size, "side": side, "role": role}
 
 
 def validate_routes(lane: str, routes: Sequence[Mapping[str, Any]]) -> None:
@@ -771,6 +935,19 @@ def _check_plan_paths(root: Path, state_dir: Path, target: Path, source_archive:
                 raise PolicyMismatch(f"PPT v2 source/output/archive paths overlap: {left_label} and {right_label}")
 
 
+def _role_lock_path(root: Path, role: str) -> Path:
+    """Resolve a role lock only from the reviewed source pin."""
+
+    pin = TRUSTED_POLICY.candidate.lock_for_role(role)
+    if not pin.complete() or pin.relative_path != ROLE_LOCK_PATHS[role]:
+        raise PolicyIncomplete(f"candidate {role} lock pin is not complete")
+    return root / pin.relative_path
+
+
+def _guarded_lock(root: Path, role: str, guard: Path) -> list[str]:
+    return [sys.executable, str(guard), "guard-role-lock", role, str(_role_lock_path(root, role)), "--"]
+
+
 def make_ppt_steps_v2(
     root: Path,
     state_dir: Path,
@@ -796,13 +973,15 @@ def make_ppt_steps_v2(
     # receipt consumption.  A plan must never be able to pair a later binary
     # with a merely named source root or archive.
     validate_source(root, "candidate", source_archive)
-    lock = root / "Cargo.lock"
     guard = Path(__file__).resolve()
     host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
-    fixture = root / "test-data/unified-ops/0294/video.ppt"
+    fixture_pins = TRUSTED_POLICY.candidate.fixtures
+    if not fixture_pins:
+        raise PolicyIncomplete("candidate fixture pins are not complete")
+    fixture = root / fixture_pins[0].relative_path
     binary = target / TARGET / "release/examples/scoped_patch_correctness"
     receipt = state_dir / "ppt-scoped-correctness.json"
-    guarded = [sys.executable, str(guard), "guard-lock", str(lock), "--"]
+    guarded = _guarded_lock(root, "workspace", guard)
     correctness = (
         "set -eu; "
         f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt --all-features --lib scoped::tests -- --test-threads=1; "
@@ -828,12 +1007,66 @@ def make_ppt_steps_v2(
     ]
 
 
-def _cli_guard_lock(path: Path, command: Sequence[str]) -> int:
+def make_legacy_steps_v2(
+    root: Path,
+    state_dir: Path,
+    target: Path,
+    *,
+    source_archive: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Build the current legacy consumer plan after fixed-source admission.
+
+    The perf-baseline example is compiled with its explicit current adapter;
+    route output names remain the eight fixed entries in the legacy manifest.
+    The source archive is required even though the command itself only reads
+    the source tree: it keeps the plan and its eventual receipt tied to the
+    same archive proof as the PPT lane.
+    """
+
+    TRUSTED_POLICY.require_execution_ready()
+    root = Path(root)
+    state_dir = Path(state_dir)
+    target = Path(target)
+    _check_plan_paths(root, state_dir, target, source_archive)
+    if source_archive is None:
+        raise PolicyMismatch("legacy v2 execution requires the verified candidate source archive")
+    validate_source(root, "candidate", source_archive)
+    guard = Path(__file__).resolve()
+    host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
+    binary = target / TARGET / "release/examples/refusal_contract_bench"
+    guarded = _guarded_lock(root, "perf", guard)
+    build = [
+        *guarded,
+        str(host_guard),
+        "--",
+        "cargo", "build", "--offline", "--locked", "--target", TARGET, "--release",
+        "--manifest-path", "tools/perf-baseline/Cargo.toml", "--no-default-features",
+        "--features", "rtf-current-api", "--example", "refusal_contract_bench",
+    ]
+
+    def direct(name: str, argv: list[str], *, env: dict[str, str] | None = None) -> dict[str, Any]:
+        return {"name": name, "kind": "argv", "argv": argv, "isolated": True, "env": env or {}}
+
+    return [
+        direct("legacy-current-build", build),
+        direct(
+            "legacy-current-probe",
+            [sys.executable, str(host_guard), "--", str(binary), "--check-only"],
+            env={"RUST_TEST_THREADS": "1"},
+        ),
+        direct(
+            "legacy-current-validate",
+            [sys.executable, str(Path(__file__).with_name("validate_current_native_v2.py")), str(state_dir / "execution-receipt.json")],
+        ),
+    ]
+
+
+def _cli_guard_lock(path: Path, command: Sequence[str], role: str = "workspace") -> int:
     """CLI implementation for the new PPT guard; no expected hash input."""
 
-    validate_lock(path, "candidate")
+    validate_lock(path, "candidate", role)
     if not command:
-        print(TRUSTED_POLICY.candidate.lock.sha256)
+        print(TRUSTED_POLICY.candidate.lock_for_role(role).sha256)
         return 0
     completed = subprocess.run(list(command), check=False)
     return int(completed.returncode)
@@ -841,18 +1074,28 @@ def _cli_guard_lock(path: Path, command: Sequence[str]) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    if not args or args[0] != "guard-lock":
+    if not args or args[0] not in {"guard-lock", "guard-role-lock"}:
         print("usage: current_native_policy_v2.py guard-lock CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
+        print("       current_native_policy_v2.py guard-role-lock ROLE CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
         return 2
     try:
         separator = args.index("--")
     except ValueError:
         separator = len(args)
-    if len(args) < 2 or separator != 2:
-        print("usage: current_native_policy_v2.py guard-lock CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
-        return 2
+    if args[0] == "guard-role-lock":
+        if len(args) < 3 or separator != 3 or args[1] not in ROLE_NAMES:
+            print("usage: current_native_policy_v2.py guard-role-lock ROLE CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
+            return 2
+        role = args[1]
+        path_index = 2
+    else:
+        if len(args) < 2 or separator != 2:
+            print("usage: current_native_policy_v2.py guard-lock CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
+            return 2
+        role = "workspace"
+        path_index = 1
     try:
-        return _cli_guard_lock(Path(args[1]), args[separator + 1 :])
+        return _cli_guard_lock(Path(args[path_index]), args[separator + 1 :], role)
     except (OSError, PolicyError) as error:
         print(f"current-source policy guard refused: {error}", file=sys.stderr)
         return 1

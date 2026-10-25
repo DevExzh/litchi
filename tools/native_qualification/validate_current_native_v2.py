@@ -71,6 +71,10 @@ def _same_observation(expected: Mapping[str, Any], actual: Mapping[str, Any], la
         raise ValidationError(f"{label}.artifacts is malformed")
     for name, recorded in expected_artifacts.items():
         current = actual_artifacts.get(name)
+        if name in {"probes", "source_manifests"}:
+            if recorded != current:
+                raise ValidationError(f"{label}.{name} changed since preparation")
+            continue
         if not isinstance(recorded, Mapping) or not isinstance(current, Mapping):
             raise ValidationError(f"{label}.{name} artifact is malformed")
         if recorded != current:
@@ -127,6 +131,8 @@ def _validate_manifest(receipt: Mapping[str, Any]) -> None:
         raise ValidationError("qualification manifest schema is not current-native v2")
     if value.get("lane") != receipt.get("lane"):
         raise ValidationError("qualification manifest lane differs from preparation receipt")
+    if value.get("trusted_inputs") != TRUSTED_POLICY.manifest_binding():
+        raise ValidationError("qualification manifest trusted source/lock/fixture binding differs from policy")
     try:
         validate_routes(str(receipt.get("lane")), value.get("routes", []))
     except PolicyError as error:

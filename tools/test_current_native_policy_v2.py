@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import io
 import inspect
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import tarfile
 import sys
 import tempfile
 import unittest
@@ -386,6 +389,75 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             with self.assertRaises(validator.ValidationError):
                 validator.validate_qualification(qualification, qualification)
 
+    def test_ready_pipeline_binds_three_roles_and_both_consumers(self) -> None:
+        """Exercise the admitted preparation path with real source/archive proofs."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before, before_archive = self._complete_source(parent / "before", "before", "before.tar")
+            after, after_archive = self._complete_source(parent / "after", "after", "after.tar")
+            trusted = self._complete_policy(before, before_archive, after, after_archive)
+            manifest = self._manifest_for_policy(parent / "manifest.json", "ppt-auxiliary", trusted)
+            output_root = parent / "outputs"
+            receipt_path = parent / "preparation.json"
+            with mock.patch.object(policy, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(preparer, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(validator, "TRUSTED_POLICY", trusted):
+                receipt = preparer.prepare(
+                    lane="ppt-auxiliary",
+                    manifest=manifest,
+                    before=before,
+                    after=after,
+                    before_archive=before_archive,
+                    after_archive=after_archive,
+                    output_root=output_root,
+                    output=receipt_path,
+                )
+                self.assertTrue(receipt["execution_admitted"])
+                self.assertEqual(set(receipt["identities"]["after"]["artifacts"]["role_locks"]), set(policy.ROLE_NAMES))
+                admitted = validator.validate_preparation(receipt_path)
+                self.assertEqual(admitted["lane"], "ppt-auxiliary")
+                ppt_steps = policy.make_ppt_steps_v2(after, parent / "ppt-state", parent / "ppt-target", source_archive=after_archive)
+                legacy_steps = policy.make_legacy_steps_v2(after, parent / "legacy-state", parent / "legacy-target", source_archive=after_archive)
+                self.assertEqual(ppt_steps[0]["argv"][2:4], ["guard-role-lock", "workspace"])
+                self.assertEqual(legacy_steps[0]["argv"][2:4], ["guard-role-lock", "perf"])
+
+    def test_ready_pipeline_rejects_wrong_source_lock_archive_and_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before, before_archive = self._complete_source(parent / "before", "before", "before.tar")
+            after, after_archive = self._complete_source(parent / "after", "after", "after.tar")
+            wrong, wrong_archive = self._complete_source(parent / "wrong", "wrong", "wrong.tar")
+            trusted = self._complete_policy(before, before_archive, after, after_archive)
+            manifest = self._manifest_for_policy(parent / "manifest.json", "ppt-auxiliary", trusted)
+            with mock.patch.object(policy, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(preparer, "TRUSTED_POLICY", trusted), \
+                mock.patch.object(validator, "TRUSTED_POLICY", trusted):
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy.validate_source(wrong, "candidate", wrong_archive)
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy.validate_lock(parent / "wrong-lock", "candidate", "perf")
+                bad_archive = parent / "bad.tar"
+                shutil.copyfile(after_archive, bad_archive)
+                with bad_archive.open("ab") as stream:
+                    stream.write(b"tampered")
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy.validate_source(after, "candidate", bad_archive)
+                tampered = json.loads(manifest.read_text(encoding="utf-8"))
+                tampered["routes"][0]["output"] = "state/caller-selected.json"
+                tampered_path = parent / "tampered-manifest.json"
+                tampered_path.write_bytes(policy._canonical(tampered))
+                with self.assertRaises(preparer.PreparationError):
+                    preparer.prepare(
+                        lane="ppt-auxiliary",
+                        manifest=tampered_path,
+                        before=before,
+                        after=after,
+                        before_archive=before_archive,
+                        after_archive=after_archive,
+                        output=parent / "tampered-receipt.json",
+                    )
+
     @staticmethod
     def _fake_source(path: Path, marker: str) -> Path:
         path.mkdir(parents=True)
@@ -395,6 +467,100 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
         subprocess.run(["git", "config", "user.name", "Policy Test"], cwd=path, check=True)
         subprocess.run(["git", "add", "Cargo.toml"], cwd=path, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "fixture"], cwd=path, check=True)
+        return path
+
+    @staticmethod
+    def _complete_source(path: Path, marker: str, archive_name: str) -> tuple[Path, Path]:
+        files = {
+            "Cargo.toml": f"[package]\nname = \"{marker}\"\nversion = \"0.0.0\"\n",
+            "Cargo.lock": f"# {marker} workspace lock\n",
+            "tools/perf-baseline/Cargo.toml": "[package]\nname = \"perf\"\nversion = \"0.0.0\"\n",
+            "tools/perf-baseline/Cargo.lock": f"# {marker} perf lock\n",
+            "tools/native-resave/Cargo.toml": "[package]\nname = \"native\"\nversion = \"0.0.0\"\n",
+            "tools/native-resave/Cargo.lock": f"# {marker} native lock\n",
+            "rust-toolchain.toml": "[toolchain]\nchannel = \"stable\"\n",
+            ".cargo/config.toml": "[build]\ntarget-dir = \"target\"\n",
+            "crates/litchi-ppt/examples/scoped_patch_probe.rs": f"fn main() {{ println!(\"{marker}\"); }}\n",
+            "tools/perf-baseline/examples/refusal_contract_bench.rs": f"fn main() {{ println!(\"legacy-{marker}\"); }}\n",
+            "test-data/unified-ops/0294/video.ppt": f"fixture-{marker}\n",
+        }
+        for relative, content in files.items():
+            target = path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+        subprocess.run(["git", "config", "user.email", "policy-test@example.invalid"], cwd=path, check=True)
+        subprocess.run(["git", "config", "user.name", "Policy Test"], cwd=path, check=True)
+        subprocess.run(["git", "add", "."], cwd=path, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "complete fixture"], cwd=path, check=True)
+        entries = policy._git_tree_entries(path)
+        directories: set[str] = {"snapshot"}
+        for item in entries:
+            relative = Path(str(item["path"]))
+            parent = relative.parent
+            while str(parent) not in {"", "."}:
+                directories.add("snapshot/" + str(parent).replace("\\", "/"))
+                parent = parent.parent
+        archive = path.parent / archive_name
+        with tarfile.open(archive, "w") as stream:
+            root_info = tarfile.TarInfo("snapshot")
+            root_info.type = tarfile.DIRTYPE
+            root_info.mode = 0o755
+            stream.addfile(root_info)
+            for directory in sorted(directories - {"snapshot"}):
+                info = tarfile.TarInfo(directory)
+                info.type = tarfile.DIRTYPE
+                info.mode = 0o755
+                stream.addfile(info)
+            for item in entries:
+                relative = str(item["path"])
+                payload = (path / relative).read_bytes()
+                info = tarfile.TarInfo("snapshot/" + relative)
+                info.mode = 0o755 if item["mode"] == "100755" else 0o644
+                info.size = len(payload)
+                stream.addfile(info, io.BytesIO(payload))
+        return path, archive
+
+    @staticmethod
+    def _complete_policy(before: Path, before_archive: Path, after: Path, after_archive: Path) -> policy.CurrentNativePolicyV2:
+        def pin(source: Path, archive: Path) -> policy.SourcePin:
+            entries = policy._git_tree_entries(source)
+            listing = policy._git_tree_payload(source)
+
+            def artifact(relative: str) -> policy.ArtifactPin:
+                payload = (source / relative).read_bytes()
+                return policy.ArtifactPin(relative, hashlib.sha256(payload).hexdigest(), len(payload))
+
+            archive_payload = archive.read_bytes()
+            return policy.SourcePin(
+                commit=policy._git(source, "rev-parse", "HEAD"),
+                git_tree=policy._git(source, "rev-parse", "HEAD^{tree}"),
+                tree_sha256=hashlib.sha256(listing).hexdigest(),
+                role_locks=tuple(artifact(path) for path in policy.ROLE_LOCK_PATHS.values()),
+                source_manifests=tuple(artifact(path) for path in policy.SOURCE_MANIFEST_PATHS),
+                toolchain=artifact("rust-toolchain.toml"),
+                cargo_config=artifact(".cargo/config.toml"),
+                probes=(artifact(policy.PPT_PROBE_PATH), artifact(policy.LEGACY_PROBE_PATH)),
+                fixtures=(artifact("test-data/unified-ops/0294/video.ppt"),),
+                archive=policy.ArtifactPin(archive.name, hashlib.sha256(archive_payload).hexdigest(), len(archive_payload)),
+                target=policy.TARGET,
+                profile=policy.PROFILE,
+                features=policy.FEATURES,
+            )
+
+        return policy.CurrentNativePolicyV2(
+            baseline=pin(before, before_archive),
+            candidate=pin(after, after_archive),
+            ppt_routes=policy.PPT_ROUTES,
+            legacy_routes=policy.LEGACY_CURRENT_ROUTES,
+        )
+
+    @staticmethod
+    def _manifest_for_policy(path: Path, lane: str, trusted: policy.CurrentNativePolicyV2) -> Path:
+        name = "ppt-current-v2.json" if lane == "ppt-auxiliary" else "legacy-current-v2.json"
+        value = json.loads((ROOT / "tools/native_qualification/manifests" / name).read_text(encoding="utf-8"))
+        value["trusted_inputs"] = trusted.manifest_binding()
+        path.write_bytes(policy._canonical(value))
         return path
 
 

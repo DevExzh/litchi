@@ -140,6 +140,8 @@ def prepare(
         raise PreparationError("manifest is not bound to current-source policy v2")
     if manifest_value.get("lane") != lane:
         raise PreparationError("manifest lane does not match preparation lane")
+    if manifest_value.get("trusted_inputs") != TRUSTED_POLICY.manifest_binding():
+        raise PreparationError("manifest trusted source/lock/probe/fixture binding differs from policy")
     routes = manifest_value.get("routes")
     if not isinstance(routes, list):
         raise PreparationError("manifest routes must be an array")
