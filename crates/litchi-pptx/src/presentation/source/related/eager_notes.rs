@@ -22,6 +22,7 @@ pub(crate) fn load<'a>(
     package: &'a OpcPackage,
     slide: &SlidePart<'a>,
     shape_limits: crate::shape::Limits,
+    notes_limits: crate::notes::Limits,
 ) -> Result<Option<Notes>> {
     let Some((relationship, part)) = related_by_type(
         package,
@@ -34,8 +35,9 @@ pub(crate) fn load<'a>(
         return Ok(None);
     };
 
-    super::notes::validate_eager(package, slide.part(), part)?;
-    let processed = super::notes::processed_eager_notes(part, package.read_limits())?;
+    super::notes::validate_eager_with_limits(package, slide.part(), part, notes_limits)?;
+    let processed =
+        super::notes::processed_eager_notes_with_limits(part, package.read_limits(), notes_limits)?;
     let parsed = shape::Scene::read(processed.as_slice(), shape_limits)?;
     let scene = OwnedScene::from_parsed(parsed, Arc::clone(&processed))?;
     super::strict_scene(&scene, "notes")?;

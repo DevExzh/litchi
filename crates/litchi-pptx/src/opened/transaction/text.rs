@@ -144,7 +144,11 @@ impl Edit {
         let max_output_bytes = shape_limits.output_bytes();
         let (part_name, candidate) = match body {
             TextBody::Notes { .. } => {
-                let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+                let source = crate::notes::load_snapshot_with_limits(
+                    &self.working,
+                    &presentation_name,
+                    self.notes_limits(),
+                )?;
                 let Some(note) = source.as_ref().and_then(|source| {
                     source
                         .slides()

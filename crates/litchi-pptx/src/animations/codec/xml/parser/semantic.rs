@@ -17,6 +17,7 @@ use super::validation::{
     parse_build_auto_advance, parse_group_id, parse_progress, parse_shape_id, parse_timing_value,
     parse_xml_bool,
 };
+use crate::animations::Limits;
 use crate::leniency::{TimingDefect, ToleranceReport};
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
@@ -26,6 +27,7 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 pub(super) struct TimingParser {
+    limits: Limits,
     sequence: Sequence,
     shape_ids: HashSet<u32>,
     time_nodes: Vec<TimeNodeFrame>,
@@ -82,8 +84,9 @@ struct OrphanRepair {
 }
 
 impl TimingParser {
-    pub(super) fn new(require_valid_targets: bool) -> Self {
+    pub(super) fn new(require_valid_targets: bool, limits: Limits) -> Self {
         Self {
+            limits,
             sequence: Sequence::new(),
             shape_ids: HashSet::new(),
             time_nodes: Vec::new(),
@@ -140,7 +143,7 @@ impl TimingParser {
         event_start: usize,
         event_end: usize,
     ) -> Result<()> {
-        check_attribute_count(element)?;
+        check_attribute_count(element, self.limits)?;
 
         if self.require_valid_targets
             && is_presentationml_name(namespace, element.name(), b"graphicFrame")
@@ -1170,7 +1173,7 @@ impl TimingParser {
         Some(repair)
     }
 
-    pub(super) fn finish(mut self, xml: &[u8]) -> Result<Sequence> {
+    pub(super) fn finish(mut self, xml: &[u8], limits: Limits) -> Result<Sequence> {
         if !self.pending.is_empty()
             || !self.time_nodes.is_empty()
             || self.timing_depth.is_some()
@@ -1191,7 +1194,7 @@ impl TimingParser {
             let raw = xml
                 .get(range)
                 .ok_or_else(|| invalid("paragraph template range is outside slide XML"))?;
-            if raw.len() > MAX_TEMPLATE_TIME_NODE_BYTES {
+            if raw.len() > limits.max_template_bytes {
                 return Err(invalid("paragraph template time node exceeds safety limit"));
             }
             let raw = std::str::from_utf8(raw)
@@ -1203,7 +1206,7 @@ impl TimingParser {
                 .ok_or_else(|| invalid("paragraph template build index is invalid"))?;
             build.templates.push(ParagraphTemplate {
                 level,
-                time_node: TemplateTimeNode::parse(raw)?,
+                time_node: TemplateTimeNode::parse(raw, limits)?,
             });
         }
         for build in &self.sequence.paragraph_builds {
@@ -1251,6 +1254,12 @@ impl TimingParser {
             if raw.len() > MAX_PRESERVED_TIMING_BYTES {
                 return Err(invalid("preserved timing subtree exceeds safety limit"));
             }
+            if raw.len() > limits.max_output_bytes {
+                return Err(crate::Error::Limit {
+                    resource: "animation XML output bytes",
+                    limit: limits.max_output_bytes,
+                });
+            }
             let raw =
                 std::str::from_utf8(raw).map_err(|_err| invalid("timing subtree is not UTF-8"))?;
             self.sequence.source_animations =
@@ -1265,7 +1274,7 @@ impl TimingParser {
                 Some(self.sequence.ole_chart_builds.clone().into_boxed_slice());
             let slide_xml = std::str::from_utf8(xml)
                 .map_err(|_err| invalid("slide timing XML is not UTF-8"))?;
-            let timing_tree = super::wire::parse_recursive_timing_tree(slide_xml)?;
+            let timing_tree = super::wire::parse_recursive_timing_tree(slide_xml, limits)?;
             self.sequence.source_timing_tree = Some(Box::new(timing_tree.clone()));
             self.sequence.timing_tree = Some(timing_tree);
             self.sequence.source_timing_xml = Some(raw.to_string().into_boxed_str());

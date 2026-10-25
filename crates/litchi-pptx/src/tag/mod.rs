@@ -61,6 +61,35 @@ const NONEMPTY_WIRE_BYTES: usize = ROOT_PREFIX_BYTES + ROOT_CHILDREN_OPEN.len() 
 
 use crate::Result;
 
+/// Resource bounds for one raw programmable-tag part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_PART_BYTES,
+        max_output_bytes: MAX_PART_BYTES,
+    };
+
+    #[must_use]
+    pub const fn from_source(source: litchi_opc::SourceLimits) -> Self {
+        Self::DEFAULT.constrained_by_source(source)
+    }
+
+    /// Intersect a selected semantic policy with the physical source ceiling.
+    #[must_use]
+    pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
+        let max_part_bytes = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        Self {
+            max_input_bytes: self.max_input_bytes.min(max_part_bytes),
+            max_output_bytes: self.max_output_bytes.min(max_part_bytes),
+        }
+    }
+}
+
 mod codec;
 mod model;
 mod package;
@@ -81,8 +110,9 @@ pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 // the old parent-private topology without expanding the external API.
 pub(crate) use codec::{bounded_text, is_namespace, pml, validate_qname};
 pub(crate) use package::{
-    Anchor, available_part_name, available_relationship_id, has_other_inbound,
-    relationship_namespace, replace_xml, resolve_anchor, staged_xml, validate_relative_target,
+    Anchor, available_part_name, available_relationship_id, discover_with_limits,
+    has_other_inbound, load_with_limits, relationship_namespace, replace_xml, resolve_anchor,
+    resolve_anchor_with_limits, staged_xml, validate_relative_target, validate_replay_part,
     validate_selected_relationship,
 };
 
@@ -96,4 +126,4 @@ pub(crate) fn allocation(
 ) -> Error {
     Error::Allocation { resource, source }
 }
-pub(crate) use package::{put, remove};
+pub(crate) use package::{put, put_with_limits, remove, remove_with_limits};

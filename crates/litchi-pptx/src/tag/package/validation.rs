@@ -2,7 +2,7 @@
 
 use super::super::codec::{parse_profiled, pml, xml_error};
 use super::super::{
-    CONTENT_TYPE, MAX_GRAPH_LINKS, MAX_GRAPH_PARTS, MAX_OWNER_DEPTH, MAX_OWNER_NODES,
+    CONTENT_TYPE, Limits, MAX_GRAPH_LINKS, MAX_GRAPH_PARTS, MAX_OWNER_DEPTH, MAX_OWNER_NODES,
     MAX_PART_NAME_BYTES, MAX_RELATIONSHIP_ID_BYTES, MAX_SOURCE_RELATIONSHIPS, PART_NAME_ATTEMPTS,
     allocation, invalid,
 };
@@ -246,6 +246,22 @@ pub(crate) fn resolve_anchor(
     anchor: &Anchor,
     expected: super::super::Conformance,
 ) -> Result<super::super::Source> {
+    resolve_anchor_with_limits(
+        owner,
+        package,
+        anchor,
+        expected,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn resolve_anchor_with_limits(
+    owner: &dyn OpcPart,
+    package: &OpcPackage,
+    anchor: &Anchor,
+    expected: super::super::Conformance,
+    limits: Limits,
+) -> Result<super::super::Source> {
     let relationship = owner.rels().get(&anchor.id).ok_or_else(|| {
         invalid(format!(
             "p:tags references missing relationship '{}'",
@@ -277,7 +293,7 @@ pub(crate) fn resolve_anchor(
             part.partname()
         )));
     }
-    let (list, conformance) = parse_profiled(part.blob())?;
+    let (list, conformance) = parse_profiled(part.blob(), limits)?;
     if conformance != expected {
         return Err(invalid(
             "tag-list namespace profile does not match its PresentationML owner",

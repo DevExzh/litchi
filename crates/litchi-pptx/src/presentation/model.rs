@@ -52,8 +52,12 @@ impl<'a> Presentation<'a> {
         }
     }
 
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        crate::open_options::selected(self.semantic_limits.as_ref())
+    }
+
     pub(crate) fn shape_limits(&self) -> crate::shape::Limits {
-        crate::open_options::selected(self.semantic_limits.as_ref()).shape()
+        self.semantic_limits().shape()
     }
 
     /// The ordered slide catalog parsed from the immutable main part.
@@ -148,7 +152,13 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
-        package::notes(self.package, &self.part)
+        package::notes(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Discover the optional opaque VBA project relationship owned by this

@@ -17,16 +17,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let package = Package::open(input)?;
-    let owner = package
-        .presentation()?
-        .slide(0)?
-        .ok_or_else(usage)?
-        .part()
-        .part()
-        .partname()
-        .clone();
-    let mut tags = litchi_pptx::tag::shape::load(package.opc()?, &owner, shape.as_str())?
-        .map_or_else(List::new, litchi_pptx::tag::Source::into_list);
+    let mut tags = package
+        .shape_tags(0_usize, shape.as_str())?
+        .unwrap_or_else(List::new);
     let outcome = match tags.set(name.as_str(), value.as_str()) {
         Ok(_) => "replaced",
         Err(litchi_pptx::Error::NameNotFound(_)) => {

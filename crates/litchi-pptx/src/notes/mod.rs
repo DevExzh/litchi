@@ -10,13 +10,16 @@ mod validation;
 pub use codec::{master_xml, write_text, write_text_with};
 pub(crate) use codec::{
     rewrite_text, root_conformance, root_conformance_from_processed, scan_xml,
-    validate_resource_xml,
+    validate_resource_xml, validate_resource_xml_with_limits,
 };
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
-    SlideRootMemo, SlideRootProof, apply_commit, clear_checked, load, load_snapshot,
-    load_snapshot_with_slide_root_proofs, remove_checked,
+    SlideRootMemo, SlideRootProof, apply_commit, clear_checked, clear_checked_with_limits,
+    clear_with_limits, load, load_snapshot, load_snapshot_with_limits,
+    load_snapshot_with_slide_root_proofs, load_snapshot_with_slide_root_proofs_and_limits,
+    load_with_limits, remove_checked, remove_checked_with_limits, remove_with_limits,
+    validate_replay_part, validate_replay_total,
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
@@ -49,6 +52,55 @@ pub(crate) const MAX_SLIDE_ROOT_NODES: usize = 1_000_000;
 pub(crate) const MAX_DEPTH: usize = 128;
 pub(crate) const MAX_ATTRIBUTES: usize = 500_000;
 pub(crate) const MAX_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;
+
+/// Resource policy for the raw notes XML codec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub max_attribute_bytes: usize,
+    pub max_text_bytes: usize,
+    pub max_total_bytes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_NOTES_XML,
+        max_output_bytes: MAX_NOTES_XML,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_attribute_bytes: MAX_ATTRIBUTE_BYTES,
+        max_text_bytes: MAX_NOTES_XML,
+        max_total_bytes: MAX_TOTAL_BYTES,
+    };
+
+    #[must_use]
+    pub const fn from_source(source: litchi_opc::SourceLimits) -> Self {
+        Self::DEFAULT.constrained_by_source(source)
+    }
+
+    /// Intersect a selected semantic policy with the physical source ceiling.
+    #[must_use]
+    pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
+        let part = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        Self {
+            max_input_bytes: self.max_input_bytes.min(part),
+            max_output_bytes: self.max_output_bytes.min(part),
+            max_depth: self.max_depth.min(source.max_depth()),
+            max_nodes: self.max_nodes.min(source.max_events()),
+            max_attribute_bytes: self
+                .max_attribute_bytes
+                .min(source.max_xml_attribute_bytes()),
+            max_text_bytes: self.max_text_bytes.min(part),
+            max_total_bytes: self
+                .max_total_bytes
+                .min(source.max_total_part_bytes().min(usize::MAX as u64) as usize),
+            ..self
+        }
+    }
+}
 
 pub(crate) fn checked_add(left: usize, right: usize, label: &str) -> crate::Result<usize> {
     left.checked_add(right)

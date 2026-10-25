@@ -241,9 +241,15 @@ fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
         .expect("replace active attachment")
         .expect("old list");
     assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-    let active = load(&package, &owner, "Active", crate::shape::Limits::DEFAULT)
-        .expect("load active attachment")
-        .expect("active attachment");
+    let active = load(
+        &package,
+        &owner,
+        "Active",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("load active attachment")
+    .expect("active attachment");
     assert_ne!(active.rel(), "rId1");
     assert_ne!(active.part(), &original_part);
     assert_eq!(
@@ -270,9 +276,15 @@ fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
         .expect("old list");
     assert_eq!(removed.get("owner").expect("old tag").value(), "Alice");
     assert!(
-        load(&package, &owner, "Active", crate::shape::Limits::DEFAULT)
-            .expect("load active")
-            .is_none()
+        load(
+            &package,
+            &owner,
+            "Active",
+            crate::tag::Limits::DEFAULT,
+            crate::shape::Limits::DEFAULT
+        )
+        .expect("load active")
+        .is_none()
     );
     let owner_part = package.get_part(&owner).expect("owner");
     assert!(owner_part.rels().get("rId1").is_some());
@@ -299,17 +311,29 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
     let (mut package, owner) = owner_package(xml);
 
     assert!(
-        load(&package, &owner, "Title", crate::shape::Limits::DEFAULT)
-            .expect("load")
-            .is_none()
+        load(
+            &package,
+            &owner,
+            "Title",
+            crate::tag::Limits::DEFAULT,
+            crate::shape::Limits::DEFAULT
+        )
+        .expect("load")
+        .is_none()
     );
     assert_eq!(
         put(&mut package, &owner, "Title", list("Owner", "Alice")).expect("create"),
         None
     );
-    let source = load(&package, &owner, 0_usize, crate::shape::Limits::DEFAULT)
-        .expect("load")
-        .expect("attachment");
+    let source = load(
+        &package,
+        &owner,
+        0_usize,
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("load")
+    .expect("attachment");
     assert_eq!(source.list().get("owner").expect("tag").value(), "Alice");
 
     let owner_before = package.get_part(&owner).expect("owner").blob_arc();
@@ -366,9 +390,15 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
     assert_eq!(removed.get("owner").expect("tag").value(), "Alice");
     assert!(!package.is_signed());
     assert!(
-        load(&package, &owner, "Title", crate::shape::Limits::DEFAULT)
-            .expect("load")
-            .is_none()
+        load(
+            &package,
+            &owner,
+            "Title",
+            crate::tag::Limits::DEFAULT,
+            crate::shape::Limits::DEFAULT
+        )
+        .expect("load")
+        .is_none()
     );
     assert!(
         remove(&mut package, &owner, "Title")
@@ -389,9 +419,15 @@ fn strict_shape_crud_uses_strict_namespaces_and_relationship_type() {
         put(&mut package, &owner, "Strict", List::new()).expect("strict create"),
         None
     );
-    let source = load(&package, &owner, "Strict", crate::shape::Limits::DEFAULT)
-        .expect("strict load")
-        .expect("strict attachment");
+    let source = load(
+        &package,
+        &owner,
+        "Strict",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("strict load")
+    .expect("strict attachment");
     assert_eq!(source.conformance(), Conformance::Strict);
     assert_eq!(
         package
@@ -444,12 +480,24 @@ fn shared_shape_anchor_forks_then_collects_each_orphan() {
         .expect("fork")
         .expect("old list");
     assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-    let first = load(&package, &owner, "First", crate::shape::Limits::DEFAULT)
-        .expect("first load")
-        .expect("first attachment");
-    let second = load(&package, &owner, "Second", crate::shape::Limits::DEFAULT)
-        .expect("second load")
-        .expect("second attachment");
+    let first = load(
+        &package,
+        &owner,
+        "First",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("first load")
+    .expect("first attachment");
+    let second = load(
+        &package,
+        &owner,
+        "Second",
+        crate::tag::Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
+    .expect("second load")
+    .expect("second attachment");
     assert_ne!(first.rel(), second.rel());
     assert_ne!(first.part(), second.part());
     assert_eq!(

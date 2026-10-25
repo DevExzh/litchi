@@ -1306,7 +1306,7 @@ fn write_static_parts<W: Write>(
     archive = write_blob(
         archive,
         NOTES_MASTER_PART,
-        crate::notes::master_xml().as_bytes(),
+        crate::notes::master_xml(crate::notes::Limits::DEFAULT)?.as_bytes(),
     )?;
     write_notes_master_relationships(archive)
 }

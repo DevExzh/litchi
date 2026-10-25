@@ -41,8 +41,12 @@ impl Edit {
             master
         };
         let owner = self.working.get_part(slide)?;
-        if crate::media_parts::document_conformance(owner.blob())?
-            != crate::media_parts::Conformance::Transitional
+        if crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )? != crate::media_parts::Conformance::Transitional
         {
             return Err(refuse(
                 "notes creation is implemented for transitional presentations only",
@@ -65,7 +69,7 @@ impl Edit {
         let mut part = BlobPart::new(
             name.clone(),
             ct::PML_NOTES_SLIDE.to_owned(),
-            crate::notes::write_text(text)?,
+            crate::notes::write_text(text, self.notes_limits())?,
         );
         part.relate_to(&slide.relative_ref(name.base_uri()), rt::SLIDE);
         part.relate_to(&master.relative_ref(name.base_uri()), rt::NOTES_MASTER);

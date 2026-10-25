@@ -118,7 +118,9 @@ impl Package {
         let mut notes_master = BlobPart::new(
             notes_master_name,
             ct::PML_NOTES_MASTER.to_string(),
-            crate::notes::master_xml().as_bytes().to_vec(),
+            crate::notes::master_xml(crate::notes::Limits::DEFAULT)?
+                .as_bytes()
+                .to_vec(),
         );
         notes_master.relate_to("../theme/theme2.xml", rt::THEME);
 
@@ -173,11 +175,14 @@ impl Package {
         package.add_part(Box::new(extended_properties));
         let part_bytes = Self::part_bytes_for(&package)?;
 
+        let replay_index = crate::package::replay_index::ReplayIndex::from_package(&package)?;
+
         Ok(Self {
             opc: std::sync::Arc::new(package),
             part_bytes,
             content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::new(replay_index),
             physical_source_provenance: false,
             semantic_limits: None,
             tolerance: crate::leniency::ToleranceReport::default(),
@@ -326,11 +331,13 @@ impl Package {
                 &mut tolerance,
                 presentation_limits,
             );
+        let replay_index = crate::package::replay_index::ReplayIndex::from_package(&opc)?;
         Ok(Self {
             opc: std::sync::Arc::new(opc),
             part_bytes,
             content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::new(replay_index),
             physical_source_provenance,
             semantic_limits,
             tolerance,
@@ -506,7 +513,12 @@ impl Package {
                 let mut notes_part = BlobPart::new(
                     notes_name,
                     ct::PML_NOTES_SLIDE.to_string(),
-                    crate::notes::write_text(text)?,
+                    crate::notes::write_text(
+                        text,
+                        self.semantic_limits()
+                            .notes()
+                            .constrained_by_source(self.opc.read_limits()),
+                    )?,
                 );
                 notes_part.relate_to(&format!("../slides/slide{}.xml", index + 1), rt::SLIDE);
                 notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);

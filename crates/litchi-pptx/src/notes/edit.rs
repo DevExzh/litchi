@@ -47,18 +47,40 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_notes(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_notes")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_notes",
+            |package, target, patch| {
+                let limits = package
+                    .semantic_limits()
+                    .notes()
+                    .constrained_by_source(target.read_limits());
+                patch.validate_changed_parts(target, |_, part| {
+                    super::validate_replay_part(part, limits)
+                })?;
+                if patch.touches_notes(&package.opc, target)? {
+                    let index = patch.replay_index_after(package, target)?;
+                    super::validate_replay_total(&index, limits)?;
+                }
+                Ok(())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::Limits {
+        self.staged
+            .semantic_limits()
+            .notes()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     fn snapshot(&self) -> Result<Option<super::Snapshot>> {
         let opc = self.staged.opc();
         let presentation = PresentationPart::from_package(opc)?;
-        super::load_snapshot(opc, presentation.part().partname())
+        super::load_snapshot_with_limits(opc, presentation.part().partname(), self.limits())
     }
 
     fn stage(&mut self, change: impl FnOnce(&mut Draft) -> Result<bool>) -> Result<bool> {
@@ -164,8 +186,9 @@ impl Edit<'_> {
         let Some(source) = self.snapshot()? else {
             return Ok(false);
         };
+        let limits = self.limits();
         self.staged
-            .update(|opc| super::remove_checked(opc, &source, &slide))
+            .update(|opc| super::remove_checked_with_limits(opc, &source, &slide, limits))
     }
 
     /// Remove the notes of every slide while retaining shared notes
@@ -179,7 +202,9 @@ impl Edit<'_> {
         let Some(source) = self.snapshot()? else {
             return Ok(0);
         };
-        self.staged.update(|opc| super::clear_checked(opc, &source))
+        let limits = self.limits();
+        self.staged
+            .update(|opc| super::clear_checked_with_limits(opc, &source, limits))
     }
 
     /// The position, in the staged notes graph, of the selected slide's

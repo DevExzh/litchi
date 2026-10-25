@@ -174,7 +174,6 @@ pub use master_layout::{
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
-    load_slide_media, parse_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
 pub use open_options::{OpenOptions, OpenPolicy};

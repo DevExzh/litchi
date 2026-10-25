@@ -227,6 +227,7 @@ impl Package {
         Self {
             opc: std::sync::Arc::new(opc),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index: std::sync::Arc::clone(&self.replay_index),
             physical_source_provenance: self.physical_source_provenance,
             semantic_limits: self.semantic_limits.clone(),
             tolerance: self.tolerance.clone(),

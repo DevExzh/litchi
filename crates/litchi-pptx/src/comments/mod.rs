@@ -19,7 +19,16 @@ pub use collaboration::{
     load_threading, load_threading_snapshot,
 };
 pub use model::{Author, Comment, Comments, Conformance, List};
-pub(crate) use package::reattribute_presentation_comment;
+pub(crate) use package::{
+    add_presentation_comment_author_with_limits, add_presentation_comment_with_limits,
+    load_presentation_comments_strict_with_limits,
+    load_presentation_comments_with_tolerance_and_limits, reattribute_presentation_comment,
+    reattribute_presentation_comment_with_limits, remove_presentation_comment_author_with_limits,
+    remove_presentation_comment_with_limits, reorder_presentation_comment_authors_with_limits,
+    reorder_presentation_comments_with_limits, store_presentation_comments_with_limits,
+    update_presentation_comment_author_with_limits, update_presentation_comment_with_limits,
+    validate_replay_part,
+};
 pub use package::{
     find_presentation_comment, find_presentation_comment_author, load_presentation_comments,
     load_presentation_comments_strict, load_presentation_comments_with_tolerance,
@@ -54,6 +63,46 @@ pub(crate) const MAX_AUTHORS: usize = 4096;
 pub(crate) const MAX_SLIDES: usize = 100_000;
 pub(crate) const MAX_COMMENTS_PER_SLIDE: usize = 65_536;
 pub(crate) const MAX_TOTAL_COMMENTS: usize = 1_000_000;
+
+/// Resource bounds for one raw legacy-comment part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub max_string_bytes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_PART_BYTES,
+        max_output_bytes: MAX_PART_BYTES,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_string_bytes: MAX_STRING_BYTES,
+    };
+
+    #[must_use]
+    pub const fn from_source(source: litchi_opc::SourceLimits) -> Self {
+        Self::DEFAULT.constrained_by_source(source)
+    }
+
+    /// Intersect a selected semantic policy with the physical source ceiling.
+    #[must_use]
+    pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
+        let part = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        Self {
+            max_input_bytes: self.max_input_bytes.min(part),
+            max_output_bytes: self.max_output_bytes.min(part),
+            max_depth: self.max_depth.min(source.max_depth()),
+            max_nodes: self.max_nodes.min(source.max_events()),
+            max_string_bytes: self
+                .max_string_bytes
+                .min(source.max_xml_attribute_bytes().min(usize::MAX as u64) as usize),
+        }
+    }
+}
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())

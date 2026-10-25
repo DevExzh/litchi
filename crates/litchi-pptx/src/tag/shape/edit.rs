@@ -51,14 +51,16 @@ impl Package {
             "apply_shape_tags",
             |package, target, patch| {
                 let shape_limits = package.semantic_limits().shape();
-                patch.validate_changed_parts(target, |_, part| {
+                let limits = package
+                    .semantic_limits()
+                    .tag()
+                    .constrained_by_source(target.read_limits());
+                patch.validate_changed_parts(target, |name, part| {
+                    crate::tag::validate_replay_part(target, name, part, limits)?;
                     if part.content_type() == ct::PML_SLIDE {
-                        crate::shape::Scene::read(part.blob(), shape_limits).map(|_| ())
-                    } else if part.content_type() == crate::tag::CONTENT_TYPE {
-                        crate::tag::parse(part.blob()).map(|_| ())
-                    } else {
-                        Ok(())
+                        crate::shape::Scene::read(part.blob(), shape_limits)?;
                     }
+                    Ok(())
                 })
             },
         )?;
@@ -83,8 +85,14 @@ impl Edit<'_> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
         let shape_limits = self.staged.shape_limits();
-        self.staged
-            .update(move |opc| super::put_with_limits(opc, &slide, shape, list, shape_limits))
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(self.staged.opc().read_limits());
+        self.staged.update(move |opc| {
+            super::put_with_limits(opc, &slide, shape, list, limits, shape_limits)
+        })
     }
 
     /// Remove the programmable-tag list of the selected shape. Returns the
@@ -102,8 +110,13 @@ impl Edit<'_> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
         let shape_limits = self.staged.shape_limits();
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(self.staged.opc().read_limits());
         self.staged
-            .update(move |opc| super::remove_with_limits(opc, &slide, shape, shape_limits))
+            .update(move |opc| super::remove_with_limits(opc, &slide, shape, limits, shape_limits))
     }
 
     /// Discard every staged change.

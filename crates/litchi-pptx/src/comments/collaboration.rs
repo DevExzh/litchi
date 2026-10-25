@@ -14,6 +14,8 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::{validate_presence_replay, validate_threading_replay};
+
 pub mod presence;
 pub mod threading;
 

@@ -8,7 +8,7 @@
 //! Run with: `cargo run --example pptx_handout_comprehensive --features ooxml`
 
 use litchi_pptx::Package;
-use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
+use litchi_pptx::animations::{Effect, EffectInstance, Limits, Sequence, Trigger};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
 use std::error::Error as StdError;
@@ -196,8 +196,8 @@ fn animations_xml() -> Result<String, Box<dyn StdError>> {
             .with_trigger(Trigger::AfterPrevious)
             .with_duration_ms(750),
     );
-    let xml = sequence.to_xml();
-    let parsed = Sequence::parse_timing_xml(&xml)?;
+    let xml = sequence.to_xml(Limits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, Limits::DEFAULT)?;
     assert_eq!(parsed.animations.len(), 2);
     Ok(xml)
 }

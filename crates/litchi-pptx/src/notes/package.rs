@@ -1,13 +1,16 @@
 //! Transactional OPC graph ownership for `PresentationML` notes.
 
-use super::codec::{root_conformance, scan_xml, validate_resource_xml};
+use super::codec::{
+    root_conformance_with_limits, scan_xml_with_limits, validate_resource_xml_with_limits,
+};
 use super::model::{Conformance, Graph, Link, Master, Slide, Theme};
 use super::transaction::{Change, PartState, Snapshot};
 use super::{
-    MAX_MASTER_XML, MAX_NOTES_SLIDES, MAX_NOTES_XML, MAX_OWNED_PARTS, MAX_PRESENTATION_XML,
-    MAX_SLIDE_XML, MAX_THEME_XML, MAX_TOTAL_BYTES, SLIDE_CT, THEME_CT, allocation, checked_add,
-    invalid, limit, own_blob,
+    Limits, MAX_MASTER_XML, MAX_NOTES_SLIDES, MAX_NOTES_XML, MAX_OWNED_PARTS, MAX_PRESENTATION_XML,
+    MAX_SLIDE_XML, MAX_THEME_XML, SLIDE_CT, THEME_CT, allocation, checked_add, invalid, limit,
+    own_blob,
 };
+use crate::package::replay_index::ReplayIndex;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 #[cfg(test)]
@@ -294,10 +297,55 @@ pub(crate) fn with_refused_slide_root_reservation<T>(operation: impl FnOnce() ->
 /// validated notes, master, and theme payload is copied exactly once. Package
 /// deletion uses the metadata-only index and does not perform these copies.
 pub(crate) fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Graph>> {
-    let Some(index) = load_index(package, presentation_name)? else {
+    load_with_limits(
+        package,
+        presentation_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    limits: Limits,
+) -> Result<Option<Graph>> {
+    let Some(index) = load_index_with_limits(package, presentation_name, limits)? else {
         return Ok(None);
     };
     Ok(Some(materialize(package, index)?))
+}
+
+/// Validate one changed notes payload under the recipient's selected policy.
+/// Patch replay calls this only for payload deltas, avoiding a second complete
+/// notes-graph scan when the patch changes one XML member.
+pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()> {
+    let (max, root, label) = match part.content_type() {
+        ct::PML_NOTES_MASTER => (MAX_MASTER_XML, "notesMaster", "notes master"),
+        ct::PML_NOTES_SLIDE => (MAX_NOTES_XML, "notes", "notes slide"),
+        THEME_CT => (MAX_THEME_XML, "theme", "notes-master theme"),
+        _ => return Ok(()),
+    };
+    let conformance = root_conformance_with_limits(part.blob(), max, root, limits)?;
+    validate_resource_xml_with_limits(part.blob(), max, conformance, root, label, limits)
+}
+
+/// Check the recipient's notes-graph aggregate after a payload replay.
+///
+/// The aggregate ceiling is read from the retained ingress index, whose
+/// notes-master/theme edges and slide contributions are updated by the exact
+/// replay write set.
+pub(crate) fn validate_replay_total(index: &ReplayIndex, limits: Limits) -> Result<()> {
+    if let Some(theme) = index.missing_theme_name()? {
+        return Err(Error::Opc(litchi_opc::OpcError::PartNotFound(
+            theme.to_string(),
+        )));
+    }
+    let total = usize::try_from(index.notes_total_bytes())
+        .map_err(|_| invalid("notes aggregate bytes overflow"))?;
+    if total > limits.max_total_bytes {
+        return Err(limit("notes aggregate bytes", limits.max_total_bytes));
+    }
+    Ok(())
 }
 
 /// Capture a complete source-checked snapshot of an existing notes graph.
@@ -305,10 +353,23 @@ pub(crate) fn load_snapshot(
     package: &OpcPackage,
     presentation_name: &PackURI,
 ) -> Result<Option<Snapshot>> {
+    load_snapshot_with_limits(
+        package,
+        presentation_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn load_snapshot_with_limits(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    limits: Limits,
+) -> Result<Option<Snapshot>> {
     snapshot_from_index(
         package,
         presentation_name,
-        load_index(package, presentation_name)?,
+        load_index_with_limits(package, presentation_name, limits)?,
+        limits,
     )
 }
 
@@ -321,18 +382,36 @@ pub(crate) fn load_snapshot_with_slide_root_proofs<'a>(
     expected_catalog_len: usize,
     proofs: &[SlideRootProof<'a>],
 ) -> Result<Option<Snapshot>> {
-    let index = load_index_with_slide_root_proofs(
+    load_snapshot_with_slide_root_proofs_and_limits(
+        package,
+        presentation_name,
+        expected_catalog_len,
+        proofs,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn load_snapshot_with_slide_root_proofs_and_limits<'a>(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    expected_catalog_len: usize,
+    proofs: &[SlideRootProof<'a>],
+    limits: Limits,
+) -> Result<Option<Snapshot>> {
+    let index = load_index_with_slide_root_proofs_and_limits(
         package,
         presentation_name,
         Some((expected_catalog_len, proofs)),
+        limits,
     )?;
-    snapshot_from_index(package, presentation_name, index)
+    snapshot_from_index(package, presentation_name, index, limits)
 }
 
 fn snapshot_from_index(
     package: &OpcPackage,
     presentation_name: &PackURI,
     index: Option<GraphIndex>,
+    limits: Limits,
 ) -> Result<Option<Snapshot>> {
     let Some(index) = index else {
         return Ok(None);
@@ -360,14 +439,17 @@ fn snapshot_from_index(
         presentation_part,
         parts,
         graph,
+        limits,
     )
     .map(Some)
 }
 
 /// Apply a source-checked notes patch atomically.
 pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
-    let current = load_snapshot(package, patch.before().presentation_part_name())?
-        .ok_or_else(|| invalid("notes patch source graph is absent"))?;
+    let limits = patch.before().limits;
+    let current =
+        load_snapshot_with_limits(package, patch.before().presentation_part_name(), limits)?
+            .ok_or_else(|| invalid("notes patch source graph is absent"))?;
     if !current.same_source(patch.before()) {
         return Err(invalid("notes patch source is stale"));
     }
@@ -397,8 +479,12 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Sn
             )?;
         }
     }
-    let resulting = load_snapshot(&candidate, patch.after().presentation_part_name())?
-        .ok_or_else(|| invalid("published notes graph is absent"))?;
+    let resulting = load_snapshot_with_limits(
+        &candidate,
+        patch.after().presentation_part_name(),
+        patch.after().limits,
+    )?
+    .ok_or_else(|| invalid("published notes graph is absent"))?;
     if !resulting.same_source(patch.after()) {
         return Err(invalid("published notes graph differs from the commit"));
     }
@@ -418,7 +504,19 @@ pub(crate) fn apply_commit(
 
 /// Validate and index the complete notes graph without copying resource payloads.
 fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<GraphIndex>> {
-    load_index_with_slide_root_proofs(package, presentation_name, None)
+    load_index_with_limits(
+        package,
+        presentation_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+fn load_index_with_limits(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    limits: Limits,
+) -> Result<Option<GraphIndex>> {
+    load_index_with_slide_root_proofs_and_limits(package, presentation_name, None, limits)
 }
 
 /// Validate and index the notes graph, optionally consuming capture-local
@@ -430,16 +528,36 @@ fn load_index_with_slide_root_proofs<'a>(
     presentation_name: &PackURI,
     slide_root_proofs: Option<(usize, &[SlideRootProof<'a>])>,
 ) -> Result<Option<GraphIndex>> {
+    load_index_with_slide_root_proofs_and_limits(
+        package,
+        presentation_name,
+        slide_root_proofs,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+fn load_index_with_slide_root_proofs_and_limits<'a>(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+    slide_root_proofs: Option<(usize, &[SlideRootProof<'a>])>,
+    limits: Limits,
+) -> Result<Option<GraphIndex>> {
     let presentation = package.get_part(presentation_name)?;
     if !is_presentation_main_content_type(presentation.content_type()) {
         return Err(invalid("notes graph requires a PresentationML main part"));
     }
-    let conformance = root_conformance(presentation.blob(), MAX_PRESENTATION_XML, "presentation")?;
-    let presentation_scan = scan_xml(
+    let conformance = root_conformance_with_limits(
+        presentation.blob(),
+        MAX_PRESENTATION_XML,
+        "presentation",
+        limits,
+    )?;
+    let presentation_scan = scan_xml_with_limits(
         presentation.blob(),
         MAX_PRESENTATION_XML,
         conformance,
         "presentation",
+        limits,
     )?;
     if presentation_scan.notes_master_ids.len() > 1 {
         return Err(invalid(
@@ -451,7 +569,10 @@ fn load_index_with_slide_root_proofs<'a>(
     }
     let proof_inventory_matches = slide_root_proofs
         .is_some_and(|(expected_len, _)| expected_len == presentation_scan.slide_ids.len());
-    let mut slide_sources = Vec::with_capacity(presentation_scan.slide_ids.len());
+    let mut slide_sources = Vec::new();
+    slide_sources
+        .try_reserve_exact(presentation_scan.slide_ids.len())
+        .map_err(|source| allocation("notes source slide inventory", source))?;
     for (slide_index, id) in presentation_scan.slide_ids.iter().enumerate() {
         validate_id(id)?;
         let relationship = presentation
@@ -471,9 +592,9 @@ fn load_index_with_slide_root_proofs<'a>(
         let actual = if proof_inventory_matches {
             let current = slide.blob();
             let proof = slide_root_proofs.and_then(|(_, proofs)| proofs.get(slide_index));
-            resolve_slide_root(current, proof)
+            resolve_slide_root(current, proof, limits)
         } else {
-            root_conformance(slide.blob(), MAX_SLIDE_XML, "sld")
+            root_conformance_with_limits(slide.blob(), MAX_SLIDE_XML, "sld", limits)
         }?;
         if actual != conformance {
             return Err(invalid("slide conformance differs from presentation"));
@@ -527,12 +648,13 @@ fn load_index_with_slide_root_proofs<'a>(
     let master_part = package.get_part(&master_name)?;
     let master_part_name = master_part.partname().clone();
     require_content_type(master_part, ct::PML_NOTES_MASTER, "notes master")?;
-    validate_resource_xml(
+    validate_resource_xml_with_limits(
         master_part.blob(),
         MAX_MASTER_XML,
         conformance,
         "notesMaster",
         "notes master",
+        limits,
     )?;
     let theme_relationships: Vec<_> = master_part
         .rels()
@@ -561,12 +683,13 @@ fn load_index_with_slide_root_proofs<'a>(
     let theme_part = package.get_part(&theme_name)?;
     let theme_part_name = theme_part.partname().clone();
     require_content_type(theme_part, THEME_CT, "notes-master theme")?;
-    validate_resource_xml(
+    validate_resource_xml_with_limits(
         theme_part.blob(),
         MAX_THEME_XML,
         conformance,
         "theme",
         "notes-master theme",
+        limits,
     )?;
     for relationship in theme_part.rels().iter() {
         validate_opaque_relationship(package, theme_part, relationship)?;
@@ -576,6 +699,9 @@ fn load_index_with_slide_root_proofs<'a>(
         theme_part.blob().len(),
         "aggregate bytes",
     )?;
+    if total > limits.max_total_bytes {
+        return Err(limit("notes aggregate bytes", limits.max_total_bytes));
+    }
     let mut slides = Vec::new();
     let mut discovered = BTreeSet::new();
     for (_, slide_name) in &slide_sources {
@@ -605,12 +731,13 @@ fn load_index_with_slide_root_proofs<'a>(
             return Err(invalid("multiple slides reference the same notes slide"));
         }
         require_content_type(notes_part, ct::PML_NOTES_SLIDE, "notes slide")?;
-        validate_resource_xml(
+        validate_resource_xml_with_limits(
             notes_part.blob(),
             MAX_NOTES_XML,
             conformance,
             "notes",
             "notes slide",
+            limits,
         )?;
         let known_relationships = notes_part
             .rels()
@@ -658,8 +785,8 @@ fn load_index_with_slide_root_proofs<'a>(
             return Err(invalid("notes slide targets the wrong notes master"));
         }
         total = checked_add(total, notes_part.blob().len(), "aggregate bytes")?;
-        if total > MAX_TOTAL_BYTES {
-            return Err(limit("notes aggregate bytes", MAX_TOTAL_BYTES));
+        if total > limits.max_total_bytes {
+            return Err(limit("notes aggregate bytes", limits.max_total_bytes));
         }
         slides.push(SlideIndex {
             slide_part_name: slide_part.partname().clone(),
@@ -705,12 +832,13 @@ fn same_raw_source(left: &[u8], right: &[u8]) -> bool {
 fn resolve_slide_root<'a>(
     current: &[u8],
     proof: Option<&SlideRootProof<'a>>,
+    limits: Limits,
 ) -> Result<Conformance> {
     match proof.filter(|proof| same_raw_source(proof.raw, current)) {
         Some(proof) => proof
             .conformance
             .ok_or_else(|| invalid("invalid sld root or namespace")),
-        None => root_conformance(current, MAX_SLIDE_XML, "sld"),
+        None => root_conformance_with_limits(current, MAX_SLIDE_XML, "sld", limits),
     }
 }
 
@@ -797,7 +925,21 @@ pub(crate) fn remove(
     presentation_name: &PackURI,
     slide_name: &PackURI,
 ) -> Result<bool> {
-    let Some(index) = load_index(package, presentation_name)? else {
+    remove_with_limits(
+        package,
+        presentation_name,
+        slide_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn remove_with_limits(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+    slide_name: &PackURI,
+    limits: Limits,
+) -> Result<bool> {
+    let Some(index) = load_index_with_limits(package, presentation_name, limits)? else {
         return Ok(false);
     };
     let slide_name = package.get_part(slide_name)?.partname().clone();
@@ -823,6 +965,16 @@ pub(crate) fn remove_checked(
     remove(package, source.presentation_part_name(), slide_name)
 }
 
+pub(crate) fn remove_checked_with_limits(
+    package: &mut OpcPackage,
+    source: &Snapshot,
+    slide_name: &PackURI,
+    limits: Limits,
+) -> Result<bool> {
+    require_current_source_with_limits(package, source, limits)?;
+    remove_with_limits(package, source.presentation_part_name(), slide_name, limits)
+}
+
 /// Remove every speaker-notes resource from a presentation.
 ///
 /// Returns the number of removed notes slides. The operation is idempotent,
@@ -834,7 +986,19 @@ pub(crate) fn remove_checked(
 /// Returns an error when the notes graph, relationships, or descendant
 /// ownership is malformed or exceeds a resource limit.
 pub(crate) fn clear(package: &mut OpcPackage, presentation_name: &PackURI) -> Result<usize> {
-    let Some(index) = load_index(package, presentation_name)? else {
+    clear_with_limits(
+        package,
+        presentation_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn clear_with_limits(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+    limits: Limits,
+) -> Result<usize> {
+    let Some(index) = load_index_with_limits(package, presentation_name, limits)? else {
         return Ok(0);
     };
     let mut removals = Vec::new();
@@ -854,8 +1018,25 @@ pub(crate) fn clear_checked(package: &mut OpcPackage, source: &Snapshot) -> Resu
     clear(package, source.presentation_part_name())
 }
 
+pub(crate) fn clear_checked_with_limits(
+    package: &mut OpcPackage,
+    source: &Snapshot,
+    limits: Limits,
+) -> Result<usize> {
+    require_current_source_with_limits(package, source, limits)?;
+    clear_with_limits(package, source.presentation_part_name(), limits)
+}
+
 fn require_current_source(package: &OpcPackage, source: &Snapshot) -> Result<()> {
-    let current = load_snapshot(package, source.presentation_part_name())?
+    require_current_source_with_limits(package, source, Limits::from_source(package.read_limits()))
+}
+
+fn require_current_source_with_limits(
+    package: &OpcPackage,
+    source: &Snapshot,
+    limits: Limits,
+) -> Result<()> {
+    let current = load_snapshot_with_limits(package, source.presentation_part_name(), limits)?
         .ok_or_else(|| invalid("notes mutation source graph is absent"))?;
     if current.same_source(source) {
         Ok(())
@@ -1214,9 +1395,24 @@ pub(crate) fn put_changed(
     presentation_name: &PackURI,
     graph: Graph,
 ) -> Result<bool> {
-    let current = load_index(package, presentation_name)?
+    put_changed_with_limits(
+        package,
+        presentation_name,
+        graph,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+#[cfg(test)]
+pub(crate) fn put_changed_with_limits(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+    graph: Graph,
+    limits: Limits,
+) -> Result<bool> {
+    let current = load_index_with_limits(package, presentation_name, limits)?
         .ok_or_else(|| invalid("store requires an existing coherent notes graph"))?;
-    validate_graph(&graph)?;
+    validate_graph_with_limits(&graph, limits)?;
     if indexed_ownership(&current) != ownership(&graph) {
         return Err(invalid(
             "store cannot retarget or orphan existing notes parts",
@@ -1226,11 +1422,12 @@ pub(crate) fn put_changed(
         return Ok(false);
     }
     let presentation = package.get_part(presentation_name)?;
-    let presentation_scan = scan_xml(
+    let presentation_scan = scan_xml_with_limits(
         presentation.blob(),
         MAX_PRESENTATION_XML,
         graph.conformance,
         "presentation",
+        limits,
     )?;
     if presentation_scan.notes_master_ids.as_slice()
         != [graph.master.presentation_relationship_id.as_str()]
@@ -1403,6 +1600,10 @@ pub(crate) fn put_changed(
 }
 
 pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
+    validate_graph_with_limits(graph, Limits::DEFAULT)
+}
+
+pub(crate) fn validate_graph_with_limits(graph: &Graph, limits: Limits) -> Result<()> {
     if graph.slides.len() > MAX_NOTES_SLIDES {
         return Err(limit("notes-slide count", MAX_NOTES_SLIDES));
     }
@@ -1417,20 +1618,22 @@ pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
     validate_leaf_path(&master_uri, "/ppt/notesMasters/", "notes master")?;
     let theme_uri = PackURI::new(&graph.master.theme.part_name).map_err(Error::Invalid)?;
     validate_leaf_path(&theme_uri, "/ppt/theme/", "notes-master theme")?;
-    validate_resource_xml(
+    validate_resource_xml_with_limits(
         &graph.master.data,
         MAX_MASTER_XML,
         graph.conformance,
         "notesMaster",
         "notes master",
+        limits,
     )?;
     super::validation::validate_links(&graph.master.relationships)?;
-    validate_resource_xml(
+    validate_resource_xml_with_limits(
         &graph.master.theme.data,
         MAX_THEME_XML,
         graph.conformance,
         "theme",
         "notes-master theme",
+        limits,
     )?;
     super::validation::validate_links(&graph.master.theme.relationships)?;
     let mut total = checked_add(
@@ -1463,17 +1666,18 @@ pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
                 "notes graph has duplicate source or resource part names",
             ));
         }
-        validate_resource_xml(
+        validate_resource_xml_with_limits(
             &slide.data,
             MAX_NOTES_XML,
             graph.conformance,
             "notes",
             "notes slide",
+            limits,
         )?;
         super::validation::validate_links(&slide.relationships)?;
         total = checked_add(total, slide.data.len(), "aggregate bytes")?;
-        if total > MAX_TOTAL_BYTES {
-            return Err(limit("notes aggregate bytes", MAX_TOTAL_BYTES));
+        if total > limits.max_total_bytes {
+            return Err(limit("notes aggregate bytes", limits.max_total_bytes));
         }
     }
     Ok(())

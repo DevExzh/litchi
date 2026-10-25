@@ -214,7 +214,12 @@ impl Edit {
         {
             return Ok(false);
         }
-        let conformance = crate::media_parts::document_conformance(xml)?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            xml,
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let reserved: HashSet<_> = self
             .working
             .iter_parts()

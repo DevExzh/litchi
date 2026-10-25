@@ -207,7 +207,12 @@ impl Edit {
         }
         let shape_id = super::next_shape_id(&scene, "placeholder")?;
         let position = scene.len();
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         drop(scene);
         let slots = self.layout_slots(slide)?;
         let (kind, index, bound) = if is_title(kind) {

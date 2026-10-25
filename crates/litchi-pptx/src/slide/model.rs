@@ -106,14 +106,28 @@ impl From<MasterId> for Owner<'_> {
 pub struct Slide<'a> {
     package: &'a OpcPackage,
     part: SlidePart<'a>,
-    shape_limits: crate::shape::Limits,
+    pub(crate) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    pub(crate) shape_limits: crate::shape::Limits,
 }
 
 impl<'a> Slide<'a> {
     /// Construct a slide view from its package and validated part view.
     #[must_use]
     pub fn new(package: &'a OpcPackage, part: SlidePart<'a>) -> Self {
-        Self::new_with_shape_limits(package, part, crate::shape::Limits::DEFAULT)
+        Self::new_with_semantic_limits(package, part, None)
+    }
+
+    pub(crate) fn new_with_semantic_limits(
+        package: &'a OpcPackage,
+        part: SlidePart<'a>,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
+        Self {
+            package,
+            part,
+            shape_limits: crate::open_options::selected(semantic_limits.as_ref()).shape(),
+            semantic_limits,
+        }
     }
 
     pub(crate) fn new_with_shape_limits(
@@ -125,7 +139,12 @@ impl<'a> Slide<'a> {
             package,
             part,
             shape_limits,
+            semantic_limits: None,
         }
+    }
+
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        crate::open_options::selected(self.semantic_limits.as_ref())
     }
 
     /// Borrow the underlying validated slide part view.
@@ -215,7 +234,13 @@ impl<'a> Slide<'a> {
     /// or carries a structurally invalid timing tree, or if a surviving build
     /// entry's host relationship cannot be resolved inside the package.
     pub fn animations(&self) -> Result<crate::animations::Sequence> {
-        crate::animations::parse_package_slide(self.package, self.part.part().partname())
+        crate::animations::parse_package_slide_with_limits(
+            self.package,
+            self.part.part().partname(),
+            self.semantic_limits()
+                .animations()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Read the optional direct programmable-tag list attached to this slide.
@@ -224,7 +249,13 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn tags(&self) -> Result<Option<crate::tag::List>> {
-        package::slide_tags(self.package, &self.part)
+        package::slide_tags(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Read the optional programmable-tag list attached to one semantic shape.
@@ -236,7 +267,15 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
-        package::slide_shape_tags(self.package, &self.part, shape, self.shape_limits)
+        package::slide_shape_tags(
+            self.package,
+            &self.part,
+            shape,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.package.read_limits()),
+            self.shape_limits,
+        )
     }
 
     /// Read the optional typed classification outcome attached to one shape.
@@ -367,7 +406,13 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn tag_inventory(&self) -> Result<Vec<crate::tag::Source>> {
-        package::slide_tag_inventory(self.package, &self.part)
+        package::slide_tag_inventory(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Resolve the ordinary charts attached to this slide.
@@ -539,7 +584,13 @@ impl<'a> Slide<'a> {
     /// Returns an error when the selected relationships, content types,
     /// author closure, or comments XML are malformed.
     pub fn comment_snapshot(&self) -> Result<Option<crate::presentation::related::Comments>> {
-        package::slide_comment_snapshot(self.package, &self.part)
+        package::slide_comment_snapshot(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .comments()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Resolve the optional modern-comment list attached to this slide.
@@ -569,7 +620,14 @@ impl<'a> Slide<'a> {
     /// Returns an error when the relationship is duplicated, external, or
     /// points to a missing, mistyped, malformed, or non-strict notes part.
     pub fn notes(&self) -> Result<Option<crate::presentation::related::Notes>> {
-        package::slide_notes(self.package, &self.part, self.shape_limits)
+        package::slide_notes(
+            self.package,
+            &self.part,
+            self.shape_limits,
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Read typed section, slide, and summary zoom metadata in this slide.

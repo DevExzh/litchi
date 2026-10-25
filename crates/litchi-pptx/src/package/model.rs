@@ -57,6 +57,10 @@ pub struct Package {
     /// snapshot still empties it.
     pub(crate) part_digests:
         std::sync::Arc<std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>>,
+    /// Retained source-backed relationship closures for semantic replay.
+    /// The index is updated by changed-part deltas, not rescanned on every
+    /// package publication.
+    pub(crate) replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     /// Limits of the encrypted container this package was opened under,
@@ -268,6 +272,7 @@ impl Package {
     ) -> Result<crate::opened::Edit> {
         Ok(crate::opened::Edit::new_lazy(
             std::sync::Arc::clone(&self.opc),
+            std::sync::Arc::clone(&self.replay_index),
             options.limits_value(),
             self.physical_source_provenance,
             std::sync::Arc::new(self.opened_owner_state()),
@@ -294,6 +299,7 @@ impl Package {
                 self.semantic_limits.clone(),
             )?,
         };
+        snapshot.replay_index = Some(std::sync::Arc::clone(&self.replay_index));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.offer_part_digests(&snapshot);
         Ok(snapshot)
@@ -343,7 +349,12 @@ impl Package {
             self.physical_source_provenance,
             self.semantic_limits.clone(),
         )?;
-        Ok(self.published(opc, snapshot))
+        let changed = patch
+            .opened_patch()
+            .resources()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.published(opc, snapshot, &changed)
     }
 
     fn require_physical_provenance(&self, source: &Self) -> Result<()> {
@@ -378,7 +389,12 @@ impl Package {
             source.semantic_limits.clone(),
             self.semantic_limits.clone(),
         )?;
-        Ok(self.published(opc, snapshot))
+        let changed = patch
+            .opened_patch()
+            .resources()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.published(opc, snapshot, &changed)
     }
 
     /// Apply a durable complete-revision-bound slide-removal patch (or its
@@ -439,10 +455,14 @@ impl Package {
         &self,
         opc: OpcPackage,
         mut snapshot: crate::opened::Snapshot,
-    ) -> (Self, crate::opened::Snapshot) {
+        changed: &[PackURI],
+    ) -> Result<(Self, crate::opened::Snapshot)> {
+        snapshot.replay_index = Some(std::sync::Arc::new(
+            self.replay_index.update(&self.opc, &opc, changed)?,
+        ));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
-        let package = Self::from_opened_candidate(opc, &snapshot);
-        (package, snapshot)
+        let package = Self::from_opened_candidate(opc, &snapshot)?;
+        Ok((package, snapshot))
     }
 
     /// Compare exact visible OPC content using the native revision proof.
@@ -498,9 +518,13 @@ impl Package {
             super::signature::refuse_signed_change(&candidate)?;
             candidate.validate_signature_edit_from(&self.opc)?;
         }
+        let changed = patch.resources().cloned().collect::<Vec<_>>();
+        snapshot.replay_index = Some(std::sync::Arc::new(
+            self.replay_index.update(&self.opc, &candidate, &changed)?,
+        ));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         Ok(crate::opened::Commit::new(
-            Self::from_opened_candidate(candidate, &snapshot),
+            Self::from_opened_candidate(candidate, &snapshot)?,
             snapshot,
             patch.clone(),
         ))
@@ -542,6 +566,29 @@ impl Package {
         opc: impl Into<std::sync::Arc<OpcPackage>>,
         part_bytes: u64,
     ) -> Self {
+        self.derive_with_part_bytes_and_replay_index(
+            opc,
+            part_bytes,
+            std::sync::Arc::clone(&self.replay_index),
+        )
+    }
+
+    pub(crate) fn derive_with_replay_index(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
+    ) -> Self {
+        let opc = opc.into();
+        let part_bytes = opc.admitted_part_bytes().unwrap_or(self.part_bytes);
+        self.derive_with_part_bytes_and_replay_index(opc, part_bytes, replay_index)
+    }
+
+    pub(crate) fn derive_with_part_bytes_and_replay_index(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        part_bytes: u64,
+        replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
+    ) -> Self {
         Self {
             opc: opc.into(),
             part_bytes,
@@ -550,6 +597,7 @@ impl Package {
             semantic_limits: self.semantic_limits.clone(),
             tolerance: self.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index,
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
@@ -566,6 +614,9 @@ impl Package {
     /// an exact digest is only needed if a later raw no-op asks for it.
     pub(crate) fn refresh_authored_publication(&mut self) -> Result<()> {
         self.part_bytes = Self::part_bytes_for(&self.opc)?;
+        self.replay_index = std::sync::Arc::new(
+            crate::package::replay_index::ReplayIndex::from_package(&self.opc)?,
+        );
         self.content_revision = std::sync::Arc::new(std::sync::OnceLock::new());
         self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
         Ok(())
@@ -585,8 +636,15 @@ impl Package {
     pub(crate) fn from_opened_candidate(
         opc: OpcPackage,
         snapshot: &crate::opened::Snapshot,
-    ) -> Self {
+    ) -> Result<Self> {
         let state = &snapshot.owner_state;
+        let replay_index = snapshot.replay_index.clone().map_or_else(
+            || {
+                crate::package::replay_index::ReplayIndex::from_package(&opc)
+                    .map(std::sync::Arc::new)
+            },
+            Ok,
+        )?;
         let mut package = Self {
             opc: std::sync::Arc::new(opc),
             part_bytes: snapshot.part_bytes,
@@ -599,13 +657,14 @@ impl Package {
             semantic_limits: state.semantic_limits.clone(),
             tolerance: state.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index,
             #[cfg(feature = "encryption")]
             encryption: state.encryption,
             #[cfg(feature = "encryption")]
             encryption_limits: state.encryption_limits,
         };
         package.adopt_part_digests(snapshot);
-        package
+        Ok(package)
     }
 
     /// Capture one slide's inert `[MS-PPTX]` change-tracking identifiers.
@@ -638,7 +697,13 @@ impl Package {
     /// graph is malformed or exceeds its resource limits.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
         let presentation = PresentationPart::from_package(&self.opc)?;
-        crate::notes::load(&self.opc, presentation.part().partname())
+        crate::notes::load_with_limits(
+            &self.opc,
+            presentation.part().partname(),
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.opc.read_limits()),
+        )
     }
 
     /// Capture the complete notes graph as a source-checked snapshot.
@@ -649,7 +714,13 @@ impl Package {
     /// graph is malformed or exceeds its resource limits.
     pub fn notes_snapshot(&self) -> Result<Option<crate::notes::Snapshot>> {
         let presentation = PresentationPart::from_package(&self.opc)?;
-        crate::notes::load_snapshot(&self.opc, presentation.part().partname())
+        crate::notes::load_snapshot_with_limits(
+            &self.opc,
+            presentation.part().partname(),
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.opc.read_limits()),
+        )
     }
 
     /// Read the presentation-owned embedded-font collection.
@@ -733,7 +804,14 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::tag::List>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        Ok(crate::tag::load(&self.opc, &slide_name)?.map(crate::tag::Source::into_list))
+        Ok(crate::tag::load_with_limits(
+            &self.opc,
+            &slide_name,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.opc.read_limits()),
+        )?
+        .map(crate::tag::Source::into_list))
     }
 
     /// Read the source-bound Designer tags owned by one stable slide ID.
@@ -821,6 +899,9 @@ impl Package {
             &self.opc,
             &slide_name,
             shape,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.opc.read_limits()),
             self.semantic_limits().shape(),
         )?
         .map(crate::tag::Source::into_list))

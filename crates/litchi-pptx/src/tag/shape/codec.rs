@@ -26,9 +26,9 @@ use super::validation::{
 };
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::tag::{
-    CONTENT_TYPE, Conformance, List, Source, available_part_name, available_relationship_id,
-    has_other_inbound, invalid, pml, relationship_namespace, staged_xml, validate_relative_target,
-    validate_selected_relationship,
+    CONTENT_TYPE, Conformance, Limits, List, Source, available_part_name,
+    available_relationship_id, has_other_inbound, invalid, pml, relationship_namespace, staged_xml,
+    validate_relative_target, validate_selected_relationship,
 };
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -56,6 +56,7 @@ pub fn load<'k>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
+    limits: Limits,
     shape_limits: crate::shape::Limits,
 ) -> Result<Option<Source>> {
     let owner = package.get_part(owner)?;
@@ -63,7 +64,7 @@ pub fn load<'k>(
     layout
         .anchor
         .as_ref()
-        .map(|anchor| resolve(owner, package, anchor, layout.conformance))
+        .map(|anchor| resolve_with_limits(owner, package, anchor, layout.conformance, limits))
         .transpose()
 }
 
@@ -92,7 +93,14 @@ pub(crate) fn put<'k>(
     key: impl Into<crate::shape::Key<'k>>,
     list: List,
 ) -> Result<Option<List>> {
-    put_with_limits(package, owner, key, list, crate::shape::Limits::DEFAULT)
+    put_with_limits(
+        package,
+        owner,
+        key,
+        list,
+        Limits::from_source(package.read_limits()),
+        crate::shape::Limits::DEFAULT,
+    )
 }
 
 pub(crate) fn put_with_limits<'k>(
@@ -100,6 +108,7 @@ pub(crate) fn put_with_limits<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
     list: List,
+    limits: Limits,
     shape_limits: crate::shape::Limits,
 ) -> Result<Option<List>> {
     let key = key.into();
@@ -110,7 +119,8 @@ pub(crate) fn put_with_limits<'k>(
             .anchor
             .as_ref()
             .map(|anchor| {
-                let source = resolve(owner, package, anchor, layout.conformance)?;
+                let source =
+                    resolve_with_limits(owner, package, anchor, layout.conformance, limits)?;
                 let relationship = owner.rels().get(source.rel()).ok_or_else(|| {
                     invalid("shape tag relationship disappeared during preflight")
                 })?;
@@ -132,7 +142,7 @@ pub(crate) fn put_with_limits<'k>(
     let conformance = attached
         .as_ref()
         .map_or(layout.conformance, |value| value.source.conformance());
-    let tag_xml = staged_xml(&list, conformance)?;
+    let tag_xml = staged_xml(&list, conformance, limits)?;
 
     if let Some(attached) = attached {
         if package.get_part(attached.source.part())?.blob() == tag_xml {
@@ -263,13 +273,20 @@ pub(crate) fn remove<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Option<List>> {
-    remove_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
+    remove_with_limits(
+        package,
+        owner,
+        key,
+        Limits::from_source(package.read_limits()),
+        crate::shape::Limits::DEFAULT,
+    )
 }
 
 pub(crate) fn remove_with_limits<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
+    limits: Limits,
     shape_limits: crate::shape::Limits,
 ) -> Result<Option<List>> {
     let key = key.into();
@@ -279,7 +296,7 @@ pub(crate) fn remove_with_limits<'k>(
         let Some(anchor) = layout.anchor.as_ref() else {
             return Ok(None);
         };
-        let source = resolve(owner, package, anchor, layout.conformance)?;
+        let source = resolve_with_limits(owner, package, anchor, layout.conformance, limits)?;
         let relationship = owner
             .rels()
             .get(source.rel())
@@ -1129,13 +1146,14 @@ fn observe_customer_child(local: &[u8], tags_seen: &mut bool) -> Result<()> {
     }
 }
 
-fn resolve(
+fn resolve_with_limits(
     owner: &dyn OpcPart,
     package: &OpcPackage,
     anchor: &Anchor,
     conformance: Conformance,
+    limits: Limits,
 ) -> Result<Source> {
-    crate::tag::resolve_anchor(
+    crate::tag::resolve_anchor_with_limits(
         owner,
         package,
         &crate::tag::Anchor {
@@ -1144,6 +1162,7 @@ fn resolve(
             id_value: anchor.id_value.clone(),
         },
         conformance,
+        limits,
     )
 }
 

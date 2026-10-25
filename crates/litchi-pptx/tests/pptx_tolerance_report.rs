@@ -210,7 +210,7 @@ fn conformant_timing_tree_opens_unchanged_with_an_empty_report() {
     // A conformant tree keeps its verbatim timing subtree for round-trip.
     assert!(sequence.preserved_timing_xml().is_some());
     // The strict verification form accepts the same slide.
-    assert!(Sequence::parse_slide_xml_strict(&xml).is_ok());
+    assert!(Sequence::parse_slide_xml_strict(&xml, Limits::DEFAULT).is_ok());
 }
 
 #[test]
@@ -246,13 +246,13 @@ fn stale_shape_target_opens_by_default_and_is_recorded() {
     assert_clean(package.tolerance_report());
 
     // The repaired model regenerates timing XML that parses cleanly.
-    let regenerated = sequence.to_xml();
+    let regenerated = sequence.to_xml(Limits::DEFAULT).unwrap();
     assert!(!regenerated.contains(r#"spid="99""#));
-    let reparsed = Sequence::parse_timing_xml(&regenerated).unwrap();
+    let reparsed = Sequence::parse_timing_xml(&regenerated, Limits::DEFAULT).unwrap();
     assert_eq!(reparsed.animations.len(), 2);
 
     // Strict verification still rejects the stale reference.
-    let error = Sequence::parse_slide_xml_strict(&xml).unwrap_err();
+    let error = Sequence::parse_slide_xml_strict(&xml, Limits::DEFAULT).unwrap_err();
     assert!(error.to_string().contains("99"), "{error}");
 }
 
@@ -296,7 +296,7 @@ fn duplicate_shape_id_opens_by_default_first_wins_and_is_recorded() {
             Some(SLIDE1)
         )]
     );
-    assert!(Sequence::parse_slide_xml_strict(&xml).is_err());
+    assert!(Sequence::parse_slide_xml_strict(&xml, Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -333,8 +333,11 @@ fn per_slide_reports_aggregate_into_one_deck_report() {
     );
 
     // A bare-XML parse has no part to name.
-    let bare =
-        Sequence::parse_slide_xml(package.opc().unwrap().get_part(&part).unwrap().blob()).unwrap();
+    let bare = Sequence::parse_slide_xml(
+        package.opc().unwrap().get_part(&part).unwrap().blob(),
+        Limits::DEFAULT,
+    )
+    .unwrap();
     assert!(
         bare.tolerance_report()
             .defects()
@@ -348,13 +351,13 @@ fn per_slide_reports_aggregate_into_one_deck_report() {
 fn structural_timing_corruption_stays_fatal() {
     // Unbalanced timing XML is still a hard error, stale target or not.
     let broken = slide_xml(&timing(&["4", "99"]), |xml| xml.replace("</p:bldLst>", ""));
-    assert!(Sequence::parse_slide_xml(&broken).is_err());
+    assert!(Sequence::parse_slide_xml(&broken, Limits::DEFAULT).is_err());
     // A malformed spid value is grammar, not a stale reference.
     let malformed = slide_xml(&timing(&["4", "nope"]), |xml| xml);
-    assert!(Sequence::parse_slide_xml(&malformed).is_err());
+    assert!(Sequence::parse_slide_xml(&malformed, Limits::DEFAULT).is_err());
     // A duplicate build shape/group pair is grammar too.
     let duplicate_pair = slide_xml(&timing(&["4", "4"]), |xml| xml);
-    assert!(Sequence::parse_slide_xml(&duplicate_pair).is_err());
+    assert!(Sequence::parse_slide_xml(&duplicate_pair, Limits::DEFAULT).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -1078,9 +1081,12 @@ fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
         r#"<p:cm authorId="3" idx="4"><p:pos x="0" y="0"/><p:text>b</p:text></p:cm></p:cmLst>"#,
     );
     let mut report = litchi_pptx::ToleranceReport::default();
-    let list =
-        litchi_pptx::comments::parse_slide_comments_with_tolerance(xml.as_bytes(), &mut report)
-            .unwrap();
+    let list = litchi_pptx::comments::parse_slide_comments_with_tolerance(
+        xml.as_bytes(),
+        litchi_pptx::comments::Limits::DEFAULT,
+        &mut report,
+    )
+    .unwrap();
     assert_eq!(list.len(), 2);
     assert_eq!(
         located_items(&report),
@@ -1091,7 +1097,13 @@ fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
             None
         )]
     );
-    assert!(litchi_pptx::comments::parse_slide_comments_strict(xml.as_bytes()).is_err());
+    assert!(
+        litchi_pptx::comments::parse_slide_comments_strict(
+            xml.as_bytes(),
+            litchi_pptx::comments::Limits::DEFAULT,
+        )
+        .is_err()
+    );
 }
 
 #[test]

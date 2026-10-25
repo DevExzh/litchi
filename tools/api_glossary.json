@@ -3549,9 +3549,9 @@
         },
         {
           "method": "litchi_pptx::tag::shape::load",
-          "inputs": ["package", "owner", "key", "limits"],
+          "inputs": ["package", "owner", "key", "limits", "shape_limits"],
           "limits_argument": "limits",
-          "limits_type": "litchi_pptx::shape::Limits"
+          "limits_type": "litchi_pptx::tag::Limits"
         },
         {
           "method": "litchi_pptx::transition::read",
@@ -3600,7 +3600,40 @@
           "inputs": ["slide_index", "slide", "limits", "usage"],
           "limits_argument": "limits",
           "limits_type": "litchi_pptx::laser::Limits"
-        }
+        },
+        {"method": "litchi_pptx::media_parts::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::media_parts::Limits"},
+        {"method": "litchi_pptx::media_parts::write_pictures", "inputs": ["value", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::media_parts::Limits"},
+        {"method": "litchi_pptx::tag::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::tag::Limits"},
+        {"method": "litchi_pptx::tag::write", "inputs": ["value", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::tag::Limits"},
+        {"method": "litchi_pptx::notes::master_xml", "inputs": ["limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::notes::write_text", "inputs": ["text", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::notes::write_text_with", "inputs": ["conformance", "text", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::comments::parse_comment_authors", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::parse_slide_comments", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::parse_slide_comments_with_tolerance", "inputs": ["xml", "limits", "tolerance"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::parse_slide_comments_strict", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::write_comment_authors", "inputs": ["authors", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::write_slide_comments", "inputs": ["comments", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::media_parts::ExtensionList::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::media_parts::Limits"},
+        {"method": "litchi_pptx::tag::List::xml", "inputs": ["self", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::tag::Limits"},
+        {"method": "litchi_pptx::notes::Slide::text", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::animations::TemplateTimeNode::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::TimingTree::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::TimingTree::to_xml", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_timing_xml", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_slide_xml", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_slide_xml_with_tolerance", "inputs": ["xml", "limits", "tolerance"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_slide_xml_strict", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::to_xml", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::to_xml_for_slide", "inputs": ["self", "valid_targets", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::comments::ListPart::comments", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::ListPart::to_xml", "inputs": ["self", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::AuthorListPart::authors", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::AuthorListPart::to_xml", "inputs": ["self", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml_owned", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml", "inputs": ["source", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml_owned", "inputs": ["source", "slide_part_name", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"}
       ],
       "result_methods": [
         {
@@ -4571,9 +4604,9 @@
         },
         {
           "method": "litchi_pptx::tag::shape::load",
-          "inputs": ["package", "owner", "key", "limits"],
+          "inputs": ["package", "owner", "key", "limits", "shape_limits"],
           "limits_argument": "limits",
-          "limits_type": "litchi_pptx::shape::Limits"
+          "limits_type": "litchi_pptx::tag::Limits"
         },
         {
           "method": "litchi_pptx::transition::read",
@@ -4622,7 +4655,40 @@
           "inputs": ["slide_index", "slide", "limits", "usage"],
           "limits_argument": "limits",
           "limits_type": "litchi_pptx::laser::Limits"
-        }
+        },
+        {"method": "litchi_pptx::media_parts::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::media_parts::Limits"},
+        {"method": "litchi_pptx::media_parts::write_pictures", "inputs": ["value", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::media_parts::Limits"},
+        {"method": "litchi_pptx::tag::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::tag::Limits"},
+        {"method": "litchi_pptx::tag::write", "inputs": ["value", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::tag::Limits"},
+        {"method": "litchi_pptx::notes::master_xml", "inputs": ["limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::notes::write_text", "inputs": ["text", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::notes::write_text_with", "inputs": ["conformance", "text", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::comments::parse_comment_authors", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::parse_slide_comments", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::parse_slide_comments_with_tolerance", "inputs": ["xml", "limits", "tolerance"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::parse_slide_comments_strict", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::write_comment_authors", "inputs": ["authors", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::write_slide_comments", "inputs": ["comments", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::media_parts::ExtensionList::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::media_parts::Limits"},
+        {"method": "litchi_pptx::tag::List::xml", "inputs": ["self", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::tag::Limits"},
+        {"method": "litchi_pptx::notes::Slide::text", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::notes::Limits"},
+        {"method": "litchi_pptx::animations::TemplateTimeNode::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::TimingTree::parse", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::TimingTree::to_xml", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_timing_xml", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_slide_xml", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_slide_xml_with_tolerance", "inputs": ["xml", "limits", "tolerance"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::parse_slide_xml_strict", "inputs": ["xml", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::to_xml", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::animations::Sequence::to_xml_for_slide", "inputs": ["self", "valid_targets", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::animations::Limits"},
+        {"method": "litchi_pptx::comments::ListPart::comments", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::ListPart::to_xml", "inputs": ["self", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::AuthorListPart::authors", "inputs": ["self", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::AuthorListPart::to_xml", "inputs": ["self", "conformance", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::AuthorPresenceSnapshot::from_xml_owned", "inputs": ["source", "author_id", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml", "inputs": ["source", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"},
+        {"method": "litchi_pptx::comments::collaboration::CommentThreadingSnapshot::from_xml_owned", "inputs": ["source", "slide_part_name", "author_id", "index", "limits"], "limits_argument": "limits", "limits_type": "litchi_pptx::comments::Limits"}
       ],
       "result_methods": [
         {

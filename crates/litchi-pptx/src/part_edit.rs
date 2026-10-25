@@ -664,8 +664,9 @@ impl PartPatch {
         if let Some(validate) = validate {
             validate(package, &target, self)?;
         }
+        let replay_index = self.replay_index_after(package, &target)?;
         crate::package::signature::settle_unsigned_change(&mut target)?;
-        Ok(package.derive_with_part_bytes(target, part_bytes))
+        Ok(package.derive_with_part_bytes_and_replay_index(target, part_bytes, replay_index))
     }
 
     /// Admit the replay candidate against the recipient's physical part
@@ -784,6 +785,51 @@ impl PartPatch {
             }
         })
     }
+
+    pub(crate) fn replay_index_after(
+        &self,
+        package: &Package,
+        target: &OpcPackage,
+    ) -> Result<Arc<crate::package::replay_index::ReplayIndex>> {
+        let mut changed = Vec::new();
+        changed
+            .try_reserve(self.deltas.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PPTX replay changed part index",
+                source,
+            })?;
+        changed.extend(self.deltas.iter().map(|delta| delta.name.clone()));
+        Ok(Arc::new(package.replay_index.update(
+            &package.opc,
+            target,
+            &changed,
+        )?))
+    }
+
+    pub(crate) fn touches_notes(&self, source: &OpcPackage, target: &OpcPackage) -> Result<bool> {
+        for delta in &self.deltas {
+            let old = optional_part(source, &delta.name)?;
+            let new = optional_part(target, &delta.name)?;
+            if old.as_ref().is_some_and(|part| {
+                matches!(
+                    part.content_type(),
+                    litchi_opc::constants::content_type::PML_NOTES_SLIDE
+                        | litchi_opc::constants::content_type::PML_NOTES_MASTER
+                        | litchi_opc::constants::content_type::OFC_THEME
+                )
+            }) || new.as_ref().is_some_and(|part| {
+                matches!(
+                    part.content_type(),
+                    litchi_opc::constants::content_type::PML_NOTES_SLIDE
+                        | litchi_opc::constants::content_type::PML_NOTES_MASTER
+                        | litchi_opc::constants::content_type::OFC_THEME
+                )
+            }) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 
 /// A staged part-level edit of one [`Package`].
@@ -837,6 +883,11 @@ impl<'a> Staged<'a> {
         self.package.semantic_limits().shape()
     }
 
+    /// The owner-retained semantic codec policies for this staged family.
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.package.semantic_limits()
+    }
+
     /// Run one typed graph operation on the staged graph. An error leaves
     /// the staged graph as it was before the operation.
     pub(crate) fn update<T>(
@@ -875,9 +926,13 @@ impl<'a> Staged<'a> {
             patch.bind_noop_identity(self.package)?;
             return Ok((self.package.duplicate(), patch));
         }
+        let replay_index = patch.replay_index_after(self.package, &staged)?;
         Ok((
-            self.package
-                .derive_with_part_bytes(staged, patch.part_bytes_after),
+            self.package.derive_with_part_bytes_and_replay_index(
+                staged,
+                patch.part_bytes_after,
+                replay_index,
+            ),
             patch,
         ))
     }

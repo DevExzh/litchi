@@ -1,3 +1,4 @@
+use super::Limits;
 use super::model::{GraphicBuildMode, Sequence};
 use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
@@ -116,15 +117,27 @@ struct AlternateState {
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn parse_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Sequence> {
+    parse_package_slide_with_limits(
+        package,
+        slide_part_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn parse_package_slide_with_limits(
+    package: &OpcPackage,
+    slide_part_name: &PackURI,
+    limits: Limits,
+) -> Result<Sequence> {
     let slide = package.get_part(slide_part_name)?;
     if slide.content_type() != SLIDE_CT {
         return invalid_relationship(
             "animation package validation requires a presentation slide part",
         );
     }
-    let mut sequence = Sequence::parse_slide_xml(slide.blob())?;
+    let mut sequence = Sequence::parse_slide_xml(slide.blob(), limits)?;
     sequence.tolerance.locate_in_part(slide_part_name.as_str());
-    validate_build_relationships(package, slide, slide.blob(), &sequence)?;
+    validate_build_relationships(package, slide, slide.blob(), &sequence, limits)?;
     Ok(sequence)
 }
 
@@ -154,8 +167,9 @@ fn validate_build_relationships(
     slide: &dyn Part,
     xml: &[u8],
     sequence: &Sequence,
+    limits: Limits,
 ) -> Result<()> {
-    let hosts = scan_hosts(xml)?;
+    let hosts = scan_hosts_with_limits(xml, limits)?;
     for build in &sequence.graphic_builds {
         let host = hosts.get(&build.shape_id).ok_or_else(|| {
             animation_relationship_error("graphical-object build has no package-resolvable host")
@@ -323,7 +337,12 @@ fn validate_relationship_id(value: &str) -> Result<()> {
 }
 
 fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
-    if xml.len() > MAX_SLIDE_XML {
+    scan_hosts_with_limits(xml, Limits::DEFAULT)
+}
+
+fn scan_hosts_with_limits(xml: &[u8], limits: Limits) -> Result<HashMap<u32, HostReference>> {
+    let input_limit = MAX_SLIDE_XML.min(limits.max_input_bytes);
+    if xml.len() > input_limit {
         return invalid_relationship("slide XML exceeds animation relationship scan limit");
     }
     // Branches are chosen below on namespace values as written; a declaration
@@ -358,6 +377,7 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
                     &element,
                     depth,
                     false,
+                    limits.max_attributes.min(MAX_ATTRIBUTES),
                     &mut frame,
                     &mut alternate,
                 )?;
@@ -373,6 +393,7 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
                     &element,
                     depth,
                     true,
+                    limits.max_attributes.min(MAX_ATTRIBUTES),
                     &mut frame,
                     &mut alternate,
                 )?;
@@ -410,7 +431,7 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
             _ => {},
         }
         nodes += 1;
-        if nodes > MAX_NODES || depth > MAX_DEPTH {
+        if nodes > MAX_NODES.min(limits.max_nodes) || depth > MAX_DEPTH.min(limits.max_depth) {
             return invalid_relationship("slide XML exceeds animation relationship scan bounds");
         }
     }
@@ -426,10 +447,11 @@ fn inspect_start(
     element: &BytesStart<'_>,
     depth: usize,
     empty: bool,
+    max_attributes: usize,
     frame: &mut Option<FrameState>,
     alternate: &mut Option<AlternateState>,
 ) -> Result<()> {
-    if count_up_to(element, MAX_ATTRIBUTES) > MAX_ATTRIBUTES {
+    if count_up_to(element, max_attributes) > max_attributes {
         return invalid_relationship(
             "slide element exceeds animation relationship attribute limit",
         );
@@ -827,7 +849,7 @@ mod tests {
         timing.add_graphic_build(GraphicBuild::chart(5, GroupId::new(1)));
         let xml = format!(
             r#"<p:sld xmlns:p="{P}" xmlns:a="{A}" xmlns:c="{C}" xmlns:r="{R}"><p:cSld><p:spTree><p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Chart"/></p:nvGraphicFramePr><a:graphic><a:graphicData uri="{C}"><c:chart r:id="rIdChart"/></a:graphicData></a:graphic></p:graphicFrame></p:spTree></p:cSld>{}</p:sld>"#,
-            timing.to_xml(),
+            timing.to_xml(Limits::DEFAULT).unwrap(),
             P = std::str::from_utf8(P_NS).unwrap(),
             A = std::str::from_utf8(A_NS).unwrap(),
             C = std::str::from_utf8(C_NS).unwrap(),

@@ -341,13 +341,19 @@ fn package_with_direct_tag_lists() -> Package {
     let mut package = package_with_named_slides();
     assert_eq!(
         package
-            .put_tags_in_place("Overview", tag::parse(LOCAL_PRIMARY_TAGS).unwrap())
+            .put_tags_in_place(
+                "Overview",
+                tag::parse(LOCAL_PRIMARY_TAGS, tag::Limits::DEFAULT).unwrap(),
+            )
             .unwrap(),
         None
     );
     assert_eq!(
         package
-            .put_tags_in_place("Appendix", tag::parse(LOCAL_SECONDARY_TAGS).unwrap())
+            .put_tags_in_place(
+                "Appendix",
+                tag::parse(LOCAL_SECONDARY_TAGS, tag::Limits::DEFAULT).unwrap(),
+            )
             .unwrap(),
         None
     );

@@ -135,6 +135,9 @@ pub(super) struct SourceInner {
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     pub(super) limits: SourceLimits,
+    /// Non-default semantic codec policies selected at ingress.  Keep this
+    /// with the deferred owner so related-part reads and source-backed edits
+    /// use the same policy as eager and owning projections.
     pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Every non-structural defect repaired while the source was opened, in
     /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
@@ -1178,6 +1181,9 @@ pub(crate) struct SourceBackedPresentationEditor {
     package_relationships: Arc<[RelationshipBinding]>,
     presentation_binding: Arc<PartBinding>,
     pub(super) limits: SourceLimits,
+    /// The ingress-selected semantic policies must stay attached to the
+    /// deferred owner.  Source limits alone cannot recover content-family
+    /// ceilings when a snapshot is projected or replayed.
     pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 }
 
@@ -1189,6 +1195,8 @@ pub(crate) struct SourceBackedSlideSnapshot {
     xml: SourcePayload,
     closure: SlideClosure,
     max_output_bytes: usize,
+    /// Preserve the complete ingress semantic bundle with the exact source
+    /// image.  A snapshot may outlive its presentation projection.
     semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     source_version: SourceVersion,
     lineage: SourceLineage,
@@ -6791,6 +6799,51 @@ mod tests {
         assert_eq!(under_source.second_payload_reads.load(Ordering::SeqCst), 0);
         drop(under_editor);
         assert_eq!(under_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn selected_semantic_bundle_survives_source_editor_and_snapshot_projection() {
+        let comments = crate::comments::Limits {
+            max_nodes: crate::comments::Limits::DEFAULT.max_nodes - 1,
+            ..crate::comments::Limits::DEFAULT
+        };
+        let options = crate::OpenOptions::default().comments_limits(comments);
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            options.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            presentation
+                .inner
+                .semantic_limits
+                .as_ref()
+                .expect("selected semantic profile")
+                .comments(),
+            comments
+        );
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            options,
+        )
+        .unwrap();
+        assert_eq!(
+            editor
+                .semantic_limits
+                .as_ref()
+                .expect("editor profile")
+                .comments(),
+            comments
+        );
+        let snapshot = editor.slide_snapshot(0).unwrap();
+        assert_eq!(
+            snapshot
+                .semantic_limits
+                .as_ref()
+                .expect("snapshot profile")
+                .comments(),
+            comments
+        );
     }
 
     #[test]

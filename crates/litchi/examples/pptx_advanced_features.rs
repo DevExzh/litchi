@@ -9,7 +9,7 @@
 //! Run with: `cargo run --example pptx_advanced_features --features ooxml`
 
 use litchi_pptx::Package;
-use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
+use litchi_pptx::animations::{Effect, EffectInstance, Limits, Sequence, Trigger};
 use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
 use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
@@ -128,8 +128,8 @@ fn animation_demo() -> Result<String, Box<dyn StdError>> {
             .with_duration_ms(1_000),
     );
 
-    let xml = sequence.to_xml();
-    let parsed = Sequence::parse_timing_xml(&xml)?;
+    let xml = sequence.to_xml(Limits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, Limits::DEFAULT)?;
     assert_eq!(parsed.animations.len(), 3);
     Ok(xml)
 }

@@ -9,6 +9,18 @@ use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
+
+fn write_text(text: &str) -> Result<Vec<u8>> {
+    super::write_text(text, Limits::DEFAULT)
+}
+
+fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
+    super::write_text_with(conformance, text, Limits::DEFAULT)
+}
+
+fn master_xml() -> &'static str {
+    super::master_xml(Limits::DEFAULT).unwrap()
+}
 const POI: &[u8] = include_bytes!("../../../../test-data/poi/test-data/slideshow/prProps.pptx");
 const LO: &[u8] =
     include_bytes!("../../../../test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx");
@@ -28,6 +40,189 @@ fn plain_text_writer_escapes_and_rejects_invalid_xml() {
     assert!(xml.contains("<a:t>A &lt; B &amp; C</a:t>"));
     assert!(xml.ends_with("</p:notes>"));
     assert!(write_text("bad\u{0}text").is_err());
+}
+
+#[test]
+fn raw_policy_admits_exact_notes_wire_and_refuses_one_byte_under() {
+    let wire = write_text("bounded note").unwrap();
+    let exact = Limits {
+        max_output_bytes: wire.len(),
+        ..Limits::DEFAULT
+    };
+    assert_eq!(super::write_text("bounded note", exact).unwrap(), wire);
+    assert!(
+        super::write_text(
+            "bounded note",
+            Limits {
+                max_output_bytes: wire.len().saturating_sub(1),
+                ..exact
+            },
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn replay_notes_aggregate_accepts_exact_and_refuses_one_byte_under() {
+    let (package, _) = synthetic(Conformance::Transitional);
+    let total = [
+        "/ppt/notesMasters/notesMaster1.xml",
+        "/ppt/theme/theme2.xml",
+        "/ppt/notesSlides/notesSlide1.xml",
+    ]
+    .into_iter()
+    .map(|name| {
+        package
+            .get_part(&PackURI::new(name).unwrap())
+            .unwrap()
+            .blob()
+            .len()
+    })
+    .sum();
+    let exact = Limits {
+        max_total_bytes: total,
+        ..Limits::DEFAULT
+    };
+    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    assert!(super::package::validate_replay_total(&index, exact).is_ok());
+    let under = Limits {
+        max_total_bytes: total.saturating_sub(1),
+        ..exact
+    };
+    assert!(matches!(
+        super::package::validate_replay_total(&index, under),
+        Err(Error::Limit {
+            resource: "notes aggregate bytes",
+            limit,
+        }) if limit == total.saturating_sub(1)
+    ));
+}
+
+#[test]
+fn replay_notes_index_applies_changed_slide_delta() {
+    let (package, _) = synthetic(Conformance::Transitional);
+    let name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+    let mut target = package.clone();
+    let old_len = target.get_part(&name).unwrap().blob().len();
+    target
+        .get_part_mut(&name)
+        .unwrap()
+        .set_blob(vec![0; old_len + 1]);
+    let index = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    let updated = index
+        .update(&package, &target, std::slice::from_ref(&name))
+        .unwrap();
+    let exact = Limits {
+        max_total_bytes: usize::try_from(updated.notes_total_bytes()).unwrap(),
+        ..Limits::DEFAULT
+    };
+    assert!(super::package::validate_replay_total(&updated, exact).is_ok());
+    let under = Limits {
+        max_total_bytes: exact.max_total_bytes - 1,
+        ..exact
+    };
+    assert!(matches!(
+        super::package::validate_replay_total(&updated, under),
+        Err(Error::Limit {
+            resource: "notes aggregate bytes",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn replay_notes_index_counts_all_theme_edges_and_refuses_missing_targets() {
+    let (package, _) = synthetic(Conformance::Transitional);
+    let master_name = PackURI::new("/ppt/notesMasters/notesMaster1.xml").unwrap();
+    let extra_theme = PackURI::new("/ppt/theme/theme-extra.xml").unwrap();
+    let mut with_extra = package.clone();
+    with_extra.add_part(Box::new(BlobPart::new(
+        extra_theme.clone(),
+        THEME_CT.into(),
+        vec![0; 13],
+    )));
+    with_extra
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:opaque/theme".into(),
+            "../theme/theme-extra.xml".into(),
+            "rIdExtraTheme".into(),
+            false,
+        );
+    let base = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    let with_extra_index =
+        crate::package::replay_index::ReplayIndex::from_package(&with_extra).unwrap();
+    assert_eq!(
+        with_extra_index.notes_total_bytes(),
+        base.notes_total_bytes() + 13
+    );
+
+    let mut removed = with_extra.clone();
+    removed
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .remove("rIdExtraTheme");
+    removed.remove_part(&extra_theme);
+    let changed = [master_name.clone(), extra_theme.clone()];
+    let restored = with_extra_index
+        .update(&with_extra, &removed, &changed)
+        .unwrap();
+    assert_eq!(restored.notes_total_bytes(), base.notes_total_bytes());
+
+    let missing_theme = PackURI::new("/ppt/theme/theme-missing.xml").unwrap();
+    let mut missing = package.clone();
+    missing
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:opaque/theme".into(),
+            "../theme/theme-missing.xml".into(),
+            "rIdMissingTheme".into(),
+            false,
+        );
+    assert!(
+        base.update(&package, &missing, std::slice::from_ref(&master_name))
+            .is_err()
+    );
+    let missing_index = crate::package::replay_index::ReplayIndex::from_package(&missing).unwrap();
+    assert!(matches!(
+        super::package::validate_replay_total(&missing_index, Limits::DEFAULT),
+        Err(Error::Opc(litchi_opc::OpcError::PartNotFound(_)))
+    ));
+    assert!(!missing.contains_part(&missing_theme));
+
+    let mut cleared = missing.clone();
+    cleared
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .remove("rIdMissingTheme");
+    let cleared_index = missing_index
+        .update(&missing, &cleared, std::slice::from_ref(&master_name))
+        .unwrap();
+    assert!(cleared_index.missing_theme_name().unwrap().is_none());
+    assert!(super::package::validate_replay_total(&cleared_index, Limits::DEFAULT).is_ok());
+
+    let master_bytes = package.get_part(&master_name).unwrap().blob().len() as u64;
+    let canonical_theme = PackURI::new("/ppt/theme/theme2.xml").unwrap();
+    let canonical_theme_bytes = package.get_part(&canonical_theme).unwrap().blob().len() as u64;
+    let mut without_master = package.clone();
+    without_master.remove_part(&master_name);
+    let removed_master_index = base
+        .update(
+            &package,
+            &without_master,
+            std::slice::from_ref(&master_name),
+        )
+        .unwrap();
+    assert_eq!(
+        removed_master_index.notes_total_bytes(),
+        base.notes_total_bytes() - master_bytes - canonical_theme_bytes
+    );
 }
 
 #[test]
@@ -72,7 +267,7 @@ fn consuming_put_moves_changed_xml_and_refuses_signed_changes_until_unsigned() {
     assert!(!package.is_signed());
     assert_eq!(
         load(&package, &name).unwrap().unwrap().slides()[0]
-            .text()
+            .text(Limits::DEFAULT)
             .unwrap()
             .as_deref(),
         Some("Updated note")
@@ -170,13 +365,13 @@ fn strict_mce_graph_round_trips_and_projects_text() {
     let (mut package, name) = synthetic(Conformance::Strict);
     let graph = load(&package, &name).unwrap().unwrap();
     assert_eq!(
-        graph.slides[0].text().unwrap().as_deref(),
+        graph.slides[0].text(Limits::DEFAULT).unwrap().as_deref(),
         Some("Strict note")
     );
     put(&mut package, &name, graph).unwrap();
     assert_eq!(
         load(&package, &name).unwrap().unwrap().slides[0]
-            .text()
+            .text(Limits::DEFAULT)
             .unwrap()
             .as_deref(),
         Some("Strict note")
@@ -218,7 +413,7 @@ fn strict_text_writer_validates_and_round_trips_replacement() {
     let graph = load(&package, &name).unwrap().unwrap();
     assert_eq!(graph.conformance(), Conformance::Strict);
     assert_eq!(
-        graph.slides()[0].text().unwrap().as_deref(),
+        graph.slides()[0].text(Limits::DEFAULT).unwrap().as_deref(),
         Some("Updated strict note")
     );
 }

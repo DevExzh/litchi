@@ -5,22 +5,24 @@ use litchi_opc::{SourceCacheLimits, SourceLimits};
 use std::sync::Arc;
 
 /// The semantic codec policies selected for an owning or source-backed
-/// presentation.  The value is retained only when a caller overrides one of
-/// the codec defaults; ordinary owners therefore keep a single empty option
-/// rather than carrying three policy copies.
+/// presentation.
+///
+/// The bundle is retained only when a caller overrides one of the codec
+/// defaults.  This keeps the ordinary owner footprint unchanged while making
+/// a selected policy available to every eager, source-backed, and edit path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SemanticLimits {
     shape: crate::shape::Limits,
     transition: crate::transition::Limits,
     laser: crate::laser::Limits,
+    media_parts: crate::media_parts::Limits,
+    tag: crate::tag::Limits,
+    notes: crate::notes::Limits,
+    animations: crate::animations::Limits,
+    comments: crate::comments::Limits,
 }
 
 pub(crate) type SemanticLimitsRef = Arc<SemanticLimits>;
-
-#[inline]
-pub(crate) fn selected(value: Option<&SemanticLimitsRef>) -> SemanticLimits {
-    value.map(|value| **value).unwrap_or_default()
-}
 
 impl Default for SemanticLimits {
     fn default() -> Self {
@@ -34,6 +36,11 @@ impl SemanticLimits {
             shape: crate::shape::Limits::DEFAULT,
             transition: crate::transition::Limits::DEFAULT,
             laser: crate::laser::Limits::DEFAULT,
+            media_parts: crate::media_parts::Limits::DEFAULT,
+            tag: crate::tag::Limits::DEFAULT,
+            notes: crate::notes::Limits::DEFAULT,
+            animations: crate::animations::Limits::DEFAULT,
+            comments: crate::comments::Limits::DEFAULT,
         }
     }
 
@@ -47,6 +54,26 @@ impl SemanticLimits {
 
     pub(crate) const fn laser(self) -> crate::laser::Limits {
         self.laser
+    }
+
+    pub(crate) const fn media_parts(self) -> crate::media_parts::Limits {
+        self.media_parts
+    }
+
+    pub(crate) const fn tag(self) -> crate::tag::Limits {
+        self.tag
+    }
+
+    pub(crate) const fn notes(self) -> crate::notes::Limits {
+        self.notes
+    }
+
+    pub(crate) const fn animations(self) -> crate::animations::Limits {
+        self.animations
+    }
+
+    pub(crate) const fn comments(self) -> crate::comments::Limits {
+        self.comments
     }
 
     const fn with_shape(mut self, limits: crate::shape::Limits) -> Self {
@@ -64,9 +91,39 @@ impl SemanticLimits {
         self
     }
 
+    const fn with_media_parts(mut self, limits: crate::media_parts::Limits) -> Self {
+        self.media_parts = limits;
+        self
+    }
+
+    const fn with_tag(mut self, limits: crate::tag::Limits) -> Self {
+        self.tag = limits;
+        self
+    }
+
+    const fn with_notes(mut self, limits: crate::notes::Limits) -> Self {
+        self.notes = limits;
+        self
+    }
+
+    const fn with_animations(mut self, limits: crate::animations::Limits) -> Self {
+        self.animations = limits;
+        self
+    }
+
+    const fn with_comments(mut self, limits: crate::comments::Limits) -> Self {
+        self.comments = limits;
+        self
+    }
+
     fn into_ref(self) -> Option<SemanticLimitsRef> {
         (self != Self::defaults()).then(|| Arc::new(self))
     }
+}
+
+#[inline]
+pub(crate) fn selected(value: Option<&SemanticLimitsRef>) -> SemanticLimits {
+    value.map(|value| **value).unwrap_or_default()
 }
 
 /// Policies for owning and positional-source PPTX ingress.
@@ -156,6 +213,53 @@ impl OpenOptions {
             .with_laser(limits);
         self.semantic_limits = profiles.into_ref();
         self
+    }
+
+    /// Select the bounded media-part policy retained by the opened owner.
+    #[must_use]
+    pub fn media_parts_limits(mut self, limits: crate::media_parts::Limits) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_media_parts(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded programmable-tag policy retained by the opened
+    /// owner.
+    #[must_use]
+    pub fn tag_limits(mut self, limits: crate::tag::Limits) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_tag(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded speaker-notes policy retained by the opened owner.
+    #[must_use]
+    pub fn notes_limits(mut self, limits: crate::notes::Limits) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_notes(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded animation-timing policy retained by the opened
+    /// owner.
+    #[must_use]
+    pub fn animations_limits(mut self, limits: crate::animations::Limits) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_animations(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded classic-comment policy retained by the opened
+    /// owner.
+    #[must_use]
+    pub fn comments_limits(mut self, limits: crate::comments::Limits) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_comments(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    pub(crate) fn semantic_limits_value(&self) -> SemanticLimits {
+        selected(self.semantic_limits.as_ref())
     }
 
     /// Select a validated finite payload-cache policy for positional-source

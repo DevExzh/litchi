@@ -410,6 +410,10 @@ impl Slide {
 pub struct Snapshot {
     pub(crate) owner_state: Arc<crate::package::OpenedOwnerState>,
     pub(crate) package: Arc<OpcPackage>,
+    /// The facade's retained source-backed replay index when this snapshot
+    /// was captured through `Package`; raw capture callers may leave it empty
+    /// until publication attaches the owner state.
+    pub(crate) replay_index: Option<Arc<crate::package::replay_index::ReplayIndex>>,
     pub(crate) presentation_name: PackURI,
     pub(crate) slides: Arc<Vec<Slide>>,
     pub(crate) slide_name_index: Arc<SlideNameIndex>,
@@ -1008,13 +1012,24 @@ fn capture_internal(
         });
     }
     let _notes = match slide_root_proofs.as_deref() {
-        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs(
+        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
             package,
             &presentation_name,
             references.len(),
             proofs,
+            semantic_limits
+                .unwrap_or_default()
+                .notes()
+                .constrained_by_source(package.read_limits()),
         )?,
-        None => crate::notes::load_snapshot(package, &presentation_name)?,
+        None => crate::notes::load_snapshot_with_limits(
+            package,
+            &presentation_name,
+            semantic_limits
+                .unwrap_or_default()
+                .notes()
+                .constrained_by_source(package.read_limits()),
+        )?,
     };
     let slide_name_index = SlideNameIndex::build(&slides)?;
     // The snapshot owns its package from here on, and the memo it keeps must
@@ -1059,6 +1074,7 @@ fn capture_internal(
             semantic_limits,
         )),
         package: owned,
+        replay_index: None,
         presentation_name,
         slides: Arc::new(slides),
         slide_name_index: Arc::new(slide_name_index),

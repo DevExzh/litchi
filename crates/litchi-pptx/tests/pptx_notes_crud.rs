@@ -200,7 +200,7 @@ fn slide_notes(package: &Package) -> Vec<String> {
                 .slides()
                 .iter()
                 .find(|notes| notes.owner() == slide.part().part().partname().as_str())
-                .and_then(|slide| slide.text().unwrap())
+                .and_then(|slide| slide.text(notes::Limits::DEFAULT).unwrap())
                 .unwrap_or_default()
         })
         .collect()
