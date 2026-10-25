@@ -5626,3 +5626,30 @@ See [0063](0063-source-pptx-modern-comments.md).
   consolidated to 33 rows and glossary coverage to 13 unique profiles/26 steps.
   The existing signed-batch contract choice is explicitly surfaced to the owner;
   no answer is inferred, and independent qualification continues.
+
+
+- Coordinator signed-batch decision and local consolidation (2026-10-25):
+  The owner selects immediate signed-batch refusal. Reviewed 102 partitions
+  signed corpus checks from unsigned equivalence and proves zero item reads;
+  it is merged privately at `b4f83c95b9`. Native policy binds that explicit
+  selection. The preceding joint compiler capture on 6964 passes formatting
+  and minimal PPTX compilation, then finds one redundant ribbon test qualifier.
+  Root verifies the failure and fast-forwards reviewed 101c at `a3aec01d5a`.
+  Fresh combined compiler/runtime/glossary qualification is required.
+
+  The owner also requests merging or deleting every local unified-derived
+  branch/worktree, excluding main and office-format-completeness. Root is
+  already on feat/unified-ops-api. The initial inventory finds 482 refs and
+  300 worktrees; lineage review distinguishes independent office siblings
+  from unified work. Already-integrated refs are being checked for guarded
+  deletion; unique work and active measurement baselines remain under review.
+  Record 0362ul103 tracks this consolidation. No push or final acceptance.
+
+  The first cleanup is complete: 70 already-trunk local branch refs are
+  deleted with exact-tip guards and all commits remain reachable. Cleanup72
+  removes retired W7 docfix without force, preserves its ignored lock and
+  reclaims 10,166,382,592 bytes; root verifies the unchanged protected probe.
+  Sixty-six independent Office/iWork sibling branches are outside scope.
+  Remaining unique rows receive semantic review against their squashed
+  replacements. The 14 signed-policy tests pass and the fresh eight-row
+  compiler packet is running on frozen joint source `ea5c95e212`.
