@@ -6017,3 +6017,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   are verified; the gate and two source-generation services remain live.
   Common-P installation, actual measurements, final census, merge and cleanup
   remain open. Nothing is pushed.
+
+  The signed v4 source-generation service subsequently dies at its 4G memory
+  cap (152a); the journal confirms a kernel OOM kill. Its constructed tar is
+  preserved but unverified. The protocol's whole-archive/member reads are
+  returned for streaming repair, with a fresh verifier allowed to reuse the
+  tar only after complete source checks. The current-native emitter and gate
+  remain live. The baseline materializer is returned before real execution
+  for full/sparse checkout metadata, unrelated-ref and completion-order fixes.
+  P stays frozen until the live emitter finishes. No acceptance or push.
