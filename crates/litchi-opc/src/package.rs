@@ -398,11 +398,71 @@ impl OwnedContentTypes {
         Arc::clone(&self.xml.bytes)
     }
 
+    /// Return the admitted content type resolved for one part name.
+    ///
+    /// This semantic projection lets a format-level graph patch compare or
+    /// compose only the overrides it owns while retaining the source
+    /// manifest's unrelated lexical bytes.
+    #[must_use]
+    pub fn part_content_type(&self, part: &PackURI) -> Option<&str> {
+        self.binding.lookup(part).map(ContentType::as_str)
+    }
+
+    /// Whether this manifest carries an explicit `<Override>` for a part.
+    ///
+    /// The resolved type alone cannot distinguish an explicit declaration from
+    /// a matching extension default; graph editors use that distinction to
+    /// avoid needlessly deleting and appending an unchanged source element.
+    #[must_use]
+    pub fn has_part_override(&self, part: &PackURI) -> bool {
+        self.binding.override_for(part).is_some()
+    }
+
+    /// Number of admitted default and override mappings in this manifest.
+    #[must_use]
+    pub fn mapping_count(&self) -> usize {
+        self.binding.mapping_count()
+    }
+
+    /// Re-admit this manifest token under a recipient's bounded source policy
+    /// without changing a package.
+    pub fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
+        let limits = self.xml.limits().min(limits);
+        self.xml.preflight_under(limits)?;
+        let parsed = ContentTypeMap::from_xml(self.bytes(), limits)?;
+        if parsed != *self.binding {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-types token binding does not match its XML".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Remove exact part and relationship-part overrides while preserving all
     /// surrounding manifest bytes. Defaults, comments, ordering, and unrelated
     /// overrides remain source-backed in the returned token.
     pub fn without_parts(&self, parts: &[PackURI], max_output_bytes: usize) -> Result<Self> {
         let xml = content_types::without_part_overrides(&self.xml, parts, max_output_bytes)?;
+        if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
+            return Ok(self.clone());
+        }
+        let binding = Arc::new(ContentTypeMap::from_xml(&xml.bytes, xml.limits())?);
+        Ok(Self { xml, binding })
+    }
+
+    /// Remove only the explicit part overrides for the supplied names.
+    ///
+    /// The corresponding relationship-member overrides remain in the source
+    /// manifest.  This is useful for a graph edit whose owner part remains in
+    /// place (for example the host document): its `.rels` member is still
+    /// physically present and its authored lexical manifest entry must not be
+    /// needlessly removed and recreated.
+    pub fn without_part_overrides_only(
+        &self,
+        parts: &[PackURI],
+        max_output_bytes: usize,
+    ) -> Result<Self> {
+        let xml = content_types::without_part_overrides_only(&self.xml, parts, max_output_bytes)?;
         if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
             return Ok(self.clone());
         }

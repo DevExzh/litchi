@@ -478,7 +478,7 @@ impl<'source> RelationshipsEditPlan<'source> {
 impl OwnedRelationships {
     /// Re-admit this source-bound relationship member under a recipient's
     /// limits without exposing the retained XML token to the parent package.
-    pub(super) fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
+    pub fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
         self.xml.preflight_under(limits)
     }
 
@@ -1286,7 +1286,9 @@ impl OpcPackage {
         let (owner_ref, relationships) = if owner.as_str() == "/" {
             (owner, self.rels())
         } else {
-            let part = self.get_part(owner)?;
+            let part = self
+                .part_metadata(owner)
+                .ok_or_else(|| OpcError::PartNotFound(owner.to_string()))?;
             (part.partname(), part.rels())
         };
         OwnedXmlPart::check_derived_capture_member_name(owner_ref, limits)?;
@@ -1423,7 +1425,9 @@ impl OpcPackage {
         let (owner_ref, relationships) = if owner.as_str() == "/" {
             (owner, self.rels())
         } else {
-            let part = self.get_part(owner)?;
+            let part = self
+                .part_metadata(owner)
+                .ok_or_else(|| OpcError::PartNotFound(owner.to_string()))?;
             (part.partname(), part.rels())
         };
         OwnedXmlPart::check_derived_capture_member_name(owner_ref, limits)?;

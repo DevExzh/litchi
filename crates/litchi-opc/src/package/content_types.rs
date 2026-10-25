@@ -332,6 +332,26 @@ pub(crate) fn without_part_overrides(
     parts: &[PackURI],
     max_output_bytes: usize,
 ) -> Result<OwnedXmlPart> {
+    without_part_overrides_inner(source, parts, max_output_bytes, true)
+}
+
+/// Remove only explicit part overrides, retaining relationship-member
+/// overrides.  The graph owner uses this when its `.rels` member survives the
+/// edit and its lexical content-type declaration remains valid.
+pub(crate) fn without_part_overrides_only(
+    source: &OwnedXmlPart,
+    parts: &[PackURI],
+    max_output_bytes: usize,
+) -> Result<OwnedXmlPart> {
+    without_part_overrides_inner(source, parts, max_output_bytes, false)
+}
+
+fn without_part_overrides_inner(
+    source: &OwnedXmlPart,
+    parts: &[PackURI],
+    max_output_bytes: usize,
+    include_relationships: bool,
+) -> Result<OwnedXmlPart> {
     let limits = source.limits();
     let maximum = max_output_bytes
         .min(limits.max_content_types_bytes())
@@ -353,8 +373,15 @@ pub(crate) fn without_part_overrides(
         // upper bound before constructing another URI from a caller's name.
         selector_bytes = selector_bytes
             .checked_add(part.as_str().len())
-            .and_then(|total| total.checked_add(part.as_str().len()))
-            .and_then(|total| total.checked_add(27))
+            .and_then(|total| {
+                if include_relationships {
+                    total
+                        .checked_add(part.as_str().len())
+                        .and_then(|total| total.checked_add(27))
+                } else {
+                    Some(total)
+                }
+            })
             .ok_or_else(|| {
                 OpcError::InvalidContentTypesManifest(
                     "content-types removal selector size overflows".into(),
@@ -378,8 +405,10 @@ pub(crate) fn without_part_overrides(
         })?;
     for part in parts {
         removals.push(part.clone());
-        let relationships = part.rels_uri().map_err(OpcError::InvalidPackUri)?;
-        removals.push(relationships);
+        if include_relationships {
+            let relationships = part.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            removals.push(relationships);
+        }
     }
     removals
         .sort_unstable_by(|left, right| cmp_ascii_case_insensitive(left.as_str(), right.as_str()));
