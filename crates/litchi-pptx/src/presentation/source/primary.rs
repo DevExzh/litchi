@@ -200,6 +200,7 @@ impl Package {
             package_relationships: seed.package_relationships,
             presentation_binding: seed.presentation_binding,
             limits: inner.limits,
+            semantic_limits: inner.semantic_limits.clone(),
         };
         let order = source_order(&owner)?;
         let physical = source_physical_index(&owner)?;
@@ -1525,8 +1526,10 @@ impl Slide {
         }
         let scene_reservation =
             reserve_scene(&self.package, self.snapshot.xml.as_bytes().len(), maximum)?;
-        let parsed =
-            crate::shape::Scene::read(self.snapshot.xml.as_bytes(), crate::shape::Limits::DEFAULT)?;
+        let parsed = crate::shape::Scene::read(
+            self.snapshot.xml.as_bytes(),
+            crate::open_options::selected(self.snapshot.semantic_limits.as_ref()).shape(),
+        )?;
         let scene = match &self.snapshot.xml {
             SourcePayload::Original(data) => {
                 crate::shape::owned::Scene::from_source(parsed, data.clone())?

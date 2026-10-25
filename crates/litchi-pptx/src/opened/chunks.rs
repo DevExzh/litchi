@@ -69,9 +69,32 @@ pub(crate) fn stage_shape_text_chunks<'a>(
     max_text_bytes: usize,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_text_chunks_with_limits(
+        xml,
+        chunks,
+        max_text_bytes,
+        max_output_bytes,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn stage_shape_text_chunks_with_limits<'a>(
+    xml: &[u8],
+    chunks: &[&[super::ShapeTextReplacement<'a>]],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
     let policy = text_policy(max_text_bytes, max_output_bytes);
     let admission = admit_chunks(chunks, |replacement| replacement.text().len(), policy)?;
-    stage_shape_text_chunks_admitted(xml, chunks, max_text_bytes, max_output_bytes, admission)
+    stage_shape_text_chunks_admitted_with_limits(
+        xml,
+        chunks,
+        max_text_bytes,
+        max_output_bytes,
+        admission,
+        shape_limits,
+    )
 }
 
 /// Stage text chunks after a caller has retained the matching no-allocation
@@ -84,15 +107,34 @@ pub(crate) fn stage_shape_text_chunks_admitted<'a>(
     max_output_bytes: usize,
     admission: ChunkAdmission,
 ) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_text_chunks_admitted_with_limits(
+        xml,
+        chunks,
+        max_text_bytes,
+        max_output_bytes,
+        admission,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn stage_shape_text_chunks_admitted_with_limits<'a>(
+    xml: &[u8],
+    chunks: &[&[super::ShapeTextReplacement<'a>]],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    admission: ChunkAdmission,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
     let policy = text_policy(max_text_bytes, max_output_bytes);
     let replacements = flatten_chunks(chunks, policy, admission)?;
-    super::xml::stage_shape_texts_admitted(
+    super::xml::stage_shape_texts_admitted_with_limits(
         xml,
         &replacements,
         max_text_bytes,
         max_output_bytes,
         MAX_SELECTIONS,
         max_output_bytes,
+        shape_limits,
     )
 }
 
@@ -106,13 +148,36 @@ pub(crate) fn stage_shape_property_chunks<'a>(
     max_text_bytes: usize,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_property_chunks_with_limits(
+        xml,
+        chunks,
+        max_text_bytes,
+        max_output_bytes,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn stage_shape_property_chunks_with_limits<'a>(
+    xml: &[u8],
+    chunks: &[&[super::ShapePropertiesReplacement<'a>]],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
     let policy = property_policy(max_text_bytes, max_output_bytes);
     let admission = admit_chunks(
         chunks,
         |replacement| replacement.text().map_or(0, str::len),
         policy,
     )?;
-    stage_shape_property_chunks_admitted(xml, chunks, max_text_bytes, max_output_bytes, admission)
+    stage_shape_property_chunks_admitted_with_limits(
+        xml,
+        chunks,
+        max_text_bytes,
+        max_output_bytes,
+        admission,
+        shape_limits,
+    )
 }
 
 /// Stage property chunks after a caller has retained the matching
@@ -125,15 +190,34 @@ pub(crate) fn stage_shape_property_chunks_admitted<'a>(
     max_output_bytes: usize,
     admission: ChunkAdmission,
 ) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_property_chunks_admitted_with_limits(
+        xml,
+        chunks,
+        max_text_bytes,
+        max_output_bytes,
+        admission,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn stage_shape_property_chunks_admitted_with_limits<'a>(
+    xml: &[u8],
+    chunks: &[&[super::ShapePropertiesReplacement<'a>]],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    admission: ChunkAdmission,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
     let policy = property_policy(max_text_bytes, max_output_bytes);
     let replacements = flatten_chunks(chunks, policy, admission)?;
-    super::properties::stage_shape_properties_admitted(
+    super::properties::stage_shape_properties_admitted_with_limits(
         xml,
         &replacements,
         max_text_bytes,
         max_output_bytes,
         MAX_SELECTIONS,
         max_output_bytes,
+        shape_limits,
     )
 }
 

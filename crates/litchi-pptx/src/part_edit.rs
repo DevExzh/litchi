@@ -494,6 +494,16 @@ impl<'a> Staged<'a> {
         }
     }
 
+    /// The semantic laser policy retained by the owning package.
+    pub(crate) fn laser_limits(&self) -> crate::laser::Limits {
+        self.package.semantic_limits().laser()
+    }
+
+    /// The semantic shape policy retained by the owning package.
+    pub(crate) fn shape_limits(&self) -> crate::shape::Limits {
+        self.package.semantic_limits().shape()
+    }
+
     /// Run one typed graph operation on the staged graph. An error leaves
     /// the staged graph as it was before the operation.
     pub(crate) fn update<T>(

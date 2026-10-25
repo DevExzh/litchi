@@ -2,6 +2,72 @@
 
 use litchi_core::ExecutionContext;
 use litchi_opc::{SourceCacheLimits, SourceLimits};
+use std::sync::Arc;
+
+/// The semantic codec policies selected for an owning or source-backed
+/// presentation.  The value is retained only when a caller overrides one of
+/// the codec defaults; ordinary owners therefore keep a single empty option
+/// rather than carrying three policy copies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SemanticLimits {
+    shape: crate::shape::Limits,
+    transition: crate::transition::Limits,
+    laser: crate::laser::Limits,
+}
+
+pub(crate) type SemanticLimitsRef = Arc<SemanticLimits>;
+
+#[inline]
+pub(crate) fn selected(value: Option<&SemanticLimitsRef>) -> SemanticLimits {
+    value.map(|value| **value).unwrap_or_default()
+}
+
+impl Default for SemanticLimits {
+    fn default() -> Self {
+        Self::defaults()
+    }
+}
+
+impl SemanticLimits {
+    const fn defaults() -> Self {
+        Self {
+            shape: crate::shape::Limits::DEFAULT,
+            transition: crate::transition::Limits::DEFAULT,
+            laser: crate::laser::Limits::DEFAULT,
+        }
+    }
+
+    pub(crate) const fn shape(self) -> crate::shape::Limits {
+        self.shape
+    }
+
+    pub(crate) const fn transition(self) -> crate::transition::Limits {
+        self.transition
+    }
+
+    pub(crate) const fn laser(self) -> crate::laser::Limits {
+        self.laser
+    }
+
+    const fn with_shape(mut self, limits: crate::shape::Limits) -> Self {
+        self.shape = limits;
+        self
+    }
+
+    const fn with_transition(mut self, limits: crate::transition::Limits) -> Self {
+        self.transition = limits;
+        self
+    }
+
+    const fn with_laser(mut self, limits: crate::laser::Limits) -> Self {
+        self.laser = limits;
+        self
+    }
+
+    fn into_ref(self) -> Option<SemanticLimitsRef> {
+        (self != Self::defaults()).then(|| Arc::new(self))
+    }
+}
 
 /// Policies for owning and positional-source PPTX ingress.
 ///
@@ -38,6 +104,7 @@ use litchi_opc::{SourceCacheLimits, SourceLimits};
 #[derive(Debug, Clone, Default)]
 pub struct OpenOptions {
     pub(crate) source_limits: SourceLimits,
+    pub(crate) semantic_limits: Option<SemanticLimitsRef>,
     pub(crate) cache_limits: Option<SourceCacheLimits>,
     pub(crate) execution_context: Option<ExecutionContext>,
     #[cfg(feature = "encryption")]
@@ -49,6 +116,45 @@ impl OpenOptions {
     #[must_use]
     pub const fn source_limits(mut self, limits: SourceLimits) -> Self {
         self.source_limits = limits;
+        self
+    }
+
+    /// Select the bounded shape-scene policy retained by the opened owner.
+    #[must_use]
+    pub fn shape_limits(mut self, limits: crate::shape::Limits) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_shape(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded transition policy retained by the opened owner.
+    #[must_use]
+    pub fn transition_limits(mut self, limits: crate::transition::Limits) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_transition(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded laser-trace policy retained by the opened owner.
+    #[must_use]
+    pub fn laser_limits(mut self, limits: crate::laser::Limits) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_laser(limits);
+        self.semantic_limits = profiles.into_ref();
         self
     }
 

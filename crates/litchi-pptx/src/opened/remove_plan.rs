@@ -427,6 +427,15 @@ pub(crate) fn apply_patch(
     patch: &Patch,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
+    apply_patch_with_semantic_limits(package, patch, physical_source_provenance, None)
+}
+
+pub(crate) fn apply_patch_with_semantic_limits(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<Snapshot> {
     if super::model::package_fingerprint(package)? != patch.source_revision {
         return Err(Error::PatchConflict);
     }
@@ -437,26 +446,32 @@ pub(crate) fn apply_patch(
     let slide_name = slide_name.clone();
     match direction {
         SinglePartChange::Remove => {
-            let source =
-                super::model::capture(package, patch.patch.limits(), physical_source_provenance)?;
+            let source = super::model::capture_with_provenance_and_semantic_limits(
+                package,
+                patch.patch.limits(),
+                physical_source_provenance,
+                semantic_limits.clone(),
+            )?;
             let proof = replan_exact_removal(&source, &slide_name)?;
             if !patch.has_same_semantics(proof.patch()) {
                 return Err(Error::PatchConflict);
             }
-            super::patch::apply_exact_revision(
+            super::patch::apply_exact_revision_with_semantic_limits(
                 package,
                 &patch.patch,
                 patch.target_revision,
                 physical_source_provenance,
+                semantic_limits.clone(),
             )
         },
         SinglePartChange::Add => {
             let mut candidate = package.clone();
-            let restored = super::patch::apply_exact_revision(
+            let restored = super::patch::apply_exact_revision_with_semantic_limits(
                 &mut candidate,
                 &patch.patch,
                 patch.target_revision,
                 physical_source_provenance,
+                semantic_limits.clone(),
             )?;
             let proof = replan_exact_removal(&restored, &slide_name)?;
             if !patch.inverse().has_same_semantics(proof.patch()) {
@@ -530,10 +545,11 @@ fn build_candidate(
             return Err(invalid("slide-removal dependent part disappeared"));
         }
     }
-    let captured = super::model::capture(
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
         &candidate,
         snapshot.limits,
         snapshot.physical_source_provenance,
+        snapshot.owner_state.semantic_limits.clone(),
     )?;
     if captured.slides.len() + 1 != snapshot.slides.len()
         || captured

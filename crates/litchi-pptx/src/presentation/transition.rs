@@ -47,12 +47,17 @@ pub(crate) enum SlideMce {
 }
 
 /// Admit a source-backed slide for a snapshot, publication or replay.
-/// A slide [`validate_source`] refuses only for markup compatibility that
+/// Source validation refuses only for markup compatibility that
 /// lies strictly inside top-level shape-tree children (an OLE object's
 /// `mc:AlternateContent` under its `p:graphicFrame`) is admitted as
 /// [`SlideMce::Enclosed`]; any other refusal stands.
-pub(crate) fn admit_source(xml: &[u8], operation: &'static str) -> Result<SlideMce> {
-    match validate_source(xml, operation) {
+pub(crate) fn admit_source_with_limits(
+    xml: &[u8],
+    operation: &'static str,
+    shape_limits: crate::shape::Limits,
+    transition_limits: crate::transition::Limits,
+) -> Result<SlideMce> {
+    match validate_source_with_limits(xml, operation, shape_limits, transition_limits) {
         Ok(()) => return Ok(SlideMce::Plain),
         Err(Error::Refused(refusal))
             if refusal.reason() == MCE_OUTSIDE_TRANSITION
@@ -67,7 +72,7 @@ pub(crate) fn admit_source(xml: &[u8], operation: &'static str) -> Result<SlideM
         ));
     }
     let layout = locate_with(xml, operation, true)?;
-    let _ = validate_owner_for_read(xml, &layout)?;
+    let _ = validate_owner_for_read_with_limits(xml, &layout, transition_limits)?;
     Ok(SlideMce::Enclosed)
 }
 
@@ -84,16 +89,20 @@ pub(crate) fn enclosed_edit_refusal(operation: &'static str) -> Error {
 /// Validate a source-backed slide while allowing its direct transition owner
 /// to use markup-compatibility. Shape edits still require every other owner to
 /// remain byte-stable after MCE preprocessing.
-pub(super) fn validate_source(xml: &[u8], operation: &'static str) -> Result<()> {
+pub(super) fn validate_source_with_limits(
+    xml: &[u8],
+    operation: &'static str,
+    shape_limits: crate::shape::Limits,
+    transition_limits: crate::transition::Limits,
+) -> Result<()> {
     let layout = locate(xml, operation)?;
-    let _ = validate_owner_for_read(xml, &layout)?;
+    let _ = validate_owner_for_read_with_limits(xml, &layout, transition_limits)?;
     let scene_is_rewritten = if let Some(range) = layout.transition.as_ref() {
         let scene_xml = remove_owner(xml, range)?;
-        crate::shape::Scene::read(&scene_xml, crate::shape::Limits::DEFAULT)?.is_rewritten()
+        crate::shape::Scene::read(&scene_xml, shape_limits)?.is_rewritten()
             && has_mce_markup(&scene_xml)?
     } else {
-        crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?.is_rewritten()
-            && has_mce_markup(xml)?
+        crate::shape::Scene::read(xml, shape_limits)?.is_rewritten() && has_mce_markup(xml)?
     };
     if scene_is_rewritten {
         return Err(Error::refused(
@@ -140,24 +149,28 @@ fn has_mce_markup(xml: &[u8]) -> Result<bool> {
     }
 }
 
-pub(crate) fn read_direct(xml: &[u8]) -> Result<Option<Transition>> {
+pub(crate) fn read_direct_with_limits(
+    xml: &[u8],
+    transition_limits: crate::transition::Limits,
+) -> Result<Option<Transition>> {
     let layout = locate(xml, "read_transition")?;
     if layout.transition.is_none() {
         return Ok(None);
     }
-    validate_owner_for_read(xml, &layout)
+    validate_owner_for_read_with_limits(xml, &layout, transition_limits)
 }
 
-pub(crate) fn stage(
+pub(crate) fn stage_with_limits(
     xml: &[u8],
     presentation_xml: &[u8],
     target: Option<&Transition>,
     max_output_bytes: usize,
+    transition_limits: crate::transition::Limits,
     operation: &'static str,
 ) -> Result<(Option<Vec<u8>>, bool)> {
     let layout = locate(xml, operation)?;
     let current = if layout.transition.is_some() {
-        validate_owner_for_read(xml, &layout)?
+        validate_owner_for_read_with_limits(xml, &layout, transition_limits)?
     } else {
         None
     };
@@ -175,10 +188,10 @@ pub(crate) fn stage(
         // Semantic equality below remains deliberately conservative: an
         // unknown retained child must not make a target that drops it look
         // like a no-op.
-        validate_owner_for_edit(xml, &layout, current, operation)?;
+        validate_owner_for_edit_with_limits(xml, &layout, current, operation, transition_limits)?;
     }
     if let Some(target) = target {
-        validate_target(target, operation)?;
+        validate_target(target, operation, transition_limits)?;
     }
     if same_semantics(current.as_ref(), target) {
         return Ok((None, false));
@@ -192,7 +205,8 @@ pub(crate) fn stage(
     }
 
     let replaced_len = layout.transition.as_ref().map_or(0, Range::len);
-    let replacement_len = preflight_replacement_len(xml, &layout, target, operation)?;
+    let replacement_len =
+        preflight_replacement_len(xml, &layout, target, operation, transition_limits)?;
     let output_len = xml
         .len()
         .checked_sub(replaced_len)
@@ -206,13 +220,22 @@ pub(crate) fn stage(
     }
 
     let replacement = match (layout.owner, target) {
-        (Some(OwnerKind::AlternateContent), Some(value)) => {
-            Some(alternate_fragment(xml, &layout, value, operation)?)
-        },
+        (Some(OwnerKind::AlternateContent), Some(value)) => Some(alternate_fragment(
+            xml,
+            &layout,
+            value,
+            operation,
+            transition_limits,
+        )?),
         (Some(OwnerKind::AlternateContent), None) => {
             Some(clear_alternate_fragment(xml, &layout, operation)?)
         },
-        (_, Some(value)) => Some(direct_fragment(value, &layout.prefix, operation)?),
+        (_, Some(value)) => Some(direct_fragment(
+            value,
+            &layout.prefix,
+            operation,
+            transition_limits,
+        )?),
         (_, None) => None,
     };
 
@@ -241,7 +264,7 @@ pub(crate) fn stage(
 
     let published_layout = locate(&output, operation)?;
     let published = if published_layout.transition.is_some() {
-        validate_owner_for_read(&output, &published_layout)?
+        validate_owner_for_read_with_limits(&output, &published_layout, transition_limits)?
     } else {
         None
     };
@@ -263,14 +286,15 @@ fn preflight_replacement_len(
     layout: &Layout,
     target: Option<&Transition>,
     operation: &'static str,
+    transition_limits: crate::transition::Limits,
 ) -> Result<usize> {
     match (layout.owner, target) {
         (Some(OwnerKind::AlternateContent), Some(value)) => {
-            alternate_fragment_len(xml, layout, value, operation)
+            alternate_fragment_len(xml, layout, value, operation, transition_limits)
         },
         (Some(OwnerKind::AlternateContent), None) => clear_alternate_fragment_len(xml, layout),
         (_, Some(value)) => {
-            let canonical = crate::transition::write(value, crate::transition::Limits::DEFAULT)?;
+            let canonical = crate::transition::write(value, transition_limits)?;
             rewrite_pml_qnames_len(canonical.as_bytes(), &layout.prefix)
         },
         (_, None) => Ok(0),
@@ -285,7 +309,11 @@ fn same_semantics(current: Option<&Transition>, target: Option<&Transition>) -> 
     }
 }
 
-fn validate_owner_for_read(xml: &[u8], layout: &Layout) -> Result<Option<Transition>> {
+fn validate_owner_for_read_with_limits(
+    xml: &[u8],
+    layout: &Layout,
+    transition_limits: crate::transition::Limits,
+) -> Result<Option<Transition>> {
     let Some(range) = layout.transition.as_ref() else {
         return Ok(None);
     };
@@ -293,25 +321,24 @@ fn validate_owner_for_read(xml: &[u8], layout: &Layout) -> Result<Option<Transit
         return Err(invalid("direct transition range is outside its slide"));
     }
     match layout.owner {
-        Some(OwnerKind::Direct) => {
-            crate::transition::read(xml, crate::transition::Limits::DEFAULT)?
-                .map(Some)
-                .ok_or_else(|| invalid("direct transition disappeared during semantic read"))
-        },
+        Some(OwnerKind::Direct) => crate::transition::read(xml, transition_limits)?
+            .map(Some)
+            .ok_or_else(|| invalid("direct transition disappeared during semantic read")),
         Some(OwnerKind::AlternateContent) => {
             // Clearing the active branch leaves the AlternateContent owner in
             // place so inactive choices and fallback bytes remain intact.
-            crate::transition::read(xml, crate::transition::Limits::DEFAULT)
+            crate::transition::read(xml, transition_limits)
         },
         None => Err(invalid("direct transition owner kind is unavailable")),
     }
 }
 
-fn validate_owner_for_edit(
+fn validate_owner_for_edit_with_limits(
     xml: &[u8],
     layout: &Layout,
     current: &Transition,
     operation: &'static str,
+    transition_limits: crate::transition::Limits,
 ) -> Result<()> {
     let Some(range) = layout.transition.as_ref() else {
         return Ok(());
@@ -331,13 +358,17 @@ fn validate_owner_for_edit(
                     "source-backed transition edits refuse an unknown active extension effect",
                 ));
             }
-            validate_active_transition(xml, operation)
+            validate_active_transition(xml, operation, transition_limits)
         },
         None => Err(invalid("direct transition owner kind is unavailable")),
     }
 }
 
-fn validate_active_transition(xml: &[u8], operation: &'static str) -> Result<()> {
+fn validate_active_transition(
+    xml: &[u8],
+    operation: &'static str,
+    transition_limits: crate::transition::Limits,
+) -> Result<()> {
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::ooxml_baseline();
     capabilities
         .understand_namespace("http://schemas.microsoft.com/office/powerpoint/2010/main")
@@ -382,7 +413,7 @@ fn validate_active_transition(xml: &[u8], operation: &'static str) -> Result<()>
     // placement and attribute names. Run the bounded typed reader as well so
     // token/boolean domains, duplicate attributes, and exact p14 timing are
     // checked before a destructive branch splice.
-    let active = crate::transition::read(processed.as_ref(), crate::transition::Limits::DEFAULT)?
+    let active = crate::transition::read(processed.as_ref(), transition_limits)?
         .ok_or_else(|| invalid("active transition disappeared during typed validation"))?;
     // The edit planner keeps the strict domain check the reader now repairs.
     if !active.tolerance_report().is_clean() {
@@ -414,9 +445,14 @@ fn remove_owner(xml: &[u8], range: &Range<usize>) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn direct_fragment(value: &Transition, prefix: &str, operation: &'static str) -> Result<Vec<u8>> {
-    validate_target(value, operation)?;
-    let canonical = crate::transition::write(value, crate::transition::Limits::DEFAULT)?;
+fn direct_fragment(
+    value: &Transition,
+    prefix: &str,
+    operation: &'static str,
+    transition_limits: crate::transition::Limits,
+) -> Result<Vec<u8>> {
+    validate_target(value, operation, transition_limits)?;
+    let canonical = crate::transition::write(value, transition_limits)?;
     Ok(rewrite_pml_qnames(canonical.as_bytes(), prefix)?.into_bytes())
 }
 
@@ -431,6 +467,7 @@ fn alternate_fragment(
     layout: &Layout,
     target: &Transition,
     operation: &'static str,
+    transition_limits: crate::transition::Limits,
 ) -> Result<Vec<u8>> {
     let owner = layout
         .transition
@@ -444,7 +481,7 @@ fn alternate_fragment(
             "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
         ));
     };
-    let canonical = crate::transition::write(target, crate::transition::Limits::DEFAULT)?;
+    let canonical = crate::transition::write(target, transition_limits)?;
     let canonical_range = first_transition_range(&canonical)?;
     let fragment = canonical
         .as_bytes()
@@ -504,13 +541,14 @@ fn alternate_fragment_len(
     layout: &Layout,
     target: &Transition,
     operation: &'static str,
+    transition_limits: crate::transition::Limits,
 ) -> Result<usize> {
     let owner = layout
         .transition
         .as_ref()
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
     let active = active_transition_range(xml, owner, operation)?.ok_or(Error::refused(litchi_core::edit::RefusalKind::UnsupportedContent, operation, "source-backed transition edit cannot insert into an AlternateContent owner without an active transition"))?;
-    let canonical = crate::transition::write(target, crate::transition::Limits::DEFAULT)?;
+    let canonical = crate::transition::write(target, transition_limits)?;
     let canonical_range = first_transition_range(&canonical)?;
     let fragment = canonical
         .as_bytes()
@@ -641,7 +679,14 @@ fn ensure_extension_namespaces(xml: &mut Vec<u8>, requirements: Option<&str>) ->
     let root = xml
         .get(..root_end)
         .ok_or_else(|| invalid("AlternateContent root range is outside its output"))?;
+    let additions_len = extension_namespace_additions_len(root, Some(requirements))?;
     let mut additions = String::new();
+    additions
+        .try_reserve_exact(additions_len)
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed AlternateContent namespace declarations",
+            source,
+        })?;
     for token in requirements.split_ascii_whitespace() {
         let uri = match token {
             "p14" => "http://schemas.microsoft.com/office/powerpoint/2010/main",
@@ -649,16 +694,22 @@ fn ensure_extension_namespaces(xml: &mut Vec<u8>, requirements: Option<&str>) ->
             "p159" => "http://schemas.microsoft.com/office/powerpoint/2015/09/main",
             _ => continue,
         };
-        let declaration = format!("xmlns:{token}=\"");
         if !root_has_namespace(root, token, uri)? {
             additions.push(' ');
-            additions.push_str(&declaration);
+            additions.push_str("xmlns:");
+            additions.push_str(token);
+            additions.push_str("=\"");
             additions.push_str(uri);
             additions.push('"');
         }
     }
     if additions.is_empty() {
         return Ok(());
+    }
+    if additions.len() != additions_len {
+        return Err(invalid(
+            "AlternateContent namespace declaration length changed during emission",
+        ));
     }
     let insertion = root_end
         .checked_sub(1)
@@ -727,10 +778,13 @@ fn root_has_namespace(root: &[u8], prefix: &str, expected: &str) -> Result<bool>
         Event::Start(element) | Event::Empty(element) => element,
         _ => return Err(invalid("AlternateContent root opening tag is unavailable")),
     };
-    let expected_name = format!("xmlns:{prefix}");
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        if attribute.key.as_ref() != expected_name.as_bytes() {
+        let key = attribute.key.as_ref();
+        if key.len() != b"xmlns:".len() + prefix.len()
+            || !key.starts_with(b"xmlns:")
+            || key[b"xmlns:".len()..] != prefix.as_bytes()
+        {
             continue;
         }
         let value = attribute
@@ -756,10 +810,15 @@ fn clear_alternate_fragment(
         .as_ref()
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
     let Some(active) = active_transition_range(xml, owner, operation)? else {
-        return Ok(xml
+        let owner_bytes = xml
             .get(owner.clone())
-            .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?
-            .to_vec());
+            .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?;
+        return replace_range_bytes(
+            owner_bytes,
+            0..0,
+            &[],
+            "source-backed AlternateContent transition XML",
+        );
     };
     let owner_bytes = xml
         .get(owner.clone())
@@ -775,16 +834,12 @@ fn clear_alternate_fragment(
     if relative_start > relative_end || relative_end > owner_bytes.len() {
         return Err(invalid("active transition range is outside its owner"));
     }
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(owner_bytes.len() - (relative_end - relative_start))
-        .map_err(|source| Error::Allocation {
-            resource: "source-backed AlternateContent transition XML",
-            source,
-        })?;
-    output.extend_from_slice(&owner_bytes[..relative_start]);
-    output.extend_from_slice(&owner_bytes[relative_end..]);
-    Ok(output)
+    replace_range_bytes(
+        owner_bytes,
+        relative_start..relative_end,
+        &[],
+        "source-backed AlternateContent transition XML",
+    )
 }
 
 fn clear_alternate_fragment_len(xml: &[u8], layout: &Layout) -> Result<usize> {
@@ -907,8 +962,13 @@ fn validate_extension_bindings(reader: &NsReader<&[u8]>, requirements: &str) -> 
             "p159" => "http://schemas.microsoft.com/office/powerpoint/2015/09/main",
             _ => return Err(invalid("unknown transition namespace requirement")),
         };
-        let name = format!("{token}:transition");
-        let (namespace, _) = reader.resolver().resolve_element(QName(name.as_bytes()));
+        let name = match token {
+            "p14" => b"p14:transition".as_slice(),
+            "p15" => b"p15:transition".as_slice(),
+            "p159" => b"p159:transition".as_slice(),
+            _ => return Err(invalid("unknown transition namespace requirement")),
+        };
+        let (namespace, _) = reader.resolver().resolve_element(QName(name));
         if let ResolveResult::Bound(namespace) = namespace
             && namespace.as_ref() != expected.as_bytes()
         {
@@ -1195,9 +1255,10 @@ fn first_transition_range(xml: &str) -> Result<Range<usize>> {
 /// Rewrite only XML qualified names in markup.  Attribute values, text, raw
 /// retained effect XML, and URI strings are copied without interpretation.
 fn rewrite_pml_qnames(xml: &[u8], prefix: &str) -> Result<String> {
+    let output_len = rewrite_pml_qnames_len(xml, prefix)?;
     let mut output = Vec::new();
     output
-        .try_reserve_exact(xml.len().saturating_add(prefix.len().saturating_mul(8)))
+        .try_reserve_exact(output_len)
         .map_err(|source| Error::Allocation {
             resource: "source-backed transition QName rewrite",
             source,
@@ -1221,6 +1282,11 @@ fn rewrite_pml_qnames(xml: &[u8], prefix: &str) -> Result<String> {
         let tag_end = find_tag_end(xml, tag_start)?;
         rewrite_tag(&xml[tag_start..tag_end], prefix, &mut output)?;
         cursor = tag_end;
+    }
+    if output.len() != output_len {
+        return Err(invalid(
+            "source-backed transition QName rewrite length changed during emission",
+        ));
     }
     String::from_utf8(output)
         .map_err(|error| Error::Xml(format!("transition QName rewrite is not UTF-8: {error}")))
@@ -1455,7 +1521,11 @@ fn write_rewritten_qname(name: &[u8], prefix: &str, output: &mut Vec<u8>) -> Res
     Ok(())
 }
 
-fn validate_target(value: &Transition, operation: &'static str) -> Result<()> {
+fn validate_target(
+    value: &Transition,
+    operation: &'static str,
+    transition_limits: crate::transition::Limits,
+) -> Result<()> {
     if matches!(value.kind(), Kind::Raw(_)) {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1467,7 +1537,7 @@ fn validate_target(value: &Transition, operation: &'static str) -> Result<()> {
     // reader. Ask the writer to validate portability before any output
     // allocation; preserved effect/auxiliary XML is intentionally retained
     // when a caller edits timing around a typed effect.
-    crate::transition::write(value, crate::transition::Limits::DEFAULT)?;
+    crate::transition::write(value, transition_limits)?;
     Ok(())
 }
 

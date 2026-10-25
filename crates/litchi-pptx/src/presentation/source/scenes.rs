@@ -447,7 +447,9 @@ impl super::SourceSlide {
                     maximum: self.owner.limits.max_part_bytes(),
                 }));
             }
-            let semantic_maximum = crate::shape::Limits::DEFAULT.input_bytes();
+            let shape_limits =
+                crate::open_options::selected(self.owner.semantic_limits.as_ref()).shape();
+            let semantic_maximum = shape_limits.input_bytes();
             if declared > semantic_maximum as u64 {
                 return Err(crate::Error::Limit {
                     resource: "shape owner input bytes",
@@ -460,7 +462,10 @@ impl super::SourceSlide {
                 self.owner.limits,
             )?;
             let slide = crate::parts::SlidePart::from_part(&part)?;
-            let scene = Scene::from_source(slide.shapes()?, part.source_data().clone())?;
+            let scene = Scene::from_source(
+                slide.shapes_with_limits(shape_limits)?,
+                part.source_data().clone(),
+            )?;
             fence()?;
             Ok(scene)
         })();

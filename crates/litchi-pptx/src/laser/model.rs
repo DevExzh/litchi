@@ -240,7 +240,7 @@ impl Limits {
     /// scan, write, insertion, and read-back step.  The codec ceilings remain
     /// hard safety ceilings when the owner was admitted under a broader
     /// source profile.
-    pub(super) fn from_source_limits(source: litchi_opc::SourceLimits) -> Self {
+    pub(crate) fn from_source_limits(source: litchi_opc::SourceLimits) -> Self {
         let default = Self::DEFAULT;
         let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
         let entry = usize::try_from(source.max_entry_bytes()).unwrap_or(usize::MAX);
@@ -257,6 +257,23 @@ impl Limits {
             max_xml_nodes: default.max_xml_nodes.min(source.max_events()),
             max_xml_depth: default.max_xml_depth.min(source.max_depth()),
             max_output_bytes: default.max_output_bytes.min(part).min(entry),
+        }
+    }
+
+    /// Intersect this caller-selected semantic policy with the physical OPC
+    /// owner policy before a package edit reads, writes, or validates a slide.
+    pub(crate) fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
+        let physical = Self::from_source_limits(source);
+        Self {
+            max_slide_xml_bytes: self.max_slide_xml_bytes.min(physical.max_slide_xml_bytes),
+            max_total_slide_xml_bytes: self
+                .max_total_slide_xml_bytes
+                .min(physical.max_total_slide_xml_bytes),
+            max_trace_count: self.max_trace_count.min(physical.max_trace_count),
+            max_point_count: self.max_point_count.min(physical.max_point_count),
+            max_xml_nodes: self.max_xml_nodes.min(physical.max_xml_nodes),
+            max_xml_depth: self.max_xml_depth.min(physical.max_xml_depth),
+            max_output_bytes: self.max_output_bytes.min(physical.max_output_bytes),
         }
     }
 }

@@ -71,7 +71,8 @@ impl Edit {
         crate::package::signature::refuse_signed_change(&candidate)?;
         let slide_part = candidate.get_part(&selected.part_name)?;
         let conformance = crate::media_parts::document_conformance(slide_part.blob())?;
-        let scene = crate::shape::Scene::read(slide_part.blob(), crate::shape::Limits::DEFAULT)?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(slide_part.blob(), shape_limits)?;
         let shape_id = next_shape_id(&scene, "media picture")?;
         drop(scene);
         let rels = slide_part.rels();
@@ -122,7 +123,7 @@ impl Edit {
         )?;
         let staged = crate::shape::Scene::read(
             candidate.get_part(&selected.part_name)?.blob(),
-            crate::shape::Limits::DEFAULT,
+            shape_limits,
         )?;
         let added = staged
             .iter()

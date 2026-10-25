@@ -124,6 +124,7 @@ pub(super) struct SourceInner {
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     pub(super) limits: SourceLimits,
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Every non-structural defect repaired while the source was opened, in
     /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
     /// then the slide-list repairs of audit finding 6.7. Repairs a
@@ -1097,6 +1098,7 @@ pub(crate) struct SourceBackedPresentationEditor {
     package_relationships: Arc<[RelationshipBinding]>,
     presentation_binding: Arc<PartBinding>,
     pub(super) limits: SourceLimits,
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 }
 
 /// An immutable exact-source snapshot of one slide XML part.
@@ -1107,6 +1109,7 @@ pub(crate) struct SourceBackedSlideSnapshot {
     xml: SourcePayload,
     closure: SlideClosure,
     max_output_bytes: usize,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     source_version: SourceVersion,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
@@ -1345,9 +1348,11 @@ impl SourceBackedPresentation {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits.clone();
         Self::from_source_backed_package_with_limits(
             source_backed_package(source, options)?,
             limits,
+            semantic_limits,
         )
     }
 
@@ -1375,9 +1380,11 @@ impl SourceBackedPresentation {
     ) -> Result<Self> {
         options.check_owning()?;
         let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits.clone();
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_reader(reader, limits, SourceCacheLimits::default(), None)?,
             limits,
+            semantic_limits,
         )
     }
 
@@ -1391,12 +1398,13 @@ impl SourceBackedPresentation {
     /// coherent PresentationML presentation.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
         let limits = package.read_limits();
-        Self::from_source_backed_package_with_limits(package, limits)
+        Self::from_source_backed_package_with_limits(package, limits, None)
     }
 
     fn from_source_backed_package_with_limits(
         package: SourceBackedPackage,
         limits: SourceLimits,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     ) -> Result<Self> {
         package.check_execution()?;
         let mut tolerance = crate::leniency::ToleranceReport::default();
@@ -1415,6 +1423,7 @@ impl SourceBackedPresentation {
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
                 limits,
+                semantic_limits,
                 tolerance,
                 strict_slide_list,
             }),
@@ -1486,6 +1495,7 @@ impl SourceBackedPresentation {
             _presentation,
             slides,
             limits,
+            semantic_limits,
             tolerance: _,
             strict_slide_list: _,
         } = inner;
@@ -1500,6 +1510,7 @@ impl SourceBackedPresentation {
             package_relationships: seed.package_relationships,
             presentation_binding: seed.presentation_binding,
             limits,
+            semantic_limits,
         })
     }
 
@@ -1857,7 +1868,12 @@ impl SourceBackedPresentationEditor {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let limits = options.source_limits;
-        Self::from_source_backed_package(source_backed_package(source, options)?, limits)
+        let semantic_limits = options.semantic_limits.clone();
+        Self::from_source_backed_package_with_semantic_limits(
+            source_backed_package(source, options)?,
+            limits,
+            semantic_limits,
+        )
     }
 
     /// Build an owning editor from a validated deferred OPC package.
@@ -1865,6 +1881,15 @@ impl SourceBackedPresentationEditor {
     fn from_source_backed_package(
         package: SourceBackedPackage,
         limits: SourceLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package_with_semantic_limits(package, limits, None)
+    }
+
+    #[cfg(test)]
+    fn from_source_backed_package_with_semantic_limits(
+        package: SourceBackedPackage,
+        limits: SourceLimits,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     ) -> Result<Self> {
         package.check_execution()?;
         // The lossless editor keeps the strict slide-list contract.
@@ -1879,6 +1904,7 @@ impl SourceBackedPresentationEditor {
             package_relationships,
             presentation_binding,
             limits,
+            semantic_limits,
         })
     }
 
@@ -2173,7 +2199,13 @@ impl SourceBackedPresentationEditor {
         SlidePart::from_part(&part)?;
         #[cfg(test)]
         record_test_semantic_scene_read();
-        crate::presentation::transition::admit_source(part.source_data().as_bytes(), operation)?;
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        crate::presentation::transition::admit_source_with_limits(
+            part.source_data().as_bytes(),
+            operation,
+            semantic.shape(),
+            semantic.transition(),
+        )?;
         self.package.check_execution()?;
         let _source_version = self.package.source_version()?;
         Ok(())
@@ -2202,8 +2234,10 @@ impl SourceBackedPresentationEditor {
                 #[cfg(test)]
                 record_test_semantic_scene_read();
                 {
-                    let _scene =
-                        crate::shape::Scene::read(raw.as_bytes(), crate::shape::Limits::DEFAULT)?;
+                    let _scene = crate::shape::Scene::read(
+                        raw.as_bytes(),
+                        crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+                    )?;
                 }
                 let part = SourcePart::from_view(&view, raw)?;
                 #[cfg(test)]
@@ -2223,7 +2257,11 @@ impl SourceBackedPresentationEditor {
                 presentation_xml: self._presentation.data.clone(),
                 slide: data.binding.clone(),
             },
-            max_output_bytes: source_slide_output_limit(self.limits),
+            max_output_bytes: source_slide_output_limit(
+                self.limits,
+                crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+            ),
+            semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
             context,
@@ -2269,7 +2307,10 @@ impl SourceBackedPresentationEditor {
         let source_part = SourcePart::from_view(&view, view.data()?)?;
         validate_source_slide_root(&source_part)?;
         validate_full_slide_picture_relationships(&self.package, source_part.blob())?;
-        let scene = crate::shape::Scene::read(source_part.blob(), crate::shape::Limits::DEFAULT)?;
+        let scene = crate::shape::Scene::read(
+            source_part.blob(),
+            crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+        )?;
         let mut picture_xmls = Vec::new();
         picture_xmls
             .try_reserve(scene.len())
@@ -2423,7 +2464,13 @@ impl SourceBackedPresentationEditor {
         #[cfg(test)]
         record_test_semantic_scene_read();
         crate::source_limits::validate_xml_limits(raw.as_bytes(), self.limits)?;
-        let mce = crate::presentation::transition::admit_source(raw.as_bytes(), operation)?;
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        let mce = crate::presentation::transition::admit_source_with_limits(
+            raw.as_bytes(),
+            operation,
+            semantic.shape(),
+            semantic.transition(),
+        )?;
         let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
@@ -2448,7 +2495,11 @@ impl SourceBackedPresentationEditor {
                 presentation_xml: self._presentation.data.clone(),
                 slide: data.binding.clone(),
             },
-            max_output_bytes: source_slide_output_limit(self.limits),
+            max_output_bytes: source_slide_output_limit(
+                self.limits,
+                crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
+            ),
+            semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
             context,
@@ -2476,7 +2527,10 @@ impl SourceBackedSlideSnapshot {
     /// unrelated slide markup.
     pub(crate) fn transition(&self) -> Result<Option<crate::transition::Transition>> {
         self.check_execution()?;
-        let mut transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
+        let mut transition = crate::presentation::transition::read_direct_with_limits(
+            self.xml.as_bytes(),
+            crate::open_options::selected(self.semantic_limits.as_ref()).transition(),
+        )?;
         if let Some(transition) = transition.as_mut() {
             transition.locate_in_part(self.part_uri.as_str());
         }
@@ -2537,6 +2591,7 @@ impl SourceBackedSlideSnapshot {
             && self.closure.presentation_xml.as_bytes() == other.closure.presentation_xml.as_bytes()
             && self.closure.slide == other.closure.slide
             && self.max_output_bytes == other.max_output_bytes
+            && self.semantic_limits == other.semantic_limits
     }
 }
 
@@ -2629,11 +2684,12 @@ impl SourceBackedSlideEdit {
                 "source-backed slide edits support one atomic semantic operation",
             ));
         }
-        let (xml, changed) = crate::presentation::transition::stage(
+        let (xml, changed) = crate::presentation::transition::stage_with_limits(
             self.working.as_bytes(),
             self.source.closure.presentation_xml.as_bytes(),
             value,
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).transition(),
             operation,
         )?;
         if let Some(xml) = xml {
@@ -2689,16 +2745,18 @@ impl SourceBackedSlideEdit {
         // spliced on its source bytes (record 0303).
         let (xml, changed) = if self.source.mce == crate::presentation::transition::SlideMce::Plain
         {
-            crate::opened::stage_shape_removal(
+            crate::opened::stage_shape_removal_with_limits(
                 self.working.as_bytes(),
                 shape.into(),
                 self.source.max_output_bytes,
+                crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
             )?
         } else {
-            crate::opened::stage_enclosed_shape_removal(
+            crate::opened::stage_enclosed_shape_removal_with_limits(
                 self.working.as_bytes(),
                 shape.into(),
                 self.source.max_output_bytes,
+                crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
             )?
         };
         let Some(xml) = xml else {
@@ -2739,11 +2797,12 @@ impl SourceBackedSlideEdit {
                 "source-backed slide edits support one atomic shape text operation",
             ));
         }
-        let (xml, changed) = crate::opened::stage_shape_texts(
+        let (xml, changed) = crate::opened::stage_shape_texts_with_limits(
             self.working.as_bytes(),
             replacements,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         if let Some(xml) = xml {
             self.working = SourcePayload::Edited(Arc::new(xml));
@@ -2769,10 +2828,12 @@ impl SourceBackedSlideEdit {
     ) -> Result<usize> {
         self.check_execution()?;
         self.refuse_enclosed("set_shape_text_chunks")?;
-        if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+        let shape_limits =
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape();
+        if chunks.len() > shape_limits.shapes() {
             return Err(Error::Limit {
                 resource: "source-backed shape text chunks",
-                limit: crate::shape::Limits::DEFAULT.shapes(),
+                limit: shape_limits.shapes(),
             });
         }
         if chunks.iter().all(|chunk| chunk.is_empty()) {
@@ -2797,12 +2858,13 @@ impl SourceBackedSlideEdit {
             admission,
             self.source.max_output_bytes,
         )?;
-        let (xml, changed) = crate::opened::stage_shape_text_chunks_admitted(
+        let (xml, changed) = crate::opened::stage_shape_text_chunks_admitted_with_limits(
             self.working.as_bytes(),
             chunks,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
             admission,
+            shape_limits,
         )?;
         self.check_execution()?;
         if let Some(xml) = xml {
@@ -2843,11 +2905,12 @@ impl SourceBackedSlideEdit {
             replacements,
             self.source.max_output_bytes,
         )?;
-        let (xml, changed) = crate::opened::stage_shape_properties(
+        let (xml, changed) = crate::opened::stage_shape_properties_with_limits(
             self.working.as_bytes(),
             replacements,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         self.check_execution()?;
         if let Some(xml) = xml {
@@ -2871,10 +2934,12 @@ impl SourceBackedSlideEdit {
     ) -> Result<usize> {
         self.check_execution()?;
         self.refuse_enclosed("set_shape_property_chunks")?;
-        if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+        let shape_limits =
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape();
+        if chunks.len() > shape_limits.shapes() {
             return Err(Error::Limit {
                 resource: "source-backed shape property chunks",
-                limit: crate::shape::Limits::DEFAULT.shapes(),
+                limit: shape_limits.shapes(),
             });
         }
         if chunks.iter().all(|chunk| chunk.is_empty()) {
@@ -2899,12 +2964,13 @@ impl SourceBackedSlideEdit {
             admission,
             self.source.max_output_bytes,
         )?;
-        let (xml, changed) = crate::opened::stage_shape_property_chunks_admitted(
+        let (xml, changed) = crate::opened::stage_shape_property_chunks_admitted_with_limits(
             self.working.as_bytes(),
             chunks,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
             admission,
+            shape_limits,
         )?;
         self.check_execution()?;
         if let Some(xml) = xml {
@@ -2938,11 +3004,12 @@ impl SourceBackedSlideEdit {
                 "source-backed slide edits support one atomic semantic operation",
             ));
         }
-        let (xml, changed) = crate::opened::stage_text_properties(
+        let (xml, changed) = crate::opened::stage_text_properties_with_limits(
             self.working.as_bytes(),
             edits,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         self.check_execution()?;
         if let Some(xml) = xml {
@@ -2978,12 +3045,13 @@ impl SourceBackedSlideEdit {
                 "source-backed slide edits support one atomic semantic operation",
             ));
         }
-        let xml = crate::opened::stage_text_structure(
+        let xml = crate::opened::stage_text_structure_with_limits(
             self.working.as_bytes(),
             body,
             change,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         self.check_execution()?;
         self.working = SourcePayload::Edited(Arc::new(xml));
@@ -3021,12 +3089,13 @@ impl SourceBackedSlideEdit {
                 "source-backed slide edits support one atomic semantic operation",
             ));
         }
-        let (xml, changed) = crate::opened::stage_text_property_chunks(
+        let (xml, changed) = crate::opened::stage_text_property_chunks_with_limits(
             self.working.as_bytes(),
             chunks,
             crate::opened::Limits::default().max_text_bytes(),
             self.source.max_output_bytes,
             changes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         self.check_execution()?;
         if let Some(xml) = xml {
@@ -3070,6 +3139,7 @@ impl SourceBackedSlideEdit {
             text,
             bounds,
             self.source.max_output_bytes,
+            crate::open_options::selected(self.source.semantic_limits.as_ref()).shape(),
         )?;
         self.check_execution()?;
         let bytes = Arc::new(xml);
@@ -3107,6 +3177,7 @@ impl SourceBackedSlideEdit {
             xml: self.working,
             closure: source.closure.clone(),
             max_output_bytes: self.source_max_output_bytes,
+            semantic_limits: source.semantic_limits.clone(),
             source_version: source.source_version,
             lineage: source.lineage.clone(),
             context: source.context.clone(),
@@ -4118,7 +4189,10 @@ impl SourceSlide {
                 return Err(error);
             }
         }
-        let scene = match crate::shape::Scene::read(part.blob(), crate::shape::Limits::DEFAULT) {
+        let scene = match crate::shape::Scene::read(
+            part.blob(),
+            crate::open_options::selected(self.owner.semantic_limits.as_ref()).shape(),
+        ) {
             Ok(scene) => scene,
             Err(Error::MarkupCompatibility(_)) => {
                 return self.query_images_from_raw_owner(&part, &view, mode);
@@ -5703,7 +5777,7 @@ fn validate_slide_graph(
     Ok(slides.into_boxed_slice())
 }
 
-fn source_slide_output_limit(limits: SourceLimits) -> usize {
+fn source_slide_output_limit(limits: SourceLimits, shape_limits: crate::shape::Limits) -> usize {
     let bounded = limits
         .max_part_bytes()
         .min(limits.max_entry_bytes())
@@ -5711,7 +5785,7 @@ fn source_slide_output_limit(limits: SourceLimits) -> usize {
         .min(limits.max_aggregate_bytes());
     usize::try_from(bounded)
         .unwrap_or(usize::MAX)
-        .min(crate::shape::Limits::DEFAULT.output_bytes())
+        .min(shape_limits.output_bytes())
 }
 
 /// Build the source catalog. With `tolerance` the slide list is read with
@@ -6085,6 +6159,7 @@ mod tests {
             xml: SourcePayload::Edited(Arc::new(after_xml)),
             closure: before.closure.clone(),
             max_output_bytes: before.max_output_bytes,
+            semantic_limits: before.semantic_limits.clone(),
             source_version: before.source_version,
             lineage: before.lineage.clone(),
             context: before.context.clone(),

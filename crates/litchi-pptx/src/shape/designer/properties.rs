@@ -201,7 +201,7 @@ pub(crate) fn load_properties<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Snapshot> {
-    load_properties_with_limits(package, owner, key, Limits::default())
+    load_properties_with_shape_limits(package, owner, key, crate::shape::Limits::DEFAULT)
 }
 
 /// Load source-bound properties under explicit finite limits.
@@ -211,10 +211,43 @@ pub(crate) fn load_properties_with_limits<'k>(
     key: impl Into<crate::shape::Key<'k>>,
     limits: Limits,
 ) -> Result<Snapshot> {
+    load_properties_with_limits_and_shape_limits(
+        package,
+        owner,
+        key,
+        limits,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+/// Load source-bound properties under explicit semantic and shape limits.
+pub(crate) fn load_properties_with_shape_limits<'k>(
+    package: &OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
+    load_properties_with_limits_and_shape_limits(
+        package,
+        owner,
+        key,
+        Limits::default(),
+        shape_limits,
+    )
+}
+
+pub(crate) fn load_properties_with_limits_and_shape_limits<'k>(
+    package: &OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    limits: Limits,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     let source = copy_owner(part.blob(), limits)?;
-    let shape = crate::tag::shape::selected_raw_span(&source, key.into())?;
+    let shape =
+        crate::tag::shape::selected_raw_span_with_limits(&source, key.into(), shape_limits)?;
     let located = locate(&source, shape.clone(), limits)?;
     let occurrences = parse_properties(&source, &located, limits)?;
     Ok(Snapshot {
@@ -314,7 +347,17 @@ pub(crate) fn put_properties<'k>(
     key: impl Into<crate::shape::Key<'k>>,
     value: DrawingProperties,
 ) -> Result<Snapshot> {
-    let mut edit = load_properties(package, owner, key)?.edit();
+    put_properties_with_shape_limits(package, owner, key, value, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn put_properties_with_shape_limits<'k>(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    value: DrawingProperties,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
+    let mut edit = load_properties_with_shape_limits(package, owner, key, shape_limits)?.edit();
     edit.set(value)?;
     apply_properties(package, edit.commit()?)
 }
@@ -325,7 +368,16 @@ pub(crate) fn remove_properties<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Snapshot> {
-    let mut edit = load_properties(package, owner, key)?.edit();
+    remove_properties_with_shape_limits(package, owner, key, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn remove_properties_with_shape_limits<'k>(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
+    let mut edit = load_properties_with_shape_limits(package, owner, key, shape_limits)?.edit();
     edit.remove();
     apply_properties(package, edit.commit()?)
 }
@@ -1270,8 +1322,10 @@ impl Edit<'_> {
     ) -> Result<Snapshot> {
         let (slide, _) = crate::package::resolve_slide_identity(self.staged.opc(), slide.into())?;
         let shape = shape.into();
-        self.staged
-            .update(|opc| put_properties(opc, &slide, shape, properties))
+        let shape_limits = self.staged.shape_limits();
+        self.staged.update(|opc| {
+            put_properties_with_shape_limits(opc, &slide, shape, properties, shape_limits)
+        })
     }
 
     /// Remove the `designPr` payload of the selected shape, leaving all
@@ -1287,8 +1341,9 @@ impl Edit<'_> {
     ) -> Result<Snapshot> {
         let (slide, _) = crate::package::resolve_slide_identity(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(|opc| remove_properties(opc, &slide, shape))
+            .update(|opc| remove_properties_with_shape_limits(opc, &slide, shape, shape_limits))
     }
 
     /// Discard every staged change.

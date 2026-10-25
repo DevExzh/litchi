@@ -1202,19 +1202,30 @@ pub(crate) fn rewrite_shape_text(
     text: &str,
     max_text_bytes: usize,
 ) -> Result<Vec<u8>> {
+    rewrite_shape_text_with_limits(
+        xml,
+        shape,
+        text,
+        max_text_bytes,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn rewrite_shape_text_with_limits(
+    xml: &[u8],
+    shape: Range<usize>,
+    text: &str,
+    max_text_bytes: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u8>> {
     let edits = [ShapeTextEdit {
         index: 0,
         shape,
         text,
         changed: true,
     }];
-    rewrite_shape_texts(
-        xml,
-        &edits,
-        max_text_bytes,
-        crate::shape::Limits::DEFAULT.output_bytes(),
-    )?
-    .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
+    rewrite_shape_texts(xml, &edits, max_text_bytes, shape_limits.output_bytes())?
+        .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
 }
 
 /// Fingerprint the exact XML outside the native editable DrawingML text slots.
@@ -1222,8 +1233,15 @@ pub(crate) fn rewrite_shape_text(
 /// CDATA/entity spelling inside an editable slot is intentionally erased, so
 /// an inverse can restore its original spelling and run distribution.
 pub(crate) fn shape_text_skeleton(xml: &[u8]) -> Result<[u8; 32]> {
+    shape_text_skeleton_with_limits(xml, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn shape_text_skeleton_with_limits(
+    xml: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<[u8; 32]> {
     use sha2::{Digest, Sha256};
-    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if scene.is_rewritten() {
         return Err(invalid(
             "source patch text proof cannot select MCE branches",
@@ -1326,13 +1344,30 @@ pub(crate) fn stage_shape_texts(
     max_text_bytes: usize,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_texts_admitted(
+    stage_shape_texts_with_limits(
+        xml,
+        replacements,
+        max_text_bytes,
+        max_output_bytes,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn stage_shape_texts_with_limits(
+    xml: &[u8],
+    replacements: &[super::ShapeTextReplacement<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_texts_admitted_with_limits(
         xml,
         replacements,
         max_text_bytes,
         max_output_bytes,
         super::MAX_SHAPE_TEXT_REPLACEMENTS,
         max_text_bytes,
+        shape_limits,
     )
 }
 
@@ -1347,6 +1382,26 @@ pub(super) fn stage_shape_texts_admitted(
     max_output_bytes: usize,
     selection_limit: usize,
     aggregate_text_limit: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_texts_admitted_with_limits(
+        xml,
+        replacements,
+        max_text_bytes,
+        max_output_bytes,
+        selection_limit,
+        aggregate_text_limit,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(super) fn stage_shape_texts_admitted_with_limits(
+    xml: &[u8],
+    replacements: &[super::ShapeTextReplacement<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    selection_limit: usize,
+    aggregate_text_limit: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
     if replacements.is_empty() {
         return Ok((None, 0));
@@ -1369,7 +1424,7 @@ pub(super) fn stage_shape_texts_admitted(
         });
     }
 
-    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1430,7 +1485,7 @@ pub(super) fn stage_shape_texts_admitted(
     let Some(candidate) = staged.as_deref() else {
         return Ok((None, 0));
     };
-    let published = crate::shape::Scene::read(candidate, crate::shape::Limits::DEFAULT)?;
+    let published = crate::shape::Scene::read(candidate, shape_limits)?;
     if published.is_rewritten() || published.len() != scene.len() {
         return Err(invalid(
             "opened-presentation shape text batch changed the semantic shape graph",
@@ -1763,6 +1818,30 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Append one native shape after an exact output-size preflight.
+pub(crate) fn append_shape_with_limit(
+    xml: &[u8],
+    fragment: &[u8],
+    max_output_bytes: usize,
+) -> Result<Vec<u8>> {
+    let output_len = xml
+        .len()
+        .checked_add(fragment.len())
+        .filter(|length| *length <= max_output_bytes)
+        .ok_or(Error::Limit {
+            resource: "opened-presentation appended shape XML",
+            limit: max_output_bytes,
+        })?;
+    let output = append_shape(xml, fragment)?;
+    if output.len() != output_len {
+        return Err(Error::Limit {
+            resource: "opened-presentation appended shape XML",
+            limit: max_output_bytes,
+        });
+    }
+    Ok(output)
+}
+
 /// Remove a suffix of native text-box roots when the suffix is exactly what
 /// the source authoring path emits.
 ///
@@ -1774,8 +1853,16 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
 /// or placement; the caller then applies the ordinary skeleton proof and
 /// rejects the pair.
 pub(crate) fn strip_appended_text_boxes(before: &[u8], after: &[u8]) -> Result<Option<Vec<u8>>> {
-    let before_scene = crate::shape::Scene::read(before, crate::shape::Limits::DEFAULT)?;
-    let after_scene = crate::shape::Scene::read(after, crate::shape::Limits::DEFAULT)?;
+    strip_appended_text_boxes_with_limits(before, after, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn strip_appended_text_boxes_with_limits(
+    before: &[u8],
+    after: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<Vec<u8>>> {
+    let before_scene = crate::shape::Scene::read(before, shape_limits)?;
+    let after_scene = crate::shape::Scene::read(after, shape_limits)?;
     if before_scene.is_rewritten() || after_scene.is_rewritten() {
         return Ok(None);
     }
@@ -2030,7 +2117,15 @@ fn shape_removal_plan(
     xml: &[u8],
     key: crate::shape::Key<'_>,
 ) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
-    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
+    shape_removal_plan_with_limits(xml, key, crate::shape::Limits::DEFAULT)
+}
+
+fn shape_removal_plan_with_limits(
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -2090,7 +2185,15 @@ pub(super) fn shape_removal_plan_in(
 /// identity validation. The eager editor uses this before its relationship
 /// cleanup; source-backed staging uses the complete plan below.
 pub(crate) fn shape_removal_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
-    shape_removal_plan(xml, key).map(|(span, _, _)| span)
+    shape_removal_span_with_limits(xml, key, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn shape_removal_span_with_limits(
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Range<usize>> {
+    shape_removal_plan_with_limits(xml, key, shape_limits).map(|(span, _, _)| span)
 }
 
 /// Stage one direct top-level shape removal without changing slide
@@ -2102,7 +2205,17 @@ pub(crate) fn stage_shape_removal(
     key: crate::shape::Key<'_>,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
-    let (span, removed_identities, shape_count) = shape_removal_plan(xml, key)?;
+    stage_shape_removal_with_limits(xml, key, max_output_bytes, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn stage_shape_removal_with_limits(
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+    max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    let (span, removed_identities, shape_count) =
+        shape_removal_plan_with_limits(xml, key, shape_limits)?;
     let retained = xml
         .len()
         .checked_sub(span.len())
@@ -2124,7 +2237,7 @@ pub(crate) fn stage_shape_removal(
     candidate.extend_from_slice(span_bytes(xml, span.end..xml.len())?);
     validate_shape_removal_dependencies(&candidate, &removed_identities)?;
 
-    let published = crate::shape::Scene::read(&candidate, crate::shape::Limits::DEFAULT)?;
+    let published = crate::shape::Scene::read(&candidate, shape_limits)?;
     if published.is_rewritten()
         || published.len().checked_add(removed_identities.len()) != Some(shape_count)
     {
@@ -2132,7 +2245,7 @@ pub(crate) fn stage_shape_removal(
             "opened-presentation shape removal changed the semantic shape graph",
         ));
     }
-    let original = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
+    let original = crate::shape::Scene::read(xml, shape_limits)?;
     let mut retained_shapes = original.iter().filter(|shape| {
         shape
             .id()

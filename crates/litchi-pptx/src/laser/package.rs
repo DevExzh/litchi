@@ -42,8 +42,9 @@ pub(crate) fn store_slide_trace(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     points: &[TracePoint],
+    semantic_limits: Limits,
 ) -> Result<()> {
-    let limits = Limits::from_source_limits(package.read_limits());
+    let limits = semantic_limits.constrained_by_source(package.read_limits());
     validate(points, &limits)?;
     let slide = package.get_part(slide_name)?;
     if slide.content_type() != ct::PML_SLIDE {
@@ -245,21 +246,43 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
                 .and_then(|size| size.checked_add(replacement)),
             limits,
         )?;
-        let mut output = Vec::with_capacity(size);
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(size)
+            .map_err(|source| Error::Allocation {
+                resource: "updated slide XML",
+                source,
+            })?;
         output.extend_from_slice(&xml[..start]);
         output.extend_from_slice(open);
         output.extend_from_slice(b">");
         output.extend_from_slice(fragment.as_bytes());
         output.extend_from_slice(b"</p:extLst>");
         output.extend_from_slice(&xml[end..]);
+        if output.len() != size {
+            return Err(Error::Invalid(
+                "updated slide XML length changed during emission".to_owned(),
+            ));
+        }
         return Ok(output);
     }
     if let Some(position) = ext_end.filter(|position| *position != usize::MAX) {
         let size = checked_output_size(xml.len().checked_add(fragment.len()), limits)?;
-        let mut output = Vec::with_capacity(size);
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(size)
+            .map_err(|source| Error::Allocation {
+                resource: "updated slide XML",
+                source,
+            })?;
         output.extend_from_slice(&xml[..position]);
         output.extend_from_slice(fragment.as_bytes());
         output.extend_from_slice(&xml[position..]);
+        if output.len() != size {
+            return Err(Error::Invalid(
+                "updated slide XML length changed during emission".to_owned(),
+            ));
+        }
         return Ok(output);
     }
 
@@ -273,7 +296,13 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
             .and_then(|size| size.checked_add(b"</p:extLst>".len())),
         limits,
     )?;
-    let mut output = Vec::with_capacity(size);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(size)
+        .map_err(|source| Error::Allocation {
+            resource: "updated slide XML",
+            source,
+        })?;
     output.extend_from_slice(&xml[..root_end]);
     output.extend_from_slice(b"<p:extLst xmlns:p=\"");
     output.extend_from_slice(dialect.as_bytes());
@@ -281,6 +310,11 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str, limits: &Limits) -> Res
     output.extend_from_slice(fragment.as_bytes());
     output.extend_from_slice(b"</p:extLst>");
     output.extend_from_slice(&xml[root_end..]);
+    if output.len() != size {
+        return Err(Error::Invalid(
+            "updated slide XML length changed during emission".to_owned(),
+        ));
+    }
     Ok(output)
 }
 
@@ -362,7 +396,7 @@ mod tests {
         ] {
             let xml = format!(r#"<p:sld xmlns:p="{pml}"><p:cSld/><p:spTree/>{tail}</p:sld>"#);
             let (mut package, name) = package(&xml);
-            store_slide_trace(&mut package, &name, &[point()]).unwrap();
+            store_slide_trace(&mut package, &name, &[point()], Limits::DEFAULT).unwrap();
             let slide = package.get_part(&name).unwrap();
             let mut usage = Usage::default();
             let traces = load_slide_traces(0, slide, &Limits::DEFAULT, &mut usage).unwrap();
@@ -376,11 +410,11 @@ mod tests {
         let strict = "http://purl.oclc.org/ooxml/presentationml/main";
         let xml = format!(r#"<p:sld xmlns:p="{strict}"><p:cSld/></p:sld>"#);
         let (mut package, name) = package(&xml);
-        store_slide_trace(&mut package, &name, &[point()]).unwrap();
+        store_slide_trace(&mut package, &name, &[point()], Limits::DEFAULT).unwrap();
         let slide = package.get_part(&name).unwrap();
         let output = std::str::from_utf8(slide.blob()).unwrap();
         assert!(output.contains(strict));
-        assert!(store_slide_trace(&mut package, &name, &[point()]).is_err());
+        assert!(store_slide_trace(&mut package, &name, &[point()], Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -402,7 +436,7 @@ mod tests {
         let before = retained.get_part(&name).unwrap().blob().to_vec();
 
         assert!(matches!(
-            store_slide_trace(&mut retained, &name, &[point()]),
+            store_slide_trace(&mut retained, &name, &[point()], Limits::DEFAULT),
             Err(Error::Limit {
                 resource: "updated slide XML bytes",
                 ..

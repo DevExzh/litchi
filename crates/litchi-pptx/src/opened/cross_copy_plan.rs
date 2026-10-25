@@ -795,6 +795,8 @@ pub(crate) fn apply_plan(
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
     live: LiveDigests<'_>,
+    source_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    destination_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let limits = plan.patch.patch.limits();
     // Both revisions are recomputed from the live packages; the caller's memos
@@ -823,25 +825,29 @@ pub(crate) fn apply_plan(
     {
         return refusal(SlideCopyRefusal::CallerDefinedPart, CALLER_DEFINED_PART);
     }
-    let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        source,
-        limits,
-        source_physical_source_provenance,
-        source_revision,
-        source_digests,
-        None,
-        None,
-    )?;
+    let source_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            source,
+            limits,
+            source_physical_source_provenance,
+            source_revision,
+            source_digests,
+            None,
+            None,
+            source_semantic_limits,
+        )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
-    let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        destination,
-        limits,
-        destination_physical_source_provenance,
-        destination_revision,
-        destination_digests,
-        None,
-        None,
-    )?;
+    let destination_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            destination,
+            limits,
+            destination_physical_source_provenance,
+            destination_revision,
+            destination_digests,
+            None,
+            None,
+            destination_semantic_limits.clone(),
+        )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let Prepared {
         plan: fresh,
@@ -881,6 +887,7 @@ pub(crate) fn apply_plan(
         destination_physical_source_provenance,
         !normalized,
         Some(&candidate_digests),
+        destination_semantic_limits.clone(),
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, fresh.target_physical_revision)?
         != plan.target_physical_revision
@@ -901,6 +908,8 @@ pub(crate) fn apply_patch(
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
     live: LiveDigests<'_>,
+    source_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    destination_semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let limits = patch.patch.limits();
     // As in `apply_plan`: recomputed from the live packages, consulting the
@@ -923,25 +932,29 @@ pub(crate) fn apply_patch(
     if destination_physical_revision != patch.destination_physical_revision {
         return Err(Error::PatchConflict);
     }
-    let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        source,
-        limits,
-        source_physical_source_provenance,
-        source_revision,
-        source_digests,
-        None,
-        None,
-    )?;
+    let source_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            source,
+            limits,
+            source_physical_source_provenance,
+            source_revision,
+            source_digests,
+            None,
+            None,
+            source_semantic_limits,
+        )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
-    let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
-        destination,
-        limits,
-        destination_physical_source_provenance,
-        destination_revision,
-        destination_digests,
-        None,
-        None,
-    )?;
+    let destination_snapshot =
+        super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+            destination,
+            limits,
+            destination_physical_source_provenance,
+            destination_revision,
+            destination_digests,
+            None,
+            None,
+            destination_semantic_limits.clone(),
+        )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let source_slide = find_slide_by_part(&source_snapshot, &patch.source_slide)?;
     let destination_slide = find_slide_by_part(&destination_snapshot, &patch.destination_slide)?;
@@ -985,11 +998,12 @@ pub(crate) fn apply_patch(
         // and comparing the exact inverse. The real destination is untouched
         // until this proof succeeds.
         let mut restored = destination.clone();
-        if super::patch::apply_exact_revision(
+        if super::patch::apply_exact_revision_with_semantic_limits(
             &mut restored,
             &patch.patch,
             patch.target_revision,
             destination_physical_source_provenance,
+            destination_semantic_limits.clone(),
         )
         .is_err()
         {
@@ -1002,11 +1016,12 @@ pub(crate) fn apply_patch(
             // The restored clone shares every payload allocation the inverse
             // did not replace with the live destination, whose memo this
             // capture consults (change 0751).
-            let restored_snapshot = super::model::capture_with_parent_digests(
+            let restored_snapshot = super::model::capture_with_parent_digests_and_semantic_limits(
                 &restored,
                 limits,
                 destination_physical_source_provenance,
                 &destination_snapshot.part_digests,
+                destination_semantic_limits.clone(),
             );
             let restored_digests = restored_snapshot
                 .ok()
@@ -1043,6 +1058,7 @@ pub(crate) fn apply_patch(
         destination_physical_source_provenance,
         reopened && !normalized,
         Some(&candidate_digests),
+        destination_semantic_limits,
     )?;
     if published_archive_revision(&candidate, limits, rebuilt, patch.target_physical_revision)?
         != patch.target_physical_revision
@@ -1083,6 +1099,7 @@ fn validate_application_candidate(
     physical_source_provenance: bool,
     may_rebuild: bool,
     candidate_digests: Option<&PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<(OpcPackage, Snapshot, bool)> {
     // Reopening preserves the observable state of untouched owned ingress.
     // Dirty packages can carry caller-defined parts or save preferences that
@@ -1091,11 +1108,12 @@ fn validate_application_candidate(
     if may_rebuild && !destination.is_unmodified_owned_source() {
         drop(candidate);
         let mut candidate = destination.clone();
-        let snapshot = super::patch::apply_exact_revision(
+        let snapshot = super::patch::apply_exact_revision_with_semantic_limits(
             &mut candidate,
             patch,
             target_revision,
             physical_source_provenance,
+            semantic_limits,
         )?;
         return Ok((candidate, snapshot, true));
     }
@@ -1106,6 +1124,7 @@ fn validate_application_candidate(
         target_revision,
         physical_source_provenance,
         candidate_digests,
+        semantic_limits,
     )?;
     Ok((candidate, snapshot, false))
 }
@@ -1978,16 +1997,18 @@ fn build_candidate(
     // the rewritten presentation part, is hashed (change 0751).
     let parents = PartDigests::union(&[&source.part_digests, &destination.part_digests]);
     let captured = match parents.as_ref() {
-        Some(parents) => super::model::capture_with_parent_digests(
+        Some(parents) => super::model::capture_with_parent_digests_and_semantic_limits(
             &reopened,
             destination.limits,
             destination.physical_source_provenance,
             parents,
+            destination.owner_state.semantic_limits.clone(),
         )?,
-        None => super::model::capture(
+        None => super::model::capture_with_provenance_and_semantic_limits(
             &reopened,
             destination.limits,
             destination.physical_source_provenance,
+            destination.owner_state.semantic_limits.clone(),
         )?,
     };
     drop(parents);

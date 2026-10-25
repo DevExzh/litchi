@@ -117,10 +117,12 @@ pub(super) fn plan(
 
     let part_uri = next_slide_part_name(package)?;
 
+    let shape_limits =
+        crate::open_options::selected(package.owner.semantic_limits.as_ref()).shape();
     let placeholders = {
         let layout_part = source.part(&layout)?;
         let data = layout_part.data()?;
-        crate::opened::plan_new_slide_placeholders(data.as_bytes())?
+        crate::opened::plan_new_slide_placeholders(data.as_bytes(), shape_limits)?
     };
     let (slide_xml, relationships_xml) = authored_slide(
         package.owner.limits,
@@ -129,8 +131,9 @@ pub(super) fn plan(
         slide_id,
         strict,
         &placeholders,
+        shape_limits,
     )?;
-    crate::opened::read_back_new_slide(&slide_xml, &placeholders)?;
+    crate::opened::read_back_new_slide(&slide_xml, &placeholders, shape_limits)?;
     crate::source_limits::validate_xml_limits(&slide_xml, package.owner.limits)?;
     crate::opened::validate_removal_slide_surface(&slide_xml).map_err(map_error)?;
     crate::source_limits::validate_xml_limits(&relationships_xml, package.owner.limits)?;
@@ -382,8 +385,9 @@ fn authored_slide(
     slide_id: u32,
     strict: bool,
     placeholders: &[crate::opened::NewSlidePlaceholder],
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut slide_xml = crate::opened::new_slide_xml(slide_id, placeholders)?;
+    let mut slide_xml = crate::opened::new_slide_xml(slide_id, placeholders, shape_limits)?;
     if strict {
         for (old, new) in [
             (

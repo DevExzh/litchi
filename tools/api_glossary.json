@@ -3013,6 +3013,12 @@
           "limits_type": "litchi_pptx::shape::Limits"
         },
         {
+          "method": "litchi_pptx::tag::shape::load",
+          "inputs": ["package", "owner", "key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
           "method": "litchi_pptx::transition::read",
           "inputs": ["xml", "limits"],
           "limits_argument": "limits",
@@ -4015,6 +4021,12 @@
         {
           "method": "litchi_pptx::shape::owned::Scene::read",
           "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::tag::shape::load",
+          "inputs": ["package", "owner", "key", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_pptx::shape::Limits"
         },

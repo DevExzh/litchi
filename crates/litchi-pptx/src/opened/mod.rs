@@ -83,32 +83,48 @@ pub use text_format::{
     TextAssignment, TextBody, TextProperties, TextTarget,
 };
 pub(crate) use text_format::{
-    TextChange, stage_text_properties, stage_text_property_chunks, stage_text_structure,
+    TextChange, stage_text_properties, stage_text_properties_with_limits,
+    stage_text_property_chunks, stage_text_property_chunks_with_limits, stage_text_structure,
+    stage_text_structure_with_limits,
 };
 pub use transaction::{Commit, Diagnostics, Edit, MediaFile, ModernCommentChange, SmartArtParts};
 
 pub(crate) use chunks::{
     ChunkAdmission, admit_shape_property_chunks, admit_shape_text_chunks,
-    stage_shape_property_chunks, stage_shape_property_chunks_admitted, stage_shape_text_chunks,
-    stage_shape_text_chunks_admitted,
+    stage_shape_property_chunks, stage_shape_property_chunks_admitted,
+    stage_shape_property_chunks_admitted_with_limits, stage_shape_property_chunks_with_limits,
+    stage_shape_text_chunks, stage_shape_text_chunks_admitted,
+    stage_shape_text_chunks_admitted_with_limits, stage_shape_text_chunks_with_limits,
 };
-pub(crate) use enclosed_removal::{stage_enclosed_shape_removal, validate_enclosed_removal_pair};
-pub(crate) use geometry::geometry_skeleton;
+pub(crate) use enclosed_removal::{
+    stage_enclosed_shape_removal, stage_enclosed_shape_removal_with_limits,
+    validate_enclosed_removal_pair, validate_enclosed_removal_pair_with_limits,
+};
+pub(crate) use geometry::{geometry_skeleton, geometry_skeleton_with_limits};
 pub(crate) use model::{
-    PartDigests, capture_with_parent_digests, capture_with_provenance, package_fingerprint,
+    PartDigests, capture_with_parent_digests, capture_with_parent_digests_and_semantic_limits,
+    capture_with_provenance, capture_with_provenance_and_semantic_limits, package_fingerprint,
     package_fingerprint_with_memo, relationships_equal,
 };
 pub(crate) use new_slide::{
     Planned as NewSlidePlaceholder, plan as plan_new_slide_placeholders,
-    read_back as read_back_new_slide, slide_xml as new_slide_xml,
+    read_back_with_limits as read_back_new_slide, slide_xml_with_limits as new_slide_xml,
 };
-pub(crate) use patch::{apply, apply_to_new};
-pub(crate) use properties::stage_shape_properties;
-pub(crate) use removal_proof::normalize_shape_removal_pair;
-pub(crate) use remove_plan::apply_patch as apply_removal_patch;
+pub(crate) use patch::{
+    apply, apply_exact_revision_with_semantic_limits, apply_to_new,
+    apply_to_new_with_semantic_limits, apply_with_semantic_limits,
+};
+pub(crate) use properties::{stage_shape_properties, stage_shape_properties_with_limits};
+pub(crate) use removal_proof::{
+    normalize_shape_removal_pair, normalize_shape_removal_pair_with_limits,
+};
 pub(crate) use remove_plan::{
     NON_POSITIONAL_EXTENSIONS, removal_layout_edge, validate_insertion_owner,
     validate_removal_presentation_owner, validate_removal_slide_surface,
+};
+pub(crate) use remove_plan::{
+    apply_patch as apply_removal_patch,
+    apply_patch_with_semantic_limits as apply_removal_patch_with_semantic_limits,
 };
 pub(crate) use sections::SECTION_EXTENSION_URI;
 pub(crate) use slide_properties::{
@@ -120,8 +136,10 @@ pub(crate) use transaction::{
     validate_text_box_input,
 };
 pub(crate) use xml::{
-    insert_slide_binding, reorder_slide_bindings, shape_text_skeleton, stage_shape_removal,
-    stage_shape_texts, strip_appended_text_boxes, validate_slide_bindings,
+    insert_slide_binding, reorder_slide_bindings, shape_removal_span_with_limits,
+    shape_text_skeleton, shape_text_skeleton_with_limits, stage_shape_removal,
+    stage_shape_removal_with_limits, stage_shape_texts, stage_shape_texts_with_limits,
+    strip_appended_text_boxes, strip_appended_text_boxes_with_limits, validate_slide_bindings,
 };
 pub(crate) use xml::{
     remove_slide_binding, slide_binding_removal_spans, validate_slide_catalog_delta,

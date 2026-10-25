@@ -18,13 +18,30 @@ pub(crate) fn stage_shape_properties(
     max_text_bytes: usize,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_properties_admitted(
+    stage_shape_properties_with_limits(
+        xml,
+        replacements,
+        max_text_bytes,
+        max_output_bytes,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn stage_shape_properties_with_limits(
+    xml: &[u8],
+    replacements: &[super::ShapePropertiesReplacement<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_properties_admitted_with_limits(
         xml,
         replacements,
         max_text_bytes,
         max_output_bytes,
         super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
         max_text_bytes,
+        shape_limits,
     )
 }
 
@@ -39,6 +56,26 @@ pub(super) fn stage_shape_properties_admitted(
     max_output_bytes: usize,
     selection_limit: usize,
     aggregate_text_limit: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    stage_shape_properties_admitted_with_limits(
+        xml,
+        replacements,
+        max_text_bytes,
+        max_output_bytes,
+        selection_limit,
+        aggregate_text_limit,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(super) fn stage_shape_properties_admitted_with_limits(
+    xml: &[u8],
+    replacements: &[super::ShapePropertiesReplacement<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+    selection_limit: usize,
+    aggregate_text_limit: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
     if replacements.is_empty() {
         return Ok((None, 0));
@@ -64,7 +101,7 @@ pub(super) fn stage_shape_properties_admitted(
         });
     }
 
-    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -163,23 +200,25 @@ pub(super) fn stage_shape_properties_admitted(
     let mut candidate = if text_replacements.is_empty() {
         None
     } else {
-        super::xml::stage_shape_texts_admitted(
+        super::xml::stage_shape_texts_admitted_with_limits(
             xml,
             &text_replacements,
             max_text_bytes,
             max_output_bytes,
             selection_limit,
             aggregate_text_limit,
+            shape_limits,
         )?
         .0
     };
 
     if !bounds_replacements.is_empty() {
         let input = candidate.as_deref().unwrap_or(xml);
-        if let Some(next) = super::geometry::rewrite_shape_bounds_many(
+        if let Some(next) = super::geometry::rewrite_shape_bounds_many_with_limits(
             input,
             &bounds_replacements,
             max_output_bytes,
+            shape_limits,
         )? {
             candidate = Some(next);
         }
@@ -194,7 +233,7 @@ pub(super) fn stage_shape_properties_admitted(
         }
         return Ok((None, 0));
     };
-    let published = crate::shape::Scene::read(&candidate, crate::shape::Limits::DEFAULT)?;
+    let published = crate::shape::Scene::read(&candidate, shape_limits)?;
     if published.is_rewritten() || published.len() != scene.len() {
         return Err(Error::Invalid(
             "opened-presentation shape property batch changed the semantic shape graph".into(),

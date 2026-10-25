@@ -95,9 +95,10 @@ impl Edit {
         let selected = self.resolve_slide(slide.into())?;
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
+        let shape_limits = self.semantic_limits().shape();
         let scene = crate::shape::Scene::read(
             candidate.get_part(&selected.part_name)?.blob(),
-            crate::shape::Limits::DEFAULT,
+            shape_limits,
         )?;
         let shape_id = next_shape_id(&scene, "SmartArt")?;
         let number = free_diagram_number(&candidate)?;
@@ -154,8 +155,12 @@ impl Edit {
         }
         let fragment = frame(shape_id, name, bounds, [&ids[0], &ids[1], &ids[2], &ids[3]]);
         let owner = candidate.get_part(&selected.part_name)?;
-        let xml = super::super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
-        let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
+        let xml = super::super::xml::append_shape_with_limit(
+            owner.blob(),
+            fragment.as_bytes(),
+            shape_limits.output_bytes(),
+        )?;
+        let scene = crate::shape::Scene::read(&xml, shape_limits)?;
         if !scene.iter().any(|shape| {
             shape.id() == Some(shape_id) && matches!(shape, crate::shape::Shape::Diagram(_))
         }) {
@@ -182,7 +187,12 @@ impl Edit {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<SmartArtParts> {
         let selected = self.resolve_slide(slide.into())?;
-        let targets = targets(&self.working, &selected.part_name, shape.into())?;
+        let targets = targets(
+            &self.working,
+            &selected.part_name,
+            shape.into(),
+            self.semantic_limits().shape(),
+        )?;
         let read = |name: &PackURI| -> Result<Vec<u8>> {
             Ok(self.working.get_part(name)?.blob().to_vec())
         };
@@ -226,7 +236,12 @@ impl Edit {
         parts: SmartArtParts,
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
-        let targets = targets(&self.working, &selected.part_name, shape.into())?;
+        let targets = targets(
+            &self.working,
+            &selected.part_name,
+            shape.into(),
+            self.semantic_limits().shape(),
+        )?;
         let read_error =
             |error: litchi_drawingml::Error| drawing_error(error, "SmartArt data model");
         diagram_edit::Outline::read(&parts.data, &Limits::default()).map_err(read_error)?;
@@ -434,11 +449,16 @@ pub(crate) fn frame_relationships(fragment: &[u8]) -> Result<Option<[String; 4]>
 
 /// The diagram parts the SmartArt frame at `shape` on slide part `slide`
 /// names.
-fn targets(package: &OpcPackage, slide: &PackURI, shape: crate::shape::Key<'_>) -> Result<Targets> {
+fn targets(
+    package: &OpcPackage,
+    slide: &PackURI,
+    shape: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Targets> {
     let owner = package.get_part(slide)?;
     let blob = owner.blob();
     {
-        let scene = crate::shape::Scene::read(blob, crate::shape::Limits::DEFAULT)?;
+        let scene = crate::shape::Scene::read(blob, shape_limits)?;
         let found = scene
             .get(shape)
             .map_err(|error| invalid(format!("SmartArt frame lookup: {error}")))?
@@ -447,7 +467,7 @@ fn targets(package: &OpcPackage, slide: &PackURI, shape: crate::shape::Key<'_>) 
             return Err(invalid("the shape is not a SmartArt frame"));
         }
     }
-    let span = super::super::xml::shape_removal_span(blob, shape)?;
+    let span = super::super::xml::shape_removal_span_with_limits(blob, shape, shape_limits)?;
     let fragment = super::super::xml::span_bytes(blob, span)?;
     let ids = frame_relationships(fragment)?
         .ok_or_else(|| invalid("the SmartArt frame names no diagram parts"))?;

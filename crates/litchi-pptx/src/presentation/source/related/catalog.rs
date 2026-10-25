@@ -33,7 +33,6 @@ const STRICT_SLIDE_LAYOUT_REL: &str =
 const MAX_REFERENCES: usize = 4_096;
 const MAX_BULK_SOURCE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_PRESENTATION_PART_BYTES: usize = crate::notes::MAX_PRESENTATION_XML;
-const MAX_MASTER_PART_BYTES: usize = crate::shape::Limits::DEFAULT.input_bytes();
 
 /// A detached source-backed slide master.
 ///
@@ -379,7 +378,11 @@ fn load_bulk_part(
     budget: &BulkBudget,
 ) -> Result<SourcePart> {
     let remaining = budget.remaining()?;
-    let semantic_maximum = remaining.min(crate::shape::Limits::DEFAULT.input_bytes());
+    let semantic_maximum = remaining.min(
+        crate::open_options::selected(owner.semantic_limits.as_ref())
+            .shape()
+            .input_bytes(),
+    );
     if semantic_maximum == 0 {
         return Err(Error::Limit {
             resource: "source presentation bulk snapshot bytes",
@@ -387,6 +390,12 @@ fn load_bulk_part(
         });
     }
     super::load_part(owner, &target.part_uri, content_type, semantic_maximum)
+}
+
+fn shape_input_limit(owner: &SourceInner) -> usize {
+    crate::open_options::selected(owner.semantic_limits.as_ref())
+        .shape()
+        .input_bytes()
 }
 
 fn prepare_master(
@@ -402,7 +411,12 @@ fn prepare_master(
     let preserved = master.is_preserved()?;
     let candidate = super::acquire_scene(owner, &part, |source| {
         let master = SlideMasterPart::from_part(source)?;
-        let scene = OwnedScene::from_source(master.shapes()?, source.source_data().clone())?;
+        let scene = OwnedScene::from_source(
+            master.shapes_with_limits(
+                crate::open_options::selected(owner.semantic_limits.as_ref()).shape(),
+            )?,
+            source.source_data().clone(),
+        )?;
         super::strict_scene(&scene, "master")?;
         Ok(scene)
     })?;
@@ -577,7 +591,7 @@ impl SourceBackedPresentation {
                             &self.inner,
                             &master.part_uri,
                             ct::PML_SLIDE_MASTER,
-                            MAX_MASTER_PART_BYTES,
+                            shape_input_limit(&self.inner),
                         )?;
                         crate::shape::theme::package::theme_target(&part)?
                     },
@@ -587,8 +601,12 @@ impl SourceBackedPresentation {
             let Some(target) = target else {
                 return Ok(None);
             };
-            let part =
-                super::load_part(&self.inner, &target, ct::OFC_THEME, MAX_MASTER_PART_BYTES)?;
+            let part = super::load_part(
+                &self.inner,
+                &target,
+                ct::OFC_THEME,
+                shape_input_limit(&self.inner),
+            )?;
             Ok(Some(litchi_drawingml::theme::codec::read(
                 part.blob(),
                 litchi_drawingml::theme::codec::Limits::DEFAULT,
@@ -611,7 +629,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &target.part_uri,
                 ct::PML_SLIDE_MASTER,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             prepare_master(
                 &self.inner,
@@ -643,7 +661,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &master_target.part_uri,
                 ct::PML_SLIDE_MASTER,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             require_conformance(&master, "sldMaster", master_target.conformance)?;
             let targets = layout_targets(&self.inner, &master)?;
@@ -684,7 +702,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &master_target.part_uri,
                 ct::PML_SLIDE_MASTER,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             require_conformance(&master, "sldMaster", master_target.conformance)?;
             let targets = layout_targets(&self.inner, &master)?;
@@ -695,7 +713,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &target.part_uri,
                 ct::PML_SLIDE_LAYOUT,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             require_conformance(&part, "sldLayout", target.conformance)?;
             super::prepare_layout(&self.inner, part, &target.relationship_id).map(Some)

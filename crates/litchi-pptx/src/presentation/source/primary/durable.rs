@@ -331,12 +331,15 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
                 current.max_output_bytes,
             ));
         }
-        validate_pair(
+        let semantic = crate::open_options::selected(package.owner.semantic_limits.as_ref());
+        validate_pair_with_limits(
             &change.before,
             &change.after,
             Some(package.owner.limits),
             package.owner.package.execution_context().as_ref(),
             shape_removals,
+            semantic.shape(),
+            semantic.transition(),
         )?;
         retained_bytes = retained_bytes
             .checked_add(change.after.len())
@@ -407,6 +410,26 @@ pub(super) fn validate_pair(
     context: Option<&litchi_core::ExecutionContext>,
     shape_removals: bool,
 ) -> Result<()> {
+    validate_pair_with_limits(
+        before,
+        after,
+        limits,
+        context,
+        shape_removals,
+        crate::shape::Limits::DEFAULT,
+        crate::transition::Limits::DEFAULT,
+    )
+}
+
+pub(super) fn validate_pair_with_limits(
+    before: &[u8],
+    after: &[u8],
+    limits: Option<litchi_opc::SourceLimits>,
+    context: Option<&litchi_core::ExecutionContext>,
+    shape_removals: bool,
+    shape_limits: crate::shape::Limits,
+    transition_limits: crate::transition::Limits,
+) -> Result<()> {
     let _proof_reservation = context
         .map(|context| {
             let maximum = crate::opened::Limits::default().max_patch_bytes();
@@ -436,7 +459,13 @@ pub(super) fn validate_pair(
                 crate::source_limits::validate_xml_limits(xml, limits)?;
             }
         }
-        if crate::opened::validate_enclosed_removal_pair(before, after, "apply")? {
+        if crate::opened::validate_enclosed_removal_pair_with_limits(
+            before,
+            after,
+            "apply",
+            shape_limits,
+            transition_limits,
+        )? {
             return Ok(());
         }
     }
@@ -451,12 +480,17 @@ pub(super) fn validate_pair(
             }
             crate::source_limits::validate_xml_limits(xml, limits)?;
         }
-        crate::presentation::transition::validate_source(xml, "apply")?;
+        crate::presentation::transition::validate_source_with_limits(
+            xml,
+            "apply",
+            shape_limits,
+            transition_limits,
+        )?;
     }
     // Old wire versions retain their original shape-only proof grammar.
     if !shape_removals {
-        let before_skeleton = crate::opened::shape_text_skeleton(before)?;
-        let after_skeleton = crate::opened::shape_text_skeleton(after)?;
+        let before_skeleton = crate::opened::shape_text_skeleton_with_limits(before, shape_limits)?;
+        let after_skeleton = crate::opened::shape_text_skeleton_with_limits(after, shape_limits)?;
         if before_skeleton == after_skeleton
             || validate_property_surface(
                 before,
@@ -465,6 +499,7 @@ pub(super) fn validate_pair(
                 after_skeleton,
                 context,
                 false,
+                shape_limits,
             )?
         {
             return Ok(());
@@ -484,8 +519,10 @@ pub(super) fn validate_pair(
     }
     let normalized_before = crate::opened::normalize_slide_properties(before)?;
     let normalized_after = crate::opened::normalize_slide_properties(after)?;
-    let before_skeleton = crate::opened::shape_text_skeleton(&normalized_before)?;
-    let after_skeleton = crate::opened::shape_text_skeleton(&normalized_after)?;
+    let before_skeleton =
+        crate::opened::shape_text_skeleton_with_limits(&normalized_before, shape_limits)?;
+    let after_skeleton =
+        crate::opened::shape_text_skeleton_with_limits(&normalized_after, shape_limits)?;
     if validate_property_surface(
         &normalized_before,
         &normalized_after,
@@ -493,6 +530,7 @@ pub(super) fn validate_pair(
         after_skeleton,
         context,
         true,
+        shape_limits,
     )? {
         return Ok(());
     }
@@ -511,6 +549,7 @@ fn validate_property_surface(
     after_skeleton: [u8; 32],
     context: Option<&litchi_core::ExecutionContext>,
     shape_removals: bool,
+    shape_limits: crate::shape::Limits,
 ) -> Result<bool> {
     if before_skeleton == after_skeleton {
         return Ok(true);
@@ -540,21 +579,27 @@ fn validate_property_surface(
                     })
             })
             .transpose()?;
-        let left = crate::opened::geometry_skeleton(left)?;
-        let right = crate::opened::geometry_skeleton(right)?;
-        Ok(crate::opened::shape_text_skeleton(&left)?
-            == crate::opened::shape_text_skeleton(&right)?)
+        let left = crate::opened::geometry_skeleton_with_limits(left, shape_limits)?;
+        let right = crate::opened::geometry_skeleton_with_limits(right, shape_limits)?;
+        Ok(
+            crate::opened::shape_text_skeleton_with_limits(&left, shape_limits)?
+                == crate::opened::shape_text_skeleton_with_limits(&right, shape_limits)?,
+        )
     };
     if properties_equal(before, after)? {
         return Ok(true);
     }
     let unchanged = if let Some(stripped_after) =
-        crate::opened::strip_appended_text_boxes(before, after)?
+        crate::opened::strip_appended_text_boxes_with_limits(before, after, shape_limits)?
     {
-        crate::opened::shape_text_skeleton(&stripped_after)? == before_skeleton
+        crate::opened::shape_text_skeleton_with_limits(&stripped_after, shape_limits)?
+            == before_skeleton
             || properties_equal(before, &stripped_after)?
-    } else if let Some(stripped_before) = crate::opened::strip_appended_text_boxes(after, before)? {
-        crate::opened::shape_text_skeleton(&stripped_before)? == after_skeleton
+    } else if let Some(stripped_before) =
+        crate::opened::strip_appended_text_boxes_with_limits(after, before, shape_limits)?
+    {
+        crate::opened::shape_text_skeleton_with_limits(&stripped_before, shape_limits)?
+            == after_skeleton
             || properties_equal(&stripped_before, after)?
     } else {
         false
@@ -567,11 +612,15 @@ fn validate_property_surface(
         // text and geometry edits plus canonical appended text boxes.
         for (forward, replacements) in [(true, false), (false, false), (true, true), (false, true)]
         {
-            if let Some(pair) =
-                crate::opened::normalize_shape_removal_pair(before, after, forward, replacements)?
-            {
-                if crate::opened::shape_text_skeleton(&pair.before)?
-                    == crate::opened::shape_text_skeleton(&pair.after)?
+            if let Some(pair) = crate::opened::normalize_shape_removal_pair_with_limits(
+                before,
+                after,
+                forward,
+                replacements,
+                shape_limits,
+            )? {
+                if crate::opened::shape_text_skeleton_with_limits(&pair.before, shape_limits)?
+                    == crate::opened::shape_text_skeleton_with_limits(&pair.after, shape_limits)?
                     || properties_equal(&pair.before, &pair.after)?
                 {
                     return Ok(true);

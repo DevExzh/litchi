@@ -68,8 +68,9 @@ impl Edit<'_> {
     ) -> Result<Option<Snapshot>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(move |opc| super::put(opc, &slide, shape, outcome))
+            .update(move |opc| super::put_with_limits(opc, &slide, shape, outcome, shape_limits))
     }
 
     /// Remove the classification of the selected shape. Returns the removed
@@ -86,8 +87,9 @@ impl Edit<'_> {
     ) -> Result<Option<Snapshot>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(move |opc| super::remove(opc, &slide, shape))
+            .update(move |opc| super::remove_with_limits(opc, &slide, shape, shape_limits))
     }
 
     /// Discard every staged change.

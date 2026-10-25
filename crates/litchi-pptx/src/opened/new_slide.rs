@@ -53,8 +53,8 @@ impl Planned {
 }
 
 /// The placeholders a new slide based on the layout XML instantiates.
-pub(crate) fn plan(layout_xml: &[u8]) -> Result<Vec<Planned>> {
-    let scene = crate::shape::Scene::read(layout_xml, crate::shape::Limits::DEFAULT)?;
+pub(crate) fn plan(layout_xml: &[u8], shape_limits: crate::shape::Limits) -> Result<Vec<Planned>> {
+    let scene = crate::shape::Scene::read(layout_xml, shape_limits)?;
     let mut plan = Vec::new();
     let mut identities: HashSet<(u32, Option<PlaceholderKind>)> = HashSet::new();
     for shape in scene.roots() {
@@ -234,11 +234,21 @@ pub(crate) const fn takes_text(kind: PlaceholderKind) -> bool {
     )
 }
 
-/// The transitional XML of a new slide `slide_id` holding the planned
-/// placeholders (shape IDs 2, 3, …).
-pub(crate) fn slide_xml(slide_id: u32, plan: &[Planned]) -> Result<String> {
+/// The transitional XML of a new slide, checked against the selected shape
+/// output bound before the caller publishes it.
+pub(crate) fn slide_xml_with_limits(
+    slide_id: u32,
+    plan: &[Planned],
+    shape_limits: crate::shape::Limits,
+) -> Result<String> {
     let mut xml = crate::builder::Slide::new(slide_id).generate_slide_xml()?;
     if plan.is_empty() {
+        if xml.len() > shape_limits.output_bytes() {
+            return Err(Error::Limit {
+                resource: "shape output bytes",
+                limit: shape_limits.output_bytes(),
+            });
+        }
         return Ok(xml);
     }
     let anchor = xml
@@ -284,12 +294,22 @@ pub(crate) fn slide_xml(slide_id: u32, plan: &[Planned]) -> Result<String> {
         shapes.push_str("</p:sp>");
     }
     xml.insert_str(anchor, &shapes);
+    if xml.len() > shape_limits.output_bytes() {
+        return Err(Error::Limit {
+            resource: "shape output bytes",
+            limit: shape_limits.output_bytes(),
+        });
+    }
     Ok(xml)
 }
 
-/// Check that a staged new slide holds exactly the planned placeholders.
-pub(crate) fn read_back(slide_xml: &[u8], plan: &[Planned]) -> Result<()> {
-    let scene = crate::shape::Scene::read(slide_xml, crate::shape::Limits::DEFAULT)?;
+/// Check a staged new slide under the selected shape policy.
+pub(crate) fn read_back_with_limits(
+    slide_xml: &[u8],
+    plan: &[Planned],
+    shape_limits: crate::shape::Limits,
+) -> Result<()> {
+    let scene = crate::shape::Scene::read(slide_xml, shape_limits)?;
     let read: Vec<_> = scene
         .iter()
         .map(|shape| {

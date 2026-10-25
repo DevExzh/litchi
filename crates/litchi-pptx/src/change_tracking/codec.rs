@@ -108,8 +108,15 @@ struct Frame {
 }
 
 pub(super) fn read_state(xml: &[u8]) -> Result<State> {
+    read_state_with_limits(xml, crate::shape::Limits::DEFAULT)
+}
+
+pub(super) fn read_state_with_limits(
+    xml: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<State> {
     let creation_id = read(xml, Owner::Slide)?.id;
-    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     let mut shapes = Vec::new();
     shapes
         .try_reserve_exact(scene.len())
@@ -120,8 +127,11 @@ pub(super) fn read_state(xml: &[u8]) -> Result<State> {
     for (position, shape) in scene.iter().enumerate() {
         let trackable = !matches!(shape, crate::shape::Shape::Unknown(_));
         let modification_id = if trackable {
-            let span =
-                crate::tag::shape::selected_raw_span(xml, crate::shape::Key::Index(position))?;
+            let span = crate::tag::shape::selected_raw_span_with_limits(
+                xml,
+                crate::shape::Key::Index(position),
+                shape_limits,
+            )?;
             read_at(xml, Owner::Shape, Some(&span))?.id
         } else {
             None
@@ -160,7 +170,20 @@ pub(super) fn set(xml: &[u8], owner: Owner, id: Id) -> Result<Vec<u8>> {
 }
 
 pub(super) fn set_shape(xml: &[u8], position: usize, id: Id) -> Result<Vec<u8>> {
-    let span = crate::tag::shape::selected_raw_span(xml, crate::shape::Key::Index(position))?;
+    set_shape_with_limits(xml, position, id, crate::shape::Limits::DEFAULT)
+}
+
+pub(super) fn set_shape_with_limits(
+    xml: &[u8],
+    position: usize,
+    id: Id,
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u8>> {
+    let span = crate::tag::shape::selected_raw_span_with_limits(
+        xml,
+        crate::shape::Key::Index(position),
+        shape_limits,
+    )?;
     let source = read_at(xml, Owner::Shape, Some(&span))?;
     set_source(xml, Owner::Shape, id, &source)
 }
@@ -219,7 +242,19 @@ pub(super) fn remove(xml: &[u8], owner: Owner) -> Result<Vec<u8>> {
 }
 
 pub(super) fn remove_shape(xml: &[u8], position: usize) -> Result<Vec<u8>> {
-    let span = crate::tag::shape::selected_raw_span(xml, crate::shape::Key::Index(position))?;
+    remove_shape_with_limits(xml, position, crate::shape::Limits::DEFAULT)
+}
+
+pub(super) fn remove_shape_with_limits(
+    xml: &[u8],
+    position: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u8>> {
+    let span = crate::tag::shape::selected_raw_span_with_limits(
+        xml,
+        crate::shape::Key::Index(position),
+        shape_limits,
+    )?;
     let source = read_at(xml, Owner::Shape, Some(&span))?;
     remove_source(xml, &source)
 }

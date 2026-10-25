@@ -58,9 +58,10 @@ pub fn load<'k>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<Source>> {
     let owner = package.get_part(owner)?;
-    let layout = selected_layout(owner, key.into())?;
+    let layout = selected_layout(owner, key.into(), shape_limits)?;
     layout
         .anchor
         .as_ref()
@@ -93,10 +94,20 @@ pub(crate) fn put<'k>(
     key: impl Into<crate::shape::Key<'k>>,
     list: List,
 ) -> Result<Option<List>> {
+    put_with_limits(package, owner, key, list, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn put_with_limits<'k>(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    list: List,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<List>> {
     let key = key.into();
     let (owner_name, layout, attached, anchor_uses) = {
         let owner = package.get_part(owner)?;
-        let layout = selected_layout(owner, key)?;
+        let layout = selected_layout(owner, key, shape_limits)?;
         let attached = layout
             .anchor
             .as_ref()
@@ -153,7 +164,7 @@ pub(crate) fn put<'k>(
             let owner = package.get_part(&owner_name)?;
             let relationship_id = available_relationship_id(owner)?;
             let owner_xml = replace_anchor_id(owner.blob(), &layout, &relationship_id)?;
-            validate_staged_anchor(owner, &owner_xml, key, Some(&relationship_id))?;
+            validate_staged_anchor(owner, &owner_xml, key, Some(&relationship_id), shape_limits)?;
             (relationship_id, Some(owner_xml))
         } else {
             (attached.source.rel().to_owned(), None)
@@ -202,7 +213,7 @@ pub(crate) fn put<'k>(
         let target_ref = part_name.relative_ref(owner_name.base_uri());
         validate_relative_target(&owner_name, &target_ref, &part_name)?;
         let owner_xml = add_anchor(owner.blob(), &layout, &relationship_id)?;
-        validate_staged_anchor(owner, &owner_xml, key, Some(&relationship_id))?;
+        validate_staged_anchor(owner, &owner_xml, key, Some(&relationship_id), shape_limits)?;
         (relationship_id, part_name, target_ref, owner_xml)
     };
     package.validate_new_part_name(&part_name)?;
@@ -210,7 +221,7 @@ pub(crate) fn put<'k>(
     refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
-        let current = selected_layout(owner, key)?;
+        let current = selected_layout(owner, key, shape_limits)?;
         if current.anchor.is_some() || owner.rels().get(&relationship_id).is_some() {
             return Err(invalid("shape tag graph changed during preflight"));
         }
@@ -254,10 +265,19 @@ pub(crate) fn remove<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Option<List>> {
+    remove_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn remove_with_limits<'k>(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<List>> {
     let key = key.into();
     let (owner_name, layout, attached, owner_xml, retain_relationship, orphan) = {
         let owner = package.get_part(owner)?;
-        let layout = selected_layout(owner, key)?;
+        let layout = selected_layout(owner, key, shape_limits)?;
         let Some(anchor) = layout.anchor.as_ref() else {
             return Ok(None);
         };
@@ -270,7 +290,7 @@ pub(crate) fn remove<'k>(
         let owner_name = owner.partname().clone();
         let retain_relationship = preserved_anchor_uses(owner.blob(), &anchor.id)? > 1;
         let owner_xml = remove_anchor(owner.blob(), &layout)?;
-        validate_staged_anchor(owner, &owner_xml, key, None)?;
+        validate_staged_anchor(owner, &owner_xml, key, None, shape_limits)?;
         let orphan = !retain_relationship
             && !has_other_inbound(package, source.part(), &owner_name, source.rel())?;
         (
@@ -289,7 +309,7 @@ pub(crate) fn remove<'k>(
     refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
-        let current = selected_layout(owner, key)?;
+        let current = selected_layout(owner, key, shape_limits)?;
         if current.anchor.as_ref().map(|anchor| anchor.id.as_str())
             != layout.anchor.as_ref().map(|anchor| anchor.id.as_str())
         {
@@ -313,14 +333,26 @@ pub(crate) fn remove<'k>(
     Ok(Some(attached.source.into_list()))
 }
 
-fn selected_layout(owner: &dyn OpcPart, key: crate::shape::Key<'_>) -> Result<Layout> {
+fn selected_layout(
+    owner: &dyn OpcPart,
+    key: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Layout> {
     validate_owner_content_type(owner.content_type())?;
-    let span = selected_raw_span(owner.blob(), key)?;
+    let span = selected_raw_span_with_limits(owner.blob(), key, shape_limits)?;
     scan_layout(owner.blob(), span)
 }
 
 pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
-    let scene = crate::shape::read(xml, crate::shape::Limits::DEFAULT)?;
+    selected_raw_span_with_limits(xml, key, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn selected_raw_span_with_limits(
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Range<usize>> {
+    let scene = crate::shape::read(xml, shape_limits)?;
     let shape = scene.shape(key)?;
     selected_raw_span_for_shape(xml, &scene, shape)
 }

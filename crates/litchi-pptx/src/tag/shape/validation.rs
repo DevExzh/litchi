@@ -1,6 +1,8 @@
 use std::ops::Range;
 
-use super::codec::{MAX_OWNER_BYTES, MAX_OWNER_NODES, anchor_id, scan_layout, selected_raw_span};
+use super::codec::{
+    MAX_OWNER_BYTES, MAX_OWNER_NODES, anchor_id, scan_layout, selected_raw_span_with_limits,
+};
 use crate::tag::pml;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -37,9 +39,10 @@ pub(super) fn validate_staged_anchor(
     xml: &[u8],
     key: crate::shape::Key<'_>,
     expected_id: Option<&str>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     validate_owner_content_type(owner.content_type())?;
-    let staged = scan_layout(xml, selected_raw_span(xml, key)?)?;
+    let staged = scan_layout(xml, selected_raw_span_with_limits(xml, key, shape_limits)?)?;
     if staged.anchor.as_ref().map(|anchor| anchor.id.as_str()) != expected_id {
         return Err(crate::tag::invalid(
             "staged shape tag anchor did not round-trip",

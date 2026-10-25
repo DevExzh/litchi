@@ -68,8 +68,9 @@ impl Edit<'_> {
         points: &[TracePoint],
     ) -> Result<()> {
         let slide_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.staged.laser_limits();
         self.staged
-            .update(move |opc| raw::store_slide_trace(opc, &slide_name, points))
+            .update(move |opc| raw::store_slide_trace(opc, &slide_name, points, limits))
     }
 
     /// Discard every staged change.
@@ -84,5 +85,53 @@ impl Edit<'_> {
     /// Returns the part-count limit of the patch.
     pub fn commit(self) -> Result<Commit> {
         Ok(commit_of(self.staged.commit()?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::laser::Limits;
+    use crate::time::Offset;
+    use litchi_drawingml::coordinate::Coordinate;
+
+    fn point() -> TracePoint {
+        TracePoint::new(
+            Offset::ZERO,
+            Coordinate::emu(914_400).unwrap(),
+            Coordinate::emu(457_200).unwrap(),
+        )
+    }
+
+    #[test]
+    fn owning_edit_retains_custom_laser_profile() {
+        let mut builder = crate::builder::Builder::new().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
+        let default = Limits::DEFAULT;
+        let profile = Limits::new(
+            default.max_slide_xml_bytes(),
+            default.max_total_slide_xml_bytes(),
+            default.max_trace_count(),
+            1,
+            default.max_xml_nodes(),
+            default.max_xml_depth(),
+            default.max_output_bytes(),
+        )
+        .unwrap();
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            crate::OpenOptions::default().laser_limits(profile),
+        )
+        .unwrap();
+        let mut edit = package.edit_laser_traces().unwrap();
+        let points = [point(), point()];
+        assert!(matches!(
+            edit.set(0_usize, &points),
+            Err(crate::Error::Limit {
+                resource: "laser trace-point count",
+                limit: 1,
+            })
+        ));
     }
 }

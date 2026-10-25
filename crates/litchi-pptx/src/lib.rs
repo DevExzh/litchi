@@ -100,7 +100,7 @@ pub mod metadata;
 pub(crate) mod namespace;
 pub mod notes;
 pub mod opc;
-mod open_options;
+pub(crate) mod open_options;
 pub mod opened;
 pub mod package;
 pub(crate) mod part_edit;

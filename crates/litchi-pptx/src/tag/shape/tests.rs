@@ -192,7 +192,7 @@ fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
         .expect("replace active attachment")
         .expect("old list");
     assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-    let active = load(&package, &owner, "Active")
+    let active = load(&package, &owner, "Active", crate::shape::Limits::DEFAULT)
         .expect("load active attachment")
         .expect("active attachment");
     assert_ne!(active.rel(), "rId1");
@@ -221,7 +221,7 @@ fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
         .expect("old list");
     assert_eq!(removed.get("owner").expect("old tag").value(), "Alice");
     assert!(
-        load(&package, &owner, "Active")
+        load(&package, &owner, "Active", crate::shape::Limits::DEFAULT)
             .expect("load active")
             .is_none()
     );
@@ -249,12 +249,16 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
         .into_bytes();
     let (mut package, owner) = owner_package(xml);
 
-    assert!(load(&package, &owner, "Title").expect("load").is_none());
+    assert!(
+        load(&package, &owner, "Title", crate::shape::Limits::DEFAULT)
+            .expect("load")
+            .is_none()
+    );
     assert_eq!(
         put(&mut package, &owner, "Title", list("Owner", "Alice")).expect("create"),
         None
     );
-    let source = load(&package, &owner, 0_usize)
+    let source = load(&package, &owner, 0_usize, crate::shape::Limits::DEFAULT)
         .expect("load")
         .expect("attachment");
     assert_eq!(source.list().get("owner").expect("tag").value(), "Alice");
@@ -312,7 +316,11 @@ fn shape_crud_is_atomic_noop_safe_and_move_based() {
         .expect("old list");
     assert_eq!(removed.get("owner").expect("tag").value(), "Alice");
     assert!(!package.is_signed());
-    assert!(load(&package, &owner, "Title").expect("load").is_none());
+    assert!(
+        load(&package, &owner, "Title", crate::shape::Limits::DEFAULT)
+            .expect("load")
+            .is_none()
+    );
     assert!(
         remove(&mut package, &owner, "Title")
             .expect("idempotent remove")
@@ -332,7 +340,7 @@ fn strict_shape_crud_uses_strict_namespaces_and_relationship_type() {
         put(&mut package, &owner, "Strict", List::new()).expect("strict create"),
         None
     );
-    let source = load(&package, &owner, "Strict")
+    let source = load(&package, &owner, "Strict", crate::shape::Limits::DEFAULT)
         .expect("strict load")
         .expect("strict attachment");
     assert_eq!(source.conformance(), Conformance::Strict);
@@ -387,10 +395,10 @@ fn shared_shape_anchor_forks_then_collects_each_orphan() {
         .expect("fork")
         .expect("old list");
     assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-    let first = load(&package, &owner, "First")
+    let first = load(&package, &owner, "First", crate::shape::Limits::DEFAULT)
         .expect("first load")
         .expect("first attachment");
-    let second = load(&package, &owner, "Second")
+    let second = load(&package, &owner, "Second", crate::shape::Limits::DEFAULT)
         .expect("second load")
         .expect("second attachment");
     assert_ne!(first.rel(), second.rel());

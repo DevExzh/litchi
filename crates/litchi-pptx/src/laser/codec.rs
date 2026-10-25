@@ -537,13 +537,19 @@ pub fn write_to(
     limits: Limits,
 ) -> Result<()> {
     validate(points, &limits)?;
+
+    // Coordinates and timestamps are variable-width values.  Count the
+    // complete fragment first so the destination gets one exact, fallible
+    // reservation instead of a payload-dependent estimate.
+    let mut count = CountingXml::default();
+    emit(points, conformance, &mut count)?;
+    let output_len = count.finish()?;
+    if output_len > limits.max_output_bytes() {
+        return Err(limit("laser trace XML bytes", limits.max_output_bytes()));
+    }
+
     let start = xml.len();
-    let capacity = points
-        .len()
-        .checked_mul(48)
-        .and_then(|bytes| bytes.checked_add(256))
-        .ok_or_else(|| limit("laser trace XML bytes", limits.max_output_bytes()))?;
-    xml.try_reserve(capacity.min(limits.max_output_bytes()))
+    xml.try_reserve_exact(output_len)
         .map_err(|source| Error::Allocation {
             resource: "laser trace XML",
             source,
@@ -553,25 +559,16 @@ pub fn write_to(
         let mut output = LimitedXml {
             xml,
             start,
-            maximum: limits.max_output_bytes(),
+            maximum: output_len,
         };
-        output.push("<p:ext xmlns:p=\"")?;
-        output.push(conformance.namespace())?;
-        output.push("\" xmlns:p14=\"")?;
-        output.push(P14_NAMESPACE)?;
-        output.push("\" uri=\"")?;
-        output.push(LASER_TRACE_EXTENSION_URI)?;
-        output.push("\"><p14:laserTraceLst><p14:tracePtLst>")?;
-        for point in points {
-            output.push("<p14:tracePt t=\"")?;
-            output.push(point.time.as_str())?;
-            output.push("\" x=\"")?;
-            output.format(format_args!("{}", point.x))?;
-            output.push("\" y=\"")?;
-            output.format(format_args!("{}", point.y))?;
-            output.push("\"/>")?;
-        }
-        output.push("</p14:tracePtLst></p14:laserTraceLst></p:ext>")
+        let result = emit(points, conformance, &mut output);
+        result.and_then(|()| {
+            if output.xml.len().saturating_sub(start) != output_len {
+                Err(invalid("laser trace XML length changed during emission"))
+            } else {
+                Ok(())
+            }
+        })
     };
     if result.is_err() {
         xml.truncate(start);
@@ -585,15 +582,63 @@ struct LimitedXml<'a> {
     maximum: usize,
 }
 
+trait LaserSink {
+    fn push(&mut self, value: &str) -> Result<()>;
+    fn format(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()>;
+}
+
+#[derive(Default)]
+struct CountingXml {
+    length: usize,
+    overflowed: bool,
+}
+
+impl CountingXml {
+    fn finish(self) -> Result<usize> {
+        if self.overflowed {
+            Err(limit("laser trace XML bytes", usize::MAX))
+        } else {
+            Ok(self.length)
+        }
+    }
+}
+
+impl LaserSink for CountingXml {
+    fn push(&mut self, value: &str) -> Result<()> {
+        if let Some(length) = self.length.checked_add(value.len()) {
+            self.length = length;
+            Ok(())
+        } else {
+            self.overflowed = true;
+            Err(limit("laser trace XML bytes", usize::MAX))
+        }
+    }
+
+    fn format(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
+        std::fmt::write(self, arguments).map_err(|_| limit("laser trace XML bytes", usize::MAX))
+    }
+}
+
+impl std::fmt::Write for CountingXml {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        self.push(value).map_err(|_| std::fmt::Error)
+    }
+}
+
 impl LimitedXml<'_> {
     fn push(&mut self, value: &str) -> Result<()> {
-        if self
+        let Some(length) = self
             .xml
             .len()
-            .saturating_sub(self.start)
-            .saturating_add(value.len())
-            > self.maximum
-        {
+            .checked_sub(self.start)
+            .and_then(|length| length.checked_add(value.len()))
+        else {
+            return Err(limit("laser trace XML bytes", self.maximum));
+        };
+        let Some(end) = self.xml.len().checked_add(value.len()) else {
+            return Err(limit("laser trace XML bytes", self.maximum));
+        };
+        if length > self.maximum || end > self.xml.capacity() {
             return Err(limit("laser trace XML bytes", self.maximum));
         }
         self.xml.push_str(value);
@@ -605,18 +650,45 @@ impl LimitedXml<'_> {
     }
 }
 
+impl LaserSink for LimitedXml<'_> {
+    fn push(&mut self, value: &str) -> Result<()> {
+        Self::push(self, value)
+    }
+
+    fn format(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
+        Self::format(self, arguments)
+    }
+}
+
+fn emit<S: LaserSink>(
+    points: &[TracePoint],
+    conformance: Conformance,
+    output: &mut S,
+) -> Result<()> {
+    output.push("<p:ext xmlns:p=\"")?;
+    output.push(conformance.namespace())?;
+    output.push("\" xmlns:p14=\"")?;
+    output.push(P14_NAMESPACE)?;
+    output.push("\" uri=\"")?;
+    output.push(LASER_TRACE_EXTENSION_URI)?;
+    output.push("\"><p14:laserTraceLst><p14:tracePtLst>")?;
+    for point in points {
+        output.push("<p14:tracePt t=\"")?;
+        output.push(point.time.as_str())?;
+        output.push("\" x=\"")?;
+        output.format(format_args!("{}", point.x))?;
+        output.push("\" y=\"")?;
+        output.format(format_args!("{}", point.y))?;
+        output.push("\"/>")?;
+    }
+    output.push("</p14:tracePtLst></p14:laserTraceLst></p:ext>")
+}
+
 impl std::fmt::Write for LimitedXml<'_> {
     fn write_str(&mut self, value: &str) -> std::fmt::Result {
-        if self
-            .xml
-            .len()
-            .saturating_sub(self.start)
-            .saturating_add(value.len())
-            > self.maximum
-        {
+        if self.push(value).is_err() {
             return Err(std::fmt::Error);
         }
-        self.xml.push_str(value);
         Ok(())
     }
 }
