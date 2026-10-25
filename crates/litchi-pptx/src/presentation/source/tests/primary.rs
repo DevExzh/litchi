@@ -21,6 +21,55 @@ fn text(package: &Package, slide: usize) -> String {
 }
 
 #[test]
+fn source_owner_retains_custom_shape_profile() {
+    let defaults = crate::shape::Limits::DEFAULT;
+    let shape_limits = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        defaults.shapes(),
+        1,
+        defaults.retained_text_bytes(),
+    )
+    .unwrap();
+    let package = Package::from_read_at_with_options(
+        Arc::new(CountingSource::new(fixture())),
+        crate::OpenOptions::default().shape_limits(shape_limits),
+    )
+    .unwrap();
+    let mut edit = package.edit().unwrap();
+    assert!(matches!(
+        edit.add_text_box(0, "bounded", (0, 0, 914_400, 914_400)),
+        Err(crate::Error::Limit {
+            resource: "shapes",
+            limit: 1,
+        })
+    ));
+}
+
+#[test]
+fn source_owner_retains_custom_transition_profile() {
+    let output_limit = crate::transition::Limits::DEFAULT
+        .with_output_bytes(1)
+        .unwrap();
+    let package = Package::from_read_at_with_options(
+        Arc::new(CountingSource::new(fixture())),
+        crate::OpenOptions::default().transition_limits(output_limit),
+    )
+    .unwrap();
+    let mut edit = package.edit().unwrap();
+    let transition =
+        crate::transition::Transition::new(crate::transition::Kind::Fade { black: None });
+    assert!(matches!(
+        edit.set_slide_transition(0, Some(&transition)),
+        Err(crate::Error::Limit {
+            resource: "transition output bytes",
+            limit: 1,
+        })
+    ));
+}
+
+#[test]
 fn immutable_commits_compose_replay_inverse_and_keep_original_exact() {
     let bytes = fixture();
     let source = package(bytes.clone());

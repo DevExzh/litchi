@@ -454,7 +454,7 @@ fn final_shape_identity_is_usable_and_exhaustion_is_atomic() {
     for name in archive.file_names() {
         let payload = archive.read(name).unwrap();
         if name == "ppt/slides/slide1.xml" {
-            let id = litchi_pptx::shape::Scene::read(&payload)
+            let id = litchi_pptx::shape::Scene::read(&payload, litchi_pptx::shape::Limits::DEFAULT)
                 .unwrap()
                 .roots()
                 .next()

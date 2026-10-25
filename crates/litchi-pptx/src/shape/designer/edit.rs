@@ -14,6 +14,8 @@
 use super::Snapshot;
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
+use litchi_opc::Part;
+use litchi_opc::constants::content_type as ct;
 
 family!("Designer design-element");
 
@@ -45,10 +47,21 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_shape_design_element(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_shape_design_element")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_shape_design_element",
+            |package, target, patch| {
+                let shape_limits = package.semantic_limits().shape();
+                patch.validate_changed_parts(target, |_, part| {
+                    if part.content_type() == ct::PML_SLIDE {
+                        crate::shape::Scene::read(part.blob(), shape_limits).map(|_| ())
+                    } else {
+                        Ok(())
+                    }
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -68,8 +81,9 @@ impl Edit<'_> {
     ) -> Result<Option<Snapshot>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(move |opc| super::put(opc, &slide, shape, value))
+            .update(move |opc| super::put_with_limits(opc, &slide, shape, value, shape_limits))
     }
 
     /// Remove the Designer design-element flag of the selected shape. Returns
@@ -86,8 +100,9 @@ impl Edit<'_> {
     ) -> Result<Option<Snapshot>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(move |opc| super::remove(opc, &slide, shape))
+            .update(move |opc| super::remove_with_limits(opc, &slide, shape, shape_limits))
     }
 
     /// Discard every staged change.

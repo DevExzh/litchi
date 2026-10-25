@@ -3528,6 +3528,80 @@
         {"path": "litchi_pptx::opened::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true,
+      "required_signatures": [
+        {
+          "method": "litchi_pptx::shape::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::shape::Scene::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::shape::owned::Scene::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::tag::shape::load",
+          "inputs": ["package", "owner", "key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::transition::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::transition::Limits"
+        },
+        {
+          "method": "litchi_pptx::transition::write",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::transition::Limits"
+        },
+        {
+          "method": "litchi_pptx::transition::write_to",
+          "inputs": ["value", "xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::transition::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::read",
+          "inputs": ["slide_index", "xml_bytes", "limits", "usage"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::validate",
+          "inputs": ["points", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::write",
+          "inputs": ["points", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::write_to",
+          "inputs": ["points", "conformance", "xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::load_slide_traces",
+          "inputs": ["slide_index", "slide", "limits", "usage"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        }
+      ],
       "result_methods": [
         {
           "method": "litchi_pptx::Package::apply",
@@ -4476,6 +4550,80 @@
         {"path": "litchi_pptx::opened::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true,
+      "required_signatures": [
+        {
+          "method": "litchi_pptx::shape::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::shape::Scene::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::shape::owned::Scene::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::tag::shape::load",
+          "inputs": ["package", "owner", "key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::shape::Limits"
+        },
+        {
+          "method": "litchi_pptx::transition::read",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::transition::Limits"
+        },
+        {
+          "method": "litchi_pptx::transition::write",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::transition::Limits"
+        },
+        {
+          "method": "litchi_pptx::transition::write_to",
+          "inputs": ["value", "xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::transition::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::read",
+          "inputs": ["slide_index", "xml_bytes", "limits", "usage"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::validate",
+          "inputs": ["points", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::write",
+          "inputs": ["points", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::write_to",
+          "inputs": ["points", "conformance", "xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::laser::load_slide_traces",
+          "inputs": ["slide_index", "slide", "limits", "usage"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::laser::Limits"
+        }
+      ],
       "result_methods": [
         {
           "method": "litchi_pptx::Package::apply",

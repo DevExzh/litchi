@@ -111,9 +111,10 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         ));
     }
     crate::master_layout::validate_master_layout_graph(&source.package)?;
-    let presentation = crate::Presentation::new(
+    let presentation = crate::Presentation::new_with_semantic_limits(
         crate::parts::PresentationPart::from_part(main)?,
         &source.package,
+        source.owner_state.semantic_limits.clone(),
     );
     let mut layout = None;
     let mut matches = 0;
@@ -179,8 +180,16 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         &[],
         policy,
     )?;
-    let placeholders = super::new_slide::plan(source.package.get_part(&layout)?.blob())?;
-    let mut slide_xml = super::new_slide::slide_xml(id, &placeholders)?;
+    let shape_limits = source
+        .owner_state
+        .semantic_limits
+        .as_deref()
+        .copied()
+        .unwrap_or_default()
+        .shape();
+    let placeholders =
+        super::new_slide::plan(source.package.get_part(&layout)?.blob(), shape_limits)?;
+    let mut slide_xml = super::new_slide::slide_xml_with_limits(id, &placeholders, shape_limits)?;
     if strict {
         for (old, new) in [
             (
@@ -215,7 +224,7 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     let mut order: Vec<u32> = source.slides.iter().map(|slide| slide.id).collect();
     order.insert(position, id);
     let xml = super::sections::place(&xml, &order, position)?.unwrap_or(xml);
-    super::new_slide::read_back(slide.blob(), &placeholders)?;
+    super::new_slide::read_back_with_limits(slide.blob(), &placeholders, shape_limits)?;
     let sizes = [
         main.blob().len(),
         xml.len(),
@@ -249,8 +258,12 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     candidate
         .get_part_mut(&source.presentation_name)?
         .set_blob(xml);
-    let captured =
-        super::model::capture(&candidate, source.limits, source.physical_source_provenance)?;
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
+        &candidate,
+        source.limits,
+        source.physical_source_provenance,
+        source.owner_state.semantic_limits.clone(),
+    )?;
     if captured
         .slides
         .get(position)

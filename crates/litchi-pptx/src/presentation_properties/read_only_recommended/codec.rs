@@ -1,6 +1,6 @@
 //! Bounded namespace-aware codec and source splicer for `readonlyRecommended`.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, TryReserveError};
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
@@ -13,6 +13,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::{XmlVersion, encoding::Decoder, reader::NsReader};
 
 use super::{EXTENSION_URI, NAMESPACE};
+use crate::presentation_properties::Limits;
 use crate::presentation_properties::{P_NS, P_STRICT, Properties};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -67,36 +68,39 @@ struct RawScan {
 }
 
 /// Parse one complete `presentationPr` part and locate the effective owner.
-pub(crate) fn locate(source: &[u8]) -> Result<Located> {
-    if source.len() > MAX_BYTES {
+pub(crate) fn locate(source: &[u8], limits: Limits) -> Result<Located> {
+    let max_bytes = limits.max_input_bytes().min(MAX_BYTES);
+    let max_depth = limits.max_depth().min(MAX_DEPTH);
+    let max_nodes = limits.max_nodes().min(MAX_NODES);
+    if source.len() > max_bytes {
         return Err(limit(
             "presentation-properties readonlyRecommended bytes",
-            MAX_BYTES,
+            max_bytes,
         ));
     }
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(NAMESPACE);
     let mce_limits = MceLimits {
-        max_input_bytes: MAX_BYTES,
-        max_output_bytes: MAX_BYTES,
-        max_depth: MAX_DEPTH,
-        max_namespace_bindings: 4096,
-        max_directive_tokens: 4096,
-        max_choices_per_alternate: 1024,
+        max_input_bytes: max_bytes,
+        max_output_bytes: limits.max_output_bytes().min(MAX_BYTES),
+        max_depth,
+        max_namespace_bindings: 4096.min(max_nodes),
+        max_directive_tokens: 4096.min(max_nodes),
+        max_choices_per_alternate: 1024.min(max_nodes),
         max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let processed = process_markup_compatibility(source, &capabilities, &mce_limits)
         .map_err(Error::MarkupCompatibility)?
         .xml;
-    let value = semantic_value(processed.as_ref())?;
-    let mut raw = scan_raw(source)?;
+    let value = semantic_value(processed.as_ref(), limits)?;
+    let mut raw = scan_raw(source, max_nodes, max_depth)?;
 
     let mut offsets = Vec::with_capacity(raw.ext_lists.len().saturating_add(raw.candidates.len()));
     for element in &raw.ext_lists {
         offsets.push(u32::try_from(element.range.start).map_err(|_| {
             limit(
                 "presentation-properties readonlyRecommended offsets",
-                MAX_BYTES,
+                max_bytes,
             )
         })?);
     }
@@ -104,7 +108,7 @@ pub(crate) fn locate(source: &[u8]) -> Result<Located> {
         offsets.push(u32::try_from(candidate.start).map_err(|_| {
             limit(
                 "presentation-properties readonlyRecommended offsets",
-                MAX_BYTES,
+                max_bytes,
             )
         })?);
     }
@@ -112,9 +116,9 @@ pub(crate) fn locate(source: &[u8]) -> Result<Located> {
         HashSet::new()
     } else {
         let limits = OffsetLimits {
-            max_source_bytes: MAX_BYTES,
-            max_offsets: MAX_OFFSETS,
-            max_marked_bytes: MAX_BYTES,
+            max_source_bytes: max_bytes,
+            max_offsets: MAX_OFFSETS.min(max_nodes),
+            max_marked_bytes: max_bytes,
             processing: mce_limits.clone(),
         };
         active_offsets(source, &offsets, &capabilities, &limits)
@@ -197,9 +201,20 @@ pub(crate) fn locate(source: &[u8]) -> Result<Located> {
 }
 
 /// Rewrite only the recognized extension, preserving all other source bytes.
-pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<bool>) -> Result<Vec<u8>> {
+pub(crate) fn rewrite(
+    source: &[u8],
+    located: &Located,
+    value: Option<bool>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if source.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "serialized presentation-properties readonlyRecommended bytes",
+            limits.max_output_bytes(),
+        ));
+    }
     if located.value == value {
-        return Ok(source.to_vec());
+        return clone_bounded(source, limits.max_output_bytes());
     }
     let mut replacements = Vec::new();
     match (located.value, value) {
@@ -304,18 +319,35 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<bool>) -> 
         },
         (None, None) => unreachable!("semantic no-op was handled above"),
     }
-    let updated = apply_replacements(source, replacements)?;
-    if updated.len() > MAX_BYTES {
+    let mut output_len = source.len();
+    for replacement in &replacements {
+        let removed = replacement
+            .range
+            .end
+            .saturating_sub(replacement.range.start);
+        output_len = output_len
+            .saturating_sub(removed)
+            .saturating_add(replacement.value.len());
+    }
+    if output_len > limits.max_output_bytes() {
         return Err(limit(
             "serialized presentation-properties readonlyRecommended bytes",
-            MAX_BYTES,
+            limits.max_output_bytes(),
+        ));
+    }
+    let updated = apply_replacements(source, replacements, output_len)?;
+    let max_bytes = limits.max_output_bytes().min(MAX_BYTES);
+    if updated.len() > max_bytes {
+        return Err(limit(
+            "serialized presentation-properties readonlyRecommended bytes",
+            max_bytes,
         ));
     }
     Ok(updated)
 }
 
-fn semantic_value(xml: &[u8]) -> Result<Option<bool>> {
-    let properties = Properties::parse(xml)?;
+fn semantic_value(xml: &[u8], limits: Limits) -> Result<Option<bool>> {
+    let properties = Properties::parse_processed_mce(xml, limits)?;
     let mut value = None;
     for extension in &properties.extensions {
         if let crate::presentation_properties::Extension::ReadOnlyRecommended(candidate) = extension
@@ -328,7 +360,7 @@ fn semantic_value(xml: &[u8]) -> Result<Option<bool>> {
     Ok(value)
 }
 
-fn scan_raw(source: &[u8]) -> Result<RawScan> {
+fn scan_raw(source: &[u8], max_nodes: usize, max_depth: usize) -> Result<RawScan> {
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
     let mut raw = RawScan::default();
@@ -345,10 +377,10 @@ fn scan_raw(source: &[u8]) -> Result<RawScan> {
         match event {
             Event::Start(element) => {
                 raw.nodes = raw.nodes.saturating_add(1);
-                if raw.nodes > MAX_NODES {
+                if raw.nodes > max_nodes {
                     return Err(limit(
                         "presentation-properties readonlyRecommended XML nodes",
-                        MAX_NODES,
+                        max_nodes,
                     ));
                 }
                 let (frame, candidate) = start_frame(
@@ -358,6 +390,7 @@ fn scan_raw(source: &[u8]) -> Result<RawScan> {
                     reader.decoder(),
                     before,
                     after,
+                    max_depth,
                 )?;
                 if let Some(candidate) = candidate {
                     raw.candidates.push(candidate);
@@ -372,10 +405,10 @@ fn scan_raw(source: &[u8]) -> Result<RawScan> {
             },
             Event::Empty(element) => {
                 raw.nodes = raw.nodes.saturating_add(1);
-                if raw.nodes > MAX_NODES {
+                if raw.nodes > max_nodes {
                     return Err(limit(
                         "presentation-properties readonlyRecommended XML nodes",
-                        MAX_NODES,
+                        max_nodes,
                     ));
                 }
                 let (mut frame, candidate) = start_frame(
@@ -385,6 +418,7 @@ fn scan_raw(source: &[u8]) -> Result<RawScan> {
                     reader.decoder(),
                     before,
                     after,
+                    max_depth,
                 )?;
                 if let Some(candidate) = candidate {
                     raw.candidates.push(candidate);
@@ -430,11 +464,12 @@ fn start_frame(
     decoder: Decoder,
     before: usize,
     after: usize,
+    max_depth: usize,
 ) -> Result<(Frame, Option<Candidate>)> {
-    if stack.len() >= MAX_DEPTH {
+    if stack.len() >= max_depth {
         return Err(limit(
             "presentation-properties readonlyRecommended XML depth",
-            MAX_DEPTH,
+            max_depth,
         ));
     }
     let (namespace, mce) = match namespace {
@@ -663,22 +698,57 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
-    replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
-    let mut output = source.to_vec();
-    let mut upper = source.len();
+fn apply_replacements(
+    source: &[u8],
+    mut replacements: Vec<Replacement>,
+    output_len: usize,
+) -> Result<Vec<u8>> {
+    replacements.sort_by_key(|replacement| replacement.range.start);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "presentation-properties readonlyRecommended output",
+            source,
+        })?;
+    let mut cursor = 0usize;
     for replacement in replacements {
         if replacement.range.start > replacement.range.end
             || replacement.range.end > source.len()
-            || replacement.range.end > upper
+            || replacement.range.start < cursor
         {
             return Err(invalid(
                 "presentation-properties patch ranges overlap or escape source",
             ));
         }
-        output.splice(replacement.range.clone(), replacement.value);
-        upper = replacement.range.start;
+        output.extend_from_slice(&source[cursor..replacement.range.start]);
+        output.extend_from_slice(&replacement.value);
+        cursor = replacement.range.end;
     }
+    output.extend_from_slice(&source[cursor..]);
+    if output.len() != output_len {
+        return Err(invalid(
+            "presentation-properties patch length differs from its plan",
+        ));
+    }
+    Ok(output)
+}
+
+fn clone_bounded(source: &[u8], maximum: usize) -> Result<Vec<u8>> {
+    if source.len() > maximum {
+        return Err(limit(
+            "serialized presentation-properties readonlyRecommended bytes",
+            maximum,
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|source: TryReserveError| Error::Allocation {
+            resource: "presentation-properties readonlyRecommended output",
+            source,
+        })?;
+    output.extend_from_slice(source);
     Ok(output)
 }
 

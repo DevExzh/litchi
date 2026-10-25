@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 
-use crate::transition::{Kind, Morph, Side, Speed, Transition};
+use crate::transition::{Kind, Limits, Morph, Side, Speed, Transition};
 use crate::{Package, Result};
 
 fn deck() -> Result<Package> {
@@ -24,7 +24,7 @@ fn slide_xml(package: &Package) -> Result<Vec<u8>> {
 }
 
 fn read(package: &Package) -> Result<Option<Transition>> {
-    crate::presentation::transition::read_direct(&slide_xml(package)?)
+    crate::presentation::transition::read_direct_with_limits(&slide_xml(package)?, Limits::DEFAULT)
 }
 
 fn set(package: &Package, value: Option<&Transition>) -> Result<(Package, bool)> {
@@ -115,13 +115,89 @@ fn out_of_range_slides_leave_the_edit_unchanged() -> Result<()> {
 }
 
 #[test]
+fn eager_edit_retains_custom_transition_profile() -> Result<()> {
+    let bytes = deck()?.to_bytes()?;
+    let output_limit = Limits::DEFAULT.with_output_bytes(1).expect("nonzero limit");
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        crate::OpenOptions::default().transition_limits(output_limit),
+    )?;
+    let mut edit = package.edit()?;
+    let push = Transition::new(Kind::Push(Side::Right));
+    assert!(matches!(
+        edit.set_slide_transition(0_usize, Some(&push)),
+        Err(crate::Error::Limit {
+            resource: "transition output bytes",
+            limit: 1,
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn eager_edit_retains_custom_shape_profile() -> Result<()> {
+    let bytes = deck()?.to_bytes()?;
+    let defaults = crate::shape::Limits::DEFAULT;
+    let shape_limits = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        1,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("nonzero shape limits");
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        crate::OpenOptions::default().shape_limits(shape_limits),
+    )?;
+    let mut edit = package.edit()?;
+    assert!(
+        edit.add_text_box(0_usize, "beta", (0, 0, 914_400, 914_400))
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn borrowed_designer_projection_retains_custom_shape_profile() -> Result<()> {
+    let mut builder = crate::builder::Builder::new()?;
+    builder
+        .presentation()?
+        .add_slide()?
+        .add_text_box("Designer", 0, 0, 914_400, 914_400)
+        .set_designer_properties(crate::shape::designer::DrawingProperties::new())?;
+    let bytes = builder.build()?.to_bytes()?;
+    let defaults = crate::shape::Limits::DEFAULT;
+    let shape_limits = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        1,
+        defaults.shapes(),
+        defaults.retained_text_bytes(),
+    )
+    .expect("tight shape profile");
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        crate::OpenOptions::default().shape_limits(shape_limits),
+    )?;
+    let slides = package.presentation()?.slides()?;
+    assert!(matches!(
+        slides[0].shape_designer_properties("Designer"),
+        Err(crate::Error::Limit { .. })
+    ));
+    Ok(())
+}
+
+#[test]
 fn shape_edits_work_after_an_extension_transition() -> Result<()> {
     // Markup compatibility after `cSld` (the Morph owner) leaves the scene
     // in source offsets, so byte-splicing shape edits stay available.
     let morph = Transition::new(Kind::Morph(Morph::ByObject));
     let (morphed, _) = set(&deck()?, Some(&morph))?;
     let xml = slide_xml(&morphed)?;
-    assert!(!crate::shape::Scene::read(&xml)?.is_rewritten());
+    assert!(!crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?.is_rewritten());
     let mut edit = morphed.edit()?;
     edit.add_text_box(0_usize, "beta", (0, 0, 914_400, 914_400))?;
     edit.set_text_properties(
@@ -137,7 +213,7 @@ fn shape_edits_work_after_an_extension_transition() -> Result<()> {
     let xml = String::from_utf8(slide_xml(&after)?).expect("UTF-8 slide");
     assert!(xml.contains("beta") && xml.contains("b=\"1\""));
     assert_eq!(
-        crate::presentation::transition::read_direct(xml.as_bytes())?
+        crate::presentation::transition::read_direct_with_limits(xml.as_bytes(), Limits::DEFAULT)?
             .as_ref()
             .map(Transition::kind),
         Some(morph.kind())
@@ -148,6 +224,8 @@ fn shape_edits_work_after_an_extension_transition() -> Result<()> {
         "<p:spTree><mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" Requires=\"p14\"/><mc:Fallback/></mc:AlternateContent>",
         1,
     );
-    assert!(crate::shape::Scene::read(inside.as_bytes())?.is_rewritten());
+    assert!(
+        crate::shape::Scene::read(inside.as_bytes(), crate::shape::Limits::DEFAULT)?.is_rewritten()
+    );
     Ok(())
 }

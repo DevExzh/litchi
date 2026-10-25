@@ -25,9 +25,10 @@ pub(crate) fn slide_shape_tags<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::tag::List>> {
     Ok(
-        crate::tag::shape::load(package, part.part().partname(), shape)?
+        crate::tag::shape::load(package, part.part().partname(), shape, shape_limits)?
             .map(crate::tag::Source::into_list),
     )
 }
@@ -36,16 +37,23 @@ pub(crate) fn slide_shape_classification<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::shape::classification::Snapshot>> {
-    crate::shape::classification::load(package, part.part().partname(), shape)
+    crate::shape::classification::load_with_limits(
+        package,
+        part.part().partname(),
+        shape,
+        shape_limits,
+    )
 }
 
 pub(crate) fn slide_shape_design_element<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::shape::designer::Snapshot>> {
-    crate::shape::designer::load(package, part.part().partname(), shape)
+    crate::shape::designer::load_with_limits(package, part.part().partname(), shape, shape_limits)
 }
 
 pub(crate) fn slide_shape_designer_properties<'a, 'k>(
@@ -53,12 +61,14 @@ pub(crate) fn slide_shape_designer_properties<'a, 'k>(
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
     limits: crate::shape::designer::Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<crate::shape::designer::properties::Snapshot> {
-    crate::shape::designer::load_properties_with_limits(
+    crate::shape::designer::load_properties_with_limits_and_shape_limits(
         package,
         part.part().partname(),
         shape,
         limits,
+        shape_limits,
     )
 }
 
@@ -143,8 +153,9 @@ pub(crate) fn slide_comment_snapshot<'a>(
 pub(crate) fn slide_notes<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<crate::presentation::related::Notes>> {
-    crate::presentation::related::load_eager_notes(package, part)
+    crate::presentation::related::load_eager_notes(package, part, shape_limits)
 }
 
 pub(crate) fn slide_zooms<'a>(

@@ -58,10 +58,21 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_color_maps(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_color_maps")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_color_maps",
+            |_, target, patch| {
+                patch.validate_changed_parts(target, |name, part| {
+                    crate::presentation_properties::metadata::validate_replay_part(
+                        target,
+                        crate::presentation_properties::metadata::ReplayFamily::ColorMaps,
+                        name,
+                        part,
+                    )
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 

@@ -8,7 +8,7 @@ use litchi_opc::{OpcError, OpcPackage, PackURI};
 
 use super::transaction::{Change, Prepared, Snapshot};
 use super::{EXTENSION_URI, NAMESPACE};
-use crate::presentation_properties::{P_NS, P_STRICT};
+use crate::presentation_properties::{Limits, P_NS, P_STRICT};
 use crate::{Error, Result};
 
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps";
@@ -29,7 +29,8 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
         return Ok(None);
     };
     let part = package.get_part(&uri)?;
-    Snapshot::from_part(uri.to_string(), part.blob_arc()).map(Some)
+    let limits = Limits::from_source_limits(package.read_limits());
+    Snapshot::from_part(uri.to_string(), part.blob_arc(), limits).map(Some)
 }
 
 /// Apply a source-checked recommendation patch atomically.

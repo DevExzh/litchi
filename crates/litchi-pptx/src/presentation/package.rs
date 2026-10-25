@@ -122,7 +122,7 @@ fn capture_slides_inner<'a, 'parent>(
             (SlidePart::from_part(part)?, None)
         };
         slides.push(CaptureSlide {
-            slide: Slide::new(package, slide_part),
+            slide: Slide::new_with_shape_limits(package, slide_part, presentation.shape_limits()),
             name,
         });
     }
@@ -274,7 +274,11 @@ pub(super) fn slide<'a>(
         return Ok(None);
     };
     let part = slide_part(package, presentation.part(), reference)?;
-    Ok(Some(Slide::new(package, part)))
+    Ok(Some(Slide::new_with_shape_limits(
+        package,
+        part,
+        presentation.shape_limits(),
+    )))
 }
 
 pub(super) fn find_slide<'a>(
@@ -308,9 +312,10 @@ pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a
     let references = presentation.catalog()?;
     let mut slides = Vec::with_capacity(references.len());
     for reference in references {
-        slides.push(Slide::new(
+        slides.push(Slide::new_with_shape_limits(
             package,
             slide_part(package, presentation.part(), reference)?,
+            presentation.shape_limits(),
         ));
     }
     Ok(slides)
@@ -319,6 +324,7 @@ pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a
 pub(super) fn slide_masters<'a>(
     package: &'a OpcPackage,
     presentation: &PresentationPart<'a>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<SlideMaster<'a>>> {
     let relationship_ids = presentation.slide_master_references()?;
     let mut masters = Vec::with_capacity(relationship_ids.len());
@@ -354,7 +360,11 @@ pub(super) fn slide_masters<'a>(
                 actual: part.content_type().to_string(),
             });
         }
-        masters.push(SlideMaster::new(package, SlideMasterPart::from_part(part)?));
+        masters.push(SlideMaster::new_with_shape_limits(
+            package,
+            SlideMasterPart::from_part(part)?,
+            shape_limits,
+        ));
     }
     Ok(masters)
 }
@@ -362,9 +372,10 @@ pub(super) fn slide_masters<'a>(
 pub(super) fn slide_layouts<'a>(
     package: &'a OpcPackage,
     presentation: &PresentationPart<'a>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<SlideLayout<'a>>> {
     let mut layouts = Vec::new();
-    for master in slide_masters(package, presentation)? {
+    for master in slide_masters(package, presentation, shape_limits)? {
         layouts.extend(master.layouts()?);
     }
     Ok(layouts)

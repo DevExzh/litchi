@@ -45,10 +45,19 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_math_properties(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_math_properties")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_math_properties",
+            |_, target, patch| {
+                let limits = crate::presentation_properties::Limits::from_source_limits(
+                    target.read_limits(),
+                );
+                patch.validate_changed_parts(target, |_, part| {
+                    crate::presentation_properties::validate_replay_part(part, limits)
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -59,8 +68,12 @@ impl Edit<'_> {
     ///
     /// Returns an error for a malformed presentation-properties part, or a changed edit of a signed package.
     pub fn set(&mut self, value: Properties) -> Result<Option<Properties>> {
-        self.staged
-            .update(move |opc| crate::presentation_properties::put_math_to_package(opc, value))
+        let limits = crate::presentation_properties::Limits::from_source_limits(
+            self.staged.opc().read_limits(),
+        );
+        self.staged.update(move |opc| {
+            crate::presentation_properties::put_math_to_package(opc, value, limits)
+        })
     }
 
     /// Remove the document-level math defaults. Returns the removed value.
@@ -69,8 +82,12 @@ impl Edit<'_> {
     ///
     /// Returns an error for a malformed presentation-properties part, or a changed edit of a signed package.
     pub fn remove(&mut self) -> Result<Option<Properties>> {
-        self.staged
-            .update(crate::presentation_properties::remove_math_from_package)
+        let limits = crate::presentation_properties::Limits::from_source_limits(
+            self.staged.opc().read_limits(),
+        );
+        self.staged.update(move |opc| {
+            crate::presentation_properties::remove_math_from_package(opc, limits)
+        })
     }
 
     /// Discard every staged change.

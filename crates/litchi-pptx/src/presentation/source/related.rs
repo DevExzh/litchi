@@ -69,8 +69,9 @@ const MAX_CHART_XML: usize = 64 * 1024 * 1024;
 pub(crate) fn load_eager_notes<'a>(
     package: &'a litchi_opc::OpcPackage,
     slide: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<Notes>> {
-    eager_notes::load(package, slide)
+    eager_notes::load(package, slide, shape_limits)
 }
 
 pub(crate) fn load_eager_comments<'a>(
@@ -619,7 +620,12 @@ fn prepare_layout(
     };
     let candidate = acquire_scene(owner, &part, |source| {
         let layout = SlideLayoutPart::from_part(source)?;
-        let scene = OwnedScene::from_source(layout.shapes()?, source.source_data().clone())?;
+        let scene = OwnedScene::from_source(
+            layout.shapes_with_limits(
+                crate::open_options::selected(owner.semantic_limits.as_ref()).shape(),
+            )?,
+            source.source_data().clone(),
+        )?;
         strict_scene(&scene, "layout")?;
         Ok(scene)
     })?;
@@ -660,7 +666,9 @@ pub(super) fn layout_for_target(
             owner,
             target,
             CT_SLIDE_LAYOUT,
-            crate::shape::Limits::DEFAULT.input_bytes(),
+            crate::open_options::selected(owner.semantic_limits.as_ref())
+                .shape()
+                .input_bytes(),
         )?;
         prepare_layout(owner, part, relationship_id)
     })?;
@@ -678,7 +686,9 @@ impl SourceSlide {
                 &self.owner,
                 &self.data.part_uri,
                 CT_SLIDE,
-                crate::shape::Limits::DEFAULT.input_bytes(),
+                crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                    .shape()
+                    .input_bytes(),
             )?;
             SlidePart::from_part(&part)?.is_hidden()
         })
@@ -696,7 +706,9 @@ impl SourceSlide {
                 SLIDE_LAYOUT_REL,
                 "slideLayout",
                 CT_SLIDE_LAYOUT,
-                crate::shape::Limits::DEFAULT.input_bytes(),
+                crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                    .shape()
+                    .input_bytes(),
                 "source slide has multiple layout relationships",
             )?
             else {
@@ -731,7 +743,10 @@ impl SourceSlide {
 
             notes::validate(&self.owner, &self.data.part_uri, &part)?;
             let candidate = acquire_scene(&self.owner, &part, |source| {
-                let parsed = crate::shape::Scene::read(source.blob())?;
+                let parsed = crate::shape::Scene::read(
+                    source.blob(),
+                    crate::open_options::selected(self.owner.semantic_limits.as_ref()).shape(),
+                )?;
                 let scene = OwnedScene::from_source(parsed, source.source_data().clone())?;
                 strict_scene(&scene, "notes")?;
                 Ok(scene)
@@ -866,7 +881,9 @@ impl SourceSlide {
             // markup-compatibility choice the processed part drops.
             let view = self.owner.package.part(&self.data.part_uri)?;
             let declared = view.declared_uncompressed_size()?;
-            let maximum = crate::shape::Limits::DEFAULT.input_bytes();
+            let maximum = crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                .shape()
+                .input_bytes();
             if declared > maximum as u64 {
                 return Err(Error::Limit {
                     resource: "source slide bytes",

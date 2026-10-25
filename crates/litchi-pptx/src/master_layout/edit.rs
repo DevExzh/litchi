@@ -138,11 +138,18 @@ impl Edit<'_> {
         spec: &PlaceholderSpec,
     ) -> Result<()> {
         let part_name = &super::package::resolve_owner(self.staged.opc(), owner.into())?;
-        if super::preflight_store_placeholder_shape(self.staged.opc(), part_name, spec)? {
+        let shape_limits = self.staged.shape_limits();
+        if super::preflight_store_placeholder_shape_with_shape_limits(
+            self.staged.opc(),
+            part_name,
+            spec,
+            shape_limits,
+        )? {
             return Ok(());
         }
-        self.staged
-            .update(|opc| super::store_placeholder_shape(opc, part_name, spec))
+        self.staged.update(|opc| {
+            super::store_placeholder_shape_with_shape_limits(opc, part_name, spec, shape_limits)
+        })
     }
 
     /// Discard every staged change.

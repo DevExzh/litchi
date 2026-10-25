@@ -489,6 +489,23 @@ pub(crate) fn drawing_error(error: litchi_drawingml::Error) -> Error {
     Error::Drawing(error)
 }
 
+/// Convert the shared model3d validator's error while preserving typed limit
+/// dimensions at the PPTX boundary.
+pub(crate) fn drawing_model3d_error(error: litchi_drawingml::model3d::Error) -> Error {
+    match error {
+        litchi_drawingml::model3d::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Drawing(litchi_drawingml::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }),
+        error => Error::Drawing(litchi_drawingml::Error::Invalid(error.to_string())),
+    }
+}
+
 /// Construct a checked shared relationship identifier for package publication.
 pub(crate) fn relationship_id(value: &str) -> Result<drawing::Id> {
     drawing::Id::new(value).map_err(|error| invalid(error.to_string()))

@@ -8,6 +8,9 @@
 
 mod slide_patch;
 
+use litchi_opc::constants::content_type as ct;
+use litchi_opc::{OpcPackage, PackURI, Part};
+
 pub mod changes;
 pub mod color_map;
 pub mod custom_show;
@@ -23,6 +26,109 @@ pub mod slide_sync;
 pub mod structure;
 pub mod template;
 pub mod tracks;
+
+/// Metadata owner whose changed payload receives family-specific replay
+/// admission.  The common patch engine already checks the exact before image,
+/// relationship graph, and recipient physical source limits; these families
+/// add the inexpensive semantic check for the changed owner only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReplayFamily {
+    Changes,
+    ColorMaps,
+    CustomShows,
+    DesignerTags,
+    Events,
+    Guides,
+    Revision,
+    SlideSync,
+    Structure,
+    Tracks,
+}
+
+/// Admit one changed metadata payload under the recipient's retained source
+/// policy before the generic package patch is published.
+///
+/// The physical scan is deliberately performed only for changed XML.  A
+/// no-op patch never calls this hook, and relationship-only patches do not
+/// allocate or rescan unchanged parts.  Family codecs then validate the
+/// changed owner where they expose a detached parser; package-aware families
+/// inspect only the candidate owner needed by their existing read path.
+pub(crate) fn validate_replay_part(
+    package: &OpcPackage,
+    family: ReplayFamily,
+    part_name: &PackURI,
+    part: &dyn Part,
+) -> crate::Result<()> {
+    let source_limits = package.read_limits();
+    if part.content_type() == crate::presentation_properties::CONTENT_TYPE {
+        return crate::presentation_properties::validate_replay_part(
+            part,
+            crate::presentation_properties::Limits::from_source_limits(source_limits),
+        );
+    }
+
+    if part.content_type().ends_with("+xml") {
+        crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
+    }
+
+    match family {
+        ReplayFamily::Changes if part.content_type() == changes::CONTENT_TYPE => {
+            changes::Info::parse(part.blob()).map(drop)
+        },
+        ReplayFamily::Revision if part.content_type() == revision::CONTENT_TYPE => {
+            revision::Info::parse(part.blob()).map(drop)
+        },
+        ReplayFamily::SlideSync if part.content_type() == slide_sync::CONTENT_TYPE => {
+            slide_sync::Properties::parse(part.blob()).map(drop)
+        },
+        ReplayFamily::Tracks if part.content_type() == tracks::CONTENT_TYPE => {
+            tracks::File::parse(part.blob()).map(drop)
+        },
+        ReplayFamily::CustomShows if is_presentation_content_type(part.content_type()) => {
+            let xml = std::str::from_utf8(part.blob())
+                .map_err(|_| crate::Error::Invalid("PresentationML is not UTF-8".into()))?;
+            custom_show::List::parse_xml(xml).map(drop)
+        },
+        ReplayFamily::ColorMaps => validate_color_map(part),
+        ReplayFamily::Events if part.content_type() == ct::PML_SLIDE => {
+            events::load(package, part_name).map(drop)
+        },
+        ReplayFamily::Guides if is_presentation_content_type(part.content_type()) => {
+            guides::load(package).map(drop)
+        },
+        ReplayFamily::Structure if is_presentation_content_type(part.content_type()) => {
+            structure::load(package).map(drop)
+        },
+        // Designer-tag ownership is selected by a stable slide ID inside the
+        // presentation owner.  Its changed-payload source scan above still
+        // enforces the recipient physical XML policy; the edit's source-bound
+        // transaction remains the authoritative selected-owner validator.
+        _ => Ok(()),
+    }
+}
+
+fn validate_color_map(part: &dyn Part) -> crate::Result<()> {
+    match part.content_type() {
+        ct::PML_SLIDE_MASTER => color_map::parse_master(part.blob()).map(drop),
+        ct::PML_SLIDE_LAYOUT => {
+            color_map::parse_override(part.blob(), b"sldLayout", "slide layout").map(drop)
+        },
+        ct::PML_SLIDE => color_map::parse_override(part.blob(), b"sld", "slide").map(drop),
+        _ => Ok(()),
+    }
+}
+
+fn is_presentation_content_type(content_type: &str) -> bool {
+    matches!(
+        content_type,
+        ct::PML_PRESENTATION_MAIN
+            | ct::PML_SLIDESHOW_MAIN
+            | ct::PML_TEMPLATE_MAIN
+            | ct::PML_PRES_MACRO_MAIN
+            | ct::PML_SLIDESHOW_MACRO_MAIN
+            | ct::PML_TEMPLATE_MACRO_MAIN
+    )
+}
 
 pub(crate) fn escape_xml(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());

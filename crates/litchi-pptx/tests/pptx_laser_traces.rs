@@ -80,11 +80,14 @@ fn traces(package: &Package) -> Vec<laser::Trace> {
 
 fn traces_result(package: &Package) -> litchi_pptx::Result<Vec<laser::Trace>> {
     let slides = package.presentation()?.slides()?;
-    let mut limits = laser::Limits::default();
+    let limits = laser::Limits::default();
+    let mut usage = laser::Usage::default();
     slides
         .iter()
         .enumerate()
-        .map(|(index, slide)| laser::load_slide_traces(index, slide.part().part(), &mut limits))
+        .map(|(index, slide)| {
+            laser::load_slide_traces(index, slide.part().part(), &limits, &mut usage)
+        })
         .collect::<litchi_pptx::Result<Vec<_>>>()
         .map(|groups| groups.into_iter().flatten().collect())
 }

@@ -15,10 +15,19 @@ pub(crate) fn load<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Option<Snapshot>> {
+    load_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn load_with_limits<'k>(
+    package: &OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<Snapshot>> {
     let part = package.get_part(owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     let key = key.into();
-    let span = crate::tag::shape::selected_raw_span(part.blob(), key)?;
+    let span = crate::tag::shape::selected_raw_span_with_limits(part.blob(), key, shape_limits)?;
     let shape = part
         .blob()
         .get(span)
@@ -33,11 +42,22 @@ pub(crate) fn put<'k>(
     key: impl Into<crate::shape::Key<'k>>,
     value: bool,
 ) -> Result<Option<Snapshot>> {
+    put_with_limits(package, owner, key, value, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn put_with_limits<'k>(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    value: bool,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<Snapshot>> {
     let key = key.into();
     let (owner_name, owner_blob, span, source, shape_blob) = {
         let part = package.get_part(owner)?;
         crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
-        let span = crate::tag::shape::selected_raw_span(part.blob(), key)?;
+        let span =
+            crate::tag::shape::selected_raw_span_with_limits(part.blob(), key, shape_limits)?;
         let shape_blob = part
             .blob()
             .get(span.clone())
@@ -54,7 +74,7 @@ pub(crate) fn put<'k>(
     let previous = source.snapshot.clone();
     let staged_shape = transaction::set(&shape_blob, &source, value)?;
     let staged_owner = codec::replace(&owner_blob, span.clone(), &staged_shape)?;
-    validate_staged(&staged_owner, key, value)?;
+    validate_staged(&staged_owner, key, value, shape_limits)?;
     // An exact no-op returns before the package is borrowed mutably, so it
     // keeps the exact source, and with it a signature, byte for byte.
     if staged_owner == owner_blob {
@@ -78,11 +98,21 @@ pub(crate) fn remove<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Option<Snapshot>> {
+    remove_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
+}
+
+pub(crate) fn remove_with_limits<'k>(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    key: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<Snapshot>> {
     let key = key.into();
     let (owner_name, owner_blob, span, source, shape_blob) = {
         let part = package.get_part(owner)?;
         crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
-        let span = crate::tag::shape::selected_raw_span(part.blob(), key)?;
+        let span =
+            crate::tag::shape::selected_raw_span_with_limits(part.blob(), key, shape_limits)?;
         let shape_blob = part
             .blob()
             .get(span.clone())
@@ -103,7 +133,7 @@ pub(crate) fn remove<'k>(
         return Ok(None);
     };
     let staged_owner = codec::replace(&owner_blob, span, &staged_shape)?;
-    validate_removed(&staged_owner, key)?;
+    validate_removed(&staged_owner, key, shape_limits)?;
     // An exact no-op returns before the package is borrowed mutably, so it
     // keeps the exact source, and with it a signature, byte for byte.
     if staged_owner == owner_blob {
@@ -121,8 +151,13 @@ pub(crate) fn remove<'k>(
     Ok(Some(previous))
 }
 
-fn validate_staged(owner: &[u8], key: crate::shape::Key<'_>, expected: bool) -> Result<()> {
-    let span = crate::tag::shape::selected_raw_span(owner, key)?;
+fn validate_staged(
+    owner: &[u8],
+    key: crate::shape::Key<'_>,
+    expected: bool,
+    shape_limits: crate::shape::Limits,
+) -> Result<()> {
+    let span = crate::tag::shape::selected_raw_span_with_limits(owner, key, shape_limits)?;
     let shape = owner
         .get(span)
         .ok_or_else(|| Error::Invalid("staged designer shape span is invalid".into()))?;
@@ -135,8 +170,12 @@ fn validate_staged(owner: &[u8], key: crate::shape::Key<'_>, expected: bool) -> 
     Ok(())
 }
 
-fn validate_removed(owner: &[u8], key: crate::shape::Key<'_>) -> Result<()> {
-    let span = crate::tag::shape::selected_raw_span(owner, key)?;
+fn validate_removed(
+    owner: &[u8],
+    key: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
+) -> Result<()> {
+    let span = crate::tag::shape::selected_raw_span_with_limits(owner, key, shape_limits)?;
     let shape = owner
         .get(span)
         .ok_or_else(|| Error::Invalid("staged designer shape span is invalid".into()))?;

@@ -15,13 +15,29 @@ pub(crate) fn normalize_shape_removal_pair(
     forward: bool,
     replacements: bool,
 ) -> Result<Option<NormalizedPair>> {
+    normalize_shape_removal_pair_with_limits(
+        before,
+        after,
+        forward,
+        replacements,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn normalize_shape_removal_pair_with_limits(
+    before: &[u8],
+    after: &[u8],
+    forward: bool,
+    replacements: bool,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<NormalizedPair>> {
     let (complete, candidate) = if forward {
         (before, after)
     } else {
         (after, before)
     };
-    let scene = crate::shape::Scene::read(complete)?;
-    let next = crate::shape::Scene::read(candidate)?;
+    let scene = crate::shape::Scene::read(complete, shape_limits)?;
+    let next = crate::shape::Scene::read(candidate, shape_limits)?;
     if scene.is_rewritten() || next.is_rewritten() {
         return Ok(None);
     }

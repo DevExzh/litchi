@@ -1741,7 +1741,12 @@ impl<'a> SlidePart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Resolve ordinary `DrawingML` chart parts related to this slide.
@@ -1882,7 +1887,12 @@ impl<'a> SlideLayoutPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the optional theme override attached to this layout.
@@ -1976,7 +1986,12 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the theme reached from this slide master.

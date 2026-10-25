@@ -16,6 +16,7 @@ use super::package;
 pub struct Presentation<'a> {
     pub(super) package: &'a OpcPackage,
     pub(super) part: PresentationPart<'a>,
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Memo of [`PresentationPart::slide_references`]: the ordered catalog as
     /// parsed from the main part, before any package-graph validation.
     ///
@@ -34,12 +35,25 @@ impl<'a> Presentation<'a> {
     /// Construct a view from a validated main part and its package.
     #[must_use]
     pub fn new(part: PresentationPart<'a>, package: &'a OpcPackage) -> Self {
+        Self::new_with_semantic_limits(part, package, None)
+    }
+
+    pub(crate) fn new_with_semantic_limits(
+        part: PresentationPart<'a>,
+        package: &'a OpcPackage,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
         Self {
             package,
             part,
+            semantic_limits,
             catalog: OnceLock::new(),
             catalog_validated: OnceLock::new(),
         }
+    }
+
+    pub(crate) fn shape_limits(&self) -> crate::shape::Limits {
+        crate::open_options::selected(self.semantic_limits.as_ref()).shape()
     }
 
     /// The ordered slide catalog parsed from the immutable main part.
@@ -241,7 +255,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_masters(&self) -> Result<Vec<SlideMaster<'a>>> {
-        package::slide_masters(self.package, &self.part)
+        package::slide_masters(self.package, &self.part, self.shape_limits())
     }
 
     /// Resolve all layouts reachable from all presentation masters.
@@ -250,7 +264,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_layouts(&self) -> Result<Vec<SlideLayout<'a>>> {
-        package::slide_layouts(self.package, &self.part)
+        package::slide_layouts(self.package, &self.part, self.shape_limits())
     }
 
     /// Flatten all slide text in presentation order.

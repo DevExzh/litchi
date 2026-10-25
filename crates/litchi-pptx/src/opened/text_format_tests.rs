@@ -109,7 +109,7 @@ fn paragraph_text_and_alignment() -> Result<()> {
     let (after, changed) = apply(&package, &[TextAssignment::new(target, properties)])?;
     assert_eq!(changed, 1);
     let scene_xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&scene_xml)?;
+    let scene = crate::shape::Scene::read(&scene_xml, crate::shape::Limits::DEFAULT)?;
     assert_eq!(scene.at(0)?.text(), Some("one\ntwo"));
     assert!(contains(&scene_xml, "algn=\"ctr\""));
     // An exact repeat changes nothing.
@@ -128,7 +128,7 @@ fn run_text_keeps_properties() -> Result<()> {
     let xml = slide_xml(&after)?;
     assert!(contains(&xml, "x &lt; y &amp; z"));
     assert!(contains(&xml, "b=\"1\""));
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     assert_eq!(scene.at(0)?.text(), Some("x < y & z"));
     Ok(())
 }
@@ -148,7 +148,7 @@ fn cell_text_and_fill() -> Result<()> {
     let (after, changed) = apply(&package, &[TextAssignment::new(target, properties)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     let frame = scene.at(1)?.xml()?.to_vec();
     let table = crate::table::Table::from_graphic_frame(&frame)?;
     let cell = table.cell(1, 0)?.expect("cell");
@@ -158,7 +158,7 @@ fn cell_text_and_fill() -> Result<()> {
     let clear = TextProperties::default().with_fill(None);
     let (cleared, _) = apply(&after, &[TextAssignment::new(target, clear)])?;
     let xml = slide_xml(&cleared)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     let frame = scene.at(1)?.xml()?.to_vec();
     let table = crate::table::Table::from_graphic_frame(&frame)?;
     assert_eq!(table.cell(1, 0)?.expect("cell").fill()?, None);
@@ -362,7 +362,7 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     let (after, changed) = apply(&package, &[TextAssignment::new(span(2, 5), bold)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     assert_eq!(scene.at(0)?.text(), Some("alpha"));
     assert!(
         contains(&xml, ">al</a:t></a:r><a:r><a:rPr"),
@@ -376,7 +376,7 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
         .with_italic(Some(true));
     let (after, _) = apply(&package, &[TextAssignment::new(span(1, 4), text)])?;
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     assert_eq!(scene.at(0)?.text(), Some("aL & Pa"));
     assert!(contains(&xml, "L &amp; P"));
     // Edits apply in order: later spans address the runs a split made.
@@ -392,7 +392,7 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     )?;
     assert_eq!(changed, 2);
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     assert_eq!(scene.at(0)?.text(), Some("alpha"));
     // Empty, out-of-range and off-boundary spans are refused.
     for (start, end) in [(2, 2), (4, 9)] {
@@ -439,7 +439,7 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
     let (after, changed) = apply(&package, &[TextAssignment::new(cell(0), text)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     let frame = scene.at(1)?.xml()?.to_vec();
     let table = crate::table::Table::from_graphic_frame(&frame)?;
     assert_eq!(table.cell(1, 1)?.expect("cell").text()?, "B2");
@@ -461,7 +461,7 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
         .with_bold(Some(true));
     let (after, _) = apply(&package, &[TextAssignment::new(span, bold)])?;
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     let frame = scene.at(1)?.xml()?.to_vec();
     let table = crate::table::Table::from_graphic_frame(&frame)?;
     let body = table.cell(0, 0)?.expect("cell").text_body()?.expect("body");
@@ -495,7 +495,7 @@ fn notes_pages_take_run_edits() -> Result<()> {
     let package = edit.commit()?.into_package();
     let notes = package.notes()?.expect("notes");
     let note = notes.slides().first().expect("note").clone();
-    let scene = crate::shape::Scene::read(note.xml())?;
+    let scene = crate::shape::Scene::read(note.xml(), crate::shape::Limits::DEFAULT)?;
     let (index, _) = (0..scene.len())
         .map(|index| (index, scene.at(index)))
         .find(|(_, shape)| {
@@ -526,7 +526,7 @@ fn notes_pages_take_run_edits() -> Result<()> {
     let notes_text = |package: &Package| -> Result<Option<String>> {
         let notes = package.notes()?.expect("notes");
         let note = notes.slides().first().expect("note");
-        let scene = crate::shape::Scene::read(note.xml())?;
+        let scene = crate::shape::Scene::read(note.xml(), crate::shape::Limits::DEFAULT)?;
         Ok(scene.at(index)?.text().map(str::to_owned))
     };
     assert_eq!(notes_text(&after)?.as_deref(), Some("Speaker final"));
@@ -569,7 +569,7 @@ fn cell_theme_fill_anchor_and_insets_round_trip() -> Result<()> {
     assert_eq!(changed, 1);
     let read = |package: &Package| -> Result<crate::table::CellProperties> {
         let xml = slide_xml(package)?;
-        let scene = crate::shape::Scene::read(&xml)?;
+        let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         let frame = scene.at(1)?.xml()?.to_vec();
         let table = crate::table::Table::from_graphic_frame(&frame)?;
         table.cell(0, 1)?.expect("cell").properties()
@@ -632,7 +632,7 @@ fn underline_and_strike_round_trip() -> Result<()> {
 fn row_cell_counts_match_the_row_reader() -> Result<()> {
     let package = deck()?;
     let xml = slide_xml(&package)?;
-    let scene = crate::shape::owned::Scene::read(xml)?;
+    let scene = crate::shape::owned::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let handle = scene
         .shape(1_usize)
         .map_err(|_| Error::Invalid("selector".into()))?
@@ -653,7 +653,7 @@ fn row_cell_counts_match_the_row_reader() -> Result<()> {
 fn cell_contents_match_the_cell_readers() -> Result<()> {
     let package = deck()?;
     let xml = slide_xml(&package)?;
-    let scene = crate::shape::owned::Scene::read(xml)?;
+    let scene = crate::shape::owned::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let handle = scene
         .shape(1_usize)
         .map_err(|_| Error::Invalid("selector".into()))?
@@ -834,7 +834,7 @@ fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
     let package = edit.commit()?.into_package();
     let notes = package.notes()?.expect("notes");
     let note = notes.slides().first().expect("note").clone();
-    let scene = crate::shape::Scene::read(note.xml())?;
+    let scene = crate::shape::Scene::read(note.xml(), crate::shape::Limits::DEFAULT)?;
     let body = (0..scene.len())
         .find(|index| {
             scene
@@ -933,7 +933,9 @@ fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
             };
             for slide in slides {
                 let xml = opc.get_part(slide.part_name())?.blob().to_vec();
-                let Ok(scene) = crate::shape::owned::Scene::read(xml) else {
+                let Ok(scene) =
+                    crate::shape::owned::Scene::read(xml, crate::shape::Limits::DEFAULT)
+                else {
                     continue;
                 };
                 for position in 0..scene.len() {
@@ -993,7 +995,7 @@ fn a_litchi_table_frame_is_indexed_in_one_pass() -> Result<()> {
         + b"</p:graphicFrame>".len();
     let index = crate::table::shape::scan_frame_cell_text_index(&xml[start..end], &xml, start)?
         .expect("the one-pass index");
-    let scene = crate::shape::owned::Scene::read(xml)?;
+    let scene = crate::shape::owned::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let handle = scene
         .shape(1_usize)
         .map_err(|_| Error::Invalid("selector".into()))?

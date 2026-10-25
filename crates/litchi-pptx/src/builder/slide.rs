@@ -454,7 +454,7 @@ impl Slide {
         }
         xml.push_str("</p:spTree></p:cSld>");
         if let Some(transition) = &self.transition {
-            crate::transition::write_to(transition, &mut xml)?;
+            crate::transition::write_to(transition, &mut xml, crate::transition::Limits::DEFAULT)?;
         }
         xml.push_str("<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>");
         Ok(xml)

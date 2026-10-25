@@ -120,7 +120,7 @@ fn inject(bytes: &[u8], marker: &str, extra: &str) -> Vec<u8> {
 
 fn shape_ids(bytes: &[u8]) -> Vec<u32> {
     let xml = member(bytes, SLIDE);
-    Scene::read(&xml)
+    Scene::read(&xml, litchi_pptx::shape::Limits::DEFAULT)
         .unwrap()
         .iter()
         .map(|shape| shape.id().unwrap())
@@ -201,7 +201,7 @@ fn with_unused_relationship(bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
 
 fn with_grouped_first_shape(bytes: &[u8]) -> Vec<u8> {
     rewrite_slide(bytes, |payload| {
-        let scene = Scene::read(&payload).unwrap();
+        let scene = Scene::read(&payload, litchi_pptx::shape::Limits::DEFAULT).unwrap();
         let shape = scene.roots().next().unwrap();
         let id = shape.id().unwrap();
         let span = shape.common().span().unwrap();
@@ -220,7 +220,7 @@ fn with_grouped_first_shape(bytes: &[u8]) -> Vec<u8> {
 
 fn with_grouped_first_shape_and_internal_connector(bytes: &[u8]) -> Vec<u8> {
     rewrite_slide(bytes, |payload| {
-        let scene = Scene::read(&payload).unwrap();
+        let scene = Scene::read(&payload, litchi_pptx::shape::Limits::DEFAULT).unwrap();
         let shape = scene.roots().next().unwrap();
         let id = shape.id().unwrap();
         let span = shape.common().span().unwrap();
@@ -628,7 +628,7 @@ fn source_multiple_removals_transport_but_retained_name_tampering_does_not() {
         members(&before)
     );
     let xml = member(&after.to_bytes().unwrap(), SLIDE);
-    let scene = Scene::read(&xml).unwrap();
+    let scene = Scene::read(&xml, litchi_pptx::shape::Limits::DEFAULT).unwrap();
     let name = scene.roots().next().unwrap().name().unwrap();
     let needle = format!("name=\"{name}\"");
     let mut wire = patch.to_bytes().unwrap();

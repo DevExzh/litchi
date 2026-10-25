@@ -45,10 +45,16 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_model3d(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_model3d")?,
-            patch.0.clone(),
-        )))
+        let package =
+            patch
+                .0
+                .apply_with_replay_validation(self, "apply_model3d", |_, target, patch| {
+                    let limits = super::codec::Limits::from_source_limits(target.read_limits());
+                    patch.validate_changed_parts(target, |name, part| {
+                        super::package::validate_replay_part(target, name, part, limits)
+                    })
+                })?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -67,8 +73,9 @@ impl Edit<'_> {
     ) -> Result<Option<Model>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let limits = super::codec::Limits::from_source_limits(self.staged.opc().read_limits());
         self.staged
-            .update(move |opc| super::package::put(opc, &slide, shape, model))
+            .update(move |opc| super::package::put(opc, &slide, shape, model, limits))
     }
 
     /// Remove the 3D model of the selected shape. Returns the removed model.
@@ -84,8 +91,9 @@ impl Edit<'_> {
     ) -> Result<Option<Model>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let limits = super::codec::Limits::from_source_limits(self.staged.opc().read_limits());
         self.staged
-            .update(move |opc| super::package::remove(opc, &slide, shape))
+            .update(move |opc| super::package::remove(opc, &slide, shape, limits))
     }
 
     /// Discard every staged change.

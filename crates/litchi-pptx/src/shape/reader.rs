@@ -218,21 +218,12 @@ impl std::fmt::Debug for LookupError {
 }
 
 impl<'a> Scene<'a> {
-    /// Index a scene with conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(xml: &'a [u8]) -> Result<Self> {
-        Self::read_with(xml, Limits::DEFAULT)
-    }
-
     /// Index a scene with caller-selected finite limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn read_with(xml: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn read(xml: &'a [u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.input_bytes {
             return Err(Error::Limit {
                 resource: "shape owner input bytes",

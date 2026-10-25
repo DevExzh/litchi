@@ -35,7 +35,6 @@ const P159_BYTES: &[u8] = P159.as_bytes();
 
 /// Resource limits for one transition read.
 ///
-/// The ordinary [`read`](super::read) entry point uses [`Limits::DEFAULT`].
 /// Advanced callers may lower or raise finite limits explicitly without
 /// changing the semantic API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +43,7 @@ pub struct Limits {
     depth: usize,
     nodes: usize,
     retained_bytes: usize,
+    output_bytes: usize,
 }
 
 impl Limits {
@@ -53,6 +53,7 @@ impl Limits {
         depth: 128,
         nodes: 1_000_000,
         retained_bytes: 8 * 1024 * 1024,
+        output_bytes: 8 * 1024 * 1024,
     };
 
     /// Creates a finite, nonzero limit set.
@@ -73,6 +74,7 @@ impl Limits {
                 depth,
                 nodes,
                 retained_bytes,
+                output_bytes: retained_bytes,
             })
         }
     }
@@ -100,6 +102,22 @@ impl Limits {
     pub const fn retained_bytes(self) -> usize {
         self.retained_bytes
     }
+
+    /// Maximum bytes emitted by one transition XML fragment.
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    /// Return this policy with a separate bounded output budget.
+    #[must_use]
+    pub const fn with_output_bytes(mut self, output_bytes: usize) -> Option<Self> {
+        if output_bytes == 0 || output_bytes > Self::DEFAULT.output_bytes {
+            return None;
+        }
+        self.output_bytes = output_bytes;
+        Some(self)
+    }
 }
 
 impl Default for Limits {
@@ -108,21 +126,12 @@ impl Default for Limits {
     }
 }
 
-/// Reads the first slide transition using bounded default resources.
+/// Reads the first slide transition using caller-selected finite resources.
 ///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn read(xml: &[u8]) -> Result<Option<Transition>> {
-    read_with(xml, Limits::DEFAULT)
-}
-
-/// Reads the first slide transition using explicit finite resource limits.
-///
-/// # Errors
-///
-/// Returns an error if the input cannot be read or is malformed.
-pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
+pub fn read(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
     if xml.len() > limits.input_bytes {
         return Err(Error::Limit {
             resource: "input bytes",

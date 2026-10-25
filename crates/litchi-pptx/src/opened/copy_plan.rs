@@ -465,10 +465,11 @@ fn build_copy_candidate(
         )?;
         staged.set_blob(xml);
     }
-    let captured = super::model::capture(
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
         &candidate,
         snapshot.limits,
         snapshot.physical_source_provenance,
+        snapshot.owner_state.semantic_limits.clone(),
     )?;
     let published = captured
         .slides

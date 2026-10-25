@@ -3381,3 +3381,23 @@ projection owners retain their immutable API. All examples, tests, facade
 consumers and performance harness imports were migrated in the same change.
 
 See [0362zab](unified-ops/0362zab-spreadsheet-chart-builder.md).
+
+## PPTX raw property and model3d limits (record 0362ul63)
+
+PPTX view-properties and presentation-properties codecs expose one explicit
+limits policy for every raw parse, tolerant/strict parse and XML write. Package
+and source-backed owners derive that policy from their retained `SourceLimits`;
+detached callers select the module-local `Limits` directly. Unknown XML and MCE
+tolerance remain preserved, while input, output, depth, node, string, semantic
+item and opaque-fragment budgets are checked before retention. Model3d reads,
+writes, validation and edits retain the same owner-derived policy for XML,
+relationships, links and embedded model/preview payloads.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::view_properties::ViewProperties::{parse, parse_with_tolerance, parse_strict, to_xml}`; `view_properties::{load_from_package, load_from_package_with_tolerance}` | adopted (0362ul63); every raw codec and package loader takes the required `view_properties::Limits` |
+| `litchi_pptx::presentation_properties::Properties::{parse, parse_with_tolerance, parse_strict, to_xml}`; `presentation_properties::{load_from_package, load_from_package_with_tolerance}` | adopted (0362ul63); strict/tolerant paths share the selected `presentation_properties::Limits` |
+| `litchi_pptx::presentation_properties::read_only_recommended::Snapshot::{from_xml, from_xml_owned}` | adopted (0362ul63); detached source snapshots require the presentation-properties limits policy |
+| `litchi_pptx::model3d::codec::{read, write}`; `model3d::validation::validate` | adopted (0362ul63); model3d package, selected-shape and edit consumers propagate the retained owner policy, including payload and relationship ceilings |
+
+See [0362ul63](unified-ops/0362ul63-pptx-raw-properties.md).

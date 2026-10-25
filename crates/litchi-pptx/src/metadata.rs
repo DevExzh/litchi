@@ -228,6 +228,7 @@ impl Package {
             opc: std::sync::Arc::new(opc),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: self.physical_source_provenance,
+            semantic_limits: self.semantic_limits.clone(),
             tolerance: self.tolerance.clone(),
             #[cfg(feature = "encryption")]
             encryption: self.encryption,

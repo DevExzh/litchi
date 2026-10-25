@@ -61,7 +61,13 @@ impl Package {
         &self,
         publish: impl Fn(&mut dyn Write) -> Result<()> + Send + Sync + 'static,
     ) -> Self {
-        let options = crate::OpenOptions::default().source_limits(self.owner.limits);
+        let mut options = crate::OpenOptions::default().source_limits(self.owner.limits);
+        if let Some(semantic) = self.owner.semantic_limits.as_deref().copied() {
+            options = options
+                .shape_limits(semantic.shape())
+                .transition_limits(semantic.transition())
+                .laser_limits(semantic.laser());
+        }
         let options = match self.owner.package.execution_context() {
             Some(context) => options.execution_context(context),
             None => options,

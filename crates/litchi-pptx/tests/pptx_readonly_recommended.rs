@@ -4,13 +4,15 @@
     reason = "test fixtures and assertions panic on failure by design"
 )]
 
+use std::fmt::Write as _;
+
 mod in_place;
 use in_place::InPlace as _;
 
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::{Error, Package};
+use litchi_pptx::{Error, OpenOptions, Package, SourceLimits};
 
 const P_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const P1710_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2017/10/main";
@@ -40,6 +42,29 @@ fn package_with_properties(xml: &[u8]) -> Package {
         );
     }
     Package::from_opc_package(opc).expect("open package")
+}
+
+fn xml_event_count(xml: &[u8]) -> usize {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut events = 0;
+    loop {
+        match reader.read_event() {
+            Ok(quick_xml::events::Event::Eof) => return events,
+            Ok(_) => events += 1,
+            Err(error) => panic!("fixture XML must parse: {error}"),
+        }
+    }
+}
+
+fn max_non_properties_events(package: &Package, properties: &PackURI) -> usize {
+    package
+        .opc()
+        .unwrap()
+        .iter_parts()
+        .filter(|part| part.partname() != properties)
+        .map(|part| xml_event_count(part.blob()))
+        .max()
+        .unwrap_or(0)
 }
 
 #[test]
@@ -95,6 +120,77 @@ fn package_snapshot_patch_is_source_checked_and_reversible() {
         .unwrap()
         .expect("restored owner snapshot");
     assert_eq!(restored.source_xml(), original.as_slice());
+}
+
+#[test]
+fn replay_rechecks_readonly_output_with_the_recipient_profile() {
+    let properties = PackURI::new("/ppt/presProps.xml").unwrap();
+    let seed = Package::new().unwrap();
+    let other_max = max_non_properties_events(&seed, &properties);
+
+    // Keep the source below the recipient event budget while making the
+    // typed edit's new ext/readonlyRecommended branch cross it.  The margin
+    // admits every unrelated package part and relationship member.
+    let target_events = other_max + 100;
+    let mut xml = format!(r#"<p:presentationPr xmlns:p="{P_NS}"><p:extLst>"#);
+    let mut events = xml_event_count(xml.as_bytes());
+    let mut ext_count = 0;
+    while events < target_events - 3 {
+        write!(xml, r#"<p:ext uri="urn:opaque:{ext_count}"/>"#).unwrap();
+        ext_count += 1;
+        events += 1;
+    }
+    xml.push_str("</p:extLst></p:presentationPr>");
+
+    let before = package_with_properties(xml.as_bytes());
+    let before_bytes = before.to_bytes().unwrap();
+    let before_part = before.opc().unwrap().get_part(&properties).unwrap();
+    let before_events = xml_event_count(before_part.blob());
+
+    let mut edit = before.edit_read_only_recommended().unwrap();
+    assert_eq!(edit.set(true).unwrap(), None);
+    let commit = edit.commit().unwrap();
+    let after = commit.package();
+    let after_events = xml_event_count(after.opc().unwrap().get_part(&properties).unwrap().blob());
+    assert!(after_events > before_events);
+
+    let tight_limits = SourceLimits::builder()
+        .max_events(before_events + 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let tight = Package::from_bytes_with_options(
+        &before_bytes,
+        OpenOptions::default().source_limits(tight_limits),
+    )
+    .expect("the original owner fits the recipient profile");
+    let unchanged = tight.to_bytes().unwrap();
+    let refusal = tight.apply_read_only_recommended(commit.patch());
+    assert!(
+        matches!(refusal, Err(Error::Limit { .. }) | Err(Error::Opc(_))),
+        "expanded readonly owner must be refused by a typed bound"
+    );
+    assert_eq!(tight.to_bytes().unwrap(), unchanged);
+
+    let permissive = Package::from_bytes(&before_bytes).unwrap();
+    let replayed = permissive
+        .apply_read_only_recommended(commit.patch())
+        .expect("a permissive recipient admits the same patch")
+        .into_package();
+    assert_eq!(replayed.read_only_recommended().unwrap(), Some(true));
+
+    let noop = Package::new()
+        .unwrap()
+        .edit_read_only_recommended()
+        .unwrap()
+        .commit()
+        .unwrap();
+    let noop_source = permissive.to_bytes().unwrap();
+    let unchanged_noop = permissive
+        .apply_read_only_recommended(noop.patch())
+        .expect("no-op replay does not require a semantic scan")
+        .into_package();
+    assert_eq!(unchanged_noop.to_bytes().unwrap(), noop_source);
 }
 
 #[test]

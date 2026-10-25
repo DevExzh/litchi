@@ -127,13 +127,21 @@ impl Draft {
                 continue;
             }
             target = match new.modification_id() {
-                Some(id) => codec::set_shape(&target, position, id)?,
-                None => codec::remove_shape(&target, position)?,
+                Some(id) => {
+                    codec::set_shape_with_limits(&target, position, id, self.original.shape_limits)?
+                },
+                None => {
+                    codec::remove_shape_with_limits(&target, position, self.original.shape_limits)?
+                },
             };
             changed_identifiers += 1;
         }
 
-        let snapshot = Snapshot::from_source(self.original.owner.clone(), target.clone())?;
+        let snapshot = Snapshot::from_source_with_limits(
+            self.original.owner.clone(),
+            target.clone(),
+            self.original.shape_limits,
+        )?;
         if snapshot.state != self.working {
             return Err(Error::Invalid(
                 "change-tracking candidate did not round-trip to the requested state".into(),

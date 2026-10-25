@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
-use super::model::{Limits, Snapshot, capture, invalid, packages_equal, relationships_equal};
+use super::model::{Limits, Snapshot, invalid, packages_equal, relationships_equal};
 use crate::{Error, Result};
 
 mod metadata;
@@ -1324,7 +1324,24 @@ pub(crate) fn apply(
     patch: &Patch,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    apply_with_revision(package, patch, None, None, physical_source_provenance, None)
+    apply_with_semantic_limits(package, patch, physical_source_provenance, None)
+}
+
+pub(crate) fn apply_with_semantic_limits(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<Snapshot> {
+    apply_with_revision(
+        package,
+        patch,
+        None,
+        None,
+        physical_source_provenance,
+        None,
+        semantic_limits,
+    )
 }
 
 /// Build an immutable replay result using the destination's retained memo.
@@ -1335,6 +1352,16 @@ pub(crate) fn apply_to_new(
     physical_source_provenance: bool,
     parent: &super::model::PartDigests,
 ) -> Result<(OpcPackage, Snapshot)> {
+    apply_to_new_with_semantic_limits(package, patch, physical_source_provenance, parent, None)
+}
+
+pub(crate) fn apply_to_new_with_semantic_limits(
+    package: &OpcPackage,
+    patch: &Patch,
+    physical_source_provenance: bool,
+    parent: &super::model::PartDigests,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<(OpcPackage, Snapshot)> {
     applied_with_revision(
         package,
         patch,
@@ -1342,6 +1369,7 @@ pub(crate) fn apply_to_new(
         None,
         physical_source_provenance,
         Some(parent),
+        semantic_limits,
     )
 }
 
@@ -1351,6 +1379,22 @@ pub(crate) fn apply_exact_revision(
     result_revision: [u8; 32],
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
+    apply_exact_revision_with_semantic_limits(
+        package,
+        patch,
+        result_revision,
+        physical_source_provenance,
+        None,
+    )
+}
+
+pub(crate) fn apply_exact_revision_with_semantic_limits(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    result_revision: [u8; 32],
+    physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+) -> Result<Snapshot> {
     apply_with_revision(
         package,
         patch,
@@ -1358,6 +1402,7 @@ pub(crate) fn apply_exact_revision(
         None,
         physical_source_provenance,
         None,
+        semantic_limits,
     )
 }
 
@@ -1369,10 +1414,12 @@ fn capture_candidate(
     physical_source_provenance: bool,
     committed: Option<&Snapshot>,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     if let Some(committed) = committed
         && committed.limits == limits
         && committed.physical_source_provenance == physical_source_provenance
+        && committed.semantic_limits() == crate::open_options::selected(semantic_limits.as_ref())
         && packages_equal(committed.package.as_ref(), candidate)
     {
         return Ok(committed.rebound_to(candidate));
@@ -1384,13 +1431,19 @@ fn capture_candidate(
         .map(|snapshot| snapshot.part_digests.as_ref())
         .or(parent)
     {
-        Some(parent) => super::model::capture_with_parent_digests(
+        Some(parent) => super::model::capture_with_parent_digests_and_semantic_limits(
             candidate,
             limits,
             physical_source_provenance,
             parent,
+            semantic_limits,
         ),
-        None => capture(candidate, limits, physical_source_provenance),
+        None => super::model::capture_with_provenance_and_semantic_limits(
+            candidate,
+            limits,
+            physical_source_provenance,
+            semantic_limits,
+        ),
     }
 }
 
@@ -1412,6 +1465,7 @@ pub(crate) fn validate_candidate(
     result_revision: [u8; 32],
     physical_source_provenance: bool,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(source)?
         .part()
@@ -1424,13 +1478,19 @@ pub(crate) fn validate_candidate(
     }
     validate_before(source, patch)?;
     let snapshot = match parent {
-        Some(parent) => super::model::capture_with_parent_digests(
+        Some(parent) => super::model::capture_with_parent_digests_and_semantic_limits(
             candidate,
             patch.limits,
             physical_source_provenance,
             parent,
+            semantic_limits,
         )?,
-        None => capture(candidate, patch.limits, physical_source_provenance)?,
+        None => super::model::capture_with_provenance_and_semantic_limits(
+            candidate,
+            patch.limits,
+            physical_source_provenance,
+            semantic_limits,
+        )?,
     };
     validate_after(candidate, patch)?;
     if snapshot.revision() != result_revision {
@@ -1448,6 +1508,7 @@ fn apply_with_revision(
     committed: Option<&Snapshot>,
     physical_source_provenance: bool,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     let (candidate, snapshot) = applied_with_revision(
         package,
@@ -1456,6 +1517,7 @@ fn apply_with_revision(
         committed,
         physical_source_provenance,
         parent,
+        semantic_limits,
     )?;
     *package = candidate;
     Ok(snapshot)
@@ -1468,6 +1530,7 @@ fn applied_with_revision(
     committed: Option<&Snapshot>,
     physical_source_provenance: bool,
     parent: Option<&super::model::PartDigests>,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<(OpcPackage, Snapshot)> {
     let current_main = crate::parts::PresentationPart::from_package(package)?
         .part()
@@ -1486,6 +1549,7 @@ fn applied_with_revision(
             physical_source_provenance,
             committed,
             parent,
+            semantic_limits,
         )?;
         if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
             return Err(invalid(
@@ -1540,6 +1604,7 @@ fn applied_with_revision(
         physical_source_provenance,
         committed,
         parent,
+        semantic_limits,
     )?;
     validate_after(&candidate, patch)?;
     if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
