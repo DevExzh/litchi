@@ -363,11 +363,7 @@ fn map_bnc_cell_error(error: litchi_numbers_wire::Error) -> NativeReplyError {
     }
 }
 
-fn encode_bnc_cell(
-    cell: &BncCell,
-    source: &[u8],
-    maximum: usize,
-) -> Result<Vec<u8>> {
+fn encode_bnc_cell(cell: &BncCell, source: &[u8], maximum: usize) -> Result<Vec<u8>> {
     let limits = crate::cell::wire::limits_for_source(source)
         .with_output_bytes(maximum)
         .map_err(|_| NativeReplyError::InvalidSource)?;

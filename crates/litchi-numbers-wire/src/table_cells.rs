@@ -11,9 +11,9 @@ use std::collections::HashSet;
 
 use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;
 
-use crate::{LimitKind, Limits};
 use crate::cell_value::{self, CellValueSource};
 pub use crate::table_data_list::Message;
+use crate::{LimitKind, Limits};
 
 /// Native message type for one table tile.
 pub const TILE_MESSAGE_KIND: u32 = 6_002;

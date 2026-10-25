@@ -1583,8 +1583,9 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
 
 const fn map_raw_limit_kind(kind: litchi_numbers_wire::LimitKind) -> LimitKind {
     match kind {
-        litchi_numbers_wire::LimitKind::InputBytes
-        | litchi_numbers_wire::LimitKind::TailBytes => LimitKind::WireBytes,
+        litchi_numbers_wire::LimitKind::InputBytes | litchi_numbers_wire::LimitKind::TailBytes => {
+            LimitKind::WireBytes
+        },
         litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
         litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
         litchi_numbers_wire::LimitKind::Items => LimitKind::PayloadItems,
