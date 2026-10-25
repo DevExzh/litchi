@@ -44,6 +44,8 @@ _path = legacy._path
 _sha256_file = legacy._sha256_file
 _under = legacy._under
 _write_json = legacy._write_json
+PROTOCOL_TOOL_PATHS = tuple(generic.DRAWINGML_V2_PROTOCOL_TOOL_PATHS)
+_protocol_tool_identities = generic._drawingml_v2_protocol_tool_identities
 
 
 SCHEMA = "litchi.drawingml.raw-qualification.manifest.v2"
@@ -74,6 +76,8 @@ CURRENT_FEATURES = (
     "drawingml-transform-limits-current",
     "drawingml-raw-current",
 )
+VALIDATOR_RELATIVE = "tools/native_qualification/drawingml_raw_validator_v2.py"
+COMPILE_DRIVER_RELATIVE = "tools/native_qualification/drawingml_compile_driver_v2.py"
 
 
 def _require_policy_binding(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -110,6 +114,23 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
         raise RunnerError(f"manifest schema must be {SCHEMA!r}")
     if data.get("plan_path") != PLAN_PATH or data.get("plan_sha256") != PLAN_SHA256:
         raise RunnerError("external DrawingML qualification plan identity differs")
+    protocol_root = _path(str(data.get("protocol_root", "")))
+    if not protocol_root.is_dir():
+        raise RunnerError(f"protocol_root is not a directory: {protocol_root}")
+    expected_runner = (protocol_root / "tools/native_qualification/drawingml_raw_paired_runner_v2.py").resolve()
+    if expected_runner != Path(__file__).resolve():
+        raise RunnerError("v2 paired runner is not executed from the bound protocol root")
+    expected_compile_driver = str((protocol_root / COMPILE_DRIVER_RELATIVE).resolve())
+    try:
+        compile_driver_module = _path(str(data.get("compile_driver_module", "")))
+    except RunnerError as error:
+        raise RunnerError(f"v2 compile driver path is invalid: {error}") from error
+    if compile_driver_module != Path(expected_compile_driver):
+        raise RunnerError("v2 compile driver is not bound to the protocol root")
+    try:
+        protocol_tools = _protocol_tool_identities(protocol_root)
+    except RunnerError as error:
+        raise RunnerError(f"protocol tool identity failed: {error}") from error
     profile_values = data.get("profiles")
     if not isinstance(profile_values, list):
         raise RunnerError("manifest profiles must be a list")
@@ -154,6 +175,13 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
         for right_name, right in names[index + 1 :]:
             if left == right or _under(left, right) or _under(right, left):
                 raise RunnerError(f"v2 source/output paths overlap: {left_name} and {right_name}")
+    for label, path in (
+        ("candidate_root", candidate_root),
+        ("output_dir", output),
+        ("target_root", target_root),
+    ):
+        if path == protocol_root or _under(path, protocol_root) or _under(protocol_root, path):
+            raise RunnerError(f"protocol_root overlaps {label}")
     fixture = _path(
         "tools/native_qualification/fixtures/drawingml_raw_fixtures.json",
         base=candidate_root,
@@ -183,7 +211,13 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
             )
         profile_specs.extend(values)
     profile_ids: set[str] = set()
-    source_paths = {"candidate": candidate_root, "trusted": trusted_root, "output": output, "target": target_root}
+    source_paths = {
+        "candidate": candidate_root,
+        "trusted": trusted_root,
+        "protocol": protocol_root,
+        "output": output,
+        "target": target_root,
+    }
     for profile in profile_specs:
         if not isinstance(profile, dict):
             raise RunnerError("profile must be an object")
@@ -308,6 +342,9 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
         "candidate_root": candidate_root,
         "candidate_revision": candidate_revision,
         "trusted_root": trusted_root,
+        "protocol_root": protocol_root,
+        "protocol_tools": protocol_tools,
+        "compile_driver_module": expected_compile_driver,
         "baseline_workspace_lock_sha256": data["baseline_workspace_lock_sha256"],
         "baseline_workspace_lock_bytes": data["baseline_workspace_lock_bytes"],
         "candidate_workspace_lock_sha256": data["candidate_workspace_lock_sha256"],
@@ -328,6 +365,8 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
     value = legacy._profile_manifest(master, profile, output)
     value["drawingml_protocol_version"] = 2
     value["drawingml_trusted_root"] = str(master["trusted_root"])
+    value["drawingml_protocol_root"] = str(master["protocol_root"])
+    value["drawingml_protocol_tools"] = dict(master["protocol_tools"])
     value["shared"]["probe_paths"] = list(PROBE_PATHS)
     value["shared"]["preparation_receipt"] = str(profile["preparation_receipt"])
     for leg in ("before", "after"):
@@ -339,7 +378,7 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
         value["legs"][leg]["allowed_dirty_paths"] = list(ADAPTER_PATHS)
         value["legs"][leg]["lock_paths"] = list(ROLE_LOCK_PATHS)
     validator = value["validators"][0]
-    script = "{source_root}/tools/native_qualification/drawingml_raw_validator_v2.py"
+    script = str(Path(master["protocol_root"]) / VALIDATOR_RELATIVE)
     validator["argv"][1] = script
     validator["script"] = script
     validator["argv"].extend([
@@ -467,6 +506,9 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
             "candidate_root": str(master["candidate_root"]),
             "candidate_revision": master["candidate_revision"],
             "trusted_root": str(master["trusted_root"]),
+            "protocol_root": str(master["protocol_root"]),
+            "protocol_tools": master["protocol_tools"],
+            "compile_driver_module": master["compile_driver_module"],
             "role_locks": preparation.ROLE_LOCKS,
             "probe_copy_paths": list(ADAPTER_PATHS),
             "abba_order": list(ABBA),
@@ -501,6 +543,9 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
             "candidate_root": str(master["candidate_root"]),
             "candidate_revision": master["candidate_revision"],
             "trusted_root": str(master["trusted_root"]),
+            "protocol_root": str(master["protocol_root"]),
+            "protocol_tools": master["protocol_tools"],
+            "compile_driver_module": master["compile_driver_module"],
             "role_locks": preparation.ROLE_LOCKS,
             "children": profile_receipts,
             "error": str(error),

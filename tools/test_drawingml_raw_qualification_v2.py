@@ -30,6 +30,10 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+        manifest["protocol_root"] = str(ROOT)
+        manifest["compile_driver_module"] = str(
+            (ROOT / "tools/native_qualification/drawingml_compile_driver_v2.py").resolve()
+        )
         candidate = root / "candidate"
         trusted = root / "trusted"
         output = root / "output"
@@ -74,6 +78,15 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
     def test_valid_v2_master_and_profile_preserve_protocol_routes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="drawingml-v2-master-") as name:
             data, binding = self._master_fixture(Path(name))
+            candidate_validator = (
+                Path(data["candidate_root"])
+                / "tools/native_qualification/drawingml_raw_validator_v2.py"
+            )
+            candidate_validator.parent.mkdir(parents=True, exist_ok=True)
+            candidate_validator.write_text(
+                "raise RuntimeError('candidate policy must never be imported')\n",
+                encoding="utf-8",
+            )
             with mock.patch.object(policy, "CANDIDATE_BINDING", binding):
                 master = paired._validate_master(data)
                 profile = paired._profile_manifest(
@@ -83,6 +96,18 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                 )
             self.assertEqual(master["candidate_revision"], binding["revision"])
             self.assertEqual(profile["drawingml_protocol_version"], 2)
+            self.assertEqual(profile["drawingml_protocol_root"], str(ROOT))
+            validator_script = Path(profile["validators"][0]["script"])
+            self.assertEqual(
+                validator_script,
+                ROOT / "tools/native_qualification/drawingml_raw_validator_v2.py",
+            )
+            self.assertNotIn(str(data["candidate_root"]), str(validator_script))
+            self.assertNotIn("candidate policy must never be imported", validator_script.read_text())
+            self.assertEqual(
+                master["compile_driver_module"],
+                str(ROOT / "tools/native_qualification/drawingml_compile_driver_v2.py"),
+            )
             self.assertEqual(profile["shared"]["probe_paths"], list(policy.PROBE_COPY_PATHS))
             self.assertEqual(profile["legs"]["before"]["lock_paths"], list(policy.ROLE_LOCK_PATHS))
             with (
@@ -92,6 +117,15 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                 paired.generic._validate_drawingml_raw_workload(profile)
             with self.assertRaisesRegex(paired.generic.RunnerError, "candidate policy is incomplete"):
                 paired.generic._validate_drawingml_raw_workload(profile)
+
+            bad_compile_module = copy.deepcopy(data)
+            bad_compile_module["compile_driver_module"] = str(
+                Path(data["candidate_root"])
+                / "tools/native_qualification/drawingml_compile_driver_v2.py"
+            )
+            with mock.patch.object(policy, "CANDIDATE_BINDING", binding):
+                with self.assertRaisesRegex(paired.RunnerError, "compile driver"):
+                    paired._validate_master(bad_compile_module)
 
     def test_candidate_identity_cannot_be_overridden_by_manifest(self) -> None:
         with tempfile.TemporaryDirectory(prefix="drawingml-v2-identity-") as name:
@@ -263,6 +297,7 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                     "baseline_revision": next(iter(policy.APPROVED_BASELINE_REVISIONS)),
                     "candidate_revision": "a" * 40,
                     "trusted_root": str(trusted),
+                    "probe_root": str(root / "probe"),
                     "source_root": str(candidate),
                     "source_revision": "a" * 40,
                 },
@@ -287,6 +322,15 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
             trusted = root / "trusted"
             for path in (baseline, candidate, trusted):
                 path.mkdir()
+            probe_root = root / "probe"
+            for relative in policy.PROBE_COPY_PATHS:
+                path = probe_root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(f"probe:{relative}\n".encode())
+            probe_identities = {
+                relative: policy._file_identity(probe_root, relative)
+                for relative in policy.PROBE_COPY_PATHS
+            }
             preparation_receipt = root / "preparation.json"
             preparation_receipt.write_text(
                 json.dumps({"schema": policy.SCHEMA, "protocol_version": 2}) + "\n",
@@ -296,7 +340,11 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
             candidate_revision = "a" * 40
             prepared = {
                 "baseline": {"root": str(baseline.resolve()), "head": baseline_revision},
-                "candidate": {"root": str(candidate.resolve()), "head": candidate_revision},
+                "candidate": {
+                    "root": str(candidate.resolve()),
+                    "head": candidate_revision,
+                    "probe_identities": probe_identities,
+                },
             }
             arguments = type(
                 "Arguments",
@@ -309,6 +357,7 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                     "baseline_revision": baseline_revision,
                     "candidate_revision": candidate_revision,
                     "trusted_root": str(trusted),
+                    "probe_root": str(probe_root),
                     "source_root": str(candidate),
                     "source_revision": candidate_revision,
                     "output": str(root / "compile.json"),
@@ -326,6 +375,30 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                                 "root": str(Path(arguments.source_root).resolve()),
                                 "revision": arguments.source_revision,
                             },
+                            "adapter": {
+                                "probe": {
+                                    "path": str(
+                                        (probe_root / compile_driver.PROBE_RELATIVE_PATH).resolve()
+                                    ),
+                                    "sha256": probe_identities[
+                                        str(compile_driver.PROBE_RELATIVE_PATH)
+                                    ]["sha256"],
+                                    "bytes": probe_identities[
+                                        str(compile_driver.PROBE_RELATIVE_PATH)
+                                    ]["bytes"],
+                                },
+                                "allocator": {
+                                    "path": str(
+                                        (probe_root / compile_driver.ALLOCATOR_RELATIVE_PATH).resolve()
+                                    ),
+                                    "sha256": probe_identities[
+                                        str(compile_driver.ALLOCATOR_RELATIVE_PATH)
+                                    ]["sha256"],
+                                    "bytes": probe_identities[
+                                        str(compile_driver.ALLOCATOR_RELATIVE_PATH)
+                                    ]["bytes"],
+                                },
+                            },
                         }
                     )
                     + "\n",
@@ -340,6 +413,22 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
             ):
                 self.assertEqual(compile_driver._compile(arguments), 0)
 
+            bad_probe_root = root / "bad-probe"
+            for relative in policy.PROBE_COPY_PATHS:
+                path = bad_probe_root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"unbound probe\n")
+            bad_arguments = copy.copy(arguments)
+            bad_arguments.probe_root = str(bad_probe_root)
+            with (
+                mock.patch.object(policy, "validate_preparation_receipt", return_value=prepared),
+                mock.patch.object(compile_driver, "_policy_revision"),
+                mock.patch.object(compile_driver.legacy, "_compile") as legacy_compile,
+            ):
+                with self.assertRaisesRegex(compile_driver.DriverError, "probe root"):
+                    compile_driver._compile(bad_arguments)
+            legacy_compile.assert_not_called()
+
             with (
                 mock.patch.object(policy, "validate_preparation_receipt", return_value=prepared),
             ):
@@ -351,6 +440,7 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                     baseline_revision=baseline_revision,
                     candidate_revision=candidate_revision,
                     trusted_root=trusted,
+                    probe_root=probe_root,
                     role="candidate",
                 )
             self.assertEqual(consumed["policy"], compile_driver._receipt_policy("compile", "candidate"))
@@ -368,6 +458,24 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                         baseline_revision=baseline_revision,
                         candidate_revision=candidate_revision,
                         trusted_root=trusted,
+                        probe_root=probe_root,
+                        role="candidate",
+                    )
+
+            tampered = json.loads(Path(arguments.output).read_text(encoding="utf-8"))
+            tampered["adapter"]["probe"]["sha256"] = "0" * 64
+            Path(arguments.output).write_text(json.dumps(tampered) + "\n", encoding="utf-8")
+            with mock.patch.object(policy, "validate_preparation_receipt", return_value=prepared):
+                with self.assertRaisesRegex(compile_driver.DriverError, "adapter identity"):
+                    compile_driver.validate_compile_receipt(
+                        Path(arguments.output),
+                        preparation_receipt=preparation_receipt,
+                        baseline_root=baseline,
+                        candidate_root=candidate,
+                        baseline_revision=baseline_revision,
+                        candidate_revision=candidate_revision,
+                        trusted_root=trusted,
+                        probe_root=probe_root,
                         role="candidate",
                     )
 
@@ -393,6 +501,7 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
         pending_manifest = ROOT / "tools/native_qualification/manifests/drawingml-raw-v2.json"
         with tempfile.TemporaryDirectory(prefix="drawingml-v2-cli-") as name:
             env = clean_env.copy()
+            env["LITCHI_NATIVE_QUAL_ROOT"] = str(ROOT)
             for key in (
                 "DRAWINGML_CANDIDATE_ROOT",
                 "DRAWINGML_CANDIDATE_REVISION",

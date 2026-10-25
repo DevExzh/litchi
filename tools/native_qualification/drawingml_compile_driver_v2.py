@@ -35,6 +35,7 @@ PROBE_RELATIVE_PATH = legacy.PROBE_RELATIVE_PATH
 ALLOCATOR_RELATIVE_PATH = legacy.ALLOCATOR_RELATIVE_PATH
 DriverError = legacy.DriverError
 _sha256 = legacy._sha256
+PROBE_PATHS = tuple(policy.PROBE_COPY_PATHS)
 
 
 def _historical_source_policy() -> dict[str, Any]:
@@ -72,6 +73,41 @@ def _toolchain_identity(root: Path) -> dict[str, dict[str, Any]]:
     return identities
 
 
+def _probe_identities(root: Path) -> dict[str, dict[str, Any]]:
+    root = root.resolve(strict=False)
+    if root.is_symlink() or not root.is_dir():
+        raise DriverError(f"v2 probe root is not a regular directory: {root}")
+    try:
+        return {relative: policy._file_identity(root, relative) for relative in PROBE_PATHS}
+    except (OSError, ValueError) as error:
+        raise DriverError(f"v2 probe identity validation failed: {error}") from error
+
+
+def _validate_adapter_receipt(
+    value: Mapping[str, Any],
+    *,
+    probe_root: Path,
+    probe_identities: Mapping[str, Mapping[str, Any]],
+) -> None:
+    adapter = value.get("adapter")
+    if not isinstance(adapter, Mapping):
+        raise DriverError("v2 compile receipt has no adapter identity")
+    for label, relative in (
+        ("probe", str(PROBE_RELATIVE_PATH)),
+        ("allocator", str(ALLOCATOR_RELATIVE_PATH)),
+    ):
+        expected = probe_identities.get(relative)
+        observed = adapter.get(label)
+        if not isinstance(expected, Mapping) or not isinstance(observed, Mapping):
+            raise DriverError(f"v2 compile receipt lacks the {label} probe identity")
+        if (
+            observed.get("sha256") != expected.get("sha256")
+            or observed.get("bytes") != expected.get("bytes")
+            or Path(str(observed.get("path", ""))).resolve() != (probe_root / relative).resolve()
+        ):
+            raise DriverError(f"v2 compile receipt {label} adapter identity differs")
+
+
 def _driver_identity() -> dict[str, Any]:
     path = Path(__file__).resolve()
     payload = path.read_bytes()
@@ -105,6 +141,7 @@ def _validate_preparation(arguments: argparse.Namespace) -> dict[str, Any]:
         "baseline_revision",
         "candidate_revision",
         "trusted_root",
+        "probe_root",
     )
     if any(not isinstance(getattr(arguments, name, None), str) for name in required):
         raise DriverError("v2 compile requires its complete preparation receipt/source binding")
@@ -139,6 +176,13 @@ def _validate_preparation(arguments: argparse.Namespace) -> dict[str, Any]:
         raise DriverError(f"v2 preparation receipt has no {arguments.role} source identity")
     if identity.get("root") != str(actual_root) or identity.get("head") != expected_revision:
         raise DriverError(f"v2 {arguments.role} source identity differs from the compile request")
+    probe_identities = _probe_identities(Path(arguments.probe_root))
+    identity_key = "probe_identities" if arguments.role == "candidate" else "probe_paths"
+    expected_probe_identities = identity.get(identity_key)
+    if expected_probe_identities != probe_identities:
+        raise DriverError(
+            f"v2 {arguments.role} probe root differs from its prepared eight-file identity"
+        )
     return receipt
 
 
@@ -166,6 +210,8 @@ def _rewrite_receipt(
     role: str | None,
     preparation_path: Path,
     preparation_receipt: Mapping[str, Any],
+    probe_root: Path,
+    probe_identities: Mapping[str, Mapping[str, Any]],
 ) -> None:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -180,6 +226,13 @@ def _rewrite_receipt(
         raise DriverError("v2 compile-driver receipt lacks its role source identity")
     value["source_identity"] = role_identity
     value["preparation"] = _receipt_artifact(preparation_path)
+    _validate_adapter_receipt(
+        value,
+        probe_root=probe_root,
+        probe_identities=probe_identities,
+    )
+    value["probe_root"] = str(probe_root.resolve())
+    value["probe_identities"] = dict(probe_identities)
     value["policy"] = _receipt_policy(operation, role)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -193,6 +246,7 @@ def validate_compile_receipt(
     baseline_revision: str,
     candidate_revision: str,
     trusted_root: Path,
+    probe_root: Path,
     role: str,
 ) -> dict[str, Any]:
     """Consume a v2 compile receipt without accepting a relabelled v1 file."""
@@ -209,6 +263,7 @@ def validate_compile_receipt(
             "baseline_revision": baseline_revision,
             "candidate_revision": candidate_revision,
             "trusted_root": str(trusted_root),
+            "probe_root": str(probe_root),
             "role": role,
             "source_root": str(baseline_root if role == "baseline" else candidate_root),
             "source_revision": baseline_revision if role == "baseline" else candidate_revision,
@@ -240,6 +295,17 @@ def validate_compile_receipt(
     expected_preparation = _receipt_artifact(preparation_receipt)
     if preparation_identity != expected_preparation:
         raise DriverError("compile receipt preparation identity differs")
+    expected_probe_root = probe_root.resolve()
+    if value.get("probe_root") != str(expected_probe_root):
+        raise DriverError("compile receipt probe root differs")
+    probe_identities = _probe_identities(probe_root)
+    if value.get("probe_identities") != probe_identities:
+        raise DriverError("compile receipt probe identities differ")
+    _validate_adapter_receipt(
+        value,
+        probe_root=expected_probe_root,
+        probe_identities=probe_identities,
+    )
     policy_value = value.get("policy")
     if policy_value != _receipt_policy("compile", role):
         raise DriverError("compile receipt v2 policy projection differs")
@@ -291,6 +357,7 @@ def _prepare_source(arguments: argparse.Namespace) -> int:
 
 def _compile(arguments: argparse.Namespace) -> int:
     prepared = _validate_preparation(arguments)
+    probe_identities = _probe_identities(Path(arguments.probe_root))
     _policy_revision(arguments.source_revision, arguments.role)
     original_schema = legacy.SCHEMA
     legacy.SCHEMA = SCHEMA
@@ -304,6 +371,8 @@ def _compile(arguments: argparse.Namespace) -> int:
         arguments.role,
         Path(arguments.preparation_receipt),
         prepared,
+        Path(arguments.probe_root),
+        probe_identities,
     )
     return result
 

@@ -51,6 +51,18 @@ from native_qualification.prepare_xlsx_raw_inputs import (
 
 SCHEMA = "litchi.native-qualification.v1"
 ABBA_ORDER = ("before", "after", "after", "before")
+# The v2 DrawingML validator and its imports must come from the pinned
+# protocol checkout, never from either source leg.  Keep this list explicit so
+# a candidate cannot replace one of the policy modules through its own tree.
+DRAWINGML_V2_PROTOCOL_TOOL_PATHS = (
+    "tools/native_qualification_runner.py",
+    "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
+    "tools/native_qualification/drawingml_raw_validator_v2.py",
+    "tools/native_qualification/drawingml_compile_driver_v2.py",
+    "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
+    "tools/native_qualification/drawingml_raw_paired_runner.py",
+    "tools/native_qualification/drawingml_raw_validator.py",
+)
 ROUNDS = 31
 TARGET_PREFLIGHT_BYTES = 19_200_000_000
 TARGET_HARD_LIMIT_BYTES = 20_000_000_000
@@ -153,6 +165,20 @@ def _sha256_file(path: Path) -> tuple[str, int]:
             digest.update(block)
             size += len(block)
     return digest.hexdigest(), size
+
+
+def _drawingml_v2_protocol_tool_identities(root: Path) -> dict[str, dict[str, Any]]:
+    root = root.resolve(strict=False)
+    identities: dict[str, dict[str, Any]] = {}
+    for relative in DRAWINGML_V2_PROTOCOL_TOOL_PATHS:
+        path = root / relative
+        digest, size = _sha256_file(path)
+        identities[relative] = {
+            "path": str(path.resolve()),
+            "sha256": digest,
+            "bytes": size,
+        }
+    return identities
 
 
 _UNTRACKED_UPSTREAM_COMPONENT = "3rd" + "party"
@@ -740,12 +766,29 @@ def _validate_drawingml_v2_policy(data: Mapping[str, Any]) -> None:
     receipt validation.
     """
 
-    from native_qualification import prepare_drawingml_raw_inputs_v2 as preparation
-
     shared = data.get("shared")
     legs = data.get("legs")
     if not isinstance(shared, Mapping) or not isinstance(legs, Mapping):
         raise RunnerError("DrawingML v2 policy needs shared and legs objects")
+    protocol_root_value = data.get("drawingml_protocol_root")
+    protocol_tools = data.get("drawingml_protocol_tools")
+    if not isinstance(protocol_root_value, str) or not protocol_root_value:
+        raise RunnerError("DrawingML v2 policy needs its pinned protocol root")
+    if not isinstance(protocol_tools, Mapping):
+        raise RunnerError("DrawingML v2 policy needs pinned protocol tool identities")
+    protocol_root = _resolve_path(protocol_root_value)
+    if not protocol_root.is_dir():
+        raise RunnerError(f"DrawingML v2 protocol root is not a directory: {protocol_root}")
+    expected_generic = (protocol_root / "tools/native_qualification_runner.py").resolve()
+    if expected_generic != Path(__file__).resolve():
+        raise RunnerError("DrawingML v2 generic runner is not executed from the bound protocol root")
+    from native_qualification import prepare_drawingml_raw_inputs_v2 as preparation
+    try:
+        expected_tools = _drawingml_v2_protocol_tool_identities(protocol_root)
+    except RunnerError as error:
+        raise RunnerError(f"DrawingML v2 protocol tool identity failed: {error}") from error
+    if dict(protocol_tools) != expected_tools:
+        raise RunnerError("DrawingML v2 protocol tool identities differ")
     receipt_value = shared.get("preparation_receipt")
     trusted_root = data.get("drawingml_trusted_root")
     before = legs.get("before")
@@ -770,6 +813,12 @@ def _validate_drawingml_v2_policy(data: Mapping[str, Any]) -> None:
     )
     if not all(isinstance(value, str) and value for value in values):
         raise RunnerError("DrawingML v2 policy is missing a bound source/receipt identity")
+    for leg_name, leg in (("before", before), ("after", after)):
+        leg_root = _resolve_path(str(leg["source_root"]))
+        if _overlap(protocol_root, leg_root):
+            raise RunnerError(
+                f"DrawingML v2 protocol root overlaps the {leg_name} source root"
+            )
     for leg_name, leg in (("before", before), ("after", after)):
         if leg.get("allowed_dirty_paths") != list(preparation.PROBE_COPY_PATHS):
             raise RunnerError(f"DrawingML v2 {leg_name} dirty-path policy differs")
@@ -1047,7 +1096,11 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("DrawingML raw validator output/cwd differs")
     expected_validator_argv = [
         "python3",
-        "{source_root}/" + validator_relative,
+        str(
+            _resolve_path(str(data["drawingml_protocol_root"])) / validator_relative
+        )
+        if protocol_version == 2
+        else "{source_root}/" + validator_relative,
         "--output-dir",
         "{output_dir}",
         "--lane",
@@ -1078,7 +1131,12 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         ])
     if validator.get("argv") != expected_validator_argv:
         raise RunnerError("DrawingML raw validator is not bound to both source revisions and its fence")
-    if validator.get("script") != "{source_root}/" + validator_relative:
+    expected_validator_script = (
+        str(_resolve_path(str(data["drawingml_protocol_root"])) / validator_relative)
+        if protocol_version == 2
+        else "{source_root}/" + validator_relative
+    )
+    if validator.get("script") != expected_validator_script:
         raise RunnerError("DrawingML raw validator script path differs")
     if validator.get("require_stdout") is not False:
         raise RunnerError("DrawingML raw validator must write summary.json, not claim stdout")

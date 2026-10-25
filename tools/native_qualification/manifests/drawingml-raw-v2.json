@@ -1,10 +1,11 @@
 {
   "schema": "litchi.drawingml.raw-qualification.manifest.v2",
   "status": "pending_final_candidate_binding",
+  "protocol_root": "${LITCHI_NATIVE_QUAL_ROOT}",
   "preparation_module": "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
   "runner_module": "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
   "validator_module": "tools/native_qualification/drawingml_raw_validator_v2.py",
-  "compile_driver_module": "tools/native_qualification/drawingml_compile_driver_v2.py",
+  "compile_driver_module": "${LITCHI_NATIVE_QUAL_ROOT}/tools/native_qualification/drawingml_compile_driver_v2.py",
   "plan_path": "docs/unified-ops/results/0362dvie/qualification-plan.json",
   "plan_sha256": "e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505",
   "candidate_root": "${DRAWINGML_CANDIDATE_ROOT}",
