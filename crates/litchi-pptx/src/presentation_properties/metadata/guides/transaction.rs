@@ -39,12 +39,18 @@ impl Snapshot {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(source_xml: &[u8], limits: Limits) -> Result<Self> {
-        Self::from_wire(
+        // Admit the borrowed source before retaining it.  In particular, do
+        // not let an oversized caller buffer turn into an owned copy before
+        // the selected input policy has had a chance to reject it.
+        let guides = Guides::from_xml(source_xml, limits)?;
+        let source_xml = Arc::new(source_xml.to_vec());
+        Ok(Self::from_parsed(
             String::new(),
             String::new(),
-            Arc::new(source_xml.to_vec()),
+            source_xml,
+            guides,
             limits,
-        )
+        ))
     }
 
     pub(crate) fn from_wire(
@@ -60,14 +66,30 @@ impl Snapshot {
             });
         }
         let guides = Guides::from_xml(source_xml.as_slice(), limits)?;
-        Ok(Self {
+        Ok(Self::from_parsed(
+            presentation_part_name,
+            presentation_content_type,
+            source_xml,
+            guides,
+            limits,
+        ))
+    }
+
+    fn from_parsed(
+        presentation_part_name: String,
+        presentation_content_type: String,
+        source_xml: Arc<Vec<u8>>,
+        guides: Guides,
+        limits: Limits,
+    ) -> Self {
+        Self {
             presentation_part_name,
             presentation_content_type,
             revision: fingerprint(source_xml.as_slice()),
             source_xml,
             guides,
             limits,
-        })
+        }
     }
 
     /// Borrow the complete typed extended-guide value.

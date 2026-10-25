@@ -14,7 +14,7 @@ use litchi_opc::{OpcPackage, Part};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
-use super::super::{BoundedString, Limits, check_string, checked_output_len};
+use super::super::{BoundedString, Limits, check_string, checked_output_len, escaped_xml_len};
 use super::model::{List, Show};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -199,6 +199,27 @@ pub(crate) fn decode_rewritten(
     Ok((list, layout))
 }
 
+/// Rewrite a detached custom-show value directly against a presentation XML
+/// source.  The structure graph family uses this entry point so that its
+/// graph edit shares the custom-show wire layout: unknown attributes,
+/// children, comments, and whitespace remain in place while known semantic
+/// slots are changed.
+pub(crate) fn rewrite_source(
+    source: &[u8],
+    before: &List,
+    after: &List,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let mut layout = scan_layout(source, limits)?;
+    layout.slide_id_to_relationship = layout
+        .slide_references
+        .iter()
+        .map(|reference| (reference.slide_id, reference.relationship_id.clone()))
+        .collect();
+    validate_list(after, layout.slide_id_to_relationship.keys(), limits)?;
+    rewrite(source, &layout, before, after, limits)
+}
+
 pub(crate) fn rewrite(
     source: &[u8],
     layout: &Layout,
@@ -233,6 +254,14 @@ pub(crate) fn rewrite(
             }
             return Ok(source.to_vec());
         }
+        let rendered_len = render_custom_list_len(layout, after, limits)?;
+        checked_output_len(
+            source.len(),
+            0,
+            rendered_len,
+            limits,
+            "patched custom-show PresentationML source bytes",
+        )?;
         let rendered = render_custom_list(layout, after, limits)?;
         return replace_ranges(
             source,
@@ -245,6 +274,14 @@ pub(crate) fn rewrite(
     };
 
     if custom.span.close_start == custom.span.start {
+        let replacement_len = expand_empty_custom_list_len(source, layout, custom, after, limits)?;
+        checked_output_len(
+            source.len(),
+            custom.span.end - custom.span.start,
+            replacement_len,
+            limits,
+            "patched custom-show PresentationML source bytes",
+        )?;
         let rendered = expand_empty_custom_list(source, layout, custom, after, limits)?;
         return replace_ranges(
             source,
@@ -266,12 +303,74 @@ pub(crate) fn rewrite(
         .iter()
         .map(|show| (show.id, show))
         .collect::<HashMap<_, _>>();
+    let slot_count = custom
+        .children
+        .iter()
+        .filter(|child| child.local == "custShow")
+        .count();
+
+    // Calculate the complete replacement delta before constructing any of
+    // the owned replacement buffers.  A per-show BoundedString is not enough:
+    // several individually valid replacements can still exceed the final
+    // presentation output policy together.
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for (index, slot) in custom
+        .children
+        .iter()
+        .filter(|child| child.local == "custShow")
+        .enumerate()
+    {
+        removed = removed.checked_add(slot.span.end - slot.span.start).ok_or(
+            Error::CapacityOverflow {
+                resource: "patched custom-show PresentationML source bytes",
+            },
+        )?;
+        if let Some(show) = after.shows.get(index) {
+            added = added
+                .checked_add(render_show_len(
+                    source,
+                    layout,
+                    original_by_id.get(&show.id).copied(),
+                    original_values.get(&show.id).copied(),
+                    show,
+                    limits,
+                )?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "patched custom-show PresentationML source bytes",
+                })?;
+        }
+    }
+    if after.shows.len() > slot_count {
+        for show in &after.shows[slot_count..] {
+            added = added
+                .checked_add(render_show_len(
+                    source,
+                    layout,
+                    original_by_id.get(&show.id).copied(),
+                    original_values.get(&show.id).copied(),
+                    show,
+                    limits,
+                )?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "patched custom-show PresentationML source bytes",
+                })?;
+        }
+    }
+    checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "patched custom-show PresentationML source bytes",
+    )?;
+
     let slots = custom
         .children
         .iter()
         .filter(|child| child.local == "custShow")
         .collect::<Vec<_>>();
-    let mut replacements = Vec::with_capacity(slots.len() + 1);
+    let mut replacements = Vec::with_capacity(slot_count + 1);
 
     for (index, slot) in slots.iter().enumerate() {
         let rendered = after
@@ -996,6 +1095,48 @@ fn render_custom_list(layout: &Layout, list: &List, limits: Limits) -> Result<St
     Ok(value.finish())
 }
 
+fn render_custom_list_len(layout: &Layout, list: &List, limits: Limits) -> Result<usize> {
+    let name = qualified_len(&layout.p_prefix, "custShowLst", limits)?;
+    let p_prefix = layout.p_prefix.len();
+    let r_prefix = layout.r_prefix.len();
+    let p_namespace = escaped_xml_len(&layout.p_namespace)?;
+    let r_namespace = escaped_xml_len(&layout.r_namespace)?;
+    let mut length = 1usize
+        .checked_add(name)
+        .and_then(|value| value.checked_add(b" xmlns:".len()))
+        .and_then(|value| value.checked_add(p_prefix))
+        .and_then(|value| value.checked_add(b"=\"".len()))
+        .and_then(|value| value.checked_add(p_namespace))
+        .and_then(|value| value.checked_add(b"\" xmlns:".len()))
+        .and_then(|value| value.checked_add(r_prefix))
+        .and_then(|value| value.checked_add(b"=\"".len()))
+        .and_then(|value| value.checked_add(r_namespace))
+        .and_then(|value| value.checked_add(b"\">".len()))
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })?;
+    // The prefixes are checked here as well as by qualified(), because they
+    // are copied into namespace attributes verbatim.
+    if p_prefix > limits.max_string_bytes() || r_prefix > limits.max_string_bytes() {
+        return Err(limit(
+            "custom-show XML namespace prefix",
+            limits.max_string_bytes(),
+        ));
+    }
+    for show in &list.shows {
+        length = length
+            .checked_add(render_new_show_len(layout, show, limits)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            })?;
+    }
+    length
+        .checked_add(2 + name + 1)
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })
+}
+
 fn expand_empty_custom_list(
     source: &[u8],
     layout: &Layout,
@@ -1031,6 +1172,44 @@ fn expand_empty_custom_list(
     Ok(value.finish())
 }
 
+fn expand_empty_custom_list_len(
+    source: &[u8],
+    layout: &Layout,
+    custom: &CustomListLayout,
+    list: &List,
+    limits: Limits,
+) -> Result<usize> {
+    if list.is_empty() {
+        return Ok(custom.span.end - custom.span.start);
+    }
+    let source = &source[custom.span.start..custom.span.end];
+    let close = source
+        .iter()
+        .rposition(|byte| *byte == b'>')
+        .ok_or_else(|| invalid("empty custom-show list has no closing bracket"))?;
+    let opening = std::str::from_utf8(&source[..close])
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .trim_end_matches('/');
+    let mut length = opening
+        .len()
+        .checked_add(1)
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })?;
+    for show in &list.shows {
+        length = length
+            .checked_add(render_new_show_len(layout, show, limits)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            })?;
+    }
+    length
+        .checked_add(2 + custom.qualified_name.len() + 1)
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })
+}
+
 fn render_show(
     source: &[u8],
     layout: &Layout,
@@ -1045,6 +1224,223 @@ fn render_show(
         },
         _ => render_new_show(layout, show, limits),
     }
+}
+
+fn render_show_len(
+    source: &[u8],
+    layout: &Layout,
+    original_layout: Option<&ShowLayout>,
+    original: Option<&Show>,
+    show: &Show,
+    limits: Limits,
+) -> Result<usize> {
+    match (original_layout, original) {
+        (Some(original_layout), Some(original)) if original.id == show.id => {
+            render_existing_show_len(source, layout, original_layout, original, show, limits)
+        },
+        _ => render_new_show_len(layout, show, limits),
+    }
+}
+
+fn render_new_show_len(layout: &Layout, show: &Show, limits: Limits) -> Result<usize> {
+    let show_name = qualified_len(&layout.p_prefix, "custShow", limits)?;
+    let list_name = qualified_len(&layout.p_prefix, "sldLst", limits)?;
+    check_string(&show.name, limits, "custom-show name")?;
+    let escaped_name = escaped_xml_len(&show.name)?;
+    let mut length = 1usize
+        .checked_add(show_name)
+        .and_then(|value| value.checked_add(7)) // ` name="`
+        .and_then(|value| value.checked_add(escaped_name))
+        .and_then(|value| value.checked_add(6)) // `" id="`
+        .and_then(|value| value.checked_add(decimal_len(show.id)))
+        .and_then(|value| value.checked_add(3)) // `"><` after the id
+        .and_then(|value| value.checked_add(list_name))
+        .and_then(|value| value.checked_add(1)) // `>` after sldLst
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })?;
+    for slide_id in &show.slide_ids {
+        length = length
+            .checked_add(render_new_slide_len(layout, *slide_id, limits)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            })?;
+    }
+    length = length
+        .checked_add(2 + list_name + 1) // `</sldLst>`
+        .and_then(|value| value.checked_add(2 + show_name + 1)) // `</custShow>`
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })?;
+    Ok(length)
+}
+
+fn render_new_slide_len(layout: &Layout, slide_id: u32, limits: Limits) -> Result<usize> {
+    let relationship_id = layout
+        .slide_id_to_relationship
+        .get(&slide_id)
+        .ok_or_else(|| invalid("custom show references an undeclared slide"))?;
+    check_string(relationship_id, limits, "custom-show relationship ID")?;
+    let slide_name = qualified_len(&layout.p_prefix, "sld", limits)?;
+    let escaped_relationship = escaped_xml_len(relationship_id)?;
+    1usize
+        .checked_add(slide_name)
+        .and_then(|value| value.checked_add(1)) // space
+        .and_then(|value| value.checked_add(layout.r_prefix.len()))
+        .and_then(|value| value.checked_add(5)) // `:id="`
+        .and_then(|value| value.checked_add(escaped_relationship))
+        .and_then(|value| value.checked_add(3)) // `"/>`
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })
+}
+
+fn render_existing_show_len(
+    source: &[u8],
+    layout: &Layout,
+    original_layout: &ShowLayout,
+    original: &Show,
+    show: &Show,
+    limits: Limits,
+) -> Result<usize> {
+    let offset = original_layout.span.start;
+    let source_show = &source[offset..original_layout.span.end];
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    if original.name != show.name {
+        check_string(&show.name, limits, "custom-show name")?;
+        removed = removed
+            .checked_add(original_layout.name_attribute.end - original_layout.name_attribute.start)
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            })?;
+        added = added
+            .checked_add(escaped_xml_len(&show.name)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            })?;
+    }
+    if original.slide_ids != show.slide_ids {
+        if let Some(slide_list) = original_layout.slide_list.as_ref() {
+            removed = removed
+                .checked_add(slide_list.span.end - slide_list.span.start)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "custom-show XML output",
+                })?;
+            added = added
+                .checked_add(render_slide_list_len(
+                    source,
+                    layout,
+                    slide_list,
+                    &show.slide_ids,
+                    limits,
+                )?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "custom-show XML output",
+                })?;
+        } else if !show.slide_ids.is_empty() {
+            added = added
+                .checked_add(render_new_slide_list_len(layout, &show.slide_ids, limits)?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "custom-show XML output",
+                })?;
+        }
+    }
+    checked_output_len(
+        source_show.len(),
+        removed,
+        added,
+        limits,
+        "custom-show XML output",
+    )
+}
+
+fn render_slide_list_len(
+    source: &[u8],
+    layout: &Layout,
+    slide_list: &SlideListLayout,
+    slide_ids: &[u32],
+    limits: Limits,
+) -> Result<usize> {
+    let source_list = &source[slide_list.span.start..slide_list.span.end];
+    let slot_count = slide_list
+        .children
+        .iter()
+        .filter(|child| child.local == "sld")
+        .count();
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for (index, slot) in slide_list
+        .children
+        .iter()
+        .filter(|child| child.local == "sld")
+        .enumerate()
+    {
+        removed = removed.checked_add(slot.span.end - slot.span.start).ok_or(
+            Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            },
+        )?;
+        if let Some(slide_id) = slide_ids.get(index) {
+            let existing = layout
+                .slide_id_to_relationship
+                .get(slide_id)
+                .and_then(|relationship_id| {
+                    slide_list
+                        .slots
+                        .iter()
+                        .find(|candidate| &candidate.relationship_id == relationship_id)
+                })
+                .map(|candidate| candidate.span.end - candidate.span.start);
+            let replacement_len = match existing {
+                Some(length) => length,
+                None => render_new_slide_len(layout, *slide_id, limits)?,
+            };
+            added = added
+                .checked_add(replacement_len)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "custom-show XML output",
+                })?;
+        }
+    }
+    if slide_ids.len() > slot_count {
+        for slide_id in &slide_ids[slot_count..] {
+            added = added
+                .checked_add(render_new_slide_len(layout, *slide_id, limits)?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "custom-show XML output",
+                })?;
+        }
+    }
+    checked_output_len(
+        source_list.len(),
+        removed,
+        added,
+        limits,
+        "custom-show XML output",
+    )
+}
+
+fn render_new_slide_list_len(layout: &Layout, slide_ids: &[u32], limits: Limits) -> Result<usize> {
+    let name = qualified_len(&layout.p_prefix, "sldLst", limits)?;
+    let mut length = 1usize
+        .checked_add(name)
+        .and_then(|value| value.checked_add(1))
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })?;
+    for slide_id in slide_ids {
+        length = length
+            .checked_add(render_new_slide_len(layout, *slide_id, limits)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML output",
+            })?;
+    }
+    length
+        .checked_add(2 + name + 1)
+        .ok_or(Error::CapacityOverflow {
+            resource: "custom-show XML output",
+        })
 }
 
 fn render_new_show(layout: &Layout, show: &Show, limits: Limits) -> Result<String> {
@@ -1238,6 +1634,51 @@ fn qualified(prefix: &str, local: &str, limits: Limits) -> Result<String> {
         value.push(':');
         value.push_str(local);
         Ok(value)
+    }
+}
+
+fn qualified_len(prefix: &str, local: &str, limits: Limits) -> Result<usize> {
+    let length = if prefix.is_empty() {
+        local.len()
+    } else {
+        prefix
+            .len()
+            .checked_add(1)
+            .and_then(|value| value.checked_add(local.len()))
+            .ok_or(Error::CapacityOverflow {
+                resource: "custom-show XML element name",
+            })?
+    };
+    if length > limits.max_string_bytes() {
+        return Err(limit(
+            "custom-show XML element name",
+            limits.max_string_bytes(),
+        ));
+    }
+    Ok(length)
+}
+
+fn decimal_len(value: u32) -> usize {
+    if value < 10 {
+        1
+    } else if value < 100 {
+        2
+    } else if value < 1_000 {
+        3
+    } else if value < 10_000 {
+        4
+    } else if value < 100_000 {
+        5
+    } else if value < 1_000_000 {
+        6
+    } else if value < 10_000_000 {
+        7
+    } else if value < 100_000_000 {
+        8
+    } else if value < 1_000_000_000 {
+        9
+    } else {
+        10
     }
 }
 

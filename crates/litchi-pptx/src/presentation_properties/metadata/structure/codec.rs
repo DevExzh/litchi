@@ -7,7 +7,7 @@
 
 use super::super::custom_show::{List as ShowList, Show};
 use super::super::sections::{List as SectionList, Section};
-use super::super::{BoundedString, Limits, check_string, checked_output_len, process_ooxml};
+use super::super::{BoundedString, Limits, checked_output_len, process_ooxml};
 use super::model::{Graph, Reference};
 use crate::package::signature::settle_unsigned_change;
 use crate::presentation_properties::metadata::new_guid;
@@ -106,17 +106,18 @@ pub(crate) fn rewrite(
         ));
     }
 
-    let (p_namespace, r_namespace) = document_namespaces(source);
+    let (p_namespace, _r_namespace) = document_namespaces(source);
     let mut staged = source.to_vec();
     if original.custom_shows.shows != value.custom_shows.shows {
-        let custom_xml = write_custom_shows(
+        // Reuse the source-preserving custom-show wire layout.  Rebuilding the
+        // whole custShowLst from the graph loses nested future attributes and
+        // elements that the typed graph deliberately does not model.
+        staged = super::super::custom_show::rewrite_source(
+            &staged,
+            &original.custom_shows,
             &value.custom_shows,
-            &value.slides,
-            p_namespace,
-            r_namespace,
             limits,
         )?;
-        staged = patch_custom_shows(&staged, custom_xml.as_bytes(), limits)?;
     }
     if original.sections != value.sections {
         let section_xml = write_section_extension(&value.sections, p_namespace, limits)?;
@@ -700,10 +701,15 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
     let mut nodes = 0usize;
     loop {
         let decoder = reader.decoder();
-        let event = reader
+        let borrowed = reader
             .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .into_owned();
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        // Admission must happen while quick-xml still borrows the source.
+        // Calling `into_owned` first would copy attacker-controlled names,
+        // attributes, text, or references before the selected string policy
+        // had a chance to reject them.
+        preflight_core_event(&borrowed, limits)?;
+        let event = borrowed.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -799,6 +805,70 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
         return Err(invalid("unterminated presentation structure"));
     }
     Ok((slides, shows))
+}
+
+fn preflight_core_event(event: &Event<'_>, limits: Limits) -> Result<()> {
+    match event {
+        Event::Start(element) | Event::Empty(element) => {
+            check_raw_name(element.name().as_ref(), limits)?;
+            let mut count = 0usize;
+            for attribute in element.checked_attributes() {
+                let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                count += 1;
+                if count > limits.max_attributes() {
+                    return Err(limit(
+                        "presentation structure attributes",
+                        limits.max_attributes(),
+                    ));
+                }
+                if attribute.key.as_ref().len() > limits.max_string_bytes()
+                    || attribute.value.as_ref().len() > limits.max_string_bytes()
+                {
+                    return Err(limit(
+                        "presentation structure attribute",
+                        limits.max_string_bytes(),
+                    ));
+                }
+            }
+        },
+        Event::End(element) => check_raw_name(element.name().as_ref(), limits)?,
+        Event::Text(text) => check_raw_text(text.as_ref(), limits, "presentation structure text")?,
+        Event::CData(text) => {
+            check_raw_text(text.as_ref(), limits, "presentation structure CDATA")?
+        },
+        Event::Comment(text) => {
+            check_raw_text(text.as_ref(), limits, "presentation structure comment")?
+        },
+        Event::GeneralRef(reference) => check_raw_text(
+            reference.as_ref(),
+            limits,
+            "presentation structure general reference",
+        )?,
+        Event::Decl(declaration) => check_raw_text(
+            declaration.as_ref(),
+            limits,
+            "presentation structure declaration",
+        )?,
+        Event::DocType(_) | Event::PI(_) | Event::Eof => {},
+    }
+    Ok(())
+}
+
+fn check_raw_name(name: &[u8], limits: Limits) -> Result<()> {
+    if name.len() > limits.max_string_bytes() {
+        return Err(limit(
+            "presentation structure XML element name",
+            limits.max_string_bytes(),
+        ));
+    }
+    Ok(())
+}
+
+fn check_raw_text(text: &[u8], limits: Limits, resource: &'static str) -> Result<()> {
+    if text.len() > limits.max_string_bytes() {
+        return Err(limit(resource, limits.max_string_bytes()));
+    }
+    Ok(())
 }
 
 fn core_element(namespace: &ResolveResult<'_>, name: QName<'_>) -> Result<CoreElement> {
@@ -1144,49 +1214,6 @@ fn validate_graph_shape(graph: &Graph, limits: Limits) -> Result<()> {
     }
     graph.sections.to_xml(limits)?;
     Ok(())
-}
-
-fn write_custom_shows(
-    shows: &ShowList,
-    slides: &[Reference],
-    p_namespace: &str,
-    r_namespace: &str,
-    limits: Limits,
-) -> Result<String> {
-    if shows.is_empty() {
-        return Ok(String::new());
-    }
-    if shows.shows.len() > limits.max_custom_shows() {
-        return Err(limit("custom shows", limits.max_custom_shows()));
-    }
-    let relationships = slides
-        .iter()
-        .map(|slide| (slide.slide_id, slide.relationship_id.as_str()))
-        .collect::<HashMap<_, _>>();
-    let mut xml = BoundedString::new(limits, "serialized custom shows");
-    xml.push_str("<p:custShowLst xmlns:p=\"")?;
-    xml.push_escaped_xml(p_namespace)?;
-    xml.push_str("\" xmlns:r=\"")?;
-    xml.push_escaped_xml(r_namespace)?;
-    xml.push_str("\">")?;
-    for show in &shows.shows {
-        check_string(&show.name, limits, "custom-show name")?;
-        xml.push_str("<p:custShow name=\"")?;
-        xml.push_escaped_xml(&show.name)?;
-        xml.write_fmt(format_args!(r#"" id="{}"><p:sldLst>"#, show.id))?;
-        for slide_id in &show.slide_ids {
-            let relationship = relationships
-                .get(slide_id)
-                .ok_or_else(|| invalid("custom show references an undeclared slide"))?;
-            check_string(relationship, limits, "custom-show relationship ID")?;
-            xml.push_str("<p:sld r:id=\"")?;
-            xml.push_escaped_xml(relationship)?;
-            xml.push_str("\"/>")?;
-        }
-        xml.push_str("</p:sldLst></p:custShow>")?;
-    }
-    xml.push_str("</p:custShowLst>")?;
-    Ok(xml.finish())
 }
 
 fn write_section_extension(

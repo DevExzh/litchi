@@ -26,7 +26,12 @@ impl Snapshot {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_master(source: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
-        Self::from_master_owned(source.as_ref().to_vec(), limits)
+        let source = source.as_ref();
+        // Locate and validate the borrowed source first.  Retention is only
+        // needed after the selected input policy admits the bytes.
+        let located = codec::locate_master(source, limits)?;
+        let source_xml = Arc::new(source.to_vec());
+        Ok(Self::from_located(source_xml, located, limits))
     }
 
     /// Parse an owned slide-master color map without another source copy.
@@ -52,7 +57,13 @@ impl Snapshot {
         root_label: impl Into<String>,
         limits: Limits,
     ) -> Result<Self> {
-        Self::from_override_owned(source.as_ref().to_vec(), root_name, root_label, limits)
+        let source = source.as_ref();
+        let root_label = root_label.into();
+        // As with the master source, admit the borrowed XML before copying
+        // it into the source-bound snapshot.
+        let located = codec::locate_override(source, root_name.as_ref(), &root_label, limits)?;
+        let source_xml = Arc::new(source.to_vec());
+        Ok(Self::from_located(source_xml, located, limits))
     }
 
     /// Parse an owned color-map override without another source copy.
@@ -154,13 +165,6 @@ pub struct Draft {
 }
 
 impl Draft {
-    /// Borrow the projected typed value.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Value {
-        &self.working
-    }
-
     /// Return the projected typed value by copy.
     #[inline]
     #[must_use]
@@ -603,10 +607,10 @@ mod tests {
         assert_eq!(snapshot.value(), Value::Override(Some(Override::Master)));
 
         let mut edit = snapshot.edit();
-        let before = *edit.snapshot();
+        let before = edit.value();
         assert!(edit.set_color(Slot::Accent1, Role::Accent2).is_err());
-        assert_eq!(*edit.snapshot(), before);
+        assert_eq!(edit.value(), before);
         assert!(edit.replace(Value::Override(None)).is_err());
-        assert_eq!(*edit.snapshot(), before);
+        assert_eq!(edit.value(), before);
     }
 }

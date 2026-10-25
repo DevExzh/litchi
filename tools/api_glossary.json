@@ -2337,6 +2337,11 @@
           "replacement": "use Draft::guides; no draft snapshot alias (record 0362ul81a)"
         },
         {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::color_map::Draft",
+          "replacement": "use Draft::value; no draft snapshot alias (record 0362ul81b)"
+        },
+        {
           "name": "read",
           "scope": "litchi_pptx::presentation_properties::metadata::structure::Snapshot",
           "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
@@ -3479,6 +3484,11 @@
           "name": "snapshot",
           "scope": "litchi_pptx::presentation_properties::metadata::guides::Draft",
           "replacement": "use Draft::guides; no draft snapshot alias (record 0362ul81a)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::presentation_properties::metadata::color_map::Draft",
+          "replacement": "use Draft::value; no draft snapshot alias (record 0362ul81b)"
         },
         {
           "name": "read",

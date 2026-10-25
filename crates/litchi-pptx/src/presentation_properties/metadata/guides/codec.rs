@@ -1,6 +1,8 @@
 //! Typed, bounded `PowerPoint` 2013 extended presentation guides.
 
-use super::super::{BoundedString, Limits, check_string, checked_output_len, process_ooxml};
+use super::super::{
+    BoundedString, Limits, check_string, checked_output_len, escaped_xml_len, process_ooxml,
+};
 use super::model::{Color, ColorKind, Guide, Guides, List, Orientation};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -103,10 +105,14 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
     }
     let source = processed.as_ref();
     let layout = scan_source(source, limits)?;
-    let entries = target_entries(value, layout.strict, layout.presentation_namespace, limits)?;
+    // Count each replacement with the same bounded writer used for the real
+    // serialization.  This dry run has no output buffer, so the final source
+    // delta can be admitted before either guide entry is allocated.
+    let entry_lengths =
+        target_entry_lengths(value, layout.strict, layout.presentation_namespace, limits)?;
 
     let Some(ext_list) = layout.ext_list.as_ref() else {
-        if entries.iter().all(Option::is_none) {
+        if entry_lengths.iter().all(Option::is_none) {
             if source.len() > limits.max_output_bytes() {
                 return Err(limit(
                     "patched presentation guides",
@@ -115,6 +121,26 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
             }
             return Ok(source.to_vec());
         }
+        let fragment_len = guide_fragment_len(&entry_lengths, &layout.presentation_namespace)?;
+        if layout.root.empty {
+            let replacement_len = expanded_empty_len(source, &layout.root, fragment_len)?;
+            checked_output_len(
+                source.len(),
+                layout.root.end - layout.root.start,
+                replacement_len,
+                limits,
+                "patched presentation guides",
+            )?;
+        } else {
+            checked_output_len(
+                source.len(),
+                0,
+                fragment_len,
+                limits,
+                "patched presentation guides",
+            )?;
+        }
+        let entries = target_entries(value, layout.strict, layout.presentation_namespace, limits)?;
         let mut fragment = BoundedString::new(limits, "presentation-guide patch fragment");
         fragment.push_str("<p:extLst xmlns:p=\"")?;
         fragment.push_escaped_xml(&layout.presentation_namespace)?;
@@ -139,13 +165,37 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
         };
     };
 
-    let mut replacements = Vec::new();
+    // Keep replacement ranges and lengths while calculating the exact
+    // combined output size.  The serialized entry strings and their owned
+    // replacement buffers are not created until the final-size admission
+    // succeeds.
+    let mut ranges: [(usize, usize, usize, usize); 2] = [(0, 0, 0, 0), (0, 0, 0, 0)];
+    let mut plan_count = 0usize;
     for (index, _) in [Target::Slide, Target::Notes].into_iter().enumerate() {
-        let replacement = entries[index].as_deref().unwrap_or_default().as_bytes();
+        let replacement_len = entry_lengths[index].unwrap_or_default();
         if let Some(span) = layout.targets[index].as_ref() {
-            replacements.push((span.start, span.end, replacement.to_vec()));
-        } else if !replacement.is_empty() {
+            ranges[plan_count] = (span.start, span.end, replacement_len, index);
+            plan_count += 1;
+        } else if replacement_len != 0 {
             if ext_list.empty {
+                let body_len = entry_lengths.iter().filter_map(|entry| *entry).try_fold(
+                    0usize,
+                    |length, entry| {
+                        length.checked_add(entry).ok_or(Error::CapacityOverflow {
+                            resource: "patched presentation guides",
+                        })
+                    },
+                )?;
+                let replacement_len = expanded_empty_len(source, ext_list, body_len)?;
+                checked_output_len(
+                    source.len(),
+                    ext_list.end - ext_list.start,
+                    replacement_len,
+                    limits,
+                    "patched presentation guides",
+                )?;
+                let entries =
+                    target_entries(value, layout.strict, layout.presentation_namespace, limits)?;
                 let mut body = BoundedString::new(limits, "presentation-guide patch fragment");
                 for entry in entries.iter().filter_map(Option::as_deref) {
                     body.push_str(entry)?;
@@ -158,12 +208,59 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
                     limits,
                 );
             }
-            replacements.push((
+            ranges[plan_count] = (
                 ext_list.close_start,
                 ext_list.close_start,
-                replacement.to_vec(),
-            ));
+                replacement_len,
+                index,
+            );
+            plan_count += 1;
         }
+    }
+
+    ranges[..plan_count].sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for pair in ranges[..plan_count].windows(2) {
+        if pair[0].1 > pair[1].0 {
+            return Err(invalid("overlapping presentation-guide patch ranges"));
+        }
+    }
+    for (start, end, replacement_len, _) in ranges[..plan_count].iter() {
+        if *start > *end || *end > source.len() {
+            return Err(invalid("presentation-guide patch range is outside source"));
+        }
+        removed = removed
+            .checked_add(*end - *start)
+            .ok_or(Error::CapacityOverflow {
+                resource: "patched presentation guides",
+            })?;
+        added = added
+            .checked_add(*replacement_len)
+            .ok_or(Error::CapacityOverflow {
+                resource: "patched presentation guides",
+            })?;
+    }
+    checked_output_len(
+        source.len(),
+        removed,
+        added,
+        limits,
+        "patched presentation guides",
+    )?;
+
+    let entries = target_entries(value, layout.strict, layout.presentation_namespace, limits)?;
+    let mut plans: [(usize, usize, &[u8]); 2] = [(0, 0, &[]), (0, 0, &[])];
+    for (index, (start, end, _, target_index)) in ranges[..plan_count].iter().enumerate() {
+        let replacement = entries[*target_index]
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes();
+        plans[index] = (*start, *end, replacement);
+    }
+    let mut replacements = Vec::with_capacity(plan_count);
+    for (start, end, replacement) in plans[..plan_count].iter() {
+        replacements.push((*start, *end, replacement.to_vec()));
     }
     replace_spans(source, &replacements, limits)
 }
@@ -525,6 +622,44 @@ fn target_entries(
     ])
 }
 
+fn target_entry_lengths(
+    value: &Guides,
+    strict: bool,
+    presentation_namespace: &str,
+    limits: Limits,
+) -> Result<[Option<usize>; 2]> {
+    Ok([
+        value
+            .slide
+            .as_ref()
+            .map(|list| {
+                extension_len(
+                    SLIDE_GUIDES_URI,
+                    "sldGuideLst",
+                    list,
+                    strict,
+                    presentation_namespace,
+                    limits,
+                )
+            })
+            .transpose()?,
+        value
+            .notes
+            .as_ref()
+            .map(|list| {
+                extension_len(
+                    NOTES_GUIDES_URI,
+                    "notesGuideLst",
+                    list,
+                    strict,
+                    presentation_namespace,
+                    limits,
+                )
+            })
+            .transpose()?,
+    ])
+}
+
 fn extension_xml(
     uri: &str,
     local: &str,
@@ -546,9 +681,68 @@ fn extension_xml(
     Ok(xml.finish())
 }
 
+fn extension_len(
+    uri: &str,
+    local: &str,
+    list: &List,
+    strict: bool,
+    presentation_namespace: &str,
+    limits: Limits,
+) -> Result<usize> {
+    let mut output = LengthCounter::new(limits, "guide extension output");
+    write_list_extension(
+        &mut output,
+        uri,
+        local,
+        list,
+        strict,
+        limits,
+        Some(presentation_namespace),
+    )?;
+    Ok(output.finish())
+}
+
 fn expand_empty(source: &[u8], span: &SourceSpan, body: &str, limits: Limits) -> Result<Vec<u8>> {
     let replacement = expand_empty_bytes(source, span, body.as_bytes(), limits)?;
     Ok(replacement)
+}
+
+fn guide_fragment_len(
+    entry_lengths: &[Option<usize>; 2],
+    presentation_namespace: &str,
+) -> Result<usize> {
+    let mut length = b"<p:extLst xmlns:p=\"".len();
+    length = length
+        .checked_add(escaped_xml_len(presentation_namespace)?)
+        .and_then(|value| value.checked_add(b"\">".len()))
+        .ok_or(Error::CapacityOverflow {
+            resource: "patched presentation guides",
+        })?;
+    for entry in entry_lengths.iter().filter_map(|entry| *entry) {
+        length = length.checked_add(entry).ok_or(Error::CapacityOverflow {
+            resource: "patched presentation guides",
+        })?;
+    }
+    length
+        .checked_add(b"</p:extLst>".len())
+        .ok_or(Error::CapacityOverflow {
+            resource: "patched presentation guides",
+        })
+}
+
+fn expanded_empty_len(source: &[u8], span: &SourceSpan, body_len: usize) -> Result<usize> {
+    let token = source[span.start..span.end].trim_ascii_end();
+    let open = token
+        .strip_suffix(b"/>")
+        .ok_or_else(|| invalid("presentation-guide empty element has no self-close"))?;
+    open.len()
+        .checked_add(1)
+        .and_then(|value| value.checked_add(body_len))
+        .and_then(|value| value.checked_add(span.qname.len()))
+        .and_then(|value| value.checked_add(3))
+        .ok_or(Error::CapacityOverflow {
+            resource: "patched presentation guides",
+        })
 }
 
 fn expand_empty_bytes(
@@ -561,15 +755,7 @@ fn expand_empty_bytes(
     let open = token
         .strip_suffix(b"/>")
         .ok_or_else(|| invalid("presentation-guide empty element has no self-close"))?;
-    let replacement_len = open
-        .len()
-        .checked_add(1)
-        .and_then(|value| value.checked_add(body.len()))
-        .and_then(|value| value.checked_add(span.qname.len()))
-        .and_then(|value| value.checked_add(3))
-        .ok_or(Error::CapacityOverflow {
-            resource: "patched presentation guides",
-        })?;
+    let replacement_len = expanded_empty_len(source, span, body.len())?;
     if replacement_len > limits.max_output_bytes() {
         return Err(limit(
             "patched presentation guides",
@@ -1157,8 +1343,103 @@ fn validate_opaque_extension(xml: &[u8], limits: Limits) -> Result<()> {
     validate_extension_list(&parse_dom(xml, limits)?, limits)
 }
 
-fn write_list_extension(
-    xml: &mut BoundedString,
+trait GuideWriter {
+    fn push_str(&mut self, value: &str) -> Result<()>;
+    fn push(&mut self, value: char) -> Result<()>;
+    fn push_escaped_xml(&mut self, value: &str) -> Result<()>;
+    fn write_fmt(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()>;
+}
+
+impl GuideWriter for BoundedString {
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        BoundedString::push_str(self, value)
+    }
+
+    fn push(&mut self, value: char) -> Result<()> {
+        BoundedString::push(self, value)
+    }
+
+    fn push_escaped_xml(&mut self, value: &str) -> Result<()> {
+        BoundedString::push_escaped_xml(self, value)
+    }
+
+    fn write_fmt(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
+        BoundedString::write_fmt(self, arguments)
+    }
+}
+
+struct LengthCounter {
+    length: usize,
+    limit: usize,
+    resource: &'static str,
+    failure: Option<Error>,
+}
+
+impl LengthCounter {
+    fn new(limits: Limits, resource: &'static str) -> Self {
+        Self {
+            length: 0,
+            limit: limits.max_output_bytes(),
+            resource,
+            failure: None,
+        }
+    }
+
+    fn reserve_for(&mut self, additional: usize) -> Result<()> {
+        let required = self
+            .length
+            .checked_add(additional)
+            .ok_or(Error::CapacityOverflow {
+                resource: self.resource,
+            })?;
+        if required > self.limit {
+            return Err(limit(self.resource, self.limit));
+        }
+        self.length = required;
+        Ok(())
+    }
+
+    fn finish(self) -> usize {
+        self.length
+    }
+}
+
+impl std::fmt::Write for LengthCounter {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        match self.reserve_for(value.len()) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.failure = Some(error);
+                Err(std::fmt::Error)
+            },
+        }
+    }
+}
+
+impl GuideWriter for LengthCounter {
+    fn push_str(&mut self, value: &str) -> Result<()> {
+        self.reserve_for(value.len())
+    }
+
+    fn push(&mut self, value: char) -> Result<()> {
+        self.reserve_for(value.len_utf8())
+    }
+
+    fn push_escaped_xml(&mut self, value: &str) -> Result<()> {
+        self.reserve_for(escaped_xml_len(value)?)
+    }
+
+    fn write_fmt(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
+        std::fmt::write(self, arguments).map_err(|_| {
+            self.failure
+                .take()
+                .unwrap_or_else(|| invalid("guide output formatting failed"))
+        })
+    }
+}
+
+fn write_list_extension<W: GuideWriter>(
+    xml: &mut W,
     uri: &str,
     local: &str,
     list: &List,
@@ -1187,7 +1468,12 @@ fn write_list_extension(
     Ok(())
 }
 
-fn write_guide(xml: &mut BoundedString, guide: &Guide, strict: bool, limits: Limits) -> Result<()> {
+fn write_guide<W: GuideWriter>(
+    xml: &mut W,
+    guide: &Guide,
+    strict: bool,
+    limits: Limits,
+) -> Result<()> {
     xml.write_fmt(format_args!("<p15:guide id=\"{}\"", guide.id))?;
     if let Some(name) = &guide.name {
         check_string(name, limits, "extended guide name")?;
@@ -1219,8 +1505,8 @@ fn write_guide(xml: &mut BoundedString, guide: &Guide, strict: bool, limits: Lim
     Ok(())
 }
 
-fn write_opaque(
-    output: &mut BoundedString,
+fn write_opaque<W: GuideWriter>(
+    output: &mut W,
     xml: &[u8],
     strict: bool,
     limits: Limits,
@@ -1233,7 +1519,11 @@ fn write_opaque(
     Ok(())
 }
 
-fn push_namespace_rewritten(output: &mut BoundedString, value: &str, strict: bool) -> Result<()> {
+fn push_namespace_rewritten<W: GuideWriter>(
+    output: &mut W,
+    value: &str,
+    strict: bool,
+) -> Result<()> {
     let replacements: &[(&str, &str)] = if strict {
         &[(P, PS), (A, AS)]
     } else {
@@ -1440,7 +1730,7 @@ fn resolve(bindings: &[(String, String)], prefix: &str) -> Result<String> {
         .ok_or_else(|| invalid(format!("unbound namespace prefix '{prefix}'")))
 }
 
-fn escape_attribute(output: &mut BoundedString, value: &str) -> Result<()> {
+fn escape_attribute<W: GuideWriter>(output: &mut W, value: &str) -> Result<()> {
     for character in value.chars() {
         match character {
             '&' => output.push_str("&amp;")?,

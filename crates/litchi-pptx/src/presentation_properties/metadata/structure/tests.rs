@@ -44,7 +44,7 @@ fn fixture() -> OpcPackage {
   </p:sldIdLst>
   <p:custShowLst>
     <p:custShow name="Opening" id="7" future="keep">
-      <p:sldLst><p:sld r:id="rIdSlideOne"/><p:sld r:id="rIdSlideThree"/></p:sldLst>
+      <p:sldLst future="keep-list"><p:sld r:id="rIdSlideOne"/><x:future nested="keep"><x:data>keep-nested-show</x:data></x:future><p:sld r:id="rIdSlideThree"/></p:sldLst>
     </p:custShow>
     <p:custShow name="Recap" id="8"><p:sldLst><p:sld r:id="rIdSlideTwo"/></p:sldLst></p:custShow>
   </p:custShowLst>
@@ -205,6 +205,16 @@ fn structure_parser_rejects_namespace_lookalikes_and_arbitrary_id_prefixes() {
 }
 
 #[test]
+fn structure_parser_limits_ignored_event_payloads_before_ownership() {
+    let limits = Limits::DEFAULT.with_string_bytes(64).unwrap();
+    let xml = format!(
+        r#"<p:presentation xmlns:p="{P}" xmlns:x="urn:future"><x:opaque>{}</x:opaque></p:presentation>"#,
+        "x".repeat(65)
+    );
+    assert!(codec::parse_core(xml.as_bytes(), limits).is_err());
+}
+
+#[test]
 fn presentation_slide_id_enforces_the_full_schema_range() {
     for id in ["255", "2147483648", "4294967295"] {
         let xml = format!(
@@ -271,6 +281,8 @@ fn no_op_and_inverse_patches_preserve_exact_source_and_opaque_xml() {
     let after_xml = commit.snapshot().source_xml().to_vec();
     assert!(commit.diagnostics().changed());
     assert!(String::from_utf8_lossy(&after_xml).contains("<x:future>keep</x:future>"));
+    assert!(String::from_utf8_lossy(&after_xml).contains(r#"future="keep-list""#));
+    assert!(String::from_utf8_lossy(&after_xml).contains("<x:data>keep-nested-show</x:data>"));
 
     apply_commit(&mut package, commit.clone()).unwrap();
     assert_eq!(presentation_xml(&package), after_xml);
