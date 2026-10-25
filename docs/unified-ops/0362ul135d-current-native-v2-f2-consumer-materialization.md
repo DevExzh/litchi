@@ -41,17 +41,17 @@ and is checked by SHA-256 before copying:
 | --- | --- | ---: | --- |
 | `tools/perf-baseline/Cargo.toml` | `rtf-baseline-Cargo.toml` | 3,638 | `af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676` |
 | `tools/perf-baseline/examples/refusal_contract_bench.rs` | `rtf-refusal_contract_bench.rs` | 12,782 | `0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81` |
-| `crates/litchi-ppt/examples/scoped_patch_correctness.rs` | `ppt-scoped_patch_correctness-f2.rs` | 3,168 | `032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a` |
+| `crates/litchi-ppt/examples/scoped_patch_correctness.rs` | `ppt-scoped_patch_correctness-f2.rs` | 3,561 | `3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06` |
 
 The RTF manifest overlay adds only the reviewed consumer features and retains
 the f2 dependency graph. The RTF adapter selects `rtf-legacy-api`; the
 candidate selects `rtf-current-api` in its own source endpoint. The PPT
 adapter is the f2-compatible `slide_order::Snapshot` consumer from review
 87051f9548. It emits the exact 0362g correctness fields: fixture, media ID 1,
-`clip-0000.avi`, source/target extents and hashes, and inverse-source hash and
-boolean. Forward-replay fields are accepted when a newer consumer emits them,
-but are not required by the reviewed f2 consumer. A partial replay pair is
-rejected.
+`clip-0000.avi`, source/target extents and hashes, forward-replay target hash
+and equality, and inverse-source hash and boolean. Forward replay is compared
+to the committed target before the receipt is written; a partial or mismatched
+replay pair is rejected.
 
 The original manifest blob is separately checked from `git show HEAD:path`
 before its working-tree replacement. The source archive is still verified
@@ -106,7 +106,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_current_native_policy_v
 ```
 
 Result: 29 tests passed. They cover exact adapter identities, non-f2
-materialization refusal, reviewed f2 correctness receipts with optional
-replay fields, malformed media/path/replay negatives, and the existing paired
+materialization refusal, reviewed f2 correctness receipts with required
+forward-replay equality, malformed media/path/replay negatives, route-tag
+shortcuts, and the existing paired
 source/lock/archive/route/ABBA boundary. No native or performance claim is
 made.

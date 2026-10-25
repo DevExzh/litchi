@@ -22,10 +22,11 @@ REQUIRED = {
     "target_len",
     "source_sha256",
     "target_sha256",
+    "replay_target_sha256",
+    "replay_matches_target",
     "inverse_source_sha256",
     "inverse_matches_source",
 }
-OPTIONAL_REPLAY = {"replay_target_sha256", "replay_matches_target"}
 
 
 def fail(message: str) -> NoReturn:
@@ -67,14 +68,10 @@ def main(argv: list[str]) -> int:
         fail("receipt source hash does not match the fixture")
     if row["source_sha256"] == row["target_sha256"]:
         fail("correctness target bytes are unchanged")
-    replay_fields = OPTIONAL_REPLAY & row.keys()
-    if replay_fields and replay_fields != OPTIONAL_REPLAY:
-        fail("forward replay fields must be supplied together")
-    if replay_fields:
-        if row["replay_target_sha256"] != row["target_sha256"]:
-            fail("forward replay bytes do not match the committed target")
-        if row["replay_matches_target"] is not True:
-            fail("forward replay did not reproduce the committed target")
+    if row["replay_target_sha256"] != row["target_sha256"]:
+        fail("forward replay bytes do not match the committed target")
+    if row["replay_matches_target"] is not True:
+        fail("forward replay did not reproduce the committed target")
     if row["inverse_source_sha256"] != row["source_sha256"]:
         fail("inverse source hash does not match the source")
     if row["inverse_matches_source"] is not True:
@@ -82,6 +79,7 @@ def main(argv: list[str]) -> int:
     for field in (
         "source_sha256",
         "target_sha256",
+        "replay_target_sha256",
         "inverse_source_sha256",
     ):
         value = row[field]
@@ -95,14 +93,11 @@ def main(argv: list[str]) -> int:
         "status": "passed",
         "source_sha256": row["source_sha256"],
         "target_sha256": row["target_sha256"],
+        "replay_target_sha256": row["replay_target_sha256"],
+        "replay_matches_target": row["replay_matches_target"],
         "external_media_path": row["external_media_path"],
         "inverse_matches_source": row["inverse_matches_source"],
     }
-    if replay_fields:
-        summary.update({
-            "replay_target_sha256": row["replay_target_sha256"],
-            "replay_matches_target": row["replay_matches_target"],
-        })
     print(json.dumps(summary, sort_keys=True))
     return 0
 

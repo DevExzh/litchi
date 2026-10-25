@@ -3,9 +3,9 @@
 //! This intentionally is not the timed scoped_patch_probe and is not part
 //! of its measured workload. It opens the same fixture with the same public
 //! package/edit/apply APIs, makes the exact clip-0000.avi operation once,
-//! and writes an external receipt proving the target bytes, parsed path, and
-//! inverse source bytes. Checksums and all publication serialization happen
-//! only in this correctness mode.
+//! and writes an external receipt proving the target bytes, forward replay,
+//! parsed path, and inverse source bytes. Checksums and all publication
+//! serialization happen only in this correctness mode.
 
 use std::{env, fs};
 
@@ -54,6 +54,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let replayed = source.apply_external_media(&patch)?;
+    let replay_target_bytes = replayed.package().to_bytes()?;
+    let replay_matches_target = replay_target_bytes == target_bytes;
+    if !replay_matches_target {
+        return Err("forward replay did not reproduce the committed target bytes".into());
+    }
     let restored = replayed.package().apply_external_media(&patch.inverse())?;
     let restored_bytes = restored.package().to_bytes()?;
     if restored_bytes != source_bytes {
@@ -71,6 +76,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "target_len": target_bytes.len(),
         "source_sha256": sha256(&source_bytes),
         "target_sha256": sha256(&target_bytes),
+        "replay_target_sha256": sha256(&replay_target_bytes),
+        "replay_matches_target": replay_matches_target,
         "inverse_source_sha256": sha256(&restored_bytes),
         "inverse_matches_source": restored_bytes == source_bytes,
     });

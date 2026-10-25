@@ -334,7 +334,7 @@ _BASELINE_PIN = SourcePin(
     probes=(
         _artifact("crates/litchi-ppt/examples/scoped_patch_probe.rs", "0350fc1696688e576613bc8b2c2ccb3d39c12b4b8ad890c5dcd14e3e7b4138ca", 5_158),
         _artifact(LEGACY_PROBE_PATH, "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81", 12_782),
-        _artifact(PPT_CORRECTNESS_PATH, "032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a", 3_168),
+        _artifact(PPT_CORRECTNESS_PATH, "3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06", 3_561),
     ),
     fixtures=(
         _artifact("test-data/unified-ops/0294/video.ppt", "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a", 43_520),
@@ -346,7 +346,7 @@ _BASELINE_PIN = SourcePin(
     adapter_overlays=(
         _artifact("tools/perf-baseline/Cargo.toml", "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676", 3_638),
         _artifact(LEGACY_PROBE_PATH, "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81", 12_782),
-        _artifact(PPT_CORRECTNESS_PATH, "032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a", 3_168),
+        _artifact(PPT_CORRECTNESS_PATH, "3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06", 3_561),
     ),
 )
 
@@ -1469,7 +1469,8 @@ def _v2_result_payload(
             required = {
                 "mode", "fixture", "media_id", "requested_external_media_path",
                 "external_media_path", "source_len", "target_len", "source_sha256",
-                "target_sha256", "inverse_source_sha256", "inverse_matches_source",
+                "target_sha256", "replay_target_sha256", "replay_matches_target",
+                "inverse_source_sha256", "inverse_matches_source",
             }
             missing = sorted(required - value.keys())
             if missing:
@@ -1499,18 +1500,27 @@ def _v2_result_payload(
                 fixture_bytes = Path(expected_fixture).read_bytes()
                 if source_len != len(fixture_bytes) or source_hash != hashlib.sha256(fixture_bytes).hexdigest():
                     raise PolicyMismatch(f"{route.route} correctness source does not match the fixed fixture")
-            replay_fields = {"replay_target_sha256", "replay_matches_target"} & value.keys()
-            if replay_fields:
-                if replay_fields != {"replay_target_sha256", "replay_matches_target"}:
-                    raise PolicyMismatch(f"{route.route} replay fields must be supplied together")
-                if digest(value.get("replay_target_sha256"), "replay_target_sha256") != target_hash or value.get("replay_matches_target") is not True:
-                    raise PolicyMismatch(f"{route.route} forward replay relation is invalid")
+            if digest(value.get("replay_target_sha256"), "replay_target_sha256") != target_hash or value.get("replay_matches_target") is not True:
+                raise PolicyMismatch(f"{route.route} forward replay relation is invalid")
+
+        def validation_summary(value: Mapping[str, Any]) -> None:
+            if value.get("status") != "passed" or value.get("external_media_path") != "clip-0000.avi" or value.get("inverse_matches_source") is not True:
+                raise PolicyMismatch(f"{route.route} validator summary is not the reviewed correctness result")
+            if digest(value.get("replay_target_sha256"), "replay_target_sha256") != digest(value.get("target_sha256"), "target_sha256") or value.get("replay_matches_target") is not True:
+                raise PolicyMismatch(f"{route.route} validator replay relation is invalid")
 
         for value, raw in rows:
+            if "route" in value and value.get("route") != route.route:
+                raise PolicyMismatch(f"{route.route} output contains a different route tag")
             if value.get("route") == route.route:
+                if route.kind == "build" and value.get("status") != "ok":
+                    raise PolicyMismatch(f"{route.route} build record is not successful")
+                if route.kind == "correctness" and value.get("status") != "ok":
+                    raise PolicyMismatch(f"{route.route} correctness-suite record is not successful")
+                if route.kind == "probe":
+                    correctness(value)
                 if route.kind == "validate":
-                    if value.get("status") != "passed" or value.get("external_media_path") != "clip-0000.avi" or value.get("inverse_matches_source") is not True:
-                        raise PolicyMismatch(f"{route.route} validator summary is not the reviewed correctness result")
+                    validation_summary(value)
                 selected.append(raw)
                 continue
             if route.kind == "correctness" and value.get("status") == "ok":
@@ -1519,8 +1529,7 @@ def _v2_result_payload(
                 correctness(value)
                 selected.append(raw)
             elif route.kind == "validate" and value.get("status") == "passed":
-                if value.get("external_media_path") != "clip-0000.avi" or value.get("inverse_matches_source") is not True:
-                    raise PolicyMismatch(f"{route.route} validator summary is not the reviewed correctness result")
+                validation_summary(value)
                 selected.append(raw)
         if len(selected) != 1:
             raise PolicyMismatch(f"{route.route} did not produce exactly one typed route record")

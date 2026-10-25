@@ -528,6 +528,8 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                         "target_len": len(source) + 1,
                         "source_sha256": hashlib.sha256(source).hexdigest(),
                         "target_sha256": "a" * 64,
+                        "replay_target_sha256": "a" * 64,
+                        "replay_matches_target": True,
                         "inverse_source_sha256": hashlib.sha256(source).hexdigest(),
                         "inverse_matches_source": True,
                     }
@@ -536,9 +538,15 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     payload = {
                         "route": route,
                         "status": "passed",
+                        "target_sha256": "a" * 64,
+                        "replay_target_sha256": "a" * 64,
+                        "replay_matches_target": True,
                         "external_media_path": "clip-0000.avi",
                         "inverse_matches_source": True,
                     }
+                    return {"returncode": 0, "output_bytes": json.dumps(payload, sort_keys=True).encode() + b"\n"}
+                if route == "ppt-scoped-correctness-suite":
+                    payload = {"route": route, "status": "ok"}
                     return {"returncode": 0, "output_bytes": json.dumps(payload, sort_keys=True).encode() + b"\n"}
                 return {
                     "returncode": 0,
@@ -686,9 +694,9 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             self.assertIn("tools/native_qualification/adapters/", identity["source_path"])
         correctness = baseline.adapter_for(policy.PPT_CORRECTNESS_PATH)
         self.assertIsNotNone(correctness)
-        self.assertEqual(correctness.sha256, "032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a")
+        self.assertEqual(correctness.sha256, "3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06")
 
-    def test_f2_correctness_receipt_is_typed_and_replay_optional(self) -> None:
+    def test_f2_correctness_receipt_requires_forward_replay(self) -> None:
         route = policy.PPT_ROUTES[2]
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
@@ -706,6 +714,8 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 "target_len": fixture.stat().st_size + 1,
                 "source_sha256": source_hash,
                 "target_sha256": "a" * 64,
+                "replay_target_sha256": "a" * 64,
+                "replay_matches_target": True,
                 "inverse_source_sha256": source_hash,
                 "inverse_matches_source": True,
             }
@@ -716,6 +726,15 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 expected_fixture=fixture,
             )
             self.assertEqual(json.loads(bound), payload)
+            tagged = dict(payload)
+            tagged["route"] = route.route
+            tagged_bound = policy._v2_result_payload(
+                {"output_bytes": json.dumps(tagged).encode()},
+                route,
+                parent,
+                expected_fixture=fixture,
+            )
+            self.assertEqual(json.loads(tagged_bound), tagged)
             for field, value in (("media_id", 2), ("external_media_path", "wrong")):
                 tampered = dict(payload)
                 tampered[field] = value
@@ -726,17 +745,29 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                         parent,
                         expected_fixture=fixture,
                     )
-            partial_replay = dict(payload)
-            partial_replay["replay_matches_target"] = True
+            missing_replay = dict(payload)
+            del missing_replay["replay_target_sha256"]
             with self.assertRaises(policy.PolicyMismatch):
                 policy._v2_result_payload(
-                    {"output_bytes": json.dumps(partial_replay).encode()},
+                    {"output_bytes": json.dumps(missing_replay).encode()},
                     route,
                     parent,
                     expected_fixture=fixture,
                 )
 
-    def test_f2_correctness_validator_accepts_reviewed_receipt_without_replay(self) -> None:
+            for tagged_route, tagged in (
+                (route, {"route": "ppt-scoped-correctness"}),
+                (policy.PPT_ROUTES[1], {"route": "ppt-scoped-correctness-suite"}),
+            ):
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy._v2_result_payload(
+                        {"output_bytes": json.dumps(tagged).encode()},
+                        tagged_route,
+                        parent,
+                        expected_fixture=fixture,
+                    )
+
+    def test_f2_correctness_validator_requires_reviewed_forward_replay(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
             fixture = parent / "video.ppt"
@@ -756,6 +787,8 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                         "target_len": fixture.stat().st_size + 1,
                         "source_sha256": source_hash,
                         "target_sha256": "b" * 64,
+                        "replay_target_sha256": "b" * 64,
+                        "replay_matches_target": True,
                         "inverse_source_sha256": source_hash,
                         "inverse_matches_source": True,
                     }
@@ -770,6 +803,19 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn('"status": "passed"', completed.stdout)
+
+            row = json.loads(receipt.read_text(encoding="utf-8"))
+            del row["replay_target_sha256"]
+            del row["replay_matches_target"]
+            receipt.write_bytes(json.dumps(row).encode())
+            failed = subprocess.run(
+                [sys.executable, str(ROOT / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"), str(receipt), str(fixture)],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertNotEqual(failed.returncode, 0)
 
     def test_adapter_materializer_rejects_non_f2_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
