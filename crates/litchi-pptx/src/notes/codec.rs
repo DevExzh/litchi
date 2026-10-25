@@ -551,6 +551,33 @@ fn node_policy(expected_root: &str) -> (crate::error::CodecLimitKind, usize) {
     }
 }
 
+/// Return the byte ceiling for the selected root.
+///
+/// Slide XML is a related PresentationML root, not notes payload.  Its
+/// 16-MiB root ceiling and one-million-node admission are intentionally
+/// independent from the selected notes policy (whose default is 8 MiB and
+/// 100,000 nodes).  Every other root scanned by this codec belongs to the
+/// notes closure and remains intersected with the recipient's selected input
+/// and output limits.
+#[inline]
+fn effective_xml_limit(max: usize, expected_root: &str, limits: Limits) -> usize {
+    if expected_root == "sld" {
+        max
+    } else {
+        max.min(limits.max_input_bytes).min(limits.max_output_bytes)
+    }
+}
+
+#[inline]
+fn effective_node_limit(expected_root: &str, limits: Limits) -> usize {
+    let (_, root_limit) = node_policy(expected_root);
+    if expected_root == "sld" {
+        root_limit
+    } else {
+        root_limit.min(limits.max_nodes)
+    }
+}
+
 pub(crate) fn scan_xml_with_limits(
     xml: &[u8],
     max: usize,
@@ -558,7 +585,7 @@ pub(crate) fn scan_xml_with_limits(
     expected_root: &str,
     limits: Limits,
 ) -> Result<XmlScan> {
-    let max = max.min(limits.max_input_bytes).min(limits.max_output_bytes);
+    let max = effective_xml_limit(max, expected_root, limits);
     if xml.len() > max {
         return Err(limit(
             crate::error::CodecLimitKind::XmlBytes,
@@ -608,7 +635,7 @@ fn scan_processed_xml_with_limits(
     expected_root: &str,
     limits: Limits,
 ) -> Result<XmlScan> {
-    let max = max.min(limits.max_input_bytes).min(limits.max_output_bytes);
+    let max = effective_xml_limit(max, expected_root, limits);
     if raw_len > max {
         return Err(limit(crate::error::CodecLimitKind::XmlBytes, raw_len, max));
     }
@@ -632,8 +659,8 @@ fn scan_processed_xml_with_limits(
     let mut attribute_bytes = 0usize;
     let mut root_seen = false;
     let mut scan = XmlScan::default();
-    let (node_kind, node_limit) = node_policy(expected_root);
-    let node_limit = node_limit.min(limits.max_nodes);
+    let (node_kind, _) = node_policy(expected_root);
+    let node_limit = effective_node_limit(expected_root, limits);
     loop {
         if pending_pop {
             resolver.pop();
@@ -785,14 +812,14 @@ fn inspect_element(
             limit(
                 crate::error::CodecLimitKind::XmlAttributes,
                 usize::MAX,
-                MAX_ATTRIBUTES.min(limits.max_nodes),
+                MAX_ATTRIBUTES,
             )
         })?;
-        if *attributes > MAX_ATTRIBUTES.min(limits.max_nodes) {
+        if *attributes > MAX_ATTRIBUTES {
             return Err(limit(
                 crate::error::CodecLimitKind::XmlAttributes,
                 *attributes,
-                MAX_ATTRIBUTES.min(limits.max_nodes),
+                MAX_ATTRIBUTES,
             ));
         }
         let (namespace, attr_local) = resolver.resolve_attribute(item.key);
@@ -1159,12 +1186,23 @@ mod tests {
             }
             xml.extend_from_slice(b"</p:notes>");
 
-            let expected = outcome(buffered_scan_oracle(
+            let expected = buffered_scan_oracle(
                 &xml,
                 xml.len(),
                 crate::notes::MAX_SLIDE_XML,
                 Conformance::Transitional,
                 "notes",
+            )
+            .expect_err("node ceiling must refuse 100001 nodes");
+            assert!(matches!(
+                &expected,
+                Error::Limit {
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlNodes
+                    ),
+                    observed,
+                    maximum,
+                } if *observed == MAX_NODES + 1 && *maximum == MAX_NODES
             ));
             let actual = outcome(scan_processed_xml(
                 &xml,
@@ -1175,14 +1213,10 @@ mod tests {
             ));
             assert_eq!(
                 actual,
-                expected,
+                outcome(Err(expected)),
                 "node ceiling diverged for {} children",
                 if empty { "empty" } else { "start" }
             );
-            match &expected {
-                Err(error) => assert!(error.contains("notes XML nodes")),
-                Ok(_) => panic!("node ceiling must refuse 100001 nodes"),
-            }
         }
     }
 

@@ -26,7 +26,10 @@ use litchi_opc::{
 use litchi_pptx::chart::{Chart as EagerChart, Series, Type};
 use litchi_pptx::presentation::related::raw;
 use litchi_pptx::shape::owned::Scene as OwnedScene;
-use litchi_pptx::{Package, SlideLayoutKind, SourceBackedPresentation, SourceLimits};
+use litchi_pptx::{
+    CodecLimitKind, Error, LimitKind, OpenOptions, Package, SlideLayoutKind,
+    SourceBackedPresentation, SourceLimits,
+};
 
 const SLIDE_ONE: &str = "/ppt/slides/slide1.xml";
 const LAYOUT: &str = "/ppt/slideLayouts/slideLayout1.xml";
@@ -142,6 +145,31 @@ fn edit_blob(opc: &mut OpcPackage, part_name: &str, edit: impl FnOnce(String) ->
     let part = opc.get_part_mut(&uri).unwrap();
     let source = String::from_utf8(part.blob().to_vec()).unwrap();
     part.set_blob(edit(source).into_bytes());
+}
+
+fn selected_notes_bytes(bytes: &[u8]) -> usize {
+    let opc = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
+    let notes = opc
+        .get_part(&PackURI::new(NOTES).unwrap())
+        .unwrap()
+        .blob()
+        .len();
+    let master = opc.get_part(&PackURI::new(NOTES_MASTER).unwrap()).unwrap();
+    let theme_uri = master
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::THEME)
+        .unwrap()
+        .target_partname()
+        .unwrap();
+    notes + master.blob().len() + opc.get_part(&theme_uri).unwrap().blob().len()
+}
+
+fn notes_limits(max_total_bytes: usize) -> litchi_pptx::notes::Limits {
+    litchi_pptx::notes::Limits {
+        max_total_bytes,
+        ..litchi_pptx::notes::Limits::DEFAULT
+    }
 }
 
 fn replace_relationship(
@@ -614,6 +642,111 @@ fn notes_require_the_slide_backlink_and_notes_master_theme() {
         remove_relationship(opc, NOTES_MASTER, rt::THEME);
     });
     assert!(open(&missing_theme).slide(0).unwrap().notes().is_err());
+}
+
+#[test]
+fn notes_selected_aggregate_is_tight_for_source_and_eager_reads() {
+    let bytes = rich_deck();
+    let selected = selected_notes_bytes(&bytes);
+    assert!(selected > 0);
+
+    let source = SourceBackedPresentation::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        OpenOptions::default().notes_limits(notes_limits(selected)),
+    )
+    .unwrap();
+    assert!(source.slide(0).unwrap().notes().unwrap().is_some());
+
+    let source = SourceBackedPresentation::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        OpenOptions::default().notes_limits(notes_limits(selected - 1)),
+    )
+    .unwrap();
+    let error = source.slide(0).unwrap().notes().unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::XmlBytes),
+            observed,
+            maximum,
+        } if observed == selected && maximum == selected - 1
+    ));
+
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::default().notes_limits(notes_limits(selected)),
+    )
+    .unwrap();
+    assert!(
+        package
+            .presentation()
+            .unwrap()
+            .slide(0)
+            .unwrap()
+            .unwrap()
+            .notes()
+            .unwrap()
+            .is_some()
+    );
+
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::default().notes_limits(notes_limits(selected - 1)),
+    )
+    .unwrap();
+    let error = package
+        .presentation()
+        .unwrap()
+        .slide(0)
+        .unwrap()
+        .unwrap()
+        .notes()
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::XmlBytes),
+            observed,
+            maximum,
+        } if observed == selected && maximum == selected - 1
+    ));
+}
+
+#[test]
+fn notes_selected_aggregate_does_not_scan_unrelated_notes_masters() {
+    let bytes = rewrite(&rich_deck(), |opc| {
+        opc.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(NOTES_MASTER_TWO).unwrap(),
+            ct::PML_NOTES_MASTER.to_owned(),
+            b"<broken-notes-master/>".to_vec(),
+        )))
+        .unwrap();
+    });
+    let selected = selected_notes_bytes(&bytes);
+
+    let source = SourceBackedPresentation::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        OpenOptions::default().notes_limits(notes_limits(selected)),
+    )
+    .unwrap();
+    assert!(source.slide(0).unwrap().notes().unwrap().is_some());
+
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::default().notes_limits(notes_limits(selected)),
+    )
+    .unwrap();
+    assert!(
+        package
+            .presentation()
+            .unwrap()
+            .slide(0)
+            .unwrap()
+            .unwrap()
+            .notes()
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]

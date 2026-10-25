@@ -71,11 +71,28 @@ struct GraphIndex {
 pub(crate) struct SlideRootProof<'a> {
     raw: &'a [u8],
     conformance: Option<Conformance>,
+    source_checked: bool,
 }
 
 impl<'a> SlideRootProof<'a> {
     pub(crate) fn new(raw: &'a [u8], conformance: Option<Conformance>) -> Self {
-        Self { raw, conformance }
+        Self {
+            raw,
+            conformance,
+            source_checked: false,
+        }
+    }
+
+    pub(crate) fn with_source_checked(
+        raw: &'a [u8],
+        conformance: Option<Conformance>,
+        source_checked: bool,
+    ) -> Self {
+        Self {
+            raw,
+            conformance,
+            source_checked,
+        }
     }
 
     pub(crate) fn is_valid(self) -> bool {
@@ -556,8 +573,12 @@ fn load_index_with_slide_root_proofs_and_limits<'a>(
         let actual = if proof_inventory_matches {
             let current = slide.blob();
             let proof = slide_root_proofs.and_then(|(_, proofs)| proofs.get(slide_index));
+            if !source_proof_matches_current(proof, current) {
+                crate::parts::validate_source_part_xml(current, package.read_limits())?;
+            }
             resolve_slide_root(current, proof, limits)
         } else {
+            crate::parts::validate_source_part_xml(slide.blob(), package.read_limits())?;
             root_conformance_with_limits(slide.blob(), MAX_SLIDE_XML, "sld", limits)
         }?;
         if actual != conformance {
@@ -801,12 +822,27 @@ fn same_raw_source(left: &[u8], right: &[u8]) -> bool {
     left.as_ptr() == right.as_ptr() && left.len() == right.len()
 }
 
+fn source_proof_matches_current(proof: Option<&SlideRootProof<'_>>, current: &[u8]) -> bool {
+    proof.is_some_and(|proof| proof.source_checked && same_raw_source(proof.raw, current))
+}
+
+/// A capture proof was classified with the default notes scanner. Slide-root
+/// byte and node ceilings are intentionally independent from that profile,
+/// but depth and aggregate attribute bytes remain selected bounds. A proof
+/// can therefore answer a recipient whose bounds are at least the defaults;
+/// tighter recipients must revalidate the current source.
+fn default_proof_covers(limits: Limits) -> bool {
+    limits.max_depth >= Limits::DEFAULT.max_depth
+        && limits.max_attribute_bytes >= Limits::DEFAULT.max_attribute_bytes
+}
+
 fn resolve_slide_root<'a>(
     current: &[u8],
     proof: Option<&SlideRootProof<'a>>,
     limits: Limits,
 ) -> Result<Conformance> {
-    match proof.filter(|proof| same_raw_source(proof.raw, current)) {
+    match proof.filter(|proof| same_raw_source(proof.raw, current) && default_proof_covers(limits))
+    {
         Some(proof) => proof
             .conformance
             .ok_or_else(|| invalid("invalid sld root or namespace")),
@@ -1829,6 +1865,17 @@ mod slide_root_proof_tests {
     const VALID_ROOT_WITH_TRAILING_SPACE: &[u8] =
         br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/> "#;
 
+    fn limit_dimensions(error: Error) -> (crate::error::CodecLimitKind, usize, usize) {
+        match error {
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(kind),
+                observed,
+                maximum,
+            } => (kind, observed, maximum),
+            other => panic!("expected a typed codec limit, got {other:?}"),
+        }
+    }
+
     #[test]
     fn root_proof_requires_exact_source_identity_and_falls_back_safely() {
         let invalid_proof = SlideRootProof::new(VALID_ROOT, None);
@@ -1859,5 +1906,73 @@ mod slide_root_proof_tests {
                 .expect("same pointer with a different length must use the raw fallback"),
             Conformance::Transitional
         );
+    }
+
+    #[test]
+    fn reused_default_proof_revalidates_tighter_depth_and_attribute_limits() {
+        let depth_xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:x><p:y/></p:x></p:sld>"#.to_vec();
+        let depth_proof =
+            SlideRootProof::new(depth_xml.as_slice(), Some(Conformance::Transitional));
+        let depth_limits = Limits {
+            max_depth: 1,
+            ..Limits::DEFAULT
+        };
+        let reused_depth =
+            resolve_slide_root(depth_xml.as_slice(), Some(&depth_proof), depth_limits)
+                .expect_err("a tighter depth must not trust the default proof");
+        let fresh_depth = resolve_slide_root(depth_xml.as_slice(), None, depth_limits)
+            .expect_err("the cold scan must refuse the same depth");
+        let reused_depth = limit_dimensions(reused_depth);
+        let fresh_depth = limit_dimensions(fresh_depth);
+        assert_eq!(reused_depth, fresh_depth);
+        assert_eq!(fresh_depth, (crate::error::CodecLimitKind::XmlDepth, 2, 1));
+
+        let attribute_xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:x a="1234"/></p:sld>"#.to_vec();
+        let attribute_proof =
+            SlideRootProof::new(attribute_xml.as_slice(), Some(Conformance::Transitional));
+        let attribute_limits = Limits {
+            max_attribute_bytes: 4,
+            ..Limits::DEFAULT
+        };
+        let reused_attribute = resolve_slide_root(
+            attribute_xml.as_slice(),
+            Some(&attribute_proof),
+            attribute_limits,
+        )
+        .expect_err("a tighter attribute budget must not trust the default proof");
+        let fresh_attribute = resolve_slide_root(attribute_xml.as_slice(), None, attribute_limits)
+            .expect_err("the cold scan must refuse the same attribute budget");
+        let reused_attribute = limit_dimensions(reused_attribute);
+        let fresh_attribute = limit_dimensions(fresh_attribute);
+        assert_eq!(reused_attribute, fresh_attribute);
+        assert_eq!(
+            fresh_attribute,
+            (crate::error::CodecLimitKind::XmlAttributeBytes, 5, 4)
+        );
+
+        assert_eq!(
+            resolve_slide_root(
+                VALID_ROOT,
+                Some(&SlideRootProof::new(
+                    VALID_ROOT,
+                    Some(Conformance::Transitional),
+                )),
+                Limits::DEFAULT
+            )
+            .expect("default bounds retain the memo fast path"),
+            Conformance::Transitional
+        );
+    }
+
+    #[test]
+    fn source_admission_does_not_trust_a_foreign_blob_observation() {
+        let proof =
+            SlideRootProof::with_source_checked(VALID_ROOT, Some(Conformance::Transitional), true);
+        assert!(source_proof_matches_current(Some(&proof), VALID_ROOT));
+        let copy = VALID_ROOT.to_vec();
+        assert!(!source_proof_matches_current(Some(&proof), &copy));
+        let shortened = &VALID_ROOT_WITH_TRAILING_SPACE[..VALID_ROOT.len()];
+        assert!(!source_proof_matches_current(Some(&proof), shortened));
+        assert!(!source_proof_matches_current(None, VALID_ROOT));
     }
 }

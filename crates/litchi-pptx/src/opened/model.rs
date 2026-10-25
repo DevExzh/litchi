@@ -713,7 +713,16 @@ impl Snapshot {
         // allocation the rebound package itself holds, each retaining that
         // package's own `Arc`; like the digest projection, a table that cannot
         // be reserved is empty, which only costs a later scan (ADR 0032).
-        let slide_roots = Arc::new(self.slide_roots.project(|key| part_digests.owner_for(key)));
+        // A slide-root memo also carries the source-profile admission proved
+        // while its entries were captured. Byte-identical rebinding under a
+        // tighter physical profile must not inherit those proofs; dropping
+        // the table costs only the next bounded root scan and keeps the memo
+        // entry footprint unchanged.
+        let slide_roots = if self.package.read_limits() == package.read_limits() {
+            Arc::new(self.slide_roots.project(|key| part_digests.owner_for(key)))
+        } else {
+            Arc::new(SlideRootMemo::default())
+        };
         Self {
             // `packages_equal` proves the fingerprint inputs are identical; it
             // says nothing about ZIP ordering, compression, or retained source
@@ -929,7 +938,8 @@ fn capture_internal(
         semantic_limits.clone(),
     );
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
-    let captured = view.capture_slides_with_mce(&mut mce_capture, parent_roots)?;
+    let captured =
+        view.capture_slides_with_mce(&mut mce_capture, parent_roots, package.read_limits())?;
     if references.len() != captured.slides.len() {
         return Err(invalid(
             "opened-presentation slide references do not resolve one-to-one",

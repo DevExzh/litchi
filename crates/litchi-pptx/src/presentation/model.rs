@@ -255,8 +255,9 @@ impl<'a> Presentation<'a> {
         &self,
         capture: &mut crate::parts::MceCapture<'a, 'parent>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_limits: litchi_opc::SourceLimits,
     ) -> Result<package::CaptureSlides<'a>> {
-        package::capture_slides_with_mce(self, capture, proved_roots)
+        package::capture_slides_with_mce(self, capture, proved_roots, source_limits)
     }
 
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.

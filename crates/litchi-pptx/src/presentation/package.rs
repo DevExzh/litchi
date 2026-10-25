@@ -6,8 +6,8 @@
 use litchi_core::{
     SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
 };
-use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{OpcPackage, SourceLimits};
 use std::io::Write;
 
 use crate::notes::SlideRootProof;
@@ -30,6 +30,21 @@ pub(crate) struct CaptureSlides<'a> {
     pub(crate) slide_root_proofs: Option<Vec<SlideRootProof<'a>>>,
 }
 
+/// Validate and wrap a slide after an earlier producer-name projection has
+/// failed. The caller deliberately keeps this root-only fallback so the first
+/// name error retains its deferred ordering, but physical source admission
+/// must still precede the MCE parse.
+pub(crate) fn root_only_slide_with_source_limits<'a>(
+    part: &'a dyn litchi_opc::Part,
+    source_limits: Option<SourceLimits>,
+) -> Result<SlidePart<'a>> {
+    if let Some(source_limits) = source_limits {
+        let source = crate::parts::raw_xml(part)?;
+        crate::parts::validate_source_part_xml(source, source_limits)?;
+    }
+    SlidePart::from_part(part)
+}
+
 pub(super) fn validate_slide_catalog(
     package: &OpcPackage,
     presentation: &PresentationPart<'_>,
@@ -48,7 +63,7 @@ pub(super) fn validate_slide_catalog(
 
 #[cfg(test)]
 pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<CaptureSlides<'a>> {
-    capture_slides_inner(presentation, None, None)
+    capture_slides_inner(presentation, None, None, None)
 }
 
 /// Capture every slide, reusing MCE projections the parent snapshot retained
@@ -58,14 +73,21 @@ pub(crate) fn capture_slides_with_mce<'a, 'parent>(
     presentation: &Presentation<'a>,
     capture: &mut MceCapture<'a, 'parent>,
     proved_roots: Option<&crate::notes::SlideRootMemo>,
+    source_limits: SourceLimits,
 ) -> Result<CaptureSlides<'a>> {
-    capture_slides_inner(presentation, Some(capture), proved_roots)
+    capture_slides_inner(
+        presentation,
+        Some(capture),
+        proved_roots,
+        Some(source_limits),
+    )
 }
 
 fn capture_slides_inner<'a, 'parent>(
     presentation: &Presentation<'a>,
     mut capture: Option<&mut MceCapture<'a, 'parent>>,
     proved_roots: Option<&crate::notes::SlideRootMemo>,
+    source_limits: Option<SourceLimits>,
 ) -> Result<CaptureSlides<'a>> {
     let package = presentation.package();
     let references = presentation.catalog()?;
@@ -94,12 +116,20 @@ fn capture_slides_inner<'a, 'parent>(
         )?;
         let (slide_part, name) = if first_name_error.is_none() {
             let (slide_part, name, notes_proof) = match capture.as_deref_mut() {
-                Some(capture) => SlidePart::from_part_with_name_with_capture(
-                    part,
-                    collect_notes_proofs,
-                    capture,
-                    proved_roots,
-                )?,
+                Some(capture) => {
+                    let Some(source_limits) = source_limits else {
+                        return Err(crate::Error::Invalid(
+                            "captured slides lack source limits".to_owned(),
+                        ));
+                    };
+                    SlidePart::from_part_with_name_with_capture(
+                        part,
+                        collect_notes_proofs,
+                        capture,
+                        proved_roots,
+                        source_limits,
+                    )?
+                },
                 None => SlidePart::from_part_with_name(part, collect_notes_proofs)?,
             };
             if let Some(proof) = notes_proof {
@@ -119,7 +149,10 @@ fn capture_slides_inner<'a, 'parent>(
             };
             (slide_part, name)
         } else {
-            (SlidePart::from_part(part)?, None)
+            (
+                root_only_slide_with_source_limits(part, source_limits)?,
+                None,
+            )
         };
         slides.push(CaptureSlide {
             slide: Slide::new_with_shape_and_semantic_limits(
@@ -428,4 +461,34 @@ fn slide_part<'a>(
         |part| part.content_type(),
     )?;
     SlidePart::from_part(part)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::root_only_slide_with_source_limits;
+    use crate::Error;
+    use litchi_opc::{BlobPart, OpcError, PackURI, SourceLimitKind, SourceLimits};
+
+    #[test]
+    fn root_only_fallback_admits_source_before_mce() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:x/></p:sld>"#;
+        let part = BlobPart::new(
+            PackURI::new("/ppt/slides/fallback.xml").expect("valid part name"),
+            crate::notes::SLIDE_CT.to_owned(),
+            xml.to_vec(),
+        );
+        let limits = SourceLimits::builder()
+            .max_events(2)
+            .expect("valid event limit")
+            .build()
+            .expect("valid source profile");
+        assert!(matches!(
+            root_only_slide_with_source_limits(&part, Some(limits)),
+            Err(Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::Events,
+                observed: 3,
+                maximum: 2,
+            }))
+        ));
+    }
 }

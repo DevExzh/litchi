@@ -6,14 +6,14 @@ use std::collections::HashSet;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::{OpcPackage, Part, SourceLimits};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
 
 use super::{
-    MceCapture, invalid, processed_xml, processed_xml_with_capture, processed_xml_with_source,
-    related_part_by_type, validate_content_type,
+    MceCapture, invalid, processed_xml, processed_xml_with_source, raw_xml, related_part_by_type,
+    validate_content_type, validate_source_part_xml,
 };
 use crate::leniency::{MarkupDefect, ToleranceReport};
 use crate::notes::SlideRootProof;
@@ -1642,24 +1642,36 @@ impl<'a> SlidePart<'a> {
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
         let xml = processed_xml_with_source(part)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml, None)
+        Self::finish_from_processed(part, collect_notes_proof, xml, None, false)
     }
 
     /// Capture variant that may reuse a default-profile transformed slide
     /// projection already retained by the opened snapshot, and a notes-root
     /// classification an earlier capture proved for the same payload
-    /// allocation. Every source, root, name, and MCE limit check still runs
-    /// for this call; only the complete notes-root scan of a payload whose
-    /// classification is already proved is not repeated.
+    /// allocation. Source, name, and MCE checks still run for this call; an
+    /// exact notes-root proof may answer the root classification without
+    /// repeating its complete bounded scan.
     pub(crate) fn from_part_with_name_with_capture<'parent>(
         part: &'a dyn Part,
         collect_notes_proof: bool,
         capture: &mut MceCapture<'a, 'parent>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_limits: SourceLimits,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
-        let xml = processed_xml_with_capture(part, capture)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots)
+        let source = raw_xml(part)?;
+        // A memo hit was admitted from this package's source profile during
+        // the preceding capture. Reusing it avoids a second physical XML
+        // scan; misses and the first capture must still honor the selected
+        // source event, depth, attribute, and part-byte limits before MCE.
+        let memo_hit = proved_roots.and_then(|memo| memo.lookup(source)).is_some();
+        if !memo_hit {
+            validate_source_part_xml(source, source_limits)?;
+        }
+        let source_checked = true;
+        let processed = capture.process(source)?;
+        let xml = super::ProcessedXml { source, processed };
+        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots, source_checked)
     }
 
     fn finish_from_processed(
@@ -1667,6 +1679,7 @@ impl<'a> SlidePart<'a> {
         collect_notes_proof: bool,
         xml: super::ProcessedXml<'a>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_checked: bool,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         if root_name_from_xml(xml.processed.as_ref())? != "sld" {
             return Err(invalid("slide part does not have a p:sld root"));
@@ -1705,7 +1718,11 @@ impl<'a> SlidePart<'a> {
                     },
                     None => scan()?,
                 };
-                Ok(SlideRootProof::new(xml.source, conformance))
+                Ok(SlideRootProof::with_source_checked(
+                    xml.source,
+                    conformance,
+                    source_checked,
+                ))
             })
             .transpose()?;
         drop(xml);

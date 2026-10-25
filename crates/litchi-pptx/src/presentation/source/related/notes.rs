@@ -31,10 +31,46 @@ trait PartLoader {
         uri: &PackURI,
         content_type: &str,
         maximum: usize,
-        operation: impl FnOnce(&dyn Part) -> Result<T>,
+        operation: impl FnOnce(&dyn Part, usize) -> Result<T>,
     ) -> Result<T>;
 
     fn exists(&self, uri: &PackURI) -> Result<()>;
+}
+
+/// Charge the selected notes payload, notes master, and theme exactly once.
+///
+/// The owning slide and presentation root have independent related-root
+/// ceilings and are intentionally not part of this notes-family aggregate.
+/// The charge is measured from the raw part payload, before any
+/// markup-compatibility promotion, so source-backed and eager reads apply the
+/// same physical-byte policy.
+struct AggregateBytes {
+    observed: usize,
+    maximum: usize,
+}
+
+impl AggregateBytes {
+    fn new(maximum: usize) -> Self {
+        Self {
+            observed: 0,
+            maximum,
+        }
+    }
+
+    fn observe(&mut self, bytes: usize) -> Result<()> {
+        self.observed = self
+            .observed
+            .checked_add(bytes)
+            .ok_or_else(|| invalid("notes aggregate bytes overflow"))?;
+        if self.observed > self.maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.observed,
+                self.maximum,
+            ));
+        }
+        Ok(())
+    }
 }
 
 struct SourceLoader<'a> {
@@ -47,10 +83,14 @@ impl PartLoader for SourceLoader<'_> {
         uri: &PackURI,
         content_type: &str,
         maximum: usize,
-        operation: impl FnOnce(&dyn Part) -> Result<T>,
+        operation: impl FnOnce(&dyn Part, usize) -> Result<T>,
     ) -> Result<T> {
         let part = super::load_part(self.owner, uri, content_type, maximum)?;
-        operation(&part)
+        // `load_part` may retain MCE-promoted XML in `Part::blob()`.  The
+        // notes aggregate follows the physical source contract, so charge
+        // the original managed payload rather than that processed view.
+        let raw_bytes = part.source_data().as_bytes().len();
+        operation(&part, raw_bytes)
     }
 
     fn exists(&self, uri: &PackURI) -> Result<()> {
@@ -68,7 +108,7 @@ impl PartLoader for EagerLoader<'_> {
         uri: &PackURI,
         content_type: &str,
         maximum: usize,
-        operation: impl FnOnce(&dyn Part) -> Result<T>,
+        operation: impl FnOnce(&dyn Part, usize) -> Result<T>,
     ) -> Result<T> {
         let part = self
             .package
@@ -80,8 +120,9 @@ impl PartLoader for EagerLoader<'_> {
                 actual: part.content_type().to_owned(),
             });
         }
+        let raw_bytes = part.blob().len();
         let processed = super::process_eager_part(part, maximum, self.package.read_limits())?;
-        operation(&processed)
+        operation(&processed, raw_bytes)
     }
 
     fn exists(&self, uri: &PackURI) -> Result<()> {
@@ -107,6 +148,7 @@ pub(super) fn validate_with_limits(
         &presentation_uri,
         &presentation_content_type,
         part,
+        part.source_data().as_bytes().len(),
         limits,
     )
 }
@@ -126,13 +168,14 @@ pub(super) fn validate_eager_with_limits(
         &notes_uri,
         ct::PML_NOTES_SLIDE,
         MAX_NOTES_XML.min(limits.max_input_bytes),
-        |selected| {
+        |selected, raw_bytes| {
             validate_selected(
                 &loader,
                 slide.partname(),
                 &presentation_uri,
                 &presentation_content_type,
                 selected,
+                raw_bytes,
                 limits,
             )
         },
@@ -158,10 +201,18 @@ fn validate_selected<L: PartLoader>(
     presentation_uri: &PackURI,
     presentation_content_type: &str,
     part: &dyn Part,
+    notes_bytes: usize,
     limits: Limits,
 ) -> Result<()> {
     require_content_type(part, ct::PML_NOTES_SLIDE)?;
     validate_leaf_path(part.partname(), "/ppt/notesSlides/")?;
+
+    // This is deliberately the raw source payload length.  A source-backed
+    // loader can expose MCE-promoted bytes through `Part::blob()`, while the
+    // selected notes aggregate is the same physical notes/master/theme
+    // budget constrained by `SourceLimits::max_total_part_bytes`.
+    let mut aggregate = AggregateBytes::new(limits.max_total_bytes);
+    aggregate.observe(notes_bytes)?;
 
     let conformance = validate_xml(
         part,
@@ -177,8 +228,14 @@ fn validate_selected<L: PartLoader>(
     let slide_conformance = loader.with_part(
         slide,
         ct::PML_SLIDE,
-        MAX_SLIDE_XML.min(limits.max_input_bytes),
-        |slide_part| root_conformance_with_limits(slide_part.blob(), MAX_SLIDE_XML, "sld", limits),
+        // Slide XML has its own 16-MiB related-root ceiling.  The selected
+        // notes policy still governs the notes, master, theme, and
+        // presentation roots, but must not narrow this owning-slide proof to
+        // the notes payload's default 8-MiB limit.
+        MAX_SLIDE_XML,
+        |slide_part, _raw_bytes| {
+            root_conformance_with_limits(slide_part.blob(), MAX_SLIDE_XML, "sld", limits)
+        },
     )?;
     if slide_conformance != conformance {
         return Err(invalid("notes slide and owning slide conformance differ"));
@@ -203,7 +260,8 @@ fn validate_selected<L: PartLoader>(
         &master_target,
         ct::PML_NOTES_MASTER,
         MAX_MASTER_XML.min(limits.max_input_bytes),
-        |master| {
+        |master, raw_bytes| {
+            aggregate.observe(raw_bytes)?;
             let master_conformance = validate_xml(
                 master,
                 MAX_MASTER_XML,
@@ -224,7 +282,8 @@ fn validate_selected<L: PartLoader>(
         &theme_target,
         crate::notes::THEME_CT,
         MAX_THEME_XML.min(limits.max_input_bytes),
-        |theme| {
+        |theme, raw_bytes| {
+            aggregate.observe(raw_bytes)?;
             let theme_conformance =
                 validate_xml(theme, MAX_THEME_XML, "theme", "notes-master theme", limits)?;
             validate_opaque_relationships(loader, theme)?;
@@ -269,7 +328,7 @@ fn validate_presentation_notes_master<L: PartLoader>(
         presentation_uri,
         presentation_content_type,
         MAX_PRESENTATION_XML.min(limits.max_input_bytes),
-        |presentation| {
+        |presentation, _raw_bytes| {
             let presentation_conformance = root_conformance_with_limits(
                 presentation.blob(),
                 MAX_PRESENTATION_XML,
@@ -469,6 +528,14 @@ fn validate_leaf_path(uri: &PackURI, prefix: &str) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn invalid(message: &'static str) -> Error {
