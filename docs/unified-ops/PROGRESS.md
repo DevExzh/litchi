@@ -4729,3 +4729,22 @@ See [0063](0063-source-pptx-modern-comments.md).
   independent review. Slots 1–4 remain XLS, DOCX, SpreadsheetDrawing and
   crypto. All final capture, gate and performance obligations remain active;
   nothing is pushed.
+
+- Coordinator corrected tooling result (2026-10-25):
+  DrawingML's explicit historical/current adapter repair merges at
+  `264316098e` from reviewed `1c210ac24e`. Fourteen focused protocol tests
+  pass. The full current tooling row then passes on clean `1bc3769f43`:
+  1,689 tests in 107.073 seconds, zero target bytes, empty Cargo trace,
+  unchanged locks and no remaining owned processes. Root verifies all
+  artifact identities; record 0362ul58 binds the result and retains the
+  previous failed row through 0362ul57. This remains one row of the full gate.
+
+  PPT `5a3d8ee950` now passes independent source review of exact recursive
+  aggregate admission and valid-source removal at exact record/payload
+  ceilings. It joins ODF in the validation queue. SpreadsheetDrawing's
+  final source delta is independently ready, while guarded validation remains
+  required. Crypto is validating the remaining encrypted DOCX/PPTX/ops
+  consumers. The font adapter now includes a pinned exact zlib workspace
+  query and is under source review; no lock refresh or final performance
+  acceptance is claimed. Four bounded validation slots remain active, and
+  nothing is pushed.
