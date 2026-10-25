@@ -991,7 +991,7 @@ def main(argv: list[str]) -> int:
     arguments = parser.parse_args(argv)
     try:
         prepare(arguments.source_root, arguments.output_root)
-    except (OSError, PolicyError) as error:
+    except (OSError, ValueError) as error:
         parser.error(str(error))
     return 0
 
