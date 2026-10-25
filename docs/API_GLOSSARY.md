@@ -3222,6 +3222,21 @@ and writer stays; the names follow the focused-module rule. The
 | `litchi_sheet_text::{sylk, dif, fixed_width}::{Options, read, write}` | adopted (0354); replace `SylkConfig`/`DifConfig`/`FixedWidthConfig`, the `*Parser` types and `read_*`/`write_*` |
 | `litchi_sheet_text::{Encoding, SourceLimits, SemanticLimits, LimitKind, SourceLimitKind, SemanticLimitKind, Error, Format, OptionKind}` | adopted (0354); every reader takes caller limits (`max_input_bytes`, `max_cells`); `litchi_ops::import::Encoding` is this `Encoding` |
 
+## Markdown reader owner policy (record 0362ul70)
+
+`litchi-markdown::reader::Snapshot` is an immutable exact-source owner, not a
+detached raw codec. Its finite CommonMark defaults remain valid owner
+convenience constructors; a selected grammar or stricter policy enters through
+one retained `OpenOptions` value and is reused for edits, rendering, and patch
+replay. The public limit-bearing `Snapshot::read_with` entry is removed; raw
+record-limit signatures are not applicable because the parser is crate-private.
+
+| Name | Status |
+|---|---|
+| `litchi_markdown::{OpenOptions, reader::OpenOptions}` | adopted (0362ul70; `dialect`/`read_limits` consuming setters and `*_value()` getters) |
+| `litchi_markdown::reader::Snapshot::{read, read_bytes, read_with_options, read_bytes_with_options}` | adopted (0362ul70; default finite owner ingress plus canonical retained options) |
+| `litchi_markdown::reader::{Edit, Patch, Commit, Diagnostics}` | adopted (0362ul70; reader family registered with the shared `Commit` alias and owner replay result) |
+
 Structured keywords (owner decision 0350, memo item 20):
 
 | Name | Status |

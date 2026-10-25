@@ -1,7 +1,7 @@
 use litchi_markdown::reader::{
     BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, Patch,
-    PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind, ReadLimits, ReferenceKind,
-    Snapshot,
+    OpenOptions, PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind, ReadLimits,
+    ReferenceKind, Snapshot,
 };
 
 #[test]
@@ -83,13 +83,13 @@ fn gfm_extensions_are_explicit_and_deterministic() -> Result<(), Error> {
         Some(BlockKind::Paragraph)
     );
 
-    let gfm = Snapshot::read_with(table, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let gfm = read_with_policy(table, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     assert_eq!(
         gfm.block(0).map(|block| block.kind()),
         Some(BlockKind::Table)
     );
 
-    let footnote = Snapshot::read_with(
+    let footnote = read_with_policy(
         "body[^n]\n\n[^n]: note",
         Dialect::GitHubFlavored,
         ReadLimits::DEFAULT,
@@ -99,6 +99,33 @@ fn gfm_extensions_are_explicit_and_deterministic() -> Result<(), Error> {
         footnote.block(1).map(|block| block.kind()),
         Some(BlockKind::FootnoteDefinition)
     );
+    Ok(())
+}
+
+#[test]
+fn open_options_are_retained_across_text_and_bytes_ingress() -> Result<(), Error> {
+    let limits = ReadLimits {
+        max_operations: 1,
+        ..ReadLimits::DEFAULT
+    };
+    let options = OpenOptions::new()
+        .dialect(Dialect::GitHubFlavored)
+        .read_limits(limits);
+    let source = "| a | b |\n| - | - |\n| x | y |";
+    let snapshot = Snapshot::read_with_options(source, options)?;
+    assert_eq!(snapshot.dialect(), Dialect::GitHubFlavored);
+    assert_eq!(snapshot.limits(), limits);
+    assert_eq!(snapshot.block(0).map(|block| block.kind()), Some(BlockKind::Table));
+
+    let bytes = Snapshot::read_bytes_with_options(source.as_bytes(), options)?;
+    assert_eq!(bytes.source(), source);
+    assert_eq!(bytes.dialect(), Dialect::GitHubFlavored);
+    assert_eq!(bytes.limits(), limits);
+
+    let mut edit = snapshot.edit();
+    edit.append_block("tail")?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.package().limits(), limits);
     Ok(())
 }
 
@@ -118,7 +145,7 @@ fn gfm_extended_autolinks_preserve_source_ranges_and_transfer() -> Result<(), Er
         "<p>Visit www.commonmark.org/help and foo@bar.baz.</p>\n"
     );
 
-    let gfm = Snapshot::read_with(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let gfm = read_with_policy(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     let links: Vec<_> = gfm
         .block(0)
         .ok_or(Error::BlockNotFound { position: 0 })?
@@ -144,7 +171,7 @@ fn gfm_extended_autolinks_preserve_source_ranges_and_transfer() -> Result<(), Er
     );
 
     let destination =
-        Snapshot::read_with("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+        read_with_policy("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     let transferred = gfm.preflight_transfer_block(0, &destination)?.into_commit();
     assert!(transferred.package().references().any(|reference| {
         reference.kind() == ReferenceKind::Link
@@ -156,7 +183,7 @@ fn gfm_extended_autolinks_preserve_source_ranges_and_transfer() -> Result<(), Er
 #[test]
 fn gfm_tagfilter_changes_html_without_changing_retained_source() -> Result<(), Error> {
     let source = "<strong> <title> <style> <em>";
-    let snapshot = Snapshot::read_with(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let snapshot = read_with_policy(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     assert_eq!(snapshot.source(), source);
     assert_eq!(
         snapshot.to_html()?,
@@ -260,13 +287,13 @@ fn contained_link_definitions_are_nested_and_remain_reference_aware() -> Result<
 
 #[test]
 fn dependency_aware_transfer_and_projection_are_preflighted() -> Result<(), Error> {
-    let source = Snapshot::read_with(
+    let source = read_with_policy(
         "[linked][id] and a note[^n]\n\n[id]: /target \"title\"\n\n[^n]: note body",
         Dialect::GitHubFlavored,
         ReadLimits::DEFAULT,
     )?;
     let destination =
-        Snapshot::read_with("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+        read_with_policy("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     let plan = source.preflight_transfer_block(0, &destination)?;
     assert_eq!(plan.dependency_count(), 2);
     assert_eq!(destination.source(), "Destination");
@@ -278,7 +305,7 @@ fn dependency_aware_transfer_and_projection_are_preflighted() -> Result<(), Erro
         reference.kind() == ReferenceKind::FootnoteDefinition && reference.label() == Some("n")
     }));
 
-    let feature_source = Snapshot::read_with(
+    let feature_source = read_with_policy(
         "| a |\n| - |\n| b |\n\n- [x] done\n\nraw <i>x</i>[^n]\n\n[^n]: note",
         Dialect::GitHubFlavored,
         ReadLimits::DEFAULT,
@@ -337,7 +364,7 @@ fn literal_edit_helpers_cannot_inject_markdown_blocks() -> Result<(), Error> {
 #[test]
 fn inline_ast_and_reference_graph_retain_exact_ranges() -> Result<(), Error> {
     let source = "Text *em **strong** [link][id]* and `code` ![alt](img.png \"t\") <b>x</b>.[^n]\n\n[id]: /target \"title\"\n\n[^n]: note";
-    let snapshot = Snapshot::read_with(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
+    let snapshot = read_with_policy(source, Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     let paragraph = snapshot
         .block(0)
         .ok_or(Error::BlockNotFound { position: 0 })?;
@@ -472,6 +499,177 @@ fn bounded_history_is_commit_coupled_and_reversible() -> Result<(), Error> {
 }
 
 #[test]
+fn replay_keeps_recipient_policy_for_noop_and_changed_commits() -> Result<(), Error> {
+    let producer = Snapshot::read("one")?;
+    let recipient_limits = ReadLimits {
+        max_operations: 1,
+        ..ReadLimits::DEFAULT
+    };
+    let recipient = Snapshot::read_with_options(
+        "one",
+        OpenOptions::default().read_limits(recipient_limits),
+    )?;
+
+    let mut no_op_edit = producer.edit();
+    no_op_edit.replace_block(0, "one")?;
+    let no_op = no_op_edit.commit()?;
+    assert!(no_op.patch().is_empty());
+    let no_op_replay = recipient.apply(no_op.patch())?;
+    assert_eq!(no_op_replay.package().source(), "one");
+    assert_eq!(no_op_replay.package().limits(), recipient_limits);
+
+    let mut changed_edit = producer.edit();
+    changed_edit.replace_block(0, "two")?;
+    let changed = changed_edit.commit()?;
+    let changed_replay = recipient.apply(changed.patch())?;
+    assert_eq!(changed_replay.package().source(), "two");
+    assert_eq!(changed_replay.package().limits(), recipient_limits);
+
+    let mut history = History::new(
+        recipient,
+        HistoryLimits {
+            max_entries: 2,
+            max_patch_bytes: 1_024,
+        },
+    )?;
+    history.apply(no_op)?;
+    assert_eq!(history.current().limits(), recipient_limits);
+    history.apply(changed)?;
+    assert_eq!(history.current().source(), "two");
+    assert_eq!(history.current().limits(), recipient_limits);
+    assert!(history.undo()?);
+    assert_eq!(history.current().limits(), recipient_limits);
+    assert!(history.redo()?);
+    assert_eq!(history.current().limits(), recipient_limits);
+    Ok(())
+}
+
+#[test]
+fn replay_rejects_stricter_recipient_policy_atomically_and_keeps_dialect_explicit() -> Result<(), Error>
+{
+    let producer = Snapshot::read("one")?;
+    let strict_limits = ReadLimits {
+        max_source_bytes: 3,
+        ..ReadLimits::DEFAULT
+    };
+    let recipient = Snapshot::read_with_options(
+        "one",
+        OpenOptions::default().read_limits(strict_limits),
+    )?;
+    let mut edit = producer.edit();
+    edit.replace_block(0, "long")?;
+    let commit = edit.commit()?;
+    assert!(matches!(
+        recipient.apply(commit.patch()),
+        Err(Error::SourceTooLarge {
+            actual: 4,
+            limit: 3
+        })
+    ));
+
+    let operation_recipient_limits = ReadLimits {
+        max_operations: 1,
+        ..ReadLimits::DEFAULT
+    };
+    let operation_recipient = Snapshot::read_with_options(
+        "one",
+        OpenOptions::default().read_limits(operation_recipient_limits),
+    )?;
+    let mut multi_edit = producer.edit();
+    multi_edit.replace_block(0, "two")?.append_block("three")?;
+    let multi_commit = multi_edit.commit()?;
+    assert!(matches!(
+        operation_recipient.apply(multi_commit.patch()),
+        Err(Error::OperationLimitExceeded { limit: 1 })
+    ));
+
+    let mut history = History::new(
+        recipient,
+        HistoryLimits {
+            max_entries: 2,
+            max_patch_bytes: 1_024,
+        },
+    )?;
+    assert!(matches!(
+        history.apply(commit),
+        Err(Error::SourceTooLarge {
+            actual: 4,
+            limit: 3
+        })
+    ));
+    assert_eq!(history.current().source(), "one");
+    assert_eq!(history.current().limits(), strict_limits);
+    assert!(!history.undo()?);
+    assert!(!history.redo()?);
+
+    let commonmark = Snapshot::read("~~same~~")?;
+    let gfm = Snapshot::read_with_options(
+        "~~same~~",
+        OpenOptions::default().dialect(Dialect::GitHubFlavored),
+    )?;
+    let mut gfm_edit = gfm.edit();
+    gfm_edit.append_block("tail")?;
+    let gfm_commit = gfm_edit.commit()?;
+    assert!(matches!(
+        commonmark.apply(gfm_commit.patch()),
+        Err(Error::PatchConflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn strict_history_replay_failure_preserves_existing_undo_and_redo_branches() -> Result<(), Error> {
+    let producer = Snapshot::read("one")?;
+    let strict_limits = ReadLimits {
+        max_source_bytes: 3,
+        ..ReadLimits::DEFAULT
+    };
+    let recipient = Snapshot::read_with_options(
+        "one",
+        OpenOptions::default().read_limits(strict_limits),
+    )?;
+    let mut history = History::new(
+        recipient,
+        HistoryLimits {
+            max_entries: 4,
+            max_patch_bytes: 1_024,
+        },
+    )?;
+
+    let mut first_edit = producer.edit();
+    first_edit.replace_block(0, "two")?;
+    history.apply(first_edit.commit()?)?;
+
+    let second_base = Snapshot::read("two")?;
+    let mut second_edit = second_base.edit();
+    second_edit.replace_block(0, "red")?;
+    history.apply(second_edit.commit()?)?;
+    assert!(history.undo()?);
+    assert_eq!(history.current().source(), "two");
+
+    let failing_base = Snapshot::read("two")?;
+    let mut failing_edit = failing_base.edit();
+    failing_edit.replace_block(0, "long")?;
+    assert!(matches!(
+        history.apply(failing_edit.commit()?),
+        Err(Error::SourceTooLarge {
+            actual: 4,
+            limit: 3
+        })
+    ));
+    assert_eq!(history.current().source(), "two");
+    assert_eq!(history.current().limits(), strict_limits);
+
+    assert!(history.undo()?);
+    assert_eq!(history.current().source(), "one");
+    assert!(history.redo()?);
+    assert_eq!(history.current().source(), "two");
+    assert!(history.redo()?);
+    assert_eq!(history.current().source(), "red");
+    Ok(())
+}
+
+#[test]
 fn durable_patch_json_is_deterministic_bounded_and_semantically_verified() -> Result<(), Error> {
     let source = Snapshot::read("one\n\ntwo")?;
     let mut edit = source.edit();
@@ -587,7 +785,7 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
         ..ReadLimits::DEFAULT
     };
     assert!(matches!(
-        Snapshot::read_with("four", Dialect::CommonMark, source_limit),
+        read_with_policy("four", Dialect::CommonMark, source_limit),
         Err(Error::SourceTooLarge {
             actual: 4,
             limit: 3
@@ -599,7 +797,7 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
         ..ReadLimits::DEFAULT
     };
     assert!(matches!(
-        Snapshot::read_with("ok\nfour", Dialect::CommonMark, line_limit),
+        read_with_policy("ok\nfour", Dialect::CommonMark, line_limit),
         Err(Error::LineTooLong {
             line: 2,
             actual: 4,
@@ -612,7 +810,7 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
         ..ReadLimits::DEFAULT
     };
     assert!(matches!(
-        Snapshot::read_with("one\n\ntwo", Dialect::CommonMark, block_limit),
+        read_with_policy("one\n\ntwo", Dialect::CommonMark, block_limit),
         Err(Error::BlockLimitExceeded { limit: 1 })
     ));
 
@@ -621,7 +819,7 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
         ..ReadLimits::DEFAULT
     };
     assert!(matches!(
-        Snapshot::read_with("one", Dialect::CommonMark, event_limit),
+        read_with_policy("one", Dialect::CommonMark, event_limit),
         Err(Error::EventLimitExceeded { limit: 2 })
     ));
 
@@ -630,7 +828,7 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
         ..ReadLimits::DEFAULT
     };
     assert!(matches!(
-        Snapshot::read_with("- ***deep***", Dialect::CommonMark, depth_limit),
+        read_with_policy("- ***deep***", Dialect::CommonMark, depth_limit),
         Err(Error::NestingLimitExceeded { limit: 2, .. })
     ));
 
@@ -639,7 +837,7 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
         ..ReadLimits::DEFAULT
     };
     assert!(matches!(
-        Snapshot::read_with("", Dialect::CommonMark, invalid_limits),
+        read_with_policy("", Dialect::CommonMark, invalid_limits),
         Err(Error::InvalidLimit { name: "max_events" })
     ));
 }
@@ -744,4 +942,15 @@ fn snapshots_are_send_sync_and_cheap_to_clone() -> Result<(), Error> {
     assert_eq!(joined, "# shared");
     assert_eq!(source.source(), "# shared");
     Ok(())
+}
+
+fn read_with_policy(
+    source: &str,
+    dialect: Dialect,
+    limits: ReadLimits,
+) -> Result<Snapshot, Error> {
+    Snapshot::read_with_options(
+        source,
+        OpenOptions::default().dialect(dialect).read_limits(limits),
+    )
 }

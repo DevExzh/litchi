@@ -9,6 +9,21 @@ reversible block edits, plus the `ToMarkdown` trait and configuration types
 used by Litchi's higher-level format adapters. It deliberately has no knowledge
 of any concrete document format.
 
+`Snapshot::read` and `Snapshot::read_bytes` are finite CommonMark convenience
+constructors. Callers that select GFM or a stricter policy use one retained
+`OpenOptions` value:
+
+```rust
+use litchi_markdown::OpenOptions;
+use litchi_markdown::reader::{Dialect, ReadLimits, Snapshot};
+
+let options = OpenOptions::default()
+    .dialect(Dialect::GitHubFlavored)
+    .read_limits(ReadLimits::DEFAULT);
+let source = Snapshot::read_with_options("# Original", options)?;
+# Ok::<(), litchi_markdown::reader::Error>(())
+```
+
 Snapshots expose source-ranged top-level blocks, nested block nodes, inline
 nodes, and a deterministic link/image/footnote reference graph. Transactions
 can stage multiple disjoint block, nested-block, and inline replacements plus

@@ -14,7 +14,7 @@ mod transaction;
 
 pub use model::{
     Block, BlockKind, Blocks, Dialect, Error, Inline, InlineKind, Inlines, NestedBlock,
-    NestedBlocks, ProjectionCapabilities, ProjectionIssue, ProjectionIssueKind,
+    NestedBlocks, OpenOptions, ProjectionCapabilities, ProjectionIssue, ProjectionIssueKind,
     ProjectionPreflight, ReadLimits, Reference, ReferenceKind, References, Snapshot,
 };
 pub use transaction::{
