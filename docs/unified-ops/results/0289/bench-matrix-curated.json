@@ -3134,6 +3134,122 @@
   {
    "record": "0362zada",
    "reason": "CFB VBA fallback/chart workspace correctness checks only; no leaf-versus-unified timing or allocation measurement is recorded."
+  },
+  {
+   "record": "0362ul3",
+   "reason": "Composed API-contract tooling receipt only: its test count, command runtime and source identity validate the contract boundary, not a leaf-versus-unified operation pair."
+  },
+  {
+   "record": "0362ul7",
+   "reason": "Source-role inventory and composed tooling evidence only; the descriptor/raw-reader review records API classification and tests, not a leaf-versus-unified timing or allocation pair."
+  },
+  {
+   "record": "0362ul8a",
+   "reason": "Composed source review and build-free Python validation only; the retained test count and command runtime are validation provenance, not a leaf-versus-unified performance measurement."
+  },
+  {
+   "record": "0362ul8c",
+   "reason": "Composed tooling receipt only; the command runtime and source index verify the tooling lane and contain no leaf-versus-unified operation measurement."
+  },
+  {
+   "record": "0362ul10f",
+   "reason": "Composed test receipt only: the command, test runtime and log identity validate the OLE protocol lane, not a leaf-versus-unified operation pair."
+  },
+  {
+   "record": "0362ul10i",
+   "reason": "Composed tooling receipt only; its exit code, command runtime and source index are validation provenance, not a leaf-versus-unified benchmark."
+  },
+  {
+   "record": "0362ul10j",
+   "reason": "Native correctness-oracle receipt only; its claim scope explicitly excludes timing, ABBA, calibration and qualification acceptance, so it has no leaf-versus-unified rows."
+  },
+  {
+   "record": "0362ul10k",
+   "reason": "Allocator correctness/observation diagnostic only; both retained receipts explicitly exclude timing, ABBA, calibration, acceptance and performance claims, so no leaf-versus-unified pair is present."
+  },
+  {
+   "record": "0362ul11",
+   "reason": "Historical API result-contract row-readiness inventory only: its 156/83 semantic rows are source-role and disposition counts, not performance measurements or leaf-versus-unified pairs."
+  },
+  {
+   "record": "0362ul12",
+   "reason": "Coordinator wave verification receipts only; protected-artifact and staging checks contain no leaf-versus-unified timing or allocation measurement."
+  },
+  {
+   "record": "0362ul13",
+   "reason": "Coordinator restore and quarantine verification only; retained paths, signals and cleanup status are operational evidence, not a leaf-versus-unified performance pair."
+  },
+  {
+   "record": "0362ul14",
+   "reason": "API inventory, source-role disposition and capture-verification receipts only; package/resource observations validate the contract capture and contain no leaf-versus-unified operation pair."
+  },
+  {
+   "record": "0362ul15",
+   "reason": "Worktree cleanup and retained-artifact verification only; preserved byte/file checks contain no leaf-versus-unified timing or allocation measurement."
+  },
+  {
+   "record": "0362ul16",
+   "reason": "Validation receipt explicitly records abba=false and performance_acceptance=false; its source/command checks contain no leaf-versus-unified benchmark rows."
+  },
+  {
+   "record": "0362ul16a",
+   "reason": "Validation receipt explicitly records abba=false and performance_acceptance=false; its source and rejected-attempt checks contain no leaf-versus-unified pair."
+  },
+  {
+   "record": "0362ul16b",
+   "reason": "Validation receipt explicitly records abba=false and performance_acceptance=false; the independent-review notification and source checks are not benchmark measurements."
+  },
+  {
+   "record": "0362ul16c",
+   "reason": "Source-preparation receipt explicitly sets qualification_claim=false; manifests, runner identity and planned execution contain no build result or leaf-versus-unified measurement."
+  },
+  {
+   "record": "0362ul16d",
+   "reason": "Source-rebind receipt explicitly sets qualification_claim=false; endpoint/runner identity and preserved packets are preparation evidence, not a leaf-versus-unified pair."
+  },
+  {
+   "record": "0362ul16e",
+   "reason": "Build-guard refusal receipt explicitly sets qualification_claim=false and records refusal before Cargo; it contains no successful paired performance measurement."
+  },
+  {
+   "record": "0362ul17",
+   "reason": "Worktree cleanup and restore verification only; retained artifact identities and source-worktree state contain no leaf-versus-unified timing or allocation pair."
+  },
+  {
+   "record": "0362ul18",
+   "reason": "Assembled-source equivalence and API capture verification only; source identity, inventory and disposition comparisons contain no leaf-versus-unified operation measurement."
+  },
+  {
+   "record": "0362ul19",
+   "reason": "Validation receipt explicitly records abba=false and performance_acceptance=false; its source-fidelity and review checks contain no leaf-versus-unified benchmark rows."
+  },
+  {
+   "record": "0362ul21",
+   "reason": "API capture/glossary/source-role and build-receipt manifest only; package build/resource fields are contract-validation provenance, not a leaf-versus-unified operation pair."
+  },
+  {
+   "record": "0362ul24",
+   "reason": "Signed-native consumer fixtures, probe and validator source only; no executed native result or leaf-versus-unified timing/allocation pair is retained."
+  },
+  {
+   "record": "0362ul26",
+   "reason": "Compile-only build-overlap guard and protocol receipt only; its source/check claims contain no leaf-versus-unified operation measurement."
+  },
+  {
+   "record": "0362ul29",
+   "reason": "Bounded gate tooling source, command plan and preserved failure diagnostic only; gate step counts and tooling tests are not leaf-versus-unified performance measurements."
+  },
+  {
+   "record": "0362ul30",
+   "reason": "ODF build/memory source-preparation and handoff repair receipts explicitly make no build, native run, timing, memory, qualification or acceptance claim; no paired benchmark rows are present."
+  },
+  {
+   "record": "0362ul32",
+   "reason": "W8 quiet-ABBA harness source only; the committed Python driver is not an executed result and contains no leaf-versus-unified measurement receipt."
+  },
+  {
+   "record": "0362ul48",
+   "reason": "IWork result-name migration Clippy receipts are compile/consumer-gate output, including a preserved fixture-setup failure and later pass; they contain no leaf-versus-unified timing or allocation pair."
   }
  ]
 }

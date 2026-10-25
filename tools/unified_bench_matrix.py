@@ -4034,7 +4034,9 @@ def outputs(rows, conflicts, agreements, cur):
 
 # Record 0344: evidence under `results/` belongs to the record its name
 # starts with (`0328/`, `0255-python-overhead.json`, `0251a-docx-…/`).
-EVIDENCE_NAME = re.compile(r"^(\d{4}[a-z]*)(?=[-.]|$)")
+# Follow-up IDs may contain a numeric segment after their alphabetic suffix
+# (`0362ul3`, `0362ul10f`); retain the full ID before the filename boundary.
+EVIDENCE_NAME = re.compile(r"^(\d{4}(?:[a-z]+(?:\d+[a-z]*)?)?)(?=[-.]|$)")
 # The matrix collects records from 0249 on (record 0289).
 FIRST_RECORD = 249
 
