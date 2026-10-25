@@ -182,6 +182,91 @@ fn order_staging_keeps_slide_payloads_deferred_until_a_logical_read() {
 }
 
 #[test]
+fn removal_dependent_then_insertion_respects_exact_selected_part_limit() {
+    let mut builder = crate::builder::Builder::new().unwrap();
+    builder
+        .presentation()
+        .unwrap()
+        .add_slide()
+        .unwrap()
+        .set_notes("owned by the removed slide");
+    builder.presentation().unwrap().add_slide().unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source_catalog =
+        litchi_opc::OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let source_parts = source_catalog.iter_parts().count();
+    assert!(source_parts > 1);
+    let ingress_limits = SourceLimits::builder()
+        .max_parts(source_parts)
+        .unwrap()
+        .build()
+        .unwrap();
+    let source = Package::from_read_at_with_options(
+        Arc::new(litchi_core::OwnedSource::new(bytes)),
+        crate::OpenOptions::default().source_limits(ingress_limits),
+    )
+    .unwrap();
+    let layout_name = source
+        .presentation()
+        .unwrap()
+        .slide(1)
+        .unwrap()
+        .layout()
+        .unwrap()
+        .unwrap()
+        .name()
+        .unwrap()
+        .to_owned();
+
+    // The removed slide contributes one exclusive notes Part.  Two inserted
+    // dependency-free slides exactly replace the removed slide and dependent,
+    // so the final catalog remains at the selected original source_parts.
+    let mut edit = source.edit().unwrap();
+    assert!(edit.remove_slide(Position::new(0)).unwrap());
+    edit.insert_slide(Position::new(0), &layout_name).unwrap();
+    edit.insert_slide(Position::new(1), &layout_name).unwrap();
+    let candidate = edit.commit().unwrap().into_package();
+    let output = candidate.to_bytes().unwrap();
+    let output_catalog =
+        litchi_opc::OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
+    assert_eq!(output_catalog.iter_parts().count(), source_parts);
+
+    let final_limits = SourceLimits::builder()
+        .max_parts(source_parts)
+        .unwrap()
+        .build()
+        .unwrap();
+    let reopened = Package::from_read_at_with_options(
+        Arc::new(litchi_core::OwnedSource::new(output.clone())),
+        crate::OpenOptions::default().source_limits(final_limits),
+    )
+    .unwrap();
+    assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 3);
+    let layout_name = reopened
+        .presentation()
+        .unwrap()
+        .slide(0)
+        .unwrap()
+        .layout()
+        .unwrap()
+        .unwrap()
+        .name()
+        .unwrap()
+        .to_owned();
+    let mut rejected = reopened.edit().unwrap();
+    assert!(matches!(
+        rejected.insert_slide(Position::new(2), &layout_name),
+        Err(crate::Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+            observed,
+            maximum,
+        }) if observed == source_parts + 1 && maximum == source_parts
+    ));
+    assert!(rejected.commit().unwrap().patch().is_noop());
+    assert_eq!(reopened.to_bytes().unwrap(), output);
+}
+
+#[test]
 fn rejected_stage_preserves_prior_changes_and_drop_preserves_source() {
     let bytes = fixture();
     let source = package(bytes.clone());

@@ -77,8 +77,8 @@ source checks do not substitute for runtime validation.
 
 The combined source still requires actual compiler/tests/Clippy, golden
 transcript regeneration, corpus/native and performance qualification. The
-89c/d final-part-count repair is separately source-reviewed and still awaits
-composition with this typed boundary.
+89c/d final-part-count repair is separately source-reviewed and its later
+typed composition is recorded in 0362ul89c.
 
 External resolution artifacts are preparation aids, not runtime receipts.
 The earlier 18,728-byte `inventory-sign-limits.patch` was accidentally
