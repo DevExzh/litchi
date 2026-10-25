@@ -1552,11 +1552,17 @@ impl OpcPackage {
                 "content-types replacement has an invalid owner or content type".to_owned(),
             ));
         }
-        let source_token_matches = self
-            .source_content_types_source()?
-            .is_some_and(|(source, _)| source == replacement.bytes());
+        let same_bytes = current.bytes() == replacement.bytes();
+        let source_token_matches = same_bytes
+            && self
+                .source_content_types_xml
+                .as_ref()
+                .is_some_and(|source| source.as_slice() == replacement.bytes())
+            && self
+                .source_content_types_source()?
+                .is_some_and(|(source, _)| source == replacement.bytes());
         let signed = self.is_signed() || self.requires_signature_edit_policy();
-        if current.bytes() == replacement.bytes() && (source_token_matches || signed) {
+        if same_bytes && (source_token_matches || signed) {
             return Ok(false);
         }
         if signed {
