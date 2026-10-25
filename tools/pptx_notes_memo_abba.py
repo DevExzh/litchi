@@ -45,6 +45,11 @@ REVISION = re.compile(r"[0-9a-f]{40}\Z")
 SAMPLES_PER_ROUND = 4
 MIN_ROUNDS = 4
 REQUIRED_SAMPLE_COUNT = SAMPLES_PER_ROUND * MIN_ROUNDS
+NATIVE_ALLOCATOR = "Rust system allocator"
+INSTRUMENTED_ALLOCATOR = "CountingSystemAllocator(std::alloc::System)"
+ALLOCATOR_COUNTER_REVISION = "serialized_region_peak_v3"
+ALLOCATION_SCOPE = "operation_global_system_allocator"
+REPORT_ALLOCATION_SCOPE = "one non-nested operation-scoped global-allocator region around each timed API operation"
 ALLOCATION_NUMERIC_FIELDS = (
     "allocation_calls",
     "deallocation_calls",
@@ -307,10 +312,16 @@ def _validate_allocation(value: Any, path: str, mode: str) -> str:
     else:
         raise ValidationError(f"{path}.status is not a supported allocation status")
     if mode == "native":
-        if status != "unavailable" or any(field in allocation for field in ALLOCATION_NUMERIC_FIELDS):
-            raise ValidationError(f"{path} must be unavailable without numeric allocation evidence for native ABBA")
+        if (
+            status != "unavailable"
+            or scope != ALLOCATION_SCOPE
+            or any(field in allocation for field in ALLOCATION_NUMERIC_FIELDS)
+        ):
+            raise ValidationError(
+                f"{path} must be unavailable with the pinned scope and without numeric allocation evidence"
+            )
     else:
-        if status != "measured" or scope != "operation_global_system_allocator":
+        if status != "measured" or scope != ALLOCATION_SCOPE:
             raise ValidationError(f"{path} must be measured system-allocator evidence")
         for field in ALLOCATION_NUMERIC_FIELDS:
             _integer(_required(allocation, field, path), f"{path}.{field}")
@@ -484,10 +495,14 @@ def validate_report(report: Mapping[str, Any], label: str, mode: str = "native")
             raise ValidationError(f"{path}.instrumentation must be none for native ABBA")
     elif instrumentation != "system_allocator_operation_scoped":
         raise ValidationError(f"{path}.instrumentation must be system_allocator_operation_scoped for allocator ABBA")
-    _string(_required(report, "allocator", path), f"{path}.allocator")
+    allocator = _string(_required(report, "allocator", path), f"{path}.allocator")
+    expected_allocator = NATIVE_ALLOCATOR if mode == "native" else INSTRUMENTED_ALLOCATOR
+    if allocator != expected_allocator:
+        raise ValidationError(f"{path}.allocator does not match the instrumentation mode")
     counter_revision = _required(report, "allocator_counter_revision", path)
     if mode == "allocator":
-        _string(counter_revision, f"{path}.allocator_counter_revision")
+        if counter_revision != ALLOCATOR_COUNTER_REVISION:
+            raise ValidationError(f"{path}.allocator_counter_revision is not the pinned counter revision")
     elif counter_revision is not None:
         raise ValidationError(f"{path}.allocator_counter_revision must be null for native ABBA")
     expected_timing_claim = (
@@ -497,7 +512,7 @@ def validate_report(report: Mapping[str, Any], label: str, mode: str = "native")
     )
     if _required(report, "timing_claim", path) != expected_timing_claim:
         raise ValidationError(f"{path}.timing_claim does not match the instrumentation mode")
-    if _required(report, "allocation_scope", path) != "one non-nested operation-scoped global-allocator region around each timed API operation":
+    if _required(report, "allocation_scope", path) != REPORT_ALLOCATION_SCOPE:
         raise ValidationError(f"{path}.allocation_scope is not the pinned operation scope")
     _string(_required(report, "memo_scope", path), f"{path}.memo_scope")
     _string(_required(report, "fidelity_scope", path), f"{path}.fidelity_scope")

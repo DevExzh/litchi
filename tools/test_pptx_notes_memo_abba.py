@@ -111,7 +111,7 @@ def report(revision: str, binary_sha: str) -> dict[str, object]:
                 "fidelity": fidelity(case),
                 "allocation": {
                     "status": "unavailable",
-                    "scope": "operation_global_system_allocator",
+                    "scope": validator.ALLOCATION_SCOPE,
                 },
             }
             for index, value in enumerate(elapsed)
@@ -245,17 +245,53 @@ class NotesMemoAbbaTests(unittest.TestCase):
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(drifting_oracle)
 
+    def test_allocator_identity_and_scope_are_exact(self) -> None:
+        wrong_native_allocator = copy.deepcopy(self.reports)
+        wrong_native_allocator["a1"]["allocator"] = "an allocator"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_native_allocator)
+
+        wrong_native_scope = copy.deepcopy(self.reports)
+        wrong_native_scope["a1"]["results"][0]["observations"][0]["allocation"][
+            "scope"
+        ] = "some allocator scope"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_native_scope)
+
+        wrong_allocator_revision = copy.deepcopy(self.reports)
+        for packet in wrong_allocator_revision.values():
+            packet["instrumentation"] = "system_allocator_operation_scoped"
+            packet["allocator"] = validator.INSTRUMENTED_ALLOCATOR
+            packet["allocator_counter_revision"] = "wrong-counter"
+            packet["timing_claim"] = "allocator-instrumented wall-clock samples; not a latency claim"
+            for row in packet["results"]:
+                for observation in row["observations"]:
+                    observation["allocation"] = {
+                        "status": "measured",
+                        "scope": validator.ALLOCATION_SCOPE,
+                        **{field: 0 for field in validator.ALLOCATION_NUMERIC_FIELDS},
+                    }
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_allocator_revision, mode="allocator")
+
+        wrong_allocator_identity = copy.deepcopy(wrong_allocator_revision)
+        for packet in wrong_allocator_identity.values():
+            packet["allocator_counter_revision"] = validator.ALLOCATOR_COUNTER_REVISION
+            packet["allocator"] = "another allocator"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_allocator_identity, mode="allocator")
+
     def test_allocator_packet_requires_measured_regions(self) -> None:
         allocator = copy.deepcopy(self.reports)
         measured = {
             "status": "measured",
-            "scope": "operation_global_system_allocator",
+            "scope": validator.ALLOCATION_SCOPE,
             **{field: 0 for field in validator.ALLOCATION_NUMERIC_FIELDS},
         }
         for packet in allocator.values():
             packet["instrumentation"] = "system_allocator_operation_scoped"
-            packet["allocator"] = "CountingSystemAllocator(std::alloc::System)"
-            packet["allocator_counter_revision"] = "serialized_region_peak_v3"
+            packet["allocator"] = validator.INSTRUMENTED_ALLOCATOR
+            packet["allocator_counter_revision"] = validator.ALLOCATOR_COUNTER_REVISION
             packet["timing_claim"] = "allocator-instrumented wall-clock samples; not a latency claim"
             for row in packet["results"]:
                 for observation in row["observations"]:

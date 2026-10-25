@@ -50,10 +50,15 @@ speedup. Native invocation:
 python3 tools/pptx_notes_memo_abba.py --output SUMMARY.json A1.json B1.json B2.json A2.json
 ```
 
-Allocator evidence uses `--mode allocator` and requires every numeric field
-from the shared operation-scoped allocator sample. The synthetic protocol
-tests cover a passing four-round packet, short packets, false raw-oracle
-evidence, source-pair identity mismatch, and allocator metric omission:
+Allocator evidence uses `--mode allocator` and requires the exact
+`CountingSystemAllocator(std::alloc::System)` identity, counter revision
+`serialized_region_peak_v3`, `operation_global_system_allocator` sample scope,
+and every numeric field from the shared operation-scoped allocator sample.
+Native reports must identify `Rust system allocator` and use the same exact
+sample scope without numeric fields. The synthetic protocol tests cover a
+passing four-round packet, short packets, false raw-oracle evidence,
+source-pair identity mismatch, strict allocator identity/scope failures, and
+allocator metric omission:
 
 ```text
 python3 -m unittest tools/test_pptx_notes_memo_abba.py
