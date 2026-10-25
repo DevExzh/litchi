@@ -523,6 +523,72 @@ class RustdocTests(unittest.TestCase):
         )
         self.assertEqual(len(failures), 1, failures)
 
+    def test_external_mce_reexport_uses_its_defining_nominal_identity(self):
+        """DOCX's MceLimits rustdoc spelling is a dependency re-export."""
+        document = {
+            "root": "0", "includes_private": False,
+            "index": {"0": {
+                "name": "fixture", "crate_id": 0, "visibility": "public",
+                "inner": {"module": {"items": [], "is_crate": True}},
+            }},
+            "paths": {"0": {"crate_id": 0, "path": ["fixture"], "kind": "module"}},
+        }
+        crate = "fixture"
+        method_id = "mce-limit-method"
+        defining_id = "mce-limit-defining-item"
+        document["index"][str(document["root"])]["inner"]["module"]["items"].append(method_id)
+        document["index"][method_id] = {
+            "name": "parse_mce", "crate_id": 0, "visibility": "public",
+            "inner": {"function": {
+                "sig": {"inputs": [
+                    ["data", {"primitive": "unit"}],
+                    ["limits", {"borrowed_ref": {
+                        "lifetime": None, "is_mutable": False,
+                        "type": {"resolved_path": {
+                            "path": "litchi_ooxml_common::mce::Limits",
+                            "id": defining_id, "args": None,
+                        }},
+                    }}],
+                ], "output": {"primitive": "unit"}},
+                "generics": {"params": []},
+            }},
+        }
+        document["paths"][method_id] = {
+            "crate_id": 0, "path": [crate, "parse_mce"], "kind": "function",
+        }
+        document["paths"][defining_id] = {
+            "crate_id": 81,
+            "path": ["litchi_ooxml_common", "mce", "model", "Limits"],
+            "kind": "struct",
+        }
+        rule = {
+            "method": f"{crate}::parse_mce", "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "litchi_ooxml_common::mce::Limits",
+        }
+        checked = profile(id=crate, package=crate, required_signatures=[rule])
+        self.assertEqual(gate.violations(document, checked), [])
+
+        wrong = copy.deepcopy(document)
+        wrong_id = "mce-limit-unrelated-item"
+        wrong["paths"][wrong_id] = {
+            "crate_id": 82,
+            "path": ["litchi_ooxml_common", "mce", "other", "Limits"],
+            "kind": "struct",
+        }
+        wrong["index"][method_id]["inner"]["function"]["sig"]["inputs"][1][1][
+            "borrowed_ref"
+        ]["type"]["resolved_path"]["id"] = wrong_id
+        self.assertEqual(len(gate.violations(wrong, checked)), 1)
+
+        ambiguous = copy.deepcopy(document)
+        ambiguous["paths"]["mce-limit-duplicate"] = {
+            "crate_id": 83,
+            "path": ["litchi_ooxml_common", "mce", "model", "Limits"],
+            "kind": "struct",
+        }
+        self.assertEqual(len(gate.violations(ambiguous, checked)), 1)
+
     def _namespace_collision_document(self, *, macro_first=False, conflict=False):
         document = copy.deepcopy(self.document)
         root = str(document["root"])

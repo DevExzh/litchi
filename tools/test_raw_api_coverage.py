@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import hashlib
 import os
@@ -492,6 +493,56 @@ class RawApiCoverageTests(unittest.TestCase):
         report = self.loaded(value)
         self.assertEqual(len(report["signature_failures"]), 1)
         self.assertIn("limits type identity", report["signature_failures"][0])
+
+    def test_raw_signature_accepts_external_mce_reexport_by_nominal_identity(self) -> None:
+        document = rustdoc_fixture()
+        method_id = "mce-limit-method"
+        defining_id = "mce-limit-defining-item"
+        document["index"]["0"]["inner"]["module"]["items"].append(method_id)
+        document["index"][method_id] = {
+            "name": "parse_mce", "crate_id": 0, "visibility": "public",
+            "inner": {"function": {
+                "sig": {"inputs": [
+                    ["data", {"primitive": "unit"}],
+                    ["limits", {"borrowed_ref": {
+                        "is_mutable": False,
+                        "type": {"resolved_path": {"id": defining_id, "args": None}},
+                    }}],
+                ], "output": {"primitive": "unit"}},
+                "generics": {"params": []},
+            }},
+        }
+        document["paths"][method_id] = {
+            "path": ["fixture", "parse_mce"], "kind": "function", "crate_id": 0,
+        }
+        document["paths"][defining_id] = {
+            "path": ["litchi_ooxml_common", "mce", "model", "Limits"],
+            "kind": "struct", "crate_id": 81,
+        }
+        signature = self.raw_signature("litchi_ooxml_common::mce::Limits")
+        entry_value = {"path": "fixture::parse_mce", "required_signature": signature}
+        surface = coverage.glossary_gate.Surface(document, "fixture")
+        self.assertIsNone(coverage.check_required_signature(surface, entry_value))
+
+        wrong = copy.deepcopy(document)
+        wrong_id = "mce-limit-unrelated-item"
+        wrong["paths"][wrong_id] = {
+            "path": ["litchi_ooxml_common", "mce", "other", "Limits"],
+            "kind": "struct", "crate_id": 82,
+        }
+        wrong["index"][method_id]["inner"]["function"]["sig"]["inputs"][1][1][
+            "borrowed_ref"
+        ]["type"]["resolved_path"]["id"] = wrong_id
+        surface = coverage.glossary_gate.Surface(wrong, "fixture")
+        self.assertIn("limits type identity", coverage.check_required_signature(surface, entry_value))
+
+        ambiguous = copy.deepcopy(document)
+        ambiguous["paths"]["mce-limit-duplicate"] = {
+            "path": ["litchi_ooxml_common", "mce", "model", "Limits"],
+            "kind": "struct", "crate_id": 83,
+        }
+        surface = coverage.glossary_gate.Surface(ambiguous, "fixture")
+        self.assertIn("limits type identity", coverage.check_required_signature(surface, entry_value))
 
     def test_active_lane_and_incomplete_state_fail_final_mode(self) -> None:
         active = entry("fixture::describe", "semantic_method", "active_lane")

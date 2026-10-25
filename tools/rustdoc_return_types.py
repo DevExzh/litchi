@@ -27,13 +27,14 @@ FACADE_COMMIT_PATHS = frozenset({
 # identity before extracting the alias's owner argument.
 ODF_METADATA_COMMIT = ("litchi_odf_common", "metadata", "Commit")
 
-# rustdoc JSON for a dependency may omit a root re-export while retaining the
-# defining item's canonical path. This is an explicit, audited binding for
-# the one external root limit type registered by the glossary; it is not a
-# basename heuristic and must be extended only with reviewed re-export
-# provenance.
-CANONICAL_ROOT_REEXPORTS = {
+# rustdoc JSON for a dependency may omit a public re-export while retaining the
+# defining item's path. These are explicit, audited bindings from a
+# caller-visible path to its defining path; they are not basename heuristics and
+# must be extended only with reviewed re-export provenance.
+CANONICAL_REEXPORTS = {
     ("litchi_opc", "SourceLimits"): ("litchi_opc", "limits", "SourceLimits"),
+    ("litchi_ooxml_common", "mce", "Limits"):
+        ("litchi_ooxml_common", "mce", "model", "Limits"),
 }
 
 
@@ -116,7 +117,7 @@ class ReturnTypes:
                 and entry.get("kind") in NOMINAL_KINDS
             ]
             if not candidates:
-                defining_path = CANONICAL_ROOT_REEXPORTS.get(path)
+                defining_path = CANONICAL_REEXPORTS.get(path)
                 if defining_path is None:
                     return None
                 candidates = [
@@ -127,7 +128,7 @@ class ReturnTypes:
                 ]
             # Multiple rustdoc IDs for one canonical path are ambiguous, even
             # when their spelling happens to match. The same fail-closed rule
-            # applies to the explicit root-reexport binding above.
+            # applies to every explicit re-export binding above.
             if len(candidates) != 1:
                 return None
             item_id = candidates[0]
