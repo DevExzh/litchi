@@ -408,6 +408,7 @@ pub fn read_prepared_with_report(
 /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
 /// for a change to a signed package, and an error when a value violates
 /// OOXML constraints or a bound.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
     ensure_core_only(metadata)?;
     let base = match graph::inspect(package)?.part {
@@ -532,6 +533,7 @@ impl Slot {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();
@@ -549,6 +551,7 @@ impl Slot {
     /// # Errors
     ///
     /// The errors of [`Self::flush`].
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
             let staged = self.source.clone();

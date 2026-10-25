@@ -333,6 +333,7 @@ where
 /// Read and update intentionally allow differently typed inbound relationships:
 /// updating a shared part leaves every edge valid. Deletion is stricter because
 /// removing the part would leave those relationships dangling.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn ensure_clear_safe(
     package: &OpcPackage,
     target: &PackURI,
@@ -348,6 +349,7 @@ pub(super) fn is_core_relationship(relationship_type: &str) -> bool {
     )
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn reject_other_inbound(package: &OpcPackage, target: &PackURI, core_id: &str) -> Result<()> {
     for relationship in package.rels().iter() {
         if relationship.r_id() == core_id || relationship.is_external() {

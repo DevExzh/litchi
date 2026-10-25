@@ -574,6 +574,7 @@ fn repair_shape_fragments(props: &mut Props, sink: &mut Sink<'_>) -> Result<()> 
     Ok(())
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
     let encoded = encoded_len(props)?;
     encode_preflighted(props, encoded)

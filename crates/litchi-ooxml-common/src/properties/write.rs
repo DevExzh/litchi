@@ -8,7 +8,9 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::rel::TargetMode;
 use litchi_opc::{OpcPackage, PackURI};
 
+#[cfg_attr(not(test), allow(dead_code))]
 const CANONICAL_PART: &str = "/docProps/core.xml";
+#[cfg_attr(not(test), allow(dead_code))]
 const MAX_PART_CANDIDATES: u32 = 10_000;
 // Reserve enough reader events for the declaration, root, every other
 // property, and EOF. A nonempty structured keyword value costs Start, Text,
@@ -34,6 +36,7 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> {
     let result = sync(package, &props);
     drop(props);
@@ -54,6 +57,7 @@ pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> 
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
@@ -83,6 +87,7 @@ pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     Ok(true)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     let graph = graph::inspect(package)?;
     match (graph.part, graph.dialect) {
@@ -137,6 +142,7 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn encode(props: &Core, dialect: Dialect) -> Result<String> {
     let encoded_bytes = preflight(props, dialect)?;
     encode_preflighted(props, dialect, encoded_bytes)
@@ -573,6 +579,7 @@ fn is_xml_10_char(character: char) -> bool {
         || matches!(u32::from(character), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..=MAX_PART_CANDIDATES {
         let candidate = if index == 1 {
@@ -592,6 +599,7 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     })
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
     let mut index = 1u32;
     loop {

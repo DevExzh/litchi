@@ -3,6 +3,7 @@
 use crate::{Error, Result};
 
 pub(super) const PART_NAME: &str = "/docProps/custom.xml";
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) const PART_TARGET: &str = "docProps/custom.xml";
 pub(super) const FORMAT_ID: &str = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}";
 pub(super) const SUMMARY_FORMAT_ID: &str = "{F29F85E0-4FF9-1068-AB91-08002B27B3D9}";

@@ -72,6 +72,7 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
 ///
 /// The errors of [`decode`] for `xml`, and [`Error::Invalid`] when a target
 /// text value holds a character XML 1.0 cannot carry.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     let Some(plan) = plan_splice(xml, target)? else {
         return Ok(None);

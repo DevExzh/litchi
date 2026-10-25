@@ -112,6 +112,7 @@ impl Props {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn write(&self, package: &mut OpcPackage) -> Result<()> {
         let graph = inspect_graph(package)?;
         if self.is_empty() {
@@ -166,6 +167,7 @@ impl Props {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
         self.validate_for(host)?;
         self.write(package)

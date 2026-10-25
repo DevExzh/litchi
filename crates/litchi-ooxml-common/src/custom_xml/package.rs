@@ -78,6 +78,7 @@ pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
 /// for a signed package, and an error when input violates OOXML constraints,
 /// exceeds a configured bound, or an underlying XML or package operation
 /// fails.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
     let source_limits = package.read_limits();
     validate_content_type(&item.content_type)?;
@@ -371,6 +372,7 @@ fn relationships(part: &dyn Part) -> Arc<[Relationship]> {
     values.into()
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn validate_new_names(part: &PackURI, props_part: Option<&PackURI>) -> Result<()> {
     let mut candidates = OpcPackage::new();
     candidates.try_add_part(Box::new(XmlPart::new(
@@ -388,6 +390,7 @@ fn validate_new_names(part: &PackURI, props_part: Option<&PackURI>) -> Result<()
     Ok(())
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn rollback_parts(package: &mut OpcPackage, part: &PackURI, props_part: Option<&PackURI>) {
     package.remove_part(part);
     if let Some(props_part) = props_part {

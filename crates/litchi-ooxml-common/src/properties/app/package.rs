@@ -197,6 +197,7 @@ pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>
 /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
 /// for a change to a signed package, the errors of [`read`], and an error
 /// when a value cannot be written.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
     let graph = inspect(package)?;
     if let Some(part) = graph.part {
@@ -248,6 +249,7 @@ pub(crate) fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
 /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
 /// for a signed package, [`Error::Relationship`] for a shared part, and the
 /// graph errors of [`read`].
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = inspect(package)?;
     let (Some(part), Some(id)) = (graph.part, graph.relationship_id) else {
@@ -266,6 +268,7 @@ pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
 }
 
 /// The first `rIdN` the package-level relationships do not use.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn next_relationship_id(relationships: &Relationships) -> Result<String> {
     for index in 1..=u32::MAX {
         let candidate = format!("rId{index}");
