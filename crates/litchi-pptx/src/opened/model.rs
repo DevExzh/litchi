@@ -923,23 +923,29 @@ fn capture_internal(
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
-    // Edit transactions keep the strict slide-list contract.
-    let references = presentation.slide_references_strict()?;
-    if references.len() > limits.max_parts {
-        return Err(Error::Limit {
-            kind: crate::opened::LimitKind::Parts,
-            observed: references.len(),
-            maximum: limits.max_parts,
-        });
-    }
     let view = crate::presentation::Presentation::new_with_semantic_limits(
         presentation,
         package,
         semantic_limits.clone(),
     );
+    // Bound the tolerant catalog before capture allocates its slide table.
+    // Strict graph validation follows source admission so a malformed
+    // selected slide retains the physical-error precedence promised by the
+    // capture projection contract.
+    let catalog_len = view.capture_catalog_len()?;
+    if catalog_len > limits.max_parts {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Parts,
+            observed: catalog_len,
+            maximum: limits.max_parts,
+        });
+    }
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
     let captured =
         view.capture_slides_with_mce(&mut mce_capture, parent_roots, package.read_limits())?;
+    // Edit transactions keep the strict slide-list contract. Delaying this
+    // check until after capture preserves physical source admission ordering.
+    let references = view.part().slide_references_strict()?;
     if references.len() != captured.slides.len() {
         return Err(invalid(
             "opened-presentation slide references do not resolve one-to-one",

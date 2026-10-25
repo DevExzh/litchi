@@ -47,6 +47,13 @@ use crate::{Error, Package, Result};
 
 use super::model::mce_retention_test_hooks;
 
+fn assert_physical_xml_malformed(error: &Error) {
+    assert!(matches!(
+        error,
+        Error::Invalid(message) if message == "PPTX XML is malformed"
+    ));
+}
+
 const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const PRESENTATION_NAMESPACE: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 
@@ -610,7 +617,7 @@ fn malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence() -> Resul
     // Physical source admission runs before MCE, including duplicate
     // attributes in a name projection. It intentionally reports the
     // content-free physical refusal rather than exposing parser text.
-    assert!(error.to_string().contains("PPTX XML is malformed"));
+    assert_physical_xml_malformed(&error);
 
     let mut notes = marked_slides_package(2, &[0, 1])?;
     replace_notes_root(&mut notes)?;

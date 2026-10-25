@@ -260,6 +260,13 @@ impl<'a> Presentation<'a> {
         package::capture_slides_with_mce(self, capture, proved_roots, source_limits)
     }
 
+    /// Return the tolerant catalog size used by capture before strict graph
+    /// validation. Capture must admit selected source payloads before a
+    /// later duplicate-target refusal can mask a physical source error.
+    pub(crate) fn capture_catalog_len(&self) -> Result<usize> {
+        self.catalog().map(|catalog| catalog.len())
+    }
+
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.
     ///
     /// # Errors
