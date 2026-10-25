@@ -389,6 +389,48 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     })
 }
 
+/// Validate the ordinary comment grammar after MCE has selected the semantic
+/// branches.  The legacy comment parser's aggregate string counter includes
+/// namespace declarations and opaque extension attributes.  Those are already
+/// bounded physically by `scan_raw` and the MCE pass, and counting them here
+/// would make an inactive typed branch consume the recipient's semantic
+/// string budget before the active collaboration payload is considered.
+/// Keep the parser's structural and typed-base checks, but cap its temporary
+/// string storage by the processed XML size and re-apply the selected policy
+/// to the fields represented by the ordinary comment model.
+fn validate_processed_part(source: &[u8], kind: Kind, limits: Limits) -> Result<()> {
+    let mut parse_limits = limits;
+    parse_limits.max_string_bytes = parse_limits.max_input_bytes;
+    match kind {
+        Kind::Presence => {
+            let authors = crate::comments::parse_comment_authors(source, parse_limits)?;
+            for author in authors {
+                validate_string_with_limit(
+                    &author.name,
+                    "comment author name",
+                    limits.max_string_bytes,
+                )?;
+                validate_string_with_limit(
+                    &author.initials,
+                    "comment author initials",
+                    limits.max_string_bytes,
+                )?;
+            }
+        },
+        Kind::Threading => {
+            let comments = crate::comments::parse_slide_comments(source, parse_limits)?;
+            for comment in comments {
+                validate_string_with_limit(
+                    &comment.text,
+                    "comment text",
+                    limits.max_string_bytes,
+                )?;
+            }
+        },
+    }
+    Ok(())
+}
+
 /// Validate the active typed collaboration extensions in one changed part
 /// under the recipient's selected policy. The ordinary comment codec accepts
 /// extension lists as opaque; replay must additionally apply the typed
@@ -431,14 +473,7 @@ fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Resu
             limits.max_input_bytes,
         ));
     }
-    match kind {
-        Kind::Presence => {
-            let _ = crate::comments::parse_comment_authors(&processed, limits)?;
-        },
-        Kind::Threading => {
-            let _ = crate::comments::parse_slide_comments(&processed, limits)?;
-        },
-    }
+    validate_processed_part(&processed, kind, limits)?;
 
     let mut candidate_items = Vec::new();
     let mut candidate_set = HashSet::new();
