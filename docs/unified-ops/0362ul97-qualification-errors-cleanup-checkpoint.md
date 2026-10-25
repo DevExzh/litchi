@@ -111,3 +111,51 @@ Final formatting, full 53-row gate including isolated documentation, fresh
 84-profile raw census and separate 68-package inventory/dispositions,
 corpus/native qualification and quiet ABBA remain open. Only redaction
 audit 22 is deferred. Nothing is pushed.
+
+## Actual runtime return and source follow-ups
+
+The `ae6f32d202` capture is now terminal (session exit 1). Formatting passes
+in 2.793 seconds, minimal all-target compilation in 57.769 seconds and strict
+all-feature/all-target Clippy in 82.980 seconds. The full-feature helper then
+fails its library command: 1,356 tests pass, 23 fail and one is ignored.
+Library execution takes 114.01 seconds; the outer helper row takes 200.111
+seconds and ends with a 798,443,514-byte target. Later helper/glossary rows
+are not executed. Root verifies all outer receipts, source/three-lock fences,
+logs/traces, guards, terminal ownership, and the inner helper's library log.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `rows.json` | 40,394 | `55e701e550165a1fe29c08e6d19d82860f6166b60fde773b1fff09210200bee2` |
+| `result.json` | 42,519 | `4b8e178cf9d63f55e1cc445c85e6d32ce32e49df2b70c91e84c9d978b3f7758e` |
+| `fullfeatures-tests/0000.log` | 378,736 | `4924bcd19683868b0cc259024ceefdb93f3ba4ef0d3ec7d8653fcf564639fb6a` |
+
+Six reviewed runtime repair chains compose privately at
+`76371266514feb010ef7478c26e963debcc7fa59`, tree
+`6e77d376c16aadb1b876a9f0cb787f4de3312a50` (record 89ak). They repair
+revision output accounting, slide-sync XML quotes, physical duplicate-attribute
+admission and stale typed expectations while preserving fidelity and atomicity.
+The physical attribute default becomes 65,536 to retain unchanged stress
+fixtures; tighter selected bounds remain enforced. Notes 89ac is returned
+for cached-proof recipient-policy bypasses; follow-up 89aca and the targeted
+source/eager aggregate repair 89aj remain active. The digest golden is still
+unchanged, pending actual isolated generation and full review.
+
+OOXML's first prepared eleven-row packet is returned before GO because its
+step kinds do not match the runner's argv schema. Corrected v2 on `95973e8c6a`
+passes 98-path formatting, then reports 16 common-crate compiler diagnostics.
+Root verifies its terminal session exit 1 and all completed receipts.
+State: `.coord/ooxml-combined-0362ul94-f5-final-95973e8c6a-v2`.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `rows.json` | 12,574 | `cd41583e87c30c34128b7d42e075cc1584a42f502a8f4153a1f3c9a3897b8ae8` |
+| `result.json` | 13,674 | `f1cc34a98fd896ba2a8a9b3abcbe74254a1b3eb0e33cd476046c5551df950fce` |
+
+Independent review verifies 94j fixes all sixteen diagnostics without adding
+namespace copies or changing namespace scope timing. Root fast-forwards the
+private OOXML candidate to `491137abe2f7b4961beaac445e463be3c7f40418`, tree
+`9f4fd05f54b8b2a381e5675c47e902fde2b2bfbc`. Its fresh eleven-row capture is
+running at `.coord/ooxml-combined-0362ul94-f5-final-491137abe2`; formatting
+and common compilation have reported PASS. Full capture/terminal verification
+remains pending. Nothing is accepted into integration or trunk by these
+private source follow-ups, and nothing is pushed.

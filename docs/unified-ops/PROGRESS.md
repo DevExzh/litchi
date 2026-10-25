@@ -5437,3 +5437,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   0362ul97 binds this checkpoint. Final gates, census/dispositions,
   corpus/native and quiet ABBA remain open. Only audit22 is deferred.
   Nothing is pushed.
+
+  Subsequent actual results: PPTX `ae6f32d202` passes strict Clippy, then
+  its full-feature library reports 1,356 passed, 23 failed and one ignored.
+  Root verifies the complete failed capture. Six reviewed repair chains
+  compose privately at `7637126651` (89ak); notes recipient-proof and
+  aggregate-limit returns remain active, and the digest golden still requires
+  isolated regeneration/review. No runtime acceptance is claimed.
+
+  OOXML's invalid inert command-kind packet is returned before GO. Corrected
+  v2 on `95973e8c6a` passes formatting and fails with 16 compiler diagnostics.
+  Independently reviewed 94j fixes them, and root fast-forwards the private
+  candidate to `491137abe2`. Its fresh eleven-row capture is running;
+  formatting and common compilation report PASS, with terminal verification
+  pending. Final acceptance obligations remain unchanged.
