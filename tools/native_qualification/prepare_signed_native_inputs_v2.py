@@ -145,7 +145,7 @@ BASELINE_NOT_APPLICABLE = frozenset(
 # actual source/archive/lock graph is revalidated by ``endpoint_identity``
 # before a consumer directory is created.
 ENDPOINTS = ("before", "after")
-ENDPOINT_SOURCE_KINDS = {"before": "f2", "after": "472b"}
+ENDPOINT_SOURCE_KINDS = {"before": "f2", "after": "candidate"}
 ENDPOINT_API_BRANCH = {"before": "legacy_api", "after": "current_api"}
 ENDPOINT_ROLE = {"before": "baseline", "after": "candidate"}
 ENDPOINT_ROUTE_STATUS = {
@@ -216,6 +216,7 @@ ENDPOINT_POLICY_BINDINGS = {
     "before": BEFORE_SOURCE_BINDING,
     "after": {
         "role": "candidate",
+        "source_kind": "candidate",
         "binding": "CANDIDATE_BINDING",
         "status": "pending_final_source_freeze",
     },
@@ -1184,7 +1185,7 @@ def _candidate_endpoint_binding() -> Mapping[str, Any]:
     _expect(SHA256.fullmatch(str(assembly.get("sha256"))) is not None, "candidate source assembly digest is malformed")
     return {
         "role": "candidate",
-        "source_kind": "472b",
+        "source_kind": "candidate",
         "commit": source.get("commit"),
         "source_archive": archive,
         "source_assembly": trusted.get("source_assembly"),
@@ -1363,7 +1364,7 @@ def endpoint_identity(root: Path, endpoint: str) -> dict[str, Any]:
     source = _endpoint_root(root, endpoint)
     if endpoint == "after":
         identity = candidate_identity(source)
-        identity.setdefault("source_kind", "472b")
+        identity.setdefault("source_kind", "candidate")
         identity.setdefault("source_role", "candidate")
     else:
         identity = _endpoint_identity_from_reviewed(source, endpoint)

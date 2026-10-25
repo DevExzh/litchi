@@ -134,7 +134,7 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "source_root": "",
             "endpoint": "after",
             "source_role": "candidate",
-            "source_kind": "472b",
+            "source_kind": "candidate",
             "api_branch": "current_api",
             **fake_binding["source"],
             "manifests": fake_binding["manifests"],

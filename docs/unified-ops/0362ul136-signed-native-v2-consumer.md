@@ -7,7 +7,9 @@ until a complete checked-in `CANDIDATE_BINDING` supplies the final source,
 archive, assembly, all three role locks, manifests, vendor closure and
 toolchain.  The retained 472b capture is historical harness provenance only;
 it is never used as the executable after endpoint.  The endpoint is not
-selected by a Cargo feature.
+selected by a Cargo feature.  Endpoint identities use stable
+`source_kind=f2` and `source_kind=candidate` labels; `source_kind=472b`
+is reserved for the separate historical harness record.
 
 The historical v1 receipts remain inputs only.  They are never relabelled as
 v2, and the no-input `policy.execute()` path still fails closed rather than

@@ -98,6 +98,9 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
             document["signed_batch"], policy.SIGNED_BATCH_POLICY
         )
         self.assertEqual(policy.ENDPOINT_API_BRANCH, {"before": "legacy_api", "after": "current_api"})
+        self.assertEqual(policy.ENDPOINT_SOURCE_KINDS, {"before": "f2", "after": "candidate"})
+        self.assertEqual(document["endpoints"]["after"]["source_kind"], "candidate")
+        self.assertEqual(document["historical_harness"]["source_kind"], "472b")
         self.assertEqual(
             policy.ENDPOINT_ROUTE_STATUS["before"]["signed_leaf/unsigned_negative"],
             "not_applicable",

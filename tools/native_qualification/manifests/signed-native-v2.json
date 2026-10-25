@@ -33,6 +33,7 @@
     },
     "after": {
       "role": "candidate",
+      "source_kind": "candidate",
       "binding": "CANDIDATE_BINDING",
       "status": "pending_final_source_freeze"
     }
