@@ -46,7 +46,7 @@ The preparation and the unchanged historical validator pass without Cargo:
     PYTHONDONTWRITEBYTECODE=1 python3 tools/prepare_raw_api_census.py \
       --root . --output tools/raw_api_census_matrix.json --check
 
-The combined run executes 23 tests. These checks validate profile closure,
+The combined run executes 25 tests. These checks validate profile closure,
 source/blob identities, deterministic serialization, the incomplete boundary,
 and the existing raw-coverage receipt policy; they do not fabricate or close
 any final evidence row.
