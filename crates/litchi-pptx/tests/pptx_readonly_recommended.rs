@@ -157,7 +157,7 @@ fn replay_rechecks_readonly_output_with_the_recipient_profile() {
         .unwrap()
         .build()
         .unwrap();
-    let mut tight = Package::from_bytes_with_options(
+    let tight = Package::from_bytes_with_options(
         &before_bytes,
         OpenOptions::default().source_limits(tight_limits),
     )
@@ -170,7 +170,7 @@ fn replay_rechecks_readonly_output_with_the_recipient_profile() {
     );
     assert_eq!(tight.to_bytes().unwrap(), unchanged);
 
-    let mut permissive = Package::from_bytes(&before_bytes).unwrap();
+    let permissive = Package::from_bytes(&before_bytes).unwrap();
     let replayed = permissive
         .apply_read_only_recommended(commit.patch())
         .expect("a permissive recipient admits the same patch")
