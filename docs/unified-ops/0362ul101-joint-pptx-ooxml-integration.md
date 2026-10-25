@@ -60,3 +60,40 @@ source. Its completed results will remain scoped to that source. Fresh joint
 compiler/runtime/glossary validation, final workspace gate/rustdoc, inventories,
 native fidelity and quiet ABBA are required. Only audit22 is deferred. The
 protected untracked constructor probe and all external captures remain intact.
+
+
+## Standalone PPTX consumer capture completed
+
+The eight-row afede compiler packet completes successfully. Root verifies
+all commands, source/role-lock bindings, logs, resource guards, empty global
+builder state and terminal process cleanup before accepting this scoped result.
+It is compiler/consumer evidence for afede, not runtime or joint-tree acceptance.
+
+| Row | Seconds |
+|---|---:|
+| Complete scoped formatting | 3.271 |
+| Minimal PPTX, all targets | 63.556 |
+| Strict all-feature PPTX Clippy, all targets | 78.732 |
+| Strict PPTX ops Clippy, all targets | 57.130 |
+| Strict PPTX facade Clippy, all targets | 43.286 |
+| Combined DOCX/PPTX ops, all targets | 53.163 |
+| Standalone performance harness, all targets | 165.965 |
+| Standalone PPTX native-resave, all targets | 33.818 |
+
+The target ends at 957,738,123 bytes. External packet
+`.coord/pptx-combined-0362ul89-f5-consumer-afede08087` retains `rows.json`
+(56,504 bytes, SHA-256
+`56822bf4dee546421373d0ca86f426b688a15f111ec3159c78920574a0a319a1`)
+and `result.json` (59,509 bytes, SHA-256
+`da4e6394a874095be6e00379ab2da7a7095e403db6b3214e52e133c461b9ac3a`).
+
+Independent source review of joint integration `e2a833d72e` is READY,
+including the exact metadata resolution, all fourteen overlapping paths,
+glossary union and coordinator progress preservation. Its fresh compiler,
+runtime and glossary packets are being prepared. No further source mutation
+is made while that candidate is frozen.
+
+Baseline `c5d2b30740186e2b4beb4a4d84e929e00a1c5718` receives the exact
+joint-tree test-only metadata consumer migration after a source-level API
+compatibility check. The eight harness blobs match e2a; production remains
+763. No benchmark build or measurement has run.

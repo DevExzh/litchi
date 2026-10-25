@@ -5607,3 +5607,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   resolution and all fourteen overlap paths preserve both migration chains;
   the tree is clean. The next compiler packet is being bound to this exact
   source. This remains private integration pending full qualification.
+
+
+  The standalone afede PPTX packet completes all eight compiler/consumer
+  checks successfully, including strict leaf/ops/facade Clippy, combined
+  DOCX/PPTX examples and standalone perf/native harnesses. Root verifies the
+  complete terminal capture; target ends at 957,738,123 bytes. This result is
+  scoped to afede. Joint e2a qualification is being prepared, with no runtime
+  or performance acceptance inferred. Baseline `c5d2b30740` carries the same
+  eight harness blobs as e2a after its test-only consumer migration.
