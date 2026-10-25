@@ -1092,10 +1092,10 @@ fn validate_crypto(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
     };
     let limits = crypto_limits();
     enforce_strict_data_spaces_oracle(fixture, bytes, profile)?;
-    if ooxml::inspect_with(bytes, &limits)? != Kind::Encrypted(profile.mode) {
+    if ooxml::inspect(bytes, &limits)? != Kind::Encrypted(profile.mode) {
         return Err(format!("{} encryption mode changed", fixture.id).into());
     }
-    let opened = ooxml::open_with(bytes.to_vec(), profile.password, &limits)?;
+    let opened = ooxml::open(bytes.to_vec(), profile.password, &limits)?;
     if opened.mode() != Some(profile.mode) {
         return Err(format!("{} opened under the wrong encryption mode", fixture.id).into());
     }
@@ -1157,7 +1157,7 @@ fn read_crypto(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
         return Err(format!("{} has a non-crypto oracle", fixture.id).into());
     };
     enforce_strict_data_spaces_oracle(fixture, bytes, profile)?;
-    let opened = ooxml::open_with(bytes.to_vec(), profile.password, &crypto_limits())?;
+    let opened = ooxml::open(bytes.to_vec(), profile.password, &crypto_limits())?;
     if opened.mode() != Some(profile.mode)
         || sha256_hex(opened.bytes()) != CLEAR_CRYPTO_SHA256
         || (profile.mode.is_agile() && opened.integrity() != Some(IntegrityStatus::Authenticated))
@@ -1176,7 +1176,7 @@ fn enforce_strict_data_spaces_oracle(
         return Ok(());
     }
     let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
-    if spaces::inspect(&mut ole).is_ok() {
+    if spaces::inspect(&mut ole, &spaces::Limits::default()).is_ok() {
         return Err(format!(
             "{} strict DataSpaces inspection unexpectedly accepted the zero-block graph",
             fixture.id
@@ -2026,7 +2026,7 @@ mod tests {
             .find(|fixture| fixture.id == "crypto-msoffcrypto-agile-zero-block-graph")
             .unwrap();
         let bytes = load_fixture(fixture).unwrap();
-        assert!(spaces::inspect_bytes(&bytes).is_err());
+        assert!(spaces::inspect_bytes(&bytes, &spaces::Limits::default()).is_err());
         validate_crypto(fixture, &bytes).unwrap();
     }
 

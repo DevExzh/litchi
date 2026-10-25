@@ -161,6 +161,9 @@ pub struct Package {
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
     pub(super) source_encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
+    /// Outer encryption resource policy retained for every managed output.
+    #[cfg(feature = "encryption")]
+    pub(super) encryption_limits: crate::encryption::Limits,
 }
 
 /// Shared immutable state; legacy mutations detach before writing.

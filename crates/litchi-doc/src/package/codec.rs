@@ -153,9 +153,14 @@ impl<R: Read + Seek> Reader<R> {
     /// limits; adoption cannot constrain allocations that already happened.
     pub fn from_ole_file_with_options(ole: OleFile<R>, options: OpenOptions) -> Result<Self> {
         let source_limits = options.source_limits_value();
+        let data_spaces_limits = options.data_spaces_limits_value();
         Self::validate_package_ole_file(&ole, source_limits)?;
         preflight_declared_streams(&ole, source_limits)?;
-        Ok(Self { ole, source_limits })
+        Ok(Self {
+            ole,
+            source_limits,
+            data_spaces_limits,
+        })
     }
 
     /// Get the main document.
@@ -190,6 +195,11 @@ impl<R: Read + Seek> Reader<R> {
     /// Source limits inherited by [`Self::document`].
     pub const fn source_limits(&self) -> SourceLimits {
         self.source_limits
+    }
+
+    /// DataSpaces limits retained by this raw reader.
+    pub const fn data_spaces_limits(&self) -> litchi_crypto::spaces::Limits {
+        self.data_spaces_limits
     }
 
     /// Return the complete package bytes exactly as received at ingress.
@@ -239,7 +249,7 @@ impl<R: Read + Seek> Reader<R> {
     /// or activates protected content. `None` means the package has no
     /// `DataSpaces` graph.
     pub fn data_spaces(&mut self) -> Result<Option<litchi_crypto::spaces::Graph>> {
-        litchi_crypto::spaces::inspect(&mut self.ole).map_err(Error::from)
+        litchi_crypto::spaces::inspect(&mut self.ole, &self.data_spaces_limits).map_err(Error::from)
     }
 
     /// Capture a source-preserving, validated `DataSpaces` edit owner.
@@ -249,7 +259,8 @@ impl<R: Read + Seek> Reader<R> {
     /// [`Self::write_data_spaces_patch`]; the current package is never
     /// mutated in place and no protected payload is decrypted or evaluated.
     pub fn data_spaces_snapshot(&mut self) -> Result<Option<litchi_crypto::spaces::Snapshot>> {
-        litchi_crypto::spaces::Snapshot::from_ole(&mut self.ole).map_err(Error::from)
+        litchi_crypto::spaces::Snapshot::from_ole(&mut self.ole, &self.data_spaces_limits)
+            .map_err(Error::from)
     }
 
     /// Rebuild the package after source-checking a `DataSpaces` patch.

@@ -17,7 +17,7 @@
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
-use litchi_crypto::ooxml::{Error, IntegrityStatus, Kind, Limits, Mode, inspect_with, open_with};
+use litchi_crypto::ooxml::{Error, IntegrityStatus, Kind, Limits, Mode, inspect, open};
 use zip::ZipArchive;
 
 const LIBREOFFICE_ROOT_ENV: &str = "LITCHI_LIBREOFFICE_CORE";
@@ -78,10 +78,7 @@ fn assert_complete_opc_zip(bytes: &[u8], required_part: &str, fixture_name: &str
 
 fn assert_wrong_password(bytes: &[u8], limits: &Limits, fixture_name: &str, password: &str) {
     assert!(
-        matches!(
-            open_with(bytes.to_vec(), password, limits),
-            Err(Error::Password)
-        ),
+        matches!(open(bytes.to_vec(), password, limits), Err(Error::Password)),
         "{fixture_name} accepted an incorrect password"
     );
 }
@@ -97,12 +94,12 @@ fn assert_native_fixture(
     let path = libreoffice_fixture(name);
     let bytes = std::fs::read(&path).expect("read native OOXML encryption fixture");
     assert_eq!(
-        inspect_with(&bytes, limits).expect("classify native OOXML encryption fixture"),
+        inspect(&bytes, limits).expect("classify native OOXML encryption fixture"),
         Kind::Encrypted(expected_mode),
         "native fixture profile: {name}"
     );
     let opened =
-        open_with(bytes.clone(), password, limits).expect("open native OOXML encryption fixture");
+        open(bytes.clone(), password, limits).expect("open native OOXML encryption fixture");
     assert_eq!(
         opened.mode(),
         Some(expected_mode),
@@ -155,14 +152,14 @@ fn libreoffice_standard_without_dataspaces_requires_explicit_compatibility() {
         ..Limits::default()
     };
     assert!(matches!(
-        open_with(bytes.clone(), PASSWORD, &Limits::default()),
+        open(bytes.clone(), PASSWORD, &Limits::default()),
         Err(Error::Malformed(_))
     ));
     assert_eq!(
-        inspect_with(&bytes, &limits).expect("classify LibreOffice Standard fixture"),
+        inspect(&bytes, &limits).expect("classify LibreOffice Standard fixture"),
         Kind::Encrypted(Mode::Standard)
     );
-    let opened = open_with(bytes.clone(), PASSWORD, &limits)
+    let opened = open(bytes.clone(), PASSWORD, &limits)
         .expect("open LibreOffice Standard fixture with explicit compatibility");
     assert_eq!(opened.mode(), Some(Mode::Standard));
     assert_eq!(opened.integrity(), Some(IntegrityStatus::Unauthenticated));
@@ -185,11 +182,10 @@ fn apache_poi_60320_mixed_wrapper_profile_opens() {
     let bytes = std::fs::read(&path).expect("read Apache POI 60320 fixture");
     let limits = Limits::default();
     assert_eq!(
-        inspect_with(&bytes, &limits).expect("classify Apache POI 60320 fixture"),
+        inspect(&bytes, &limits).expect("classify Apache POI 60320 fixture"),
         Kind::Encrypted(Mode::Agile)
     );
-    let opened =
-        open_with(bytes.clone(), POI_PASSWORD, &limits).expect("open Apache POI 60320 fixture");
+    let opened = open(bytes.clone(), POI_PASSWORD, &limits).expect("open Apache POI 60320 fixture");
     assert_eq!(opened.mode(), Some(Mode::Agile));
     assert_eq!(opened.integrity(), Some(IntegrityStatus::Authenticated));
     assert_complete_opc_zip(opened.bytes(), "xl/workbook.xml", "60320-protected.xlsx");

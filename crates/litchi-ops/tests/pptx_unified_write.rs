@@ -388,7 +388,13 @@ fn encrypted_publication_retains_profile_origin_and_plaintext_refusal() {
     use litchi_ops::{Overwrite, Password, SaveOptions, SaveTo};
     use litchi_pptx::encryption::{self, Mode};
     let clear = fixture();
-    let encrypted = encryption::encrypt(clear.clone(), "old", Mode::Standard).unwrap();
+    let encrypted = encryption::encrypt(
+        clear.clone(),
+        "old",
+        Mode::Standard,
+        &encryption::Limits::default(),
+    )
+    .unwrap();
     for eager in [false, true] {
         let dir = tempfile::tempdir().unwrap();
         let origin = dir.path().join("encrypted.pptx");
@@ -428,7 +434,12 @@ fn encrypted_publication_retains_profile_origin_and_plaintext_refusal() {
                         .reencrypt(Password::new("new".to_owned())),
                 )
                 .unwrap();
-            let result = encryption::open(std::fs::read(&target).unwrap(), "new").unwrap();
+            let result = encryption::open(
+                std::fs::read(&target).unwrap(),
+                "new",
+                &encryption::Limits::default(),
+            )
+            .unwrap();
             assert_eq!(result.mode(), Some(Mode::Standard));
             assert_eq!(result.into_bytes(), clear);
             let bytes = std::fs::read(&target).unwrap();
@@ -463,9 +474,13 @@ fn encrypted_publication_retains_profile_origin_and_plaintext_refusal() {
             )
             .unwrap();
         assert_eq!(
-            encryption::open(std::fs::read(&origin).unwrap(), "new")
-                .unwrap()
-                .into_bytes(),
+            encryption::open(
+                std::fs::read(&origin).unwrap(),
+                "new",
+                &encryption::Limits::default(),
+            )
+            .unwrap()
+            .into_bytes(),
             clear
         );
         assert_eq!(text(&source, FIRST), "first");
@@ -497,7 +512,13 @@ fn reencryption_rejects_plain_input_and_preserves_signed_encrypted_content() {
     }
     let signed =
         std::fs::read("../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx").unwrap();
-    let encrypted = encryption::encrypt(signed.clone(), "old", Mode::Standard).unwrap();
+    let encrypted = encryption::encrypt(
+        signed.clone(),
+        "old",
+        Mode::Standard,
+        &encryption::Limits::default(),
+    )
+    .unwrap();
     let File::Locked(locked) = litchi_ops::open_bytes(encrypted).unwrap() else {
         panic!("encrypted")
     };
@@ -505,9 +526,13 @@ fn reencryption_rejects_plain_input_and_preserves_signed_encrypted_content() {
     assert!(source.is_signed());
     source.save_with(SaveTo::Path(&target), &options()).unwrap();
     assert_eq!(
-        encryption::open(std::fs::read(&target).unwrap(), "new")
-            .unwrap()
-            .into_bytes(),
+        encryption::open(
+            std::fs::read(&target).unwrap(),
+            "new",
+            &encryption::Limits::default(),
+        )
+        .unwrap()
+        .into_bytes(),
         signed
     );
     let before = std::fs::read(&target).unwrap();

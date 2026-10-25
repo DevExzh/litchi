@@ -705,8 +705,7 @@ fn unlock_ooxml_with_origin(
 ) -> Result<File> {
     #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
     let _ = &origin;
-    let opened =
-        litchi_crypto::ooxml::open_with(bytes, password, &litchi_crypto::ooxml::Limits::default())?;
+    let opened = litchi_crypto::ooxml::open(bytes, password, &options.ooxml_encryption_limits)?;
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
         let limits = options.ooxml_limits.unwrap_or_default();
@@ -718,7 +717,12 @@ fn unlock_ooxml_with_origin(
         match detected {
             #[cfg(feature = "docx")]
             FileFormat::Docx => {
-                let package = litchi_docx::Package::from_decrypted(opened, litchi_docx::OpenOptions::default().source_limits(limits))?;
+                let package = litchi_docx::Package::from_decrypted(
+                    opened,
+                    litchi_docx::OpenOptions::default()
+                        .source_limits(limits)
+                        .encryption_limits(options.ooxml_encryption_limits),
+                )?;
                 let signed = package.is_signed();
                 let docx = crate::format::docx::Docx::from_owned_package_with_origin(
                     package, options, origin,
@@ -732,7 +736,12 @@ fn unlock_ooxml_with_origin(
             },
             #[cfg(feature = "pptx")]
             FileFormat::Pptx => {
-                let package = litchi_pptx::Package::from_decrypted(opened, limits)?;
+                let package = litchi_pptx::Package::from_decrypted(
+                    opened,
+                    litchi_pptx::OpenOptions::default()
+                        .source_limits(limits)
+                        .encryption_limits(options.ooxml_encryption_limits),
+                )?;
                 let signed = package.opc()?.is_signed();
                 let pptx = crate::format::pptx::Pptx::from_package(package, options)?.with_origin(origin);
                 Ok(signed_if(
@@ -744,7 +753,12 @@ fn unlock_ooxml_with_origin(
             },
             #[cfg(feature = "xlsx")]
             FileFormat::Xlsx => {
-                let package = litchi_xlsx::Package::from_decrypted(opened, litchi_xlsx::OpenOptions::new().source_limits(limits))?;
+                let package = litchi_xlsx::Package::from_decrypted(
+                    opened,
+                    litchi_xlsx::OpenOptions::new()
+                        .source_limits(limits)
+                        .encryption_limits(options.ooxml_encryption_limits),
+                )?;
                 let signed = package.is_signed();
                 let xlsx = crate::format::xlsx::Xlsx::from_package(package, options)?.with_origin(origin);
                 Ok(signed_if(

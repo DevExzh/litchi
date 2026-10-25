@@ -125,7 +125,7 @@ impl Package {
         options: OpenOptions,
     ) -> Result<Self> {
         let file = std::fs::File::open(path).map_err(crate::encryption::Error::Io)?;
-        let opened = crate::encryption::load_with(file, password, &options.encryption_limits)?;
+        let opened = crate::encryption::load(file, password, &options.encryption_limits)?;
         Self::from_decrypted(opened, options)
     }
 
@@ -143,7 +143,7 @@ impl Package {
         password: &str,
         options: OpenOptions,
     ) -> Result<Self> {
-        let opened = crate::encryption::load_with(bytes, password, &options.encryption_limits)?;
+        let opened = crate::encryption::load(bytes, password, &options.encryption_limits)?;
         Self::from_decrypted(opened, options)
     }
 
@@ -162,7 +162,7 @@ impl Package {
         password: &str,
         options: OpenOptions,
     ) -> Result<Self> {
-        let opened = crate::encryption::load_with(reader, password, &options.encryption_limits)?;
+        let opened = crate::encryption::load(reader, password, &options.encryption_limits)?;
         Self::from_decrypted(opened, options)
     }
 
@@ -653,7 +653,7 @@ impl Package {
     #[cfg(feature = "encryption")]
     pub fn to_encrypted(&self, password: &str, mode: crate::encryption::Mode) -> Result<Vec<u8>> {
         let plaintext = self.to_plain_bytes()?;
-        Ok(crate::encryption::encrypt_with(
+        Ok(crate::encryption::encrypt(
             plaintext,
             password,
             mode,

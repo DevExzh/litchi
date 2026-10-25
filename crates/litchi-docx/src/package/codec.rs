@@ -231,6 +231,8 @@ impl Package {
             semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
             source_encryption: Default::default(),
+            #[cfg(feature = "encryption")]
+            encryption_limits: Default::default(),
         })
     }
 
@@ -359,6 +361,8 @@ impl Package {
             semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
             source_encryption: Default::default(),
+            #[cfg(feature = "encryption")]
+            encryption_limits: Default::default(),
         })
     }
 
@@ -423,7 +427,7 @@ impl Package {
         options: OpenOptions,
     ) -> Result<Self> {
         options.check_owning()?;
-        let opened = crate::encryption::load_with(reader, password, &options.encryption_limits)?;
+        let opened = crate::encryption::load(reader, password, &options.encryption_limits)?;
         Self::from_decrypted(opened, options)
     }
 
@@ -494,6 +498,7 @@ impl Package {
             litchi_ooxml_common::package_encryption::PackageEncryption::plain,
             litchi_ooxml_common::package_encryption::PackageEncryption::encrypted,
         );
+        package.encryption_limits = options.encryption_limits;
         Ok(package)
     }
 }
@@ -649,7 +654,13 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn to_encrypted(&self, password: &str, mode: Mode) -> Result<Vec<u8>> {
-        crate::encryption::encrypt(self.to_plain_bytes()?, password, mode).map_err(Into::into)
+        crate::encryption::encrypt(
+            self.to_plain_bytes()?,
+            password,
+            mode,
+            &self.encryption_limits,
+        )
+        .map_err(Into::into)
     }
 
     /// Serialize and encrypt using the source package's retained profile.

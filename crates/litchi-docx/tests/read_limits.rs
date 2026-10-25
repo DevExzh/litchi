@@ -207,10 +207,10 @@ fn encrypted_options_preserve_independent_bounds_and_source_profile_on_every_rou
                 if actual == encrypted.len() as u64 && maximum == (encrypted.len() - 1) as u64
         ));
     }
-    let opened = encryption::open(encrypted.clone(), "options").unwrap();
+    let opened = encryption::open(encrypted.clone(), "options", &Limits::default()).unwrap();
     let package = Package::from_decrypted(opened, options.clone()).unwrap();
     assert_eq!(package.encryption(), Some(Mode::Standard));
-    let opened = encryption::open(encrypted.clone(), "options").unwrap();
+    let opened = encryption::open(encrypted.clone(), "options", &Limits::default()).unwrap();
     assert_input_limit(
         Package::from_decrypted(opened, options.source_limits(input_limit(clear.len() - 1)))
             .err()

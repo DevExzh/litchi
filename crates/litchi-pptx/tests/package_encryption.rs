@@ -20,7 +20,7 @@ fn plain() -> Vec<u8> {
 }
 
 fn encrypted(mode: Mode, password: &str) -> Vec<u8> {
-    encryption::encrypt(plain(), password, mode).unwrap()
+    encryption::encrypt(plain(), password, mode, &encryption::Limits::default()).unwrap()
 }
 
 fn spreadsheet_package() -> Vec<u8> {
@@ -121,7 +121,13 @@ fn password_aware_ingress_accepts_plain_zip_without_provenance() {
 
 #[test]
 fn encrypted_wrong_family_is_rejected_after_decryption() {
-    let encrypted = encryption::encrypt(spreadsheet_package(), "secret", Mode::Agile).unwrap();
+    let encrypted = encryption::encrypt(
+        spreadsheet_package(),
+        "secret",
+        Mode::Agile,
+        &encryption::Limits::default(),
+    )
+    .unwrap();
     assert!(matches!(
         Package::from_reader_with_password(Cursor::new(encrypted), "secret"),
         Err(Error::ContentType { .. })
@@ -142,7 +148,7 @@ fn standard_and_agile_ingress_retain_mode_and_reencrypt() {
 
         let rekeyed = package.to_reencrypted("new password").unwrap();
         assert_eq!(
-            encryption::inspect(&rekeyed).unwrap(),
+            encryption::inspect(&rekeyed, &encryption::Limits::default()).unwrap(),
             Kind::Encrypted(mode)
         );
         assert!(matches!(
@@ -211,7 +217,10 @@ fn downgrade_and_mutation_are_explicit() {
 
     let clear = package.to_plain_bytes().unwrap();
     assert_eq!(package.encryption(), Some(Mode::Standard));
-    assert_eq!(encryption::inspect(&clear).unwrap(), Kind::Plain);
+    assert_eq!(
+        encryption::inspect(&clear, &encryption::Limits::default()).unwrap(),
+        Kind::Plain
+    );
     assert!(matches!(
         package.to_bytes(),
         Err(Error::EncryptionPolicy { .. })
@@ -230,7 +239,7 @@ fn selected_mode_saves_leave_the_retained_mode_unchanged() {
     let agile_bytes = package.to_encrypted("byte password", Mode::Agile).unwrap();
     assert_eq!(package.encryption(), Some(Mode::Standard));
     assert_eq!(
-        encryption::inspect(&agile_bytes).unwrap(),
+        encryption::inspect(&agile_bytes, &encryption::Limits::default()).unwrap(),
         Kind::Encrypted(Mode::Agile)
     );
 
@@ -249,7 +258,7 @@ fn selected_mode_saves_leave_the_retained_mode_unchanged() {
     assert_eq!(package.encryption(), Some(Mode::Standard));
     let saved = std::fs::read(output).unwrap();
     assert_eq!(
-        encryption::inspect(&saved).unwrap(),
+        encryption::inspect(&saved, &encryption::Limits::default()).unwrap(),
         Kind::Encrypted(Mode::Agile)
     );
     Package::from_reader_with_password(Cursor::new(saved), "new password").unwrap();
@@ -394,7 +403,7 @@ fn immutable_reencryption_preserves_profile_content_and_protection() {
         let package = Package::from_reader_with_password(Cursor::new(input), "old").unwrap();
         let mut output = Vec::new();
         package.write_reencrypted(&mut output, "new").unwrap();
-        let clear = encryption::open(output, "new").unwrap();
+        let clear = encryption::open(output, "new", &encryption::Limits::default()).unwrap();
         assert_eq!(clear.mode(), Some(mode));
         assert_eq!(clear.into_bytes(), plain());
         assert_eq!(package.encryption(), Some(mode));

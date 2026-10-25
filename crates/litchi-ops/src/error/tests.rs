@@ -1466,6 +1466,22 @@ fn legacy_doc_foreign_boundaries_delegate_classification_before_core_projection(
         litchi_doc::Error::Crypto(litchi_crypto::spaces::Error::PatchConflict),
         Code::InvalidInput,
     );
+    assert_code(
+        litchi_doc::Error::Crypto(litchi_crypto::spaces::Error::InvalidLimit {
+            kind: litchi_crypto::spaces::LimitKind::OutputBytes,
+            value: 0,
+            maximum: 1,
+        }),
+        Code::InvalidArgument,
+    );
+    assert_code(
+        litchi_doc::Error::Crypto(litchi_crypto::spaces::Error::LimitExceeded {
+            kind: litchi_crypto::spaces::LimitKind::TotalBytes,
+            observed: 2,
+            maximum: 1,
+        }),
+        Code::LimitExceeded,
+    );
 }
 
 #[cfg(feature = "xls")]

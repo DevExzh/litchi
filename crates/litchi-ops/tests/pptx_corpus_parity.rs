@@ -235,7 +235,13 @@ fn signed_sources_refuse_the_new_writes() {
 fn encrypted_sources_refuse_the_new_writes_until_reencrypted() {
     use litchi_ops::Password;
     use litchi_pptx::encryption::{self, Mode};
-    let encrypted = encryption::encrypt(fixture(), "secret", Mode::Standard).unwrap();
+    let encrypted = encryption::encrypt(
+        fixture(),
+        "secret",
+        Mode::Standard,
+        &encryption::Limits::default(),
+    )
+    .unwrap();
     let File::Locked(locked) = litchi_ops::open_bytes(encrypted).unwrap() else {
         panic!("encrypted fixture")
     };

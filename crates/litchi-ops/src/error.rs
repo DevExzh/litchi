@@ -1286,6 +1286,8 @@ impl Classify for litchi_docx::Error {
     fn classify(&self) -> Class {
         match self {
             #[cfg(feature = "encryption")]
+            Self::Encryption(error) => error.classify(),
+            #[cfg(feature = "encryption")]
             Self::EncryptionPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::Opc(error) => error.classify(),
@@ -2534,6 +2536,9 @@ impl Classify for litchi_crypto::spaces::Error {
         match self {
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::Ole(error) => error.classify(),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::LimitExceeded { .. } => Class::of(Code::LimitExceeded),
+            Self::Allocation { .. } => Class::of(Code::InternalError),
             Self::Invalid(_) => Class::of(Code::CorruptFile),
             _ => Class::of(Code::CorruptFile),
         }

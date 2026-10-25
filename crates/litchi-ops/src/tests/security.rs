@@ -468,7 +468,13 @@ mod unlock {
     ) {
         let plain = std::fs::read(test_data(relative)).unwrap();
         let expected = crate::open_bytes(plain.clone()).unwrap().text().unwrap();
-        let encrypted = litchi_crypto::ooxml::encrypt(plain, "unlock-test", mode).unwrap();
+        let encrypted = litchi_crypto::ooxml::encrypt(
+            plain,
+            "unlock-test",
+            mode,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .unwrap();
 
         let file = crate::open_bytes(encrypted.clone()).unwrap();
         assert_eq!(file.format(), None);
@@ -547,9 +553,13 @@ mod unlock {
     #[test]
     fn an_unlocked_docx_keeps_its_encryption_profile() {
         let plain = std::fs::read(test_data("ooxml/docx/FancyFoot.docx")).unwrap();
-        let encrypted =
-            litchi_crypto::ooxml::encrypt(plain, "profile", litchi_crypto::ooxml::Mode::Agile)
-                .unwrap();
+        let encrypted = litchi_crypto::ooxml::encrypt(
+            plain,
+            "profile",
+            litchi_crypto::ooxml::Mode::Agile,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .unwrap();
         let file = locked(crate::open_bytes(encrypted).unwrap())
             .unlock(password("profile"))
             .unwrap();
@@ -564,13 +574,64 @@ mod unlock {
         }
     }
 
+    /// Every OOXML eager owner retains the selected outer encryption profile
+    /// across the facade's locked-to-unlocked transition. A deliberately
+    /// tight output ceiling must therefore refuse re-encryption for DOCX,
+    /// PPTX, and XLSX alike rather than silently reverting to the default.
+    #[cfg(all(feature = "docx", feature = "pptx", feature = "xlsx"))]
+    #[test]
+    fn unlocked_ooxml_consumers_retain_custom_encryption_limits() {
+        use crate::{File, OpenOptions, SaveOptions, SaveTo};
+
+        let encryption_limits = litchi_crypto::ooxml::Limits {
+            max_output_bytes: 512,
+            ..litchi_crypto::ooxml::Limits::default()
+        };
+        for (relative, suffix) in [
+            ("ooxml/docx/FancyFoot.docx", ".docx"),
+            ("ooxml/pptx/shapes.pptx", ".pptx"),
+            ("ooxml/xlsx/styles.xlsx", ".xlsx"),
+        ] {
+            let plain = std::fs::read(test_data(relative)).unwrap();
+            let encrypted = litchi_crypto::ooxml::encrypt(
+                plain,
+                "profile",
+                litchi_crypto::ooxml::Mode::Agile,
+                &litchi_crypto::ooxml::Limits::default(),
+            )
+            .unwrap();
+            let locked = crate::open_bytes_with(
+                encrypted,
+                &OpenOptions::new().ooxml_encryption_limits(encryption_limits),
+            )
+            .unwrap();
+            let unlocked = match locked {
+                File::Locked(locked) => locked.unlock(password("profile")).unwrap(),
+                other => panic!("expected locked {relative}, got {other:?}"),
+            };
+            let directory = tempfile::tempdir().unwrap();
+            let destination = directory.path().join(format!("output{suffix}"));
+            let error = unlocked
+                .save_with(
+                    SaveTo::Path(&destination),
+                    &SaveOptions::new().reencrypt(password("new")),
+                )
+                .unwrap_err();
+            assert_eq!(error.code(), Code::LimitExceeded, "{relative}: {error:?}");
+        }
+    }
+
     #[cfg(feature = "xlsb")]
     #[test]
     fn an_encrypted_xlsb_is_refused_as_an_unsupported_capability() {
         let plain = std::fs::read(test_data("ooxml/xlsb/Simple.xlsb")).unwrap();
-        let encrypted =
-            litchi_crypto::ooxml::encrypt(plain, "xlsb", litchi_crypto::ooxml::Mode::Agile)
-                .unwrap();
+        let encrypted = litchi_crypto::ooxml::encrypt(
+            plain,
+            "xlsb",
+            litchi_crypto::ooxml::Mode::Agile,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .unwrap();
         let error = locked(crate::open_bytes(encrypted).unwrap())
             .unlock(password("xlsb"))
             .unwrap_err();
@@ -584,9 +645,13 @@ mod unlock {
     fn a_signed_package_unlocks_as_signed() {
         let plain =
             std::fs::read(test_data("poi/test-data/xmldsign/hello-world-signed.docx")).unwrap();
-        let encrypted =
-            litchi_crypto::ooxml::encrypt(plain, "signed", litchi_crypto::ooxml::Mode::Agile)
-                .unwrap();
+        let encrypted = litchi_crypto::ooxml::encrypt(
+            plain,
+            "signed",
+            litchi_crypto::ooxml::Mode::Agile,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .unwrap();
         let file = locked(crate::open_bytes(encrypted).unwrap())
             .unlock(password("signed"))
             .unwrap();

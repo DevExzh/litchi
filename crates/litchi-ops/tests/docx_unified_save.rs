@@ -525,8 +525,13 @@ fn signed_noop_preserves_signature_and_explicit_unsign_publishes_unsigned_docx()
 #[test]
 fn locked_save_refuses_before_destination_policy_validation() {
     let encrypted =
-        litchi_crypto::ooxml::encrypt(fixture(), "locked-save", litchi_crypto::ooxml::Mode::Agile)
-            .expect("encrypt DOCX fixture");
+        litchi_crypto::ooxml::encrypt(
+            fixture(),
+            "locked-save",
+            litchi_crypto::ooxml::Mode::Agile,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .expect("encrypt DOCX fixture");
     let file = litchi_ops::open_bytes(encrypted).expect("open encrypted DOCX");
     assert!(matches!(file, File::Locked(_)));
 
@@ -557,8 +562,13 @@ fn locked_save_refuses_before_destination_policy_validation() {
 fn encrypted_docx_save_requires_reencryption_and_preserves_origin() {
     let password = "save-password";
     let encrypted =
-        litchi_crypto::ooxml::encrypt(fixture(), password, litchi_crypto::ooxml::Mode::Agile)
-            .expect("encrypt DOCX fixture");
+        litchi_crypto::ooxml::encrypt(
+            fixture(),
+            password,
+            litchi_crypto::ooxml::Mode::Agile,
+            &litchi_crypto::ooxml::Limits::default(),
+        )
+        .expect("encrypt DOCX fixture");
     let directory = tempfile::tempdir().expect("encrypted save directory");
     let origin = directory.path().join("encrypted-origin.docx");
     std::fs::write(&origin, &encrypted).expect("write encrypted origin");

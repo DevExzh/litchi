@@ -13263,7 +13263,276 @@
         }
       ],
       "families": [],
-      "family_methods": true
+      "family_methods": true,
+      "required_signatures": [
+        {
+          "method": "litchi_crypto::labels::parse",
+          "inputs": [
+            "xml",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::labels::Limits"
+        },
+        {
+          "method": "litchi_crypto::labels::write",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::labels::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::encrypt",
+          "inputs": [
+            "bytes",
+            "password",
+            "mode",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::inspect",
+          "inputs": [
+            "bytes",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::inspect_with_policy",
+          "inputs": [
+            "bytes",
+            "limits",
+            "integrity_policy"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::load",
+          "inputs": [
+            "reader",
+            "password",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::load_with_policy",
+          "inputs": [
+            "reader",
+            "password",
+            "limits",
+            "integrity_policy"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::open",
+          "inputs": [
+            "bytes",
+            "password",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::open_with_policy",
+          "inputs": [
+            "bytes",
+            "password",
+            "limits",
+            "integrity_policy"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::rekey",
+          "inputs": [
+            "bytes",
+            "old_password",
+            "new_password",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::ooxml::rekey_with_policy",
+          "inputs": [
+            "bytes",
+            "old_password",
+            "new_password",
+            "limits",
+            "integrity_policy"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::ooxml::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::Snapshot::from_ole",
+          "inputs": [
+            "ole",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::inspect",
+          "inputs": [
+            "ole",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::inspect_bytes",
+          "inputs": [
+            "bytes",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_definition",
+          "inputs": [
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_encryption_transform",
+          "inputs": [
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_irm_transform",
+          "inputs": [
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_license",
+          "inputs": [
+            "stream_name",
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_map",
+          "inputs": [
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_transform_header",
+          "inputs": [
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::parse_version_info",
+          "inputs": [
+            "data",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_definition",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_encryption_transform",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_irm_transform",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_license",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_map",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_transform_header",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        },
+        {
+          "method": "litchi_crypto::spaces::write_version_info",
+          "inputs": [
+            "value",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_crypto::spaces::Limits"
+        }
+      ]
     },
     {
       "id": "sign",

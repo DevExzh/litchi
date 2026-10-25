@@ -67,7 +67,7 @@ impl Package {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         options.check_owning()?;
-        let opened = ooxml::load_with(reader, password, &options.encryption_limits)?;
+        let opened = ooxml::load(reader, password, &options.encryption_limits)?;
         let mut package = Self::from_opened_encryption(opened, options.source_limits)?;
         package.encryption_limits = options.encryption_limits;
         Ok(package)
@@ -102,7 +102,7 @@ impl Package {
                 source,
             })?;
         owned.extend_from_slice(bytes);
-        let opened = ooxml::open_with(owned, password, &options.encryption_limits)?;
+        let opened = ooxml::open(owned, password, &options.encryption_limits)?;
         let mut package = Self::from_opened_encryption(opened, options.source_limits)?;
         package.encryption_limits = options.encryption_limits;
         Ok(package)
@@ -187,8 +187,7 @@ impl Package {
             return Err(error);
         }
         staged?;
-        let encrypted =
-            ooxml::encrypt_with(std::mem::take(&mut *clear.bytes), password, mode, limits)?;
+        let encrypted = ooxml::encrypt(std::mem::take(&mut *clear.bytes), password, mode, limits)?;
         writer.write_all(&encrypted)?;
         writer.flush()?;
         Ok(())
@@ -241,10 +240,13 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error if the clear package violates `limits` or is not a
-    /// valid PPTX package.
-    pub fn from_decrypted(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
-        Self::from_opened_encryption(opened, limits)
+    /// Returns an error if the clear package violates the selected source
+    /// limits or is not a valid PPTX package.
+    pub fn from_decrypted(opened: ooxml::Opened, options: crate::OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        let mut package = Self::from_opened_encryption(opened, options.source_limits)?;
+        package.encryption_limits = options.encryption_limits;
+        Ok(package)
     }
 
     fn from_opened_encryption(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
@@ -262,7 +264,7 @@ impl Package {
 
     fn encrypt_inner(&self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         let clear = PackageWriter::to_bytes(&self.opc)?;
-        Ok(ooxml::encrypt_with(
+        Ok(ooxml::encrypt(
             clear,
             password,
             mode,
