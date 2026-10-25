@@ -179,8 +179,11 @@ fn replay_rechecks_readonly_output_with_the_recipient_profile() {
         .into_package();
     assert_eq!(replayed.read_only_recommended().unwrap(), Some(true));
 
-    let noop = Package::new()
-        .unwrap()
+    // Build the exact no-op on the recipient that will replay it. A no-op
+    // patch is content-rooted just like a changed patch; constructing it from
+    // Package::new() would exercise the foreign-base conflict path instead of
+    // the unchanged-payload fast path.
+    let noop = permissive
         .edit_read_only_recommended()
         .unwrap()
         .commit()
@@ -191,6 +194,25 @@ fn replay_rechecks_readonly_output_with_the_recipient_profile() {
         .expect("no-op replay does not require a semantic scan")
         .into_package();
     assert_eq!(unchanged_noop.to_bytes().unwrap(), noop_source);
+
+    // Equal content under a different recipient SourceLimits profile still
+    // matches the no-op base. The replay must return the original bytes before
+    // any family semantic validation, even though the tight profile rejects
+    // the changed patch above.
+    let tight_source = tight.to_bytes().unwrap();
+    let unchanged_tight = tight
+        .apply_read_only_recommended(noop.patch())
+        .expect("equal-content no-op replay is profile-independent")
+        .into_package();
+    assert_eq!(unchanged_tight.to_bytes().unwrap(), tight_source);
+
+    let mut foreign = Package::new().unwrap();
+    let foreign_source = foreign.to_bytes().unwrap();
+    let error = foreign
+        .apply_read_only_recommended(noop.patch())
+        .unwrap_err();
+    assert!(matches!(error, Error::PatchConflict));
+    assert_eq!(foreign.to_bytes().unwrap(), foreign_source);
 }
 
 #[test]
