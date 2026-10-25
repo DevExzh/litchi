@@ -125,6 +125,56 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                 with self.assertRaisesRegex(paired.RunnerError, "owner_profiles"):
                     paired._validate_master(missing_owner)
 
+    def test_v2_restores_per_profile_parent_and_feature_contracts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-v2-profile-contract-") as name:
+            root = Path(name)
+            data, binding = self._master_fixture(root)
+            with mock.patch.object(policy, "CANDIDATE_BINDING", binding):
+                missing_parents = copy.deepcopy(data)
+                missing_parents["profiles"][0]["approved_baseline_revisions"] = []
+                with self.assertRaisesRegex(
+                    paired.RunnerError, "reviewed source parents"
+                ):
+                    paired._validate_master(missing_parents)
+
+                wrong_parent = copy.deepcopy(data)
+                wrong_parent["profiles"][0]["approved_baseline_revisions"] = [
+                    next(
+                        revision
+                        for revision in policy.APPROVED_BASELINE_REVISIONS
+                        if revision != wrong_parent["profiles"][0]["baseline_revision"]
+                    )
+                ]
+                with self.assertRaisesRegex(paired.RunnerError, "reviewed source parents"):
+                    paired._validate_master(wrong_parent)
+
+                missing_routes = copy.deepcopy(data)
+                missing_routes["route_profiles"][0]["route_baselines"] = {
+                    "theme": missing_routes["route_profiles"][0]["baseline_revision"],
+                }
+                with self.assertRaisesRegex(paired.RunnerError, "route_baselines"):
+                    paired._validate_master(missing_routes)
+
+                wrong_theme_parent = copy.deepcopy(data)
+                wrong_theme_parent["route_profiles"][0]["route_baselines"] = {
+                    "theme": wrong_theme_parent["profiles"][0]["baseline_revision"],
+                    "ink": wrong_theme_parent["route_profiles"][0]["baseline_revision"],
+                }
+                with self.assertRaisesRegex(paired.RunnerError, "exact theme parent"):
+                    paired._validate_master(wrong_theme_parent)
+
+                family_baseline = copy.deepcopy(data)
+                family_baseline["route_profiles"][0]["baseline_features"].append(
+                    "drawingml-theme-family-current"
+                )
+                with self.assertRaisesRegex(paired.RunnerError, "legacy branch"):
+                    paired._validate_master(family_baseline)
+
+                owner_features = copy.deepcopy(data)
+                owner_features["owner_profiles"][0].pop("candidate_features")
+                with self.assertRaisesRegex(paired.RunnerError, "all current DrawingML features"):
+                    paired._validate_master(owner_features)
+
     def test_pending_manifest_fails_before_any_source_path_is_used(self) -> None:
         manifest = json.loads(
             (ROOT / "tools/native_qualification/manifests/drawingml-raw-v2.json").read_text(

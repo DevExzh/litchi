@@ -66,6 +66,14 @@ OWNER_PROFILE_IDS = (
     "drawingml-ink-actions-owner",
     "drawingml-transform-owner",
 )
+CURRENT_FEATURES = (
+    "drawingml-owner-current",
+    "drawingml-theme-family-current",
+    "drawingml-theme-family-owner-limits-current",
+    "drawingml-ink-limits-current",
+    "drawingml-transform-limits-current",
+    "drawingml-raw-current",
+)
 
 
 def _require_policy_binding(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -200,16 +208,65 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
             raise RunnerError(f"{profile_id} raw endpoint carries an owner route")
         if raw_scope is not None and raw_scope not in RAW_SCOPES:
             raise RunnerError(f"{profile_id} has an unknown raw scope")
+        approved = profile.get("approved_baseline_revisions")
+        if not isinstance(approved, list) or not approved:
+            raise RunnerError(
+                f"{profile_id} baseline revision is not one of its reviewed source parents"
+            )
+        for index, revision in enumerate(approved):
+            _full_sha(revision, f"{profile_id}.approved_baseline_revisions[{index}]")
         for label in ("baseline_features", "candidate_features"):
             features = profile.get(label, ["drawingml-owner-current"] if label == "candidate_features" else [])
             if not isinstance(features, list) or any(not isinstance(item, str) or not item for item in features):
                 raise RunnerError(f"{profile_id}.{label} must be a list of non-empty feature names")
             if set(features) - DRAWINGML_FEATURES:
                 raise RunnerError(f"{profile_id}.{label} has an unknown DrawingML feature")
+        baseline_features = profile.get("baseline_features", [])
+        candidate_features = profile.get("candidate_features", ["drawingml-owner-current"])
+        if endpoint == "owner" and tuple(candidate_features) != CURRENT_FEATURES:
+            raise RunnerError(
+                f"{profile_id} owner endpoint must select all current DrawingML features"
+            )
+        if profile_id == "drawingml-theme-family-raw":
+            if "drawingml-owner-current" not in baseline_features:
+                raise RunnerError(
+                    "drawingml-theme-family-raw must compile its 11728 baseline with the current Package/Edit owner API"
+                )
+            if "drawingml-theme-family-current" in baseline_features:
+                raise RunnerError(
+                    "drawingml-theme-family-raw must keep the 11728 part caller-limit API on its legacy branch"
+                )
+            if "drawingml-theme-family-current" not in candidate_features:
+                raise RunnerError(
+                    "drawingml-theme-family-raw candidate must select the current caller-limit API"
+                )
         baseline_root = _path(str(profile.get("baseline_root", "")))
         baseline_revision = _full_sha(profile.get("baseline_revision"), f"{profile_id}.baseline_revision")
         if baseline_revision not in preparation.APPROVED_BASELINE_REVISIONS:
             raise RunnerError(f"{profile_id} baseline revision is not approved")
+        if baseline_revision not in approved:
+            raise RunnerError(f"{profile_id} baseline revision is not one of its reviewed source parents")
+        route_baselines = profile.get("route_baselines")
+        if route_baselines is not None:
+            if not isinstance(route_baselines, dict):
+                raise RunnerError(f"{profile_id}.route_baselines must be an object")
+            if lane == "drawingml-theme-ink" and set(route_baselines) != {"theme", "ink"}:
+                raise RunnerError("drawingml-theme-ink route_baselines must name only theme and ink")
+            for route, revisions in route_baselines.items():
+                values = [revisions] if isinstance(revisions, str) else revisions
+                if not isinstance(values, list) or not values:
+                    raise RunnerError(f"{profile_id}.{route} has no exact baseline parent")
+                for revision in values:
+                    _full_sha(revision, f"{profile_id}.{route}.baseline")
+            theme_parent = route_baselines.get("theme")
+            if lane == "drawingml-theme-ink" and not isinstance(theme_parent, str):
+                raise RunnerError(
+                    "drawingml-theme-ink needs one exact theme parent; Ink routes are separate"
+                )
+            if isinstance(theme_parent, str) and baseline_revision != theme_parent:
+                raise RunnerError(
+                    f"{profile_id} baseline must be the exact theme parent; Ink routes need a separate endpoint"
+                )
         if profile.get("perf_lock_sha256") != preparation.ROLE_LOCKS["perf"]["baseline"]["sha256"]:
             raise RunnerError(f"{profile_id} perf lock differs from the v2 baseline role lock")
         receipt = _path(str(profile.get("preparation_receipt", "")))
@@ -239,10 +296,10 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
             "preparation_receipt": receipt,
             "source_fence": profile["source_fence"],
             "record": profile["record"],
-            "approved_baseline_revisions": tuple(profile.get("approved_baseline_revisions", ())),
-            "route_baselines": profile.get("route_baselines"),
-            "baseline_features": tuple(profile.get("baseline_features", ())),
-            "candidate_features": tuple(profile.get("candidate_features", ("drawingml-owner-current",))),
+            "approved_baseline_revisions": tuple(approved),
+            "route_baselines": route_baselines,
+            "baseline_features": tuple(baseline_features),
+            "candidate_features": tuple(candidate_features),
         })
     return {
         "schema": SCHEMA,
