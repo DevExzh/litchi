@@ -9,8 +9,10 @@ native, or performance command was run in this leaf.
 Recipient admission now checks retained part metadata before parsing
 `[Content_Types].xml`.  A deferred graph whose selected payload exceeds a
 tighter edit policy therefore returns the VBA `PartBytes` limit identity
-without hydrating the payload.  The repair does not change the bounded
-metadata scan or publication order.
+without hydrating the payload.  The modeled per-part pass also precedes the
+retained-archive metrics pass, so simultaneous part and entry ceilings keep
+the selected VBA limit identity while archive member and aggregate accounting
+remain intact.
 
 The noncanonical content-types replay test now spells out the expected Excel
 fixture manifest independently: it replaces the known plain workbook

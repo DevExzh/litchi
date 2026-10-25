@@ -1487,10 +1487,6 @@ fn validate_recipient_metadata_limits(
     package: &OpcPackage,
     limits: SourceLimits,
 ) -> Result<RecipientAdmission> {
-    let retained = package
-        .retained_archive_metrics(limits)
-        .map_err(Error::from)?;
-
     let mut parts = 0usize;
     let mut part_bytes = 0u64;
     for metadata in package.iter_parts() {
@@ -1523,6 +1519,14 @@ fn validate_recipient_metadata_limits(
             maximum: limit_observed(limits.max_total_part_bytes()),
         })?;
     }
+
+    // Re-admit the retained archive only after all modeled part metadata has
+    // established the VBA per-part precedence.  The archive pass remains
+    // metadata-only and supplies the opaque/member/aggregate totals below;
+    // it does not decode or rescan modeled payloads.
+    let retained = package
+        .retained_archive_metrics(limits)
+        .map_err(Error::from)?;
 
     // Check retained part metadata before parsing [Content_Types].xml.  This
     // keeps a tighter selected-part policy deterministic for deferred source
