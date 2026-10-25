@@ -9,7 +9,7 @@
 
 use std::{env, fs};
 
-use litchi_ppt::{slide_order, Package};
+use litchi_ppt::{Package, slide_order};
 use sha2::{Digest, Sha256};
 
 const MEDIA_ID: u32 = 1;

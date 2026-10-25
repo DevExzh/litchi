@@ -694,7 +694,7 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             self.assertIn("tools/native_qualification/adapters/", identity["source_path"])
         correctness = baseline.adapter_for(policy.PPT_CORRECTNESS_PATH)
         self.assertIsNotNone(correctness)
-        self.assertEqual(correctness.sha256, "3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06")
+        self.assertEqual(correctness.sha256, "3bb1deaa67f64e8cb70f7dc2cf05ad41803fa8edd2f73b492991555d260579ab")
 
     def test_f2_correctness_receipt_requires_forward_replay(self) -> None:
         route = policy.PPT_ROUTES[2]

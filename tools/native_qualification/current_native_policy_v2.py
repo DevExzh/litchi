@@ -334,7 +334,7 @@ _BASELINE_PIN = SourcePin(
     probes=(
         _artifact("crates/litchi-ppt/examples/scoped_patch_probe.rs", "0350fc1696688e576613bc8b2c2ccb3d39c12b4b8ad890c5dcd14e3e7b4138ca", 5_158),
         _artifact(LEGACY_PROBE_PATH, "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81", 12_782),
-        _artifact(PPT_CORRECTNESS_PATH, "3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06", 3_561),
+        _artifact(PPT_CORRECTNESS_PATH, "3bb1deaa67f64e8cb70f7dc2cf05ad41803fa8edd2f73b492991555d260579ab", 3_561),
     ),
     fixtures=(
         _artifact("test-data/unified-ops/0294/video.ppt", "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a", 43_520),
@@ -346,7 +346,7 @@ _BASELINE_PIN = SourcePin(
     adapter_overlays=(
         _artifact("tools/perf-baseline/Cargo.toml", "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676", 3_638),
         _artifact(LEGACY_PROBE_PATH, "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81", 12_782),
-        _artifact(PPT_CORRECTNESS_PATH, "3b7e581bf01f66f70e3fe21d9a3ebe18065206cbd1e00ff07d9e36b9ecae1e06", 3_561),
+        _artifact(PPT_CORRECTNESS_PATH, "3bb1deaa67f64e8cb70f7dc2cf05ad41803fa8edd2f73b492991555d260579ab", 3_561),
     ),
 )
 
