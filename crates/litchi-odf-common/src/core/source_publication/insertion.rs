@@ -1122,9 +1122,7 @@ fn map_replay_archive_marker(
     progress: SourceContentPublicationProgress,
 ) -> Option<SourceContentPublicationError> {
     match error.kind() {
-        soapberry_zip::ErrorKind::IO(source) | soapberry_zip::ErrorKind::Io(source) => {
-            map_replay_io_marker(source, progress)
-        },
+        soapberry_zip::ErrorKind::IO(source) => map_replay_io_marker(source, progress),
         soapberry_zip::ErrorKind::Cancelled => {
             Some(SourceContentPublicationError::Cancelled { progress })
         },

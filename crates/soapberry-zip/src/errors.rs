@@ -158,9 +158,6 @@ pub enum ErrorKind {
     /// An IO error
     IO(std::io::Error),
 
-    /// An IO error (alias for compatibility)
-    Io(std::io::Error),
-
     /// An unexpected end of file
     Eof,
 
@@ -200,7 +197,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &self.inner.kind {
             ErrorKind::Allocation { source, .. } => Some(source),
-            ErrorKind::IO(error) | ErrorKind::Io(error) => Some(error),
+            ErrorKind::IO(error) => Some(error),
             ErrorKind::CentralDirectorySpool { source, .. } => Some(source),
             _ => None,
         }
@@ -305,7 +302,6 @@ impl std::fmt::Display for ErrorKind {
             ErrorKind::InvalidEndOfCentralDirectory => {
                 write!(f, "Invalid end of central directory")
             },
-            ErrorKind::Io(ref err) => err.fmt(f),
             ErrorKind::FileNotFound(ref name) => {
                 write!(f, "File not found in archive: {}", name)
             },

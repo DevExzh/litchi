@@ -3717,7 +3717,7 @@ impl<'data> ArchiveReader<'data> {
     pub fn read_string(&self, name: &str) -> Result<String, Error> {
         let bytes = self.read(name)?;
         String::from_utf8(bytes).map_err(|e| {
-            Error::from(ErrorKind::Io(std::io::Error::new(
+            Error::from(ErrorKind::IO(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 e,
             )))
@@ -6539,7 +6539,7 @@ fn streaming_limit_io_error(
 
 fn streaming_limit_from_error(error: &Error) -> Option<StreamingLimitExceeded> {
     let io_error = match error.kind() {
-        ErrorKind::IO(error) | ErrorKind::Io(error) => error,
+        ErrorKind::IO(error) => error,
         _ => return None,
     };
     streaming_limit_from_io_error(io_error)
@@ -6603,7 +6603,7 @@ impl std::fmt::Display for StreamingArchiveFailure {
 impl std::error::Error for StreamingArchiveFailure {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self.error.kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => Some(error),
+            ErrorKind::IO(error) => Some(error),
             _ => Some(&self.error),
         }
     }
@@ -9561,7 +9561,7 @@ mod tests {
         )
         .unwrap_err();
         match error.kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => {
+            ErrorKind::IO(error) => {
                 assert_eq!(error.kind(), io::ErrorKind::InvalidData);
             },
             other => panic!("expected invalid read-count error, got {other:?}"),
@@ -9716,7 +9716,7 @@ mod tests {
                 &mut stored_stream_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             stored_stream_accounting.stored_payload_bytes_read(),
             stored_payload.len() as u64
@@ -9816,7 +9816,7 @@ mod tests {
                 &mut indexed_deflated_failure_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(indexed_deflated_failure_accounting.compressed_deflate_payload_bytes_read() > 0);
         assert_eq!(
             indexed_deflated_failure_accounting.deflate_bytes_accepted(),
@@ -9878,7 +9878,7 @@ mod tests {
                 &mut indexed_stored_failure_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(indexed_stored_failure_accounting.stored_payload_bytes_read() > 0);
         assert_eq!(
             indexed_stored_failure_accounting.stored_payload_bytes_accepted(),
@@ -9934,7 +9934,7 @@ mod tests {
         let error = reader
             .read_to_with_accounting("payload.bin", &mut sink, &mut accounting)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
         assert_eq!(accounting.deflate_bytes_accepted(), sink.bytes.len() as u64);
         assert!(accounting.deflate_bytes_produced() >= accounting.deflate_bytes_accepted());
@@ -9990,7 +9990,7 @@ mod tests {
         let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut failing = FailingWriter::new(5);
         let error = reader.read_to("payload.bin", &mut failing).unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(failing.bytes.len(), 5);
     }
 
@@ -10173,10 +10173,7 @@ mod tests {
             Ok(_) => panic!("descriptor sink failure unexpectedly succeeded"),
             Err(failure) => failure,
         };
-        assert!(matches!(
-            failure.error().kind(),
-            ErrorKind::IO(_) | ErrorKind::Io(_)
-        ));
+        assert!(matches!(failure.error().kind(), ErrorKind::IO(_)));
         assert!(failure.progress().is_poisoned());
         assert!(failure.progress().output_bytes() <= 52);
     }
@@ -10200,7 +10197,7 @@ mod tests {
             Err(failure) => failure,
         };
         let error = match failure.error().kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => error,
+            ErrorKind::IO(error) => error,
             other => panic!("expected retained I/O error, got {other:?}"),
         };
         assert!(
@@ -10365,7 +10362,7 @@ mod tests {
                 .unwrap_err()
         };
 
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(sink.bytes.len() <= sink.fail_after);
     }
 
@@ -10487,10 +10484,7 @@ mod tests {
         let mut output_over = StreamingArchiveWriter::new(output_limits);
         output_over.write_stored("one", b"payload").unwrap();
         let failure = output_over.finish_with_progress().unwrap_err();
-        assert!(matches!(
-            failure.error().kind(),
-            ErrorKind::IO(_) | ErrorKind::Io(_)
-        ));
+        assert!(matches!(failure.error().kind(), ErrorKind::IO(_)));
         let limit = failure.limit().expect("typed output limit");
         assert_eq!(limit.resource(), StreamingLimitResource::OutputBytes);
         assert_eq!(limit.maximum(), expected_output_bytes - 1);
@@ -10603,7 +10597,7 @@ mod tests {
 
         let reader = ScriptedReader::new([ReadStep::Bytes(b"partial".to_vec()), ReadStep::Error]);
         let error = writer.write_stored_stream("bad", reader).unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(writer.is_poisoned());
         let progress = writer.progress();
         assert!(progress.is_poisoned());
@@ -10624,7 +10618,7 @@ mod tests {
         let error = writer
             .write_stored_stream("zero", Cursor::new(b"payload".to_vec()))
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(writer.is_poisoned());
         assert_eq!(writer.output_bytes(), 0);
 
@@ -11455,14 +11449,14 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         let error = archive.read_to("payload.bin", &mut output).unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert!(output.is_empty());
 
         let reader = ArchiveReader::new(&bytes, ArchiveLimits::default()).unwrap();
         let mut zero = ZeroWriter;
         let error = reader.read_to("payload.bin", &mut zero).unwrap_err();
         match error.kind() {
-            ErrorKind::IO(error) | ErrorKind::Io(error) => {
+            ErrorKind::IO(error) => {
                 assert_eq!(error.kind(), io::ErrorKind::WriteZero);
             },
             other => panic!("expected zero-progress sink failure, got {other:?}"),
@@ -15921,7 +15915,7 @@ mod tests {
     fn assert_materialized_size_error(error: Error) {
         match error.kind() {
             ErrorKind::InvalidSize { .. } => {},
-            ErrorKind::IO(io_error) | ErrorKind::Io(io_error) => {
+            ErrorKind::IO(io_error) => {
                 let source = io_error
                     .get_ref()
                     .and_then(|source| source.downcast_ref::<Error>());
@@ -15939,7 +15933,7 @@ mod tests {
     fn assert_materialized_checksum_error(error: Error) {
         match error.kind() {
             ErrorKind::InvalidChecksum { .. } => {},
-            ErrorKind::IO(io_error) | ErrorKind::Io(io_error) => {
+            ErrorKind::IO(io_error) => {
                 let source = io_error
                     .get_ref()
                     .and_then(|source| source.downcast_ref::<Error>());

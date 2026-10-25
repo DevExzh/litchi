@@ -68,9 +68,7 @@ pub(crate) fn map_archive_error_kind(kind: soapberry_zip::ErrorKind) -> Error {
             actual,
             maximum,
         } => archive_limit_error(resource, actual, maximum),
-        soapberry_zip::ErrorKind::IO(io_error) | soapberry_zip::ErrorKind::Io(io_error) => {
-            Error::Io(io_error)
-        },
+        soapberry_zip::ErrorKind::IO(io_error) => Error::Io(io_error),
         kind => Error::InvalidFormat(soapberry_zip::Error::from(kind).to_string()),
     }
 }

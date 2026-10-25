@@ -2157,9 +2157,7 @@ fn classify_zip_error(error: &soapberry_zip::Error) -> Class {
     use soapberry_zip::ErrorKind;
 
     match error.kind() {
-        ErrorKind::IO(_) | ErrorKind::Io(_) | ErrorKind::CentralDirectorySpool { .. } => {
-            Class::of(Code::IoError)
-        },
+        ErrorKind::IO(_) | ErrorKind::CentralDirectorySpool { .. } => Class::of(Code::IoError),
         ErrorKind::FileNotFound(_) => Class::of(Code::FileNotFound),
         ErrorKind::LimitExceeded { .. } | ErrorKind::CentralDirectorySpoolLimitExceeded { .. } => {
             Class::of(Code::LimitExceeded)

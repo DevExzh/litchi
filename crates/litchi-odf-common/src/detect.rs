@@ -1175,9 +1175,7 @@ fn catalog_probe_range_is_bounded(
 
 fn map_catalog_probe_zip_error<T>(error: soapberry_zip::Error) -> Result<Option<T>> {
     match error.into_kind() {
-        soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-            map_catalog_probe_io_error(error)
-        },
+        soapberry_zip::ErrorKind::IO(error) => map_catalog_probe_io_error(error),
         soapberry_zip::ErrorKind::Allocation { resource, source } => {
             Err(Error::Allocation { resource, source })
         },

@@ -336,9 +336,9 @@ fn archive_core(error: soapberry_zip::Error) -> litchi_core::Error {
     use soapberry_zip::ErrorKind;
 
     match error.into_kind() {
-        ErrorKind::IO(error)
-        | ErrorKind::Io(error)
-        | ErrorKind::CentralDirectorySpool { source: error, .. } => litchi_core::Error::Io(error),
+        ErrorKind::IO(error) | ErrorKind::CentralDirectorySpool { source: error, .. } => {
+            litchi_core::Error::Io(error)
+        },
         ErrorKind::FileNotFound(path) => litchi_core::Error::ComponentNotFound(path),
         ErrorKind::UnsupportedPreservation { reason } => {
             litchi_core::Error::Unsupported(reason.to_string())

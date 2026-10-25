@@ -3157,10 +3157,7 @@ fn validate_local_span<R: ReaderAt>(
 
 fn map_local_layout_error(error: Error) -> Error {
     match error.kind() {
-        ErrorKind::Allocation { .. }
-        | ErrorKind::IO(_)
-        | ErrorKind::Io(_)
-        | ErrorKind::LimitExceeded { .. } => error,
+        ErrorKind::Allocation { .. } | ErrorKind::IO(_) | ErrorKind::LimitExceeded { .. } => error,
         _ => unsupported("invalid local member framing"),
     }
 }
@@ -4903,7 +4900,7 @@ mod tests {
                 &mut partial_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(sink.bytes, data[..fail_after]);
         assert_eq!(
             partial_accounting.raw_unchanged_source_bytes_accepted(),
@@ -5180,7 +5177,7 @@ mod tests {
         let error = index
             .write_to_with_accounting(&store_plan, &mut store_sink, &mut store_accounting)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(store_accounting.stored_payload_bytes_emitted(), 3);
 
         let deflate = b"partial deflate payload with repeated repeated repeated bytes";
@@ -5196,7 +5193,7 @@ mod tests {
         let error = index
             .write_to_with_accounting(&deflate_plan, &mut deflate_sink, &mut deflate_accounting)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             deflate_accounting.generated_deflate_payload_bytes_emitted(),
             3
@@ -5234,7 +5231,7 @@ mod tests {
                 &mut precompressed_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             precompressed_accounting.precompressed_payload_bytes_emitted(),
             3
@@ -6046,7 +6043,7 @@ mod tests {
             &mut partial_accounting,
         )
         .expect_err("partial central sink must fail");
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(sink.bytes.len(), 8);
         assert_eq!(partial_accounting.raw_unchanged_source_bytes_accepted(), 6);
     }
@@ -6484,7 +6481,7 @@ mod tests {
                 &mut partial_accounting,
             )
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
         assert_eq!(
             partial_accounting.raw_unchanged_source_bytes_accepted(),
             sink.bytes.len() as u64
@@ -6500,7 +6497,7 @@ mod tests {
         let error = index
             .write_to(&PreservationPlan::copy_all(&index), FailingSink)
             .unwrap_err();
-        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
     }
 
     #[test]
@@ -7022,7 +7019,7 @@ mod tests {
                 let error = index
                     .write_to_with_accounting(&plan, &mut sink, &mut partial_accounting)
                     .unwrap_err();
-                assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+                assert!(matches!(error.kind(), ErrorKind::IO(_)));
                 assert_eq!(sink.bytes, output[..fail_after]);
 
                 let accepted_payload = fail_after

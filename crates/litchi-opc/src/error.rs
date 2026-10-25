@@ -371,9 +371,7 @@ impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
         match err.into_kind() {
             soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
-            soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-                map_io_error(error)
-            },
+            soapberry_zip::ErrorKind::IO(error) => map_io_error(error),
             soapberry_zip::ErrorKind::LimitExceeded {
                 resource,
                 actual,

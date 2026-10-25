@@ -15426,6 +15426,21 @@
           "name": "max_active_key_bytes",
           "scope": "soapberry_zip::office::LazyArchiveCacheLimits",
           "replacement": "use max_flight_key_bytes_value (record 0362zaea)"
+        },
+        {
+          "name": "start_entry_owned",
+          "scope": "soapberry_zip::writer::ZipArchiveWriter",
+          "replacement": "use start_file_owned; entry-oriented aliases are removed (record 0362ul86)"
+        },
+        {
+          "name": "start_entry_owned_zip64",
+          "scope": "soapberry_zip::writer::ZipArchiveWriter",
+          "replacement": "use start_file_owned_zip64; entry-oriented aliases are removed (record 0362ul86)"
+        },
+        {
+          "name": "Io",
+          "scope": "soapberry_zip::ErrorKind",
+          "replacement": "use the canonical IO variant (record 0362ul86)"
         }
       ],
       "families": []

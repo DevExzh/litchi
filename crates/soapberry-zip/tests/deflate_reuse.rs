@@ -1226,7 +1226,7 @@ impl Write for StopSink {
 
 fn assert_io_kind(error: &ErrorKind, expected: io::ErrorKind) {
     match error {
-        ErrorKind::IO(error) | ErrorKind::Io(error) => assert_eq!(error.kind(), expected),
+        ErrorKind::IO(error) => assert_eq!(error.kind(), expected),
         other => panic!("expected I/O error, got {other:?}"),
     }
 }
@@ -1278,7 +1278,7 @@ fn owned_deflate_compressed_limit_does_not_publish_a_partial_member() {
             None => Some(entry.finish().expect_err("zero compressed limit succeeded")),
         };
         if let Some(error) = error {
-            assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+            assert!(matches!(error.kind(), ErrorKind::IO(_)));
             assert!(error.to_string().contains("compressed limit"));
         }
     }
