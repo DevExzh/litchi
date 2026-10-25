@@ -4914,3 +4914,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   historical-library identity checks. Additional source workers prepare new
   signed and legacy/PPT qualification policies (0362ul74–75); no actual native
   execution or final source qualification is claimed. Nothing is pushed.
+
+- Coordinator raw census integration checkpoint (2026-10-25):
+  Reviewed 0362ul71b merges at `6b95d89554`; all 86 selected census,
+  glossary, matrix and historical-adapter tests pass. Its final mode remains
+  fail-closed until the complete frozen rustdoc census and dispositions are
+  populated. Tooling-row registration is assigned as 0362ul76 without
+  changing the approved runner used by active validations.
+
+  PPT consumer return `200a3e5af3` passes independent source review:
+  the public options-based constructor is exactly equivalent to the private
+  default helper. Slot 4 continues the corrected composed check. DrawingML
+  v2 `2b0bc89552` passes independent review and 28 source-only tests, including
+  fixed historical input, disjoint paths and complete vendor-tree checks;
+  candidate binding deliberately remains unset. It will compose with the
+  RTF consumer change after actual validation. Further reviews return VBA,
+  XLDM and formula changes for concrete retained-policy, typed-error and
+  preallocation gaps. Those fixes and actual acceptance remain required;
+  nothing is pushed.
