@@ -12,7 +12,10 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
+        let shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut animations = Vec::new();
         let mut pending = shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
@@ -60,8 +63,12 @@ impl Slide<'_> {
             return Ok((Vec::new(), report));
         };
 
-        let shapes =
-            Self::parse_shape_enums(&ppdrawing.data, self.outline_text_bodies, &mut report)?;
+        let shapes = Self::parse_shape_enums(
+            &ppdrawing.data,
+            self.outline_text_bodies,
+            self.source_limits,
+            &mut report,
+        )?;
         report.locate_from(
             0,
             crate::leniency::DefectLocation {
@@ -85,10 +92,14 @@ impl Slide<'_> {
     pub(crate) fn parse_shape_enums(
         ppdrawing_data: &[u8],
         outline: &[crate::OutlineTextBody],
+        source_limits: crate::SourceLimits,
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Vec<ShapeEnum<'static>>> {
         // Extract Escher shapes from PPDrawing data
-        let escher_shapes = crate::odraw::parse(ppdrawing_data, &crate::odraw::Limits::default())?;
+        let escher_shapes = crate::odraw::parse(
+            ppdrawing_data,
+            &crate::odraw::limits_for_source(source_limits),
+        )?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());

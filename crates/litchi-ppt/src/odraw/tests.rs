@@ -60,6 +60,14 @@ fn concatenated_drawing_roots_are_complete_and_strict() {
 }
 
 #[test]
+fn source_limits_intersect_officeart_safety_ceiling() {
+    let source = crate::SourceLimits::default();
+    let limits = super::limits_for_source(source);
+    assert_eq!(limits.max_depth, super::Limits::default().max_depth);
+    assert!(parse(&[], &limits).unwrap().is_empty());
+}
+
+#[test]
 fn drawing_retains_root_records_alongside_typed_shapes() {
     let mut shape_atom = Vec::new();
     shape_atom.extend_from_slice(&42u32.to_le_bytes());

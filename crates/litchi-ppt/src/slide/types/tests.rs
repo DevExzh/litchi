@@ -1917,7 +1917,13 @@ fn outline_references_supply_text_and_record_what_they_cannot_resolve() {
     let bodies = outline_bodies();
     let drawing = outline_drawing();
     let mut report = crate::leniency::ToleranceReport::default();
-    let shapes = Slide::parse_shape_enums(&drawing, &bodies, &mut report).unwrap();
+    let shapes = Slide::parse_shape_enums(
+        &drawing,
+        &bodies,
+        crate::SourceLimits::default(),
+        &mut report,
+    )
+    .unwrap();
 
     let texts = shapes
         .iter()
@@ -1975,10 +1981,21 @@ fn outline_resolution_never_changes_which_shapes_are_read() {
             .collect::<Vec<_>>()
     };
     let mut resolved_report = crate::leniency::ToleranceReport::default();
-    let resolved =
-        Slide::parse_shape_enums(&drawing, &outline_bodies(), &mut resolved_report).unwrap();
+    let resolved = Slide::parse_shape_enums(
+        &drawing,
+        &outline_bodies(),
+        crate::SourceLimits::default(),
+        &mut resolved_report,
+    )
+    .unwrap();
     let mut plain_report = crate::leniency::ToleranceReport::default();
-    let plain = Slide::parse_shape_enums(&drawing, &[], &mut plain_report).unwrap();
+    let plain = Slide::parse_shape_enums(
+        &drawing,
+        &[],
+        crate::SourceLimits::default(),
+        &mut plain_report,
+    )
+    .unwrap();
     assert_eq!(identity(&resolved), identity(&plain));
     // Without bodies every reference is unresolved, and every shape is kept.
     assert_eq!(unresolved_defects(&plain_report).len(), 7);
@@ -2010,6 +2027,7 @@ fn outline_resolution_keeps_the_shapes_of_every_corpus_slide() {
             let plain = Slide::parse_shape_enums(
                 &ppdrawing.data,
                 &[],
+                crate::SourceLimits::default(),
                 &mut crate::leniency::ToleranceReport::default(),
             )
             .unwrap();

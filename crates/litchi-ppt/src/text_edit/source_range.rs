@@ -263,6 +263,7 @@ pub(super) fn resolve_source_target(
     let shapes = crate::slide::types::Slide::parse_shape_enums(
         &ppdrawing.data,
         &[],
+        limits,
         &mut crate::leniency::ToleranceReport::default(),
     )?;
     let shape = shapes

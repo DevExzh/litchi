@@ -178,9 +178,19 @@ pub fn parse<'data>(data: &'data [u8], limits: &litchi_odraw::Limits) -> Result<
 /// source profile. A source-backed slide projection must not reopen its
 /// drawing with the neutral crate's defaults.
 pub(crate) fn limits_for_source(source: SourceLimits) -> litchi_odraw::Limits {
+    // `SourceLimits` governs the outer PPT record tree and deliberately allows
+    // deeper nesting than the shape decoder can safely traverse.  Intersect
+    // the host profile with OfficeArt's own hard safety ceiling before handing
+    // it to the format-neutral parser; otherwise the default PPT profile (256)
+    // is rejected by `litchi-odraw` (64) even for ordinary source-backed
+    // projections.
+    let defaults = litchi_odraw::Limits::default();
     litchi_odraw::Limits {
         max_record_bytes: source.max_record_bytes().min(u32::MAX as usize) as u32,
-        max_depth: source.max_depth().min(u16::MAX as usize) as u16,
+        max_depth: source
+            .max_depth()
+            .min(usize::from(defaults.max_depth))
+            .min(u16::MAX as usize) as u16,
         max_records: source.max_events().min(u32::MAX as usize) as u32,
     }
 }
