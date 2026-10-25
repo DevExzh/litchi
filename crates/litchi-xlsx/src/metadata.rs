@@ -84,7 +84,7 @@ fn is_family_relationship(family: Family, relationship_type: &str) -> bool {
         ),
         Family::Custom => {
             relationship_type == litchi_opc::constants::relationship_type::CUSTOM_PROPERTIES
-        }
+        },
         _ => false,
     }
 }
@@ -119,7 +119,7 @@ fn owner_family(
                 Some(retained_part_metadata_bytes(part)),
                 Some(retained_relationship_bytes(relationship)),
             )
-        }
+        },
         None => (None, None),
     };
     let new_part = snapshot.new_part_name(family);
