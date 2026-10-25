@@ -68,7 +68,10 @@ impl Limits {
         max_guides: 16_384,
         max_sections: 4_096,
         max_slide_references: 100_000,
-        max_attributes: 20_000,
+        // Physical attributes include duplicates. Keep the default above the
+        // repository's 40,001-attribute first-wins stress fixtures while
+        // retaining a bounded linear preflight in each metadata codec.
+        max_attributes: 65_536,
         max_relationships: 100_000,
     };
 

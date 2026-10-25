@@ -728,7 +728,7 @@ mod tests {
         assert!(matches!(
             Tag::new_with_limits("abc", "", tight),
             Err(Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Names),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
                 observed: 3,
                 maximum: 2,
             })

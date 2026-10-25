@@ -869,7 +869,7 @@ fn serialized_len(value: &Info, root_prefix: &str) -> Result<usize> {
             add_len(&mut length, escaped_len(&client.client_id)?)?;
             add_len(
                 &mut length,
-                b"\" dt=".len() + escaped_len(&client.date_time)? + 1,
+                b"\" dt=\"".len() + escaped_len(&client.date_time)? + 1,
             )?;
             if let Some(revision) = client.revision {
                 add_len(&mut length, u32_attr_len("v", revision))?;

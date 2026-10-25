@@ -1663,10 +1663,13 @@ fn public_presentation_inventory_charges_shared_targets_once_and_distinct_target
         matches!(
             error,
             crate::Error::Limit {
-                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::RetainedBytes,
+                ),
+                observed,
                 maximum,
-                ..
-            } if maximum == payload_len
+            } if observed == payload_len.checked_add(payload_len).unwrap()
+                && maximum == payload_len
         ),
         "unexpected multi-slide aggregate error: {error:?}"
     );

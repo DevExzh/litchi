@@ -89,7 +89,7 @@ mod comment_tests {
         assert!(matches!(
             List::from_processed(&oversized),
             Err(Error::Limit {
-                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 observed,
                 maximum: MAX_BYTES,
                 ..
@@ -98,7 +98,7 @@ mod comment_tests {
         assert!(matches!(
             Authors::from_processed(&oversized),
             Err(Error::Limit {
-                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 observed,
                 maximum: MAX_BYTES,
                 ..

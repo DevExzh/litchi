@@ -5,7 +5,7 @@
 use super::super::{BoundedString, Limits, check_string, process_str};
 use super::model::{List, Show};
 use crate::{Error, Result};
-use litchi_ooxml_common::xml::attributes::{BytesStartExt as _, first_wins};
+use litchi_ooxml_common::xml::attributes::{count_up_to, first_wins};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashMap;
@@ -323,23 +323,24 @@ fn check_attributes(
     decoder: quick_xml::encoding::Decoder,
     limits: Limits,
 ) -> Result<()> {
-    let mut count = 0usize;
-    for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count = count.checked_add(1).ok_or_else(|| {
-            limit(
-                crate::opened::CodecLimitKind::XmlAttributes,
-                usize::MAX,
-                limits.max_attributes(),
-            )
-        })?;
-        if count > limits.max_attributes() {
-            return Err(limit(
-                crate::opened::CodecLimitKind::XmlAttributes,
-                count,
-                limits.max_attributes(),
-            ));
-        }
+    let count = count_up_to(element, limits.max_attributes());
+    if count > limits.max_attributes() {
+        return Err(limit(
+            crate::opened::CodecLimitKind::XmlAttributes,
+            count,
+            limits.max_attributes(),
+        ));
+    }
+    // `first_wins` is the established semantic policy for these metadata
+    // elements: duplicate names are accepted and the first value is used.
+    // The physical count above includes every duplicate; only the first value
+    // is retained by the model and checked for semantic string bounds below.
+    for attribute in first_wins(element) {
+        let attribute = match attribute {
+            Ok(attribute) => attribute,
+            Err(quick_xml::events::attributes::AttrError::Duplicated(..)) => continue,
+            Err(error) => return Err(Error::Xml(error.to_string())),
+        };
         if attribute.key.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
                 crate::opened::CodecLimitKind::XmlAttributeBytes,
@@ -476,6 +477,24 @@ mod tests {
         );
         let list = List::parse_xml(&xml, Limits::DEFAULT).unwrap();
         assert_eq!(list.shows, vec![Show::new(9, "First").with_slides(vec![3])]);
+    }
+
+    #[test]
+    fn duplicate_attributes_count_against_the_selected_physical_limit() {
+        let xml = r#"<p:custShowLst><p:custShow name="First" id="9" name="Later"><p:sldLst/></p:custShow></p:custShowLst>"#;
+        let exact = Limits::DEFAULT.with_attributes(3).unwrap();
+        let list = List::parse_xml(xml, exact).expect("three physical attributes fit");
+        assert_eq!(list.shows, vec![Show::new(9, "First")]);
+
+        let one_under = Limits::DEFAULT.with_attributes(2).unwrap();
+        assert!(matches!(
+            List::parse_xml(xml, one_under),
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: 3,
+                maximum: 2,
+            })
+        ));
     }
 
     #[test]

@@ -1761,12 +1761,12 @@ mod tests {
         let (mut package, slide_name) = slide_package("");
         let limits = Limits::new(
             Limits::DEFAULT.max_slide_xml_bytes(),
-            1,
             Limits::DEFAULT.max_total_slide_xml_bytes(),
             Limits::DEFAULT.max_events(),
             Limits::DEFAULT.max_xml_nodes(),
             Limits::DEFAULT.max_xml_depth(),
             Limits::DEFAULT.max_event_string_bytes(),
+            1,
         )
         .unwrap();
         let before = package.get_part(&slide_name).unwrap().blob().to_vec();

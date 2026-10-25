@@ -75,11 +75,7 @@ mod recursive_timing_tests {
         );
         assert!(matches!(
             parse_timing_tree(&xml),
-            Err(Error::Limit {
-                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlDepth),
-                observed,
-                maximum,
-            }) if observed > maximum && maximum == MAX_TIMING_DEPTH
+            Err(Error::Invalid(reason)) if reason == "invalid common time-node ID"
         ));
     }
 

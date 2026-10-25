@@ -45,12 +45,16 @@ fn replay_presence_validator_accepts_partial_multi_author_extensions() {
 
 #[test]
 fn replay_presence_validator_ignores_inactive_typed_uri_bytes() {
+    let inactive_user = "inactive-user".repeat(16);
+    let inactive_provider = "inactive-provider".repeat(16);
     let source = format!(
-        r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><mc:AlternateContent><mc:Choice Requires="p15"><p:ext uri="urn:other-extension"/></mc:Choice><mc:Fallback><p:ext uri="{uri}"><p15:presenceInfo userId="inactive-user" providerId="inactive-provider"><p15:unexpected/></p15:presenceInfo></p:ext></mc:Fallback></mc:AlternateContent></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
+        r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><mc:AlternateContent><mc:Choice Requires="p15"><p:ext uri="urn:other-extension"/></mc:Choice><mc:Fallback><p:ext uri="{uri}"><p15:presenceInfo userId="{inactive_user}" providerId="{inactive_provider}"><p15:unexpected/></p15:presenceInfo></p:ext></mc:Fallback></mc:AlternateContent></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
         uri = super::PRESENCE_EXTENSION_URI,
+        inactive_user = inactive_user,
+        inactive_provider = inactive_provider,
     );
     let mut limits = crate::comments::Limits::DEFAULT;
-    limits.max_string_bytes = 1;
+    limits.max_string_bytes = 128;
     assert!(super::validate_presence_replay(source.as_bytes(), limits).is_ok());
 }
 

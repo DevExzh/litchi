@@ -1163,17 +1163,15 @@ fn the_memo_costs_one_32_byte_entry_per_captured_slide() -> Result<()> {
         7 * SlideRootMemo::ENTRY_BYTES,
         "the table is reserved exactly, one entry per captured slide"
     );
-    // The slide count is bounded by the capture's limit, and so is the memo.
+    // Capture charges the slide references against the primary parts limit.
     let limits = Limits::new(6, 1 << 20, 1 << 20, 4, 1 << 20, 1 << 20).expect("limits");
     match package.opened_presentation_with_limits(limits) {
         Err(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
-            maximum,
-            ..
-        }) => {
-            assert_eq!(maximum, 6);
-        },
-        other => panic!("seven slides exceed a six-part limit: {other:?}"),
+            kind: crate::opened::LimitKind::Parts,
+            observed: 7,
+            maximum: 6,
+        }) => {},
+        other => panic!("seven slide references exceed a six-part limit: {other:?}"),
     }
     Ok(())
 }
