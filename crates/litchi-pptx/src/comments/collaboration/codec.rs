@@ -560,7 +560,7 @@ fn semantic_element(namespace: &ResolveResult<'_>, local: &[u8]) -> SemanticElem
     let ResolveResult::Bound(Namespace(value)) = namespace else {
         return SemanticElement::Other;
     };
-    if !pml_namespace(value.as_ref()) {
+    if !pml_namespace(value) {
         return SemanticElement::Other;
     }
     match local {
