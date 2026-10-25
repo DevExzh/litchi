@@ -22,6 +22,13 @@ macro_rules! assert_refused_kind {
     }};
 }
 
+fn assert_physical_xml_malformed(error: &Error) {
+    assert!(matches!(
+        error,
+        Error::Invalid(message) if message == "PPTX XML is malformed"
+    ));
+}
+
 /// Reproduce the capture sequence that preceded the capture-local projection
 /// helper. This deliberately uses the ordinary public presentation slide
 /// resolver and keeps the relationship, identity, notes, and name checks in
@@ -347,7 +354,7 @@ fn capture_projection_keeps_deferred_name_projection_but_admits_physical_errors(
     let error = package
         .opened_presentation()
         .expect_err("opened capture must use the same physical admission");
-    assert!(error.to_string().contains("PPTX XML is malformed"));
+    assert_physical_xml_malformed(&error);
     Ok(())
 }
 
@@ -531,7 +538,7 @@ fn notes_capture_matrix_falls_back_when_notes_inventory_has_a_foreign_sld_id() -
     let error = name_and_missing
         .opened_presentation()
         .expect_err("physical admission must precede the deferred name error");
-    assert!(error.to_string().contains("PPTX XML is malformed"));
+    assert_physical_xml_malformed(&error);
     Ok(())
 }
 
@@ -638,7 +645,7 @@ fn capture_projection_preserves_relationship_and_part_identity_error_order() -> 
     let error = malformed_name
         .opened_presentation()
         .expect_err("physical admission must precede relationship replay");
-    assert!(error.to_string().contains("PPTX XML is malformed"));
+    assert_physical_xml_malformed(&error);
 
     for earlier_name_error in [false, true] {
         let mut duplicate = opened_plain_slides_package(3)?;
@@ -661,7 +668,7 @@ fn capture_projection_preserves_relationship_and_part_identity_error_order() -> 
             let error = duplicate
                 .opened_presentation()
                 .expect_err("physical admission must precede duplicate-target replay");
-            assert!(error.to_string().contains("PPTX XML is malformed"));
+            assert_physical_xml_malformed(&error);
         } else {
             // Stable graphs fail the earlier catalog's case-folded target
             // check; the capture loop's duplicate-part guard remains
