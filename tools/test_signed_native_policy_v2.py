@@ -54,12 +54,12 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
                 policy.execute()
             self.assertFalse(output.exists())
 
-    def test_prepare_fails_before_source_or_output_mutation(self) -> None:
+    def test_prepare_rejects_an_unbound_source_before_output_mutation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="signed-native-v2-prepare-") as name:
             root = Path(name)
             source = root / "source"
             output = root / "output"
-            with self.assertRaisesRegex(policy.IncompletePolicyError, "candidate is incomplete"):
+            with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
                 policy.prepare(source, output)
             self.assertFalse(output.exists())
 
@@ -96,6 +96,22 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
         )
         self.assertEqual(
             document["signed_batch"], policy.SIGNED_BATCH_POLICY
+        )
+        self.assertEqual(policy.ENDPOINT_API_BRANCH, {"before": "legacy_api", "after": "current_api"})
+        self.assertEqual(policy.ENDPOINT_SOURCE_KINDS, {"before": "f2", "after": "candidate"})
+        self.assertEqual(document["endpoints"]["after"]["source_kind"], "candidate")
+        self.assertEqual(document["historical_harness"]["source_kind"], "472b")
+        self.assertEqual(
+            policy.ENDPOINT_ROUTE_STATUS["before"]["signed_leaf/unsigned_negative"],
+            "not_applicable",
+        )
+        self.assertEqual(
+            policy.ENDPOINT_ROUTE_STATUS["before"]["signed_leaf/noop_commit"],
+            "capability_missing",
+        )
+        self.assertEqual(
+            policy.ENDPOINT_ROUTE_STATUS["after"]["signed_leaf/unsigned_negative"],
+            "expected_refusal",
         )
 
     def test_signed_batch_choice_cannot_be_overridden_by_policy_input(self) -> None:
@@ -275,6 +291,11 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
                         }
                     ],
                 },
+            },
+            "source_assembly": {
+                "path": "/tmp/source-assembly.json",
+                "bytes": 1,
+                "sha256": "6" * 64,
             },
             "manifests": {path: {"bytes": 1, "sha256": "4" * 64} for path in policy.SOURCE_MANIFEST_PATHS},
             "vendor_tree": {"files": 1, "bytes": 1, "sha256": "5" * 64, "entries": []},

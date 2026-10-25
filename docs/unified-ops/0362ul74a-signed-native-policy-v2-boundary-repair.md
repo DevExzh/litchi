@@ -2,8 +2,8 @@
 
 This source-only follow-up repairs the three independent review findings for
 0362ul74.  The candidate source binding remains pending and the owner’s
-signed-batch selection remains `null`; no historical ul24 receipt is changed
-or relabelled.
+signed-batch selection is `immediate_refusal`; no historical ul24 receipt is
+changed or relabelled.
 
 ## Materialized vendor tree
 
@@ -52,5 +52,5 @@ Coordinator integration registers `tools.test_signed_native_policy_v2` in the
 tracked and external tooling rows (37 to 38 modules; 53 gate steps remain).
 The approved runner used by active scoped validations remains unchanged.
 All 13 source-only protocol tests pass in the composed tree. Candidate binding
-and the signed-batch contract choice remain pending; this is not an executed
-qualification result.
+and the signed-batch contract is now an owner-confirmed immediate refusal;
+this is not an executed qualification result.
