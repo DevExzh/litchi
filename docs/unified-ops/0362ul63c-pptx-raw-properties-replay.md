@@ -16,13 +16,15 @@ selected byte bounds, and metadata owners use their detached/package-aware
 codecs after the physical recipient scan. A no-op still returns a duplicate
 without invoking a semantic scan.
 
-The read-only-recommendation replay path already re-parses its candidate owner
-through `load_snapshot`, which derives the same presentation-properties policy
-from the recipient's retained source limits. View-properties is a raw
-projection with no patch family, so its required-limit parse and serialization
-paths remain unchanged. The new boundary tests cover a tighter recipient
-presentation profile and a model payload above the recipient model budget;
-existing expansion-boundary and opaque-fidelity tests remain in place. The
+The read-only-recommendation owner edit already re-parses its candidate through
+`load_snapshot`, which derives the same presentation-properties policy from the
+recipient's retained source limits. Its public package replay now adds the
+same strict changed-payload admission to the shared part-patch path. View-
+properties is a raw projection with no patch family, so its required-limit
+parse and serialization paths remain unchanged. The new boundary tests cover a
+tighter recipient presentation profile and a model payload above the recipient
+model budget; existing expansion-boundary and opaque-fidelity tests remain in
+place. The
 metadata replay hook covers Changes Information, color maps, custom shows,
 Designer tags, show events, guides, revision information, slide
 synchronization, presentation structure, and WebVTT tracks; Designer tags
