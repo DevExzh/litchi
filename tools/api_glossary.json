@@ -20520,6 +20520,26 @@
           "name": "Chart3dSeriesGap",
           "scope": "litchi_iwa_common",
           "replacement": "use chart3d::SeriesGap; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "MediaAsset",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::Asset; no host `Media` prefix (record 0375)"
+        },
+        {
+          "name": "MediaStats",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::Stats; no host `Media` prefix (record 0375)"
+        },
+        {
+          "name": "MediaLimits",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::asset::Limits; no host `Media` prefix (record 0375)"
+        },
+        {
+          "name": "MediaManager",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::Catalog (discovery); per-format package families own extraction and replacement; no host `Media` prefix (record 0375)"
         }
       ],
       "families": []
