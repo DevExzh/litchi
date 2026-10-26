@@ -40,6 +40,7 @@ const ROUTES: &[(&str, &str)] = &[
     ("image_add", TEXT_BOX),
     ("slide_duplicate", TEXT_BOX),
     ("slide_add", TEXT_BOX),
+    ("slide_layout", TEXT_BOX),
 ];
 
 #[inline(never)]
@@ -94,6 +95,15 @@ fn w1c_host_route(route: &str, source: &[u8], png: &[u8], id: u64) -> TestResult
             let layout = editor.default_slide_layout()?;
             editor.add_slide(layout)?;
         },
+        "slide_layout" => {
+            let layout = editor
+                .slide_layouts()?
+                .into_iter()
+                .find(|layout| layout.name == "Title & Photo")
+                .ok_or("no Title & Photo layout")?
+                .id;
+            editor.set_slide_layout(0, layout)?;
+        },
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(editor.to_bytes()?)
@@ -104,9 +114,11 @@ fn w1c_leaf_route(route: &str, source: &[u8], png: &[u8], position: usize) -> Te
     let package = Package::from_bytes(source)?;
     let slide = SlideSelector::index(0);
     let committed = match route {
-        "slide_duplicate" | "slide_add" => {
+        "slide_duplicate" | "slide_add" | "slide_layout" => {
             let mut edit = package.edit_slide_creation();
-            if route == "slide_duplicate" {
+            if route == "slide_layout" {
+                edit.set_layout(slide, "Title & Photo")?;
+            } else if route == "slide_duplicate" {
                 edit.duplicate_slide(slide, Position::new(1))?;
             } else {
                 let layout = package.default_slide_layout()?.ok_or("no default layout")?;

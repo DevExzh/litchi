@@ -482,7 +482,7 @@ keynote/editor/slide_images.rs	slide_image_geometry	1	keynote	drawable.image	mig
 keynote/editor/slide_images.rs	slide_image_properties	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	slide_image_title_caption	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	slide_images	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_layout_update.rs	set_slide_layout	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_layout_update.rs	set_slide_layout	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::set_layout	keynote_slide_layout_set_parity	B	-	-
 keynote/editor/slide_shapes.rs	add_slide_line	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	add_slide_line_with_endpoints	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	add_slide_line_with_style	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-

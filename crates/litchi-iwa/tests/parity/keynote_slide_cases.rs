@@ -77,6 +77,25 @@ fn component_of_member(metadata: &tsp::PackageMetadata, member: &str) -> Option<
         .map(|component| component.identifier)
 }
 
+/// Documented divergence of layout reassignment with layout media: the
+/// host registers the materialized media's external references in
+/// `HashSet` order (it varies run to run), the leaf in a deterministic
+/// order. The external references of every component are compared as a
+/// set (sorted); everything else as for slide creation.
+fn metadata_unordered_external_references(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut metadata = tsp::PackageMetadata::decode(data)?;
+    for component in &mut metadata.components {
+        component.external_references.sort_by_key(|reference| {
+            (
+                reference.component_identifier,
+                reference.object_identifier,
+                reference.is_weak,
+            )
+        });
+    }
+    Ok(decoded(metadata, data))
+}
+
 fn package_metadata(bytes: &[u8]) -> TestResult<tsp::PackageMetadata> {
     for member in crate::archive_diff::members(bytes)? {
         if member.name != "Index/Metadata.iwa" {
@@ -161,6 +180,7 @@ fn cross_references_registered(bytes: &[u8]) -> TestResult<Vec<String>> {
 
 const BASIC: &str = "iwork/keynote/basic.key";
 const MULTI: &str = "iwork/keynote/multi-slide.key";
+const LAYOUT: &str = "iwork/keynote/slide-layout-native-resaved.key";
 
 fn leaf_run(
     source: &[u8],
@@ -221,6 +241,26 @@ fn run(
     host: impl FnOnce(&mut keynote::Draft) -> TestResult,
     leaf: impl FnOnce(&[u8]) -> TestResult<LeafRun>,
 ) -> TestResult {
+    run_with(
+        name,
+        path,
+        tier,
+        evidence,
+        metadata_native_slide_components,
+        host,
+        leaf,
+    )
+}
+
+fn run_with(
+    name: &'static str,
+    path: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    metadata: crate::known_fields::Decoder,
+    host: impl FnOnce(&mut keynote::Draft) -> TestResult,
+    leaf: impl FnOnce(&[u8]) -> TestResult<LeafRun>,
+) -> TestResult {
     let input = fixture(path)?;
     let components = package_metadata(&input.bytes)?
         .components
@@ -240,11 +280,7 @@ fn run(
         .known_fields(|known| {
             known
                 .with(4, "KN.SlideNodeArchive", slide_node_hyperlink_count_default)
-                .with(
-                    11_006,
-                    "TSP.PackageMetadata",
-                    metadata_native_slide_components,
-                )
+                .with(11_006, "TSP.PackageMetadata", metadata)
         })
         .read("leaf slide text", leaf_slides)
         .read("host slides", host_slides)
@@ -377,5 +413,56 @@ fn keynote_slide_layouts_read_parity() -> TestResult {
         .read("host and leaf layouts agree", layouts_agree)
         .run()?;
     }
+    Ok(())
+}
+
+/// Every theme layout, applied to slide 0 of `basic.key`, slide 1 of
+/// `multi-slide.key` and slide 0 of `slide-layout-native-resaved.key` (a
+/// native slide carrying materialized layout media).
+#[test]
+fn keynote_slide_layout_set_parity() -> TestResult {
+    let mut checked = 0;
+    for (path, slide) in [(BASIC, 0), (MULTI, 1), (LAYOUT, 0)] {
+        let package = Package::from_bytes(&fixture(path)?.bytes)?;
+        let names: Vec<String> = package
+            .slide_layouts()?
+            .iter()
+            .filter_map(|layout| layout.name().map(str::to_owned))
+            .collect();
+        for name in names {
+            let probe = {
+                let mut edit = package.edit_slide_creation();
+                edit.set_layout(SlideSelector::index(slide), name.as_str())?;
+                edit.commit()
+            };
+            match probe {
+                Err(error) => return Err(format!("{path} {name}: {error}").into()),
+                Ok(commit) if !commit.diagnostics().changed() => continue,
+                Ok(_) => {},
+            }
+            run_with(
+                "keynote_slide_layout_set_parity",
+                path,
+                Tier::B,
+                Evidence::Queued,
+                metadata_unordered_external_references,
+                |editor| {
+                    let layout = host_layout(editor, &name)?;
+                    editor.set_slide_layout(slide, layout)?;
+                    Ok(())
+                },
+                |source| {
+                    leaf_run(source, |edit| {
+                        edit.set_layout(SlideSelector::index(slide), name.as_str())?;
+                        Ok(())
+                    })
+                },
+            )
+            .map_err(|error| format!("{path} slide {slide} -> {name}: {error}"))?;
+            checked += 1;
+        }
+    }
+    eprintln!("layout reassignments checked: {checked}");
+    assert!(checked > 0);
     Ok(())
 }
