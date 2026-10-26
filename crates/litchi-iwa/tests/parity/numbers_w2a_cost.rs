@@ -15,15 +15,29 @@ use std::time::Duration;
 
 use litchi_core::Position;
 use litchi_iwa::numbers;
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings};
+use litchi_iwa_common::shape::path::Preset;
 use litchi_iwa_text::paragraph::format::Alignment;
 use litchi_numbers::Package;
 use litchi_numbers::sheet::drawable::text::Property;
-use litchi_numbers::sheet::drawable::{DrawableSelector, Kind, Point};
+use litchi_numbers::sheet::drawable::{DrawableSelector, Geometry, Kind, Point, Size};
 
 use crate::harness::{TestResult, fixture};
 use crate::numbers_drawable_cases::{authored_fixture, chart_fixture, host_drawable};
+
+const POINT: DrawablePoint = DrawablePoint { x: 120.0, y: 140.0 };
+const SIZE: DrawableSize = DrawableSize {
+    width: 360.0,
+    height: 180.0,
+};
+const FRAME: Geometry = Geometry::new(
+    Point { x: 120.0, y: 140.0 },
+    Size {
+        width: 360.0,
+        height: 180.0,
+    },
+);
 
 const IMAGES: &str = "iwork/numbers/image-adjustments-native.numbers";
 const AUDIO: &str = "iwork/numbers/audio-playback-native.numbers";
@@ -38,6 +52,8 @@ const ROUTES: &[(&str, Kind, usize)] = &[
     ("text_box_remove", Kind::TextBox, 0),
     ("shape_remove", Kind::Shape, 0),
     ("text_box_alignment", Kind::TextBox, 0),
+    ("text_box_add", Kind::TextBox, 0),
+    ("shape_add", Kind::TextBox, 0),
 ];
 
 fn playback() -> MediaPlaybackSettings {
@@ -78,6 +94,10 @@ fn w2a_host_route(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult
         "text_box_alignment" => {
             editor.set_sheet_text_box_paragraph_alignment(sheet, id, Alignment::Center)?;
         },
+        "text_box_add" => drop(editor.add_sheet_text_box(sheet, "Added", POINT, SIZE)?),
+        "shape_add" => {
+            drop(editor.add_sheet_shape(sheet, "Added", POINT, SIZE, Preset::Ellipse)?)
+        },
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(editor.to_bytes()?)
@@ -87,12 +107,13 @@ fn w2a_host_route(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult
 fn w2a_leaf_route(route: &str, source: &[u8], selector: DrawableSelector) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
     let committed = match route {
-        "drawable_move" | "text_box_remove" | "shape_remove" => {
+        "drawable_move" | "text_box_remove" | "shape_remove" | "text_box_add" | "shape_add" => {
             let mut edit = package.edit_sheet_drawables(0)?;
-            if route == "drawable_move" {
-                edit.move_to(selector, Position::new(0))?;
-            } else {
-                edit.remove(selector)?;
+            match route {
+                "drawable_move" => drop(edit.move_to(selector, Position::new(0))?),
+                "text_box_add" => drop(edit.add_text_box(FRAME, "Added")?),
+                "shape_add" => drop(edit.add_shape(Preset::Ellipse, FRAME, "Added")?),
+                _ => drop(edit.remove(selector)?),
             }
             edit.commit()?.into_package()
         },

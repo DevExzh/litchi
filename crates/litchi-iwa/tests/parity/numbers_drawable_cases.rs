@@ -15,6 +15,7 @@ use litchi_iwa::shapes::{
 use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use litchi_iwa_common::shape::path::Preset;
 use litchi_numbers::Package;
 use litchi_numbers::sheet::drawable::{
     DrawableSelector, FlipAxis, Geometry, GeometryFlags, Kind, Point, Properties, Size,
@@ -892,5 +893,97 @@ fn numbers_sheet_drawable_order_parity() -> TestResult {
     .read("host sheet_drawable_order", host_order)
     .read("leaf sheet_drawable_list", leaf_list)
     .run()?;
+    Ok(())
+}
+
+/// The host's `add_sheet_text_box` / `add_sheet_shape` against the leaf's
+/// `add_text_box` / `add_shape`, on the first sheet of `basic.numbers`.
+fn creation_case(name: &'static str, preset: Option<Preset>, rectangle: bool) -> TestResult {
+    let input = fixture(BASIC)?;
+    let position = DrawablePoint { x: 300.0, y: 220.0 };
+    let size = DrawableSize {
+        width: 180.0,
+        height: 96.0,
+    };
+    let text = "Created through the leaf";
+    let geometry = Geometry::new(
+        Point {
+            x: position.x,
+            y: position.y,
+        },
+        Size {
+            width: size.width,
+            height: size.height,
+        },
+    );
+    Case::new(name, Format::Numbers, Tier::B, Evidence::Queued, &input)
+        .host(|source| {
+            let mut editor = numbers::Draft::from_bytes(source)?;
+            let sheet = first_sheet(&editor)?;
+            match preset {
+                None => drop(editor.add_sheet_text_box(sheet, text, position, size)?),
+                Some(_) if rectangle => {
+                    drop(editor.add_sheet_rectangle(sheet, text, position, size)?);
+                },
+                Some(preset) => drop(editor.add_sheet_shape(sheet, text, position, size, preset)?),
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_sheet_drawables(0)?;
+            match preset {
+                None => drop(edit.add_text_box(geometry, text)?),
+                Some(preset) => drop(edit.add_shape(preset, geometry, text)?),
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawables(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host sheet_drawable_order", host_order)
+        .read("leaf sheet_drawable_list", leaf_list)
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    creation_case("numbers_sheet_text_box_add_parity", None, false)
+}
+
+#[test]
+fn numbers_sheet_rectangle_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    creation_case(
+        "numbers_sheet_rectangle_add_parity",
+        Some(Preset::Rectangle),
+        true,
+    )
+}
+
+#[test]
+fn numbers_sheet_shape_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for preset in [
+        Preset::Rectangle,
+        Preset::ROUNDED_RECTANGLE,
+        Preset::Ellipse,
+        Preset::LeftArrow,
+        Preset::RightArrow,
+        Preset::DoubleArrow,
+        Preset::PENTAGON,
+        Preset::STAR,
+    ] {
+        creation_case("numbers_sheet_shape_add_parity", Some(preset), false)
+            .map_err(|error| format!("{preset:?}: {error}"))?;
+    }
     Ok(())
 }

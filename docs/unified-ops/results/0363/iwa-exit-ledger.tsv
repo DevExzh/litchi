@@ -1291,8 +1291,8 @@ numbers/editor/sheet_movies/caption.rs	sheet_movie_title_caption	1	numbers	drawa
 numbers/editor/sheet_shapes.rs	add_sheet_line	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	add_sheet_line_with_endpoints	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	add_sheet_line_with_style	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	add_sheet_rectangle	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	add_sheet_shape	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	add_sheet_rectangle	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::Edit::add_shape	numbers_sheet_rectangle_add_parity	B	-	-
+numbers/editor/sheet_shapes.rs	add_sheet_shape	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::Edit::add_shape	numbers_sheet_shape_add_parity	B	-	-
 numbers/editor/sheet_shapes.rs	add_sheet_shape_with_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	clear_sheet_shape_text	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	duplicate_sheet_shape	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
@@ -1342,7 +1342,7 @@ numbers/editor/table_sort.rs	apply_table_sort_order_to_rows	1	numbers	table.sort
 numbers/editor/table_sort.rs	clear_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
 numbers/editor/table_sort.rs	set_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
 numbers/editor/table_sort.rs	table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
-numbers/editor/text_box_create.rs	add_sheet_text_box	1	numbers	drawable.text_box_lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/text_box_create.rs	add_sheet_text_box	1	numbers	drawable.text_box_lifecycle	migrated	litchi_numbers::sheet::drawable::Edit::add_text_box	numbers_sheet_text_box_add_parity	B	-	-
 numbers/editor/text_box_duplicate.rs	duplicate_sheet_text_box	1	numbers	drawable.text_box_lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/topology_oracle.rs	__edit_table_topology_unverified	1	numbers	other	host-only	litchi-numbers	-	-	-	-
 package.rs	apply	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
