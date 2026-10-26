@@ -31,4 +31,5 @@ mod numbers_cases;
 mod pages_cases;
 mod pages_cost_probes;
 mod pages_media_cases;
+mod pages_text_cases;
 mod self_test;
