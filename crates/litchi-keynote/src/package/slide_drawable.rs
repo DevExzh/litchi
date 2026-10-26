@@ -11,6 +11,7 @@
 //! applies the operations in order in one structural workspace, publishes one
 //! candidate, reopens and validates it, and reads every touched slide back.
 
+mod arrange;
 mod author;
 mod inventory;
 mod stage;
@@ -32,6 +33,7 @@ use super::{Package, PhysicalSource, ReadError};
 use crate::{DrawableSelector, SlideSelector, SlideSelectorError};
 
 pub use self::text::{Style, TextRun, TextSpan};
+use litchi_iwa_common::shape::geometry::FlipAxis;
 use litchi_iwa_common::shape::path::{InnerRadiusRatio, PolygonSides, StarPoints};
 
 /// What a slide drawable is.
@@ -496,6 +498,10 @@ pub enum Refusal {
     /// The text span is empty, reversed or past the end of the text.
     #[error("the Keynote text span is outside the drawable text")]
     InvalidSpan,
+    /// The drawable's frame records no native flags, so it cannot be
+    /// flipped.
+    #[error("the Keynote drawable frame records no flip state")]
+    UnflippableGeometry,
 }
 
 impl Refusal {
@@ -504,9 +510,9 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::UnsupportedSource { .. } | Self::Unsupported { .. } => {
-                RefusalKind::UnsupportedContent
-            },
+            Self::UnsupportedSource { .. }
+            | Self::Unsupported { .. }
+            | Self::UnflippableGeometry => RefusalKind::UnsupportedContent,
             Self::AmbiguousSelector { .. }
             | Self::EmptySlideName { .. }
             | Self::ZPositionOutOfRange { .. }
@@ -594,6 +600,26 @@ enum Operation {
         storage: u64,
         span: TextSpan,
         style: Style,
+    },
+    Duplicate {
+        slide: u64,
+        slide_position: Position,
+        item: inventory::Item,
+        text: Option<Box<str>>,
+    },
+    Flip {
+        slide: u64,
+        drawable: u64,
+        message_index: usize,
+        message_type: u32,
+        axis: FlipAxis,
+    },
+    Properties {
+        slide: u64,
+        drawable: u64,
+        message_index: usize,
+        message_type: u32,
+        properties: crate::slide::media::MediaProperties,
     },
 }
 
@@ -984,9 +1010,12 @@ impl<'a> Edit<'a> {
             | Operation::Text { .. }
             | Operation::TextStyle { .. }
             | Operation::NotesStyle { .. }
+            | Operation::Flip { .. }
+            | Operation::Properties { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
+            | Operation::Duplicate { slide, .. }
             | Operation::AddText { slide, .. }
             | Operation::AddImage { slide, .. }
             | Operation::AddTable { slide, .. } => *slide == selected.identifier,
@@ -1007,6 +1036,138 @@ impl<'a> Edit<'a> {
             slide: selected.identifier,
             drawable: item.identifier,
             position: position.get(),
+        });
+        Ok(self)
+    }
+
+    fn arrangeable(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+    ) -> Result<(SelectedSlide, inventory::Item), Error> {
+        let (selected, item) = self.drawable(slide, drawable)?;
+        if !matches!(item.kind, Kind::TextBox | Kind::Shape | Kind::Line) || item.geometry.is_none()
+        {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        Ok((selected, item))
+    }
+
+    fn stage_duplicate(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        text: Option<&str>,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item) = self.arrangeable(slide, drawable)?;
+        if text.is_some() && item.storage.is_none() {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        if let Some(text) = text {
+            let maximum = self.source.semantic_limits().max_text_bytes();
+            if text.len() > maximum {
+                return Err(Error::Limit {
+                    kind: LimitKind::TextBytes,
+                    observed: text.len() as u64,
+                    maximum: maximum as u64,
+                });
+            }
+        }
+        self.check_drawable_limit(selected.identifier)?;
+        *self.deltas.entry(selected.identifier).or_default() += 1;
+        self.operations.push(Operation::Duplicate {
+            slide: selected.identifier,
+            slide_position: selected.position,
+            item,
+            text: text.map(Into::into),
+        });
+        Ok(self)
+    }
+
+    /// Stage a copy of one text box, shape or line with its private objects
+    /// (text storage, stand-in captions) on the same slide, offset by ten
+    /// points and in front of the slide's drawables, as Keynote's Duplicate
+    /// does (host `duplicate_slide_shape`). The copy is listed in
+    /// [`Commit::created`].
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for other
+    /// kinds (images have `slide::image::lifecycle`).
+    pub fn duplicate<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_duplicate(slide.into(), drawable.into(), None)
+    }
+
+    /// Stage a copy of one text box, shape or line whose text is replaced
+    /// by `text` (host `duplicate_slide_text_box`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::duplicate`], and [`Refusal::Unsupported`] for a drawable
+    /// without text storage.
+    pub fn duplicate_with_text<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        text: &str,
+    ) -> Result<&mut Self, Error> {
+        self.stage_duplicate(slide.into(), drawable.into(), Some(text))
+    }
+
+    /// Stage one native Arrange Flip of a text box, shape or line (host
+    /// `flip_slide_shape`): the reflection toggles; a vertical flip also
+    /// adds a half turn.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a frame without native flags
+    /// ([`Refusal::UnflippableGeometry`]).
+    pub fn flip<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        axis: FlipAxis,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item) = self.arrangeable(slide.into(), drawable.into())?;
+        self.operations.push(Operation::Flip {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            message_index: item.message_index,
+            message_type: item.message_type,
+            axis,
+        });
+        Ok(self)
+    }
+
+    /// Stage the hyperlink, lock and accessibility properties of a text
+    /// box, shape or line (host `set_slide_shape_properties`,
+    /// `set_slide_text_box_properties`); `None` omits a property.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn set_properties<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        properties: crate::slide::media::MediaProperties,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item) = self.arrangeable(slide.into(), drawable.into())?;
+        self.operations.push(Operation::Properties {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            message_index: item.message_index,
+            message_type: item.message_type,
+            properties,
         });
         Ok(self)
     }
@@ -1881,6 +2042,50 @@ impl Package {
         Ok(public_list(&inventory))
     }
 
+    /// Read the hyperlink, lock and accessibility properties and the flip
+    /// state of one text box, shape or line (host `slide_shape_properties`,
+    /// `slide_text_box_properties`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for other
+    /// kinds.
+    pub fn slide_drawable_properties<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<(crate::slide::media::MediaProperties, bool), Error> {
+        let selected = select_slide(self, slide.into())?;
+        let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
+        let drawable = drawable.into();
+        let item = inventory
+            .items
+            .get(drawable.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: drawable.as_position(),
+            }))?;
+        if !matches!(item.kind, Kind::TextBox | Kind::Shape | Kind::Line) {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        let workspace = Workspace::new(self).map_err(lift)?;
+        Ok((
+            arrange::properties(
+                &workspace,
+                item.identifier,
+                item.message_index,
+                item.message_type,
+            )?,
+            arrange::reflected(
+                &workspace,
+                item.identifier,
+                item.message_index,
+                item.message_type,
+            )?,
+        ))
+    }
+
     /// Read the character-style runs of one drawable's text.
     ///
     /// Each run covers a span of characters and carries the style of the
@@ -2295,6 +2500,84 @@ fn commit_operations(
                 tables.push((*slide_position, drawable, name.clone(), table.clone()));
                 created.push((*slide_position, *slide, drawable));
                 touched.entry(*slide).or_default().insert(drawable);
+            },
+            Operation::Duplicate {
+                slide,
+                slide_position,
+                item,
+                text,
+            } => {
+                let geometry = item.geometry.ok_or(Error::InvalidSource)?;
+                let (copy, remap) = arrange::duplicate(
+                    &mut workspace,
+                    *slide,
+                    item.identifier,
+                    item.message_index,
+                    item.message_type,
+                    geometry,
+                )?;
+                if let Some(text) = text {
+                    let storage = item
+                        .storage
+                        .and_then(|storage| remap.get(&storage).copied())
+                        .ok_or(Error::InvalidSource)?;
+                    stage::set_text(&mut workspace, *slide, copy, storage, text, source)?;
+                }
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                let made = staged.item(copy).ok_or(Error::Verification)?;
+                let expected_text = text
+                    .as_deref()
+                    .map(str::to_owned)
+                    .or_else(|| item.text.clone());
+                if made.kind != item.kind || made.text != expected_text {
+                    return Err(Error::Verification);
+                }
+                created.push((*slide_position, *slide, copy));
+                touched.entry(*slide).or_default().insert(copy);
+            },
+            Operation::Flip {
+                slide,
+                drawable,
+                message_index,
+                message_type,
+                axis,
+            } => {
+                let before =
+                    arrange::reflected(&workspace, *drawable, *message_index, *message_type)?;
+                arrange::flip(
+                    &mut workspace,
+                    *drawable,
+                    *message_index,
+                    *message_type,
+                    *axis,
+                )?;
+                if arrange::reflected(&workspace, *drawable, *message_index, *message_type)?
+                    == before
+                {
+                    return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Properties {
+                slide,
+                drawable,
+                message_index,
+                message_type,
+                properties,
+            } => {
+                arrange::set_properties(
+                    &mut workspace,
+                    *drawable,
+                    *message_index,
+                    *message_type,
+                    properties,
+                )?;
+                if arrange::properties(&workspace, *drawable, *message_index, *message_type)?
+                    != *properties
+                {
+                    return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::AddImage {
                 slide,
