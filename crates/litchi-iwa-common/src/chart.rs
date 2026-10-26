@@ -10,11 +10,13 @@ pub mod donut;
 pub mod error_bar;
 pub mod gaps;
 pub mod kind;
+pub mod legend;
 pub mod metadata;
 pub mod number_format;
 pub mod pie;
 pub mod radar;
 pub mod reference_line;
+pub mod series;
 pub mod series_labels;
 
 pub use arrangement::ChartArrangement;

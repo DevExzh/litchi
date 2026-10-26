@@ -646,7 +646,7 @@ fn numbers_cell_text_style_parity() -> TestResult {
     )
 }
 /// The host's native identifier of the first sheet's first table model.
-fn host_first_table_model_id(editor: &numbers::Draft) -> TestResult<u64> {
+pub fn host_first_table_model_id(editor: &numbers::Draft) -> TestResult<u64> {
     let package = editor.package();
     let document = package
         .iwa_entry_names()
