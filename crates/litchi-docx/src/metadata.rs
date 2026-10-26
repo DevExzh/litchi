@@ -386,6 +386,124 @@ mod tests {
     use litchi_opc::PackURI;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::part::BlobPart;
+    use std::collections::BTreeMap;
+    use std::ops::Range;
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ArchiveMemberFidelity {
+        raw_name: Vec<u8>,
+        local_record: Vec<u8>,
+        central_record: Vec<u8>,
+        payload: Vec<u8>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ArchiveFidelity {
+        comment: Vec<u8>,
+        zip64: bool,
+        members: BTreeMap<String, ArchiveMemberFidelity>,
+    }
+
+    struct CentralEntry {
+        name: String,
+        raw_name: Vec<u8>,
+        central_record: Range<usize>,
+        zip64_local_header_offset: Option<Range<usize>>,
+        directory: bool,
+    }
+
+    fn archive_fidelity(bytes: &[u8]) -> ArchiveFidelity {
+        let archive = soapberry_zip::ZipArchive::from_slice(bytes).expect("parse ZIP");
+        let comment = archive.comment().as_bytes().to_vec();
+        let zip64 = archive.is_zip64();
+        let mut central_entries = Vec::new();
+        for entry in archive.entries() {
+            let entry = entry.expect("central entry");
+            let raw_name = entry.file_path().as_ref().to_vec();
+            let name = std::str::from_utf8(&raw_name)
+                .expect("DOCX ZIP member names are UTF-8")
+                .to_owned();
+            let central_start = usize::try_from(entry.central_directory_offset())
+                .expect("central offset fits usize");
+            let central_len = usize::try_from(
+                46_u64
+                    .checked_add(entry.metadata_size_hint())
+                    .expect("central record length does not overflow"),
+            )
+            .expect("central record length fits usize");
+            let central_end = central_start
+                .checked_add(central_len)
+                .expect("central record end does not overflow");
+            let zip64_local_header_offset = entry.zip64_local_header_offset_range().map(|range| {
+                let start = usize::try_from(range.start)
+                    .expect("ZIP64 offset fits usize")
+                    .checked_sub(central_start)
+                    .expect("ZIP64 offset belongs to central record");
+                let end = usize::try_from(range.end)
+                    .expect("ZIP64 offset end fits usize")
+                    .checked_sub(central_start)
+                    .expect("ZIP64 offset end belongs to central record");
+                start..end
+            });
+            central_entries.push(CentralEntry {
+                name,
+                raw_name,
+                central_record: central_start..central_end,
+                zip64_local_header_offset,
+                directory: entry.is_dir(),
+            });
+        }
+
+        let indexed = archive.into_zip_archive();
+        let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index = soapberry_zip::PreservationIndex::new(
+            &indexed,
+            &mut buffer,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("index ZIP members");
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("index ZIP payloads");
+
+        let mut members = BTreeMap::new();
+        for (entry, preserved) in central_entries.iter().zip(index.entries()) {
+            let local = preserved.local_span();
+            let local_start = usize::try_from(local.start).expect("local offset fits usize");
+            let local_end = usize::try_from(local.end).expect("local end fits usize");
+            let mut central_record = bytes[entry.central_record.clone()].to_vec();
+            central_record[42..46].fill(0);
+            if let Some(offset) = &entry.zip64_local_header_offset {
+                central_record[offset.clone()].fill(0);
+            }
+            let payload = if entry.directory {
+                Vec::new()
+            } else {
+                reader.read(&entry.name).expect("read ZIP member payload")
+            };
+            assert!(
+                members
+                    .insert(
+                        entry.name.clone(),
+                        ArchiveMemberFidelity {
+                            raw_name: entry.raw_name.clone(),
+                            local_record: bytes[local_start..local_end].to_vec(),
+                            central_record,
+                            payload,
+                        },
+                    )
+                    .is_none(),
+                "duplicate ZIP member name"
+            );
+        }
+        ArchiveFidelity {
+            comment,
+            zip64,
+            members,
+        }
+    }
 
     fn package_with_opaque_app() -> Result<Package> {
         let package = Package::new()?;
@@ -451,6 +569,14 @@ mod tests {
 
     fn package_without_app_part() -> Result<Package> {
         package_without_parts(&["/docProps/app.xml"])
+    }
+
+    #[test]
+    fn archive_fidelity_rejects_a_member_payload_change() -> Result<()> {
+        let baseline = Package::new()?.to_bytes()?;
+        let changed = package_with_opaque_app()?.to_bytes()?;
+        assert_ne!(archive_fidelity(&baseline), archive_fidelity(&changed));
+        Ok(())
     }
 
     fn signed_package(package: &Package) -> Result<Package> {
@@ -680,7 +806,14 @@ mod tests {
 
         let reopened_source = Package::from_bytes(&original)?;
         let replayed = reopened_source.apply_metadata(&patch)?.into_package();
-        assert_eq!(replayed.to_bytes()?, next_bytes);
+        let replayed_bytes = replayed.to_bytes()?;
+        assert_eq!(replayed.metadata(), next.metadata());
+        assert_eq!(replayed.app_props()?, next.app_props()?);
+        assert_eq!(replayed.custom_props(), next.custom_props());
+        assert_eq!(
+            archive_fidelity(&replayed_bytes),
+            archive_fidelity(&next_bytes)
+        );
 
         let reopened_target = Package::from_bytes(&next_bytes)?;
         let restored = reopened_target
