@@ -117,6 +117,27 @@ pub(super) fn insertion_extents(
     rows: u32,
     columns: u32,
 ) -> Result<(TableExtents, TableExtents)> {
+    edit_extents(model, settings, i64::from(rows), i64::from(columns))
+}
+
+/// The table extents before and after a removal of `rows` rows and
+/// `columns` columns (record 0370b: a header or footer removal moves the
+/// body's edge, as an insertion does).
+pub(super) fn removal_extents(
+    model: &TableModelArchive,
+    settings: Option<HeaderSettings>,
+    rows: u32,
+    columns: u32,
+) -> Result<(TableExtents, TableExtents)> {
+    edit_extents(model, settings, -i64::from(rows), -i64::from(columns))
+}
+
+fn edit_extents(
+    model: &TableModelArchive,
+    settings: Option<HeaderSettings>,
+    rows: i64,
+    columns: i64,
+) -> Result<(TableExtents, TableExtents)> {
     let before_settings = table_headers::settings_from_model(model)?;
     let after_settings = settings.unwrap_or(before_settings);
     let count = |value: usize| {
@@ -140,14 +161,8 @@ pub(super) fn insertion_extents(
         )?,
         extents(
             after_settings,
-            model
-                .number_of_rows
-                .checked_add(rows)
-                .ok_or_else(overflow)?,
-            model
-                .number_of_columns
-                .checked_add(columns)
-                .ok_or_else(overflow)?,
+            u32::try_from(i64::from(model.number_of_rows) + rows).map_err(|_| overflow())?,
+            u32::try_from(i64::from(model.number_of_columns) + columns).map_err(|_| overflow())?,
         )?,
     ))
 }

@@ -6524,3 +6524,11 @@ See [0063](0063-source-pptx-modern-comments.md).
 
 ## Coordinator gate (2026-10-26): all 53 rows green on one commit
 - `tools/gate/run_gate.sh` full run on trunk `ac0d111c4c` (after records 0364–0369 and 0373): `DONE failed=0` (finished 2026-10-26T19:49:08Z). Results in `.coord/gates/full-ac0d111c4c/`. This closes the source gate of the API-debt program (owner decision 0350); what remains for it is the performance qualification under the goal's PERFORMANCE BAR (paired leaf-vs-unified routes of 0351 §5 against the pre-program baseline), which runs next. The iWork monolith exit (0363) continues in parallel and is gated separately as its waves land.
+
+## iWork monolith exit (record 0363) — status 2026-10-26 evening
+- W0 complete (0367 substrate + IWA constructor return, 0368/0368a codecs/formula graph/table vocabulary, 0369 parity harness + exit ledger).
+- W1-D shared text engine complete (0374: 154 rows migrated); W1-E shared chart/shape/media engine (0375) merged, 0375a (style-variation write engine, new `litchi-iwa-style` crate — coordinator decision) in progress; W1-F shared formula dependency/cache engine (0376) merged, 0376a in progress.
+- Format waves in progress with slices merged: W1-A Numbers (0370, 0370a–c: insertion/removal, cell text, lists), W1-B Pages (0371 slices 1–3), W1-C Keynote (0372: drawables, slides, layouts, builds, charts, images), W2-A Numbers drawables (0378) started.
+- Every migrated route is cheaper than its host route; host defects found by the parity harness are fixed and macOS-queued (`0363-mac-queue.md`).
+- Coordinator decisions: Keynote/Pages/Numbers drawing/media plumbing moves into `litchi-iwa-style`; ledger conflicts resolve to the most advanced row.
+- Trunk at the point of this entry has all 53 gate rows green on `ac0d111c4c`; a full gate on `3ab7df643a` is running. API-debt performance qualification (0377) in progress. Nothing pushed.
