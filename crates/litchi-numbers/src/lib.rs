@@ -332,6 +332,21 @@ pub mod drawing_native;
 pub mod formula;
 /// Checked source and semantic ingress profiles and the open envelope.
 pub mod limits;
+/// Feed of the shared embedded-media inventory from the package metadata
+/// scan (record 0375; W1-E hunk).
+#[cfg(not(feature = "internal-iwork-source"))]
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "consumed by the W2 media families"
+)]
+mod media_native;
+/// Feed of the shared embedded-media inventory from the package metadata
+/// scan (record 0375; W1-E hunk), visible to the `litchi-iwa` exit parity
+/// harness only.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub mod media_native;
 /// Atomic, preservation-safe Numbers sheet and table name transactions.
 pub mod names;
 /// Native Numbers package parsing and semantic projection.
