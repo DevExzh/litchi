@@ -32,4 +32,5 @@ mod keynote_slide_cases;
 mod keynote_w1c_cost;
 mod numbers_cases;
 mod pages_cases;
+mod physical_cases;
 mod self_test;
