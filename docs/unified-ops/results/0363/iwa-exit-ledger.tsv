@@ -2065,12 +2065,12 @@ shapes/fill/image.rs	without_tint	1	shared	drawable.shape	host-only	litchi-iwa-c
 shapes/line.rs	length	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 shapes/line.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/date_time_field.rs	from_object_id	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	add_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	add_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	add_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	add_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	add_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	add_text_hyperlink	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	apply_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	create_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
@@ -2109,12 +2109,12 @@ text/editor.rs	paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text
 text/editor.rs	paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::WritingDirection); host kept as the oracle (record 0374)
 text/editor.rs	redefine_applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_hyperlink	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_language_boundary	1	shared	text.language	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	rename_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
@@ -2196,7 +2196,7 @@ text/editor.rs	storage	1	shared	text.shared	host-only	litchi-iwa-text (values) +
 text/editor.rs	storages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextBackground); host kept as the oracle (record 0374)
 text/editor.rs	text_baseline_shift	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextBaselineShift); host kept as the oracle (record 0374)
-text/editor.rs	text_bookmarks	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_bookmarks	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::entries	text_smart_field_read_parity	A	-	ranged::entries over the bookmark table plus smart_field::bookmark; host kept as the oracle (record 0374)
 text/editor.rs	text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCapitalization); host kept as the oracle (record 0374)
 text/editor.rs	text_character_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCharacterSpacing); host kept as the oracle (record 0374)
 text/editor.rs	text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextColor); host kept as the oracle (record 0374)
@@ -2206,7 +2206,7 @@ text/editor.rs	text_date_time_fields	1	shared	text.date_time_field	host-only	lit
 text/editor.rs	text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextDecorations); host kept as the oracle (record 0374)
 text/editor.rs	text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextFont); host kept as the oracle (record 0374)
 text/editor.rs	text_highlights	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::entries	text_smart_field_read_parity	A	-	ranged::entries over the smart-field table plus smart_field::hyperlink; host kept as the oracle (record 0374)
 text/editor.rs	text_language	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_languages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextLigatures); host kept as the oracle (record 0374)
@@ -2216,12 +2216,12 @@ text/editor.rs	text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::p
 text/editor.rs	text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextShadow); host kept as the oracle (record 0374)
 text/editor.rs	text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextStyle); host kept as the oracle (record 0374)
 text/editor.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-text/editor.rs	update_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	update_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	update_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	update_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	update_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	update_text_hyperlink	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	update_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/extractor.rs	extract_from_bundle	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/extractor.rs	extract_from_object	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-

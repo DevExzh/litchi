@@ -194,6 +194,145 @@ impl Workspace {
         })
     }
 
+    /// Replace one message payload, adding and removing one object
+    /// reference of its metadata (the host's ranged-table bookkeeping).
+    pub fn replace_with_references(
+        &mut self,
+        located: &Located,
+        payload: Vec<u8>,
+        added: Option<u64>,
+        removed: Option<u64>,
+    ) -> TestResult {
+        let (object, index, message_type) = (located.object, located.index, located.message_type);
+        self.update(&located.entry, |archive| {
+            let target = archive
+                .object_mut(object)
+                .ok_or_else(|| error("object disappeared"))?;
+            target.replace_message(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data: payload,
+                },
+                Default::default(),
+            )?;
+            let info = &mut target.archive_info.message_infos.as_mut_slice()[index];
+            if let Some(identifier) = added {
+                if info.object_references.contains(&identifier) {
+                    return Err(error("reference already present"));
+                }
+                info.object_references.push(identifier);
+            }
+            if let Some(identifier) = removed {
+                let count = info
+                    .object_references
+                    .iter()
+                    .filter(|candidate| **candidate == identifier)
+                    .count();
+                if count != 1 {
+                    return Err(error(format!("{count} references to {identifier}")));
+                }
+                info.object_references
+                    .retain(|candidate| *candidate != identifier);
+                for field in &mut info.field_infos {
+                    field
+                        .object_references
+                        .retain(|candidate| *candidate != identifier);
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Replace the single message of object `identifier` in `entry`.
+    pub fn replace_object_message(
+        &mut self,
+        entry: &str,
+        identifier: u64,
+        message_type: u32,
+        payload: Vec<u8>,
+    ) -> TestResult {
+        self.update(entry, |archive| {
+            let object = archive
+                .object_mut(identifier)
+                .ok_or_else(|| error("object disappeared"))?;
+            let index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == message_type)
+                .ok_or_else(|| error("message disappeared"))?;
+            object.replace_message(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data: payload,
+                },
+                Default::default(),
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Insert a plain one-message object (default archive metadata).
+    pub fn insert_plain(
+        &mut self,
+        entry: &str,
+        identifier: u64,
+        message_type: u32,
+        payload: Vec<u8>,
+    ) -> TestResult {
+        let object = ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: message_type,
+                data: payload,
+            }],
+            Default::default(),
+        )?;
+        self.update(entry, |archive| {
+            archive.insert_object(object, Default::default())?;
+            Ok(())
+        })
+    }
+
+    pub fn remove_object(&mut self, entry: &str, identifier: u64) -> TestResult {
+        self.update(entry, |archive| {
+            archive
+                .remove_object(identifier)
+                .ok_or_else(|| error("object disappeared"))?;
+            Ok(())
+        })
+    }
+
+    /// The component whose UUID map lists `identifier`.
+    pub fn uuid_component(&self, identifier: u64) -> TestResult<Option<u64>> {
+        let Some(metadata) = self.metadata()? else {
+            return Ok(None);
+        };
+        Ok(metadata
+            .components
+            .iter()
+            .find(|component| {
+                component
+                    .object_uuid_map_entries
+                    .iter()
+                    .any(|entry| entry.identifier == identifier)
+            })
+            .map(|component| component.identifier))
+    }
+
+    /// The host's removal bookkeeping of an object owned by `entry`.
+    pub fn forget_object(&mut self, entry: &str, identifier: u64) -> TestResult {
+        let registered = self.uuid_component(identifier)?;
+        if let Some(component) = self.component(entry)? {
+            self.remove_external_references_to(component, identifier)?;
+        }
+        if let Some(component) = registered {
+            self.remove_object_uuid(component, identifier)?;
+        }
+        self.release_watermark(&[identifier])
+    }
+
     /// The host's next object identifier: one above every archive object,
     /// the metadata watermark and every identifier the metadata names.
     pub fn next_identifier(&self) -> TestResult<u64> {
