@@ -20319,6 +20319,35 @@
           ],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::language::runs",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::language::at",
+          "inputs": [
+            "storage",
+            "position",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::language::rewrite",
+          "inputs": [
+            "storage",
+            "change",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
         }
       ]
     },
