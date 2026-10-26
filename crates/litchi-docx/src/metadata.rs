@@ -127,12 +127,18 @@ pub enum Error {
 /// A replayable document-properties change: the core-properties value the
 /// edit started from and the value it published (`None` is an absent
 /// core-properties part), and the exact part changes of the application and
-/// custom properties.
+/// custom properties. The exact core-part delta is retained privately for
+/// byte-faithful replay and inversion; [`Patch::parts`] remains the public
+/// application/custom-properties scope.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     base: Option<Metadata>,
     target: Option<Metadata>,
     parts: families::Patch,
+    /// The exact shared-codec patch for the core-properties family, when the
+    /// core transition changed. `parts` deliberately remains the public
+    /// application/custom-properties scope.
+    core: Option<families::Patch>,
 }
 
 impl Patch {
@@ -154,10 +160,16 @@ impl Patch {
         &self.parts
     }
 
+    pub(crate) fn core(&self) -> Option<&families::Patch> {
+        self.core.as_ref()
+    }
+
     /// Whether applying the patch leaves every package byte unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.base == self.target && self.parts.is_noop()
+        self.base == self.target
+            && self.parts.is_noop()
+            && self.core.as_ref().map_or(true, families::Patch::is_noop)
     }
 
     /// The patch that restores the base value.
@@ -167,6 +179,7 @@ impl Patch {
             base: self.target.clone(),
             target: self.base.clone(),
             parts: self.parts.inverse(),
+            core: self.core.as_ref().map(families::Patch::inverse),
         }
     }
 }
@@ -299,10 +312,12 @@ impl Edit {
             base: self.base,
             target: self.staged,
             parts,
+            core: None,
         };
-        let (package, changed) = self
-            .source
-            .publish_metadata(patch.target.as_ref(), &patch.parts)?;
+        let (package, changed, core) =
+            self.source
+                .publish_metadata(patch.target.as_ref(), &patch.parts, None)?;
+        let patch = Patch { core, ..patch };
         Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 }
@@ -379,11 +394,39 @@ mod tests {
         Ok(Package::from_opc_package(opc)?)
     }
 
+    fn package_with_opaque_core() -> Result<Package> {
+        let package = Package::new()?;
+        let mut opc = package.opc_package().clone();
+        let core = PackURI::new("/docProps/core.xml").expect("static core URI");
+        let part = opc.get_part_mut(&core).map_err(crate::Error::from)?;
+        let mut bytes = part.blob().to_vec();
+        let close = b"/>";
+        let offset = bytes
+            .windows(close.len())
+            .position(|window| window == close)
+            .expect("default core root");
+        bytes.splice(
+            offset..offset + close.len(),
+            br#"><!--opaque keep="yes"--></cp:coreProperties>"#.iter().copied(),
+        );
+        part.set_blob(bytes);
+        Ok(Package::from_opc_package(opc)?)
+    }
+
     fn app_bytes(package: &Package) -> Vec<u8> {
         package
             .opc_package()
             .get_part(&PackURI::new("/docProps/app.xml").expect("static app URI"))
             .expect("app properties")
+            .blob()
+            .to_vec()
+    }
+
+    fn core_bytes(package: &Package) -> Vec<u8> {
+        package
+            .opc_package()
+            .get_part(&PackURI::new("/docProps/core.xml").expect("static core URI"))
+            .expect("core properties")
             .blob()
             .to_vec()
     }
@@ -487,6 +530,31 @@ mod tests {
     }
 
     #[test]
+    fn opaque_core_replay_and_inverse_preserve_exact_bytes() -> Result<()> {
+        let package = package_with_opaque_core()?;
+        let original = package.clone().to_bytes()?;
+        let original_core = core_bytes(&package);
+        let mut edit = package.edit_metadata();
+        edit.update(|props| props.title = Some("Opaque core target".to_owned()));
+        let (next, patch) = edit.commit()?.into_parts();
+        assert!(patch.core.is_some());
+        assert_ne!(core_bytes(&next), original_core);
+
+        let reopened_source = Package::from_bytes(&package.to_bytes()?)?;
+        let replayed = reopened_source.apply_metadata(&patch)?.into_package();
+        assert_eq!(core_bytes(&replayed), core_bytes(&next));
+        assert_eq!(replayed.to_bytes()?, next.to_bytes()?);
+
+        let reopened_target = Package::from_bytes(&next.to_bytes()?)?;
+        let restored = reopened_target
+            .apply_metadata(&patch.inverse())?
+            .into_package();
+        assert_eq!(core_bytes(&restored), original_core);
+        assert_eq!(restored.to_bytes()?, original);
+        Ok(())
+    }
+
+    #[test]
     fn apply_refuses_a_conflicting_base() -> Result<()> {
         let package = Package::new()?;
         let mut first = package.edit_metadata();
@@ -530,6 +598,7 @@ mod tests {
         assert!(commit.diagnostics().changed());
         assert!(!commit.patch().is_noop());
         let (next, patch) = commit.into_parts();
+        assert!(patch.core.is_some());
         let app = next.app_props()?.unwrap_or_default();
         assert_eq!(app.company.as_deref(), Some("Acme"));
         assert_eq!(app.manager.as_deref(), Some("Dana"));

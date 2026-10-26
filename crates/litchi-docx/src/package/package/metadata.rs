@@ -65,7 +65,8 @@ impl Package {
         if self.metadata() != patch.base() {
             return Err(Error::PatchConflict);
         }
-        let (package, changed) = self.publish_metadata(patch.target(), patch.parts())?;
+        let (package, changed, _) =
+            self.publish_metadata(patch.target(), patch.parts(), patch.core())?;
         Ok(crate::metadata::Commit::new(
             package,
             patch.clone(),
@@ -123,7 +124,8 @@ impl Package {
         &self,
         target: Option<&Props>,
         parts: &families::Patch,
-    ) -> Result<(Self, bool)> {
+        retained_core: Option<&families::Patch>,
+    ) -> Result<(Self, bool, Option<families::Patch>)> {
         let core = self.metadata() != target;
         let parts_noop = parts.is_noop();
         // A no-op patch from the shared properties planner carries a complete
@@ -144,24 +146,28 @@ impl Package {
         }
         let mut package = self.clone();
         let mut failure = None;
+        let mut published_core = None;
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
             if core {
-                let mut core_edit =
-                    families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
-                match target {
-                    Some(props) => {
-                        core_edit
-                            .set_core_metadata(props.clone())
-                            .map_err(crate::Error::from)?;
-                    },
-                    None => {
-                        core_edit.clear_metadata();
-                    },
-                }
-                *opc = core_edit
-                    .commit()
-                    .map_err(crate::Error::from)?
-                    .into_package();
+                let core_commit = if let Some(retained_core) = retained_core {
+                    retained_core.apply(opc).map_err(crate::Error::from)?
+                } else {
+                    let mut core_edit =
+                        families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
+                    match target {
+                        Some(props) => {
+                            core_edit
+                                .set_core_metadata(props.clone())
+                                .map_err(crate::Error::from)?;
+                        },
+                        None => {
+                            core_edit.clear_metadata();
+                        },
+                    }
+                    core_edit.commit().map_err(crate::Error::from)?
+                };
+                published_core = Some(core_commit.patch().clone());
+                *opc = core_commit.into_package();
             }
             if !parts_noop {
                 if let Err(error) = parts.apply(opc).map(|commit| *opc = commit.into_package()) {
@@ -177,6 +183,6 @@ impl Package {
             return Err(Error::Properties(error));
         }
         published?;
-        Ok((package, true))
+        Ok((package, true, published_core))
     }
 }
