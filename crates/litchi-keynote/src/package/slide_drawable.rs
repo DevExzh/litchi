@@ -17,6 +17,7 @@ mod inventory;
 mod stage;
 mod table;
 mod text;
+mod text_lists;
 mod text_properties;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -648,6 +649,12 @@ enum Operation {
         storage: u64,
         change: litchi_iwa_text_wire::paragraph_style::Change,
     },
+    TextList {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_lists::ListChange,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1042,6 +1049,7 @@ impl<'a> Edit<'a> {
             | Operation::Preset { .. }
             | Operation::LineSegment { .. }
             | Operation::TextProperty { .. }
+            | Operation::TextList { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
@@ -1308,6 +1316,134 @@ impl<'a> Edit<'a> {
             change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
         });
         Ok(self)
+    }
+
+    fn stage_list(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_lists::ListChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::TextList {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage one list preset for the whole, uniformly listed text of a text
+    /// box or shape (host `set_slide_text_box_paragraph_list`;
+    /// `ParagraphList::None` is the host's reset). The stylesheet's preset
+    /// is reused or created.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
+    /// drawables without text; [`Self::commit`] refuses text whose list
+    /// styles it does not rewrite ([`Unsupported::TextStyling`]).
+    pub fn set_list<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        list: litchi_iwa_text::paragraph::list::ParagraphList,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::List(list),
+        )
+    }
+
+    /// Stage the list level of the paragraph starting at `paragraph` (host
+    /// `set_slide_text_box_paragraph_list_level`; level zero is the host's
+    /// reset).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn set_list_level<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        level: litchi_iwa_text::paragraph::list::ParagraphListLevel,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Level(paragraph, level),
+        )
+    }
+
+    /// Stage whether the paragraph starting at `paragraph` continues or
+    /// restarts its list numbering (host
+    /// `set_slide_text_box_paragraph_list_numbering`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn set_list_numbering<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        numbering: litchi_iwa_text::paragraph::list::ParagraphListNumbering,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Numbering(paragraph, numbering),
+        )
+    }
+
+    /// Stage one list property (bullet, bullet geometry, indentation, label
+    /// color, number format, scale or tiering) of the paragraph's level
+    /// (host `set_slide_text_box_paragraph_list_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn set_list_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        property: litchi_iwa_text_wire::list::Property,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Property(
+                paragraph,
+                litchi_iwa_text_wire::list::Change::Set(property),
+            ),
+        )
+    }
+
+    /// Stage restoring one list property of the paragraph's level to its
+    /// standard value (host `reset_slide_text_box_paragraph_list_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn reset_list_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        kind: litchi_iwa_text_wire::list::PropertyKind,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Property(
+                paragraph,
+                litchi_iwa_text_wire::list::Change::Reset(kind),
+            ),
+        )
     }
 
     /// Stage a new straight line along `segment` in front of the slide's
@@ -2234,6 +2370,110 @@ impl Package {
         Ok(public_list(&inventory))
     }
 
+    fn text_storage_of(
+        &self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+    ) -> Result<u64, Error> {
+        let selected = select_slide(self, slide)?;
+        let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
+        let item = inventory
+            .items
+            .get(drawable.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: drawable.as_position(),
+            }))?;
+        item.storage
+            .filter(|_| matches!(item.kind, Kind::TextBox | Kind::Shape))
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))
+    }
+
+    /// Read the list preset of the whole, uniformly listed text of one text
+    /// box or shape (host `slide_text_box_paragraph_list`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_paragraph_list<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<litchi_iwa_text::paragraph::list::ParagraphList, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::list(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read every paragraph's list level (host
+    /// `slide_text_box_paragraph_list_levels`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_levels<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::paragraph::list::ParagraphListLevelPlacement>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::levels(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read one paragraph's list level (host
+    /// `slide_text_box_paragraph_list_level`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_level<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+    ) -> Result<litchi_iwa_text::paragraph::list::ParagraphListLevel, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::level(&Workspace::new(self).map_err(lift)?, storage, paragraph)
+    }
+
+    /// Read one paragraph's list numbering (host
+    /// `slide_text_box_paragraph_list_numbering`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_numbering<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+    ) -> Result<litchi_iwa_text::paragraph::list::ParagraphListNumbering, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::numbering(&Workspace::new(self).map_err(lift)?, storage, paragraph)
+    }
+
+    /// Read one effective list property of the paragraph's level (host
+    /// `slide_text_box_paragraph_list_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_property<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        kind: litchi_iwa_text_wire::list::PropertyKind,
+    ) -> Result<litchi_iwa_text_wire::list::Property, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::property(
+            &Workspace::new(self).map_err(lift)?,
+            storage,
+            paragraph,
+            kind,
+        )
+    }
+
     /// Read the effective character or paragraph property `kind` of the
     /// whole, uniformly styled text of one text box or shape (host
     /// `slide_text_box_text_*` / `slide_text_box_paragraph_*`).
@@ -2831,6 +3071,15 @@ fn commit_operations(
                 {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TextList {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_lists::apply(&mut workspace, *storage, change)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::TextProperty {

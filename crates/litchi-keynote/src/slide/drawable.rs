@@ -56,6 +56,20 @@ pub use litchi_iwa_common::shape::geometry::FlipAxis;
 pub mod text_property {
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
+/// Paragraph-list vocabulary ([`Edit::set_list`], [`Edit::set_list_property`]
+/// and the list reads), shared with the W1-D list engine.
+pub mod list {
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
 /// A straight line's segment ([`Edit::set_line_segment`]).
 pub use litchi_iwa_common::shape::line::Segment;
 /// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
