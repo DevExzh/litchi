@@ -18,23 +18,23 @@ charts/pie_wedge_explosion.rs	percent	1	shared	chart	migrated	litchi_iwa_common:
 charts/radar_start_angle.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart::radar::StartAngle::from_degrees	keynote_chart_radar_start_angle_parity	A	-	-
 charts/rounded_corners.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::corner::Radius::new	keynote_chart_rounded_corners_parity	A	-	-
 charts/scene_3d.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart3d::Rotation::from_degrees	keynote_chart_3d_rotation_parity	A	-	-
-charts/series_connection_line.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_fill.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
+charts/series_connection_line.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::ConnectionLineFamily::for_chart_kind	keynote_chart_series_connection_lines_read_parity	A	-	-
+charts/series_fill.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::FillFamily::for_chart_kind	keynote_chart_series_fills_read_parity	A	-	-
 charts/series_gap_3d.rs	new	1	shared	io	migrated	litchi_iwa_common::chart3d::SeriesGap::new	keynote_chart_3d_series_gap_parity	A	-	-
-charts/series_stroke.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_symbol.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_symbol.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/series_symbol_fill.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_symbol_outline.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_trendline.rs	custom_name	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_trendline.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/series_trendline.rs	new	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/series_trendline.rs	unsupported	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_trendline.rs	with_equation_visibility	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	with_legend_name	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	with_legend_visibility	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	with_r_squared_visibility	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	without_custom_name	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
+charts/series_stroke.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::StrokeFamily::for_chart_kind	keynote_chart_series_strokes_read_parity	A	-	-
+charts/series_symbol.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::SymbolFamily::for_chart_kind	keynote_chart_series_symbols_read_parity	A	-	-
+charts/series_symbol.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::series::SymbolSize::new	numbers_chart_series_symbols_read_parity	A	-	-
+charts/series_symbol_fill.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::SymbolFillFamily::for_chart_kind	keynote_chart_series_symbol_fills_read_parity	A	-	-
+charts/series_symbol_outline.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::SymbolOutlineFamily::for_chart_kind	keynote_chart_series_symbol_outlines_read_parity	A	-	-
+charts/series_trendline.rs	custom_name	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::custom_name	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::series::PolynomialOrder::new	numbers_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	new	2	shared	io	migrated	litchi_iwa_common::chart::series::MovingAveragePeriod::new	pages_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	unsupported	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::unsupported	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_equation_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_equation_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_legend_name	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_legend_name	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_legend_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_legend_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_r_squared_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_r_squared_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	without_custom_name	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::without_custom_name	keynote_chart_series_trendlines_read_parity	A	-	-
 comments.rs	add_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 comments.rs	application	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 comments.rs	clear_comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
@@ -2052,16 +2052,16 @@ pages/editor/tables/topology.rs	insert_table_row	1	pages	table.topology	host-onl
 pages/editor/tables/topology.rs	remove_table_column	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/topology.rs	remove_table_row	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
 pages/editor/text_box_create.rs	add_text_box	1	pages	drawable.text_box_lifecycle	host-only	litchi-pages	-	-	-	-
-shapes/fill/image.rs	embedded	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-shapes/fill/image.rs	placeholder	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	with_fill_size	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	with_generic_untagged_image	1	shared	drawable.image	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	with_reference_color	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	with_technique	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	with_tint	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	without_tint	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+shapes/fill/image.rs	embedded	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::embedded	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::fill::ImageData::new	numbers_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	placeholder	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::placeholder	pages_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_fill_size	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_fill_size	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_generic_untagged_image	1	shared	drawable.image	migrated	litchi_iwa_common::shape::fill::Image::with_generic_untagged_image	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_reference_color	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_reference_color	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_technique	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_technique	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_tint	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_tint	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::without_reference_color	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	without_tint	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::without_tint	keynote_shape_image_fill_read_parity	A	-	-
 shapes/line.rs	length	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::line::Segment::length	numbers_line_segment_parity	A	-	-
 shapes/line.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::line::Segment::new	keynote_line_segment_parity	A	-	-
 text/date_time_field.rs	from_object_id	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-

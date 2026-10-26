@@ -41,18 +41,18 @@ const SIZE: DrawableSize = DrawableSize {
 
 /// Where the host added the chart.
 #[derive(Clone, Copy, Debug)]
-enum Target {
+pub(crate) enum Target {
     Keynote { slide: usize },
     Numbers { sheet: u64 },
     Pages,
 }
 
 /// A native-saved fixture with one chart of a given kind added by the host.
-struct Input {
-    fixture: Fixture,
-    format: Format,
-    target: Target,
-    chart: u64,
+pub(crate) struct Input {
+    pub(crate) fixture: Fixture,
+    pub(crate) format: Format,
+    pub(crate) target: Target,
+    pub(crate) chart: u64,
 }
 
 fn pie_data() -> TestResult<ChartData> {
@@ -82,7 +82,7 @@ fn data_for(kind: Kind) -> TestResult<ChartData> {
     }
 }
 
-fn input(format: Format, kind: Kind) -> TestResult<Input> {
+pub(crate) fn input(format: Format, kind: Kind) -> TestResult<Input> {
     let (path, extension) = match format {
         Format::Keynote => ("iwork/keynote/chart-data-native.key", "key"),
         Format::Numbers => ("iwork/numbers/chart-data-native.numbers", "numbers"),
