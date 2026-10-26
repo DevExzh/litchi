@@ -481,6 +481,18 @@ pub(crate) struct PartDigests {
     /// It is carried with the memo so snapshot publication does not need a
     /// second package walk merely to retain the physical owner metric.
     part_bytes: u64,
+    /// The slide-root memo of the capture that filled this package memo, with
+    /// the package source profile it was admitted under (record 0377).
+    ///
+    /// A package keeps one memo per graph state (`Package::part_digests`), so
+    /// every later capture of the same immutable package — each detached
+    /// `Package::edit` captures afresh — reuses the classifications and the
+    /// source admission the first capture proved for the identical payload
+    /// allocations, instead of rescanning every slide. It is consulted only
+    /// under an equal source profile, like a rebind's projection, and only
+    /// [`Snapshot::package_memo`] attaches it: [`Self::project`] and
+    /// [`Self::union`] never carry it to another package.
+    slide_roots: Option<(litchi_opc::SourceLimits, Arc<SlideRootMemo>)>,
 }
 
 impl PartDigests {
@@ -495,6 +507,7 @@ impl PartDigests {
         Ok(Self {
             entries,
             part_bytes: 0,
+            slide_roots: None,
         })
     }
 
@@ -525,6 +538,16 @@ impl PartDigests {
             }
         }
         Some(union)
+    }
+
+    /// The slide-root memo a capture of a package with source profile
+    /// `limits` may consult: the one this package memo carries, when it was
+    /// admitted under the same profile.
+    fn slide_roots_for(&self, limits: litchi_opc::SourceLimits) -> Option<&SlideRootMemo> {
+        self.slide_roots
+            .as_ref()
+            .filter(|(admitted, _memo)| *admitted == limits)
+            .map(|(_admitted, memo)| memo.as_ref())
     }
 
     /// Return the package-owned payload allocation for an exact memo key.
@@ -611,6 +634,7 @@ impl PartDigests {
             return Ok(Self {
                 entries: HashMap::new(),
                 part_bytes: self.part_bytes,
+                slide_roots: None,
             });
         }
         let mut projected = Self::with_capacity(package.part_count())?;
@@ -746,6 +770,20 @@ impl Snapshot {
         }
     }
 
+    /// This snapshot's payload-digest memo re-projected onto `package`'s own
+    /// allocations, carrying the slide-root memo when `package` has the
+    /// snapshot's source profile (record 0377). Every entry kept names, and
+    /// retains, an allocation `package` holds.
+    pub(crate) fn package_memo(&self, package: &OpcPackage) -> Result<PartDigests> {
+        let mut memo = self.part_digests.project(package)?;
+        let limits = package.read_limits();
+        if self.package.read_limits() == limits {
+            let roots = self.slide_roots.project(|key| memo.owner_for(key));
+            memo.slide_roots = Some((limits, Arc::new(roots)));
+        }
+        Ok(memo)
+    }
+
     /// Aggregate charged bytes held by this snapshot's optional MCE table.
     ///
     /// Counts output vector capacity and table/Arc metadata. Clones may share
@@ -852,6 +890,28 @@ pub(crate) fn capture_with_parent_digests_and_semantic_limits(
     )
 }
 
+/// Capture a candidate package assembled from `parent`'s package, reusing
+/// `parent`'s payload digests and, under the same source profile, its proved
+/// slide-root classifications and source admission for every payload
+/// allocation the candidate still shares (record 0377). Every validation of
+/// a changed or reallocated payload still runs.
+pub(crate) fn capture_with_parent_snapshot(
+    package: &OpcPackage,
+    parent: &Snapshot,
+) -> Result<Snapshot> {
+    let parent_roots = (parent.package.read_limits() == package.read_limits())
+        .then(|| parent.slide_roots.as_ref());
+    capture_internal(
+        package,
+        parent.limits,
+        parent.physical_source_provenance,
+        Revision::Parent(parent.part_digests.as_ref()),
+        None,
+        parent_roots,
+        parent.owner_state.semantic_limits.clone(),
+    )
+}
+
 /// Capture a package with its already computed revision, reusing a parent
 /// snapshot's retained MCE projections and its proved notes-root
 /// classifications for every payload allocation the two packages share. A
@@ -941,8 +1001,19 @@ fn capture_internal(
         });
     }
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
-    let captured =
-        view.capture_slides_with_mce(&mut mce_capture, parent_roots, package.read_limits())?;
+    // A capture of a package whose memo already carries the slide-root
+    // proofs of an earlier capture of the same payload allocations under the
+    // same source profile reuses them (record 0377); a commit passes its
+    // source snapshot's memo explicitly.
+    let inherited_roots = match &revision {
+        Revision::Parent(parent) => parent.slide_roots_for(package.read_limits()),
+        Revision::Cold | Revision::Known(..) => None,
+    };
+    let captured = view.capture_slides_with_mce(
+        &mut mce_capture,
+        parent_roots.or(inherited_roots),
+        package.read_limits(),
+    )?;
     // Edit transactions keep the strict slide-list contract. Delaying this
     // check until after capture preserves physical source admission ordering.
     let references = view.part().slide_references_strict()?;

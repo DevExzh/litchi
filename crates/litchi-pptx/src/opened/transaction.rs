@@ -260,7 +260,7 @@ impl Edit {
             snapshot.release_retained_mce();
         }
         if lazy.digest_sink.get().is_none()
-            && let Ok(projected) = snapshot.part_digests.project(lazy.package.as_ref())
+            && let Ok(projected) = snapshot.package_memo(lazy.package.as_ref())
         {
             let _kept = lazy.digest_sink.set(Arc::new(projected));
         }
