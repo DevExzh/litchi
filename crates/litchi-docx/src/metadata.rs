@@ -468,11 +468,9 @@ mod tests {
         let default = Metadata::default();
         assert!(set_patch.base().is_none());
         assert_eq!(set_patch.target(), Some(&default));
-        assert!(set_patch.parts().changes().iter().any(|change| {
-            change.family() == families::Family::Core
-                && change.before().is_none()
-                && change.after().is_some()
-        }));
+        // The DOCX wrapper exposes core transition state through `base` and
+        // `target`; `parts` is the application/custom-properties patch.
+        assert!(set_patch.parts().is_noop());
         assert_eq!(created.metadata(), Some(&default));
 
         let restored = created.apply_metadata(&set_patch.inverse())?.into_package();
@@ -543,7 +541,10 @@ mod tests {
             next.metadata().and_then(|props| props.title.as_deref()),
             Some("Quarterly")
         );
-        assert_eq!(package.metadata(), None);
+        // `Package::new` owns an explicit, empty core-properties part.  The
+        // edit must preserve that present-vs-absent distinction on the source
+        // snapshot while changing the staged value in the new package.
+        assert_eq!(package.metadata(), Some(&Metadata::default()));
         assert_eq!(package.clone().to_bytes()?, original);
         let reopened = Package::from_bytes(&next.clone().to_bytes()?)?;
         assert_eq!(
