@@ -20,6 +20,7 @@
 mod char_style;
 pub mod language;
 mod native;
+pub mod number_attachment;
 pub mod paragraph_style;
 pub mod ranged;
 mod rewrite;

@@ -827,30 +827,38 @@ impl SourceCatalog {
         Self::from_package(package, limits)
     }
 
-    /// Parse a candidate derived from `base` (for example an edited
-    /// reassembly of it), reusing `base`'s parsed component for every IWA
-    /// member whose compressed payload is byte-identical. The candidate's
-    /// ZIP is read and checked in full and every budget is charged as
-    /// [`Self::from_shared_bytes`] charges it; only the decompression and
-    /// archive parse of unchanged members are skipped.
+    /// Parse `candidate`, a package derived from this snapshot (for example
+    /// an edited reassembly of it), under this snapshot's limits.
+    ///
+    /// The candidate's ZIP is read and checked in full and every budget is
+    /// charged exactly as [`Self::from_shared_bytes`] charges it. Only the
+    /// Snappy decompression and archive parse of IWA members whose
+    /// compressed payload is byte-identical to this snapshot's member of the
+    /// same name are skipped: those members share this snapshot's parsed
+    /// archive. A directory- or semantic-profile snapshot parses every
+    /// member.
+    ///
+    /// ```
+    /// # use std::sync::Arc;
+    /// # use litchi_iwa_archive::SourceCatalog;
+    /// # fn demo(source: &SourceCatalog, edited: Vec<u8>) -> litchi_iwa_archive::Result<()> {
+    /// let candidate = source.reopen(Arc::from(edited))?;
+    /// assert_eq!(candidate.limits(), source.limits());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// Returns the errors of [`Self::from_shared_bytes`].
-    #[doc(hidden)]
-    pub fn __from_shared_bytes_reusing(
-        source: Arc<[u8]>,
-        limits: Limits,
-        base: &SourceCatalog,
-    ) -> Result<Self> {
-        let package = Catalog::from_shared_bytes(source, limits)?;
-        let validated_limits = limits.validate()?;
+    pub fn reopen(&self, candidate: Arc<[u8]>) -> Result<Self> {
+        let package = Catalog::from_shared_bytes(candidate, self.limits)?;
         let components =
-            ComponentCatalog::from_package_catalog_reusing(&package, validated_limits, Some(base))?;
+            ComponentCatalog::from_package_catalog_reusing(&package, self.limits, Some(self))?;
         Ok(Self {
             package,
             components,
-            limits: validated_limits,
+            limits: self.limits,
         })
     }
 
@@ -1109,11 +1117,7 @@ mod tests {
     fn reopen_reuses_unchanged_members_and_parses_changed_ones() -> Result<()> {
         let base = SourceCatalog::from_bytes(&two_member_package(6001)?, Default::default())?;
         let candidate: Arc<[u8]> = Arc::from(two_member_package(6002)?);
-        let reopened = SourceCatalog::__from_shared_bytes_reusing(
-            Arc::clone(&candidate),
-            Default::default(),
-            &base,
-        )?;
+        let reopened = base.reopen(Arc::clone(&candidate))?;
         let parsed = SourceCatalog::from_shared_bytes(candidate, Default::default())?;
         let shared = |catalog: &SourceCatalog, name: &str| match &catalog
             .components
