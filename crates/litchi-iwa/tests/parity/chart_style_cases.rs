@@ -255,7 +255,7 @@ const fn scale3d(scale: Scale) -> property::Scale3d {
 
 /// The library write rules (`chart_style_codec::property`) for `value`:
 /// what a format family calls with its common value.
-fn property_write(value: Property) -> property::PropertyWrite {
+fn property_write(value: Property) -> property::PropertyWrite<'static> {
     match value {
         Property::PieStartAngle(angle) => property::pie_start_angle(angle.degrees()),
         Property::DonutInnerRadius(radius) => {
@@ -1225,7 +1225,7 @@ impl SeriesProperty {
     }
 
     /// The library write rules for wedge `index`.
-    fn write(&self, index: usize) -> property::PropertyWrite {
+    fn write(&self, index: usize) -> property::PropertyWrite<'static> {
         match self {
             Self::WedgeExplosions(values) => {
                 property::pie_wedge_explosion(values[index].native_fraction())

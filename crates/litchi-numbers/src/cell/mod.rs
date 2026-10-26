@@ -19,6 +19,24 @@ pub mod text {
     };
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
+/// Paragraph lists of cells' text (record 0370b), started by
+/// [`crate::Package::edit_table_cell_lists`]: a plain cell is promoted to
+/// rich text on its first list change.
+pub mod list {
+    pub use crate::package::table_cell_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
 /// Character properties of cells' text (record 0309), started by
 /// [`crate::Package::edit_table_cell_text_style`].
 pub mod text_style {

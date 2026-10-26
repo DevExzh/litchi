@@ -1,7 +1,8 @@
-//! Field pass from the stored drawing values decoded by
-//! `litchi_iwa_protos::shape_style_codec::native` (`color`, `stroke`, `fill`)
-//! to their semantic reading in `litchi_iwa_common::shape::native`
-//! (`color`, `stroke`, `stop`, `gradient`, `image`, `fill`).
+//! Field pass between the stored drawing values of
+//! `litchi_iwa_protos::shape_style_codec::native` (decoders `color`,
+//! `stroke`, `fill`; encoders `encode_stroke`, `encode_fill`) and their
+//! semantic form in `litchi_iwa_common::shape::native` (`color`, `stroke`,
+//! `stop`, `gradient`, `image`, `fill`; `stored_stroke`, `stored_fill`).
 //!
 //! The crate graph keeps the two crates apart, so this plain 1:1 pass is
 //! repeated, identically, in `litchi-pages`, `litchi-numbers` and
@@ -10,7 +11,7 @@
 
 use litchi_iwa_common::color::Rgba;
 use litchi_iwa_common::shape::fill::{Fill, Gradient, Image};
-use litchi_iwa_common::shape::native::{self as rules, Error, StoredPattern};
+use litchi_iwa_common::shape::native::{self as rules, Error, StoredColor, StoredPattern};
 use litchi_iwa_common::shape::stroke::Stroke;
 use litchi_iwa_protos::shape_style_codec::native as stored;
 
@@ -88,6 +89,67 @@ pub fn fill(value: &stored::Fill) -> Result<Fill, Error> {
         value.gradient.as_ref().map(gradient).transpose()?,
         value.image.as_ref().map(image).transpose()?,
     )
+}
+
+fn to_stored_color(value: StoredColor) -> stored::Color {
+    stored::Color {
+        model: Some(value.model),
+        rgba: value.rgba.map(Some),
+        rgb_space: Some(value.rgb_space),
+        has_other_channels: false,
+    }
+}
+
+/// The encoded `TSD.StrokeArchive` of a stroke (`None`: the hidden stroke).
+pub fn encode_stroke(value: Option<Stroke>) -> Vec<u8> {
+    let value = rules::stored_stroke(value);
+    stored::encode_stroke(&stored::Stroke {
+        color: Some(to_stored_color(value.color)),
+        width: Some(value.width),
+        cap: Some(value.cap),
+        join: Some(value.join),
+        miter_limit: Some(value.miter_limit),
+        pattern: Some(stored::StrokePattern {
+            kind: Some(value.pattern_kind),
+            phase: Some(0.0),
+            count: Some(value.pattern_count),
+            lengths: value.pattern_lengths.to_vec(),
+        }),
+        is_special: false,
+    })
+}
+
+/// The encoded `TSD.FillArchive` of a fill.
+pub fn encode_fill(value: &Fill) -> Vec<u8> {
+    let value = rules::stored_fill(value);
+    stored::encode_fill(&stored::Fill {
+        color: value.color.map(to_stored_color),
+        gradient: value.gradient.map(|gradient| stored::Gradient {
+            kind: Some(gradient.kind),
+            stops: gradient
+                .stops
+                .iter()
+                .map(|stop| stored::GradientStop {
+                    color: Some(to_stored_color(stop.color)),
+                    fraction: Some(stop.fraction),
+                    inflection: Some(stop.inflection),
+                })
+                .collect(),
+            opacity: Some(gradient.opacity),
+            advanced: Some(gradient.advanced),
+            angle: Some(gradient.angle),
+            is_transformed: false,
+        }),
+        image: value.image.map(|image| stored::ImageFill {
+            data: Some(image.data),
+            technique: Some(image.technique),
+            tint: image.tint.map(to_stored_color),
+            fill_size: Some(image.fill_size),
+            generic: Some(image.generic),
+            reference_color: image.reference_color.map(to_stored_color),
+            is_legacy: false,
+        }),
+    })
 }
 
 #[cfg(test)]

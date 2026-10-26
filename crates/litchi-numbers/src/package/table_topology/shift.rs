@@ -141,7 +141,6 @@ impl Shift {
         if value > self.position {
             return Ok(value - 1);
         }
-        eprintln!("DEBUGREF {}", std::backtrace::Backtrace::force_capture());
         refuse(Unsupported::DeletedReference)
     }
 

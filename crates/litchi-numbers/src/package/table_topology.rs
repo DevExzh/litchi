@@ -81,6 +81,8 @@ const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 pub(super) const LIST_MESSAGE_TYPE: u32 = 6_005;
 /// `TST.TableDataListSegment`.
 pub(super) const LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
+/// `TSCE.FormulaOwnerDependenciesArchive`.
+const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
 /// `TST.FilterSetArchive`.
 const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 /// `TST.ColumnRowUIDMapArchive`.
@@ -849,7 +851,7 @@ fn clear_comments(
         }
         let base = current.as_ref().unwrap_or(source);
         let commit = base
-            .clear_table_cell_comment(
+            .clear_table_cell_comment_for_axis_removal(
                 SheetSelector::index(sheet),
                 TableSelector::index(table),
                 position,
@@ -858,6 +860,64 @@ fn clear_comments(
         current = Some(commit.into_package());
     }
     Ok(current)
+}
+
+/// `released` (a root list after its releases) with `next_list_id` handed
+/// back over the keys whose entries the releases in `order` emptied, one
+/// release at a time, against `original`'s reference counts.
+fn reclaim_in_order(original: &[u8], released: Vec<u8>, order: &[u32]) -> Result<Vec<u8>, Error> {
+    let mut counts: BTreeMap<u32, u64> = BTreeMap::new();
+    for entry in repeated_bytes(original, 3)? {
+        let key = single_varint(entry, 1)?.ok_or(Error::InvalidSource)?;
+        let key = u32::try_from(key).map_err(|_error| Error::InvalidSource)?;
+        counts.insert(key, single_varint(entry, 2)?.unwrap_or(0));
+    }
+    let current = single_varint(original, 2)?.ok_or(Error::InvalidSource)?;
+    let mut next = current;
+    for key in order {
+        let Some(count) = counts.get_mut(key) else {
+            continue;
+        };
+        *count = count.saturating_sub(1);
+        if *count == 0 && u64::from(*key) + 1 == next {
+            next = u64::from(*key);
+        }
+    }
+    if next == current {
+        return Ok(released);
+    }
+    Ok(structure::put_varint(&released, 2, next)?)
+}
+
+/// Whether no formula owner of the document holds formulas of, or reads,
+/// the table whose drawable is `info`.
+fn formula_inert(working: &Working<'_>, info: u64) -> Result<bool, Error> {
+    let mut owners: Vec<&[u8]> = Vec::new();
+    for object in working.source().state.components.iter_objects() {
+        for message in &object.messages {
+            if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
+                owners
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation { amount: 1 })?;
+                owners.push(message.data.as_slice());
+            }
+        }
+    }
+    let object = |identifier: u64| -> Option<&[u8]> {
+        working
+            .object(identifier)
+            .ok()
+            .and_then(|object| object.messages.first())
+            .map(|message| message.data.as_slice())
+    };
+    let limits = working
+        .source()
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let state =
+        litchi_numbers_wire::table_write::table_formula_state(&owners, &object, info, &limits)
+            .map_err(|_error| Error::InvalidSource)?;
+    Ok(state == litchi_numbers_wire::table_write::FormulaState::Inert)
 }
 
 /// Clear the stored cells of a removed row or column through the cell
@@ -927,6 +987,9 @@ struct Released {
     per_index: BTreeMap<u32, u64>,
     /// Data-store list field -> key -> references released.
     keys: BTreeMap<u32, BTreeMap<u32, u32>>,
+    /// Data-store list field -> keys in release order (cell by cell), for
+    /// the host's per-release hand-back of a last key (record 0370b).
+    order: BTreeMap<u32, Vec<u32>>,
     /// Formula-list key -> references the dropped cells hold (record 0329).
     formulas: BTreeMap<u64, u64>,
 }
@@ -978,6 +1041,11 @@ fn released_cells(
                         .or_default()
                         .entry(list_key)
                         .or_insert(0) += 1;
+                    let order = released.order.entry(field).or_default();
+                    order
+                        .try_reserve(1)
+                        .map_err(|_error| Error::Allocation { amount: 1 })?;
+                    order.push(list_key);
                 }
             }
         }
@@ -1130,6 +1198,11 @@ fn plan(
                     .or_default()
                     .entry(key)
                     .or_insert(0) += 1;
+                let order = released.order.entry(STRING_LIST_FIELD).or_default();
+                order
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation { amount: 1 })?;
+                order.push(key);
             }
         } else {
             readers.entry(patch.info).or_default().push(*patch);
@@ -1172,10 +1245,13 @@ fn plan(
         let list = single_reference(store, *field)?.ok_or(Error::InvalidSource)?;
         let (index, data) = message(working, list, &[LIST_MESSAGE_TYPE])?;
         let mut remaining = keys.clone();
-        let reclaim = drop_cells && (*field == STRING_LIST_FIELD || *field == 12);
         let (payload, pruned) =
-            lists::release_with(data, &mut remaining, reclaim).map_err(storage_fault)?;
+            lists::release_with(data, &mut remaining, false).map_err(storage_fault)?;
         if let Some(payload) = payload {
+            // A released last key goes back as each release empties it, as
+            // the host's per-cell list decrements do (record 0370b).
+            let order = released.order.get(field).map_or(&[][..], Vec::as_slice);
+            let payload = reclaim_in_order(data, payload, order)?;
             push(list, index, payload, pruned)?;
         }
         for reference in repeated_bytes(data, 4)? {
@@ -1428,7 +1504,7 @@ fn run(
     let before = read_geometry(source, sheet, table)?;
     let step = resolve(operation, before)?;
     // Check everything before clearing anything.
-    let cells = {
+    let (cells, inert) = {
         let working = Working::new(source)?;
         let target = locate(&working, sheet, table)?;
         plan(&working, &target, step, before, true, false)?;
@@ -1436,9 +1512,12 @@ fn run(
             AxisEdit::Remove(index) => {
                 let (_, model) = message(&working, target.model, &[6_001])?;
                 let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
-                cells_on_axis(&working, store, before.columns, step.row_axis, index)?
+                (
+                    cells_on_axis(&working, store, before.columns, step.row_axis, index)?,
+                    formula_inert(&working, target.info)?,
+                )
             },
-            AxisEdit::Insert(_) => Vec::new(),
+            AxisEdit::Insert(_) => (Vec::new(), true),
         }
     };
     // Comments on the removed axis go through the comment transaction
@@ -1453,8 +1532,13 @@ fn run(
     // The cell writer clears the removed cells and refreshes the caches of
     // the formulas that read them; where it cannot, the structural pass
     // drops them itself (record 0329).
+    // A table no formula touches drops the removed cells in the structural
+    // pass, as the host's axis removal does (record 0370b): the previews
+    // stay, and a dropped cell's string key is handed back.
     let (cleared, drop_cells) = if cells.is_empty() {
         (None, false)
+    } else if inert {
+        (None, true)
     } else {
         match clear_axis(commented, sheet, table, &cells) {
             Ok(package) => (Some(package), false),

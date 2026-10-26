@@ -46,7 +46,7 @@ fn color(red: f32, green: f32, blue: f32) -> TestResult<RgbaColor> {
 
 /// The series property a case styles and reads.
 #[derive(Clone, Copy, Debug)]
-enum Property {
+pub(crate) enum Property {
     Strokes,
     Fills,
     ConnectionLines,
@@ -57,7 +57,7 @@ enum Property {
 }
 
 impl Property {
-    const fn kind(self) -> Kind {
+    pub(crate) const fn kind(self) -> Kind {
         match self {
             Self::Fills => Kind::Column2d,
             _ => Kind::Line2d,
@@ -230,7 +230,12 @@ fn from_host_trendline(trendline: &ChartSeriesTrendline) -> TestResult<Trendline
         .with_r_squared_visibility(trendline.shows_r_squared())?)
 }
 
-fn host_read(bytes: &[u8], target: Target, chart: u64, property: Property) -> TestResult<String> {
+pub(crate) fn host_read(
+    bytes: &[u8],
+    target: Target,
+    chart: u64,
+    property: Property,
+) -> TestResult<String> {
     macro_rules! read {
         ($editor:expr, $($scope:expr,)? ; $strokes:ident, $fills:ident, $lines:ident, $symbols:ident, $symbol_fills:ident, $outlines:ident, $trendlines:ident) => {{
             let editor = $editor;
@@ -289,7 +294,7 @@ fn host_read(bytes: &[u8], target: Target, chart: u64, property: Property) -> Te
 
 /// Resolve a series-style property through the parent chain: `read`
 /// returns `Some` when the style stores the property.
-fn inherited<T>(
+pub(crate) fn inherited<T>(
     components: &Components,
     first: u64,
     read: impl Fn(&Properties<'_>) -> TestResult<Option<T>>,
@@ -310,7 +315,10 @@ fn inherited<T>(
     Err("series style chain too deep".into())
 }
 
-fn stroke_at(properties: &Properties<'_>, field: u32) -> TestResult<Option<Option<Stroke>>> {
+pub(crate) fn stroke_at(
+    properties: &Properties<'_>,
+    field: u32,
+) -> TestResult<Option<Option<Stroke>>> {
     let Some(bytes) = properties.message(field)? else {
         return Ok(None);
     };
@@ -318,7 +326,7 @@ fn stroke_at(properties: &Properties<'_>, field: u32) -> TestResult<Option<Optio
     Ok(Some(stroke.map(Stroke::from_shape_stroke).transpose()?))
 }
 
-fn fill_at(properties: &Properties<'_>, field: u32) -> TestResult<Option<Fill>> {
+pub(crate) fn fill_at(properties: &Properties<'_>, field: u32) -> TestResult<Option<Fill>> {
     let Some(bytes) = properties.message(field)? else {
         return Ok(None);
     };
@@ -328,12 +336,17 @@ fn fill_at(properties: &Properties<'_>, field: u32) -> TestResult<Option<Fill>> 
     )?)?))
 }
 
-fn flag(properties: &Properties<'_>, field: u32) -> TestResult<Option<bool>> {
+pub(crate) fn flag(properties: &Properties<'_>, field: u32) -> TestResult<Option<bool>> {
     Ok(properties.varint(field)?.map(|value| value != 0))
 }
 
 /// The engine read of the case's property for every series.
-fn engine_read(bytes: &[u8], chart: u64, property: Property, series: usize) -> TestResult<String> {
+pub(crate) fn engine_read(
+    bytes: &[u8],
+    chart: u64,
+    property: Property,
+    series: usize,
+) -> TestResult<String> {
     let components = Components::read(bytes)?;
     let drawable = components.locate(chart, CHART_MESSAGE_TYPE)?;
     let references = codec::references(components.payload(chart, drawable)?, Limits::DEFAULT)?;
@@ -467,7 +480,7 @@ fn host_rendered(
     host_read(bytes, target, chart, property)
 }
 
-fn leaf_reopen(format: Format, source: &[u8]) -> TestResult<Vec<u8>> {
+pub(crate) fn leaf_reopen(format: Format, source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(match format {
         Format::Numbers => leaf_bytes!(litchi_numbers::Package::from_bytes(source)?),
         Format::Pages => leaf_bytes!(litchi_pages::Package::from_bytes(source)?),

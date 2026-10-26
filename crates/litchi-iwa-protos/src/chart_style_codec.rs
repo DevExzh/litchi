@@ -189,7 +189,7 @@ pub struct Vector {
 /// left it so far (an absent extension has every field absent).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]
-pub enum Write {
+pub enum Write<'a> {
     /// A `float` (fixed32) property.
     Float {
         /// Extension field number.
@@ -249,6 +249,26 @@ pub enum Write {
         /// The whole vector to write when the field is absent.
         absent: Option<Vector>,
     },
+    /// A message-typed property (a stroke or fill payload), replaced as a
+    /// whole; `None` removes the field.
+    Message {
+        /// Extension field number.
+        field: u32,
+        /// The encoded message, or `None` to remove the field.
+        value: Option<&'a [u8]>,
+    },
+    /// A message-typed property merged into a present field: the fields
+    /// `schema` knows are replaced from `value` (singular messages
+    /// recursively), unknown fields stay at every level; an absent field is
+    /// set to `value`.
+    MergeMessage {
+        /// Extension field number.
+        field: u32,
+        /// The encoded replacement message.
+        value: &'a [u8],
+        /// The schema of the message's known fields.
+        schema: &'static [merge::KnownField],
+    },
     /// A depth stored as the `z` component of a scale vector: when the vector
     /// is present, `z = ratio * denominator` where the denominator is the
     /// stored `denominator` component ([`field::vector::X`] or
@@ -266,7 +286,7 @@ pub enum Write {
     },
 }
 
-impl Write {
+impl Write<'_> {
     const fn field(self) -> u32 {
         match self {
             Self::Float { field, .. }
@@ -276,7 +296,9 @@ impl Write {
             | Self::BoolUnlessAbsentDefault { field, .. }
             | Self::Vector { field, .. }
             | Self::VectorComponents { field, .. }
-            | Self::VectorDepth { field, .. } => field,
+            | Self::VectorDepth { field, .. }
+            | Self::Message { field, .. }
+            | Self::MergeMessage { field, .. } => field,
         }
     }
 
@@ -286,9 +308,11 @@ impl Write {
             Self::Bool { .. } | Self::Int32 { .. } | Self::BoolUnlessAbsentDefault { .. } => {
                 WIRE_VARINT
             },
-            Self::Vector { .. } | Self::VectorComponents { .. } | Self::VectorDepth { .. } => {
-                WIRE_LENGTH_DELIMITED
-            },
+            Self::Vector { .. }
+            | Self::VectorComponents { .. }
+            | Self::VectorDepth { .. }
+            | Self::Message { .. }
+            | Self::MergeMessage { .. } => WIRE_LENGTH_DELIMITED,
         }
     }
 }
@@ -954,7 +978,7 @@ impl<'source> Rewrite<'source> {
     }
 }
 
-fn validate_write(write: Write) -> Result<(), Error> {
+fn validate_write(write: Write<'_>) -> Result<(), Error> {
     let number = write.field();
     if number == 0 || number == EXTENSION_FIELD || u64::from(number) > MAX_FIELD_NUMBER {
         return Err(Error::InvalidField { field: number });
@@ -984,7 +1008,7 @@ fn validate_write(write: Write) -> Result<(), Error> {
 pub fn rewrite<'source>(
     source: &'source [u8],
     archive: Archive,
-    writes: &[Write],
+    writes: &[Write<'_>],
     empty: EmptyExtension,
     limits: Limits,
 ) -> Result<Rewrite<'source>, Error> {
@@ -1072,13 +1096,26 @@ fn int32_bytes(value: i32) -> Vec<u8> {
 
 /// Resolve a write; `present` is the stored vector payload (for vector
 /// writes) or an empty slice for any other present field.
-fn resolve(write: Write, present: Option<&[u8]>, budget: &mut Budget) -> Result<Resolved, Error> {
+fn resolve(
+    write: Write<'_>,
+    present: Option<&[u8]>,
+    budget: &mut Budget,
+    limits: Limits,
+) -> Result<Resolved, Error> {
     let set_or_clear = |value: Option<Vec<u8>>| value.map_or(Resolved::Clear, Resolved::Set);
     Ok(match write {
         Write::Float { value, .. } => set_or_clear(value.map(|v| v.to_le_bytes().to_vec())),
         Write::Bool { value, .. } => set_or_clear(value.map(|v| vec![u8::from(v)])),
         Write::Int32 { value, .. } => set_or_clear(value.map(int32_bytes)),
         Write::Vector { value, .. } => set_or_clear(value.map(encode_vector)),
+        Write::Message { value, .. } => set_or_clear(value.map(<[u8]>::to_vec)),
+        Write::MergeMessage { value, schema, .. } => Resolved::Set(match present {
+            Some(existing) => merge::merge(existing, value, schema, limits)?,
+            None => {
+                merge::validate(value, schema, limits)?;
+                value.to_vec()
+            },
+        }),
         Write::FloatUnlessAbsentDefault { value, default, .. } => {
             if present.is_none() && value == default {
                 Resolved::Keep
@@ -1126,7 +1163,7 @@ fn resolve(write: Write, present: Option<&[u8]>, budget: &mut Budget) -> Result<
     })
 }
 
-fn create_extension(writes: &[Write], limits: Limits) -> Result<Option<Vec<u8>>, Error> {
+fn create_extension(writes: &[Write<'_>], limits: Limits) -> Result<Option<Vec<u8>>, Error> {
     // Sequential application over an empty extension: later writes of the
     // same field see the earlier ones.
     let mut fields: Vec<(u32, u8, Vec<u8>)> = Vec::new();
@@ -1135,7 +1172,7 @@ fn create_extension(writes: &[Write], limits: Limits) -> Result<Option<Vec<u8>>,
         let number = write.field();
         let index = fields.iter().position(|(kept, ..)| *kept == number);
         let present = index.map(|index| fields[index].2.as_slice());
-        match resolve(write, present, &mut budget)? {
+        match resolve(write, present, &mut budget, limits)? {
             Resolved::Keep => {},
             Resolved::Clear => {
                 if let Some(index) = index {
@@ -1185,23 +1222,27 @@ fn push_field(output: &mut Vec<u8>, number: u32, wire_type: u8, value: &[u8]) {
 /// Append one whole field for a value-carrying plain write (tests build
 /// payloads with it).
 #[cfg(test)]
-fn encode_field(output: &mut Vec<u8>, write: Write) {
+fn encode_field(output: &mut Vec<u8>, write: Write<'_>) {
     let mut budget = Budget::new(Limits::DEFAULT);
-    if let Ok(Resolved::Set(value)) = resolve(write, None, &mut budget) {
+    if let Ok(Resolved::Set(value)) = resolve(write, None, &mut budget, Limits::DEFAULT) {
         push_field(output, write.field(), write.wire_type(), &value);
     }
 }
 
 /// Apply one write to an extension payload; `None` when the bytes are
 /// unchanged.
-fn apply_write(extension: &[u8], write: Write, limits: Limits) -> Result<Option<Vec<u8>>, Error> {
+fn apply_write(
+    extension: &[u8],
+    write: Write<'_>,
+    limits: Limits,
+) -> Result<Option<Vec<u8>>, Error> {
     let mut budget = Budget::new(limits);
     let existing = singular(extension, write.field(), &mut budget)?;
     if let Some(field) = &existing {
         require_wire_type(field, write.wire_type())?;
     }
     let present = existing.map(|field| field.payload(extension));
-    let resolved = resolve(write, present, &mut budget)?;
+    let resolved = resolve(write, present, &mut budget, limits)?;
     match (resolved, existing) {
         (Resolved::Keep, _) | (Resolved::Clear | Resolved::Components(_), None) => Ok(None),
         (Resolved::Clear, Some(field)) => remove_field(extension, &field, limits).map(Some),
@@ -1324,8 +1365,8 @@ pub(crate) fn remove_field(data: &[u8], field: &Field, limits: Limits) -> Result
 pub mod property {
     use super::{Archive, EmptyExtension, Vector, Write, field};
 
-    const MAX_WRITES: usize = 2;
-    const NO_WRITE: Write = Write::Float {
+    const MAX_WRITES: usize = 3;
+    const NO_WRITE: Write<'static> = Write::Float {
         field: field::chart_non_style::PIE_START_ANGLE,
         value: None,
     };
@@ -1340,28 +1381,42 @@ pub mod property {
 
     /// The archive, writes and empty-extension policy of one property value.
     #[derive(Debug, Clone, Copy, PartialEq)]
-    pub struct PropertyWrite {
+    pub struct PropertyWrite<'a> {
         archive: Archive,
-        writes: [Write; MAX_WRITES],
+        writes: [Write<'a>; MAX_WRITES],
         len: usize,
         empty: EmptyExtension,
     }
 
-    impl PropertyWrite {
-        const fn one(archive: Archive, write: Write, empty: EmptyExtension) -> Self {
+    impl<'a> PropertyWrite<'a> {
+        const fn one(archive: Archive, write: Write<'a>, empty: EmptyExtension) -> Self {
             Self {
                 archive,
-                writes: [write, NO_WRITE],
+                writes: [write, NO_WRITE, NO_WRITE],
                 len: 1,
                 empty,
             }
         }
 
-        const fn two(archive: Archive, first: Write, second: Write, empty: EmptyExtension) -> Self {
+        const fn two(
+            archive: Archive,
+            first: Write<'a>,
+            second: Write<'a>,
+            empty: EmptyExtension,
+        ) -> Self {
             Self {
                 archive,
-                writes: [first, second],
+                writes: [first, second, NO_WRITE],
                 len: 2,
+                empty,
+            }
+        }
+
+        const fn three(archive: Archive, writes: [Write<'a>; 3], empty: EmptyExtension) -> Self {
+            Self {
+                archive,
+                writes,
+                len: 3,
                 empty,
             }
         }
@@ -1374,7 +1429,7 @@ pub mod property {
 
         /// The writes, in order.
         #[must_use]
-        pub fn writes(&self) -> &[Write] {
+        pub fn writes(&self) -> &[Write<'a>] {
             &self.writes[..self.len]
         }
 
@@ -1422,7 +1477,7 @@ pub mod property {
         }
     }
 
-    const fn chart_float(field: u32, value: f32, default: f32) -> PropertyWrite {
+    const fn chart_float(field: u32, value: f32, default: f32) -> PropertyWrite<'static> {
         PropertyWrite::one(
             Archive::ChartNonStyle,
             Write::Float {
@@ -1435,13 +1490,13 @@ pub mod property {
 
     /// Pie/donut start angle (stored degrees; 0 clears).
     #[must_use]
-    pub const fn pie_start_angle(degrees: f32) -> PropertyWrite {
+    pub const fn pie_start_angle(degrees: f32) -> PropertyWrite<'static> {
         chart_float(field::chart_non_style::PIE_START_ANGLE, degrees, 0.0)
     }
 
     /// Donut inner radius (stored fraction; the default clears).
     #[must_use]
-    pub const fn donut_inner_radius(fraction: f32) -> PropertyWrite {
+    pub const fn donut_inner_radius(fraction: f32) -> PropertyWrite<'static> {
         chart_float(
             field::chart_non_style::DONUT_INNER_RADIUS,
             fraction,
@@ -1451,13 +1506,13 @@ pub mod property {
 
     /// Radar start angle (stored degrees; 0 clears).
     #[must_use]
-    pub const fn radar_start_angle(degrees: f32) -> PropertyWrite {
+    pub const fn radar_start_angle(degrees: f32) -> PropertyWrite<'static> {
         chart_float(field::chart_non_style::RADAR_START_ANGLE, degrees, 0.0)
     }
 
     /// 3D series gap (stored ratio; the default clears).
     #[must_use]
-    pub const fn series_gap_3d(ratio: f32) -> PropertyWrite {
+    pub const fn series_gap_3d(ratio: f32) -> PropertyWrite<'static> {
         chart_float(
             field::chart_non_style::SERIES_GAP_3D,
             ratio,
@@ -1469,7 +1524,7 @@ pub mod property {
     /// a stored vector keeps `z`/`w` and an absent one is written as
     /// `(x, y, 0, 0)`.
     #[must_use]
-    pub const fn rotation_3d(x_degrees: f32, y_degrees: f32) -> PropertyWrite {
+    pub const fn rotation_3d(x_degrees: f32, y_degrees: f32) -> PropertyWrite<'static> {
         let field = field::chart_non_style::ROTATION_3D;
         let write = if x_degrees == DEFAULT_ROTATION_3D.0 && y_degrees == DEFAULT_ROTATION_3D.1 {
             Write::Vector { field, value: None }
@@ -1492,7 +1547,11 @@ pub mod property {
     /// absent one is written as `absent`, or left absent when `absent` is
     /// `None` (the caller passes `None` for the default depth).
     #[must_use]
-    pub const fn depth_3d(scale: Scale3d, ratio: f32, absent: Option<[f32; 4]>) -> PropertyWrite {
+    pub const fn depth_3d(
+        scale: Scale3d,
+        ratio: f32,
+        absent: Option<[f32; 4]>,
+    ) -> PropertyWrite<'static> {
         let absent = match absent {
             Some([x, y, z, w]) => Some(Vector { x, y, z, w }),
             None => None,
@@ -1513,7 +1572,10 @@ pub mod property {
     /// default (0, false) clears both; otherwise a default-valued field is
     /// written only when it is already present.
     #[must_use]
-    pub const fn rounded_corners(radius: f32, outside_corners_only: bool) -> PropertyWrite {
+    pub const fn rounded_corners(
+        radius: f32,
+        outside_corners_only: bool,
+    ) -> PropertyWrite<'static> {
         let radius_field = field::chart_style::ROUNDED_CORNER_RADIUS;
         let flag_field = field::chart_style::ROUNDED_CORNER_OUTER_END_ONLY;
         if radius == 0.0 && !outside_corners_only {
@@ -1546,10 +1608,121 @@ pub mod property {
         )
     }
 
+    /// A series stroke (series style): `Some(encoded)` merges the encoded
+    /// `TSD.StrokeArchive` into a stored stroke (or sets it), `None` removes
+    /// the local override; an emptied extension is removed. `field` is the
+    /// family's field (`litchi_iwa_common::chart::series::StrokeFamily`).
+    #[must_use]
+    pub const fn series_stroke(field: u32, encoded: Option<&[u8]>) -> PropertyWrite<'_> {
+        let write = match encoded {
+            Some(value) => Write::MergeMessage {
+                field,
+                value,
+                schema: super::merge::schema::STROKE,
+            },
+            None => Write::Message { field, value: None },
+        };
+        PropertyWrite::one(Archive::SeriesStyle, write, EmptyExtension::Remove)
+    }
+
+    /// A series fill or a data-symbol outline (series style): `Some` replaces
+    /// the stored message with the encoded `TSD.FillArchive` or
+    /// `TSD.StrokeArchive`, `None` removes it; an emptied extension is
+    /// removed.
+    #[must_use]
+    pub const fn series_message(field: u32, encoded: Option<&[u8]>) -> PropertyWrite<'_> {
+        PropertyWrite::one(
+            Archive::SeriesStyle,
+            Write::Message {
+                field,
+                value: encoded,
+            },
+            EmptyExtension::Remove,
+        )
+    }
+
+    /// A data-symbol size in points (series style; `None` is automatic).
+    #[must_use]
+    pub const fn symbol_size(field: u32, points: Option<f32>) -> PropertyWrite<'static> {
+        PropertyWrite::one(
+            Archive::SeriesStyle,
+            Write::Float {
+                field,
+                value: points,
+            },
+            EmptyExtension::Remove,
+        )
+    }
+
+    /// What a data-symbol fill stores.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SymbolFill<'a> {
+        /// An encoded `TSD.FillArchive`.
+        Custom(&'a [u8]),
+        /// Follow the series fill.
+        SeriesFill,
+        /// Follow the series stroke.
+        SeriesStroke,
+        /// Remove the local override.
+        Reset,
+    }
+
+    /// A data-symbol fill (series style): the fill message and the two
+    /// switches, in that order. `None` when `value` follows the series fill
+    /// but the family has no such switch.
+    #[must_use]
+    pub const fn symbol_fill(
+        fill_field: u32,
+        use_series_fill_field: Option<u32>,
+        use_series_stroke_field: u32,
+        value: SymbolFill<'_>,
+    ) -> Option<PropertyWrite<'_>> {
+        let fill = Write::Message {
+            field: fill_field,
+            value: match value {
+                SymbolFill::Custom(bytes) => Some(bytes),
+                SymbolFill::SeriesFill | SymbolFill::SeriesStroke | SymbolFill::Reset => None,
+            },
+        };
+        let use_stroke = Write::Bool {
+            field: use_series_stroke_field,
+            value: if matches!(value, SymbolFill::SeriesStroke) {
+                Some(true)
+            } else {
+                None
+            },
+        };
+        match use_series_fill_field {
+            Some(field) => Some(PropertyWrite::three(
+                Archive::SeriesStyle,
+                [
+                    fill,
+                    Write::Bool {
+                        field,
+                        value: if matches!(value, SymbolFill::SeriesFill) {
+                            Some(true)
+                        } else {
+                            None
+                        },
+                    },
+                    use_stroke,
+                ],
+                EmptyExtension::Remove,
+            )),
+            None if matches!(value, SymbolFill::SeriesFill) => None,
+            None => Some(PropertyWrite::two(
+                Archive::SeriesStyle,
+                fill,
+                use_stroke,
+                EmptyExtension::Remove,
+            )),
+        }
+    }
+
     /// One wedge's explosion (stored fraction; 0 clears and an emptied
     /// extension is removed).
     #[must_use]
-    pub const fn pie_wedge_explosion(fraction: f32) -> PropertyWrite {
+    pub const fn pie_wedge_explosion(fraction: f32) -> PropertyWrite<'static> {
         PropertyWrite::one(
             Archive::SeriesNonStyle,
             Write::Float {
@@ -1568,7 +1741,7 @@ pub mod property {
     /// current field; the default clears both and an emptied extension is
     /// removed).
     #[must_use]
-    pub const fn pie_label_distance(percent: f32) -> PropertyWrite {
+    pub const fn pie_label_distance(percent: f32) -> PropertyWrite<'static> {
         let value = if percent == DEFAULT_PIE_LABEL_DISTANCE {
             None
         } else {
@@ -2028,6 +2201,8 @@ fn sparse_references(data: &[u8], budget: &mut Budget) -> Result<SparseReference
     }
     Ok(sparse)
 }
+
+pub mod merge;
 
 #[cfg(test)]
 mod tests;
