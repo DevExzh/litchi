@@ -13,6 +13,7 @@
 mod duplicate;
 mod graph;
 mod layout;
+mod reassign;
 
 use std::fmt;
 use std::sync::Arc;
@@ -354,6 +355,11 @@ enum Operation {
         layout: usize,
         destination: usize,
     },
+    Layout {
+        node: u64,
+        slide: Position,
+        layout: usize,
+    },
 }
 
 /// One bounded slide-creation edit staged against an immutable package.
@@ -492,6 +498,71 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// Stage the reassignment of one existing slide to a theme layout, as
+    /// Keynote's Layout menu does.
+    ///
+    /// The slide keeps its text, speaker notes, builds, transition and
+    /// ordinary drawables; the layout supplies the slide style, the title
+    /// and body placeholder geometry, style, path and visibility, and the
+    /// slide node's template identity. The slide preview is invalidated.
+    /// Reassigning a slide to the layout it already uses stages nothing.
+    /// The selector resolves against the base snapshot; the slide keeps its
+    /// position. Layouts with layout-owned media (images, live video, media
+    /// placeholders) on either side are refused by [`Self::commit`] with
+    /// [`Unsupported::LayoutMedia`].
+    ///
+    /// # Errors
+    ///
+    /// Returns typed slide- and layout-selector errors.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::{Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// let mut edit = package.edit_slide_creation();
+    /// edit.set_layout(SlideSelector::index(0), "Title Only")?;
+    /// let package = edit.commit()?.into_package();
+    /// let layouts = package.slide_layout_list()?;
+    /// assert_eq!(layouts[0].as_ref().and_then(|layout| layout.name()), Some("Title Only"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_layout<'s, 'l>(
+        &mut self,
+        selector: impl Into<SlideSelector<'s>>,
+        layout: impl Into<LayoutSelector<'l>>,
+    ) -> Result<&mut Self, Error> {
+        let selector = selector.into();
+        let show = self.source.show().map_err(map_read_error)?;
+        let selected = show
+            .select_slide(selector)
+            .map_err(map_selector_error)?
+            .ok_or(match selector {
+                SlideSelector::Name(_) => Error::Refused(Refusal::SlideNameNotFound),
+                SlideSelector::Position(position) => {
+                    Error::Refused(Refusal::SlidePositionNotFound { position })
+                },
+            })?;
+        let slide = selected.position();
+        if self.catalog.is_none() {
+            self.catalog = Some(Catalog::read(self.source)?);
+        }
+        let catalog = self.catalog.as_ref().ok_or(Error::InvalidSource)?;
+        let layout = catalog.select(layout.into())?;
+        let nodes = self
+            .source
+            .private_slide_node_order()
+            .map_err(|_error| Error::InvalidSource)?;
+        let node = *nodes.get(slide.get()).ok_or(Error::InvalidSource)?;
+        self.operations.push(Operation::Layout {
+            node,
+            slide,
+            layout,
+        });
+        Ok(self)
+    }
+
     /// Stage a fresh slide built from one theme layout at `destination`.
     ///
     /// The fresh slide's title, body and speaker notes are empty. Layouts
@@ -588,10 +659,9 @@ impl<'a> Edit<'a> {
         }
         let catalog = match self.catalog {
             Some(catalog) => Some(catalog),
-            None if self
-                .operations
-                .iter()
-                .any(|operation| matches!(operation, Operation::Add { .. })) =>
+            None if self.operations.iter().any(|operation| {
+                matches!(operation, Operation::Add { .. } | Operation::Layout { .. })
+            }) =>
             {
                 Some(Catalog::read(self.source)?)
             },
@@ -944,8 +1014,20 @@ fn commit_operations(
     }
     let mut notes = None;
     let mut created = Vec::with_capacity(operations.len());
+    let mut reassigned = Vec::new();
     for operation in operations {
         let (node, destination, expectation) = match *operation {
+            Operation::Layout {
+                node,
+                slide,
+                layout,
+            } => {
+                let record = catalog.ok_or(Error::InvalidSource)?.record(layout)?;
+                if !reassign::stage(&mut workspace, node, record)?.unchanged {
+                    reassigned.push((node, slide, layout));
+                }
+                continue;
+            },
             Operation::Duplicate {
                 node,
                 source: position,
@@ -977,8 +1059,29 @@ fn commit_operations(
         order.insert(destination, node);
         created.push(Created { node, expectation });
     }
+    if created.is_empty() && reassigned.is_empty() {
+        let source_bytes = physical_source(source)?;
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
+                artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
+                source_slide_count,
+                created_slides: 0,
+                touched_components: 0,
+                creates: true,
+            },
+            diagnostics: Diagnostics {
+                changed: false,
+                created_slides: 0,
+                touched_components: 0,
+                full_reparse_performed: false,
+            },
+        });
+    }
     check_object_limit(source, &workspace)?;
-    show.write(&mut workspace, &order)?;
+    if !created.is_empty() {
+        show.write(&mut workspace, &order)?;
+    }
     let touched_components = workspace.touched_members();
     let bytes = workspace.publish().lift()?;
     let mut candidate = source.structure_reopen(bytes).map_err(map_read_error)?;
@@ -995,6 +1098,20 @@ fn commit_operations(
         }
     }
     verify(source, &candidate, &order, &created)?;
+    if !reassigned.is_empty() {
+        let layouts = catalog
+            .ok_or(Error::InvalidSource)?
+            .assignments(&candidate)?;
+        for (node, slide, layout) in &reassigned {
+            let position = position_of(&order, *node)?;
+            let expected = catalog.ok_or(Error::InvalidSource)?.layouts();
+            if layouts.get(position.get()).cloned().flatten().as_ref() != expected.get(*layout)
+                || slide_text(source, *slide)? != slide_text(&candidate, position)?
+            {
+                return Err(Error::Verification);
+            }
+        }
+    }
     let target = physical_source(&candidate)?;
     let patch = Patch {
         artifacts: ExactArtifacts::new(source_bytes, target),

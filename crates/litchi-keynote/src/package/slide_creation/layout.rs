@@ -101,6 +101,23 @@ pub(in crate::package) struct Record {
     name: Option<String>,
 }
 
+impl Record {
+    /// The layout's template component member.
+    pub(in crate::package) fn member(&self) -> &str {
+        &self.member
+    }
+
+    /// The layout's slide node.
+    pub(in crate::package) const fn node(&self) -> u64 {
+        self.node
+    }
+
+    /// The layout's template slide.
+    pub(in crate::package) const fn slide(&self) -> u64 {
+        self.slide
+    }
+}
+
 /// The theme's layouts, read once per edit.
 #[derive(Debug, Clone)]
 pub(in crate::package) struct Catalog {
@@ -275,7 +292,7 @@ impl Catalog {
 /// Objects reachable from `roots` inside `member`, following every object
 /// reference (walked and header-listed). `stop` objects are selected but not
 /// followed. Returns the selection in archive order.
-fn private_closure(
+pub(super) fn private_closure(
     workspace: &Workspace<'_>,
     member: &str,
     roots: impl IntoIterator<Item = u64>,
@@ -384,7 +401,7 @@ impl NoteSource {
 }
 
 /// How one owned layout drawable is materialized.
-enum Media {
+pub(super) enum Media {
     /// Not media: cloned as is.
     None,
     /// A template image: cloned with its template flag cleared.
@@ -395,7 +412,7 @@ enum Media {
     TemplateOnly,
 }
 
-fn classify(workspace: &Workspace<'_>, drawable: u64) -> Result<Media, Error> {
+pub(super) fn classify(workspace: &Workspace<'_>, drawable: u64) -> Result<Media, Error> {
     let object = workspace.require(drawable).lift()?;
     let image = object
         .messages
@@ -433,7 +450,10 @@ fn classify(workspace: &Workspace<'_>, drawable: u64) -> Result<Media, Error> {
 }
 
 /// The drawable parent of a cloned media payload (`DrawableArchive.parent`).
-fn media_parent(payload: &[u8], workspace: &Workspace<'_>) -> Result<Option<u64>, Error> {
+pub(super) fn media_parent(
+    payload: &[u8],
+    workspace: &Workspace<'_>,
+) -> Result<Option<u64>, Error> {
     let fields = Fields::parse(payload, workspace.wire).lift()?;
     let Some(drawable) = fields.unique(DRAWABLE_SUPER).lift()? else {
         return Ok(None);
@@ -605,7 +625,11 @@ fn materialize_slide(
 
 /// Clear a cloned layout image's template-media flag after checking that it
 /// belongs to the new slide.
-fn materialize_image(workspace: &mut Workspace<'_>, image: u64, slide: u64) -> Result<(), Error> {
+pub(super) fn materialize_image(
+    workspace: &mut Workspace<'_>,
+    image: u64,
+    slide: u64,
+) -> Result<(), Error> {
     let payload = graph::payload(workspace, image, IMAGE_MESSAGE_TYPE)?;
     if media_parent(payload, workspace)? != Some(slide) {
         return Err(Error::Refused(
