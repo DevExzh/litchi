@@ -1545,6 +1545,9 @@ pub(super) fn decode_cfuuid_in<'source>(
             _ => {},
         }
     }
+    if uuid_bytes.is_some() && words.iter().any(Option::is_some) {
+        return Err(DecodeError::invalid());
+    }
     let snapshot = CfuuidSnapshot { uuid_bytes, words };
     budget.message(source, depth)?;
     let view: projection::CFUUIDArchiveLazyView<'_> = budget
@@ -1894,6 +1897,24 @@ mod tests {
         v(&mut out, 2, seed + 1);
         out
     }
+    fn cfuuid_with_bytes_and_words() -> Vec<u8> {
+        let mut out = Vec::new();
+        b(&mut out, 1, &[0; 16]);
+        v(&mut out, 2, 1);
+        v(&mut out, 3, 2);
+        v(&mut out, 4, 3);
+        v(&mut out, 5, 4);
+        out
+    }
+    fn range_reference_with_table(table: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        b(&mut out, 1, table);
+        v(&mut out, 2, 0);
+        v(&mut out, 3, 0);
+        v(&mut out, 4, 1);
+        v(&mut out, 5, 1);
+        out
+    }
     fn cell_record(column: u32, row: u32) -> Vec<u8> {
         let mut out = Vec::new();
         v(&mut out, 1, u64::from(column));
@@ -2239,6 +2260,29 @@ mod tests {
             nesting.resource_limit(),
             Some(DecodeLimit::Nesting { .. })
         ));
+    }
+
+    #[test]
+    fn cfuuid_rejects_mixed_bytes_and_word_representations() {
+        let mixed = range_reference_with_table(&cfuuid_with_bytes_and_words());
+        assert!(decode_range_reference(&mixed, options(&mixed)).is_err());
+
+        let bytes_only = range_reference_with_table(&{
+            let mut value = Vec::new();
+            b(&mut value, 1, &[0; 16]);
+            value
+        });
+        assert!(decode_range_reference(&bytes_only, options(&bytes_only)).is_ok());
+
+        let words_only = range_reference_with_table(&{
+            let mut value = Vec::new();
+            v(&mut value, 2, 1);
+            v(&mut value, 3, 2);
+            v(&mut value, 4, 3);
+            v(&mut value, 5, 4);
+            value
+        });
+        assert!(decode_range_reference(&words_only, options(&words_only)).is_ok());
     }
 
     #[test]

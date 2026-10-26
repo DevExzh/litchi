@@ -10,6 +10,8 @@
 mod caption;
 mod color;
 mod effects;
+#[cfg(test)]
+mod exit_parity;
 mod fill;
 mod geometry;
 pub mod line;

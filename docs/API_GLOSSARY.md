@@ -2771,7 +2771,7 @@ Both profiles now register 30 families.
 
 | Canonical name | Notes | Status |
 | --- | --- | --- |
-| `litchi_numbers::table::topology::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Unsupported}` | Registered family (31st) in `numbers-minimal` / `numbers-full`; the section-relative `RowInsertion`, `ColumnInsertion`, `RowDeletion`, `ColumnDeletion` values stay in the same module | ✅ 0309 |
+| `litchi_numbers::table::topology::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Unsupported}` | Registered family (31st) in `numbers-minimal` / `numbers-full`; the section-relative `RowInsertion`, `ColumnInsertion`, `RowDeletion`, `ColumnDeletion` values stay reachable in the same module, re-exported from their canonical owner `litchi_iwa_common::table::topology` (0368) | ✅ 0309, 0368 |
 | `Package::edit_table_topology(sheet, table) -> topology::Edit<'_>` | `Edit::{insert_row, insert_column, remove_row, remove_column}`; several operations per edit, applied in order, one commit | ✅ 0309 |
 | `Package::apply_table_topology(&Patch)` | Exact source check; `Patch::{is_noop, inverse}` | ✅ 0309 |
 | `topology::Error::Unsupported { reason: Unsupported }` | `Formulas`, `ReferencedByOtherOwners`, `Merges`, `Filters`, `Categories`, `Pivot`, `SortRules`, `HiddenAxis`, `Borders`, `Comments`, `StorageLayout` | ✅ 0309 |
@@ -2809,6 +2809,22 @@ registered in the `pages` profile.
 | `litchi_pages::Package::{insert_body_table, apply_body_table_creation}`, `litchi_pages::table::creation::{NewTable, Commit, Patch, Diagnostics, Error, LimitKind}` | A body table cloned from the document's first body table, anchored at a UTF-16 body `Position`; `Error::NoTemplate` without one | ✅ 0329 |
 | `litchi_numbers_wire::BncCell::{set_formula_cached_error, set_formula_identifier}` | `#REF!` result caches and shared-formula splits of the topology shift | ✅ 0329 |
 | `litchi_keynote::slide::drawable::Edit::set_notes_text_style`, `litchi_keynote::Package::slide_notes_text_runs` | Speaker-notes character styles (request 10) | ✅ 0329 |
+
+## iWork neutral table vocabulary and formula graph (record 0368)
+
+Wave W0-B of record 0363 (decision D4). A moved type keeps one canonical
+definition; the format owner re-exports it at its established path, which is
+not an alias (no second name exists).
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_iwa_common::table::cell::data_format::{DataFormat, Text, Checkbox, StarRating, control, currency, custom, date_time, duration, fraction, number, numeral_system, percentage, pop_up_menu, scientific, text}` | Archive-free cell display and control formats, moved from `litchi_numbers::cell::data_format`; Numbers re-exports every value at its existing path beside its `transaction` modules, so no public path changes | ✅ 0368 |
+| `litchi_iwa_common::table::topology::{RowInsertion, ColumnInsertion, RowDeletion, ColumnDeletion}` | Section-relative topology coordinates, moved from `litchi_numbers::table::topology` (re-exported there) | ✅ 0368 |
+| `litchi_numbers_wire::formula_graph::{remap_owner, remap_cell_record_tile, remap_range_precedents_tile, append_owners_to_engine, Remap, Limits, LimitKind, Error}` | Bounded source-preserving formula-graph remaps for table/sheet duplication, moved from the host's `formula_clone`; required `&Limits`, typed `Error::{Limit, InvalidLimit, InvalidRemap, UnsupportedDependency, InvalidSource, Allocation}`; no `*_with_limits` twin | ✅ 0368 |
+| `litchi_numbers_wire::formula_owner::{Uuid, TABLE_OWNER_KIND, Error, encode_empty_table}` | Formula-owner identity arithmetic (`for_table`, `cfuuid_words`, `translate_from`) and the host's empty table owner, byte for byte | ✅ 0368 |
+| `litchi_numbers_wire::table_lifecycle::{ReferenceRemap, TABLE_MODEL_REFERENCE_PATHS, TABLE_INFO_REFERENCE_PATHS, Error, rewrite_table_model, rewrite_table_info, rewrite_table_data_list, rewrite_reference, remap_reference_paths}` | Table duplicate/remove reference rewrites (donor `numbers_table_lifecycle_codec`), required `&Limits` | ✅ 0368 |
+| `litchi_iwa_protos::{theme_codec, keynote_theme_codec, theme_presets_codec, shape_properties_codec, keynote_shape_creation_codec, number_attachment_codec}` | Bounded Buffa codecs ported from the donors; each entry point takes its `DecodeOptions`/`EncodeOptions`; no limit-less twin | ✅ 0368 |
+| `shape_properties_codec::{decode_shape_properties, rewrite_shape_properties}` | banned donor aliases: use `decode_drawable_archive`, `rewrite_drawable_archive` (never ported) | ✅ 0368 |
 
 ## iWork facade retirement and iWork open options (record 0306)
 

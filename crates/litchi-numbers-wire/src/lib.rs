@@ -35,6 +35,16 @@ pub mod formula_render;
 /// Shared bounded reader for native table merge formulas.
 pub mod table_merges;
 
+/// Bounded, source-preserving rewrites of the native formula graph (owner
+/// dependencies, dependency tiles and the calculation-engine owner registry)
+/// for table and sheet duplication (record 0368).
+pub mod formula_graph;
+/// Formula-owner identities and the canonical empty table owner (record 0368).
+pub mod formula_owner;
+/// Source-preserving object-reference rewrites for table duplication and
+/// removal (record 0368).
+pub mod table_lifecycle;
+
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
 /// Payload-level cell writes shared by the Pages and Keynote table owners.
