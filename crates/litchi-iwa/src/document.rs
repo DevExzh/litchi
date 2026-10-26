@@ -227,13 +227,11 @@ impl Document {
         let total_objects = self.state.object_index.object_count();
         let archives_count = self.state.bundle.iter_archives().count();
 
-        let mut message_type_counts = HashMap::new();
+        let mut types = Vec::new();
         for object in self.state.object_index.iter_refs(&self.state.bundle) {
-            let object = object?;
-            for msg_type in object.message_types() {
-                *message_type_counts.entry(msg_type).or_insert(0) += 1;
-            }
+            types.extend(object?.message_types());
         }
+        let message_type_counts = litchi_iwa_archive::unstable::count_message_types(types);
 
         let media_stats = self.media_stats();
 
@@ -291,40 +289,12 @@ pub struct DocumentStats {
 impl DocumentStats {
     /// Get the most common message type
     pub fn most_common_message_type(&self) -> Option<(u32, usize)> {
-        self.message_type_counts
-            .iter()
-            .max_by(|(left_type, left_count), (right_type, right_count)| {
-                left_count
-                    .cmp(right_count)
-                    .then_with(|| right_type.cmp(left_type))
-            })
-            .map(|(&type_, &count)| (type_, count))
+        litchi_iwa_archive::unstable::most_common_message_type(&self.message_type_counts)
     }
 
     /// Get message type distribution as a deterministic summary string.
     pub fn message_type_summary(&self) -> String {
-        let mut types: Vec<_> = self.message_type_counts.iter().collect();
-        types.sort_by(|(left_type, left_count), (right_type, right_count)| {
-            right_count
-                .cmp(left_count)
-                .then_with(|| left_type.cmp(right_type))
-        });
-
-        let top_types: Vec<String> = types
-            .into_iter()
-            .take(5)
-            .map(|(type_, count)| format!("{}: {}", type_, count))
-            .collect();
-
-        if top_types.len() < self.message_type_counts.len() {
-            format!(
-                "{} (and {} more)",
-                top_types.join(", "),
-                self.message_type_counts.len() - top_types.len()
-            )
-        } else {
-            top_types.join(", ")
-        }
+        litchi_iwa_archive::unstable::message_type_summary(&self.message_type_counts)
     }
 }
 

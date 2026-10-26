@@ -5,7 +5,9 @@ use super::*;
 mod storage;
 
 use cell_merge::{MergeAxis, shift_merges_for_axis_insertion};
-use formula_dependency_shift::{DependencyAxis, FooterRangeInsertion, shift_formula_dependencies};
+use formula_dependency_shift::{
+    DependencyAxis, FooterRangeInsertion, TableExtents, shift_formula_dependencies,
+};
 use storage::{insert_row_uid, set_table_row_count, shift_row_headers, shift_table_tile_rows};
 use stroke_layers::{StrokeAxis, insert as insert_stroke_layers};
 use table_headers::set_attached_table_header_settings;
@@ -65,12 +67,14 @@ pub(super) fn insert_attached_table_row(
     let locations = object_locations(package)?;
     validate_table_sort_order_for_topology(package, table_id)?;
     validate_row_insertion_features(package, &locations, &descriptor.model)?;
+    let extents = insertion_extents(&descriptor.model, resolved.updated_header_settings, 1, 0)?;
     shift_formula_dependencies(
         package,
         descriptor.table_info_id,
         DependencyAxis::Row,
         u32::try_from(row).map_err(|_| Error::ParseError("iWork row exceeds u32".to_owned()))?,
         resolved.footer_range_insertion,
+        extents,
     )?;
     shift_table_tile_rows(package, &locations, &descriptor.model, row)?;
     shift_row_headers(package, &locations, &descriptor.model, row)?;
@@ -103,6 +107,49 @@ pub(super) fn insert_attached_table_row(
         ));
     }
     Ok(new_rows)
+}
+
+/// The table extents before and after an insertion of `rows` rows and
+/// `columns` columns, with the section counts `settings` gives (record 0370).
+pub(super) fn insertion_extents(
+    model: &TableModelArchive,
+    settings: Option<HeaderSettings>,
+    rows: u32,
+    columns: u32,
+) -> Result<(TableExtents, TableExtents)> {
+    let before_settings = table_headers::settings_from_model(model)?;
+    let after_settings = settings.unwrap_or(before_settings);
+    let count = |value: usize| {
+        u32::try_from(value).map_err(|_| Error::ParseError("iWork section exceeds u32".to_owned()))
+    };
+    let extents = |settings: HeaderSettings, rows: u32, columns: u32| -> Result<TableExtents> {
+        Ok(TableExtents::of(
+            rows,
+            columns,
+            count(settings.header_row_count())?,
+            count(settings.header_column_count())?,
+            count(settings.footer_row_count())?,
+        ))
+    };
+    let overflow = || Error::ParseError("iWork table extent overflow".to_owned());
+    Ok((
+        extents(
+            before_settings,
+            model.number_of_rows,
+            model.number_of_columns,
+        )?,
+        extents(
+            after_settings,
+            model
+                .number_of_rows
+                .checked_add(rows)
+                .ok_or_else(overflow)?,
+            model
+                .number_of_columns
+                .checked_add(columns)
+                .ok_or_else(overflow)?,
+        )?,
+    ))
 }
 
 struct ResolvedRowInsertion {

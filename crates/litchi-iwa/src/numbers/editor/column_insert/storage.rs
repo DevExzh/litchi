@@ -11,6 +11,45 @@ fn checked_shift(value: u32, insertion: u32, what: &str) -> Result<u32> {
         .ok_or_else(|| Error::ParseError(format!("Numbers {what} overflow")))
 }
 
+/// Give a row's pre-BNC cell-offset table the inserted column's empty slot
+/// (record 0370).
+///
+/// Native Numbers keeps a row's pre-BNC offset table naming the same
+/// columns as its BNC one; shifting only the BNC table left the pre-BNC
+/// table naming the old columns. A table with spare capacity keeps its
+/// length, as the focused `litchi-numbers` topology splice does.
+fn splice_pre_bnc_offsets(row: &mut TileRowInfo, columns: usize, insertion: usize) -> Result<()> {
+    const MISSING: [u8; 2] = [0xff, 0xff];
+    let offsets = &row.cell_offsets_pre_bnc;
+    if offsets.is_empty() {
+        return Ok(());
+    }
+    if !offsets.len().is_multiple_of(2) {
+        return Err(Error::InvalidFormat(
+            "Numbers pre-BNC cell offsets have an odd length".to_owned(),
+        ));
+    }
+    let entries = offsets.len() / 2;
+    if insertion >= entries {
+        return Ok(());
+    }
+    let mut table: Vec<[u8; 2]> = offsets
+        .chunks_exact(2)
+        .map(|pair| [pair[0], pair[1]])
+        .collect();
+    if table.iter().skip(columns).any(|entry| *entry != MISSING) {
+        return Err(Error::InvalidFormat(
+            "Numbers pre-BNC row stores cells beyond the declared table columns".to_owned(),
+        ));
+    }
+    table.insert(insertion, MISSING);
+    if entries > columns {
+        table.pop();
+    }
+    row.cell_offsets_pre_bnc = table.into_iter().flatten().collect();
+    Ok(())
+}
+
 pub(super) fn shift_table_tile_columns(
     package: &mut HostPackage,
     locations: &HashMap<u64, String>,
@@ -68,6 +107,7 @@ pub(super) fn shift_table_tile_columns(
                     cells[insertion] = None;
                 }
                 rebuild_row(row, &cells)?;
+                splice_pre_bnc_offsets(row, old_columns, insertion)?;
                 changed = true;
             }
             if changed {

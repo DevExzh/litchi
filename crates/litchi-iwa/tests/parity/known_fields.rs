@@ -12,7 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
-use litchi_iwa_protos::{kn, tn, tp, tsp, tss, tst, tswp};
+use litchi_iwa_protos::{kn, tn, tp, tsce, tsp, tss, tst, tswp};
 use prost::Message;
 
 use crate::harness::Format;
@@ -78,7 +78,22 @@ impl KnownFields {
         match format {
             Format::Numbers => known
                 .with(1, "TN.DocumentArchive", decode_as::<tn::DocumentArchive>)
-                .with(2, "TN.SheetArchive", decode_as::<tn::SheetArchive>),
+                .with(2, "TN.SheetArchive", decode_as::<tn::SheetArchive>)
+                .with(
+                    4_000,
+                    "TSCE.CalculationEngineArchive",
+                    decode_as::<tsce::CalculationEngineArchive>,
+                )
+                .with(
+                    4_008,
+                    "TSCE.FormulaOwnerDependenciesArchive",
+                    decode_as::<tsce::FormulaOwnerDependenciesArchive>,
+                )
+                .with(
+                    6_000,
+                    "TST.TableInfoArchive",
+                    decode_as::<tst::TableInfoArchive>,
+                ),
             Format::Pages => known
                 .with(
                     10_000,

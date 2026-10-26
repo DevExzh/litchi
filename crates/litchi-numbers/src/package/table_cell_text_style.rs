@@ -307,7 +307,7 @@ fn locate_cell(
         if field.number != 5 || single_varint(field.payload, 1)? != Some(local) {
             continue;
         }
-        for (column, bytes) in storage::bnc_cells(field.payload)? {
+        for (column, bytes) in storage::bnc_cells(field.payload).map_err(Fault::from)? {
             if column == position.column() {
                 return Ok(Some(Located {
                     tile: *tile,
@@ -630,7 +630,7 @@ fn publish(
     }
     // Release the cells' old keys (root entries only).
     let mut remaining = releases;
-    let (released, pruned) = lists::release(&list_data, &mut remaining)?;
+    let (released, pruned) = lists::release(&list_data, &mut remaining).map_err(Fault::from)?;
     if !remaining.is_empty() {
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
@@ -665,7 +665,8 @@ fn publish(
             if this != located.row_field {
                 return Ok(None);
             }
-            let row = storage::replace_cell(field.payload, position.column(), &encoded)?
+            let row = storage::replace_cell(field.payload, position.column(), &encoded)
+                .map_err(Fault::from)?
                 .ok_or(Fault::Invalid)?;
             bytes_field(5, &row).map(Some)
         })?;
