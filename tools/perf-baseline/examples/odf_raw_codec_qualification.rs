@@ -10,11 +10,10 @@
 //! the manifest boundary.  Report construction happens after the allocator
 //! observer has stopped.
 
+#[cfg(all(feature = "raw-codec-original", feature = "raw-codec-current"))]
+compile_error!("select exactly one raw-codec API era");
 #[cfg(not(any(feature = "raw-codec-original", feature = "raw-codec-current")))]
 compile_error!("select raw-codec-original or raw-codec-current");
-// The paired runner always selects one adapter.  If a broad all-features
-// lint profile enables both, the current adapter wins so --all-targets stays
-// buildable; that profile is not a qualification endpoint.
 
 #[cfg(feature = "raw-codec-allocator")]
 mod allocation {
@@ -126,6 +125,7 @@ mod probe {
     };
     use litchi_ops::{OpenOptions, create, open_bytes_with};
     use quick_xml::events::Event;
+    use quick_xml::name::ResolveResult;
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
     use zip::{HasZipMetadata, ZipArchive};
@@ -173,6 +173,16 @@ mod probe {
         "failing_reader_or_sink",
         "corrupt_stored_payload_without_verification",
     ];
+
+    #[cfg(feature = "raw-codec-current")]
+    const API_ERA: &str = "current";
+    #[cfg(all(feature = "raw-codec-original", not(feature = "raw-codec-current")))]
+    const API_ERA: &str = "original";
+
+    #[cfg(feature = "raw-codec-current")]
+    const NAMESPACE_CONTRACT: &str = "document_rejects_undeclared_namespace";
+    #[cfg(all(feature = "raw-codec-original", not(feature = "raw-codec-current")))]
+    const NAMESPACE_CONTRACT: &str = "legacy_unknown_namespace_event";
 
     fn digest(bytes: &[u8]) -> String {
         let mut output = String::with_capacity(64);
@@ -242,7 +252,8 @@ mod probe {
         ResolvedReader::from_xml(xml, limits).map_err(error_text)
     }
 
-    fn undeclared_namespace_rejected(xml: &str, limits: XmlStreamLimits) -> bool {
+    #[cfg(feature = "raw-codec-current")]
+    fn undeclared_namespace_contract(xml: &str, limits: XmlStreamLimits) -> bool {
         let mut reader = match resolved_document(xml, limits) {
             // Construction is intentionally lazy.  A setup error is not the
             // event-consumption proof this lane requires.
@@ -260,10 +271,32 @@ mod probe {
                 },
                 Err(error) => {
                     let message = error_text(error).to_ascii_lowercase();
-                    return message.contains("namespace")
-                        || message.contains("undeclared")
-                        || message.contains("prefix");
+                    return message.contains("unknown namespace") && message.contains("prefix");
                 },
+            }
+        }
+    }
+
+    #[cfg(all(feature = "raw-codec-original", not(feature = "raw-codec-current")))]
+    fn undeclared_namespace_contract(xml: &str, limits: XmlStreamLimits) -> bool {
+        let mut reader = match resolved_document(xml, limits) {
+            Ok(reader) => reader,
+            Err(_) => return false,
+        };
+        let mut buffer = Vec::new();
+        let mut saw_unknown = false;
+        loop {
+            match reader.read_resolved_event_into(&mut buffer) {
+                Ok((namespace, event)) => {
+                    if matches!(namespace, ResolveResult::Unknown(_)) {
+                        saw_unknown = true;
+                    }
+                    if matches!(event, Event::Eof) {
+                        return saw_unknown;
+                    }
+                    buffer.clear();
+                },
+                Err(_) => return false,
             }
         }
     }
@@ -326,7 +359,7 @@ mod probe {
         writer
             .add_file_reader_with_media_type_and_compression(
                 OPAQUE_MEMBER,
-                Cursor::new(opaque.to_vec()),
+                Cursor::new(opaque),
                 "application/octet-stream",
                 PackageCompression::Stored,
             )
@@ -529,7 +562,7 @@ mod probe {
         );
         cases.insert(
             "undeclared_namespace".to_string(),
-            undeclared_namespace_rejected("<office:meta/>", xml_limits),
+            undeclared_namespace_contract("<office:meta/>", xml_limits),
         );
 
         let source = OwnedPackage::from_bytes(package.to_vec()).expect("source package");
@@ -635,7 +668,7 @@ mod probe {
                 "id": id,
                 "family": "splice",
                 "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
-                "boundary": "prebuilt source part/range and fragment publication/rebuild only; source reopen/index/proof and output audit are outside the clock",
+                "boundary": "prebuilt per-iteration source publication batches and rebuild only; source reopen/index/proof, fragment copies and output audit are outside the clock",
             }),
             "unified_facade_raw_parts_and_publication" => json!({
                 "id": id,
@@ -1203,18 +1236,20 @@ mod probe {
             ],
         );
         let timed_source = source.clone();
-        let timed_part = part.clone();
-        let timed_proof = range_proof.clone();
-        let timed_fragment = fragment.clone();
+        let mut timed_batches = Vec::with_capacity(MAX_ITERATIONS);
+        for _ in 0..MAX_ITERATIONS {
+            let mut timed_publication = XmlSplicePublication::new(part.clone());
+            timed_publication
+                .replace(range_proof.clone(), fragment.clone())
+                .expect("prepared timed replace");
+            timed_batches.push(vec![timed_publication]);
+        }
         (
             json!({ "proof": row_proof, "output_sha256": digest(&output) }),
             move || {
-                let mut publication = XmlSplicePublication::new(timed_part.clone());
-                publication
-                    .replace(timed_proof.clone(), timed_fragment.clone())
-                    .expect("timed replace");
+                let publications = timed_batches.pop().expect("prepared timed splice batch");
                 black_box(
-                    rebuild_package_with_xml_splices(&timed_source, vec![publication], 1 << 20)
+                    rebuild_package_with_xml_splices(&timed_source, publications, 1 << 20)
                         .expect("timed splice"),
                 );
             },
@@ -1419,6 +1454,8 @@ mod probe {
             "routes": rows,
             "families": FAMILY_IDS,
             "negative_cases": negative,
+            "api_era": API_ERA,
+            "namespace_contract": NAMESPACE_CONTRACT,
             "claim_scope": "correctness and reproducible paired protocol only; no native acceptance claim",
             "allocator_enabled": allocation::ENABLED,
         });

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -33,6 +34,19 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             [str(runner.CONSUMER_MANIFEST), str(runner.PROBE_PATH)],
         )
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
+
+    def test_manifest_hashes_match_live_adapter_sources(self) -> None:
+        value = manifest()
+
+        def digest(relative: str) -> str:
+            return hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+
+        self.assertEqual(value["probe"]["sha256"], digest(str(runner.PROBE_PATH)))
+        self.assertEqual(
+            value["source"]["candidate_consumer_manifest_sha256"],
+            digest(str(runner.CONSUMER_MANIFEST)),
+        )
+        self.assertEqual(value["source"]["candidate_lock_sha256"], digest(str(runner.LOCK_PATH)))
 
     def test_manifest_rejects_stale_hashes_and_route_mutation(self) -> None:
         value = manifest()
@@ -65,43 +79,6 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
                 target[key] = changed
             with self.assertRaises(runner.RunnerError, msg=f"mutation {path} was accepted"):
                 runner.validate_manifest(value)
-
-    def test_cli_forwards_separate_adapter_endpoint(self) -> None:
-        captured: dict[str, object] = {}
-
-        class FakeRunner:
-            def __init__(self, **kwargs: object) -> None:
-                captured.update(kwargs)
-
-            def abba(self) -> None:
-                return None
-
-            def build(self) -> None:
-                return None
-
-        original = runner.PairedRunner
-        runner.PairedRunner = FakeRunner  # type: ignore[assignment]
-        try:
-            result = runner.main(
-                [
-                    "--manifest", "/e/manifest.json",
-                    "--preparation", "/e/preparation.json",
-                    "--baseline-root", "/e/baseline",
-                    "--candidate-root", "/e/candidate",
-                    "--adapter-root", "/e/adapter",
-                    "--candidate-commit", "a" * 40,
-                    "--candidate-lock-sha256", "b" * 64,
-                    "--output", "/e/output",
-                    "--target-root", "/e/target",
-                    "--tmp-root", "/e/tmp",
-                    "--cpu", "0",
-                    "--phase", "abba",
-                ]
-            )
-        finally:
-            runner.PairedRunner = original
-        self.assertEqual(result, 0)
-        self.assertEqual(captured["adapter_root"], Path("/e/adapter"))
 
     def test_build_journal_is_variant_major_and_hashed(self) -> None:
         events = [{"event_id": f"build-{key.replace('/', '-')}"} for key in runner._build_keys()]
@@ -144,6 +121,12 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertIn("archive_comment_sha256", probe)
         self.assertIn("version_needed", probe)
         self.assertIn("external_attributes", probe)
+        self.assertIn("select exactly one raw-codec API era", probe)
+        self.assertIn("NAMESPACE_CONTRACT", probe)
+        self.assertIn("legacy_unknown_namespace_event", probe)
+        self.assertIn("document_rejects_undeclared_namespace", probe)
+        self.assertNotIn("Cursor::new(opaque.to_vec())", probe)
+        self.assertNotIn("timed_fragment.clone()", probe)
         self.assertIn("PackageCompression::Stored", probe)
 
 

@@ -26,9 +26,14 @@
       "raw-codec-current",
       "raw-codec-allocator"
     ],
+    "api_eras": ["original", "current"],
+    "namespace_contracts": {
+      "baseline": "legacy_unknown_namespace_event",
+      "candidate": "document_rejects_undeclared_namespace"
+    },
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128,
-    "sha256": "2c69298c04ae48f7ae4de4401d9ca22f174ae151b7dc816f48c64f9a0aaa652b"
+    "sha256": "e2a649f8b0bad9e4236d760466711c32eba8bfdd71f21509ffa47fdfca0d316e"
   },
   "routes": [
     {
@@ -77,7 +82,7 @@
       "id": "raw_xml_splice_merge_publication",
       "family": "splice",
       "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
-      "boundary": "prebuilt source part/range and fragment publication/rebuild only; source reopen/index/proof and output audit are outside the clock"
+      "boundary": "prebuilt per-iteration source publication batches and rebuild only; source reopen/index/proof, fragment copies and output audit are outside the clock"
     },
     {
       "id": "unified_facade_raw_parts_and_publication",

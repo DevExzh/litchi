@@ -115,7 +115,7 @@ EXPECTED_ROUTES = (
         "id": "raw_xml_splice_merge_publication",
         "family": "splice",
         "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
-        "boundary": "prebuilt source part/range and fragment publication/rebuild only; source reopen/index/proof and output audit are outside the clock",
+        "boundary": "prebuilt per-iteration source publication batches and rebuild only; source reopen/index/proof, fragment copies and output audit are outside the clock",
     },
     {
         "id": "unified_facade_raw_parts_and_publication",
@@ -131,6 +131,11 @@ EXPECTED_ROUTES = (
     },
 )
 FAMILY_IDS = ("odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm")
+API_ERAS = ("original", "current")
+NAMESPACE_CONTRACTS = {
+    "baseline": "legacy_unknown_namespace_event",
+    "candidate": "document_rejects_undeclared_namespace",
+}
 ALLOCATOR_COUNTERS = (
     "allocations",
     "deallocations",
@@ -387,6 +392,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     probe_sha = _require_sha(probe.get("sha256"), "probe.sha256", 64)
     if probe.get("features") != ["raw-codec-original", "raw-codec-current", "raw-codec-allocator"]:
         raise RunnerError("manifest feature adapter set differs")
+    if probe.get("api_eras") != list(API_ERAS) or probe.get("namespace_contracts") != NAMESPACE_CONTRACTS:
+        raise RunnerError("manifest API-era namespace contract differs")
     if probe.get("modes") != ["validate", "timed", "allocator"] or probe.get("max_iterations") != PROBE_ITERATIONS:
         raise RunnerError("manifest probe mode/iteration contract differs")
     routes = _validate_route_descriptors(data.get("routes"))
@@ -445,6 +452,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
 def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Mapping[str, Any], baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_commit: str, candidate_lock_sha256: str) -> dict[str, Any]:
     if data.get("schema") != PREPARATION_SCHEMA or data.get("lane") != "odf-raw-codec":
         raise RunnerError("preparation schema/lane differs")
+    if candidate_lock_sha256 != manifest["candidate_lock_sha256"]:
+        raise RunnerError("candidate Cargo.lock argument differs from the manifest identity")
     baseline = data.get("baseline")
     candidate = data.get("candidate")
     if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping):
@@ -588,7 +597,12 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
         "production_manifest": package,
         "probe": probe,
         "lock": lock,
-        "features": ["raw-codec-odf", "raw-codec-original", "raw-codec-current", "raw-codec-allocator"],
+        "features": [
+            "raw-codec-odf",
+            "raw-codec-original" if role == "baseline" else "raw-codec-current",
+        ],
+        "api_era": "original" if role == "baseline" else "current",
+        "namespace_contract": NAMESPACE_CONTRACTS[role],
         "routes": list(manifest["routes"]),
         "families": list(FAMILY_IDS),
     }
@@ -710,7 +724,7 @@ class PairedRunner:
 
     def _assert_endpoint(self, role: str, expected: Mapping[str, Any], *, full: bool = False) -> None:
         actual = self._endpoint(role, full=full)
-        for key in ("commit", "tree", "production_tree_sha256", "source_tree_sha256", "status_sha256", "status_paths", "tracked_closure", "cargo_configs", "consumer_manifest", "production_manifest", "probe", "lock", "features", "routes", "families"):
+        for key in ("commit", "tree", "production_tree_sha256", "production_source_tree_sha256", "source_tree_sha256", "status_sha256", "status_paths", "tracked_closure", "cargo_configs", "consumer_manifest", "production_manifest", "probe", "lock", "features", "api_era", "namespace_contract", "routes", "families"):
             if actual.get(key) != expected.get(key):
                 raise RunnerError(f"{role} source identity changed: {key}")
 
@@ -953,7 +967,7 @@ class PairedRunner:
         receipt["receipt_sha256"] = receipt_sha
         return receipt
 
-    def _validate_probe_output(self, path: Path, mode: str, iterations: int) -> dict[str, Any]:
+    def _validate_probe_output(self, path: Path, mode: str, iterations: int, role: str) -> dict[str, Any]:
         raw = path.read_bytes()
         if not raw or len(raw) > PROBE_MAX_BYTES:
             raise RunnerError(f"probe output is empty or too large: {path}")
@@ -965,6 +979,9 @@ class PairedRunner:
             raise RunnerError("probe output schema/mode/claim identity differs")
         if payload.get("families") != list(FAMILY_IDS):
             raise RunnerError("probe family order differs")
+        expected_era = "original" if role == "baseline" else "current"
+        if payload.get("api_era") != expected_era or payload.get("namespace_contract") != NAMESPACE_CONTRACTS[role]:
+            raise RunnerError("probe API-era namespace contract differs")
         negative = payload.get("negative_cases")
         if not isinstance(negative, Mapping) or any(negative.get(key) is not True for key in self.manifest["phases"]["negative_cases"]):
             raise RunnerError("probe negative-case proof is incomplete")
@@ -1007,7 +1024,7 @@ class PairedRunner:
         stderr = prefix.with_suffix(".stderr")
         command = [str(binary), "--mode", mode, "--route", "all", "--iterations", str(iterations)]
         event = self._run_process(event_id=f"probe-{phase}-{role}-{kind}-{index:03d}", role=role, variant=variant, argv=command, cwd=root, env=env, target=target, stdout_path=output, stderr_path=stderr)
-        payload = self._validate_probe_output(output, mode, iterations)
+        payload = self._validate_probe_output(output, mode, iterations, role)
         self._assert_endpoint(role, build["source"])
         output_sha, output_bytes = _sha256_file(output)
         return {"role": role, "phase": phase, "kind": kind, "index": index, "mode": mode, "iterations": iterations, "command": command, "source": build["source"], "binary": {"path": str(binary), "sha256": binary_sha, "bytes": binary_bytes}, "output": {"path": str(output), "sha256": output_sha, "bytes": output_bytes}, "stderr": event["stderr"], "monitor": event["monitor"], "payload_identity": {"schema": payload["schema"], "mode": payload["mode"], "iterations": payload["iterations"], "routes": [row["route"] for row in payload["routes"]]}, "claim_scope": "paired correctness/protocol evidence only; no native acceptance claim"}

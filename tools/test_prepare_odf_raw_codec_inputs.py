@@ -206,6 +206,110 @@ class OdfRawPreparationTests(unittest.TestCase):
             self.assertEqual(before_candidate, {path: path.read_bytes() for path in before_candidate})
             self.assertFalse((baseline / prep.PROBE_PATH).exists())
 
+    def test_public_prepare_main_to_real_runner_admission(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-raw-cli-composition-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            adapter = root / "adapter"
+            baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
+            candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
+            repository(adapter, probe=b"adapter\n", lock=None, consumer=True)
+            external_lock = root / "baseline.lock"
+            external_lock.write_bytes(b"baseline\n")
+            manifest = json.loads(
+                (Path(__file__).resolve().parents[1] / "tools/native_qualification/manifests/odf-raw-codec.json").read_text(encoding="utf-8")
+            )
+            manifest["baseline_commit"] = baseline_ref
+            manifest["candidate_commit"] = candidate_ref
+            manifest["source"]["candidate_consumer_manifest_sha256"] = hashlib.sha256(
+                (adapter / prep.CONSUMER_MANIFEST).read_bytes()
+            ).hexdigest()
+            manifest["source"]["candidate_lock_sha256"] = hashlib.sha256(b"candidate\n").hexdigest()
+            manifest["probe"]["sha256"] = hashlib.sha256(
+                (adapter / prep.PROBE_PATH).read_bytes()
+            ).hexdigest()
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            preparation_path = root / "preparation.json"
+            old_baseline = prep.BASELINE_COMMIT
+            old_candidate = prep.CANDIDATE_COMMIT
+            old_runner_candidate = runner.CANDIDATE_COMMIT
+            old_build = runner.PairedRunner.build
+            prep.BASELINE_COMMIT = baseline_ref
+            prep.CANDIDATE_COMMIT = candidate_ref
+            runner.CANDIDATE_COMMIT = candidate_ref
+
+            def admit_endpoints(instance: runner.PairedRunner) -> None:
+                instance._endpoint("baseline", full=True)
+                instance._endpoint("candidate", full=True)
+
+            runner.PairedRunner.build = admit_endpoints  # type: ignore[method-assign]
+            try:
+                self.assertEqual(
+                    prep.main(
+                        [
+                            "--baseline-root", str(baseline),
+                            "--candidate-root", str(candidate),
+                            "--adapter-root", str(adapter),
+                            "--candidate-ref", candidate_ref,
+                            "--candidate-lock-sha256", manifest["source"]["candidate_lock_sha256"],
+                            "--baseline-lock", str(external_lock),
+                            "--output", str(preparation_path),
+                        ]
+                    ),
+                    0,
+                )
+                candidate_lock = manifest["source"]["candidate_lock_sha256"]
+                self.assertEqual(
+                    runner.main(
+                        [
+                            "--manifest", str(manifest_path),
+                            "--preparation", str(preparation_path),
+                            "--baseline-root", str(baseline),
+                            "--candidate-root", str(candidate),
+                            "--adapter-root", str(adapter),
+                            "--candidate-commit", candidate_ref,
+                            "--candidate-lock-sha256", candidate_lock,
+                            "--output", str(root / "runner-output"),
+                            "--target-root", str(root / "target"),
+                            "--tmp-root", str(root / "tmp"),
+                            "--cpu", "0",
+                            "--phase", "build",
+                        ]
+                    ),
+                    0,
+                )
+                bad_manifest = dict(manifest)
+                bad_manifest["source"] = dict(manifest["source"])
+                bad_manifest["source"]["candidate_lock_sha256"] = "0" * 64
+                bad_manifest_path = root / "bad-manifest.json"
+                bad_manifest_path.write_text(json.dumps(bad_manifest, indent=2) + "\n", encoding="utf-8")
+                self.assertEqual(
+                    runner.main(
+                        [
+                            "--manifest", str(bad_manifest_path),
+                            "--preparation", str(preparation_path),
+                            "--baseline-root", str(baseline),
+                            "--candidate-root", str(candidate),
+                            "--adapter-root", str(adapter),
+                            "--candidate-commit", candidate_ref,
+                            "--candidate-lock-sha256", candidate_lock,
+                            "--output", str(root / "bad-output"),
+                            "--target-root", str(root / "bad-target"),
+                            "--tmp-root", str(root / "bad-tmp"),
+                            "--cpu", "0",
+                            "--phase", "build",
+                        ]
+                    ),
+                    2,
+                )
+            finally:
+                runner.PairedRunner.build = old_build
+                runner.CANDIDATE_COMMIT = old_runner_candidate
+                prep.BASELINE_COMMIT = old_baseline
+                prep.CANDIDATE_COMMIT = old_candidate
+
 
 if __name__ == "__main__":
     unittest.main()
