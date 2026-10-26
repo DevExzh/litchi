@@ -12,13 +12,8 @@ import unittest
 from unittest import mock
 
 from tools import odg_joined_qualification_builder as BUILDER
+from tools import odg_joined_qualification as RUNTIME
 from tools.test_odg_joined_qualification import write_manifest
-
-
-V4_PACKET_FIXTURE = (
-    Path(__file__).resolve().parents[2]
-    / ".coord/final-C2a-three-lanes-source-only-20261026-v4/odg-fixture-joined-content.xml"
-)
 
 
 def _file_identity(path: Path) -> dict[str, object]:
@@ -28,19 +23,15 @@ def _file_identity(path: Path) -> dict[str, object]:
 
 class ODGSourceBuildHandoffTests(unittest.TestCase):
     def _reviewed_fixture(self) -> Path:
-        # The v4 handoff is the reviewed external fixture.  The tracked copy
-        # keeps this unit module usable in a clean checkout before a handoff
-        # packet is materialized, but the packet is preferred whenever it is
-        # available and has the same fixed identity.
-        if V4_PACKET_FIXTURE.is_file():
-            return V4_PACKET_FIXTURE
+        # Runtime admission deliberately accepts only this fixed reviewed
+        # harness file.  Source endpoints remain separate temporary Git roots.
         return BUILDER.REVIEWED_REPO_ROOT / BUILDER.REVIEWED_FIXTURE_RELATIVE
 
     def _fixture_and_plan(self, root: Path) -> tuple[Path, dict[str, object], dict[str, object]]:
         manifest = write_manifest(root)
         data = json.loads(manifest.read_text(encoding="utf-8"))
-        # Keep the manifest bound to the actual external v4 packet whenever
-        # this handoff is present; do not replace it with a test-local copy.
+        # Keep the source handoff and runtime validator on the same fixed
+        # reviewed harness path; do not replace it with a packet-local copy.
         data["fixture"]["path"] = str(self._reviewed_fixture())
         manifest.write_text(json.dumps(data), encoding="utf-8")
         self.baseline_ref = data["baseline"]["ref"]
@@ -165,6 +156,16 @@ class ODGSourceBuildHandoffTests(unittest.TestCase):
             self.assertTrue(final_manifest.is_file())
             with mock.patch.object(BUILDER, "PRISTINE_BASELINE_REF", self.baseline_ref):
                 BUILDER.validate_build_receipt(final_manifest)
+            parsed = RUNTIME.load_manifest(final_manifest)
+            runtime_output = root / "runtime-output"
+            runtime_output.mkdir()
+            with mock.patch.object(BUILDER, "PRISTINE_BASELINE_REF", self.baseline_ref):
+                identity = RUNTIME.runtime_identity(parsed, runtime_output, require_build_receipt=True)
+            self.assertEqual(identity["fixture"]["path"], str(self._reviewed_fixture()))
+            self.assertEqual(
+                set(identity["probe_sources"]),
+                {"common", "allocator", "baseline", "candidate"},
+            )
 
     def test_seal_rejects_producer_artifact_drift_before_final_admission(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
