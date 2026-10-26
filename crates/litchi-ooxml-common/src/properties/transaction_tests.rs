@@ -1189,7 +1189,7 @@ fn a_stale_patch_conflicts_without_mutation() {
 }
 
 fn source_backed(package: &OpcPackage) -> litchi_opc::SourceBackedPackage {
-    let bytes = litchi_opc::PackageWriter::to_bytes(package).unwrap();
+    let bytes = PackageWriter::to_bytes(package).unwrap();
     litchi_opc::SourceBackedPackage::from_vec(
         bytes,
         litchi_opc::SourceLimits::default(),
@@ -1277,10 +1277,7 @@ fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
         .unwrap()
         .publish_to_stream(&mut exact)
         .unwrap();
-    assert_eq!(
-        exact,
-        litchi_opc::PackageWriter::to_bytes(&package).unwrap()
-    );
+    assert_eq!(exact, PackageWriter::to_bytes(&package).unwrap());
 }
 
 #[test]
