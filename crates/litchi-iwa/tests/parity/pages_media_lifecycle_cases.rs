@@ -729,3 +729,183 @@ fn pages_body_media_read_parity() -> TestResult {
     }
     Ok(())
 }
+
+fn blank_fixture() -> TestResult<Fixture> {
+    Ok(Fixture {
+        path: "source-built: Draft::create_with_text",
+        bytes: pages::Draft::create_with_text("Quarterly report")?.to_bytes()?,
+    })
+}
+
+#[derive(Clone, Copy)]
+enum New {
+    Image,
+    Movie,
+    Audio,
+}
+
+fn image_options() -> TestResult<litchi_pages::image::Options> {
+    Ok(litchi_pages::image::Options::new(
+        litchi_pages::drawable::Point { x: 72.0, y: 96.0 },
+        litchi_pages::drawable::Size {
+            width: 160.0,
+            height: 120.0,
+        },
+    )?)
+}
+
+fn movie_options() -> TestResult<litchi_pages::movie::Options> {
+    Ok(litchi_pages::movie::Options::new(
+        litchi_pages::drawable::Point { x: 96.0, y: 144.0 },
+        litchi_pages::drawable::Size {
+            width: 320.0,
+            height: 180.0,
+        },
+        std::time::Duration::from_secs(8),
+    )?)
+}
+
+fn audio_options() -> TestResult<litchi_pages::audio::Options> {
+    Ok(litchi_pages::audio::Options::new(
+        litchi_pages::drawable::Point { x: 180.0, y: 240.0 },
+        std::time::Duration::from_millis(1_375),
+    )?)
+}
+
+const NEW_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  created-pages-movie";
+const NEW_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCcreated-pages-audio";
+
+fn host_add(source: &[u8], kind: New, png: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = pages::Draft::from_bytes(source)?;
+    match kind {
+        New::Image => drop(editor.add_body_image(0, "photo.png", png, image_options()?)?),
+        New::Movie => drop(editor.add_body_movie(
+            0,
+            "clip.mov",
+            NEW_MOVIE,
+            "frame.png",
+            png,
+            movie_options()?,
+        )?),
+        New::Audio => drop(editor.add_body_audio(0, "sound.aiff", NEW_AUDIO, audio_options()?)?),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_add(source: &[u8], kind: New, png: &[u8]) -> TestResult<LeafRun> {
+    let package = Package::from_bytes(source)?;
+    let mut edit = package.edit_body_media();
+    let at = litchi_pages::TextPosition::from_utf16_index(0)?;
+    match kind {
+        New::Image => drop(edit.add_image(at, "photo.png", png, image_options()?)?),
+        New::Movie => drop(edit.add_movie(
+            at,
+            ("clip.mov", NEW_MOVIE),
+            ("frame.png", png),
+            movie_options()?,
+        )?),
+        New::Audio => drop(edit.add_audio(at, "sound.aiff", NEW_AUDIO, audio_options()?)?),
+    }
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_body_media(&commit.patch().inverse())?;
+    Ok(LeafRun::with_inverse(
+        leaf_bytes!(commit.package()),
+        leaf_bytes!(restored.package()),
+    ))
+}
+
+fn add_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &Fixture,
+    kind: New,
+) -> TestResult {
+    let png = fixture(REPLACEMENT_PNG)?.bytes;
+    let png = &png;
+    Case::new(name, Format::Pages, tier, evidence, input)
+        .host(|source| host_add(source, kind, png))
+        .leaf(|source| leaf_add(source, kind, png))
+        .read("host media", host_media)
+        .read("host body media", host_media_facts)
+        .leaf_structural_metadata()
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_image_add_parity() -> TestResult {
+    add_case(
+        "pages_body_image_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        &blank_fixture()?,
+        New::Image,
+    )?;
+    add_case(
+        "pages_body_image_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(IMAGES)?,
+        New::Image,
+    )
+}
+
+#[test]
+fn pages_body_movie_add_parity() -> TestResult {
+    add_case(
+        "pages_body_movie_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        &blank_fixture()?,
+        New::Movie,
+    )?;
+    add_case(
+        "pages_body_movie_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(IMAGES)?,
+        New::Movie,
+    )
+}
+
+#[test]
+fn pages_body_audio_add_parity() -> TestResult {
+    add_case(
+        "pages_body_audio_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        &blank_fixture()?,
+        New::Audio,
+    )?;
+    add_case(
+        "pages_body_audio_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(IMAGES)?,
+        New::Audio,
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn image_add_cost_abba() -> TestResult {
+    let png = fixture(REPLACEMENT_PNG)?.bytes;
+    crate::pages_cost_probes::abba(
+        &fixture(IMAGES)?,
+        |source| host_add(source, New::Image, &png),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_media();
+            edit.add_image(
+                litchi_pages::TextPosition::from_utf16_index(0)?,
+                "photo.png",
+                &png,
+                image_options()?,
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

@@ -144,6 +144,10 @@ pub enum Refusal {
     /// The asset is not materialized in the package.
     #[error("the media asset is not materialized in this package")]
     NotMaterialized,
+    /// The file name is not a safe basename with a stem, or its extension
+    /// or the data's signature names another media type than the kind.
+    #[error("the media file name or type does not fit the new drawable")]
+    InvalidMedia,
     /// The selector resolves no section.
     #[error("the Pages document has no such section")]
     SectionNotFound,
@@ -171,7 +175,9 @@ impl Refusal {
                 RefusalKind::NotFound
             },
             Self::NotMedia { .. } | Self::NoPoster { .. } => RefusalKind::UnsupportedTarget,
-            Self::EmptyData | Self::MismatchedType => RefusalKind::InvalidValue,
+            Self::EmptyData | Self::MismatchedType | Self::InvalidMedia => {
+                RefusalKind::InvalidValue
+            },
             Self::NotMaterialized => RefusalKind::UnsupportedContent,
             Self::Commented | Self::SharedGraph | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
@@ -230,12 +236,35 @@ impl From<caption::Error> for Error {
 }
 
 /// The staged operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Operation {
     Remove(DrawableSelector),
     Duplicate(DrawableSelector, TextPosition),
     Replace(DrawableSelector, Asset, Arc<[u8]>),
     ReplaceAsset(AssetId, Arc<[u8]>),
+    Add(TextPosition, NewMedia),
+}
+
+/// A new body image, movie or audio clip.
+#[derive(Debug, Clone, PartialEq)]
+enum NewMedia {
+    Image {
+        file_name: Box<str>,
+        data: Arc<[u8]>,
+        options: crate::image::Options,
+    },
+    Movie {
+        file_name: Box<str>,
+        data: Arc<[u8]>,
+        poster_name: Box<str>,
+        poster: Arc<[u8]>,
+        options: crate::movie::Options,
+    },
+    Audio {
+        file_name: Box<str>,
+        data: Arc<[u8]>,
+        options: crate::audio::Options,
+    },
 }
 
 /// Which embedded asset of a drawable a replacement targets.
@@ -349,6 +378,86 @@ impl Edit<'_> {
         self.stage(Operation::ReplaceAsset(asset, Arc::from(data)))
     }
 
+    /// Stage a new body image anchored at a UTF-16 body position, from a
+    /// file name (a safe basename whose extension names an image type) and
+    /// its bytes, placed by `options`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses empty data and a second operation; the file name and type
+    /// are checked at commit.
+    pub fn add_image(
+        &mut self,
+        anchor: TextPosition,
+        file_name: &str,
+        data: &[u8],
+        options: crate::image::Options,
+    ) -> Result<&mut Self, Error> {
+        if data.is_empty() {
+            return Err(Refusal::EmptyData.into());
+        }
+        self.stage(Operation::Add(
+            anchor,
+            NewMedia::Image {
+                file_name: Box::from(file_name),
+                data: Arc::from(data),
+                options,
+            },
+        ))
+    }
+
+    /// Stage a new body movie with its poster image.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_image`].
+    pub fn add_movie(
+        &mut self,
+        anchor: TextPosition,
+        (file_name, data): (&str, &[u8]),
+        (poster_name, poster): (&str, &[u8]),
+        options: crate::movie::Options,
+    ) -> Result<&mut Self, Error> {
+        if data.is_empty() || poster.is_empty() {
+            return Err(Refusal::EmptyData.into());
+        }
+        self.stage(Operation::Add(
+            anchor,
+            NewMedia::Movie {
+                file_name: Box::from(file_name),
+                data: Arc::from(data),
+                poster_name: Box::from(poster_name),
+                poster: Arc::from(poster),
+                options,
+            },
+        ))
+    }
+
+    /// Stage a new body audio clip.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_image`].
+    pub fn add_audio(
+        &mut self,
+        anchor: TextPosition,
+        file_name: &str,
+        data: &[u8],
+        options: crate::audio::Options,
+    ) -> Result<&mut Self, Error> {
+        if data.is_empty() {
+            return Err(Refusal::EmptyData.into());
+        }
+        self.stage(Operation::Add(
+            anchor,
+            NewMedia::Audio {
+                file_name: Box::from(file_name),
+                data: Arc::from(data),
+                options,
+            },
+        ))
+    }
+
     fn stage(&mut self, operation: Operation) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
             return Err(Refusal::OperationAlreadyStaged.into());
@@ -370,6 +479,7 @@ impl Edit<'_> {
                 let identifier = asset_identifier(self.source, selector, asset)?;
                 replace(self.source, identifier, &data)?
             },
+            Operation::Add(anchor, media) => add(self.source, anchor, &media)?,
             Operation::ReplaceAsset(asset, data) => {
                 if !media_assets(self.source, graph::ROOT_OBJECT_IDENTIFIER)?
                     .iter()
@@ -2027,4 +2137,667 @@ fn media_facts(
             size_field(&view, natural, budget)?
         },
     })
+}
+
+const ROOT_MESSAGE_TYPE: u32 = 10_000;
+const ROOT_ZORDER_FIELD: u32 = 20;
+const THEME_MESSAGE_TYPE: u32 = 10_001;
+const STANDARD_VERSION: [u32; 3] = [1, 0, 5];
+const STANDIN_VERSION: [u32; 3] = [10, 1, 0];
+
+/// A minimal protobuf writer for the fixed native payloads authored here.
+#[derive(Default)]
+struct Pb(Vec<u8>);
+
+impl Pb {
+    fn key(&mut self, field: u32, wire: u8) {
+        litchi_iwa_common::varint::encode_varint_into(
+            &mut self.0,
+            (u64::from(field) << 3) | u64::from(wire),
+        );
+    }
+
+    fn varint(mut self, field: u32, value: u64) -> Self {
+        self.key(field, 0);
+        litchi_iwa_common::varint::encode_varint_into(&mut self.0, value);
+        self
+    }
+
+    fn boolean(self, field: u32, value: bool) -> Self {
+        self.varint(field, u64::from(value))
+    }
+
+    fn float(mut self, field: u32, value: f32) -> Self {
+        self.key(field, 5);
+        self.0.extend_from_slice(&value.to_le_bytes());
+        self
+    }
+
+    fn message(mut self, field: u32, payload: &[u8]) -> Self {
+        self.key(field, 2);
+        litchi_iwa_common::varint::encode_varint_into(&mut self.0, payload.len() as u64);
+        self.0.extend_from_slice(payload);
+        self
+    }
+
+    fn reference(self, field: u32, identifier: u64) -> Self {
+        let reference = Pb::default().varint(1, identifier);
+        self.message(field, &reference.0)
+    }
+
+    fn pair(self, field: u32, first: f32, second: f32) -> Self {
+        let pair = Pb::default().float(1, first).float(2, second);
+        self.message(field, &pair.0)
+    }
+}
+
+struct CreationIds {
+    zorder: Option<u64>,
+    drawable: u64,
+    title: u64,
+    caption: u64,
+    attachment: u64,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn drawable_payload(
+    ids: &CreationIds,
+    body: u64,
+    position: crate::drawable::Point,
+    size: crate::drawable::Size,
+    aspect_ratio_locked: bool,
+) -> Vec<u8> {
+    let geometry = Pb::default()
+        .pair(1, position.x, position.y)
+        .pair(2, size.width, size.height)
+        .varint(3, 3)
+        .float(4, 0.0);
+    let wrap = Pb::default()
+        .varint(1, 4)
+        .varint(2, 2)
+        .varint(3, 1)
+        .float(4, 12.0)
+        .float(5, 0.5)
+        .boolean(6, false);
+    Pb::default()
+        .message(1, &geometry.0)
+        .reference(2, body)
+        .message(3, &wrap.0)
+        .boolean(5, false)
+        .boolean(7, aspect_ratio_locked)
+        .reference(10, ids.title)
+        .reference(11, ids.caption)
+        .boolean(12, false)
+        .boolean(13, false)
+        .0
+}
+
+fn new_object(
+    source: &Package,
+    identifier: u64,
+    message_type: u32,
+    data: Vec<u8>,
+    version: [u32; 3],
+    references: Vec<u64>,
+    data_references: Vec<u64>,
+) -> Result<litchi_iwa_core::ArchiveObject, Error> {
+    let mut object = objects::new_object(source, identifier, message_type, data)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or(Error::InvalidSource)?;
+    info.versions = version.to_vec().into();
+    info.object_references = references;
+    info.data_references = data_references;
+    Ok(object)
+}
+
+/// The first image (7) or movie (8) style preset of the document theme.
+fn style_preset(package: &Package, field: u32) -> Result<NonZeroU64, Error> {
+    let mut budget = Budget::new(package)?;
+    let (theme, _) = graph::root_theme(package, &mut budget)?;
+    let index = ObjectIndex::new(package, &mut budget)?;
+    let theme = index.get(theme.ok_or(Error::InvalidSource)?)?;
+    let (_, message) = graph::unique_message(theme.object, THEME_MESSAGE_TYPE)?;
+    let wrapper = budget.parse(&message.data, 1)?;
+    let base = graph::unique_field(&wrapper, 1, 2)?.ok_or(Error::InvalidSource)?;
+    let base = budget.parse(base.payload(), 2)?;
+    let drawing = graph::unique_field(&base, 100, 2)?.ok_or(Error::InvalidSource)?;
+    let drawing = budget.parse(drawing.payload(), 3)?;
+    let preset = drawing
+        .fields()
+        .find(|candidate| candidate.number() == field)
+        .ok_or(Error::InvalidSource)?;
+    if preset.wire_type() != 2 {
+        return Err(Error::InvalidSource);
+    }
+    Ok(graph::parse_reference(preset.payload(), &mut budget)?)
+}
+
+/// A new embedded asset's `Data/` file name (`stem-identifier.extension`).
+fn materialized_name(preferred: &str, identifier: u64) -> Result<String, Error> {
+    let path = std::path::Path::new(preferred);
+    if path.file_name().and_then(|name| name.to_str()) != Some(preferred)
+        || preferred.contains(['\0', '\\'])
+    {
+        return Err(Refusal::InvalidMedia.into());
+    }
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.is_empty())
+        .ok_or(Refusal::InvalidMedia)?;
+    Ok(
+        match path.extension().and_then(|extension| extension.to_str()) {
+            Some(extension) if !extension.is_empty() => format!("{stem}-{identifier}.{extension}"),
+            _ => format!("{stem}-{identifier}"),
+        },
+    )
+}
+
+fn check_type(
+    preferred: &str,
+    data: &[u8],
+    expected: litchi_iwa_common::media::Type,
+) -> Result<(), Error> {
+    let declared = litchi_iwa_common::media::Type::from_extension(
+        std::path::Path::new(preferred)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or(""),
+    );
+    let detected = litchi_iwa_common::media::Type::from_bytes(data);
+    if declared != expected
+        || (detected != litchi_iwa_common::media::Type::Unknown && detected != declared)
+    {
+        return Err(Refusal::InvalidMedia.into());
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
+fn add(
+    source: &Package,
+    anchor: TextPosition,
+    media: &NewMedia,
+) -> Result<(Package, Diagnostics), Error> {
+    use litchi_iwa_common::media::Type;
+    use sha1::Digest as _;
+    let (kind, assets): (DrawableSelector, Vec<(&str, &[u8], Type)>) = match media {
+        NewMedia::Image {
+            file_name, data, ..
+        } => (
+            DrawableSelector::image(0),
+            vec![(file_name.as_ref(), data.as_ref(), Type::Image)],
+        ),
+        NewMedia::Movie {
+            file_name,
+            data,
+            poster_name,
+            poster,
+            ..
+        } => (
+            DrawableSelector::movie(0),
+            vec![
+                (file_name.as_ref(), data.as_ref(), Type::Video),
+                (poster_name.as_ref(), poster.as_ref(), Type::Image),
+            ],
+        ),
+        NewMedia::Audio {
+            file_name, data, ..
+        } => (
+            DrawableSelector::audio(0),
+            vec![(file_name.as_ref(), data.as_ref(), Type::Audio)],
+        ),
+    };
+    for (name, data, expected) in &assets {
+        check_type(name, data, *expected)?;
+    }
+    let anchor = anchor.utf16_index();
+    let archive_limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(graph::map_archive_error)?;
+    let style = style_preset(
+        source,
+        if matches!(kind, DrawableSelector::Image(_)) {
+            7
+        } else {
+            8
+        },
+    )?;
+    let metadata = objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let (body_identifier, left_margin, zorder, body_component) = {
+        let mut budget = Budget::new(source)?;
+        let index = ObjectIndex::new(source, &mut budget)?;
+        let body = graph::resolve_body(&index, &mut budget)?;
+        let zorder = graph::root_zorder(source, &mut budget)?;
+        let component = index.component_name(index.get(body.root.body)?.component_index)?;
+        (
+            body.root.body.get(),
+            body.root.left_margin,
+            zorder,
+            component,
+        )
+    };
+    let first = objects::next_identifier(source, Some(&metadata))?;
+    let graph_first = first + u64::from(zorder.is_none());
+    let ids = CreationIds {
+        zorder: zorder.is_none().then_some(first),
+        drawable: graph_first,
+        title: graph_first + 1,
+        caption: graph_first + 2,
+        attachment: graph_first + 3,
+    };
+
+    // Data assets.
+    let mut metadata_payload = metadata.payload.clone();
+    let mut next_data = objects::max_data_identifier(&metadata_payload)?;
+    let mut members = Vec::new();
+    let mut data_ids = Vec::new();
+    for (name, data, _) in &assets {
+        next_data = next_data.checked_add(1).ok_or(Error::InvalidSource)?;
+        let file_name = materialized_name(name, next_data)?;
+        let member = format!("Data/{file_name}");
+        if source
+            .state
+            .source
+            .package()
+            .iter()
+            .any(|entry| entry.name() == member)
+        {
+            return Err(Error::InvalidSource);
+        }
+        metadata_payload = objects::append_data_info(
+            &metadata_payload,
+            next_data,
+            &sha1::Sha1::digest(data),
+            name,
+            &file_name,
+            data.len() as u64,
+        )?;
+        members.push((member, *data));
+        data_ids.push(next_data);
+    }
+
+    // The drawable graph.
+    let (position, size, aspect) = match media {
+        NewMedia::Image { options, .. } => (options.position(), options.size(), false),
+        NewMedia::Movie { options, .. } => (options.position(), options.size(), true),
+        NewMedia::Audio { options, .. } => (
+            options.position(),
+            crate::drawable::Size {
+                width: 0.0,
+                height: 0.0,
+            },
+            true,
+        ),
+    };
+    let drawable = drawable_payload(&ids, body_identifier, position, size, aspect);
+    let data_reference = |identifier: u64| Pb::default().varint(1, identifier).0;
+    let payload = match media {
+        NewMedia::Image { options, .. } => {
+            let natural = options.natural_size();
+            Pb::default()
+                .message(1, &drawable)
+                .reference(3, style.get())
+                .pair(4, natural.width, natural.height)
+                .varint(7, 0)
+                .pair(9, natural.width, natural.height)
+                .message(11, &data_reference(data_ids[0]))
+                .0
+        },
+        _ => {
+            let audio = matches!(media, NewMedia::Audio { .. });
+            let (duration, natural) = match media {
+                NewMedia::Movie { options, .. } => {
+                    (options.duration_seconds(), options.natural_size())
+                },
+                NewMedia::Audio { options, .. } => (
+                    options.duration_seconds(),
+                    crate::drawable::Size {
+                        width: 0.0,
+                        height: 0.0,
+                    },
+                ),
+                NewMedia::Image { .. } => return Err(Error::InvalidSource),
+            };
+            let mut payload = Pb::default()
+                .message(1, &drawable)
+                .float(3, 0.0)
+                .float(4, duration)
+                .float(5, 0.0)
+                .float(7, 1.0)
+                .boolean(9, audio)
+                .varint(13, 0)
+                .message(14, &data_reference(data_ids[0]));
+            if !audio {
+                payload = payload.message(15, &data_reference(data_ids[1]));
+            }
+            payload
+                .boolean(18, false)
+                .reference(19, style.get())
+                .pair(20, natural.width, natural.height)
+                .pair(21, natural.width, natural.height)
+                .boolean(23, !audio)
+                .varint(24, 0)
+                .0
+        },
+    };
+    let message_type = graph::message_type(kind);
+    let attachment = Pb::default()
+        .reference(1, ids.drawable)
+        .varint(2, 0)
+        .float(3, position.x - left_margin.unwrap_or_default())
+        .varint(4, 1)
+        .float(5, position.y)
+        .0;
+    let mut archives: Vec<(Arc<str>, Archive)> = Vec::new();
+    {
+        let archive = editable(source, &mut archives, &body_component)?;
+        if let Some(zorder) = ids.zorder {
+            archive
+                .insert_object(
+                    new_object(
+                        source,
+                        zorder,
+                        ZORDER_MESSAGE_TYPE,
+                        Vec::new(),
+                        STANDARD_VERSION,
+                        Vec::new(),
+                        Vec::new(),
+                    )?,
+                    archive_limits,
+                )
+                .map_err(graph::map_core_error)?;
+            let root = archive
+                .object_mut(graph::ROOT_OBJECT_IDENTIFIER)
+                .ok_or(Error::InvalidSource)?;
+            let (index, message) = graph::unique_message(root, ROOT_MESSAGE_TYPE)?;
+            let data = litchi_iwa_common::wire::patch_length_delimited_field(
+                &message.data,
+                ROOT_ZORDER_FIELD,
+                false,
+                Some(&Pb::default().varint(1, zorder).0),
+            )
+            .map_err(graph::map_wire_error)?;
+            root.replace_message_preserving_header(
+                index,
+                RawMessage {
+                    type_: ROOT_MESSAGE_TYPE,
+                    data,
+                },
+                archive_limits,
+            )
+            .map_err(graph::map_core_error)?;
+            add_reference(
+                &mut root
+                    .archive_info
+                    .message_infos
+                    .get_mut(index)
+                    .ok_or(Error::InvalidSource)?
+                    .object_references,
+                zorder,
+            );
+        }
+        for object in [
+            new_object(
+                source,
+                ids.drawable,
+                message_type,
+                payload,
+                STANDARD_VERSION,
+                vec![ids.title, ids.caption, style.get()],
+                data_ids.clone(),
+            )?,
+            new_object(
+                source,
+                ids.title,
+                STANDIN_MESSAGE_TYPE,
+                Vec::new(),
+                STANDIN_VERSION,
+                Vec::new(),
+                Vec::new(),
+            )?,
+            new_object(
+                source,
+                ids.caption,
+                STANDIN_MESSAGE_TYPE,
+                Vec::new(),
+                STANDIN_VERSION,
+                Vec::new(),
+                Vec::new(),
+            )?,
+            new_object(
+                source,
+                ids.attachment,
+                graph::DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
+                attachment,
+                STANDARD_VERSION,
+                vec![ids.drawable],
+                Vec::new(),
+            )?,
+        ] {
+            archive
+                .insert_object(object, archive_limits)
+                .map_err(graph::map_core_error)?;
+        }
+    }
+
+    // The U+FFFC, the attachment entry and the z-order entry.
+    insert_anchor(
+        source,
+        &mut archives,
+        anchor,
+        ids.attachment,
+        archive_limits,
+    )?;
+    let zorder_identifier = zorder.map_or(ids.zorder.unwrap_or(0), NonZeroU64::get);
+    append_zorder(
+        source,
+        &mut archives,
+        zorder_identifier,
+        &body_component,
+        ids.drawable,
+        archive_limits,
+    )?;
+
+    // Package metadata.
+    let staged_metadata = objects::Metadata::with_payload(&metadata, metadata_payload);
+    let mut payload = staged_metadata.registered(
+        source,
+        DOCUMENT_COMPONENT_IDENTIFIER,
+        &[ids.drawable, ids.title, ids.caption],
+        ids.attachment,
+    )?;
+    for data in &data_ids {
+        payload = objects::adjust_data_reference(
+            &payload,
+            DOCUMENT_COMPONENT_IDENTIFIER,
+            *data,
+            ids.drawable,
+            true,
+        )?;
+    }
+    {
+        let mut budget = Budget::new(source)?;
+        let index = ObjectIndex::new(source, &mut budget)?;
+        let style_component = index.component_name(index.get(style)?.component_index)?;
+        if let Some(component) = metadata.component_for_entry(&style_component)?
+            && component != DOCUMENT_COMPONENT_IDENTIFIER
+        {
+            payload = objects::add_external_reference(
+                &payload,
+                DOCUMENT_COMPONENT_IDENTIFIER,
+                component,
+                style.get(),
+            )?;
+        }
+    }
+    {
+        let archive = editable(source, &mut archives, &metadata.component)?;
+        archive
+            .object_mut(metadata.object)
+            .ok_or(Error::InvalidSource)?
+            .replace_message_preserving_header(
+                metadata.message_index,
+                RawMessage {
+                    type_: METADATA_MESSAGE_TYPE,
+                    data: payload,
+                },
+                archive_limits,
+            )
+            .map_err(graph::map_core_error)?;
+    }
+    let insertions = members
+        .iter()
+        .map(|(name, data)| (name.as_str(), *data))
+        .collect::<Vec<_>>();
+    let candidate = graph::publish_changes(source, archives, &insertions, &[], &[])?;
+    if !resolve_drawable(&candidate, kind, NonZeroU64::new(ids.drawable))? {
+        return Err(Error::Verification);
+    }
+    Ok((
+        candidate,
+        Diagnostics {
+            changed: true,
+            created_objects: 4 + usize::from(ids.zorder.is_some()),
+            ..Diagnostics::default()
+        },
+    ))
+}
+
+/// Insert a U+FFFC at `anchor` and its attachment entry (shared by
+/// duplication and creation).
+fn insert_anchor(
+    source: &Package,
+    archives: &mut Vec<(Arc<str>, Archive)>,
+    anchor: u32,
+    attachment: u64,
+    archive_limits: litchi_iwa_core::Limits,
+) -> Result<(), Error> {
+    let (mut storage, _) = objects::body_storage(source)?;
+    let removed = objects::splice_text(source, &mut storage, anchor, anchor, "\u{fffc}")?;
+    if !removed.is_empty() {
+        return Err(Error::InvalidSource);
+    }
+    let payload = with_attachment_entry(&storage.payload, anchor, attachment)?;
+    let existing = {
+        let mut budget = Budget::new(source)?;
+        let index = ObjectIndex::new(source, &mut budget)?;
+        graph::resolve_body(&index, &mut budget)?
+            .anchors
+            .iter()
+            .map(|anchor| anchor.attachment.get())
+            .collect::<HashSet<_>>()
+    };
+    let archive = editable(source, archives, &storage.component)?;
+    let object = archive
+        .object_mut(storage.identifier.get())
+        .ok_or(Error::InvalidSource)?;
+    object
+        .replace_message_preserving_header(
+            storage.message_index,
+            RawMessage {
+                type_: storage.message_type,
+                data: payload,
+            },
+            archive_limits,
+        )
+        .map_err(graph::map_core_error)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get_mut(storage.message_index)
+        .ok_or(Error::InvalidSource)?;
+    add_reference(&mut info.object_references, attachment);
+    for field in &mut info.field_infos {
+        if field
+            .object_references
+            .iter()
+            .any(|identifier| existing.contains(identifier))
+        {
+            add_reference(&mut field.object_references, attachment);
+        }
+    }
+    Ok(())
+}
+
+/// Append `drawable` to the document z-order (shared by duplication and
+/// creation); `fallback` is the component of a z-order created in this
+/// candidate.
+fn append_zorder(
+    source: &Package,
+    archives: &mut Vec<(Arc<str>, Archive)>,
+    zorder: u64,
+    fallback: &str,
+    drawable: u64,
+    archive_limits: litchi_iwa_core::Limits,
+) -> Result<(), Error> {
+    let component = {
+        let mut budget = Budget::new(source)?;
+        let index = ObjectIndex::new(source, &mut budget)?;
+        match NonZeroU64::new(zorder).map(|identifier| index.get(identifier)) {
+            Some(Ok(located)) => index.component_name(located.component_index)?,
+            _ => Arc::from(fallback),
+        }
+    };
+    let archive = editable(source, archives, &component)?;
+    let object = archive.object_mut(zorder).ok_or(Error::InvalidSource)?;
+    let (message_index, message) = graph::unique_message(object, ZORDER_MESSAGE_TYPE)?;
+    let previous = litchi_iwa_common::wire::repeated_length_delimited_payloads(
+        &message.data,
+        ZORDER_DRAWABLES_FIELD,
+    )
+    .map_err(graph::map_wire_error)?
+    .into_iter()
+    .filter_map(|reference| {
+        litchi_iwa_common::wire::WireView::parse(
+            reference,
+            litchi_iwa_common::WireLimits::default(),
+        )
+        .ok()
+        .and_then(|view| {
+            view.fields()
+                .find(|field| field.number() == 1)
+                .and_then(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+                .map(|(value, _)| value)
+        })
+    })
+    .collect::<HashSet<_>>();
+    let data = litchi_iwa_common::wire::append_repeated_length_delimited_field(
+        &message.data,
+        ZORDER_DRAWABLES_FIELD,
+        &reference_payload(drawable),
+    )
+    .map_err(graph::map_wire_error)?;
+    object
+        .replace_message_preserving_header(
+            message_index,
+            RawMessage {
+                type_: ZORDER_MESSAGE_TYPE,
+                data,
+            },
+            archive_limits,
+        )
+        .map_err(graph::map_core_error)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get_mut(message_index)
+        .ok_or(Error::InvalidSource)?;
+    add_reference(&mut info.object_references, drawable);
+    for field in &mut info.field_infos {
+        if field
+            .object_references
+            .iter()
+            .any(|identifier| previous.contains(identifier))
+        {
+            add_reference(&mut field.object_references, drawable);
+        }
+    }
+    Ok(())
 }

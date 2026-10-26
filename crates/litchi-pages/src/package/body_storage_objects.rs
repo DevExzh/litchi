@@ -362,6 +362,23 @@ impl Metadata {
 }
 
 impl Metadata {
+    /// These facts over a staged payload (the UUID, component and watermark
+    /// facts are the source's).
+    pub(crate) fn with_payload(source: &Self, payload: Vec<u8>) -> Self {
+        Self {
+            component: Arc::clone(&source.component),
+            object: source.object,
+            message_index: source.message_index,
+            payload,
+            last: source.last,
+            max_registered: source.max_registered,
+            components: source.components.clone(),
+            uuids: source.uuids.clone(),
+            uuid_bits: source.uuid_bits.clone(),
+            data_metadata_map: source.data_metadata_map,
+        }
+    }
+
     /// The payload with fresh UUID registrations for `objects` in the
     /// current component `component` and the watermark raised to
     /// `new_last` (the host's `add_component_object_uuids` followed by
@@ -923,4 +940,99 @@ pub(crate) fn data_owners(payload: &[u8]) -> GraphResult<Vec<(u64, u64)>> {
         }
     }
     Ok(owners)
+}
+
+/// Add `component`'s external reference to `object` in `target` unless it
+/// is already listed (the host's `add_component_external_reference`).
+pub(crate) fn add_external_reference(
+    payload: &[u8],
+    component: u64,
+    target: u64,
+    object: u64,
+) -> GraphResult<Vec<u8>> {
+    let mut reference = Vec::new();
+    litchi_iwa_common::wire::append_varint_field(&mut reference, EXTERNAL_COMPONENT_FIELD, target)
+        .map_err(map_wire_error)?;
+    litchi_iwa_common::wire::append_varint_field(&mut reference, EXTERNAL_OBJECT_FIELD, object)
+        .map_err(map_wire_error)?;
+    let mut matched = 0usize;
+    let output =
+        transform_length_delimited_fields_at_path(payload, &[METADATA_COMPONENTS_FIELD], |info| {
+            if view_varint(info, COMPONENT_IDENTIFIER_FIELD)? != Some(component) {
+                return Ok(info.to_vec());
+            }
+            matched += 1;
+            let existing =
+                repeated_length_delimited_payloads(info, COMPONENT_EXTERNAL_REFERENCES_FIELD)?;
+            if existing.contains(&reference.as_slice()) {
+                return Ok(info.to_vec());
+            }
+            litchi_iwa_common::wire::append_repeated_length_delimited_field(
+                info,
+                COMPONENT_EXTERNAL_REFERENCES_FIELD,
+                &reference,
+            )
+        })
+        .map_err(map_wire_error)?;
+    if matched != 1 {
+        return Err(GraphError::InvalidSource);
+    }
+    Ok(output)
+}
+
+/// The largest `DataInfo` identifier of a metadata payload (0 for none).
+pub(crate) fn max_data_identifier(payload: &[u8]) -> GraphResult<u64> {
+    let mut maximum = 0;
+    for info in
+        repeated_length_delimited_payloads(payload, METADATA_DATAS_FIELD).map_err(map_wire_error)?
+    {
+        maximum = maximum.max(
+            view_varint(info, DATA_INFO_IDENTIFIER_FIELD)
+                .map_err(map_wire_error)?
+                .ok_or(GraphError::InvalidSource)?,
+        );
+    }
+    Ok(maximum)
+}
+
+/// The metadata payload with a new `DataInfo` appended (the host's
+/// `append_data_info`).
+pub(crate) fn append_data_info(
+    payload: &[u8],
+    data: u64,
+    digest: &[u8],
+    preferred_file_name: &str,
+    file_name: &str,
+    length: u64,
+) -> GraphResult<Vec<u8>> {
+    let limits = litchi_iwa_common::WireLimits::default();
+    let mut info = Vec::new();
+    litchi_iwa_common::wire::append_varint_field(&mut info, DATA_INFO_IDENTIFIER_FIELD, data)
+        .map_err(map_wire_error)?;
+    litchi_iwa_common::wire::append_length_delimited_field(&mut info, 2, digest, limits)
+        .map_err(map_wire_error)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut info,
+        3,
+        preferred_file_name.as_bytes(),
+        limits,
+    )
+    .map_err(map_wire_error)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut info,
+        DATA_INFO_FILE_NAME_FIELD,
+        file_name.as_bytes(),
+        limits,
+    )
+    .map_err(map_wire_error)?;
+    litchi_iwa_common::wire::append_varint_field(&mut info, 18, length).map_err(map_wire_error)?;
+    let mut output = payload.to_vec();
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut output,
+        METADATA_DATAS_FIELD,
+        &info,
+        limits,
+    )
+    .map_err(map_wire_error)?;
+    Ok(output)
 }
