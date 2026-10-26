@@ -916,7 +916,9 @@ def _environment_identity(
     }
 
 
-def _command(endpoint: Mapping[str, Any], *, allocator: bool, cpu: int) -> dict[str, Any]:
+def _command(
+    endpoint: Mapping[str, Any], *, allocator: bool, cpu: int, tmpdir: Path | None = None,
+) -> dict[str, Any]:
     target = endpoint["allocator_target_dir"] if allocator else endpoint["target_dir"]
     features = endpoint["features"]
     command = [
@@ -927,13 +929,21 @@ def _command(endpoint: Mapping[str, Any], *, allocator: bool, cpu: int) -> dict[
     ]
     if features:
         command.extend(("--features", ",".join(features)))
+    environment = {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_TERM_COLOR": "never",
+        "RUSTFLAGS": "--cfg odg_joined_allocator" if allocator else "",
+    }
+    if tmpdir is not None:
+        environment.update({
+            "CARGO_BUILD_JOBS": "1",
+            "CARGO_PROFILE_RELEASE_DEBUG": "0",
+            "LITCHI_MEM_MAX": "20G",
+            "TMPDIR": str(tmpdir),
+        })
     return {
         "argv": command,
-        "environment": {
-            "CARGO_INCREMENTAL": "0",
-            "CARGO_TERM_COLOR": "never",
-            "RUSTFLAGS": "--cfg odg_joined_allocator" if allocator else "",
-        },
+        "environment": environment,
     }
 
 
@@ -1158,7 +1168,7 @@ def _source_preparation_plan(
         endpoints[name] = endpoint_state
         commands[name] = {}
         for kind, allocator in (("normal", False), ("allocator", True)):
-            command = _command(endpoint, allocator=allocator, cpu=cpu)
+            command = _command(endpoint, allocator=allocator, cpu=cpu, tmpdir=tmpdir)
             overrides = dict(command["environment"])
             overrides.update({
                 "CARGO_BUILD_JOBS": "1",
@@ -1516,11 +1526,16 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
     for root in (Path(baseline["root"]), Path(candidate["root"])):
         _outside(prepare_receipt, root, "prepare receipt")
         _outside(receipt, root, "build receipt")
+    runtime = _object(raw.get("runtime"), "manifest.runtime")
+    runtime_tmpdir = _safe_path(
+        _raw_path(runtime.get("tmpdir"), "manifest.runtime.tmpdir", base),
+        "manifest.runtime.tmpdir",
+    )
     commands = {
-        "baseline": {"normal": _command(baseline, allocator=False, cpu=cpu),
-                     "allocator": _command(baseline, allocator=True, cpu=cpu)},
-        "candidate": {"normal": _command(candidate, allocator=False, cpu=cpu),
-                       "allocator": _command(candidate, allocator=True, cpu=cpu)},
+        "baseline": {"normal": _command(baseline, allocator=False, cpu=cpu, tmpdir=runtime_tmpdir),
+                     "allocator": _command(baseline, allocator=True, cpu=cpu, tmpdir=runtime_tmpdir)},
+        "candidate": {"normal": _command(candidate, allocator=False, cpu=cpu, tmpdir=runtime_tmpdir),
+                       "allocator": _command(candidate, allocator=True, cpu=cpu, tmpdir=runtime_tmpdir)},
     }
     for name, endpoint in (("baseline", baseline), ("candidate", candidate)):
         for kind in ("normal", "allocator"):
