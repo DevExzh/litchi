@@ -41,6 +41,9 @@ pub mod table_merges;
 pub mod formula_graph;
 /// Formula-owner identities and the canonical empty table owner (record 0368).
 pub mod formula_owner;
+/// Source-preserving object-reference rewrites for table duplication and
+/// removal (record 0368).
+pub mod table_lifecycle;
 
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
