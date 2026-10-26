@@ -10,12 +10,22 @@ so an intentional dirty-worktree refusal escaped `assertRaises`. Package
 qualified imports are now preferred, with the top-level form retained only for
 direct execution from the tools directory.
 
-The DrawingML reviewed-adapter table still pinned the pre-DOCX/ODF
-`tools/perf-baseline/Cargo.toml` identity. The checked-in shared consumer now
-has SHA-256
+The DrawingML reviewed-adapter table still pinned the pre-ODF
+`tools/perf-baseline/Cargo.toml` identity (`61e103…`). The accepted ODF
+consumer lane adds the ten-format `raw-codec-odf` feature set, its original /
+current / allocator selectors, and the `odf_raw_codec_qualification` example.
+The resulting checked-in shared consumer has SHA-256
 `f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a`, so the
-candidate identity is updated while detached historical RTF manifest pins
-remain unchanged.
+DrawingML candidate identity is updated while detached historical RTF manifest
+pins remain unchanged.
+
+The separate DOCX metadata lane is still unmerged at this checkpoint. Its
+manifest additions (`docx-metadata-native` and `docx-metadata-alloc`) produce
+the next candidate manifest SHA-256
+`e98ad3e8d0367c5faba021bec5ee2fcfb48ec2f908846db31fadfae94f03483f`.
+The final DOCX integration commit must update this DrawingML static pin to
+that value together with the manifest additions; changing the RTF historical
+adapter pin is incorrect.
 
 Source-only validation on the leaf passes `git diff --check`, the direct and
 combined PPT lazy unit tests, the DrawingML reviewed-hash test, the legacy and
