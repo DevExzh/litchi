@@ -120,6 +120,7 @@ enum Change {
     Direction(Direction),
     Geometry(Geometry),
     Remove,
+    Duplicate,
 }
 
 #[derive(Clone, Copy)]
@@ -252,6 +253,22 @@ impl<'a> Edit<'a> {
         self.stage(slide.into(), chart.into(), Change::Remove)
     }
 
+    /// Stage a copy of one chart on its slide, offset by ten points (host
+    /// `duplicate_slide_chart`): the copy gets fresh drawable, title and
+    /// caption, style and preset identities, registered like the source's,
+    /// and its own data grid and frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors.
+    pub fn duplicate<'s, 'c>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        chart: impl Into<ChartSelector<'c>>,
+    ) -> Result<&mut Self, Error> {
+        self.stage(slide.into(), chart.into(), Change::Duplicate)
+    }
+
     /// Apply every staged operation, publish one candidate, reopen it and
     /// read the touched charts back.
     ///
@@ -355,12 +372,16 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
             removed += 1;
             continue;
         }
+        if matches!(operation.change, Change::Duplicate) {
+            duplicate_chart(&mut workspace, source, operation.chart)?;
+            continue;
+        }
         let payload = workspace
             .payload(operation.chart, CHART_MESSAGE_TYPE)
             .map_err(lift)?
             .to_vec();
         let data = match operation.change {
-            Change::Remove => unreachable!("handled above"),
+            Change::Remove | Change::Duplicate => unreachable!("handled above"),
             Change::Kind(kind) => edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
                 fields.set_varint(CHART_TYPE, native(kind.native_value()));
                 Ok(())
@@ -430,7 +451,7 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
                 (geometry.x, geometry.y, geometry.width, geometry.height)
                     == (expected.x, expected.y, expected.width, expected.height)
             }),
-            Change::Remove => true,
+            Change::Remove | Change::Duplicate => true,
         };
         if !ok {
             return Err(Error::Verification);
@@ -523,6 +544,334 @@ fn drop_references(
         field.object_references.retain(|id| !removed.contains(id));
     }
     Ok(count)
+}
+
+/// The chart's private graph inside its component, in the host's
+/// `chart_graph` order: the drawable, its caption graph, its title
+/// stand-in, then the chart's styles in `TSCH.ChartArchive` field order;
+/// anything else of the closure follows in identifier order.
+fn chart_graph(workspace: &Workspace<'_>, chart: u64) -> Result<(u64, Vec<u64>), Error> {
+    let wire = workspace.wire;
+    let member = workspace.component_of(chart).ok_or(Error::InvalidSource)?;
+    let internal = workspace
+        .member_objects(&member)
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let payload = workspace.payload(chart, CHART_MESSAGE_TYPE).map_err(lift)?;
+    let fields = Fields::parse(payload, wire).map_err(lift)?;
+    let drawable = fields
+        .unique(CHART_DRAWABLE)
+        .map_err(lift)?
+        .ok_or(Error::InvalidSource)?;
+    let drawable = Fields::parse(drawable.message().map_err(lift)?, wire).map_err(lift)?;
+    let parent = reference_of(&drawable, 2, wire)?.ok_or(Error::InvalidSource)?;
+    let reachable = |root: u64| -> Result<Vec<u64>, Error> {
+        let mut found = vec![root];
+        let mut seen = std::collections::BTreeSet::from([root, parent]);
+        let mut index = 0;
+        while index < found.len() {
+            for target in
+                super::slide_drawable::outgoing_references(workspace, found[index]).map_err(lift)?
+            {
+                if internal.contains(&target) && seen.insert(target) {
+                    found.push(target);
+                }
+            }
+            index += 1;
+        }
+        Ok(found)
+    };
+    let closure = reachable(chart)?
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut ordered = vec![chart];
+    let push = |id: u64, ordered: &mut Vec<u64>| {
+        if closure.contains(&id) && !ordered.contains(&id) {
+            ordered.push(id);
+        }
+    };
+    if let Some(caption) = reference_of(&drawable, 11, wire)? {
+        if internal.contains(&caption) {
+            for id in reachable(caption)? {
+                push(id, &mut ordered);
+            }
+        }
+    }
+    if let Some(title) = reference_of(&drawable, 10, wire)? {
+        push(title, &mut ordered);
+    }
+    if let Some(unity) = fields.unique(CHART_UNITY).map_err(lift)? {
+        let unity = Fields::parse(unity.message().map_err(lift)?, wire).map_err(lift)?;
+        for number in [4, 9, 10, 11, 12, 13, 14, 15, 16, 17] {
+            for field in unity.all(number) {
+                let id = super::structure::wire::reference_identifier(
+                    field.message().map_err(lift)?,
+                    wire,
+                )
+                .map_err(lift)?;
+                push(id, &mut ordered);
+            }
+        }
+        for number in [18, 19] {
+            if let Some(sparse) = unity.unique(number).map_err(lift)? {
+                let sparse = Fields::parse(sparse.message().map_err(lift)?, wire).map_err(lift)?;
+                for entry in sparse.all(2) {
+                    let entry =
+                        Fields::parse(entry.message().map_err(lift)?, wire).map_err(lift)?;
+                    if let Some(id) = reference_of(&entry, 2, wire)? {
+                        push(id, &mut ordered);
+                    }
+                }
+            }
+        }
+    }
+    for id in &closure {
+        push(*id, &mut ordered);
+    }
+    Ok((parent, ordered))
+}
+
+/// The theme, its chart-preset list and the document stylesheet.
+fn theme_and_stylesheet(
+    workspace: &Workspace<'_>,
+    source: &Package,
+) -> Result<(u64, Vec<u64>, u64, Vec<u64>), Error> {
+    let wire = workspace.wire;
+    let show = source
+        .root_show_identifier()
+        .map_err(|_| Error::InvalidSource)?;
+    let show = Fields::parse(
+        workspace.payload(show, SHOW_MESSAGE_TYPE).map_err(lift)?,
+        wire,
+    )
+    .map_err(lift)?;
+    let theme = reference_of(&show, SHOW_THEME, wire)?.ok_or(Error::InvalidSource)?;
+    let theme_fields = Fields::parse(
+        workspace.payload(theme, THEME_MESSAGE_TYPE).map_err(lift)?,
+        wire,
+    )
+    .map_err(lift)?;
+    let theme_super = theme_fields
+        .unique(THEME_SUPER)
+        .map_err(lift)?
+        .ok_or(Error::InvalidSource)?;
+    let theme_super = Fields::parse(theme_super.message().map_err(lift)?, wire).map_err(lift)?;
+    let stylesheet =
+        reference_of(&theme_super, THEME_DOCUMENT_STYLESHEET, wire)?.ok_or(Error::InvalidSource)?;
+    let references = |fields: &Fields, number| -> Result<Vec<u64>, Error> {
+        fields
+            .all(number)
+            .map(|field| {
+                super::structure::wire::reference_identifier(field.message().map_err(lift)?, wire)
+                    .map_err(lift)
+            })
+            .collect()
+    };
+    let presets = match theme_super.unique(THEME_CHART_PRESETS).map_err(lift)? {
+        Some(presets) => references(
+            &Fields::parse(presets.message().map_err(lift)?, wire).map_err(lift)?,
+            1,
+        )?,
+        None => Vec::new(),
+    };
+    let styles = references(
+        &Fields::parse(
+            workspace
+                .payload(stylesheet, STYLESHEET_MESSAGE_TYPE)
+                .map_err(lift)?,
+            wire,
+        )
+        .map_err(lift)?,
+        STYLESHEET_STYLES,
+    )?;
+    Ok((theme, presets, stylesheet, styles))
+}
+
+/// Append references to a repeated field at `path` and to the header.
+fn append_references(
+    workspace: &mut Workspace<'_>,
+    object: u64,
+    message_type: u32,
+    path: &[u32],
+    number: u32,
+    added: &[u64],
+) -> Result<(), Error> {
+    if added.is_empty() {
+        return Ok(());
+    }
+    let wire = workspace.wire;
+    let payload = workspace
+        .payload(object, message_type)
+        .map_err(lift)?
+        .to_vec();
+    let data = edit_nested(&payload, path, wire, &mut |fields| {
+        let mut values = fields
+            .all(number)
+            .map(|field| field.message().map(<[u8]>::to_vec))
+            .collect::<Result<Vec<_>, _>>()?;
+        values.extend(
+            added
+                .iter()
+                .map(|id| super::structure::wire::reference(*id)),
+        );
+        fields.replace_all(number, super::structure::wire::LENGTH_DELIMITED, &values);
+        Ok(())
+    })
+    .map_err(lift)?;
+    super::slide_drawable::replace_message_payload(workspace, object, message_type, data)
+        .map_err(lift)?;
+    let target = workspace.object_mut(object).map_err(lift)?;
+    let index = target
+        .messages
+        .iter()
+        .position(|message| message.type_ == message_type)
+        .ok_or(Error::InvalidSource)?;
+    let info = &mut target.archive_info.message_infos[index];
+    for id in added {
+        if !info.object_references.contains(id) {
+            info.object_references.push(*id);
+        }
+    }
+    Ok(())
+}
+
+const DUPLICATE_OFFSET: f32 = 10.0;
+
+/// Duplicate one chart (host `duplicate_slide_chart`).
+fn duplicate_chart(
+    workspace: &mut Workspace<'_>,
+    source: &Package,
+    chart: u64,
+) -> Result<(), Error> {
+    let wire = workspace.wire;
+    let member = workspace.component_of(chart).ok_or(Error::InvalidSource)?;
+    let (slide, objects) = chart_graph(workspace, chart)?;
+    let mut remap = std::collections::HashMap::with_capacity(objects.len());
+    for object in &objects {
+        remap.insert(*object, workspace.allocate().map_err(lift)?);
+    }
+    for object in &objects {
+        let original = workspace.require(*object).map_err(lift)?.clone();
+        let clone = workspace
+            .clone_object(&original, remap[object], &remap)
+            .map_err(lift)?;
+        workspace.insert(&member, clone).map_err(lift)?;
+    }
+    let copy = remap[&chart];
+    // The copy's frame, offset like Keynote's Duplicate.
+    let payload = workspace
+        .payload(copy, CHART_MESSAGE_TYPE)
+        .map_err(lift)?
+        .to_vec();
+    let geometry = chart_values(&payload, wire)?
+        .2
+        .ok_or(Error::InvalidSource)?;
+    let offset = Geometry {
+        x: geometry.x + DUPLICATE_OFFSET,
+        y: geometry.y + DUPLICATE_OFFSET,
+        ..geometry
+    };
+    let data = edit_nested(
+        &payload,
+        &[CHART_DRAWABLE, DRAWABLE_GEOMETRY],
+        wire,
+        &mut |fields| super::slide_drawable::patch_geometry_fields(fields, offset, wire),
+    )
+    .map_err(lift)?;
+    super::slide_drawable::replace_message_payload(workspace, copy, CHART_MESSAGE_TYPE, data)
+        .map_err(lift)?;
+    super::slide_drawable::attach_drawable(workspace, slide, copy).map_err(lift)?;
+    // Styles and preset registered like the source's.
+    let (theme, presets, stylesheet, styles) = theme_and_stylesheet(workspace, source)?;
+    let new_styles = objects
+        .iter()
+        .filter(|object| styles.contains(object))
+        .map(|object| remap[object])
+        .collect::<Vec<_>>();
+    append_references(
+        workspace,
+        stylesheet,
+        STYLESHEET_MESSAGE_TYPE,
+        &[],
+        STYLESHEET_STYLES,
+        &new_styles,
+    )?;
+    let new_presets = objects
+        .iter()
+        .filter(|object| presets.contains(object))
+        .map(|object| remap[object])
+        .collect::<Vec<_>>();
+    append_references(
+        workspace,
+        theme,
+        THEME_MESSAGE_TYPE,
+        &[THEME_SUPER, THEME_CHART_PRESETS],
+        1,
+        &new_presets,
+    )?;
+    // Registry: external references, UUIDs and data owners of the copy.
+    let component_of = |workspace: &Workspace<'_>, object: u64| -> Result<u64, Error> {
+        let member = workspace.component_of(object).ok_or(Error::InvalidSource)?;
+        Ok(workspace
+            .registry
+            .component_for_member(&member)
+            .ok_or(Error::InvalidSource)?
+            .identifier)
+    };
+    let owner = component_of(workspace, chart)?;
+    let stylesheet_component = component_of(workspace, stylesheet)?;
+    let theme_component = component_of(workspace, theme)?;
+    for (component, added) in [
+        (stylesheet_component, &new_styles),
+        (theme_component, &new_presets),
+    ] {
+        if component == owner {
+            continue;
+        }
+        let entry = workspace
+            .registry
+            .component_mut(component)
+            .ok_or(Error::InvalidSource)?;
+        for id in added.iter() {
+            entry.add_external_reference(super::structure::metadata::ExternalReference {
+                component: owner,
+                object: Some(*id),
+                is_weak: None,
+            });
+        }
+    }
+    let registered = workspace
+        .registry
+        .component(owner)
+        .ok_or(Error::InvalidSource)?
+        .clone();
+    let mut fresh = Vec::new();
+    for object in &objects {
+        if let Some(uuid) = registered.uuid_of(*object) {
+            fresh.push((
+                remap[object],
+                workspace
+                    .clone_uuid(Some(uuid), remap[object])
+                    .map_err(lift)?,
+            ));
+        }
+    }
+    let data = registered.data_owned_by(&objects);
+    let entry = workspace
+        .registry
+        .component_mut(owner)
+        .ok_or(Error::InvalidSource)?;
+    for (object, uuid) in fresh {
+        entry.add_object_uuid(object, uuid);
+    }
+    for datum in data {
+        for object in &objects {
+            if registered.data_owned_by(&[*object]).contains(&datum) {
+                entry.add_data_owner(datum, remap[object]);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Remove one chart (host `remove_slide_chart`).

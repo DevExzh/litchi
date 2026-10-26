@@ -2665,3 +2665,12 @@ pub(in crate::package) fn outgoing_references(
 ) -> Result<Vec<u64>, StructureError> {
     stage::outgoing(workspace, identifier)
 }
+
+/// Append a drawable to its slide's owned list and z-order (front).
+pub(in crate::package) fn attach_drawable(
+    workspace: &mut Workspace<'_>,
+    slide: u64,
+    drawable: u64,
+) -> Result<(), StructureError> {
+    author::attach(workspace, slide, drawable)
+}
