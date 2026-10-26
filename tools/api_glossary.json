@@ -20436,6 +20436,61 @@
           "name": "with_limits",
           "scope": "litchi_iwa_common",
           "replacement": "raw wire scans require RawWireLimits in RawWireFields::new (record 0362b)"
+        },
+        {
+          "name": "ChartPieStartAngle",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::StartAngle; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartPieWedgeExplosion",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::WedgeExplosion; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartPieWedgeIndex",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::WedgeIndex; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartPieLabelDistance",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::LabelDistance; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartDonutInnerRadius",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::donut::InnerRadius; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartRadarStartAngle",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::radar::StartAngle; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartCornerRadius",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::corner::Radius; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartRoundedCorners",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::corner::Rounding; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "Chart3dDepth",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart3d::Depth; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "Chart3dRotation",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart3d::Rotation; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "Chart3dSeriesGap",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart3d::SeriesGap; the shared chart values carry no host `Chart` prefix (record 0375)"
         }
       ],
       "families": []
@@ -28575,7 +28630,27 @@
           "replacement": "use rewrite_table_model_control_cell_spec_table (record 0362ul14)"
         }
       ],
-      "families": []
+      "families": [],
+      "required_signatures": [
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::decode",
+          "inputs": ["source", "archive", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::rewrite",
+          "inputs": ["source", "archive", "writes", "empty", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::references",
+          "inputs": ["chart_drawable", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        }
+      ]
     },
     {
       "id": "formula-raw",

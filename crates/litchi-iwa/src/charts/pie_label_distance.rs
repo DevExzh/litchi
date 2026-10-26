@@ -1,5 +1,6 @@
 //! Lossless per-wedge data-label distance CRUD for native pie and donut charts.
 
+use litchi_iwa_common::chart::pie::LabelDistance;
 use prost::Message;
 
 use crate::charts::series_non_style::{
@@ -16,43 +17,49 @@ const LEGACY_PIE_LABEL_DISTANCE_FIELD: u32 = 16;
 /// Modern `tschchartseriespielabelexplosion`.
 const PIE_LABEL_DISTANCE_FIELD: u32 = 147;
 const MINIMUM_LABEL_DISTANCE_PERCENT: f32 = 30.0;
-const DEFAULT_LABEL_DISTANCE_PERCENT: f32 = 67.0;
 const MAXIMUM_LABEL_DISTANCE_PERCENT: f32 = 200.0;
 
 /// Distance of a pie or donut wedge's label from the chart center.
 ///
 /// Values use the percentage displayed by iWork and must be finite in the
-/// inclusive native range `30%..=200%`.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartPieLabelDistance(f32);
+/// inclusive native range `30%..=200%`. The value is the shared
+/// `litchi_iwa_common::chart::pie::LabelDistance` (record 0375).
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ChartPieLabelDistance(LabelDistance);
+
+impl std::fmt::Debug for ChartPieLabelDistance {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartPieLabelDistance")
+            .field(&self.0.percent())
+            .finish()
+    }
+}
 
 impl ChartPieLabelDistance {
     /// Nearest label position accepted by the iWork inspector.
-    pub const MINIMUM: Self = Self(MINIMUM_LABEL_DISTANCE_PERCENT);
+    pub const MINIMUM: Self = Self(LabelDistance::MINIMUM);
     /// Native label position when no per-wedge override is stored.
-    pub const DEFAULT: Self = Self(DEFAULT_LABEL_DISTANCE_PERCENT);
+    pub const DEFAULT: Self = Self(LabelDistance::DEFAULT);
     /// Farthest label position accepted by the iWork inspector.
-    pub const MAXIMUM: Self = Self(MAXIMUM_LABEL_DISTANCE_PERCENT);
+    pub const MAXIMUM: Self = Self(LabelDistance::MAXIMUM);
 
     /// Construct a label distance from an inspector percentage.
     pub fn from_percent(percent: f32) -> Result<Self> {
-        if !percent.is_finite()
-            || !(MINIMUM_LABEL_DISTANCE_PERCENT..=MAXIMUM_LABEL_DISTANCE_PERCENT).contains(&percent)
-        {
-            return Err(Error::InvalidFormat(format!(
+        LabelDistance::from_percent(percent).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart pie label distance must be finite and within {MINIMUM_LABEL_DISTANCE_PERCENT}%..={MAXIMUM_LABEL_DISTANCE_PERCENT}%"
-            )));
-        }
-        Ok(Self(percent))
+            ))
+        })
     }
 
     /// Return the percentage displayed by iWork.
     pub const fn percent(self) -> f32 {
-        self.0
+        self.0.percent()
     }
 
-    fn native_percent(self) -> f32 {
-        self.0
+    const fn native_percent(self) -> f32 {
+        self.0.percent()
     }
 }
 

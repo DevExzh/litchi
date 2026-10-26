@@ -5,6 +5,7 @@
 //! public scalar rejects noncanonical values while the wire patch preserves
 //! every unrelated field byte-for-byte.
 
+use litchi_iwa_common::chart::radar::StartAngle;
 use prost::Message;
 
 use crate::charts::Kind;
@@ -25,34 +26,36 @@ const FULL_TURN_DEGREES: f32 = 360.0;
 ///
 /// Angles use the clockwise degrees displayed by the iWork inspector. Values
 /// must be finite and lie in the canonical half-open range `0°..360°`.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartRadarStartAngle(f32);
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ChartRadarStartAngle(StartAngle);
+
+impl std::fmt::Debug for ChartRadarStartAngle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartRadarStartAngle")
+            .field(&self.0.degrees())
+            .finish()
+    }
+}
 
 impl ChartRadarStartAngle {
-    pub const ZERO: Self = Self(MINIMUM_RADAR_START_ANGLE_DEGREES);
-    pub const QUARTER_TURN: Self = Self(90.0);
-    pub const HALF_TURN: Self = Self(180.0);
-    pub const THREE_QUARTER_TURN: Self = Self(270.0);
+    pub const ZERO: Self = Self(StartAngle::ZERO);
+    pub const QUARTER_TURN: Self = Self(StartAngle::QUARTER_TURN);
+    pub const HALF_TURN: Self = Self(StartAngle::HALF_TURN);
+    pub const THREE_QUARTER_TURN: Self = Self(StartAngle::THREE_QUARTER_TURN);
 
     /// Construct a canonical angle accepted by the native Radar inspector.
     pub fn from_degrees(degrees: f32) -> Result<Self> {
-        if !degrees.is_finite()
-            || !(MINIMUM_RADAR_START_ANGLE_DEGREES..FULL_TURN_DEGREES).contains(&degrees)
-        {
-            return Err(Error::InvalidFormat(format!(
+        StartAngle::from_degrees(degrees).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart radar start angle must be finite and within {MINIMUM_RADAR_START_ANGLE_DEGREES}°..{FULL_TURN_DEGREES}°"
-            )));
-        }
-        Ok(if degrees == MINIMUM_RADAR_START_ANGLE_DEGREES {
-            Self::ZERO
-        } else {
-            Self(degrees)
+            ))
         })
     }
 
     /// Return the clockwise degrees displayed by iWork.
     pub const fn degrees(self) -> f32 {
-        self.0
+        self.0.degrees()
     }
 
     fn from_native(degrees: f32) -> Result<Self> {

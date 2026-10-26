@@ -3,14 +3,17 @@
 pub mod arrangement;
 pub mod axis;
 pub mod category_labels;
+pub mod corner;
 pub mod data;
 pub mod direction;
+pub mod donut;
 pub mod error_bar;
 pub mod gaps;
 pub mod kind;
 pub mod metadata;
 pub mod number_format;
 pub mod pie;
+pub mod radar;
 pub mod reference_line;
 pub mod series_labels;
 

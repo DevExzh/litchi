@@ -4002,21 +4002,16 @@ fn set_cell_with_context(
         if replacement_identifier == identifier && old_formula_error.is_none() {
             return Ok(());
         }
-        let cell_count = update_tile(
-            package,
-            tile_archive,
-            *tile_id,
-            *tile_row,
-            column,
-            descriptor.model.number_of_columns as usize,
-            EncodedValue::RichText(replacement_identifier),
-        )?;
-        return update_row_header(
+        return update_tile_and_headers(
             package,
             object_locations,
             &descriptor.model,
+            tile_archive,
+            *tile_id,
+            *tile_row,
             row,
-            cell_count,
+            column,
+            EncodedValue::RichText(replacement_identifier),
         );
     }
 
@@ -4101,21 +4096,16 @@ fn set_cell_with_context(
         )?;
     }
 
-    let cell_count = update_tile(
-        package,
-        tile_archive,
-        *tile_id,
-        *tile_row,
-        column,
-        descriptor.model.number_of_columns as usize,
-        encoded_value,
-    )?;
-    update_row_header(
+    update_tile_and_headers(
         package,
         object_locations,
         &descriptor.model,
+        tile_archive,
+        *tile_id,
+        *tile_row,
         row,
-        cell_count,
+        column,
+        encoded_value,
     )
 }
 
