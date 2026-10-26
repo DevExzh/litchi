@@ -150,12 +150,7 @@ pub(super) fn delete_table_tile_row(
                 .iter()
                 .map(|raw| TileRowInfo::decode(raw.as_slice()).map_err(Error::from))
                 .collect::<Result<Vec<_>>>()?;
-            current.numrows = current
-                .row_infos
-                .iter()
-                .map(|row| row.tile_row_index + 1)
-                .max()
-                .unwrap_or(0);
+            current.numrows = topology_tile_numrows(&previous, &current.row_infos);
             let mut data = patch_varint_field(original, 4, true, Some(u64::from(current.numrows)))?;
             data = rewrite_repeated_length_delimited_fields(&data, 5, &desired)?;
             if Tile::decode(data.as_slice())? != current {

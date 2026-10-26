@@ -760,7 +760,7 @@ numbers/creation.rs	new	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	sheet_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	table_dimensions	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	table_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/editor/column_insert.rs	insert_table_column	1	numbers	table.topology	host-only	litchi-numbers	-	-	-	-
+numbers/editor/column_insert.rs	insert_table_column	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_insert_column_parity	A	-	-
 numbers/editor/date_time_fields.rs	add_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
 numbers/editor/date_time_fields.rs	insert_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
 numbers/editor/date_time_fields.rs	remove_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
@@ -777,7 +777,7 @@ numbers/editor/named_paragraph_styles.rs	redefine_applied_sheet_text_box_named_p
 numbers/editor/named_paragraph_styles.rs	rename_sheet_text_box_named_paragraph_style	1	numbers	text.paragraph_style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/named_paragraph_styles.rs	sheet_text_box_applied_named_paragraph_style	1	numbers	text.paragraph_style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/named_paragraph_styles.rs	sheet_text_box_named_paragraph_styles	1	numbers	text.paragraph_style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/row_insert.rs	insert_table_row	1	numbers	table.topology	host-only	litchi-numbers	-	-	-	-
+numbers/editor/row_insert.rs	insert_table_row	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_insert_row_parity	A	-	-
 numbers/editor/semantic/drawables.rs	add_sheet_drawable_comment_reply	1	numbers	drawable.comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/drawables.rs	clear_sheet_drawable_comment	1	numbers	drawable.comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/drawables.rs	remove_sheet_drawable_comment_reply	1	numbers	drawable.comment	host-only	litchi-numbers	-	-	-	-

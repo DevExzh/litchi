@@ -16,8 +16,8 @@
 //!   perpendicular runs shift, split or shorten);
 //! - the table model's row or column count and, for a header or footer
 //!   section edit, its section count;
-//! - the table drawable's layout cache, and the table formula owner's
-//!   table extents;
+//! - the table formula owner's table extents (the drawable's layout cache
+//!   is left for the application to rebuild, as the host editor leaves it);
 //! - every formula coordinate of the calculation engine that addresses the
 //!   table ([`shift`], record 0318): the table's own formulas and their
 //!   dependency records, and other tables' formulas that read it.
@@ -48,11 +48,10 @@
     reason = "the focused transaction keeps its public types beside the staged rewrite"
 )]
 
-mod calc;
-pub(super) mod lists;
 mod shift;
-pub(super) mod storage;
 pub(super) mod wire;
+
+pub(super) use litchi_numbers_wire::table_topology::{extents as calc, lists, storage};
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -283,8 +282,8 @@ const fn refuse(reason: Unsupported) -> Error {
 }
 
 /// A storage-phase fault: an unowned layout is a typed storage refusal.
-fn storage_fault(fault: Fault) -> Error {
-    match fault {
+fn storage_fault(fault: impl Into<Fault>) -> Error {
+    match fault.into() {
         Fault::Unsupported => refuse(Unsupported::StorageLayout),
         other => other.into(),
     }
@@ -1060,7 +1059,7 @@ fn plan(
 ) -> Result<Planned, Error> {
     let source = working.source();
     let (model_index, model) = message(working, target.model, &[6_001])?;
-    let (info_index, info) = message(working, target.info, &[6_000, 6_003])?;
+    let (_, info) = message(working, target.info, &[6_000, 6_003])?;
     check_features(working, target, model, info, step)?;
     let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
 
@@ -1205,7 +1204,7 @@ fn plan(
     let (uid_index, uid_payload) = message(working, uid_object, &UID_MAP_MESSAGE_TYPES)?;
     let uids = UidMap::read(uid_payload, before.rows, before.columns).map_err(storage_fault)?;
     if let AxisEdit::Remove(index) = step.edit {
-        let uuid = uids.uuid_at(step.row_axis, index)?;
+        let uuid = uids.uuid_at(step.row_axis, index).map_err(Fault::from)?;
         check_hidden(model, uuid, step.row_axis)?;
     }
     push(
@@ -1278,6 +1277,7 @@ fn plan(
     // Border layers.
     if let Some(sidecar) = single_reference(model, 49)? {
         let (index, data) = message(working, sidecar, &[STROKE_SIDECAR_MESSAGE_TYPE])?;
+        let mut layer_fault = None;
         let StrokePlan {
             sidecar: new_sidecar,
             layers,
@@ -1287,12 +1287,21 @@ fn plan(
             before.columns,
             step.row_axis,
             step.edit,
-            |layer| message(working, layer, &[STROKE_LAYER_MESSAGE_TYPE]).map(|(_, data)| data),
+            |layer| {
+                message(working, layer, &[STROKE_LAYER_MESSAGE_TYPE])
+                    .map(|(_, data)| data)
+                    .map_err(|fault| {
+                        layer_fault.get_or_insert(fault);
+                        litchi_numbers_wire::table_topology::Error::Invalid
+                    })
+            },
         )
-        .map_err(|fault| match fault {
-            Fault::Unsupported => refuse(Unsupported::Borders),
-            other => other.into(),
-        })?;
+        .map_err(
+            |error| match layer_fault.take().unwrap_or_else(|| error.into()) {
+                Fault::Unsupported => refuse(Unsupported::Borders),
+                other => other.into(),
+            },
+        )?;
         for (layer, payload) in layers {
             let (layer_index, _) = message(working, layer, &[STROKE_LAYER_MESSAGE_TYPE])?;
             push(layer, layer_index, payload, Vec::new())?;
@@ -1319,12 +1328,9 @@ fn plan(
     }
     push(target.model, model_index, new_model, Vec::new())?;
 
-    // The drawable's layout cache.
-    if let Some(rewritten) =
-        storage::layout_cache(info, before.rows, before.columns, step.row_axis, step.edit)?
-    {
-        push(target.info, info_index, rewritten, Vec::new())?;
-    }
+    // The drawable's layout cache stays as it is (record 0370): the
+    // application rebuilds a cache that no longer describes the table, and
+    // the host editor, whose output carries the native evidence, leaves it.
 
     // The calculation engine: the shifted payloads, and the table formula
     // owner's extents.
@@ -1336,7 +1342,7 @@ fn plan(
             step.row_axis,
             insert,
         )
-        .map_err(|fault| match fault {
+        .map_err(|fault| match Fault::from(fault) {
             Fault::Unsupported => refuse(Unsupported::Formulas),
             other => other.into(),
         })?
@@ -1463,6 +1469,7 @@ fn run(
     };
     let base = cleared.as_ref().unwrap_or(commented);
     let mut working = Working::new(base)?;
+    working.keep_previews();
     let target = locate(&working, sheet, table)?;
     let planned = plan(&working, &target, step, before, false, drop_cells)?;
     for replacement in planned.replacements {
@@ -1508,12 +1515,12 @@ fn verify(
     let mut expected = Vec::new();
     for (position, value) in table_cells(source, sheet, table)? {
         let (row, column) = if step.row_axis {
-            match step.edit.shift(position.row())? {
+            match step.edit.shift(position.row()).map_err(Fault::from)? {
                 Some(row) => (row, position.column()),
                 None => continue,
             }
         } else {
-            match step.edit.shift(position.column())? {
+            match step.edit.shift(position.column()).map_err(Fault::from)? {
                 Some(column) => (position.row(), column),
                 None => continue,
             }
