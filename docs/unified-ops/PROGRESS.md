@@ -6289,3 +6289,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   handoff; its reviewed v2 is ready but not launched. W6 v4 and flat-parts v3
   are returned for concrete public-flow defects, with successors in repair.
   All final qualification remains required; nothing is pushed.
+
+  The ODF tooling leaf fixes its consumer-lock overlay, actual ZIP API calls,
+  buffer borrow and generic closure dispatch (165k). Both current release
+  compiler variants pass at 340191f1ef; all 82 affected Python tests pass
+  after materializing a tracked fixture omitted by the sparse checkout.
+  Independent review passes and root merges the leaf without conflicts.
+  Historical compilation and native qualification remain pending. The
+  remaining-29 driver fixes OfficeCLI symlink admission, passes 17 controls
+  and independent review, then starts its bounded diagnostic. Flat-parts v5
+  passes independent source review; W6 v5 repair continues. The branch audit
+  confirms 76 heads/63 worktrees and 70 unchanged excluded refs. Every retained
+  unified leaf branch is now merged; required validation inputs remain.
+  The unused ODF design worktree/ref is removed, bringing cumulative cleanup
+  to 278 worktrees/440 refs. C/P stay frozen; final qualification remains open.
+  Nothing is pushed.

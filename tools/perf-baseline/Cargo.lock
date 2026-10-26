@@ -1047,6 +1047,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-odb"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
+]
+
+[[package]]
+name = "litchi-odc"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
 name = "litchi-odf-common"
 version = "0.0.1"
 dependencies = [
@@ -1077,6 +1096,44 @@ dependencies = [
  "x509-cert",
  "xml-minifier",
  "zeroize",
+]
+
+[[package]]
+name = "litchi-odf-formula"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
+name = "litchi-odg"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
+]
+
+[[package]]
+name = "litchi-odi"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+]
+
+[[package]]
+name = "litchi-odm"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
+ "serde_json",
 ]
 
 [[package]]
@@ -1227,7 +1284,13 @@ dependencies = [
  "litchi-doc",
  "litchi-docx",
  "litchi-drawingml",
+ "litchi-odb",
+ "litchi-odc",
  "litchi-odf-common",
+ "litchi-odf-formula",
+ "litchi-odg",
+ "litchi-odi",
+ "litchi-odm",
  "litchi-odp",
  "litchi-ods",
  "litchi-odt",
@@ -1235,6 +1298,7 @@ dependencies = [
  "litchi-ole-common",
  "litchi-ooxml-common",
  "litchi-opc",
+ "litchi-oth",
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
@@ -1251,6 +1315,15 @@ dependencies = [
  "sha2 0.11.0",
  "soapberry-zip",
  "unicode-normalization",
+]
+
+[[package]]
+name = "litchi-oth"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-odf-common",
+ "quick-xml",
 ]
 
 [[package]]

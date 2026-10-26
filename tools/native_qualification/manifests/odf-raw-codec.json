@@ -1,0 +1,178 @@
+{
+  "schema": "litchi.odf.raw-codec-qualification.manifest.v1",
+  "lane": "odf-raw-codec",
+  "baseline_commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+  "candidate_commit": "33a0a63d3553712c1276da592f7846a0c7dcabd6",
+  "source": {
+    "consumer_manifest": "tools/perf-baseline/Cargo.toml",
+    "production_manifest": "crates/litchi-ops/Cargo.toml",
+    "lock_path": "tools/perf-baseline/Cargo.lock",
+    "candidate_consumer_manifest_sha256": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
+    "candidate_lock_before_sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
+    "candidate_lock_before_bytes": 56941,
+    "candidate_lock_sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",
+    "candidate_lock_bytes": 57961,
+    "baseline_overlay": [
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/Cargo.lock",
+      "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
+    ],
+    "candidate_overlay": [
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/Cargo.lock",
+      "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
+    ]
+  },
+  "probe": {
+    "path": "tools/perf-baseline/examples/odf_raw_codec_qualification.rs",
+    "features": [
+      "raw-codec-original",
+      "raw-codec-current",
+      "raw-codec-allocator"
+    ],
+    "api_eras": ["original", "current"],
+    "namespace_contracts": {
+      "baseline": "legacy_unknown_namespace_event",
+      "candidate": "document_rejects_undeclared_namespace"
+    },
+    "modes": ["validate", "timed", "allocator"],
+    "max_iterations": 128,
+    "sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
+  },
+  "build": {
+    "profile": "release",
+    "cargo_flag": "--release",
+    "binary_directory": "release",
+    "variants": {
+      "normal": {"allocator_feature": null},
+      "allocator": {"allocator_feature": "raw-codec-allocator"}
+    }
+  },
+  "routes": [
+    {
+      "id": "archive_catalog_and_raw_split",
+      "family": "raw",
+      "operations": ["Archive::new", "file_names", "contains", "metadata", "is_stored", "read"],
+      "boundary": "Archive construction and catalog/read operation; package bytes and expected content are prepared outside the clock"
+    },
+    {
+      "id": "manifest_xml_stream_and_parse",
+      "family": "manifest",
+      "operations": ["Archive::read_manifest_xml", "read_manifest", "parse_manifest"],
+      "boundary": "prebuilt Archive manifest materialization/read/parse only; package bytes, Archive and limits are prepared outside the clock"
+    },
+    {
+      "id": "metadata_xml_and_namespace_resolution",
+      "family": "xml",
+      "operations": ["Metadata::from_xml", "ResolvedReader::from_xml baseline/from_xml_document current", "read_resolved_event_into"],
+      "boundary": "bounded metadata/namespace construction and event consumption; XML constants, limits and proof serialization are outside the clock"
+    },
+    {
+      "id": "writer_memory_publication",
+      "family": "writer",
+      "operations": ["PackageWriter::new", "add_authored_xml", "add_file_reader_with_media_type_and_compression", "finish"],
+      "boundary": "in-memory writer construction/publication; deterministic payload values are prepared outside and output proof is outside the clock"
+    },
+    {
+      "id": "writer_stream_publication",
+      "family": "writer",
+      "operations": ["PackageWriter::with_writer", "add_file_reader_with_media_type_and_compression", "finish_to_writer"],
+      "boundary": "stream writer/sink construction and reader-to-sink publication; deterministic payload is prepared outside the clock"
+    },
+    {
+      "id": "writer_bounded_policy",
+      "family": "writer",
+      "operations": ["PackageWriter::new_bounded", "add_file", "finish_to_bounded_bytes"],
+      "boundary": "bounded writer construction/publication and refusal; payload and output/error proof are outside the clock"
+    },
+    {
+      "id": "raw_split_merge_and_opaque_preservation",
+      "family": "merge",
+      "operations": ["OwnedPackage::from_bytes", "replace_content_xml", "raw_identical_members"],
+      "boundary": "source reopen and raw replacement/publication; expected payload, member audit and output proof are outside the clock"
+    },
+    {
+      "id": "raw_xml_splice_merge_publication",
+      "family": "splice",
+      "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
+      "boundary": "prebuilt per-iteration source publication batches and rebuild only; source reopen/index/proof, fragment copies and output audit are outside the clock"
+    },
+    {
+      "id": "unified_facade_raw_parts_and_publication",
+      "family": "facade",
+      "operations": ["open_bytes_with", "File::parts", "File::raw", "File::to_bytes", "File::metadata"],
+      "boundary": "facade open, raw/parts/metadata access and byte-identical no-op publication; input bytes are intentionally cloned inside the measured API boundary"
+    },
+    {
+      "id": "consumer_reopen_matrix",
+      "family": "consumers",
+      "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
+      "boundary": "prebuilt owned per-iteration family inputs; raw split and unified facade reopen/projection only; package generation and ownership copies/output comparison are outside the clock"
+    }
+  ],
+  "families": ["odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm"],
+  "phases": {
+    "setup_outside_clock": [
+      "deterministic package and ODF family packages prepared before timing",
+      "Archive/OwnedPackage/File opening for correctness proofs",
+      "XML, metadata, namespace, reader/sink and expected-hash construction",
+      "route-specific limit and refusal inputs"
+    ],
+    "inside_clock": "the route operation named by the exact descriptor boundary only",
+    "output_proof": [
+      "operation_ok",
+      "changed_ok",
+      "no_op_ok",
+      "reopen_ok",
+      "source_bytes_ok",
+      "facade_bytes_ok",
+      "untouched_members_ok",
+      "manifest_ok",
+      "metadata_ok",
+      "namespace_ok",
+      "bounded_error_ok",
+      "negative_cases_ok"
+    ],
+    "negative_cases": [
+      "duplicate_manifest_path",
+      "manifest_limit",
+      "malformed_xml",
+      "undeclared_namespace",
+      "stale_xml_range",
+      "foreign_xml_source",
+      "bounded_output",
+      "failing_reader_or_sink",
+      "corrupt_stored_payload_without_verification"
+    ]
+  },
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmup_iterations_per_leg": 3,
+    "samples_per_leg": 30,
+    "probe_iterations": 128,
+    "roles": ["baseline", "candidate"],
+    "variants": ["normal", "allocator"],
+    "calibration": {"mode": "validate", "iterations": 1},
+    "allocator": {
+      "scope": "operation_global_system_allocator",
+      "elapsed_claimable": false,
+      "counters": ["allocations", "deallocations", "allocated_bytes", "deallocated_bytes", "reallocations"]
+    },
+    "quiet": {
+      "process_guard": "tools.native_qualification_runner.ProcessGuard",
+      "cpu_affinity_required": true,
+      "resource_monitor": "loadavg+proc-descendants+RSS+target-bytes"
+    }
+  },
+  "guards": {
+    "cargo": {"offline": true, "locked": true, "jobs": 1, "incremental": false},
+    "target_preflight_bytes": 19200000000,
+    "target_hard_limit_bytes": 20000000000,
+    "memory_hard_limit_bytes": 20000000000,
+    "max_probe_output_bytes": 1048576,
+    "fresh_no_follow_outputs": true,
+    "full_source_closure": true,
+    "quiet_host": true
+  },
+  "claim_scope": "correctness and reproducible paired protocol only; no native acceptance claim"
+}

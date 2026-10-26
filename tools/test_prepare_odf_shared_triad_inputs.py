@@ -115,6 +115,59 @@ class OdfPreparationTests(unittest.TestCase):
             finally:
                 prep.BASELINE_COMMIT = old
 
+    def test_reuses_existing_approved_overlay_without_rewriting_it(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-prep-reuse-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            probe = b"reviewed adapter\n"
+            baseline_ref = repository(baseline, probe=None, lock=None)
+            candidate_ref = repository(candidate, probe=probe, lock=b"candidate lock\n")
+            external_lock = root / "baseline.lock"
+            external_lock.write_bytes(b"baseline lock\n")
+            old = prep.BASELINE_COMMIT
+            prep.BASELINE_COMMIT = baseline_ref
+            try:
+                approved_path = root / "approved.json"
+                prep.prepare(
+                    baseline_root=baseline,
+                    candidate_root=candidate,
+                    candidate_ref=candidate_ref,
+                    candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
+                    baseline_lock=external_lock,
+                    output=approved_path,
+                )
+                before_probe = (baseline / prep.PROBE_PATH).read_bytes()
+                before_lock = (baseline / prep.LOCK_PATH).read_bytes()
+                before_status = git(baseline, "status", "--porcelain=v1", "--untracked-files=all")
+                successor = root / "successor.json"
+                document = prep.reuse_approved_overlay(
+                    baseline_root=baseline,
+                    candidate_root=candidate,
+                    candidate_ref=candidate_ref,
+                    candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
+                    baseline_lock=external_lock,
+                    approved_preparation=approved_path,
+                    output=successor,
+                )
+            finally:
+                prep.BASELINE_COMMIT = old
+            self.assertEqual(document["candidate"]["commit"], candidate_ref)
+            self.assertEqual((baseline / prep.PROBE_PATH).read_bytes(), before_probe)
+            self.assertEqual((baseline / prep.LOCK_PATH).read_bytes(), before_lock)
+            self.assertEqual(
+                git(baseline, "status", "--porcelain=v1", "--untracked-files=all"),
+                before_status,
+            )
+            self.assertEqual(
+                document["baseline"]["lock"]["sha256"],
+                hashlib.sha256(b"baseline lock\n").hexdigest(),
+            )
+            self.assertEqual(
+                json.loads(successor.read_text(encoding="utf-8"))["claim_scope"],
+                "retained approved source overlay rebound to selected candidate; no build, timing, or acceptance claim",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

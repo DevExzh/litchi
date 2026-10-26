@@ -551,6 +551,47 @@ class ODGJoinedQualificationTests(unittest.TestCase):
                 RUNNER.REVIEWED_PROBE_IDENTITIES["common"]["sha256"],
             )
 
+    def test_source_binder_accepts_only_pending_binary_slots(self) -> None:
+        from tools import odg_joined_qualification_builder as builder
+
+        def endpoint(name: str) -> dict[str, object]:
+            root = "/external/" + name
+            digest_value = "a" * 64
+            files = {
+                "path": "Cargo.lock", "bytes": 1, "sha256": digest_value,
+            }
+            return {
+                "root": root,
+                "ref": "1" * 40,
+                "tree": "2" * 40,
+                "profile": "legacy-apply-joined" if name == "baseline" else "current-edit-join-commit",
+                "features": ["odg"],
+                "source_manifest": {"entries": 1, "bytes": 1, "sha256": digest_value},
+                "source_closure": {"entries": 1, "bytes": 1, "sha256": digest_value},
+                "lock": files,
+                "toolchain": {**files, "path": "rust-toolchain.toml"},
+                "cargo_config": {**files, "path": ".cargo/config.toml"},
+                "cargo_manifest": {**files, "path": "Cargo.toml"},
+                "binary": {
+                    "path": root + "/target/release/examples/litchi-perf-odg-joined-qualification",
+                    "bytes": None, "sha256": None,
+                    "status": "pending " + ("baseline" if name == "baseline" else "C2a") + " normal build",
+                },
+                "allocator_binary": {
+                    "path": root + "/target/release/examples/litchi-perf-odg-joined-qualification",
+                    "bytes": None, "sha256": None,
+                    "status": "pending " + ("baseline" if name == "baseline" else "C2a") + " allocator build",
+                },
+            }
+
+        accepted = builder._source_binder_endpoint({"candidate": endpoint("candidate")}, "candidate")
+        self.assertIsNone(accepted["binary"]["sha256"])
+        rejected = endpoint("candidate")
+        rejected["binary"] = dict(rejected["binary"])
+        rejected["binary"]["bytes"] = 1
+        with self.assertRaises(RUNNER.RunFailure):
+            builder._source_binder_endpoint({"candidate": rejected}, "candidate")
+
     def test_builder_rejects_assume_unchanged_and_skip_worktree(self) -> None:
         from tools import odg_joined_qualification_builder as builder
 
