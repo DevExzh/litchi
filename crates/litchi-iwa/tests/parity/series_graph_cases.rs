@@ -10,7 +10,9 @@
 //! exact-source reassembly; selection belongs to the families.
 
 use litchi_iwa::charts::{
-    ChartPieLabelDistance, ChartPieWedgeExplosion, ChartSeriesConnectionLine,
+    ChartPieLabelDistance, ChartPieWedgeExplosion, ChartSeriesConnectionLine, ChartSeriesSymbol,
+    ChartSeriesSymbolShape, ChartSeriesSymbolSize, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
 };
 use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_archive::Limits as ArchiveLimits;
@@ -18,11 +20,14 @@ use litchi_iwa_archive::iwa::{Limits as CoreLimits, SnappyLimits, SnappyStream};
 use litchi_iwa_archive::unstable::{EntryEdit, EntryInsertion};
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::pie::{LabelDistance, WedgeExplosion};
-use litchi_iwa_common::chart::series::{ConnectionLine, ConnectionLineFamily};
+use litchi_iwa_common::chart::series::{
+    ConnectionLine, ConnectionLineFamily, MovingAveragePeriod, PolynomialOrder, Symbol,
+    SymbolFamily, SymbolShape, SymbolSize, Trendline,
+};
 use litchi_iwa_style::graph::{Changes, Workspace};
 use litchi_iwa_style::series::{
     self,
-    property::{ConnectionLines, LabelDistances, WedgeExplosions},
+    property::{ConnectionLines, LabelDistances, Trendlines, WedgeExplosions},
 };
 
 use crate::chart_style_cases::{Components, Target, input};
@@ -36,13 +41,72 @@ enum Values {
     Wedges(Vec<f32>),
     /// Label distances, in percent.
     Labels(Vec<f32>),
+    /// Data symbols: `None` hides; `(shape, size in points)`.
+    Symbols(Kind, Vec<Option<(SymbolShape, Option<f32>)>>),
+    Trendlines(Vec<Trend>),
+}
+
+/// A trendline configuration, spelled once for both vocabularies.
+#[derive(Clone, Copy, Debug)]
+enum Trend {
+    None,
+    /// Linear, named "Fit" in the legend, with its equation.
+    NamedLinear,
+    /// Third-order polynomial with R².
+    Polynomial,
+    /// Four-point moving average.
+    MovingAverage,
+}
+
+impl Trend {
+    fn host(self) -> TestResult<ChartSeriesTrendline> {
+        Ok(match self {
+            Self::None => ChartSeriesTrendline::none(),
+            Self::NamedLinear => ChartSeriesTrendline::linear()
+                .with_legend_name("Fit")?
+                .with_legend_visibility(true)?
+                .with_equation_visibility(true)?,
+            Self::Polynomial => {
+                ChartSeriesTrendline::polynomial(ChartSeriesTrendlinePolynomialOrder::new(3)?)
+                    .with_r_squared_visibility(true)?
+            },
+            Self::MovingAverage => ChartSeriesTrendline::moving_average(
+                ChartSeriesTrendlineMovingAveragePeriod::new(4)?,
+            ),
+        })
+    }
+
+    fn common(self) -> TestResult<Trendline> {
+        Ok(match self {
+            Self::None => Trendline::none(),
+            Self::NamedLinear => Trendline::linear()
+                .with_legend_name("Fit")?
+                .with_legend_visibility(true)?
+                .with_equation_visibility(true)?,
+            Self::Polynomial => {
+                Trendline::polynomial(PolynomialOrder::new(3)?).with_r_squared_visibility(true)?
+            },
+            Self::MovingAverage => Trendline::moving_average(MovingAveragePeriod::new(4)?),
+        })
+    }
+}
+
+const fn host_shape(shape: SymbolShape) -> ChartSeriesSymbolShape {
+    match shape {
+        SymbolShape::Circle => ChartSeriesSymbolShape::Circle,
+        SymbolShape::Triangle => ChartSeriesSymbolShape::Triangle,
+        SymbolShape::InvertedTriangle => ChartSeriesSymbolShape::InvertedTriangle,
+        SymbolShape::Diamond => ChartSeriesSymbolShape::Diamond,
+        SymbolShape::Square => ChartSeriesSymbolShape::Square,
+    }
 }
 
 impl Values {
     const fn kind(&self) -> Kind {
         match self {
-            Self::Lines(kind, _) => *kind,
+            Self::Lines(kind, _) | Self::Symbols(kind, _) => *kind,
             Self::Wedges(_) | Self::Labels(_) => Kind::Pie2d,
+            Self::Trendlines(_) => Kind::Scatter2d,
         }
     }
 }
@@ -71,13 +135,33 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
             .map(|percent| ChartPieLabelDistance::from_percent(*percent))
             .collect::<Result<_, _>>()?)
     };
+    let symbols = |values: &[Option<(SymbolShape, Option<f32>)>]| -> TestResult<Vec<Option<ChartSeriesSymbol>>> {
+        values
+            .iter()
+            .map(|value| {
+                Ok(match value {
+                    None => None,
+                    Some((shape, None)) => Some(ChartSeriesSymbol::automatic(host_shape(*shape))),
+                    Some((shape, Some(points))) => Some(ChartSeriesSymbol::sized(
+                        host_shape(*shape),
+                        ChartSeriesSymbolSize::new(*points)?,
+                    )),
+                })
+            })
+            .collect()
+    };
+    let trends = |values: &[Trend]| -> TestResult<Vec<ChartSeriesTrendline>> {
+        values.iter().map(|trend| trend.host()).collect()
+    };
     macro_rules! write {
-        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident) => {{
+        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident) => {{
             let mut editor = $editor;
             match values {
                 Values::Lines(_, values) => editor.$lines($($scope,)? chart, &lines(values))?,
                 Values::Wedges(values) => editor.$wedges($($scope,)? chart, &wedges(values)?)?,
                 Values::Labels(values) => editor.$labels($($scope,)? chart, &labels(values)?)?,
+                Values::Symbols(_, values) => editor.$symbols($($scope,)? chart, &symbols(values)?)?,
+                Values::Trendlines(values) => editor.$trends($($scope,)? chart, &trends(values)?)?,
             }
             editor.to_bytes()?
         }};
@@ -86,17 +170,20 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
         Target::Keynote { slide } => write!(
             keynote::Draft::from_bytes(source)?, slide, ;
             set_slide_chart_series_connection_lines, set_slide_chart_pie_wedge_explosions,
-            set_slide_chart_pie_label_distances
+            set_slide_chart_pie_label_distances, set_slide_chart_series_symbols,
+            set_slide_chart_series_trendlines
         ),
         Target::Numbers { sheet } => write!(
             numbers::Draft::from_bytes(source)?, sheet, ;
             set_sheet_chart_series_connection_lines, set_sheet_chart_pie_wedge_explosions,
-            set_sheet_chart_pie_label_distances
+            set_sheet_chart_pie_label_distances, set_sheet_chart_series_symbols,
+            set_sheet_chart_series_trendlines
         ),
         Target::Pages => write!(
             pages::Draft::from_bytes(source)?, ;
             set_body_chart_series_connection_lines, set_body_chart_pie_wedge_explosions,
-            set_body_chart_pie_label_distances
+            set_body_chart_pie_label_distances, set_body_chart_series_symbols,
+            set_body_chart_series_trendlines
         ),
     })
 }
@@ -104,12 +191,14 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
 /// The host's read of the same property, as comparable text.
 fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestResult<String> {
     macro_rules! read {
-        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident) => {{
+        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident) => {{
             let editor = $editor;
             match values {
                 Values::Lines(..) => format!("{:?}", editor.$lines($($scope,)? chart)?),
                 Values::Wedges(_) => format!("{:?}", editor.$wedges($($scope,)? chart)?),
                 Values::Labels(_) => format!("{:?}", editor.$labels($($scope,)? chart)?),
+                Values::Symbols(..) => format!("{:?}", editor.$symbols($($scope,)? chart)?),
+                Values::Trendlines(_) => format!("{:?}", editor.$trends($($scope,)? chart)?),
             }
         }};
     }
@@ -117,17 +206,20 @@ fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestR
         Target::Keynote { slide } => read!(
             keynote::Draft::from_bytes(bytes)?, slide, ;
             slide_chart_series_connection_lines, slide_chart_pie_wedge_explosions,
-            slide_chart_pie_label_distances
+            slide_chart_pie_label_distances, slide_chart_series_symbols,
+            slide_chart_series_trendlines
         ),
         Target::Numbers { sheet } => read!(
             numbers::Draft::from_bytes(bytes)?, sheet, ;
             sheet_chart_series_connection_lines, sheet_chart_pie_wedge_explosions,
-            sheet_chart_pie_label_distances
+            sheet_chart_pie_label_distances, sheet_chart_series_symbols,
+            sheet_chart_series_trendlines
         ),
         Target::Pages => read!(
             pages::Draft::from_bytes(bytes)?, ;
             body_chart_series_connection_lines, body_chart_pie_wedge_explosions,
-            body_chart_pie_label_distances
+            body_chart_pie_label_distances, body_chart_series_symbols,
+            body_chart_series_trendlines
         ),
     })
 }
@@ -221,6 +313,30 @@ fn engine_write(source: &[u8], chart: u64, values: &Values) -> TestResult<Vec<u8
                 .collect::<Result<Vec<_>, _>>()?;
             series::set_values(&mut workspace, chart, &LabelDistances, &labels)?;
         },
+        Values::Symbols(kind, values) => {
+            let family = SymbolFamily::for_chart_kind(*kind).ok_or("no symbol family")?;
+            let symbols = values
+                .iter()
+                .map(|value| {
+                    value
+                        .map(|(shape, size)| {
+                            Ok::<_, Box<dyn std::error::Error>>(Symbol {
+                                shape,
+                                size: size.map(SymbolSize::new).transpose()?,
+                            })
+                        })
+                        .transpose()
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            series::set_symbols(&mut workspace, chart, family, &symbols)?;
+        },
+        Values::Trendlines(values) => {
+            let trends = values
+                .iter()
+                .map(|trend| trend.common())
+                .collect::<TestResult<Vec<_>>>()?;
+            series::set_values(&mut workspace, chart, &Trendlines, &trends)?;
+        },
     }
     let changes = workspace.finish();
     publish_changes(source, &components, changes)
@@ -265,6 +381,18 @@ const ALL_STRAIGHT: [ConnectionLine; 2] = [ConnectionLine::Straight, ConnectionL
 const SCATTER: [ConnectionLine; 1] = [ConnectionLine::Curved];
 const SCATTER_HIDDEN: [ConnectionLine; 1] = [ConnectionLine::Hidden];
 
+fn symbols(kind: Kind, values: &[Option<(SymbolShape, Option<f32>)>]) -> Values {
+    Values::Symbols(kind, values.to_vec())
+}
+
+const DIAMONDS: [Option<(SymbolShape, Option<f32>)>; 2] = [
+    Some((SymbolShape::Diamond, Some(9.0))),
+    Some((SymbolShape::Square, None)),
+];
+const SQUARE_HIDDEN: [Option<(SymbolShape, Option<f32>)>; 2] =
+    [Some((SymbolShape::Square, Some(12.0))), None];
+const NO_SYMBOLS: [Option<(SymbolShape, Option<f32>)>; 2] = [None, None];
+
 macro_rules! graph_cases {
     ($($name:ident: $format:ident, $tier:ident, [$($before:expr),*], $after:expr;)*) => {$(
         #[test]
@@ -296,6 +424,18 @@ graph_cases! {
     keynote_chart_pie_label_distances_allocate_parity: Keynote, B, [], Values::Labels(vec![120.0, 67.0, 40.0]);
     numbers_chart_pie_label_distances_patch_parity: Numbers, A, [Values::Wedges(vec![25.0, 0.0, 10.0])], Values::Labels(vec![120.0, 67.0, 40.0]);
     pages_chart_pie_label_distances_patch_parity: Pages, A, [Values::Wedges(vec![25.0, 0.0, 10.0])], Values::Labels(vec![120.0, 67.0, 40.0]);
+    keynote_chart_series_symbols_allocate_parity: Keynote, B, [], symbols(Kind::Line2d, &DIAMONDS);
+    numbers_chart_series_symbols_allocate_parity: Numbers, B, [], symbols(Kind::Line2d, &DIAMONDS);
+    pages_chart_series_symbols_allocate_parity: Pages, B, [], symbols(Kind::Line2d, &DIAMONDS);
+    keynote_chart_series_symbols_patch_parity: Keynote, A, [symbols(Kind::Line2d, &DIAMONDS)], symbols(Kind::Line2d, &SQUARE_HIDDEN);
+    numbers_chart_series_symbols_remove_parity: Numbers, A, [symbols(Kind::Line2d, &DIAMONDS)], symbols(Kind::Line2d, &NO_SYMBOLS);
+    pages_chart_series_symbols_patch_parity: Pages, A, [symbols(Kind::Line2d, &DIAMONDS)], symbols(Kind::Line2d, &SQUARE_HIDDEN);
+    keynote_chart_series_trendlines_allocate_parity: Keynote, B, [], Values::Trendlines(vec![Trend::NamedLinear]);
+    numbers_chart_series_trendlines_allocate_parity: Numbers, B, [], Values::Trendlines(vec![Trend::Polynomial]);
+    pages_chart_series_trendlines_allocate_parity: Pages, B, [], Values::Trendlines(vec![Trend::MovingAverage]);
+    keynote_chart_series_trendlines_patch_parity: Keynote, A, [Values::Trendlines(vec![Trend::NamedLinear])], Values::Trendlines(vec![Trend::Polynomial]);
+    numbers_chart_series_trendlines_patch_parity: Numbers, A, [Values::Trendlines(vec![Trend::Polynomial])], Values::Trendlines(vec![Trend::MovingAverage]);
+    pages_chart_series_trendlines_remove_parity: Pages, A, [Values::Trendlines(vec![Trend::NamedLinear])], Values::Trendlines(vec![Trend::None]);
 }
 
 /// The leaf route a family runs: admit the source package, the graph
