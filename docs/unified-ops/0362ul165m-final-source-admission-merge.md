@@ -47,15 +47,23 @@ archive generation, finalization and integrated execution remain pending.
 ## Gate, branches and cleanup
 
 The same Q472a diagnostic remains active. ODS Clippy, the full ODS suite and
-workspace Clippy pass; the leaf suite's two stale DOCX assertions remain a
-recorded failure. The workspace suite continues. The isolated DOCX repair
-still awaits focused Rust validation after the Cargo slot is released.
+workspace Clippy pass. After 157 passing chunks, the workspace suite
+reproduces the leaf suite's two stale DOCX assertions: 1,525 DOCX library
+tests pass and two fail. Root verifies unchanged source/locks and no resource
+failure. The diagnostic proceeds to the isolated `wsdoc` rerun. The DOCX
+repair still awaits focused Rust validation after the Cargo slot is released.
+Its bounded driver passes source preflight; the absent ignored root lock is
+copied from Q and verified against the approved digest. No Cargo command has
+run on that repair yet.
 
 The branch census confirms 78 heads and 66 worktrees before this merge.
 All 70 excluded heads are unchanged. Five retained unified controls were
 already merged; this merge accepts the ODF admission leaf. The DOCX leaf
-is the remaining unmerged repair. Required benchmark baselines and live
-diagnostic inputs remain in use.
+is the remaining unmerged repair. Root removes the now-merged, clean ODF
+admission worktree and branch after checking for live holders. This leaves
+77 heads and 65 worktrees, with cumulative retirement at 279 worktrees and
+441 refs. Required benchmark baselines and live diagnostic inputs remain
+in use.
 
 The first source-copy cleanup attempts stop before deletion because old
 recursive searches hold files open. Root cancels the specific obsolete
@@ -64,9 +72,13 @@ attempt removes the Hx5DTD and w0Is8v failed preparation directories,
 55,828,817,557 apparent bytes in total, then stops when `du` exceeds its
 512 MiB process-group cap on the next directory. A bounded continuation uses
 `du --count-links` to avoid its growing inode table and handles only the two
-remaining failed copies. All failed logs and preserved source identities,
-diffs and small inputs remain. Successful TDnt83 and registered worktrees
-are untouched by this copy cleanup.
+remaining failed copies. That continuation completes, reporting a further
+55,828,688,747 apparent bytes with hard links counted individually. All four
+failed preparation directories are absent; about 111.66 GB of apparent data
+is retired across the two runs. This is not a measurement of physical disk
+blocks reclaimed. All failed logs and preserved source identities, diffs
+and small inputs remain. Successful TDnt83 and registered worktrees are
+untouched by this copy cleanup.
 
 W6 v7 is still repairing the four concrete v6 findings. Final all-65 gate,
 all 28 qualifications, corpus and census checks remain required. Memo 22 is
@@ -83,6 +95,11 @@ Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
 | `protocol-consumer-composition-C2a-20261026-v11/receipt.json` | `2cc5fbab9bbf32057290211782de126ebdff39233d1ef697b7bfc67268dc3330` |
 | `protocol-composition-v11-root-metadata-verification-20261026/receipt.json` | `35a79c783d2f27247db5362fcde8100378abbc37c943fd6715af230835cb4f21` |
 | `branch-worktree-165m-20261026/receipt.json` | `651a9000ba489e219fd88485b558f065b42c78072c8b2158e658752b439aeb45` |
+| `rest29-workspace-docx-failure-20261026/receipt.json` | `9374323f4b6b7d4b7e589f92ce84d23a41322c3d8b8c962f6440bd6f637a73e1` |
+| `docx-metadata-focused-prep-20261026/receipt.json` | `6fb49529b6055f686cdfdec710ceba7d118bd587615d1e89a057544b8df04f18` |
+| `w6-failed-source-retirement-20261026-v5/retirement.json` | `6ec639a10ef571ffd2ef8945e6b5a86c303b786ffddbc14f8c880ff28aee51f0` |
+| `w6-failed-source-retirement-20261026-v6/retirement.json` | `b3722713fc75e7cf8be9d8e3836c1768977d9bb3f013cd88ce7afc4a1b0de74e` |
+| `odf-final-source-admission-retirement-20261026/receipt.json` | `81020430f12519a91e9f9864f76c9d0988bbcdd930cb2167e3c5ff90cb69570c` |
 
 Root validation command, run at the exact merged leaf:
 
