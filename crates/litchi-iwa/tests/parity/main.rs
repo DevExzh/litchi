@@ -46,4 +46,5 @@ mod text_field_cases;
 mod text_glue;
 mod text_language_cases;
 mod text_list_cases;
+mod text_named_style_cases;
 mod text_style_cases;
