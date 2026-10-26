@@ -1050,10 +1050,13 @@ pub(super) fn set_table_cell(
             }
         }
     }
+    // The staged state: an earlier write of the same edit is a baseline
+    // value of this one.
+    let staged = &*workspace;
     let object = |identifier: u64| -> Option<&[u8]> {
-        package
-            .object_with_component(identifier)
-            .and_then(|(_, object)| object.messages.first())
+        staged
+            .object(identifier)
+            .and_then(|object| object.messages.first())
             .map(|message| message.data.as_slice())
     };
     let refresh = match engine {
@@ -1165,7 +1168,7 @@ pub(super) fn set_table_cell(
     for caches in &refresh.tiles {
         let (index, message_type, payload) = payload_of(workspace, caches.tile, &[TILE])?;
         let refreshed = caches
-            .apply(payload, columns, &limits)
+            .apply(payload, &limits)
             .map_err(|_| table_formulas())?;
         replace_payload(workspace, caches.tile, index, message_type, refreshed).map_err(lift)?;
     }

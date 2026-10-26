@@ -639,7 +639,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     for caches in &refresh.tiles {
         let (tile_type, payload) = staged.payload(caches.tile, &[TILE])?;
         let refreshed = caches
-            .apply(payload, target.table_columns, &limits)
+            .apply(payload, &limits)
             .map_err(|_error| Error::Refused(Refusal::Formulas))?;
         staged.payloads.insert(caches.tile, (tile_type, refreshed));
     }
