@@ -3278,6 +3278,10 @@
   {
    "record": "0362ul79f",
    "reason": "Raw-census tooling-row registration and build-free runner checks only. The tracked runner patch changes command coverage but records no leaf-versus-unified timing or allocation measurement."
+  },
+  {
+   "record": "0363",
+   "reason": "Planning record for the litchi-iwa exit: results/0363 holds a source scan of the host's public functions (crosswalk) and its classifier, no leaf-versus-unified timing or allocation measurement."
   }
  ]
 }
