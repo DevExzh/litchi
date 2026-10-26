@@ -1484,6 +1484,43 @@ pub fn parse_wire_fields(data: &[u8], limits: WireLimits) -> Result<Vec<WireFiel
     Ok(items)
 }
 
+/// Visit protobuf wire fields in order without retaining a field list.
+///
+/// This applies exactly the framing, input-byte and field-count rules of
+/// [`parse_wire_fields`], in the same order and with the same errors, but
+/// hands each field to `visit` instead of collecting it. Callers that only
+/// look up a few field numbers avoid an input-sized allocation. A field is
+/// visited only after it parsed and passed the field-count ceiling; an error
+/// returned by `visit` stops the scan.
+pub fn visit_wire_fields<F>(data: &[u8], limits: WireLimits, mut visit: F) -> Result<()>
+where
+    F: FnMut(WireField) -> Result<()>,
+{
+    if data.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: data.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut fields = 0usize;
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let field = parse_wire_field(data, offset)?;
+        offset = field.end;
+        if fields >= limits.max_fields() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: fields + 1,
+                limit: limits.max_fields(),
+            });
+        }
+        fields += 1;
+        visit(field)?;
+    }
+    Ok(())
+}
+
 fn parse_wire_field(data: &[u8], start: usize) -> Result<WireField> {
     let (key, key_length) = crate::varint::decode_varint_from_bytes(&data[start..])
         .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
@@ -4059,6 +4096,64 @@ mod tests {
         let mut duplicate = varint_field(2, 21);
         duplicate.extend(varint_field(2, 22));
         assert!(overlay_singular_wire_fields(&base, &duplicate).is_err());
+    }
+
+    #[test]
+    fn visiting_wire_fields_matches_the_collected_parse() {
+        let mut source = varint_field(1, 7);
+        source.extend(length_delimited_field(2, b"payload"));
+        source.extend(varint_field(1, 9));
+        let collected = parse_wire_fields(&source, WireLimits::DEFAULT).unwrap();
+        let mut visited = Vec::new();
+        visit_wire_fields(&source, WireLimits::DEFAULT, |field| {
+            visited.push(field);
+            Ok(())
+        })
+        .unwrap();
+        let shape = |fields: &[WireField]| {
+            fields
+                .iter()
+                .map(|field| {
+                    (
+                        field.number(),
+                        field.wire_type(),
+                        field.start(),
+                        field.key_end(),
+                        field.payload_start(),
+                        field.end(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(shape(&visited), shape(&collected));
+
+        // The same field ceiling and framing errors, in the same order.
+        let tight = WireLimits::default().with_fields(2).unwrap();
+        assert_eq!(
+            visit_wire_fields(&source, tight, |_| Ok(()))
+                .unwrap_err()
+                .to_string(),
+            parse_wire_fields(&source, tight).unwrap_err().to_string()
+        );
+        let mut truncated = source.clone();
+        truncated.extend([0x12, 0x05, b'x']);
+        assert_eq!(
+            visit_wire_fields(&truncated, WireLimits::DEFAULT, |_| Ok(()))
+                .unwrap_err()
+                .to_string(),
+            parse_wire_fields(&truncated, WireLimits::DEFAULT)
+                .unwrap_err()
+                .to_string()
+        );
+        let mut visits = 0;
+        assert!(
+            visit_wire_fields(&source, WireLimits::DEFAULT, |_| {
+                visits += 1;
+                Err(Error::InvalidFormat("stop".to_owned()))
+            })
+            .is_err()
+        );
+        assert_eq!(visits, 1);
     }
 
     #[test]
