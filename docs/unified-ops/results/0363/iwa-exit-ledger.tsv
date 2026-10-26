@@ -1139,14 +1139,14 @@ numbers/editor/sheet_charts/hidden_data.rs	sheet_chart_includes_hidden_data	1	nu
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_fill	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_frame	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_frame	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_style_set_parity	A	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_shadow	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_visible	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_fill	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_frame	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_frame	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_shadow	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_visible	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-

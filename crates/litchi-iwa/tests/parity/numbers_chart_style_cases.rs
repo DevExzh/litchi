@@ -13,7 +13,7 @@ use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_numbers::Package;
 use litchi_numbers::sheet::chart::style::{
-    Property, PropertyKind, chart3d, corner, donut, pie, radar,
+    Property, PropertyKind, chart3d, corner, donut, legend, pie, radar,
 };
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -103,6 +103,17 @@ fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestRes
                 v.outside_corners_only(),
             ),
         )?,
+        Property::LegendFrame(frame) => {
+            use litchi_iwa::charts::{ChartLegendFrame, ChartLegendRect};
+            let frame = match frame {
+                legend::Frame::Automatic => ChartLegendFrame::Automatic,
+                legend::Frame::Frame(rect) => {
+                    let [x, y, width, height] = rect.native();
+                    ChartLegendFrame::Frame(ChartLegendRect::from_points(x, y, width, height)?)
+                },
+            };
+            e.set_sheet_chart_legend_frame(sheet, chart, frame)?;
+        },
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -144,6 +155,21 @@ fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestRe
                 (corners.radius().percent(), corners.outside_corners_only())
             )
         },
+        PropertyKind::LegendFrame => {
+            use litchi_iwa::charts::ChartLegendFrame;
+            match e.sheet_chart_legend_frame(sheet, chart)? {
+                ChartLegendFrame::Automatic => format!("{:?}", legend::Frame::Automatic),
+                ChartLegendFrame::Frame(rect) => format!(
+                    "{:?}",
+                    legend::Frame::Frame(legend::Rect::from_points(
+                        rect.x().points(),
+                        rect.y().points(),
+                        rect.width().points(),
+                        rect.height().points(),
+                    )?)
+                ),
+            }
+        },
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -161,6 +187,7 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::RoundedCorners(v) => {
             format!("{:?}", (v.radius().percent(), v.outside_corners_only()))
         },
+        Property::LegendFrame(frame) => format!("{frame:?}"),
         _ => return Err("unmapped property".into()),
     })
 }
