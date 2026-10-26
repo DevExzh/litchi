@@ -126,6 +126,24 @@ impl Component {
         before - self.object_uuids.len()
     }
 
+    /// The data items any of `objects` owns, ascending and unique.
+    pub(in crate::package) fn data_owned_by(&self, objects: &[u64]) -> Vec<u64> {
+        let mut data = self
+            .data_references
+            .iter()
+            .filter(|entry| {
+                entry
+                    .owners
+                    .iter()
+                    .any(|(owner, _)| objects.contains(owner))
+            })
+            .map(|entry| entry.data)
+            .collect::<Vec<_>>();
+        data.sort_unstable();
+        data.dedup();
+        data
+    }
+
     /// Drop `object` as an owner of every data item; a data record left
     /// without owners is removed from this component (the data item itself
     /// stays in the package).
@@ -507,6 +525,79 @@ impl Registry {
                 }
             }
         }
+    }
+
+    /// Lower the object watermark to `value` after a removal released the
+    /// identifier suffix above it (the caller proves no surviving object
+    /// lies above `value`).
+    pub(in crate::package) fn release_last_object_identifier(&mut self, value: u64) {
+        if value < self.last_object_identifier {
+            self.last_object_identifier = value;
+            for entry in &mut self.entries {
+                if let Entry::Watermark(raw) = entry {
+                    *raw = None;
+                }
+            }
+        }
+    }
+
+    /// Whether any component still records an owner of data item `data`.
+    pub(in crate::package) fn data_has_owner(&self, data: u64) -> bool {
+        self.components().any(|component| {
+            component
+                .data_references
+                .iter()
+                .any(|entry| entry.data == data)
+        })
+    }
+
+    /// Remove the `DataInfo` record of `identifier`; returns its stored file
+    /// name (`file_name`, else `preferred_file_name`), or `None` when the
+    /// registry has no such record.
+    pub(in crate::package) fn remove_data_info(
+        &mut self,
+        identifier: u64,
+        limits: WireLimits,
+    ) -> Result<Option<String>, StructureError> {
+        let mut found = None;
+        for (position, entry) in self.entries.iter().enumerate() {
+            let Entry::Raw(raw) = entry else { continue };
+            if field_number(raw) != Some(DATAS) {
+                continue;
+            }
+            let outer = parse_wire_fields(raw, limits)?;
+            let [field] = outer.as_slice() else {
+                return Err(StructureError::Registry("data info"));
+            };
+            let inner = field.payload(raw)?;
+            let mut id = None;
+            let mut preferred = None;
+            let mut stored = None;
+            for part in parse_wire_fields(inner, limits)? {
+                match (part.number(), part.wire_type()) {
+                    (1, VARINT) => id = Some(varint(part, inner)?),
+                    (3, LENGTH_DELIMITED) => preferred = Some(part.payload(inner)?.to_vec()),
+                    (4, LENGTH_DELIMITED) => stored = Some(part.payload(inner)?.to_vec()),
+                    _ => {},
+                }
+            }
+            if id == Some(identifier) {
+                if found.is_some() {
+                    return Err(StructureError::Registry("duplicate data info"));
+                }
+                let name = stored
+                    .or(preferred)
+                    .map(String::from_utf8)
+                    .transpose()
+                    .map_err(|_| StructureError::Registry("data file name"))?
+                    .ok_or(StructureError::Registry("data file name"))?;
+                found = Some((position, name));
+            }
+        }
+        Ok(found.map(|(position, name)| {
+            self.entries.remove(position);
+            name
+        }))
     }
 
     pub(in crate::package) fn components(&self) -> impl Iterator<Item = &Component> {

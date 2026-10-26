@@ -10,6 +10,7 @@ mod chart_axis_support;
 pub(crate) mod edit;
 mod identity;
 pub(crate) mod image_adjustments;
+mod locale;
 mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;

@@ -157,6 +157,8 @@ fn entry_names(
 /// What a removal took out of the package.
 pub(super) struct Removal {
     pub(super) objects: usize,
+    /// Data items culled with their final owner.
+    pub(super) data: usize,
 }
 
 /// Remove one drawable and its private object closure from its slide.
@@ -325,12 +327,14 @@ pub(super) fn remove(
         .map_err(StructureError::from)
         .map_err(lift)?;
 
+    let owned_data;
     {
         let component = workspace
             .registry
             .component_mut(component_id)
             .ok_or(Error::InvalidSource)?;
         component.remove_object_uuids(&closure);
+        owned_data = component.data_owned_by(&closure);
         for identifier in &closure {
             component.remove_data_owner(*identifier);
         }
@@ -338,9 +342,81 @@ pub(super) fn remove(
     for identifier in &closure {
         workspace.remove_object(*identifier).map_err(lift)?;
     }
+    let data = cull_unowned_data(workspace, &member, &owned_data)?;
     Ok(Removal {
         objects: closure.len(),
+        data,
     })
+}
+
+const METADATA_MEMBER: &str = "Index/Metadata.iwa";
+const DATA_METADATA_MAP: u32 = 11_015;
+
+/// Remove the data items a removal left without any owner, as the legacy
+/// host's `remove_slide_image` does: the `DataInfo` record and the `Data/`
+/// member go when no component records an owner, no surviving object of
+/// the slide's component lists the data in its header, and no
+/// `TSP.DataMetadataMap` entry names it. Returns how many were removed.
+fn cull_unowned_data(
+    workspace: &mut Workspace<'_>,
+    member: &str,
+    candidates: &[u64],
+) -> Result<usize, Error> {
+    let wire = workspace.wire;
+    let mut culled = 0;
+    'candidates: for &data in candidates {
+        if workspace.registry.data_has_owner(data) {
+            continue;
+        }
+        for identifier in workspace.member_objects(member) {
+            let object = workspace.require(identifier).map_err(lift)?;
+            if object
+                .archive_info
+                .message_infos
+                .iter()
+                .any(|info| info.data_references.contains(&data))
+            {
+                continue 'candidates;
+            }
+        }
+        for identifier in workspace.member_objects(METADATA_MEMBER) {
+            let object = workspace.require(identifier).map_err(lift)?;
+            for message in &object.messages {
+                if message.type_ == DATA_METADATA_MAP
+                    && metadata_map_names(&message.data, data, wire).map_err(lift)?
+                {
+                    continue 'candidates;
+                }
+            }
+        }
+        let Some(file_name) = workspace
+            .registry
+            .remove_data_info(data, wire)
+            .map_err(lift)?
+        else {
+            continue;
+        };
+        let path = format!("Data/{file_name}");
+        if workspace.package().structure_has_member(&path) {
+            workspace.delete_member(&path).map_err(lift)?;
+        }
+        culled += 1;
+    }
+    Ok(culled)
+}
+
+/// Whether a `TSP.DataMetadataMap` payload has an entry for `data`.
+fn metadata_map_names(payload: &[u8], data: u64, wire: WireLimits) -> Result<bool, StructureError> {
+    let fields = Fields::parse(payload, wire)?;
+    for entry in fields.all(1) {
+        let entry = Fields::parse(entry.message()?, wire)?;
+        if let Some(field) = entry.unique(1)?
+            && field.varint()? == data
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Move one drawable to `position` in its slide's back-to-front z-order.

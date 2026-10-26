@@ -90,7 +90,7 @@ keynote/editor.rs	cubic	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	delay	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	dissolve_in	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	dissolve_out	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
-keynote/editor.rs	duplicate_slide	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor.rs	duplicate_slide	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::duplicate_slide	keynote_slide_duplicate_parity	B	-	-
 keynote/editor.rs	duplicate_slide_text_box	1	keynote	drawable.text_box_lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	duration	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	effect	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
@@ -111,7 +111,7 @@ keynote/editor.rs	pop_action	1	keynote	keynote.build	host-only	litchi-keynote	-	
 keynote/editor.rs	pulse_action	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	recalculate_natural_size	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	remove_slide_build	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
-keynote/editor.rs	remove_slide_text_box	1	keynote	drawable.text_box_lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor.rs	remove_slide_text_box	1	keynote	drawable.text_box_lifecycle	migrated	litchi_keynote::slide::drawable::Edit::remove	keynote_slide_text_box_remove_parity	B	-	-
 keynote/editor.rs	remove_slide_text_box_comment	1	keynote	text.comment	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	remove_slide_text_box_comment_reply	1	keynote	text.comment	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	remove_slide_text_box_highlight	1	keynote	text.highlight	host-only	litchi-keynote	-	-	-	-
@@ -168,7 +168,7 @@ keynote/editor.rs	set_move_alignment	1	keynote	keynote.build	host-only	litchi-ke
 keynote/editor.rs	set_move_path	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	set_slide_build	1	keynote	keynote.build	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	set_slide_text_box_columns	1	keynote	drawable.text_box_properties	host-only	litchi-keynote	-	-	-	-
-keynote/editor.rs	set_slide_text_box_geometry	1	keynote	drawable.text_box_properties	host-only	litchi-keynote	-	-	-	-
+keynote/editor.rs	set_slide_text_box_geometry	1	keynote	drawable.text_box_properties	migrated	litchi_keynote::slide::drawable::Edit::set_geometry	keynote_slide_text_box_geometry_parity	B	-	-
 keynote/editor.rs	set_slide_text_box_paragraph_alignment	1	keynote	text.paragraph	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	set_slide_text_box_paragraph_background	1	keynote	text.paragraph	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	set_slide_text_box_paragraph_borders	1	keynote	text.paragraph	host-only	litchi-keynote	-	-	-	-
@@ -218,7 +218,7 @@ keynote/editor.rs	slide_media_assets	1	keynote	media.asset	host-only	litchi-keyn
 keynote/editor.rs	slide_text_box_columns	1	keynote	drawable.text_box_properties	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	slide_text_box_comment_replies	1	keynote	text.comment	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	slide_text_box_comments	1	keynote	text.comment	host-only	litchi-keynote	-	-	-	-
-keynote/editor.rs	slide_text_box_geometry	1	keynote	drawable.text_box_properties	host-only	litchi-keynote	-	-	-	-
+keynote/editor.rs	slide_text_box_geometry	1	keynote	drawable.text_box_properties	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_drawable_read_parity	A	-	-
 keynote/editor.rs	slide_text_box_highlights	1	keynote	text.highlight	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	slide_text_box_hyperlinks	1	keynote	text.hyperlink	host-only	litchi-keynote	-	-	-	-
 keynote/editor.rs	slide_text_box_paragraph_alignment	1	keynote	text.paragraph	host-only	litchi-keynote	-	-	-	-
@@ -283,9 +283,9 @@ keynote/editor/date_time_fields.rs	insert_slide_text_box_date_time_field	1	keyno
 keynote/editor/date_time_fields.rs	remove_slide_text_box_date_time_field	1	keynote	text.date_time_field	host-only	litchi-keynote	-	-	-	-
 keynote/editor/date_time_fields.rs	slide_text_box_date_time_fields	1	keynote	text.date_time_field	host-only	litchi-keynote	-	-	-	-
 keynote/editor/date_time_fields.rs	update_slide_text_box_date_time_field	1	keynote	text.date_time_field	host-only	litchi-keynote	-	-	-	-
-keynote/editor/drawable_order.rs	move_slide_drawable	1	keynote	drawable.order	host-only	litchi-keynote	-	-	-	-
-keynote/editor/drawable_order.rs	set_slide_drawable_order	1	keynote	drawable.order	host-only	litchi-keynote	-	-	-	-
-keynote/editor/drawable_order.rs	slide_drawable_order	1	keynote	drawable.order	host-only	litchi-keynote	-	-	-	-
+keynote/editor/drawable_order.rs	move_slide_drawable	1	keynote	drawable.order	migrated	litchi_keynote::slide::drawable::Edit::move_to	keynote_slide_drawable_move_parity	B	-	-
+keynote/editor/drawable_order.rs	set_slide_drawable_order	1	keynote	drawable.order	migrated	litchi_keynote::slide::drawable::Edit::move_to	keynote_slide_drawable_order_parity	B	-	-
+keynote/editor/drawable_order.rs	slide_drawable_order	1	keynote	drawable.order	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_drawable_read_parity	A	-	-
 keynote/editor/named_paragraph_styles.rs	apply_slide_text_box_named_paragraph_style	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/named_paragraph_styles.rs	create_slide_text_box_named_paragraph_style	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/named_paragraph_styles.rs	delete_applied_slide_text_box_named_paragraph_style_with_replacement	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
@@ -462,37 +462,37 @@ keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_labe
 keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/shadow.rs	set_slide_chart_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/shadow.rs	slide_chart_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_create.rs	add_slide	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_create.rs	default_slide_layout	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_create.rs	insert_slide	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_create.rs	slide_layouts	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_images.rs	add_slide_image	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_create.rs	add_slide	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::add_slide	keynote_slide_add_parity	B	-	-
+keynote/editor/slide_create.rs	default_slide_layout	1	keynote	slide.lifecycle	migrated	litchi_keynote::Package::default_slide_layout	keynote_slide_layouts_read_parity	A	-	-
+keynote/editor/slide_create.rs	insert_slide	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::add_slide	keynote_slide_insert_parity	B	-	-
+keynote/editor/slide_create.rs	slide_layouts	1	keynote	slide.lifecycle	migrated	litchi_keynote::Package::slide_layouts	keynote_slide_layouts_read_parity	A	-	-
+keynote/editor/slide_images.rs	add_slide_image	1	keynote	drawable.image	migrated	litchi_keynote::slide::drawable::Edit::add_image	keynote_slide_image_add_parity	B	-	-
 keynote/editor/slide_images.rs	duplicate_slide_image	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	flip_slide_image	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_images.rs	remove_slide_image	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_images.rs	remove_slide_image	1	keynote	drawable.image	migrated	litchi_keynote::slide::drawable::Edit::remove	keynote_slide_image_remove_parity	B	-	-
 keynote/editor/slide_images.rs	remove_slide_image_caption	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	remove_slide_image_title	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	replace_slide_image_data	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	restore_slide_image_original_size	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	set_slide_image_caption	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_images.rs	set_slide_image_geometry	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_images.rs	set_slide_image_geometry	1	keynote	drawable.image	migrated	litchi_keynote::slide::drawable::Edit::set_geometry	keynote_slide_image_geometry_parity	B	-	-
 keynote/editor/slide_images.rs	set_slide_image_properties	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	set_slide_image_title	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_images.rs	slide_image_geometry	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_images.rs	slide_image_geometry	1	keynote	drawable.image	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_drawable_read_parity	A	-	-
 keynote/editor/slide_images.rs	slide_image_properties	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	slide_image_title_caption	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_images.rs	slide_images	1	keynote	drawable.image	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_layout_update.rs	set_slide_layout	1	keynote	slide.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_layout_update.rs	set_slide_layout	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::set_layout	keynote_slide_layout_set_parity	B	-	-
 keynote/editor/slide_shapes.rs	add_slide_line	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	add_slide_line_with_endpoints	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	add_slide_line_with_style	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes.rs	add_slide_rectangle	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes.rs	add_slide_shape	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	add_slide_rectangle	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::add_shape	keynote_slide_rectangle_add_parity	B	-	-
+keynote/editor/slide_shapes.rs	add_slide_shape	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::add_shape	keynote_slide_shape_add_parity	B	-	-
 keynote/editor/slide_shapes.rs	add_slide_shape_with_fill	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	clear_slide_shape_text	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	duplicate_slide_shape	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	flip_slide_shape	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes.rs	remove_slide_shape	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	remove_slide_shape	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::remove	keynote_slide_shape_remove_parity	B	-	-
 keynote/editor/slide_shapes.rs	replace_slide_shape_text	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	reset_slide_line_endpoints	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	reset_slide_shape_effects	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
@@ -504,7 +504,7 @@ keynote/editor/slide_shapes.rs	set_slide_line_endpoints	1	keynote	drawable.shape
 keynote/editor/slide_shapes.rs	set_slide_line_segment	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_effects	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_fill	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes.rs	set_slide_shape_geometry	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	set_slide_shape_geometry	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::set_geometry	keynote_slide_shape_geometry_parity	B	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_image_fill	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_preset	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_properties	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
@@ -516,7 +516,7 @@ keynote/editor/slide_shapes.rs	slide_line_endpoints	1	keynote	drawable.shape	hos
 keynote/editor/slide_shapes.rs	slide_line_segment	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	slide_shape_effects	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	slide_shape_fill	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes.rs	slide_shape_geometry	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	slide_shape_geometry	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_drawable_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_preset	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	slide_shape_properties	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	slide_shape_shadow	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
@@ -703,24 +703,24 @@ keynote/editor/slide_tables/topology.rs	insert_slide_table_column	1	keynote	tabl
 keynote/editor/slide_tables/topology.rs	insert_slide_table_row	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/topology.rs	remove_slide_table_column	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/topology.rs	remove_slide_table_row	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
-keynote/editor/text_box_create.rs	add_slide_text_box	1	keynote	drawable.text_box_lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/text_box_create.rs	add_slide_text_box	1	keynote	drawable.text_box_lifecycle	migrated	litchi_keynote::slide::drawable::Edit::add_text_box	keynote_slide_text_box_add_parity	B	-	-
 lib.rs	publication_error	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 lib.rs	publication_was_committed	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-media/model.rs	is_audio	1	shared	drawable.audio	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-media/model.rs	is_image	1	shared	drawable.image	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+media/model.rs	is_audio	1	shared	drawable.audio	migrated	litchi_iwa_common::media::Asset::is_audio	keynote_media_catalog_parity	A	-	-
+media/model.rs	is_image	1	shared	drawable.image	migrated	litchi_iwa_common::media::Asset::is_image	pages_media_catalog_parity	A	-	-
 media/model.rs	is_materialized	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/model.rs	is_referenced	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/model.rs	is_video	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/model.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/model.rs	new	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/model.rs	summary	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/model.rs	total_size_human	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/model.rs	is_video	1	shared	media.asset	migrated	litchi_iwa_common::media::Asset::is_video	keynote_media_catalog_parity	A	-	-
+media/model.rs	new	1	shared	io	migrated	litchi_iwa_common::media::Asset::new	keynote_media_catalog_parity	A	-	-
+media/model.rs	new	2	shared	io	migrated	litchi_iwa_common::media::asset::Limits::new	keynote_media_catalog_parity	A	-	-
+media/model.rs	summary	1	shared	media.asset	migrated	litchi_iwa_common::media::Stats::summary	numbers_media_catalog_parity	A	-	-
+media/model.rs	total_size_human	1	shared	media.asset	migrated	litchi_iwa_common::media::Stats::total_size_human	numbers_media_catalog_parity	A	-	-
 media/package.rs	asset	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	assets	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	assets	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::assets	keynote_media_catalog_parity	A	-	-
 media/package.rs	assets	2	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	assets_by_type	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	assets_in_order	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	audio	1	shared	drawable.audio	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+media/package.rs	assets_by_type	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::by_type	keynote_media_catalog_parity	A	-	-
+media/package.rs	assets_in_order	1	shared	media.asset	retired	-	-	-	-	duplicate of `litchi_iwa_common::media::Catalog::assets`, which is already path-ordered (record 0375)
+media/package.rs	audio	1	shared	drawable.audio	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Audio)` (record 0375)
 media/package.rs	extract	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/package.rs	extract	2	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/package.rs	extract_to_file	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
@@ -731,11 +731,11 @@ media/package.rs	from_bytes_with_options	1	shared	media.asset	host-only	litchi-i
 media/package.rs	from_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 media/package.rs	from_package	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 media/package.rs	from_package_with_options	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	get	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	images	1	shared	drawable.image	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+media/package.rs	get	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::get	pages_media_catalog_parity	A	-	-
+media/package.rs	images	1	shared	drawable.image	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Image)` (record 0375)
 media/package.rs	insert_unreferenced	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/package.rs	into_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	iter_assets	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	iter_assets	1	shared	media.asset	retired	-	-	-	-	duplicate of `litchi_iwa_common::media::Catalog::assets` (slice iteration; record 0375)
 media/package.rs	limits	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/package.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 media/package.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
@@ -748,9 +748,9 @@ media/package.rs	replace	1	shared	media.asset	host-only	litchi-iwa-archive (Data
 media/package.rs	save	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 media/package.rs	set_max_replacement_bytes	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/package.rs	snapshot	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	stats	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	stats	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::stats	numbers_media_catalog_parity	A	-	-
 media/package.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	videos	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	videos	1	shared	media.asset	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Video)` (record 0375)
 numbers/creation.rs	build	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	builder	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	create	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
@@ -2062,23 +2062,23 @@ shapes/fill/image.rs	with_technique	1	shared	keynote.build	host-only	litchi-iwa-
 shapes/fill/image.rs	with_tint	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 shapes/fill/image.rs	without_tint	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/line.rs	length	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/line.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+shapes/line.rs	length	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::line::Segment::length	numbers_line_segment_parity	A	-	-
+shapes/line.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::line::Segment::new	keynote_line_segment_parity	A	-	-
 text/date_time_field.rs	from_object_id	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	add_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	add_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	add_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	add_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::encode_date_time	text_date_time_add_parity	B	-	ranged::rewrite(Change::Add) plus smart_field::encode_date_time (caller UUID; host UUID random, masked); host kept as the oracle (record 0374)
 text/editor.rs	add_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	add_text_hyperlink	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	apply_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	create_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	delete_applied_named_paragraph_style_with_replacement	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	delete_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-text/editor.rs	insert_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	insert_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	insert_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::encode_date_time	text_date_time_insert_parity	B	-	rewrite_storage_text_with_behavior then ranged::rewrite(Change::Add) and smart_field::encode_date_time; host kept as the oracle (record 0374)
+text/editor.rs	insert_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::anchor	text_number_attachment_insert_parity	A	-	U+FFFC insertion by rewrite_storage_text_with_behavior, number_attachment::anchor and number_attachment::encode; host kept as the oracle (record 0374)
 text/editor.rs	named_paragraph_styles	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Alignment); host kept as the oracle (record 0374)
@@ -2086,8 +2086,8 @@ text/editor.rs	paragraph_background	1	shared	text.shared	migrated	litchi_iwa_tex
 text/editor.rs	paragraph_borders	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Borders); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_decimal_tab_character	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::DecimalTabCharacter); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_default_tab_interval	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::DefaultTabInterval); host kept as the oracle (record 0374)
-text/editor.rs	paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_drop_caps	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	paragraph_drop_cap	1	shared	text.drop_cap	migrated	litchi_iwa_text_wire::drop_cap::model	text_drop_cap_read_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	paragraph_drop_caps	1	shared	text.drop_cap	migrated	litchi_iwa_text_wire::drop_cap::placements	text_drop_cap_read_parity	A	-	drop_cap::placements plus drop_cap::model; the base style comes from the format package theme presets; host kept as the oracle (record 0374)
 text/editor.rs	paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Flow); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::FollowingStyle); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Indents); host kept as the oracle (record 0374)
@@ -2108,17 +2108,17 @@ text/editor.rs	paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_w
 text/editor.rs	paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TabStops); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::WritingDirection); host kept as the oracle (record 0374)
 text/editor.rs	redefine_applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_paragraph_drop_cap	1	shared	text.drop_cap	migrated	litchi_iwa_text_wire::drop_cap::plan	text_drop_cap_remove_parity	A	-	drop_cap::plan(Change::Remove) and drop_cap::point; host kept as the oracle (record 0374)
+text/editor.rs	remove_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::ranged::rewrite	text_date_time_remove_parity	A	-	ranged::rewrite(Change::Remove); the format package drops the object; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_hyperlink	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_language_boundary	1	shared	text.language	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
+text/editor.rs	remove_text_language_boundary	1	shared	text.language	migrated	litchi_iwa_text_wire::language::rewrite	text_language_remove_parity	A	-	language::rewrite(Change::RemoveBoundary); host kept as the oracle (record 0374)
+text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_number_attachment_remove_parity	A	-	deleting the U+FFFC drops the anchor; the format package prunes and drops the orphan object; host kept as the oracle (record 0374)
 text/editor.rs	rename_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	replace_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	replace_text	1	shared	text.shared	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_replace_parity	A	-	host delegates the payload rewrite; object cleanup of removed references is the format package publication (record 0374)
 text/editor.rs	reset_paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Alignment)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::ParagraphBackground)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_borders	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Borders)); host kept as the oracle (record 0374)
@@ -2147,7 +2147,7 @@ text/editor.rs	reset_text_character_spacing	1	shared	text.shared	migrated	litchi
 text/editor.rs	reset_text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextColor)); host kept as the oracle (record 0374)
 text/editor.rs	reset_text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextDecorations)); host kept as the oracle (record 0374)
 text/editor.rs	reset_text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextFont)); host kept as the oracle (record 0374)
-text/editor.rs	reset_text_languages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	reset_text_languages	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::rewrite	text_language_reset_parity	A	-	language::rewrite(Change::Reset); host kept as the oracle (record 0374)
 text/editor.rs	reset_text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextLigatures)); host kept as the oracle (record 0374)
 text/editor.rs	reset_text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextOutline)); host kept as the oracle (record 0374)
 text/editor.rs	reset_text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextScript)); host kept as the oracle (record 0374)
@@ -2159,7 +2159,7 @@ text/editor.rs	set_paragraph_background	1	shared	text.shared	migrated	litchi_iwa
 text/editor.rs	set_paragraph_borders	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Borders)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_decimal_tab_character	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::DecimalTabCharacter)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_default_tab_interval	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::DefaultTabInterval)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
-text/editor.rs	set_paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_paragraph_drop_cap	1	shared	text.drop_cap	migrated	litchi_iwa_text_wire::drop_cap::plan	text_drop_cap_set_parity	B	-	drop_cap::plan(Change::Set): derived variations tier B (host metadata UUID random), in-place rewrites tier A in text_drop_cap_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Flow)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::FollowingStyle)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Indents)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
@@ -2178,7 +2178,7 @@ text/editor.rs	set_paragraph_lists	1	shared	text.shared	host-only	litchi-iwa-tex
 text/editor.rs	set_paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Spacing)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TabStops)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::WritingDirection)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
-text/editor.rs	set_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_text	1	shared	text.shared	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_replace_parity	A	-	replace_text over the whole text; host delegates the payload rewrite (record 0374)
 text/editor.rs	set_text_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextBackground)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_baseline_shift	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextBaselineShift)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextCapitalization)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
@@ -2186,43 +2186,43 @@ text/editor.rs	set_text_character_spacing	1	shared	text.shared	migrated	litchi_i
 text/editor.rs	set_text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextColor)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextDecorations)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextFont)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
-text/editor.rs	set_text_language	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_text_language	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::rewrite	text_language_set_parity	A	-	language::rewrite(Change::Set); host kept as the oracle (record 0374)
 text/editor.rs	set_text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextLigatures)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextOutline)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextScript)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextShadow)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextStyle)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
-text/editor.rs	storage	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	storages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	storage	1	shared	text.shared	migrated	litchi_iwa_text_wire::from_bytes	text_storage_read_parity	A	-	storage text decode (record 0374)
+text/editor.rs	storages	1	shared	text.shared	migrated	litchi_iwa_text_wire::from_bytes	text_storage_read_parity	A	-	storage text decode; storage discovery is the format package (record 0374)
 text/editor.rs	text_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextBackground); host kept as the oracle (record 0374)
 text/editor.rs	text_baseline_shift	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextBaselineShift); host kept as the oracle (record 0374)
-text/editor.rs	text_bookmarks	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_bookmarks	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::entries	text_smart_field_read_parity	A	-	ranged::entries over the bookmark table plus smart_field::bookmark; host kept as the oracle (record 0374)
 text/editor.rs	text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCapitalization); host kept as the oracle (record 0374)
 text/editor.rs	text_character_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCharacterSpacing); host kept as the oracle (record 0374)
 text/editor.rs	text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextColor); host kept as the oracle (record 0374)
 text/editor.rs	text_comment_replies	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_comments	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_date_time_fields	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_date_time_fields	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::date_time	text_date_time_read_parity	A	-	ranged::entries over the smart-field table plus smart_field::date_time; host kept as the oracle (record 0374)
 text/editor.rs	text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextDecorations); host kept as the oracle (record 0374)
 text/editor.rs	text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextFont); host kept as the oracle (record 0374)
 text/editor.rs	text_highlights	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_language	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_languages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::entries	text_smart_field_read_parity	A	-	ranged::entries over the smart-field table plus smart_field::hyperlink; host kept as the oracle (record 0374)
+text/editor.rs	text_language	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::at	text_language_read_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	text_languages	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::runs	text_language_read_parity	A	-	host kept as the oracle (record 0374)
 text/editor.rs	text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextLigatures); host kept as the oracle (record 0374)
-text/editor.rs	text_number_attachments	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_number_attachments	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::anchors	text_number_attachment_read_parity	A	-	number_attachment::anchors plus number_attachment::settings; host kept as the oracle (record 0374)
 text/editor.rs	text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextOutline); host kept as the oracle (record 0374)
 text/editor.rs	text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextScript); host kept as the oracle (record 0374)
 text/editor.rs	text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextShadow); host kept as the oracle (record 0374)
 text/editor.rs	text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextStyle); host kept as the oracle (record 0374)
 text/editor.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-text/editor.rs	update_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	update_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	update_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	update_text_date_time_field	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::date_time_with_settings	text_date_time_update_parity	A	-	ranged::rewrite(Change::Move) plus smart_field::date_time_with_settings; host kept as the oracle (record 0374)
 text/editor.rs	update_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	update_text_hyperlink	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	update_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
+text/editor.rs	update_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::with_settings	text_number_attachment_update_parity	A	-	host kept as the oracle (record 0374)
 text/extractor.rs	extract_from_bundle	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/extractor.rs	extract_from_object	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/extractor.rs	get_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
