@@ -3755,7 +3755,45 @@ pub(super) fn set_attached_cell_in_package(
 ) -> Result<()> {
     table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
-    set_cell_at_location(package, location, row, column, value)
+    set_cell_at_location(
+        package,
+        location,
+        row,
+        column,
+        value,
+        ClearPolicy::KeepMetadata,
+    )
+}
+
+/// Remove an attached cell's value together with its stored metadata, as
+/// an axis removal needs before it drops the axis (record 0370: a value
+/// clear now keeps a cell's formatting).
+pub(super) fn remove_attached_cell_in_package(
+    package: &mut HostPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    set_cell_at_location(
+        package,
+        location,
+        row,
+        column,
+        CellValue::Empty,
+        ClearPolicy::DropMetadata,
+    )
+}
+
+/// What clearing a cell's value does with the rest of the cell.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ClearPolicy {
+    /// A cell whose style, text-style or format keys survive the clear
+    /// stays (native Numbers keeps a cleared cell's formatting).
+    KeepMetadata,
+    /// The cell goes unless it is commented (axis removal).
+    DropMetadata,
 }
 
 /// Return whether an attached table cell stores a native formula reference.
@@ -3828,13 +3866,7 @@ pub(super) fn relocate_attached_cell_in_package(
                 destination_column,
             )?;
         }
-        set_attached_cell_in_package(
-            package,
-            table_id,
-            destination_row,
-            destination_column,
-            CellValue::Empty,
-        )?;
+        remove_attached_cell_in_package(package, table_id, destination_row, destination_column)?;
     }
 
     let destination_count = update_tile(
@@ -3919,7 +3951,14 @@ fn set_cells_for_descriptor(
             tile_id,
             tile_row,
         };
-        set_cell_with_context(package, &context, update.row, update.column, update.value)?;
+        set_cell_with_context(
+            package,
+            &context,
+            update.row,
+            update.column,
+            update.value,
+            ClearPolicy::KeepMetadata,
+        )?;
     }
     Ok(())
 }
@@ -3930,6 +3969,7 @@ fn set_cell_at_location(
     row: usize,
     column: usize,
     value: CellValue,
+    clear: ClearPolicy,
 ) -> Result<()> {
     let context = CellWriteContext {
         descriptor: &location.descriptor,
@@ -3938,7 +3978,7 @@ fn set_cell_at_location(
         tile_id: location.tile_id,
         tile_row: location.tile_row,
     };
-    set_cell_with_context(package, &context, row, column, value)
+    set_cell_with_context(package, &context, row, column, value, clear)
 }
 
 struct CellWriteContext<'a> {
@@ -3949,12 +3989,25 @@ struct CellWriteContext<'a> {
     tile_row: u32,
 }
 
+/// Whether `cell` still stores anything once its value is cleared.
+fn keeps_metadata_after_clear(cell: Option<&BncCell>) -> Result<bool> {
+    let Some(cell) = cell else {
+        return Ok(false);
+    };
+    let limits = litchi_numbers_wire::Limits::DEFAULT;
+    let mut cleared = cell.clone();
+    cleared.clear_value_preserving_metadata();
+    Ok(crate::numbers::bnc_encode(&cleared, &limits)?
+        != crate::numbers::bnc_encode(&BncCell::minimal(), &limits)?)
+}
+
 fn set_cell_with_context(
     package: &mut HostPackage,
     context: &CellWriteContext<'_>,
     row: usize,
     column: usize,
     value: CellValue,
+    clear: ClearPolicy,
 ) -> Result<()> {
     let CellWriteContext {
         descriptor,
@@ -4038,7 +4091,17 @@ fn set_cell_with_context(
                     None,
                 )?;
             }
-            if old_comment.is_some() {
+            // Host defect fixed with record 0370: clearing a value kept
+            // only a commented cell and dropped every other cell with its
+            // style, text-style and format keys, leaving their table-data
+            // list entries counting a cell that no longer exists. Native
+            // Numbers keeps a cleared cell's formatting; the shared leaf
+            // writer (`table_write::cell_bytes`) keeps a cell whose
+            // metadata survives the clear.
+            if old_comment.is_some()
+                || (clear == ClearPolicy::KeepMetadata
+                    && keeps_metadata_after_clear(old_bnc.as_ref())?)
+            {
                 EncodedValue::ClearValuePreservingMetadata
             } else {
                 EncodedValue::Clear
