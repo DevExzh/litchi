@@ -6359,3 +6359,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   passes 17 source tests, bringing preparations to 28/28 source-ready. All
   actual qualification, final candidate rebinding and final all-65 remain
   pending. Nothing is pushed.
+
+  DOCX metadata replay now retains exact core XML, publishes source-scoped
+  application/custom parts before core, and reverses that order for inverse
+  replay (165p). Review returns for error classification, public scope and
+  duplicate planning are repaired. The shared planner reserves base
+  relationship IDs across a removal/creation patch. All 532 shared OOXML and
+  1,532 DOCX library tests pass; root verifies source/locks and bounded runner
+  evidence before merging e7f9e97f0a. The new cross-provenance forward test
+  respects the writer's existing member-order policy while comparing exact
+  member records; inverse whole-archive assertions remain strict. A focused
+  29th native group is required because the existing groups do not measure
+  these metadata paths. The original ODF baseline compiler check exposes
+  unrelated OOXML dependencies in the broad consumer; an isolated ten-family
+  consumer and independently pinned baseline lock are in review. Quarantine
+  leaf retirement brings cumulative cleanup to 280 worktrees/442 refs, with
+  all 70 excluded refs unchanged. Final rebinding, all-65 and native
+  qualification remain pending. Nothing is pushed.

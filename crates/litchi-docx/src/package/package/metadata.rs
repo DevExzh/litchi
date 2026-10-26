@@ -65,11 +65,52 @@ impl Package {
         if self.metadata() != patch.base() {
             return Err(Error::PatchConflict);
         }
-        let (package, changed) = self.publish_metadata(patch.target(), patch.parts())?;
+        if patch.is_noop() {
+            self.ensure_opc_current("apply_metadata")?;
+            patch
+                .core_patch()
+                .check(&self.opc)
+                .map_err(crate::Error::from)?;
+            patch.parts().check(&self.opc).map_err(Error::Properties)?;
+            return Ok(crate::metadata::Commit::new(
+                self.clone(),
+                patch.clone(),
+                litchi_core::edit::Diagnostics::new(false),
+            ));
+        }
+        if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
+            return Err(Error::Signed);
+        }
+        let mut package = self.clone();
+        let mut parts_failure = None;
+        let published = package.edit_semantic_opc("apply_metadata", |opc| {
+            if patch.parts_first() {
+                if let Err(error) = apply_metadata_parts(opc, patch.parts()) {
+                    parts_failure = Some(error);
+                    return Err(crate::Error::InvalidFormat(
+                        "document-property parts refused the patch".to_owned(),
+                    ));
+                }
+                apply_metadata_core(opc, patch.core_patch())?;
+            } else {
+                apply_metadata_core(opc, patch.core_patch())?;
+                if let Err(error) = apply_metadata_parts(opc, patch.parts()) {
+                    parts_failure = Some(error);
+                    return Err(crate::Error::InvalidFormat(
+                        "document-property parts refused the patch".to_owned(),
+                    ));
+                }
+            }
+            Ok(())
+        });
+        if let Some(error) = parts_failure {
+            return Err(Error::Properties(error));
+        }
+        published?;
         Ok(crate::metadata::Commit::new(
             package,
             patch.clone(),
-            litchi_core::edit::Diagnostics::new(changed),
+            litchi_core::edit::Diagnostics::new(true),
         ))
     }
 
@@ -116,67 +157,151 @@ impl Package {
         Ok(plan.finish()?.1)
     }
 
-    /// Publish `target` as the core properties of a new package, and `parts`
-    /// over its application and custom properties. Returns whether the
-    /// package changed.
+    /// Publish the staged core, application and custom properties as one
+    /// atomic package edit. The application/custom family is published first
+    /// from the source-scoped patch; the core family is then planned over the
+    /// intermediate graph so relationship IDs cannot collide.
     pub(crate) fn publish_metadata(
         &self,
         target: Option<&Props>,
-        parts: &families::Patch,
-    ) -> Result<(Self, bool)> {
+        app: Option<Option<app::Props>>,
+        custom: Option<CustomProps>,
+        remove_custom: bool,
+    ) -> Result<(Self, bool, families::Patch, families::Patch)> {
         let core = self.metadata() != target;
-        let parts_noop = parts.is_noop();
-        // A no-op patch from the shared properties planner carries a complete
-        // property-family scope. Authenticate it before a core edit changes
-        // the package; applying it after that edit would compare the scope
-        // against the new core bytes and reject a valid combined edit.
-        if parts_noop {
-            parts.check(&self.opc)?;
-        }
-        if !core && parts_noop {
-            return Ok((self.clone(), false));
+        let has_parts = app.is_some() || custom.is_some() || remove_custom;
+        if !core && !has_parts {
+            return Ok((
+                self.clone(),
+                false,
+                families::Patch::default(),
+                families::Patch::default(),
+            ));
         }
         if core && let Some(props) = target {
             admit(props)?;
         }
+
+        // Retain one source-scoped application/custom patch. A core edit is
+        // planned after this patch has been applied to the candidate.
+        let source_parts = if has_parts {
+            self.property_parts_patch(app.clone(), custom.clone(), remove_custom)?
+        } else {
+            families::Patch::default()
+        };
+
+        // An application/custom-only edit can use the source plan directly.
+        if !core {
+            let parts = source_parts;
+            if parts.is_noop() {
+                return Ok((self.clone(), false, parts, families::Patch::default()));
+            }
+            if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
+                return Err(Error::Signed);
+            }
+            let mut package = self.clone();
+            let mut parts_failure = None;
+            let published =
+                package.edit_semantic_opc("edit_metadata", |opc| match parts.apply(opc) {
+                    Ok(commit) => {
+                        *opc = commit.into_package();
+                        Ok(())
+                    },
+                    Err(error) => {
+                        parts_failure = Some(error);
+                        Err(crate::Error::InvalidFormat(
+                            "document-property parts refused the patch".to_owned(),
+                        ))
+                    },
+                });
+            if let Some(error) = parts_failure {
+                return Err(Error::Properties(error));
+            }
+            published?;
+            return Ok((package, true, parts, families::Patch::default()));
+        }
+
         if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
+
         let mut package = self.clone();
-        let mut failure = None;
+        let mut parts_failure = None;
+        let mut core_patch = families::Patch::default();
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
-            if core {
-                let mut core_edit =
-                    families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
-                match target {
-                    Some(props) => {
-                        core_edit
-                            .set_core_metadata(props.clone())
-                            .map_err(crate::Error::from)?;
-                    },
-                    None => {
-                        core_edit.clear_metadata();
-                    },
-                }
-                *opc = core_edit
-                    .commit()
-                    .map_err(crate::Error::from)?
-                    .into_package();
-            }
-            if !parts_noop {
-                if let Err(error) = parts.apply(opc).map(|commit| *opc = commit.into_package()) {
-                    failure = Some(error);
+            if source_parts.is_noop() {
+                if has_parts && let Err(error) = source_parts.check(opc) {
+                    parts_failure = Some(error);
                     return Err(crate::Error::InvalidFormat(
                         "document-property parts refused the patch".to_owned(),
                     ));
                 }
+            } else {
+                match source_parts.apply(opc) {
+                    Ok(commit) => {
+                        *opc = commit.into_package();
+                    },
+                    Err(error) => {
+                        parts_failure = Some(error);
+                        return Err(crate::Error::InvalidFormat(
+                            "document-property parts refused the patch".to_owned(),
+                        ));
+                    },
+                }
             }
+
+            let mut core_edit = families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
+            match target {
+                Some(props) => {
+                    core_edit
+                        .set_core_metadata(props.clone())
+                        .map_err(crate::Error::from)?;
+                },
+                None => {
+                    core_edit.clear_metadata();
+                },
+            }
+            let core_commit = core_edit.commit().map_err(crate::Error::from)?;
+            let (core_package, committed_core_patch) = core_commit.into_parts();
+            *opc = core_package;
+            core_patch = committed_core_patch;
             Ok(())
         });
-        if let Some(error) = failure {
+        if let Some(error) = parts_failure {
             return Err(Error::Properties(error));
         }
         published?;
-        Ok((package, true))
+        Ok((
+            package,
+            !core_patch.is_noop() || !source_parts.is_noop(),
+            source_parts,
+            core_patch,
+        ))
+    }
+}
+
+fn apply_metadata_core(
+    opc: &mut litchi_opc::OpcPackage,
+    patch: &families::Patch,
+) -> std::result::Result<(), crate::Error> {
+    if patch.is_noop() {
+        patch.check(opc).map_err(crate::Error::from)
+    } else {
+        let commit = patch.apply(opc).map_err(crate::Error::from)?;
+        *opc = commit.into_package();
+        Ok(())
+    }
+}
+
+fn apply_metadata_parts(
+    opc: &mut litchi_opc::OpcPackage,
+    patch: &families::Patch,
+) -> std::result::Result<(), families::Error> {
+    if patch.is_noop() {
+        patch.check(opc)
+    } else {
+        let commit = patch.apply(opc)?;
+        *opc = commit.into_package();
+        Ok(())
     }
 }

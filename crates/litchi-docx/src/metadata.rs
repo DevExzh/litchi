@@ -127,12 +127,20 @@ pub enum Error {
 /// A replayable document-properties change: the core-properties value the
 /// edit started from and the value it published (`None` is an absent
 /// core-properties part), and the exact part changes of the application and
-/// custom properties.
+/// custom properties. The exact core delta planned over the post-parts graph
+/// and the source-scoped application/custom delta are retained for
+/// byte-faithful replay and inversion.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     base: Option<Metadata>,
     target: Option<Metadata>,
     parts: families::Patch,
+    /// The exact shared-codec core patch over the graph after `parts` has
+    /// been applied.
+    core: families::Patch,
+    /// Whether replay must apply the application/custom patch before the core
+    /// patch. Forward edits are parts-first; inverses are core-first.
+    parts_first: bool,
 }
 
 impl Patch {
@@ -148,16 +156,25 @@ impl Patch {
         self.target.as_ref()
     }
 
-    /// The exact part changes of the application and custom properties.
+    /// The exact application/custom part changes planned over the source
+    /// package, independent of any core transition in this patch.
     #[must_use]
     pub const fn parts(&self) -> &families::Patch {
         &self.parts
     }
 
+    pub(crate) const fn core_patch(&self) -> &families::Patch {
+        &self.core
+    }
+
+    pub(crate) const fn parts_first(&self) -> bool {
+        self.parts_first
+    }
+
     /// Whether applying the patch leaves every package byte unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.base == self.target && self.parts.is_noop()
+        self.base == self.target && self.core.is_noop() && self.parts.is_noop()
     }
 
     /// The patch that restores the base value.
@@ -167,6 +184,8 @@ impl Patch {
             base: self.target.clone(),
             target: self.base.clone(),
             parts: self.parts.inverse(),
+            core: self.core.inverse(),
+            parts_first: !self.parts_first,
         }
     }
 }
@@ -289,20 +308,23 @@ impl Edit {
     /// cannot be written, and [`Error::Package`] when the codec or package
     /// graph refuses the value.
     pub fn commit(self) -> Result<Commit> {
-        let parts = if self.app.is_some() || self.custom.is_some() || self.remove_custom {
-            self.source
-                .property_parts_patch(self.app, self.custom, self.remove_custom)?
-        } else {
-            families::Patch::default()
-        };
+        let Self {
+            source,
+            base,
+            staged,
+            app,
+            custom,
+            remove_custom,
+        } = self;
+        let (package, changed, parts, core) =
+            source.publish_metadata(staged.as_ref(), app, custom, remove_custom)?;
         let patch = Patch {
-            base: self.base,
-            target: self.staged,
+            base,
+            target: staged,
             parts,
+            core,
+            parts_first: true,
         };
-        let (package, changed) = self
-            .source
-            .publish_metadata(patch.target.as_ref(), &patch.parts)?;
         Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 }
@@ -362,6 +384,136 @@ pub(crate) fn admit(props: &Metadata) -> Result<()> {
 mod tests {
     use super::*;
     use litchi_opc::PackURI;
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    use litchi_opc::part::BlobPart;
+    use std::collections::BTreeMap;
+    use std::ops::Range;
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ArchiveMemberFidelity {
+        raw_name: Vec<u8>,
+        local_record: Vec<u8>,
+        central_record: Vec<u8>,
+        payload: Vec<u8>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ArchiveFidelity {
+        comment: Vec<u8>,
+        zip64: bool,
+        members: BTreeMap<String, ArchiveMemberFidelity>,
+    }
+
+    struct CentralEntry {
+        name: String,
+        raw_name: Vec<u8>,
+        central_record: Range<usize>,
+        zip64_local_header_offset: Option<Range<usize>>,
+        directory: bool,
+    }
+
+    fn archive_fidelity(bytes: &[u8]) -> ArchiveFidelity {
+        let archive = soapberry_zip::ZipArchive::from_slice(bytes).expect("parse ZIP");
+        let comment = archive.comment().as_bytes().to_vec();
+        let zip64 = archive.is_zip64();
+        let mut central_entries = Vec::new();
+        for entry in archive.entries() {
+            let entry = entry.expect("central entry");
+            let raw_name = entry.file_path().as_ref().to_vec();
+            let name = std::str::from_utf8(&raw_name)
+                .expect("DOCX ZIP member names are UTF-8")
+                .to_owned();
+            let central_start = usize::try_from(entry.central_directory_offset())
+                .expect("central offset fits usize");
+            let central_len = usize::try_from(
+                46_u64
+                    .checked_add(entry.metadata_size_hint())
+                    .expect("central record length does not overflow"),
+            )
+            .expect("central record length fits usize");
+            let central_end = central_start
+                .checked_add(central_len)
+                .expect("central record end does not overflow");
+            let zip64_local_header_offset = entry.zip64_local_header_offset_range().map(|range| {
+                let start = usize::try_from(range.start)
+                    .expect("ZIP64 offset fits usize")
+                    .checked_sub(central_start)
+                    .expect("ZIP64 offset belongs to central record");
+                let end = usize::try_from(range.end)
+                    .expect("ZIP64 offset end fits usize")
+                    .checked_sub(central_start)
+                    .expect("ZIP64 offset end belongs to central record");
+                start..end
+            });
+            central_entries.push(CentralEntry {
+                name,
+                raw_name,
+                central_record: central_start..central_end,
+                zip64_local_header_offset,
+                directory: entry.is_dir(),
+            });
+        }
+
+        let indexed = archive.into_zip_archive();
+        let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index = soapberry_zip::PreservationIndex::new(
+            &indexed,
+            &mut buffer,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("index ZIP members");
+        assert_eq!(
+            central_entries.len(),
+            index.entries().len(),
+            "ZIP central and preservation indexes must cover the same members"
+        );
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("index ZIP payloads");
+
+        let mut members = BTreeMap::new();
+        for (entry, preserved) in central_entries.iter().zip(index.entries()) {
+            let local = preserved.local_span();
+            let local_start = usize::try_from(local.start).expect("local offset fits usize");
+            let local_end = usize::try_from(local.end).expect("local end fits usize");
+            let mut central_record = bytes[entry.central_record.clone()].to_vec();
+            central_record[42..46].fill(0);
+            if let Some(offset) = &entry.zip64_local_header_offset {
+                central_record[offset.clone()].fill(0);
+            }
+            assert_eq!(
+                entry.raw_name.as_slice(),
+                preserved.raw_name_bytes(),
+                "ZIP central and preservation indexes must agree on member names"
+            );
+            let payload = if entry.directory {
+                Vec::new()
+            } else {
+                reader.read(&entry.name).expect("read ZIP member payload")
+            };
+            assert!(
+                members
+                    .insert(
+                        entry.name.clone(),
+                        ArchiveMemberFidelity {
+                            raw_name: entry.raw_name.clone(),
+                            local_record: bytes[local_start..local_end].to_vec(),
+                            central_record,
+                            payload,
+                        },
+                    )
+                    .is_none(),
+                "duplicate ZIP member name"
+            );
+        }
+        ArchiveFidelity {
+            comment,
+            zip64,
+            members,
+        }
+    }
 
     fn package_with_opaque_app() -> Result<Package> {
         let package = Package::new()?;
@@ -379,11 +531,95 @@ mod tests {
         Ok(Package::from_opc_package(opc)?)
     }
 
+    fn package_with_opaque_core() -> Result<Package> {
+        let package = Package::new()?;
+        let mut opc = package.opc_package().clone();
+        let core = PackURI::new("/docProps/core.xml").expect("static core URI");
+        let part = opc.get_part_mut(&core).map_err(crate::Error::from)?;
+        let mut bytes = part.blob().to_vec();
+        let close = b"/>";
+        let offset = bytes
+            .windows(close.len())
+            .position(|window| window == close)
+            .expect("default core root");
+        bytes.splice(
+            offset..offset + close.len(),
+            br#"><!--opaque keep="yes"--></cp:coreProperties>"#.iter().copied(),
+        );
+        part.set_blob(bytes);
+        Ok(Package::from_opc_package(opc)?)
+    }
+
+    fn package_without_parts(names: &[&str]) -> Result<Package> {
+        let package = Package::new()?;
+        let mut opc = package.opc_package().clone();
+        for &name in names {
+            let part = PackURI::new(name).expect("static property URI");
+            let relationship_ids: Vec<_> = opc
+                .rels()
+                .iter()
+                .filter(|relationship| relationship.target_partname().ok().as_ref() == Some(&part))
+                .map(|relationship| relationship.r_id().to_owned())
+                .collect();
+            for relationship_id in relationship_ids {
+                opc.rels_mut().remove(&relationship_id);
+            }
+            opc.remove_part(&part);
+        }
+        Ok(Package::from_opc_package(opc)?)
+    }
+
+    fn package_without_property_parts() -> Result<Package> {
+        package_without_parts(&[
+            "/docProps/core.xml",
+            "/docProps/app.xml",
+            "/docProps/custom.xml",
+        ])
+    }
+
+    fn package_without_app_part() -> Result<Package> {
+        package_without_parts(&["/docProps/app.xml"])
+    }
+
+    #[test]
+    fn archive_fidelity_rejects_a_member_payload_change() -> Result<()> {
+        let baseline = Package::new()?.to_bytes()?;
+        let changed = package_with_opaque_app()?.to_bytes()?;
+        assert_ne!(archive_fidelity(&baseline), archive_fidelity(&changed));
+        Ok(())
+    }
+
+    fn signed_package(package: &Package) -> Result<Package> {
+        let mut opc = package.opc_package().clone();
+        opc.try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").expect("static signature URI"),
+            ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            Vec::new(),
+        )))
+        .map_err(crate::Error::from)?;
+        opc.rels_mut().add_relationship(
+            rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
+            "rSignature".to_owned(),
+            false,
+        );
+        Ok(Package::from_opc_package(opc)?)
+    }
+
     fn app_bytes(package: &Package) -> Vec<u8> {
         package
             .opc_package()
             .get_part(&PackURI::new("/docProps/app.xml").expect("static app URI"))
             .expect("app properties")
+            .blob()
+            .to_vec()
+    }
+
+    fn core_bytes(package: &Package) -> Vec<u8> {
+        package
+            .opc_package()
+            .get_part(&PackURI::new("/docProps/core.xml").expect("static core URI"))
+            .expect("core properties")
             .blob()
             .to_vec()
     }
@@ -468,16 +704,132 @@ mod tests {
         let default = Metadata::default();
         assert!(set_patch.base().is_none());
         assert_eq!(set_patch.target(), Some(&default));
-        assert!(set_patch.parts().changes().iter().any(|change| {
-            change.family() == families::Family::Core
-                && change.before().is_none()
-                && change.after().is_some()
-        }));
+        // The DOCX wrapper exposes core transition state through `base` and
+        // `target`; `parts` is the application/custom-properties patch.
+        assert!(set_patch.parts().is_noop());
         assert_eq!(created.metadata(), Some(&default));
+
+        let reopened = Package::from_bytes(&created.to_bytes()?)?;
+        assert_eq!(reopened.metadata(), Some(&default));
+
+        let reopened_cleared = Package::from_bytes(&cleared.to_bytes()?)?;
+        let replayed = reopened_cleared.apply_metadata(&set_patch)?.into_package();
+        assert_eq!(replayed.metadata(), Some(&default));
 
         let restored = created.apply_metadata(&set_patch.inverse())?.into_package();
         assert!(restored.metadata().is_none());
         assert_eq!(restored.to_bytes()?, cleared.to_bytes()?);
+        Ok(())
+    }
+
+    #[test]
+    fn opaque_core_replay_and_inverse_preserve_exact_bytes() -> Result<()> {
+        let package = package_with_opaque_core()?;
+        let original = package.clone().to_bytes()?;
+        let original_core = core_bytes(&package);
+        let original_app = app_bytes(&package);
+        let mut edit = package.edit_metadata();
+        let app = edit.app_props()?;
+        edit.set_app_props(app);
+        edit.update(|props| props.title = Some("Opaque core target".to_owned()));
+        let (next, patch) = edit.commit()?.into_parts();
+        assert!(
+            patch
+                .core
+                .changes()
+                .iter()
+                .any(|change| change.family() == families::Family::Core)
+        );
+        patch.parts().check(package.opc_package())?;
+        assert_ne!(core_bytes(&next), original_core);
+        assert_eq!(app_bytes(&next), original_app);
+
+        let reopened_source = Package::from_bytes(&package.to_bytes()?)?;
+        let replayed = reopened_source.apply_metadata(&patch)?.into_package();
+        assert_eq!(core_bytes(&replayed), core_bytes(&next));
+        assert_eq!(replayed.to_bytes()?, next.to_bytes()?);
+
+        let reopened_target = Package::from_bytes(&next.to_bytes()?)?;
+        let restored = reopened_target
+            .apply_metadata(&patch.inverse())?
+            .into_package();
+        assert_eq!(core_bytes(&restored), original_core);
+        assert_eq!(restored.to_bytes()?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn absent_property_parts_combined_create_replay_and_inverse() -> Result<()> {
+        let package = package_without_property_parts()?;
+        assert!(package.metadata().is_none());
+        assert!(package.app_props()?.is_none());
+        assert!(package.custom_props().is_empty());
+        let original = package.clone().to_bytes()?;
+
+        let mut edit = package.edit_metadata();
+        edit.set(Metadata::default());
+        let mut app = app::Props::default();
+        app.company = Some("Acme".to_owned());
+        edit.set_app_props(Some(app));
+        let mut custom = CustomProps::new();
+        custom
+            .insert("Reviewed", litchi_ooxml_common::custom::Value::Bool(true))
+            .map_err(families::Error::from)?;
+        edit.set_custom_props(custom);
+        let (next, patch) = edit.commit()?.into_parts();
+        let next_bytes = next.clone().to_bytes()?;
+        assert!(
+            patch
+                .core
+                .changes()
+                .iter()
+                .any(|change| { change.family() == families::Family::Core })
+        );
+        assert!(
+            patch
+                .parts()
+                .changes()
+                .iter()
+                .all(|change| change.family() != families::Family::Core)
+        );
+        assert_eq!(next.metadata(), Some(&Metadata::default()));
+        assert_eq!(
+            next.app_props()?.and_then(|props| props.company),
+            Some("Acme".to_owned())
+        );
+        assert_eq!(
+            next.custom_props().get("Reviewed"),
+            Some(&litchi_ooxml_common::custom::Value::Bool(true))
+        );
+
+        let projected = patch.parts().apply(package.opc_package())?.into_package();
+        let projected = Package::from_opc_package(projected)?;
+        assert!(projected.metadata().is_none());
+        assert_eq!(
+            projected.app_props()?.and_then(|props| props.company),
+            Some("Acme".to_owned())
+        );
+        assert_eq!(
+            projected.custom_props().get("Reviewed"),
+            Some(&litchi_ooxml_common::custom::Value::Bool(true))
+        );
+
+        let reopened_source = Package::from_bytes(&original)?;
+        let replayed = reopened_source.apply_metadata(&patch)?.into_package();
+        let replayed_bytes = replayed.to_bytes()?;
+        assert_eq!(replayed.metadata(), next.metadata());
+        assert_eq!(replayed.app_props()?, next.app_props()?);
+        assert!(replayed.custom_props().same_values(next.custom_props()));
+        assert_eq!(
+            archive_fidelity(&replayed_bytes),
+            archive_fidelity(&next_bytes)
+        );
+
+        let reopened_target = Package::from_bytes(&next_bytes)?;
+        let restored = reopened_target
+            .apply_metadata(&patch.inverse())?
+            .into_package();
+        assert_eq!(restored.to_bytes()?, original);
         Ok(())
     }
 
@@ -505,9 +857,39 @@ mod tests {
     }
 
     #[test]
+    fn replay_reports_property_graph_refusal_as_properties() -> Result<()> {
+        let source = Package::new()?;
+        let mut edit = source.edit_metadata();
+        let mut app = edit.app_props()?.expect("app properties");
+        app.company = Some("Acme".to_owned());
+        edit.set_app_props(Some(app));
+        let patch = edit.commit()?.patch().clone();
+
+        let target = package_without_app_part()?;
+        assert_eq!(target.metadata(), source.metadata());
+        assert!(matches!(
+            target.apply_metadata(&patch),
+            Err(Error::Properties(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn replay_refuses_a_changed_signed_package_with_metadata_error() -> Result<()> {
+        let source = Package::new()?;
+        let mut edit = source.edit_metadata();
+        edit.update(|props| props.title = Some("Signed replay".to_owned()));
+        let patch = edit.commit()?.patch().clone();
+        let signed = signed_package(&source)?;
+        assert!(matches!(signed.apply_metadata(&patch), Err(Error::Signed)));
+        Ok(())
+    }
+
+    #[test]
     fn app_and_custom_props_publish_replay_and_invert() -> Result<()> {
         let package = package_with_opaque_app()?;
         let original = package.clone().to_bytes()?;
+        let original_metadata = package.metadata().cloned();
         let app_before = package.app_props()?.expect("app properties");
         let mut edit = package.edit_metadata();
         edit.update(|props| props.title = Some("Quarterly".to_owned()));
@@ -524,6 +906,13 @@ mod tests {
         assert!(commit.diagnostics().changed());
         assert!(!commit.patch().is_noop());
         let (next, patch) = commit.into_parts();
+        assert!(
+            patch
+                .core
+                .changes()
+                .iter()
+                .any(|change| change.family() == families::Family::Core)
+        );
         let app = next.app_props()?.unwrap_or_default();
         assert_eq!(app.company.as_deref(), Some("Acme"));
         assert_eq!(app.manager.as_deref(), Some("Dana"));
@@ -543,7 +932,10 @@ mod tests {
             next.metadata().and_then(|props| props.title.as_deref()),
             Some("Quarterly")
         );
-        assert_eq!(package.metadata(), None);
+        // `Package::new` owns an explicit, empty core-properties part.  The
+        // edit must preserve that present-vs-absent distinction on the source
+        // snapshot while changing the staged value in the new package.
+        assert_eq!(package.metadata(), original_metadata.as_ref());
         assert_eq!(package.clone().to_bytes()?, original);
         let reopened = Package::from_bytes(&next.clone().to_bytes()?)?;
         assert_eq!(

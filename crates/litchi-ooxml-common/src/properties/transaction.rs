@@ -1859,14 +1859,12 @@ fn planned_change_bytes(
     relationship_ids: &mut BTreeSet<String>,
 ) -> Result<(usize, PreparedChange)> {
     let state = snapshot.family(family);
-    if after_len.is_none()
-        && let Some(present) = state.present.as_ref()
-    {
-        // A removed family's relationship ID is free for a later family
-        // creation in the same prepared plan. Keep the admission ledger in
-        // the same order as `stage_change`, which removes it immediately.
-        relationship_ids.remove(&present.relationship_id);
-    }
+    // Keep every relationship ID from the base snapshot reserved for the
+    // entire plan. A family removed earlier in this plan still occupies its
+    // ID in the patch's authenticated before graph; letting a later family
+    // creation reuse it would make the one-patch check fail (and would make
+    // its inverse ambiguous). IDs become free only between independent
+    // plans, after the first patch has been published.
     let (part, relationship_id, relationship_type, relationship_target, before_len) =
         match &state.present {
             Some(present) => (
