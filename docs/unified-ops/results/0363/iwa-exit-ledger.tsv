@@ -1889,14 +1889,14 @@ pages/editor/tables/formula.rs	clear_table_formula	1	pages	table.formula	host-on
 pages/editor/tables/formula.rs	set_table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	clear_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	comment_count	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	duplicate_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	get_cell	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	get_cell	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	get_comment	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	iter_cells	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	iter_cells	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	iter_comments	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	merge_table_cells	1	pages	table.merge	migrated	litchi_pages::Package::edit_body_table_merges	pages_body_table_merge_parity	A	-	-
 pages/editor/tables/semantic.rs	merges	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
@@ -1945,7 +1945,7 @@ pages/editor/tables/semantic.rs	reset_table_cell_text_script	1	pages	table.cell_
 pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
@@ -1993,7 +1993,7 @@ pages/editor/tables/semantic.rs	set_table_cell_text_outline	1	pages	table.cell_r
 pages/editor/tables/semantic.rs	set_table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cells	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cells	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cells_batch_parity	A	-	-
 pages/editor/tables/semantic.rs	table	1	pages	other	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_borders	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-

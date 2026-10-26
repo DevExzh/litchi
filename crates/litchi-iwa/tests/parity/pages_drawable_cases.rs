@@ -693,7 +693,7 @@ enum TextOp {
 fn shape_text_case(name: &'static str, tier: Tier, evidence: Evidence, op: TextOp) -> TestResult {
     let input = shape_fixture()?;
     let op = &op;
-    Case::new(name, Format::Pages, Tier::A, Evidence::Queued, &input)
+    Case::new(name, Format::Pages, tier, evidence, &input)
         .host(|source| {
             let mut editor = pages::Draft::from_bytes(source)?;
             let id = editor
