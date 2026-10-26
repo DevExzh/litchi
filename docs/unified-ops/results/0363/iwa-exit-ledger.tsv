@@ -2062,8 +2062,8 @@ shapes/fill/image.rs	with_technique	1	shared	keynote.build	host-only	litchi-iwa-
 shapes/fill/image.rs	with_tint	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 shapes/fill/image.rs	without_tint	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/line.rs	length	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/line.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+shapes/line.rs	length	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::line::Segment::length	numbers_line_segment_parity	A	-	-
+shapes/line.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::line::Segment::new	keynote_line_segment_parity	A	-	-
 text/date_time_field.rs	from_object_id	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	add_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
 text/editor.rs	add_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-

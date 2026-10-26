@@ -39,6 +39,7 @@ mod numbers_owner_allocation;
 mod pages_cases;
 mod physical_cases;
 mod self_test;
+mod shape_cases;
 mod text_annotation_cases;
 mod text_glue;
 mod text_language_cases;
