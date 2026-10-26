@@ -46,6 +46,12 @@ pub use crate::package::slide_drawable::{
     Commit, Created, Diagnostics, Drawable, Edit, Error, Geometry, ImageFormat, Kind, LimitKind,
     NewTable, Patch, Preset, Refusal, Style, TableCellValue, TextRun, TextSpan, Unsupported,
 };
+/// Hyperlink, lock and accessibility properties ([`Edit::set_properties`]).
+pub use crate::slide::media::MediaProperties;
+/// The axis of an Arrange Flip ([`Edit::flip`]).
+pub use litchi_iwa_common::shape::geometry::FlipAxis;
+/// A straight line's segment ([`Edit::set_line_segment`]).
+pub use litchi_iwa_common::shape::line::Segment;
 /// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
 /// the shared iWork shape vocabulary.
 pub use litchi_iwa_common::shape::path::{InnerRadiusRatio, PolygonSides, StarPoints};

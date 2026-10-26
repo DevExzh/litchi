@@ -302,7 +302,7 @@ fn path(elements: &[Writer]) -> Writer {
 }
 
 /// The host's `shape_path_source` for every preset.
-fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error> {
+pub(super) fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error> {
     let size = point(width, height);
     let source = Writer::new().boolean(1, false).boolean(2, false);
     Ok(match preset {
