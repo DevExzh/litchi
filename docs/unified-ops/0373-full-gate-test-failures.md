@@ -70,7 +70,7 @@ No hot path was re-measured.
 
 ## Commits
 
-- (this commit): tooling, retire the pinned raw-API census and regenerate the bench matrix (rows 48, 51)
+- 99230e7a08: tooling, retire the pinned raw-API census and regenerate the bench matrix (rows 48, 51)
 
 - 25f045c746: OPC replacement relationships (2)
 - ecde66248b: OPC limit test (3)
