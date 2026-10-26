@@ -507,14 +507,12 @@ impl ThemeReferenceSnapshot {
     }
 
     /// Encode this reference as a bounded TSP.Reference payload.
-    #[must_use]
-    pub fn encode(self) -> Vec<u8> {
-        self.encode_checked()
-            .expect("ThemeReferenceSnapshot::encode requires a non-zero identifier")
-    }
-
-    /// Fallibly encode this reference after validating native identity.
-    pub fn encode_checked(self) -> Result<Vec<u8>, DecodeError> {
+    ///
+    /// # Errors
+    ///
+    /// A typed invalid-source [`DecodeError`] when the identifier is zero
+    /// (record 0368a: no panicking twin).
+    pub fn encode(self) -> Result<Vec<u8>, DecodeError> {
         if self.identifier == 0 {
             return Err(DecodeError::invalid(
                 "TSP.Reference.identifier must be non-zero",
@@ -4504,9 +4502,9 @@ mod tests {
 
     #[test]
     fn typed_reference_list_rewrite_preserves_unknown_nested_reference_fields() {
-        let mut first_reference = ThemeReferenceSnapshot::new(88).encode();
+        let mut first_reference = ThemeReferenceSnapshot::new(88).encode().unwrap();
         first_reference.extend(field(77, b"removed-reference-future"));
-        let mut retained_reference = ThemeReferenceSnapshot::new(89).encode();
+        let mut retained_reference = ThemeReferenceSnapshot::new(89).encode().unwrap();
         retained_reference.extend(field(78, b"retained-reference-future"));
         let source = [
             field(1, &first_reference),
@@ -4550,9 +4548,9 @@ mod tests {
 
     #[test]
     fn typed_reference_list_rewrite_preserves_unknown_nested_fields_after_reorder() {
-        let mut first_reference = ThemeReferenceSnapshot::new(88).encode();
+        let mut first_reference = ThemeReferenceSnapshot::new(88).encode().unwrap();
         first_reference.extend(field(77, b"first-reference-future"));
-        let mut second_reference = ThemeReferenceSnapshot::new(89).encode();
+        let mut second_reference = ThemeReferenceSnapshot::new(89).encode().unwrap();
         second_reference.extend(field(78, b"second-reference-future"));
         let source = [field(1, &first_reference), field(1, &second_reference)].concat();
 
@@ -4584,9 +4582,9 @@ mod tests {
 
     #[test]
     fn typed_reference_list_rewrite_precharges_final_emission_walk() {
-        let mut first_reference = ThemeReferenceSnapshot::new(88).encode();
+        let mut first_reference = ThemeReferenceSnapshot::new(88).encode().unwrap();
         first_reference.extend(field(77, b"first-reference-future"));
-        let mut second_reference = ThemeReferenceSnapshot::new(89).encode();
+        let mut second_reference = ThemeReferenceSnapshot::new(89).encode().unwrap();
         second_reference.extend(field(78, b"second-reference-future"));
         let source = [field(1, &first_reference), field(1, &second_reference)].concat();
         let references = [
@@ -4662,7 +4660,7 @@ mod tests {
     #[test]
     fn archive_reference_list_write_is_source_preserving_and_single_candidate() {
         let source = theme_source();
-        let mut reference_payload = ThemeReferenceSnapshot::new(21).encode();
+        let mut reference_payload = ThemeReferenceSnapshot::new(21).encode().unwrap();
         reference_payload.extend(field(88, b"future-reference"));
         let text = field(1, &reference_payload);
         let source = rewrite_theme_archive(
@@ -4803,9 +4801,9 @@ mod tests {
     #[test]
     fn archive_reference_reorder_duplicates_precharge_every_emission_walk() {
         let base = theme_source();
-        let mut first = ThemeReferenceSnapshot::new(88).encode();
+        let mut first = ThemeReferenceSnapshot::new(88).encode().unwrap();
         first.extend(field(77, b"first-reference-future"));
-        let mut second = ThemeReferenceSnapshot::new(89).encode();
+        let mut second = ThemeReferenceSnapshot::new(89).encode().unwrap();
         second.extend(field(78, b"second-reference-future"));
         let text = [field(1, &first), field(1, &second), field(1, &first)].concat();
         let source = rewrite_theme_archive(
@@ -5319,5 +5317,11 @@ mod tests {
             }
         }
         panic!("field {number} missing");
+    }
+
+    #[test]
+    fn zero_reference_identifier_is_a_typed_error() {
+        assert!(ThemeReferenceSnapshot::new(0).encode().is_err());
+        assert!(!ThemeReferenceSnapshot::new(7).encode().unwrap().is_empty());
     }
 }

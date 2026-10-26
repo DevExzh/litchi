@@ -1640,9 +1640,15 @@ impl OpcPackage {
         if !source_part.relationships_member_present {
             return Ok(false);
         }
-        if relationships
-            .source_capture()
-            .is_some_and(|capture| Arc::ptr_eq(capture, &source_part.relationships_xml))
+        // The capture proves the collection only while the package still
+        // holds the owner's source relationships token: replacing or adding
+        // the part drops that token, and a replacement that cloned the
+        // original's collection (capture included) publishes its own
+        // relationships, as the publication plan's pristine test requires.
+        if self.source_relationships_member_present(owner)
+            && relationships
+                .source_capture()
+                .is_some_and(|capture| Arc::ptr_eq(capture, &source_part.relationships_xml))
         {
             return Ok(true);
         }

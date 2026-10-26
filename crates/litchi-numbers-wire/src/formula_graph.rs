@@ -663,25 +663,33 @@ pub struct Remap<'a> {
 }
 
 impl<'a> Remap<'a> {
-    /// A borrowed graph remap; each map is sorted by source and checked when
-    /// a rewrite runs ([`Error::InvalidRemap`]).
-    #[must_use]
-    pub const fn new(
+    /// A checked borrowed graph remap.
+    ///
+    /// Each map must be sorted by source, with no zero identity and no
+    /// repeated source or target. The check runs once here, so every rewrite
+    /// that takes the remap trusts it (record 0368a).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidRemap`] for an unsorted, repeated or zero identity;
+    /// [`Error::Allocation`] when the target check cannot reserve its copy.
+    pub fn new(
         object_ids: &'a [(u64, u64)],
         owner_ids: &'a [(u32, u32)],
         uuids: &'a [(FormulaOwnerUuid, FormulaOwnerUuid)],
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let remap = Self {
             object_ids,
             owner_ids,
             uuids,
-        }
-    }
-
-    fn validate(self, budget: &mut RewriteBudget) -> Result<(), Error> {
-        validate_u64_map(self.object_ids, budget)?;
-        validate_u32_map(self.owner_ids, budget)?;
-        validate_uuid_map(self.uuids, budget)
+        };
+        // The maps are caller-owned memory; their check is bounded by their
+        // own length, not by a rewrite's budget.
+        let mut budget = RewriteBudget::new(Limits::DEFAULT);
+        validate_u64_map(remap.object_ids, &mut budget)?;
+        validate_u32_map(remap.owner_ids, &mut budget)?;
+        validate_uuid_map(remap.uuids, &mut budget)?;
+        Ok(remap)
     }
 }
 
@@ -690,7 +698,6 @@ impl<'a> Remap<'a> {
 pub fn remap_owner(source: &[u8], remap: Remap<'_>, limits: &Limits) -> Result<Vec<u8>, Error> {
     let mut budget = RewriteBudget::new(*limits);
     budget.admit_source(source)?;
-    remap.validate(&mut budget)?;
     let owner = decode_owner(source, &mut budget)?;
     validate_owner_nested_fields(source, &mut budget)?;
     reject_unsupported_dependencies(&owner, &mut budget)?;
@@ -1008,7 +1015,6 @@ pub fn remap_cell_record_tile(
 ) -> Result<Vec<u8>, Error> {
     let mut budget = RewriteBudget::new(*limits);
     budget.admit_source(source)?;
-    remap.validate(&mut budget)?;
     let tile = decode_cell_tile(source, &mut budget)?;
     if lookup_u32(remap.owner_ids, tile.internal_owner_id()).is_none() {
         return Err(Error::InvalidRemap);
@@ -1023,6 +1029,11 @@ pub fn remap_cell_record_tile(
         &mut budget,
     )?;
     output = rewrite_paths(&output, CELL_TILE_RULES, remap, &mut budget)?;
+    // The rewrite replaces only owner-identifier varints that the strict
+    // source decode admitted, with checked non-zero `u32` targets, so the
+    // result's structure is the source's; re-decoding it in release builds
+    // would only repeat the source decode (record 0368a).
+    #[cfg(debug_assertions)]
     decode_cell_tile(&output, &mut budget)?;
     Ok(output)
 }
@@ -1036,7 +1047,6 @@ pub fn remap_range_precedents_tile(
 ) -> Result<Vec<u8>, Error> {
     let mut budget = RewriteBudget::new(*limits);
     budget.admit_source(source)?;
-    remap.validate(&mut budget)?;
     let tile = decode_range_tile(source, &mut budget)?;
     let Some(replacement) = lookup_u32(remap.owner_ids, tile.to_owner_id()) else {
         return clone_output(source, &mut budget, 0);
@@ -1050,6 +1060,44 @@ pub fn remap_range_precedents_tile(
     )?;
     decode_range_tile(&output, &mut budget)?;
     Ok(output)
+}
+
+/// The first internal formula-owner identifier free in a calculation engine.
+///
+/// The identifier is one above the largest identifier in use anywhere the
+/// engine registers one: every owner payload's `internal_formula_owner_id`
+/// (field 2), and every owner-map entry and unregistered identifier of the
+/// engine's dependency tracker. Every larger identifier is free as well, so a
+/// clone of `n` owners takes `next..next + n`.
+///
+/// The legacy host counted only owner payloads, so on engines whose owner
+/// map holds identifiers without an owner object it allocated identifiers
+/// already in the map (record 0368a); this allocator never does.
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for malformed wire, a missing owner identifier or
+/// an exhausted identifier space; [`Error::UnsupportedDependency`] for an
+/// owner map with unknown fields; [`Error::Limit`] / [`Error::Allocation`].
+pub fn next_owner_id(engine: &[u8], owners: &[&[u8]], limits: &Limits) -> Result<u32, Error> {
+    let mut budget = RewriteBudget::new(*limits);
+    budget.admit_source(engine)?;
+    let decoded = decode_engine(engine, &mut budget)?;
+    let tracker = decode_tracker(decoded.dependency_tracker(), &mut budget)?;
+    let map = validate_owner_id_map(tracker.owner_id_map(), &mut budget)?;
+    let mut maximum = map
+        .identities
+        .iter()
+        .map(|(internal, _)| *internal)
+        .chain(map.unregistered.iter().copied())
+        .max()
+        .unwrap_or(0);
+    for owner in owners {
+        let identifier = required_varint_with_budget(owner, 2, &mut budget)?;
+        let identifier = u32::try_from(identifier).map_err(|_| Error::InvalidSource)?;
+        maximum = maximum.max(identifier);
+    }
+    maximum.checked_add(1).ok_or(Error::InvalidSource)
 }
 
 /// Append cloned formula-owner references and owner-map entries to a native
@@ -2893,9 +2941,9 @@ mod tests {
     #[test]
     fn remap_rejects_unsorted_target_duplicates() {
         let source = owner_source();
-        let remap = Remap::new(&[(1, 2), (2, 1), (3, 2)], &[], &[]);
+        let _ = source;
         assert_eq!(
-            remap_owner(&source, remap, &Limits::default()),
+            Remap::new(&[(1, 2), (2, 1), (3, 2)], &[], &[]),
             Err(Error::InvalidRemap)
         );
     }
@@ -3104,7 +3152,7 @@ mod tests {
         assert_eq!(
             remap_owner(
                 &source,
-                Remap::new(&[], &owner_ids, &[]),
+                Remap::new(&[], &owner_ids, &[]).unwrap(),
                 &Limits::default(),
             ),
             Err(Error::UnsupportedDependency)
@@ -3121,7 +3169,7 @@ mod tests {
         assert_eq!(
             remap_owner(
                 &source,
-                Remap::new(&object, &root_owner, &[]),
+                Remap::new(&object, &root_owner, &[]).unwrap(),
                 &Limits::default(),
             ),
             Err(Error::InvalidRemap)
@@ -3129,7 +3177,7 @@ mod tests {
         assert_eq!(
             remap_owner(
                 &source,
-                Remap::new(&object, &[], &root_uuid),
+                Remap::new(&object, &[], &root_uuid).unwrap(),
                 &Limits::default(),
             ),
             Err(Error::InvalidRemap)
@@ -3137,7 +3185,7 @@ mod tests {
         assert_eq!(
             remap_owner(
                 &source,
-                Remap::new(&[], &root_owner, &root_uuid),
+                Remap::new(&[], &root_owner, &root_uuid).unwrap(),
                 &Limits::default(),
             ),
             Err(Error::InvalidRemap)
@@ -3150,7 +3198,7 @@ mod tests {
         let new = FormulaOwnerUuid::new(0x1001, 0x2002);
         let owner_ids = [(7, 17)];
         let uuids = [(old, new)];
-        let remap = Remap::new(&[], &owner_ids, &uuids);
+        let remap = Remap::new(&[], &owner_ids, &uuids).unwrap();
         for family in [6_u32, 7, 8] {
             let mut source = Vec::new();
             bytes_field(&mut source, 1, &uuid(old));
@@ -3176,7 +3224,7 @@ mod tests {
         let uuids = [(old, new)];
         let rewritten = remap_owner(
             &source,
-            Remap::new(&object_ids, &owner_ids, &uuids),
+            Remap::new(&object_ids, &owner_ids, &uuids).unwrap(),
             &Limits::default(),
         )
         .unwrap();
@@ -3196,7 +3244,7 @@ mod tests {
         assert_eq!(
             remap_owner(
                 &rewritten,
-                Remap::new(&reverse_object_ids, &reverse_owner_ids, &reverse_uuids,),
+                Remap::new(&reverse_object_ids, &reverse_owner_ids, &reverse_uuids,).unwrap(),
                 &Limits::default(),
             )
             .unwrap(),
@@ -3206,13 +3254,8 @@ mod tests {
 
     #[test]
     fn identity_map_is_required_to_be_source_sorted() {
-        let source = owner_source();
         let object_ids = [(101, 201), (100, 200)];
-        let remap = Remap::new(&object_ids, &[], &[]);
-        assert_eq!(
-            remap_owner(&source, remap, &Limits::default()),
-            Err(Error::InvalidRemap)
-        );
+        assert_eq!(Remap::new(&object_ids, &[], &[]), Err(Error::InvalidRemap));
     }
 
     #[test]
@@ -3224,7 +3267,7 @@ mod tests {
         let uuids = [(owner_uuid, owner_uuid)];
         let rewritten = remap_owner(
             &source,
-            Remap::new(&object_ids, &owner_ids, &uuids),
+            Remap::new(&object_ids, &owner_ids, &uuids).unwrap(),
             &Limits::default(),
         )
         .unwrap();
@@ -3241,7 +3284,7 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            remap_owner(&source, Remap::new(&[], &[], &[]), &limits),
+            remap_owner(&source, Remap::new(&[], &[], &[]).unwrap(), &limits),
             Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 ..
@@ -3254,7 +3297,11 @@ mod tests {
         let source = owner_source();
         let scratch_limited = Limits::default().with_scratch_bytes(1).unwrap();
         assert!(matches!(
-            remap_owner(&source, Remap::new(&[], &[], &[]), &scratch_limited,),
+            remap_owner(
+                &source,
+                Remap::new(&[], &[], &[]).unwrap(),
+                &scratch_limited,
+            ),
             Err(Error::Limit {
                 kind: LimitKind::ScratchBytes,
                 ..
@@ -3262,7 +3309,11 @@ mod tests {
         ));
         let allocation_limited = Limits::default().with_allocations(1).unwrap();
         assert!(matches!(
-            remap_owner(&source, Remap::new(&[], &[], &[]), &allocation_limited,),
+            remap_owner(
+                &source,
+                Remap::new(&[], &[], &[]).unwrap(),
+                &allocation_limited,
+            ),
             Err(Error::Limit {
                 kind: LimitKind::Allocations,
                 ..
@@ -3273,7 +3324,7 @@ mod tests {
     #[test]
     fn dependency_tiles_remap_root_and_expanded_owner_edges() {
         let owner_ids = [(7, 17)];
-        let remap = Remap::new(&[], &owner_ids, &[]);
+        let remap = Remap::new(&[], &owner_ids, &[]).unwrap();
         let limits = Limits::default();
 
         let cell_source = cell_tile_source();
@@ -3299,7 +3350,7 @@ mod tests {
         .unwrap();
         assert_eq!(range.to_owner_id(), 17);
 
-        let reverse = Remap::new(&[], &[(17, 7)], &[]);
+        let reverse = Remap::new(&[], &[(17, 7)], &[]).unwrap();
         assert_eq!(
             remap_cell_record_tile(&cell_rewritten, reverse, &limits).unwrap(),
             cell_source
@@ -3320,7 +3371,7 @@ mod tests {
         let mut source = Vec::new();
         bytes_field(&mut source, 6, &nested);
         let owner_ids = [(7, 17)];
-        let remap = Remap::new(&[], &owner_ids, &[]);
+        let remap = Remap::new(&[], &owner_ids, &[]).unwrap();
         let run = |scratch: usize| {
             let limits = Limits::default().with_scratch_bytes(scratch).unwrap();
             rewrite_paths(&source, RULES, remap, &mut RewriteBudget::new(limits))
@@ -3478,5 +3529,33 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn next_owner_id_clears_owner_map_entries_without_owner_objects() {
+        let mut budget = RewriteBudget::new(Limits::default());
+        let first =
+            encode_owner_map_entry(7, FormulaOwnerUuid::new(0x101, 0x202), &mut budget, 0).unwrap();
+        let orphan =
+            encode_owner_map_entry(20, FormulaOwnerUuid::new(0x303, 0x404), &mut budget, 0)
+                .unwrap();
+        let mut owner_map = Vec::new();
+        bytes_field(&mut owner_map, 1, &first);
+        bytes_field(&mut owner_map, 1, &orphan);
+        let engine = engine_with_owner_map(&owner_map);
+        let owner = owner_source();
+        // The owner objects alone would give 8; the orphan map entry wins.
+        assert_eq!(
+            next_owner_id(&engine, &[&owner], &Limits::default()),
+            Ok(21)
+        );
+        assert_eq!(
+            next_owner_id(&engine_source(), &[&owner], &Limits::default()),
+            Ok(8)
+        );
+        assert_eq!(
+            next_owner_id(&engine, &[&[0xff][..]], &Limits::default()),
+            Err(Error::InvalidSource)
+        );
     }
 }
