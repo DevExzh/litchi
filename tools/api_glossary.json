@@ -23283,6 +23283,7 @@
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::drawable::hyperlink",
         "litchi_numbers::sheet::drawable::drop_cap",
         "litchi_numbers::sheet::drawable::list",
         "litchi_numbers::sheet::drawable::properties",
@@ -23340,6 +23341,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_drawable_drop_caps",
           "ok": "litchi_numbers::sheet::drawable::drop_cap::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_hyperlinks",
+          "ok": "litchi_numbers::sheet::drawable::hyperlink::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
@@ -24139,6 +24144,7 @@
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::drawable::hyperlink",
         "litchi_numbers::sheet::drawable::drop_cap",
         "litchi_numbers::sheet::drawable::list",
         "litchi_numbers::sheet::drawable::properties",
@@ -24196,6 +24202,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_drawable_drop_caps",
           "ok": "litchi_numbers::sheet::drawable::drop_cap::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_hyperlinks",
+          "ok": "litchi_numbers::sheet::drawable::hyperlink::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",

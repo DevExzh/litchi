@@ -55,6 +55,7 @@ pub(crate) mod sheet_drawable;
 mod sheet_drawable_author;
 pub(crate) mod sheet_drawable_drop_cap;
 mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_hyperlink;
 pub(crate) mod sheet_drawable_language;
 pub(crate) mod sheet_drawable_list;
 pub(crate) mod sheet_drawable_plain_text;

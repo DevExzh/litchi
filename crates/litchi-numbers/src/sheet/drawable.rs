@@ -61,6 +61,16 @@ pub mod drop_cap {
     };
 }
 
+/// Exact-source hyperlink transactions for the text a sheet text box or
+/// shape owns: [`crate::Package::edit_sheet_drawable_hyperlinks`].
+pub mod hyperlink {
+    pub use crate::package::sheet_drawable_hyperlink::{
+        Commit, Diagnostics, Edit, Error, Hyperlink, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::hyperlink::TextHyperlinkTarget;
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
 /// Exact-source paragraph-list transactions for the text a sheet text box
 /// or shape owns: [`crate::Package::edit_sheet_text_box_lists`].
 pub mod list {
