@@ -906,7 +906,7 @@ numbers/editor/semantic/text_box.rs	add_sheet_text_box_comment	1	numbers	text.co
 numbers/editor/semantic/text_box.rs	add_sheet_text_box_comment_reply	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	add_sheet_text_box_highlight	1	numbers	text.highlight	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	add_sheet_text_box_hyperlink	1	numbers	text.hyperlink	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/text_box.rs	clear_sheet_text_box_text	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	clear_sheet_text_box_text	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::clear	numbers_sheet_text_box_text_clear_parity	A	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box	1	numbers	drawable.text_box_lifecycle	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_text_box_remove_parity	B	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_comment	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_comment_reply	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
@@ -914,7 +914,7 @@ numbers/editor/semantic/text_box.rs	remove_sheet_text_box_highlight	1	numbers	te
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_hyperlink	1	numbers	text.hyperlink	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_text_language_boundary	1	numbers	text.language	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/text_box.rs	replace_sheet_text_box_text	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	replace_sheet_text_box_text	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::replace	numbers_sheet_text_box_text_replace_parity	A	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_columns	1	numbers	drawable.text_box_properties	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_paragraph_alignment	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_paragraph_background	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
@@ -975,7 +975,7 @@ numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_spacing	1	numbe
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_tab_stops	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_writing_direction	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_properties	1	numbers	drawable.text_box_properties	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_properties	numbers_sheet_text_box_properties_parity	A	-	-
-numbers/editor/semantic/text_box.rs	set_sheet_text_box_text	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	set_sheet_text_box_text	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::set	numbers_sheet_text_box_text_set_parity	A	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_background	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_baseline_shift	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_capitalization	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
@@ -1294,11 +1294,11 @@ numbers/editor/sheet_shapes.rs	add_sheet_line_with_style	1	numbers	drawable.shap
 numbers/editor/sheet_shapes.rs	add_sheet_rectangle	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::Edit::add_shape	numbers_sheet_rectangle_add_parity	B	-	-
 numbers/editor/sheet_shapes.rs	add_sheet_shape	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::Edit::add_shape	numbers_sheet_shape_add_parity	B	-	-
 numbers/editor/sheet_shapes.rs	add_sheet_shape_with_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	clear_sheet_shape_text	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	clear_sheet_shape_text	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::clear	numbers_sheet_shape_text_clear_parity	A	-	-
 numbers/editor/sheet_shapes.rs	duplicate_sheet_shape	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	flip_sheet_shape	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_shape_flip_parity	A	-	-
 numbers/editor/sheet_shapes.rs	remove_sheet_shape	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_shape_remove_parity	B	-	-
-numbers/editor/sheet_shapes.rs	replace_sheet_shape_text	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	replace_sheet_shape_text	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::replace	numbers_sheet_shape_text_replace_parity	A	-	-
 numbers/editor/sheet_shapes.rs	reset_sheet_line_endpoints	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	reset_sheet_shape_effects	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	reset_sheet_shape_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
@@ -1315,7 +1315,7 @@ numbers/editor/sheet_shapes.rs	set_sheet_shape_preset	1	numbers	drawable.shape	h
 numbers/editor/sheet_shapes.rs	set_sheet_shape_properties	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_properties	numbers_sheet_shape_properties_parity	A	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_shadow	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_stroke	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	set_sheet_shape_text	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	set_sheet_shape_text	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::set	numbers_sheet_shape_text_set_parity	A	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_text_layout	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	sheet_line_endpoints	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	sheet_line_segment	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-

@@ -987,3 +987,157 @@ fn numbers_sheet_shape_add_parity() -> TestResult {
     }
     Ok(())
 }
+
+/// One plain-text splice, expressed once for both routes.
+#[derive(Clone, Debug)]
+enum Splice {
+    Replace(usize, usize, &'static str),
+    Set(&'static str),
+    Clear,
+}
+
+fn plain_text_case(name: &'static str, kind: Kind, splice: Splice) -> TestResult {
+    let input = authored_fixture()?;
+    let splice = &splice;
+    Case::new(name, Format::Numbers, Tier::A, Evidence::Queued, &input)
+        .host(|source| {
+            let mut editor = numbers::Draft::from_bytes(source)?;
+            let (sheet, id) = host_drawable(&editor, kind, 0)?;
+            match (kind, splice) {
+                (Kind::TextBox, Splice::Replace(start, end, text)) => {
+                    editor.replace_sheet_text_box_text(sheet, id, *start..*end, text)?;
+                },
+                (Kind::TextBox, Splice::Set(text)) => {
+                    editor.set_sheet_text_box_text(sheet, id, text)?
+                },
+                (Kind::TextBox, Splice::Clear) => editor.clear_sheet_text_box_text(sheet, id)?,
+                (Kind::Shape, Splice::Replace(start, end, text)) => {
+                    editor.replace_sheet_shape_text(sheet, id, *start..*end, text)?;
+                },
+                (Kind::Shape, Splice::Set(text)) => editor.set_sheet_shape_text(sheet, id, text)?,
+                (Kind::Shape, Splice::Clear) => editor.clear_sheet_shape_text(sheet, id)?,
+                _ => return Err("no host route".into()),
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            use litchi_numbers::sheet::drawable::plain_text::{TextPosition, TextSpan};
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_plain_text(0, DrawableSelector::of(kind, 0))?;
+            match splice {
+                Splice::Replace(start, end, text) => drop(edit.replace(
+                    TextSpan::new(
+                        TextPosition::from_utf16_index(*start)?,
+                        TextPosition::from_utf16_index(*end)?,
+                    )?,
+                    text,
+                )?),
+                Splice::Set(text) => drop(edit.set(text)?),
+                Splice::Clear => drop(edit.clear()?),
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_plain_text(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host storage text", move |bytes| {
+            let editor = numbers::Draft::from_bytes(bytes)?;
+            let (sheet, id) = host_drawable(&editor, kind, 0)?;
+            Ok(match kind {
+                Kind::TextBox => editor
+                    .sheet_text_boxes(sheet)?
+                    .into_iter()
+                    .find(|item| item.drawable_object_id == id)
+                    .ok_or("text box")?
+                    .storage
+                    .storage
+                    .text()
+                    .to_owned(),
+                _ => editor
+                    .sheet_shapes(sheet)?
+                    .into_iter()
+                    .find(|item| item.drawable_object_id == id)
+                    .ok_or("shape")?
+                    .storage
+                    .storage
+                    .text()
+                    .to_owned(),
+            })
+        })
+        .read("leaf sheet_drawable_plain_text", move |bytes| {
+            Ok(Package::from_bytes(bytes)?
+                .sheet_drawable_plain_text(0, DrawableSelector::of(kind, 0))?)
+        })
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_text_replace_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    plain_text_case(
+        "numbers_sheet_text_box_text_replace_parity",
+        Kind::TextBox,
+        Splice::Replace(0, 5, "Opening ✓"),
+    )?;
+    plain_text_case(
+        "numbers_sheet_text_box_text_replace_parity",
+        Kind::TextBox,
+        Splice::Replace(9, 9, " inserted"),
+    )
+}
+
+#[test]
+fn numbers_sheet_text_box_text_set_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    plain_text_case(
+        "numbers_sheet_text_box_text_set_parity",
+        Kind::TextBox,
+        Splice::Set("Replaced text\nSecond paragraph"),
+    )
+}
+
+#[test]
+fn numbers_sheet_text_box_text_clear_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    plain_text_case(
+        "numbers_sheet_text_box_text_clear_parity",
+        Kind::TextBox,
+        Splice::Clear,
+    )
+}
+
+#[test]
+fn numbers_sheet_shape_text_replace_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    plain_text_case(
+        "numbers_sheet_shape_text_replace_parity",
+        Kind::Shape,
+        Splice::Replace(6, 10, "words"),
+    )
+}
+
+#[test]
+fn numbers_sheet_shape_text_set_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    plain_text_case(
+        "numbers_sheet_shape_text_set_parity",
+        Kind::Shape,
+        Splice::Set("A shape label"),
+    )
+}
+
+#[test]
+fn numbers_sheet_shape_text_clear_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    plain_text_case(
+        "numbers_sheet_shape_text_clear_parity",
+        Kind::Shape,
+        Splice::Clear,
+    )
+}
