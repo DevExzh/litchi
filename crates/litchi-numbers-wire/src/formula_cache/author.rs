@@ -3,7 +3,7 @@
 //! tables, Pages body tables; record 0376a).
 //!
 //! [`encode`](crate::formula_cache::author::encode) lowers a
-//! [`FormulaExpression`] into the native formula archive and its dependency
+//! [`FormulaExpression`](litchi_iwa_common::formula::FormulaExpression) into the native formula archive and its dependency
 //! facts. [`plan`](crate::formula_cache::author::plan) then plans the formula
 //! side of setting or removing one cell's formula. That covers the
 //! formula-owner dependency records, the cell-record tiles and the
