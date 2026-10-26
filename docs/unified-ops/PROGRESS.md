@@ -6277,3 +6277,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   ordinary/allocator compilation of the ODF raw example after materializing
   its tracked dependencies. W6 v4 enters independent review, and flat-parts
   v3 remains in repair. C/P stay frozen; no native acceptance or push.
+
+
+  ODF raw compilation exposes a missing lock migration (165j). Root verifies
+  that its repair adds only seven local ODF packages/edges; leaf16744934d6
+  updates all live lock consumers and the optimized build profile. The next
+  locked release check reaches the probe and finds three Rust errors; the
+  allocator check is unrun. A candidate consumer-lock overlay also remains
+  necessary. ODF raw is returned, leaving 24/28 source preparations ready.
+  Root repairs and tests the remaining-29 diagnostic's actual runner-source
+  handoff; its reviewed v2 is ready but not launched. W6 v4 and flat-parts v3
+  are returned for concrete public-flow defects, with successors in repair.
+  All final qualification remains required; nothing is pushed.
