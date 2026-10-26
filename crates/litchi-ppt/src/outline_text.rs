@@ -48,7 +48,7 @@ const TEXT_HEADER_ATOM_SIZE: usize = 4;
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct OutlineTextBody {
     /// The body's `TextTypeEnum` (`TextHeaderAtom.textType`).
     text_type: TextType,
@@ -61,6 +61,16 @@ pub struct OutlineTextBody {
     /// Source policy retained by this source-backed projection.
     source_limits: SourceLimits,
 }
+
+impl PartialEq for OutlineTextBody {
+    fn eq(&self, other: &Self) -> bool {
+        self.text_type == other.text_type
+            && self.text_header_instance == other.text_header_instance
+            && self.records == other.records
+    }
+}
+
+impl Eq for OutlineTextBody {}
 
 impl OutlineTextBody {
     /// Splits the records that follow one slide's `SlidePersistAtom` into

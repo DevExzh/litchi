@@ -145,7 +145,7 @@ impl PictureBulletType {
 }
 
 /// One picture bullet from a `BlipEntityAtom`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PictureBullet {
     /// Zero-based bullet index referenced by `TextPFException9`.
     pub index: u16,
@@ -155,11 +155,74 @@ pub struct PictureBullet {
     pub unused: u8,
     /// Complete embedded `OfficeArt` BLIP or FBSE record, including its header.
     pub officeart_record: Vec<u8>,
-    /// The admission policy retained for all later BLIP and FBSE reads.
+    /// The admission policy retained for all later BLIP and FBSE reads. This
+    /// operational policy is intentionally excluded from content equality.
     limits: PictureBulletLimits,
 }
 
+impl PartialEq for PictureBullet {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+            && self.picture_type == other.picture_type
+            && self.unused == other.unused
+            && self.officeart_record == other.officeart_record
+    }
+}
+
+impl Eq for PictureBullet {}
+
 impl PictureBullet {
+    /// Construct and validate one picture bullet from an owned `OfficeArt`
+    /// BLIP or FBSE record.
+    ///
+    /// The supplied record is consumed without an additional allocation. The
+    /// selected limits are retained for later [`Self::blip`] and
+    /// [`Self::to_record`] calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index, OfficeArt record, preferred kind, or
+    /// selected limits are invalid.
+    pub fn new(
+        index: u16,
+        picture_type: PictureBulletType,
+        unused: u8,
+        officeart_record: Vec<u8>,
+        limits: PictureBulletLimits,
+    ) -> Result<Self> {
+        limits.validate()?;
+        validate_bullet_index(index, limits)?;
+        validate_officeart_record(
+            picture_type,
+            &officeart_record,
+            limits.max_officeart_record_bytes,
+            limits.records,
+        )?;
+        Ok(Self::from_admitted(
+            index,
+            picture_type,
+            unused,
+            officeart_record,
+            limits,
+        ))
+    }
+
+    fn from_admitted(
+        index: u16,
+        picture_type: PictureBulletType,
+        unused: u8,
+        officeart_record: Vec<u8>,
+        limits: PictureBulletLimits,
+    ) -> Self {
+        Self {
+            index,
+            picture_type,
+            unused,
+            officeart_record,
+            limits,
+        }
+    }
+
     /// Parses the embedded `OfficeArt` image without copying its file data.
     ///
     /// # Errors
@@ -513,13 +576,13 @@ fn parse_picture_bullet_with_limits(
         .map_err(|_err| Error::AllocationFailed("picture-bullet OfficeArt record"))?;
     owned_officeart.extend_from_slice(officeart_record);
 
-    Ok(PictureBullet {
-        index: record.instance,
+    Ok(PictureBullet::from_admitted(
+        record.instance,
         picture_type,
         unused,
-        officeart_record: owned_officeart,
+        owned_officeart,
         limits,
-    })
+    ))
 }
 
 fn validate_bullet_index(index: u16, _limits: PictureBulletLimits) -> Result<()> {
@@ -2023,12 +2086,21 @@ mod tests {
             max_officeart_record_bytes: 25,
             ..PictureBulletLimits::default()
         };
+        let default_bullet = PictureBulletCollection::parse(
+            &collection(png_bullet(3)),
+            &PictureBulletLimits::default(),
+        )
+        .unwrap()
+        .bullets
+        .pop()
+        .unwrap();
         let mut bullet =
             PictureBulletCollection::parse_with_limits(&collection(png_bullet(3)), limits)
                 .unwrap()
                 .bullets
                 .pop()
                 .unwrap();
+        assert_eq!(default_bullet, bullet);
 
         // The source was admitted at the exact encoded size. Lowering the
         // retained policy after admission proves that `blip()` does not
