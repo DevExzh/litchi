@@ -133,11 +133,40 @@ impl Diff {
 
 /// Compare `input`, the host output and the leaf output member by member
 /// and object by object.
-pub fn compare(input: &[u8], host: &[u8], leaf: &[u8], known: &KnownFields) -> TestResult<Diff> {
+///
+/// `leaf_drops` names members the leaf is documented to delete where the
+/// host keeps them (Keynote's root previews, see
+/// [`crate::harness::Case::leaf_invalidates_root_previews`]): when such a
+/// member is in the input and the host output and absent from the leaf
+/// output, the difference is a note instead of a violation.
+pub fn compare(
+    input: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+    known: &KnownFields,
+    leaf_drops: &[&str],
+    policy: MetadataPolicy,
+) -> TestResult<Diff> {
     let input = members(input)?;
-    let host = members(host)?;
+    let mut host = members(host)?;
     let leaf = members(leaf)?;
     let mut diff = Diff::default();
+    if !leaf_drops.is_empty() {
+        let in_leaf: BTreeSet<_> = leaf.iter().map(|m| m.name.clone()).collect();
+        let in_input: BTreeSet<_> = input.iter().map(|m| m.name.clone()).collect();
+        let before = host.len();
+        host.retain(|member| {
+            !(leaf_drops.contains(&member.name.as_str())
+                && in_input.contains(&member.name)
+                && !in_leaf.contains(&member.name))
+        });
+        if host.len() != before {
+            diff.notes.push(format!(
+                "the leaf deleted {} root preview member(s) the host kept (documented rendering invalidation)",
+                before - host.len()
+            ));
+        }
+    }
 
     let names = |members: &[Member]| members.iter().map(|m| m.name.clone()).collect::<Vec<_>>();
     let (input_names, host_names, leaf_names) = (names(&input), names(&host), names(&leaf));
@@ -237,6 +266,7 @@ pub fn compare(input: &[u8], host: &[u8], leaf: &[u8], known: &KnownFields) -> T
             &objects(&h.data)?,
             &objects(&l.data)?,
             known,
+            policy,
             &mut diff,
         );
     }
@@ -261,6 +291,7 @@ fn compare_objects(
     host: &[Object],
     leaf: &[Object],
     known: &KnownFields,
+    policy: MetadataPolicy,
     diff: &mut Diff,
 ) {
     diff.host_changed_objects += count_changed(input, host);
@@ -317,7 +348,7 @@ fn compare_objects(
                 "{label}: the host re-encoded an object the leaf kept byte-identical"
             ));
         }
-        compare_known(&label, h, l, known, diff);
+        compare_known(&label, source, h, l, known, policy, diff);
     }
 }
 
@@ -330,7 +361,15 @@ fn types(object: &Object) -> String {
         .join("+")
 }
 
-fn compare_known(label: &str, host: &Object, leaf: &Object, known: &KnownFields, diff: &mut Diff) {
+fn compare_known(
+    label: &str,
+    source: Option<&Object>,
+    host: &Object,
+    leaf: &Object,
+    known: &KnownFields,
+    policy: MetadataPolicy,
+    diff: &mut Diff,
+) {
     if host.messages.len() != leaf.messages.len() {
         diff.violations.push(format!(
             "{label}: payload count differs (host {}, leaf {})",
@@ -375,7 +414,36 @@ fn compare_known(label: &str, host: &Object, leaf: &Object, known: &KnownFields,
             ));
             continue;
         };
-        match (decode(&h.data), decode(&l.data)) {
+        let normalised;
+        let leaf_data = if h.type_ == PACKAGE_METADATA && policy.any() {
+            let input = source.and_then(|source| {
+                source
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == PACKAGE_METADATA)
+            });
+            match normalise_metadata(input.map(|m| m.data.as_slice()), &h.data, &l.data, policy) {
+                Ok((data, notes)) => {
+                    for note in notes {
+                        diff.notes
+                            .push(format!("{label} payload {position}: {note}"));
+                    }
+                    normalised = data;
+                    normalised.as_slice()
+                },
+                Err(violation) => {
+                    diff.violations
+                        .push(format!("{label} payload {position}: {violation}"));
+                    continue;
+                },
+            }
+        } else {
+            l.data.as_slice()
+        };
+        if h.data == leaf_data {
+            continue;
+        }
+        match (decode(&h.data), decode(leaf_data)) {
             (Ok(hd), Ok(ld)) => {
                 if hd.canonical != ld.canonical {
                     diff.violations.push(format!(
@@ -396,6 +464,124 @@ fn compare_known(label: &str, host: &Object, leaf: &Object, known: &KnownFields,
             )),
         }
     }
+}
+
+const PACKAGE_METADATA: u32 = 11_006;
+
+/// Documented leaf metadata policies a case accepts. Each one rewrites the
+/// leaf's `TSP.PackageMetadata` to the host's value for exactly the
+/// difference it names (after checking the leaf value has the documented
+/// shape), so every other field is still compared.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MetadataPolicy {
+    /// The leaf advances the document save token by one and stamps every
+    /// component it rewrites with the new token (record 0298 §2.1); the
+    /// host keeps the source token.
+    pub save_token: bool,
+    /// The leaf derives the UUIDs of objects it creates deterministically
+    /// (record 0298 §2.1); the host draws random ones. The identifiers must
+    /// match; only the UUIDs of objects absent from the input may differ,
+    /// and the leaf's must be unique.
+    pub fresh_uuids: bool,
+}
+
+impl MetadataPolicy {
+    fn any(self) -> bool {
+        self.save_token || self.fresh_uuids
+    }
+}
+
+fn normalise_metadata(
+    input: Option<&[u8]>,
+    host: &[u8],
+    leaf: &[u8],
+    policy: MetadataPolicy,
+) -> Result<(Vec<u8>, Vec<String>), String> {
+    use litchi_iwa_protos::tsp::PackageMetadata;
+    use prost::Message as _;
+    let decode = |data: &[u8]| PackageMetadata::decode(data).map_err(|e| e.to_string());
+    let host = decode(host)?;
+    let mut leaf = decode(leaf)?;
+    let input = input.map(decode).transpose()?;
+    let mut notes = Vec::new();
+    if policy.save_token && leaf.save_token != host.save_token {
+        let source = input.as_ref().and_then(|input| input.save_token);
+        let advanced = source.zip(leaf.save_token).is_some_and(|(s, l)| l == s + 1);
+        if host.save_token != source || !advanced {
+            return Err(format!(
+                "save token: input {source:?}, host {:?}, leaf {:?} (the leaf must advance the input token by one)",
+                host.save_token, leaf.save_token
+            ));
+        }
+        let token = leaf.save_token;
+        let mut stamped = 0;
+        for component in &mut leaf.components {
+            let Some(theirs) = host
+                .components
+                .iter()
+                .find(|c| c.identifier == component.identifier)
+            else {
+                continue;
+            };
+            if component.save_token != theirs.save_token {
+                if component.save_token != token {
+                    return Err(format!(
+                        "component {} save token {:?} is neither the host's {:?} nor the new document token {token:?}",
+                        component.identifier, component.save_token, theirs.save_token
+                    ));
+                }
+                component.save_token = theirs.save_token;
+                stamped += 1;
+            }
+        }
+        leaf.save_token = host.save_token;
+        notes.push(format!(
+            "the leaf advanced the save token to {token:?} and stamped {stamped} component(s) (documented policy)"
+        ));
+    }
+    if policy.fresh_uuids {
+        let known: BTreeSet<u64> = input
+            .iter()
+            .flat_map(|input| &input.components)
+            .flat_map(|c| &c.object_uuid_map_entries)
+            .map(|entry| entry.identifier)
+            .collect();
+        let host_uuid: BTreeMap<u64, _> = host
+            .components
+            .iter()
+            .flat_map(|c| &c.object_uuid_map_entries)
+            .map(|entry| (entry.identifier, entry.uuid))
+            .collect();
+        let mut seen = BTreeSet::new();
+        let mut replaced = 0;
+        for entry in leaf
+            .components
+            .iter_mut()
+            .flat_map(|c| &mut c.object_uuid_map_entries)
+        {
+            if !seen.insert((entry.uuid.lower, entry.uuid.upper)) {
+                return Err(format!(
+                    "the leaf reuses a UUID for object {}",
+                    entry.identifier
+                ));
+            }
+            if known.contains(&entry.identifier) {
+                continue;
+            }
+            if let Some(uuid) = host_uuid.get(&entry.identifier)
+                && *uuid != entry.uuid
+            {
+                entry.uuid = *uuid;
+                replaced += 1;
+            }
+        }
+        if replaced > 0 {
+            notes.push(format!(
+                "{replaced} new object UUID(s) differ (leaf deterministic, host random; documented policy)"
+            ));
+        }
+    }
+    Ok((leaf.encode_to_vec(), notes))
 }
 
 /// Offset of the first differing byte, or the shorter length.
