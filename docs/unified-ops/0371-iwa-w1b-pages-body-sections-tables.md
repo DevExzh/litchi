@@ -26,9 +26,9 @@
 | `a408e00fbd`, `9bac132398` | `litchi_pages::bookmark` — `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add, update, remove}` by position or name; on W1-D's `ranged` and `smart_field` engines | 4 |
 | `c0ec0bac27`, `9bac132398` | `litchi_pages::date_time` — `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add, insert, update, remove}` (insert adds the display text) | 5 |
 | `a9d2af35ca`, `de1dbad71e` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}`; on W1-D's `number_attachment` engine | 6 |
-| (caption commit, below) | `litchi_pages::drawable::caption` — `Package::{body_drawable_caption, edit_body_drawable_caption, apply_body_drawable_caption}` over `DrawableSelector` + `Kind::{Title, Caption}`; `Edit::{set, clear}`. A present label's storage text is rewritten; an absent label gets the native inline graph from the shared `keynote_chart_caption_graph_codec` (style, CaptionInfo, storage, placement; the payloads the host writes); clearing points the drawable at a fresh stand-in and keeps the old graph. New objects get deterministic UUIDs in the document component and raise the watermark (`body_storage_objects::Metadata::registered`) | 15 |
-| (number-attachment host fix commit, below) | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
-| (lifecycle commit, below) | parity for existing leaf families: host `append_section`, `remove_section`, `sections` → `Package::{edit_section_lifecycle, sections}` (tier B); host `remove_table` (already delegating) → `Package::edit_body_table_deletion` (tier A) | 4 |
+| `658c8bb696` | `litchi_pages::drawable::caption` — `Package::{body_drawable_caption, edit_body_drawable_caption, apply_body_drawable_caption}` over `DrawableSelector` + `Kind::{Title, Caption}`; `Edit::{set, clear}`. A present label's storage text is rewritten; an absent label gets the native inline graph from the shared `keynote_chart_caption_graph_codec` (style, CaptionInfo, storage, placement; the payloads the host writes); clearing points the drawable at a fresh stand-in and keeps the old graph. New objects get deterministic UUIDs in the document component and raise the watermark (`body_storage_objects::Metadata::registered`) | 15 |
+| `b8116873a5` | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
+| `26ce96d0f7` | parity for existing leaf families: host `append_section`, `remove_section`, `sections` → `Package::{edit_section_lifecycle, sections}` (tier B); host `remove_table` (already delegating) → `Package::edit_body_table_deletion` (tier A) | 4 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -83,8 +83,12 @@ corpus has no native file with them.
 
 ### Pinned divergences (routes left host-only)
 
-None. The number-attachment removal divergence pinned in the first slice
-was a host defect and is fixed (§3, item 3).
+| Route | Divergence | Owner |
+|---|---|---|
+| `add_table` | the leaf `table::creation` family (record 0329) writes a different graph from the host (random table UUID, its own identifier order, formula owner type 6267 against 4008) — `pages_body_table_add_divergence_is_reported` | W1-B follow-up: align the leaf creation with the host graph, or document the leaf graph as the native one and retire the host |
+
+The number-attachment removal divergence pinned in the first slice was a
+host defect and is fixed (§3, item 3).
 
 ## 3. Host defects found
 

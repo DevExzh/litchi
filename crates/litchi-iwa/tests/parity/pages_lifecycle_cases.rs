@@ -121,11 +121,16 @@ fn leaf_tables(bytes: &[u8]) -> TestResult<Vec<Option<String>>> {
         .collect())
 }
 
+/// Table creation is not at parity: the leaf `table::creation` family
+/// (record 0329) writes a different graph from the host's `add_table` (a
+/// random table UUID, its own identifier order, a formula owner of type
+/// 6267 where the host writes 4008). `add_table` stays host-only (record
+/// 0371).
 #[test]
-fn pages_body_table_add_parity() -> TestResult {
+fn pages_body_table_add_divergence_is_reported() -> TestResult {
     let input = fixture(TABLES)?;
-    Case::new(
-        "pages_body_table_add_parity",
+    let outcome = Case::new(
+        "pages_body_table_add_divergence_is_reported",
         Format::Pages,
         Tier::A,
         Evidence::Queued,
@@ -155,7 +160,12 @@ fn pages_body_table_add_parity() -> TestResult {
     })
     .read("host tables", host_tables)
     .read("leaf body_tables", leaf_tables)
-    .run()?;
+    .run();
+    let Err(error) = outcome else {
+        return Err("body-table creation is now at parity; migrate add_table".into());
+    };
+    let report = error.to_string();
+    assert!(report.contains("leaf [(6267"), "{report}");
     Ok(())
 }
 
