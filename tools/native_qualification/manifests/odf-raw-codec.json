@@ -8,6 +8,8 @@
     "lock_path": "tools/perf-baseline/Cargo.lock",
     "candidate_mode": "integrated_final_c",
     "candidate_identity_schema": "litchi.odf.raw-codec-qualification.candidate-identity.v1",
+    "protocol_p_commit": "33a0a63d3553712c1276da592f7846a0c7dcabd6",
+    "protocol_p_tree": "656d66603b33aec273d529263aa10b504bd3b7f8",
     "candidate_consumer_manifest_sha256": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
     "candidate_consumer_manifest_bytes": 8181,
     "candidate_lock_sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",

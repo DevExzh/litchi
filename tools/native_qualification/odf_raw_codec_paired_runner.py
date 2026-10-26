@@ -24,6 +24,7 @@ from pathlib import Path
 import resource
 import signal
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -43,6 +44,8 @@ SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v2"
 PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v3"
 IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v1"
 CANDIDATE_MODE = "integrated_final_c"
+PROTOCOL_P_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
+PROTOCOL_P_TREE = "656d66603b33aec273d529263aa10b504bd3b7f8"
 ROLES = ("baseline", "candidate")
 VARIANTS = ("normal", "allocator")
 ABBA_ORDER = ("baseline", "candidate", "candidate", "baseline")
@@ -191,6 +194,38 @@ def _sha256_file(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
+def _read_regular_nofollow(path: Path, label: str, *, max_bytes: int | None = None) -> bytes:
+    _reject_symlink_ancestors(path, label)
+    flags = os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise RunnerError(f"cannot open {label} without following symlinks: {path}: {error}") from error
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise RunnerError(f"{label} is not a regular file: {path}")
+        payload = bytearray()
+        while True:
+            block = os.read(descriptor, 1024 * 1024)
+            if not block:
+                break
+            payload.extend(block)
+            if max_bytes is not None and len(payload) > max_bytes:
+                raise RunnerError(f"{label} exceeds the bounded read limit: {path}")
+        after = os.fstat(descriptor)
+        if (before.st_dev, before.st_ino, before.st_size) != (after.st_dev, after.st_ino, after.st_size):
+            raise RunnerError(f"{label} changed while it was being read: {path}")
+        return bytes(payload)
+    finally:
+        os.close(descriptor)
+
+
+def _sha256_regular_nofollow(path: Path, label: str) -> tuple[str, int]:
+    payload = _read_regular_nofollow(path, label)
+    return _sha256_bytes(payload), len(payload)
+
+
 def _resolve(value: str | os.PathLike[str], *, base: Path | None = None) -> Path:
     path = Path(value)
     if not path.is_absolute():
@@ -238,12 +273,10 @@ def _reject_symlink_ancestors(path: Path, label: str) -> None:
 
 
 def _load_json(path: Path, label: str) -> tuple[dict[str, Any], str, int]:
-    if path.is_symlink() or not path.is_file():
-        raise RunnerError(f"{label} is missing or symlinked: {path}")
     try:
-        raw = path.read_bytes()
+        raw = _read_regular_nofollow(path, label, max_bytes=8 * 1024 * 1024)
         data = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, json.JSONDecodeError, RunnerError) as error:
         raise RunnerError(f"cannot read {label}: {error}") from error
     if not isinstance(data, dict):
         raise RunnerError(f"{label} root must be an object")
@@ -313,6 +346,35 @@ def _load_candidate_identity(path: Path, *, manifest: Mapping[str, Any], roots: 
     data, digest, size = _load_json(path, "candidate identity")
     identity = _validate_candidate_identity(data, manifest)
     return identity, digest, size, path
+
+
+def _verify_protocol_p_anchor(protocol_p_root: Path, sealed_by: Mapping[str, Any], candidate_commit: str) -> dict[str, str]:
+    protocol_p_root = _resolve(protocol_p_root)
+    try:
+        top = _resolve(_git(protocol_p_root, "rev-parse", "--show-toplevel").strip())
+        p_commit = _require_sha(sealed_by.get("commit"), "candidate identity seal commit", 40)
+        p_tree = _require_sha(sealed_by.get("tree"), "candidate identity seal tree", 40)
+        if p_commit != PROTOCOL_P_COMMIT or p_tree != PROTOCOL_P_TREE:
+            raise RunnerError("candidate identity seal is not the independently pinned protocol-P object")
+        if top != protocol_p_root:
+            raise RunnerError("protocol-P anchor is not a worktree top-level")
+        _git(protocol_p_root, "cat-file", "-e", f"{p_commit}^{{commit}}")
+        actual_tree = _git(protocol_p_root, "rev-parse", f"{p_commit}^{{tree}}").strip()
+        if actual_tree != p_tree:
+            raise RunnerError("protocol-P commit tree differs from the pinned trust anchor")
+        _git(protocol_p_root, "cat-file", "-e", f"{candidate_commit}^{{commit}}")
+    except (reviewed.RunnerError, RunnerError) as error:
+        raise RunnerError(str(error)) from error
+    ancestry = subprocess.run(
+        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", p_commit, candidate_commit],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if ancestry.returncode != 0:
+        raise RunnerError("protocol-P trust anchor is not an ancestor of the sealed candidate commit")
+    return {"root": str(protocol_p_root), "commit": p_commit, "tree": p_tree, "candidate_commit": candidate_commit}
 
 
 def _require_sha(value: Any, label: str, length: int) -> str:
@@ -406,6 +468,16 @@ def _file_identity(root: Path, relative: Path, label: str) -> dict[str, Any]:
     return {"path": str(path), "relative": str(relative), "label": label, "sha256": digest, "bytes": size}
 
 
+def _require_tracked_regular(root: Path, relative: Path, label: str) -> Path:
+    path = _resolve(relative, base=root)
+    if path.is_symlink() or not path.is_file():
+        raise RunnerError(f"{label} must be a regular file: {path}")
+    tracked = _git(root, "ls-files", "--error-unmatch", "--", str(relative)).strip().splitlines()
+    if tracked != [str(relative)]:
+        raise RunnerError(f"{label} must be tracked exactly at {relative}")
+    return path
+
+
 def _package_identity(root: Path, relative: Path, expected_name: str) -> dict[str, Any]:
     path = _resolve(relative, base=root)
     try:
@@ -466,6 +538,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         "candidate_integrated_files": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
         "candidate_mode": CANDIDATE_MODE,
         "candidate_identity_schema": IDENTITY_SCHEMA,
+        "protocol_p_commit": PROTOCOL_P_COMMIT,
+        "protocol_p_tree": PROTOCOL_P_TREE,
         "adapter_provenance_scope": "three consumer files only; production closure is not equated to final C",
     }
     for key, expected in expected_source.items():
@@ -564,6 +638,7 @@ def _validate_preparation(
     baseline_root: Path,
     candidate_root: Path,
     adapter_root: Path,
+    protocol_p_root: Path,
     candidate_identity: Mapping[str, Any],
     candidate_identity_path: Path,
     candidate_identity_sha256: str,
@@ -576,6 +651,10 @@ def _validate_preparation(
     adapter = data.get("adapter")
     if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping) or not isinstance(adapter, Mapping):
         raise RunnerError("preparation endpoints are missing")
+    protocol_p_anchor = data.get("protocol_p_anchor")
+    expected_p_anchor = _verify_protocol_p_anchor(protocol_p_root, candidate_identity["sealed_by"], candidate_identity["candidate"]["commit"])
+    if protocol_p_anchor != expected_p_anchor:
+        raise RunnerError("preparation protocol-P anchor handoff differs")
     identity_record = data.get("candidate_identity")
     if not isinstance(identity_record, Mapping) or identity_record.get("path") != str(candidate_identity_path) or identity_record.get("sha256") != candidate_identity_sha256 or identity_record.get("bytes") != candidate_identity_bytes or identity_record.get("value") != candidate_identity:
         raise RunnerError("preparation candidate identity handoff differs")
@@ -654,9 +733,10 @@ def _validate_preparation(
         if adapter_value["sha256"] != manifest_sha or adapter_value["bytes"] != manifest_bytes:
             raise RunnerError(f"preparation adapter {label} does not match the manifest identity")
         relative = {"consumer_manifest": CONSUMER_MANIFEST, "probe": PROBE_PATH, "perf_lock": LOCK_PATH}[label]
-        if _resolve(str(adapter_value["path"])) != _resolve(relative, base=adapter_root):
+        adapter_path = _require_tracked_regular(adapter_root, relative, f"adapter {label}")
+        if _resolve(str(adapter_value["path"])) != adapter_path:
             raise RunnerError(f"preparation adapter {label} path is not inside the selected adapter endpoint")
-        observed, size = _sha256_file(_resolve(str(adapter_value["path"])))
+        observed, size = _sha256_file(adapter_path)
         if (observed, size) != (manifest_sha, manifest_bytes):
             raise RunnerError(f"preparation adapter {label} bytes differ")
 
@@ -789,7 +869,7 @@ def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
 
 
 class PairedRunner:
-    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
+    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, protocol_p_root: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
         if phase not in {"build", "abba"}:
             raise RunnerError("phase must be build or abba")
         if not isinstance(cpu, int) or cpu < 0 or cpu >= (os.cpu_count() or 1):
@@ -800,17 +880,20 @@ class PairedRunner:
         self.baseline_root = _resolve(baseline_root)
         self.candidate_root = _resolve(candidate_root)
         self.adapter_root = _resolve(adapter_root)
+        self.protocol_p_root = _resolve(protocol_p_root)
         self.candidate_identity_path = _resolve(candidate_identity_path)
         self.output = _resolve(output)
         self.target_root = _resolve(target_root)
         self.tmp_root = _resolve(tmp_root)
         self.cpu = cpu
-        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
+        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "protocol_p": self.protocol_p_root, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
-        self.candidate_identity, self.candidate_identity_sha256, self.candidate_identity_bytes, self.candidate_identity_path = _load_candidate_identity(self.candidate_identity_path, manifest=self.manifest, roots=(self.baseline_root, self.candidate_root, self.adapter_root))
+        self.candidate_identity, self.candidate_identity_sha256, self.candidate_identity_bytes, self.candidate_identity_path = _load_candidate_identity(self.candidate_identity_path, manifest=self.manifest, roots=(self.baseline_root, self.candidate_root, self.adapter_root, self.protocol_p_root))
+        self.protocol_p_anchor = _verify_protocol_p_anchor(self.protocol_p_root, self.candidate_identity["sealed_by"], self.candidate_identity["candidate"]["commit"])
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
-        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
+        self.preparation_sha256 = prep_sha
+        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, protocol_p_root=self.protocol_p_root, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
         self.runner_sha256, _ = _sha256_file(Path(__file__).resolve())
         self.guard = generic.ProcessGuard()
         self.endpoint_cache: dict[str, dict[str, Any]] = {}
@@ -854,7 +937,56 @@ class PairedRunner:
     def _tmp(self, role: str, variant: str) -> Path:
         return self.tmp_root / f"{role}-{variant}"
 
+    def _refresh_handoffs(self, boundary: str) -> None:
+        """Re-read all external proof inputs at every execution boundary."""
+
+        manifest, manifest_sha, _ = _load_json(self.manifest_path, "manifest")
+        if manifest_sha != self.manifest_sha256:
+            raise RunnerError(f"manifest changed after initialization before {boundary}")
+        checked_manifest = validate_manifest(manifest)
+        if checked_manifest != self.manifest:
+            raise RunnerError(f"manifest content changed after initialization before {boundary}")
+        identity, identity_sha, identity_bytes, identity_path = _load_candidate_identity(
+            self.candidate_identity_path,
+            manifest=self.manifest,
+            roots=(self.baseline_root, self.candidate_root, self.adapter_root, self.protocol_p_root),
+        )
+        if identity_path != self.candidate_identity_path or identity_sha != self.candidate_identity_sha256 or identity_bytes != self.candidate_identity_bytes or identity != self.candidate_identity:
+            raise RunnerError(f"candidate identity changed after initialization before {boundary}")
+        p_anchor = _verify_protocol_p_anchor(self.protocol_p_root, identity["sealed_by"], identity["candidate"]["commit"])
+        if p_anchor != self.protocol_p_anchor:
+            raise RunnerError(f"protocol-P anchor changed before {boundary}")
+        preparation, preparation_sha, _ = _load_json(self.preparation_path, "preparation")
+        if preparation_sha != self.preparation_sha256:
+            raise RunnerError(f"preparation changed after initialization before {boundary}")
+        checked_preparation = _validate_preparation(
+            preparation,
+            preparation_sha,
+            manifest=self.manifest,
+            baseline_root=self.baseline_root,
+            candidate_root=self.candidate_root,
+            adapter_root=self.adapter_root,
+            protocol_p_root=self.protocol_p_root,
+            candidate_identity=self.candidate_identity,
+            candidate_identity_path=self.candidate_identity_path,
+            candidate_identity_sha256=self.candidate_identity_sha256,
+            candidate_identity_bytes=self.candidate_identity_bytes,
+        )
+        if checked_preparation != self.preparation:
+            raise RunnerError(f"preparation content changed after initialization before {boundary}")
+
+    def _assert_handoff_file_hashes(self, boundary: str) -> None:
+        for path, expected, label in (
+            (self.manifest_path, self.manifest_sha256, "manifest"),
+            (self.preparation_path, self.preparation_sha256, "preparation"),
+            (self.candidate_identity_path, self.candidate_identity_sha256, "candidate identity"),
+        ):
+            observed, _ = _sha256_regular_nofollow(path, label)
+            if observed != expected:
+                raise RunnerError(f"{label} changed after initialization before {boundary}")
+
     def _endpoint(self, role: str, *, full: bool = False) -> dict[str, Any]:
+        self._assert_handoff_file_hashes(f"{role} endpoint")
         root = self.baseline_root if role == "baseline" else self.candidate_root
         if not full and role in self.endpoint_cache:
             cached = self.endpoint_cache[role]
@@ -966,8 +1098,8 @@ class PairedRunner:
             error = error or "unrelated Litchi process remained after child exit"
         if after > TARGET_HARD_LIMIT_BYTES:
             error = error or f"target exceeded hard limit after {event_id}"
-        stdout_sha, stdout_bytes = _sha256_file(stdout_path)
-        stderr_sha, stderr_bytes = _sha256_file(stderr_path)
+        stdout_sha, stdout_bytes = _sha256_regular_nofollow(stdout_path, f"{event_id} stdout")
+        stderr_sha, stderr_bytes = _sha256_regular_nofollow(stderr_path, f"{event_id} stderr")
         event = {"schema": SCHEMA, "event_id": event_id, "role": role, "variant": variant, "argv": list(argv), "cwd": str(cwd), "environment": self._recorded_environment(env), "cpu_affinity": self.cpu, "start_utc": _now(), "duration_ns": time.monotonic_ns() - started, "returncode": returncode, "stdout": {"path": str(stdout_path), "sha256": stdout_sha, "bytes": stdout_bytes}, "stderr": {"path": str(stderr_path), "sha256": stderr_sha, "bytes": stderr_bytes}, "target": {"path": str(target), "bytes_before": before, "bytes_after": after}, "monitor": [{key: value for key, value in sample.items() if key != "monotonic"} for sample in monitor], "process_guard_violations": violation, "post_exit_descendants": descendants, "post_exit_offenders": offenders, "error": error}
         if error:
             raise RunnerError(f"{error}; stderr={stderr_path}")
@@ -1035,12 +1167,14 @@ class PairedRunner:
             os.fsync(stream.fileno())
 
     def build(self) -> None:
+        self._refresh_handoffs("build")
         builds: dict[str, Any] = {}
         endpoints = {role: self._endpoint(role, full=True) for role in ROLES}
         for variant in VARIANTS:
             for role in ROLES:
                 builds[f"{role}/{variant}"] = self._build_one(role, variant)
         receipt = {"schema": SCHEMA, "phase": "build", "status": "passed", "manifest": {"path": str(self.manifest_path), "sha256": self.manifest_sha256}, "preparation": {"path": str(self.preparation_path), **self.preparation}, "runner": {"path": str(Path(__file__).resolve()), "sha256": self.runner_sha256}, "build": self.manifest["build"], "cpu_affinity": self.cpu, "features": ["raw-codec-odf", "raw-codec-original", "raw-codec-current", "raw-codec-allocator"], "routes": self.manifest["routes"], "families": list(FAMILY_IDS), "paired": {key: self.manifest["paired"][key] for key in ("abba_order", "warmup_iterations_per_leg", "samples_per_leg", "probe_iterations", "roles", "variants")}, "endpoints": endpoints, "builds": builds, "event_journal": _journal([builds[key]["event"] for key in _build_keys()]), "claim_scope": "build identity only; no native acceptance claim"}
+        self._refresh_handoffs("build receipt")
         self._write_fresh(self.output / "build-receipt.json", receipt, "build receipt")
 
     def _load_build_receipt(self) -> dict[str, Any]:
@@ -1115,30 +1249,37 @@ class PairedRunner:
         return receipt
 
     def _validate_probe_output(self, path: Path, mode: str, iterations: int, role: str) -> dict[str, Any]:
-        raw = path.read_bytes()
-        if not raw or len(raw) > PROBE_MAX_BYTES:
-            raise RunnerError(f"probe output is empty or too large: {path}")
+        raw = _read_regular_nofollow(path, "probe report", max_bytes=PROBE_MAX_BYTES)
+        if not raw:
+            raise RunnerError(f"probe output is empty: {path}")
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError as error:
             raise RunnerError(f"probe output is not JSON: {error}") from error
-        if not isinstance(payload, Mapping) or payload.get("schema") != "litchi.odf.raw-codec-qualification.v1" or payload.get("mode") != mode or payload.get("iterations") != iterations or NON_ACCEPTANCE not in str(payload.get("claim_scope")):
+        expected_payload_keys = {"schema", "mode", "iterations", "routes", "families", "negative_cases", "api_era", "namespace_contract", "claim_scope", "allocator_enabled"}
+        if not isinstance(payload, Mapping) or set(payload) != expected_payload_keys or payload.get("schema") != "litchi.odf.raw-codec-qualification.v1" or payload.get("mode") != mode or payload.get("iterations") != iterations or NON_ACCEPTANCE not in str(payload.get("claim_scope")):
             raise RunnerError("probe output schema/mode/claim identity differs")
         if payload.get("families") != list(FAMILY_IDS):
             raise RunnerError("probe family order differs")
         expected_era = "original" if role == "baseline" else "current"
         if payload.get("api_era") != expected_era or payload.get("namespace_contract") != NAMESPACE_CONTRACTS[role]:
             raise RunnerError("probe API-era namespace contract differs")
+        expected_allocator = mode == "allocator"
+        if payload.get("allocator_enabled") is not expected_allocator:
+            raise RunnerError("probe allocator observer identity differs")
         negative = payload.get("negative_cases")
         if not isinstance(negative, Mapping) or any(negative.get(key) is not True for key in self.manifest["phases"]["negative_cases"]):
             raise RunnerError("probe negative-case proof is incomplete")
         routes = payload.get("routes")
-        if not isinstance(routes, list) or [row.get("route") for row in routes if isinstance(row, Mapping)] != list(ROUTE_IDS):
+        if not isinstance(routes, list) or len(routes) != len(ROUTE_IDS) or [row.get("route") for row in routes if isinstance(row, Mapping)] != list(ROUTE_IDS):
             raise RunnerError("probe route order differs")
         expected_descriptors = {route["id"]: route for route in self.manifest["routes"]}
         for row in routes:
-            if not isinstance(row, Mapping) or row.get("descriptor") != expected_descriptors.get(row.get("route")):
+            if not isinstance(row, Mapping) or set(row) != {"route", "family", "descriptor", "mode", "iterations", "details", "timing"} or row.get("descriptor") != expected_descriptors.get(row.get("route")):
                 raise RunnerError("probe route descriptor differs")
+            descriptor = expected_descriptors.get(row.get("route"))
+            if not isinstance(descriptor, Mapping) or row.get("family") != descriptor.get("family") or row.get("mode") != mode or row.get("iterations") != iterations:
+                raise RunnerError("probe route family/mode/iteration identity differs")
             details = row.get("details")
             proof = details.get("proof") if isinstance(details, Mapping) else None
             if not isinstance(proof, Mapping) or any(proof.get(key) is not True for key in ("operation_ok", "changed_ok", "no_op_ok", "reopen_ok", "source_bytes_ok", "facade_bytes_ok", "untouched_members_ok", "manifest_ok", "metadata_ok", "namespace_ok", "bounded_error_ok", "negative_cases_ok")):
@@ -1146,11 +1287,29 @@ class PairedRunner:
             timing = row.get("timing")
             if not isinstance(timing, Mapping):
                 raise RunnerError("probe route timing is missing")
-            expected_allocator = mode == "allocator"
             if timing.get("allocator_enabled") is not expected_allocator or timing.get("elapsed_claimable") is not (mode == "timed"):
                 raise RunnerError("probe timing/allocator claim differs")
-            if mode == "validate" and timing.get("status") != "not_run":
-                raise RunnerError("validate output contains a timing claim")
+            if mode == "validate":
+                if set(timing) != {"status", "elapsed_claimable", "allocator_enabled", "iterations"} or timing.get("status") != "not_run" or timing.get("iterations") != 0:
+                    raise RunnerError("validate output contains a timing claim")
+                continue
+            if set(timing) != {"status", "elapsed_claimable", "allocator_enabled", "measurement"}:
+                raise RunnerError("timed output timing schema differs")
+            expected_status = "allocator_observed" if mode == "allocator" else "measured"
+            if timing.get("status") != expected_status:
+                raise RunnerError("timed output status differs")
+            measurement = timing.get("measurement")
+            if not isinstance(measurement, Mapping) or set(measurement) != {"iterations", "ns_per_operation", "allocation_samples"} or measurement.get("iterations") != iterations:
+                raise RunnerError("timed output measurement schema differs")
+            ns_per_operation = measurement.get("ns_per_operation")
+            if isinstance(ns_per_operation, bool) or not isinstance(ns_per_operation, int) or ns_per_operation < 0:
+                raise RunnerError("timed output measurement value differs")
+            samples = measurement.get("allocation_samples")
+            if not isinstance(samples, list) or len(samples) != (iterations if mode == "allocator" else 0):
+                raise RunnerError("allocation measurement sample count differs")
+            for sample in samples:
+                if not isinstance(sample, Mapping) or set(sample) != set(ALLOCATOR_COUNTERS) or any(isinstance(sample.get(key), bool) or not isinstance(sample.get(key), int) or sample.get(key) < 0 for key in ALLOCATOR_COUNTERS):
+                    raise RunnerError("allocation measurement sample schema differs")
         return dict(payload)
 
     def _run_probe(self, builds: Mapping[str, Any], *, role: str, phase: str, kind: str, index: int, iterations: int) -> dict[str, Any]:
@@ -1173,10 +1332,11 @@ class PairedRunner:
         event = self._run_process(event_id=f"probe-{phase}-{role}-{kind}-{index:03d}", role=role, variant=variant, argv=command, cwd=root, env=env, target=target, stdout_path=output, stderr_path=stderr)
         payload = self._validate_probe_output(output, mode, iterations, role)
         self._assert_endpoint(role, build["source"])
-        output_sha, output_bytes = _sha256_file(output)
+        output_sha, output_bytes = _sha256_regular_nofollow(output, "probe report")
         return {"role": role, "phase": phase, "kind": kind, "index": index, "mode": mode, "iterations": iterations, "command": command, "source": build["source"], "binary": {"path": str(binary), "sha256": binary_sha, "bytes": binary_bytes}, "output": {"path": str(output), "sha256": output_sha, "bytes": output_bytes}, "stderr": event["stderr"], "monitor": event["monitor"], "payload_identity": {"schema": payload["schema"], "mode": payload["mode"], "iterations": payload["iterations"], "routes": [row["route"] for row in payload["routes"]]}, "claim_scope": "paired correctness/protocol evidence only; no native acceptance claim"}
 
     def abba(self) -> None:
+        self._refresh_handoffs("ABBA")
         build_receipt = self._load_build_receipt()
         builds = build_receipt["builds"]
         calibration = {role: self._run_probe(builds, role=role, phase="calibration", kind="validate", index=0, iterations=1) for role in ROLES}
@@ -1195,12 +1355,13 @@ class PairedRunner:
                 self._assert_endpoint(role, builds[f"{role}/{phase}" if phase == "normal" else f"{role}/allocator"]["source"], full=True)
             phases[phase] = {"mode": "timed" if phase == "normal" else "allocator", "abba_order": list(ABBA_ORDER), "warmup_iterations_per_leg": WARMUPS, "samples_per_leg": SAMPLES, "records": records, "allocator_elapsed_claimable": phase == "normal"}
         receipt = {"schema": SCHEMA, "phase": "abba", "status": "passed", "manifest": {"path": str(self.manifest_path), "sha256": self.manifest_sha256}, "preparation": {"path": str(self.preparation_path), **self.preparation}, "build_receipt": {"path": str(self.output / "build-receipt.json"), "sha256": build_receipt["receipt_sha256"]}, "runner": {"path": str(Path(__file__).resolve()), "sha256": self.runner_sha256}, "cpu_affinity": self.cpu, "features": ["raw-codec-odf", "raw-codec-original", "raw-codec-current", "raw-codec-allocator"], "routes": self.manifest["routes"], "families": list(FAMILY_IDS), "calibration": calibration, "abba": phases, "claim_scope": "paired correctness/protocol evidence only; no native acceptance claim"}
+        self._refresh_handoffs("ABBA receipt")
         self._write_fresh(self.output / "abba-receipt.json", receipt, "ABBA receipt")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "candidate-identity", "output", "target-root", "tmp-root"):
+    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "protocol-p-root", "candidate-identity", "output", "target-root", "tmp-root"):
         parser.add_argument(f"--{name}", required=True, type=Path if name.endswith(("manifest", "preparation", "root", "output")) else str)
     parser.add_argument("--cpu", required=True, type=int)
     parser.add_argument("--phase", required=True, choices=("build", "abba"))
@@ -1210,7 +1371,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
+        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, protocol_p_root=args.protocol_p_root, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
         if args.phase == "build":
             runner.build()
         else:

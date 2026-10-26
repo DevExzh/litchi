@@ -33,6 +33,8 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["source"]["candidate_overlay"], [])
         self.assertEqual(value["source"]["candidate_mode"], runner.CANDIDATE_MODE)
         self.assertEqual(value["source"]["candidate_integrated_files"], [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)])
+        self.assertEqual(value["source"]["protocol_p_commit"], runner.PROTOCOL_P_COMMIT)
+        self.assertEqual(value["source"]["protocol_p_tree"], runner.PROTOCOL_P_TREE)
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
 
     def test_manifest_hashes_match_live_adapter_sources(self) -> None:
@@ -199,6 +201,61 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertIn("open_bytes_with(bytes,", probe)
         self.assertNotIn("let file = open_bytes_with(bytes.clone(), &OpenOptions::new())", probe)
         self.assertIn("PackageCompression::Stored", probe)
+
+    def test_probe_report_requires_real_row_and_measurement_schema_without_following_symlinks(self) -> None:
+        instance = runner.PairedRunner.__new__(runner.PairedRunner)
+        instance.manifest = runner.validate_manifest(manifest())
+        proof = {key: True for key in (
+            "operation_ok", "changed_ok", "no_op_ok", "reopen_ok", "source_bytes_ok",
+            "facade_bytes_ok", "untouched_members_ok", "manifest_ok", "metadata_ok",
+            "namespace_ok", "bounded_error_ok", "negative_cases_ok",
+        )}
+        negative = {key: True for key in instance.manifest["phases"]["negative_cases"]}
+        routes = []
+        for descriptor in instance.manifest["routes"]:
+            routes.append({
+                "route": descriptor["id"],
+                "family": descriptor["family"],
+                "descriptor": descriptor,
+                "mode": "timed",
+                "iterations": 2,
+                "details": {"proof": proof},
+                "timing": {
+                    "status": "measured",
+                    "elapsed_claimable": True,
+                    "allocator_enabled": False,
+                    "measurement": {"iterations": 2, "ns_per_operation": 1, "allocation_samples": []},
+                },
+            })
+        payload = {
+            "schema": "litchi.odf.raw-codec-qualification.v1",
+            "mode": "timed",
+            "iterations": 2,
+            "routes": routes,
+            "families": list(runner.FAMILY_IDS),
+            "negative_cases": negative,
+            "api_era": "current",
+            "namespace_contract": runner.NAMESPACE_CONTRACTS["candidate"],
+            "claim_scope": runner.NON_ACCEPTANCE,
+            "allocator_enabled": False,
+        }
+        with tempfile.TemporaryDirectory(prefix="odf-raw-report-") as directory:
+            root = Path(directory)
+            report = root / "report.json"
+            report.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            self.assertEqual(instance._validate_probe_output(report, "timed", 2, "candidate")["iterations"], 2)
+            minimal = copy.deepcopy(payload)
+            del minimal["routes"][0]["family"]
+            minimal["routes"][0]["timing"]["measurement"]
+            report.write_text(json.dumps(minimal) + "\n", encoding="utf-8")
+            with self.assertRaises(runner.RunnerError):
+                instance._validate_probe_output(report, "timed", 2, "candidate")
+            target = root / "target.json"
+            target.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            report.unlink()
+            report.symlink_to(target)
+            with self.assertRaises(runner.RunnerError):
+                instance._validate_probe_output(report, "timed", 2, "candidate")
 
 
 if __name__ == "__main__":

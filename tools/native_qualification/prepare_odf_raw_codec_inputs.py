@@ -28,6 +28,8 @@ IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v1"
 CANDIDATE_MODE = "integrated_final_c"
 LANE = "odf-raw-codec"
 BASELINE_COMMIT = "70d64634c9d1d4328447d8724d3b076114a91fd0"
+PROTOCOL_P_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
+PROTOCOL_P_TREE = "656d66603b33aec273d529263aa10b504bd3b7f8"
 HISTORICAL_CANDIDATE = "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee"
 PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
@@ -108,6 +110,9 @@ def _source_state(root: Path) -> dict[str, Any]:
         raise PreparationError(f"cannot inspect sparse-checkout configuration: {sparse_result.stderr.strip()}")
     sparse_config = sparse_result.stdout.strip()
     tracked_flags = _git(root, "ls-files", "-v").splitlines()
+    non_normal_flags = [line for line in tracked_flags if not line.startswith("H")]
+    if non_normal_flags:
+        raise PreparationError(f"source has sparse or assume-unchanged tracked entries: {non_normal_flags[:3]!r}")
     skip_worktree_count = sum(line.startswith("S") for line in tracked_flags)
     return {
         "root": str(root),
@@ -310,11 +315,38 @@ def _require_tracked_regular(root: Path, relative: Path, label: str) -> Path:
     return path
 
 
+def _verify_protocol_p_anchor(protocol_p_root: Path, sealed_by: Mapping[str, Any], candidate_commit: str) -> dict[str, str]:
+    protocol_p_root = _resolve(protocol_p_root)
+    top = _resolve(_git(protocol_p_root, "rev-parse", "--show-toplevel").strip())
+    if top != protocol_p_root:
+        raise PreparationError("protocol-P anchor is not a worktree top-level")
+    p_commit = _require_sha(sealed_by.get("commit"), "candidate identity seal commit")
+    p_tree = _require_sha(sealed_by.get("tree"), "candidate identity seal tree")
+    if p_commit != PROTOCOL_P_COMMIT or p_tree != PROTOCOL_P_TREE:
+        raise PreparationError("candidate identity seal is not the independently pinned protocol-P object")
+    _git(protocol_p_root, "cat-file", "-e", f"{p_commit}^{{commit}}")
+    actual_tree = _git(protocol_p_root, "rev-parse", f"{p_commit}^{{tree}}").strip()
+    if actual_tree != p_tree:
+        raise PreparationError("protocol-P commit tree differs from the pinned trust anchor")
+    _git(protocol_p_root, "cat-file", "-e", f"{candidate_commit}^{{commit}}")
+    ancestry = subprocess.run(
+        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", p_commit, candidate_commit],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if ancestry.returncode != 0:
+        raise PreparationError("protocol-P trust anchor is not an ancestor of the sealed candidate commit")
+    return {"root": str(protocol_p_root), "commit": p_commit, "tree": p_tree, "candidate_commit": candidate_commit}
+
+
 def prepare(
     *,
     baseline_root: Path,
     candidate_root: Path,
     adapter_root: Path,
+    protocol_p_root: Path,
     candidate_identity_path: Path,
     baseline_lock: Path,
     output: Path,
@@ -322,12 +354,14 @@ def prepare(
     baseline_root = _resolve(baseline_root)
     candidate_root = _resolve(candidate_root)
     adapter_root = _resolve(adapter_root)
-    output = _external_output(output, (baseline_root, candidate_root, adapter_root))
+    protocol_p_root = _resolve(protocol_p_root)
+    output = _external_output(output, (baseline_root, candidate_root, adapter_root, protocol_p_root))
     identity, identity_sha256, identity_bytes, identity_path = _load_candidate_identity(
         candidate_identity_path,
-        (baseline_root, candidate_root, adapter_root),
+        (baseline_root, candidate_root, adapter_root, protocol_p_root),
     )
     candidate_identity = identity["candidate"]
+    protocol_p_anchor = _verify_protocol_p_anchor(protocol_p_root, identity["sealed_by"], candidate_identity["commit"])
     baseline = _source_state(baseline_root)
     candidate = _source_state(candidate_root)
     adapter = _source_state(adapter_root)
@@ -347,13 +381,15 @@ def prepare(
         raise PreparationError("sparse/skip-worktree source is not admissible for preparation")
     if len({baseline_root, candidate_root, adapter_root}) != 3:
         raise PreparationError("baseline, candidate production, and adapter endpoints must be disjoint")
+    if any(protocol_p_root == root or _under(protocol_p_root, root) or _under(root, protocol_p_root) for root in (baseline_root, candidate_root, adapter_root)):
+        raise PreparationError("protocol-P anchor endpoint must be disjoint from source endpoints")
     candidate_production_source_tree = _production_source_tree(candidate_root)
     if candidate_production_source_tree != candidate_identity["production_source_tree_sha256"]:
         raise PreparationError("candidate production source closure differs from the P-sealed identity")
 
-    adapter_probe = _resolve(PROBE_PATH, base=adapter_root)
-    adapter_consumer = _resolve(CONSUMER_MANIFEST, base=adapter_root)
-    adapter_lock = _resolve(LOCK_PATH, base=adapter_root)
+    adapter_probe = _require_tracked_regular(adapter_root, PROBE_PATH, "adapter probe")
+    adapter_consumer = _require_tracked_regular(adapter_root, CONSUMER_MANIFEST, "adapter consumer manifest")
+    adapter_lock = _require_tracked_regular(adapter_root, LOCK_PATH, "adapter performance lock")
     candidate_probe = _require_tracked_regular(candidate_root, PROBE_PATH, "candidate probe")
     candidate_consumer = _require_tracked_regular(candidate_root, CONSUMER_MANIFEST, "candidate consumer manifest")
     candidate_lock = _require_tracked_regular(candidate_root, LOCK_PATH, "candidate performance lock")
@@ -475,6 +511,7 @@ def prepare(
             "bytes": identity_bytes,
             "value": identity,
         },
+        "protocol_p_anchor": protocol_p_anchor,
         "claim_scope": "source preparation identity only; no native acceptance claim; no build or timing claim",
     }
     _write_exclusive_json(output, preparation)
@@ -486,6 +523,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline-root", type=Path, required=True)
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--adapter-root", type=Path, required=True)
+    parser.add_argument("--protocol-p-root", type=Path, required=True)
     parser.add_argument("--candidate-identity", type=Path, required=True)
     parser.add_argument("--baseline-lock", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -495,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
             baseline_root=args.baseline_root,
             candidate_root=args.candidate_root,
             adapter_root=args.adapter_root,
+            protocol_p_root=args.protocol_p_root,
             candidate_identity_path=args.candidate_identity,
             baseline_lock=args.baseline_lock,
             output=args.output,
