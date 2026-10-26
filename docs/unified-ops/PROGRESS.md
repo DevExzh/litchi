@@ -6347,3 +6347,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   ODF files; its signed guard and phase logic are unchanged. W6 v8 repairs
   continue without Cargo. Final all-65 and all 28 qualification groups remain
   required; nothing is pushed.
+
+  The remaining diagnostic stops on a cross-suite quarantine collision after
+  the CLI library's three tests pass (165o); 20 checks remain unrun. Root
+  merges the reviewed namespace/reuse repair at 28a6967294 after 22 focused
+  tests, including its symlink-refusal follow-up. DOCX focused validation
+  requires materializing omitted sparse dependencies, then reports seven
+  passes and one real inverse-fidelity failure: typed core values are restored
+  but original XML bytes are not. The exact-byte assertion remains, and a
+  production repair is required. W6 v8 closes all four review findings and
+  passes 17 source tests, bringing preparations to 28/28 source-ready. All
+  actual qualification, final candidate rebinding and final all-65 remain
+  pending. Nothing is pushed.

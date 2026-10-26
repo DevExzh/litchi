@@ -402,6 +402,23 @@ def _sidecars(path: Path) -> set[Path]:
     }
 
 
+def _quarantine_namespace(scope: str) -> str:
+    """Map an invocation scope to a path-safe, stable quarantine namespace."""
+    if not isinstance(scope, str) or not scope:
+        raise RuntimeError("quarantine scope must be a non-empty string")
+    return hashlib.sha256(scope.encode("utf-8")).hexdigest()[:24]
+
+
+def _reject_symlink_components(path: Path, label: str) -> None:
+    """Reject lexical symlinks before any canonicalization can follow them."""
+    lexical = path.absolute()
+    current = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        current /= component
+        if current.is_symlink():
+            raise RuntimeError(f"{label} may not contain a symlink component: {current}")
+
+
 def _retire_artifacts(
     artifacts: set[Path],
     target: Path,
@@ -411,10 +428,12 @@ def _retire_artifacts(
     chunk_index: int,
     *,
     scan_private: bool = True,
+    quarantine_scope: str = "direct",
 ) -> list[dict]:
     """Move only private Cargo ELF outputs and their exact sidecars."""
     debug = (target / "debug").resolve()
-    destination_root = quarantine / f"{chunk_index:04d}"
+    namespace = _quarantine_namespace(quarantine_scope)
+    destination_root = quarantine / namespace / f"{chunk_index:04d}"
     reported = {Path(path).resolve() for path in artifacts}
     selected_elfs: set[Path] = set()
     for raw_path in artifacts:
@@ -448,25 +467,43 @@ def _retire_artifacts(
         source_stat = path.stat()
         source_digest = digest(path)
         relative = path.relative_to(target.resolve())
-        destination = (destination_root / relative).resolve()
+        destination_lexical = destination_root / relative
+        _reject_symlink_components(destination_lexical, "quarantine destination")
+        destination = destination_lexical.resolve()
         if destination == quarantine or not destination.is_relative_to(quarantine.resolve()):
             raise RuntimeError(f"quarantine destination escaped quarantine root: {destination}")
-        if destination.exists():
-            raise RuntimeError(f"quarantine destination already exists: {destination}")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        # The gate places quarantine beside target on the same filesystem, so
-        # this is atomic and preserves the original inode/mode without a
-        # temporary duplicate inside target.
-        os.replace(path, destination)
-        destination_stat = destination.stat()
-        destination_digest = digest(destination)
         mode = stat.S_IMODE(source_stat.st_mode)
-        if (
-            destination_digest != source_digest
-            or destination_stat.st_size != source_stat.st_size
-            or stat.S_IMODE(destination_stat.st_mode) != mode
-        ):
-            raise RuntimeError(f"quarantined artifact changed: {path}")
+        reused = False
+        if destination.exists() or destination.is_symlink():
+            if destination.is_symlink() or not destination.is_file():
+                raise RuntimeError(f"quarantine destination already exists and is not a regular file: {destination}")
+            destination_stat = destination.stat()
+            destination_digest = digest(destination)
+            if (
+                destination_digest != source_digest
+                or destination_stat.st_size != source_stat.st_size
+                or stat.S_IMODE(destination_stat.st_mode) != mode
+            ):
+                raise RuntimeError(f"quarantine destination differs from source artifact: {destination}")
+            # A previous invocation may have completed the move before its
+            # manifest append.  Preserve that verified artifact and remove
+            # only the identical source, recording this reuse explicitly.
+            path.unlink()
+            reused = True
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            # The gate places quarantine beside target on the same filesystem,
+            # so this is atomic and preserves the original inode/mode without
+            # a temporary duplicate inside target.
+            os.replace(path, destination)
+            destination_stat = destination.stat()
+            destination_digest = digest(destination)
+            if (
+                destination_digest != source_digest
+                or destination_stat.st_size != source_stat.st_size
+                or stat.S_IMODE(destination_stat.st_mode) != mode
+            ):
+                raise RuntimeError(f"quarantined artifact changed: {path}")
         row = {
             "source": str(path),
             "relative_source": str(relative),
@@ -475,6 +512,9 @@ def _retire_artifacts(
             "sha256": source_digest,
             "mode": f"{mode:04o}",
             "chunk_index": chunk_index,
+            "quarantine_scope": quarantine_scope,
+            "quarantine_namespace": namespace,
+            "reused": reused,
             "reason": "cargo-reported" if path in reported else "completed-target-private",
             "command": command,
         }
@@ -489,6 +529,8 @@ def execute(
     log: Path,
     quarantine: Path,
     chunk_index: int,
+    *,
+    quarantine_scope: str = "direct",
 ) -> tuple[int, list[dict], dict]:
     started = time.time()
     size = target_bytes(target)
@@ -576,7 +618,15 @@ def execute(
     # cache from being moved accidentally. This happens after process.wait(),
     # so no test/example caller can still need the executable.
     if status == 0:
-        removed = _retire_artifacts(artifacts, target, quarantine, manifest, command, chunk_index)
+        removed = _retire_artifacts(
+            artifacts,
+            target,
+            quarantine,
+            manifest,
+            command,
+            chunk_index,
+            quarantine_scope=quarantine_scope,
+        )
     after = target_bytes(target)
     if after > MAX_TARGET:
         raise RuntimeError(f"target exceeded 20 GB after retention: {after}")
@@ -633,6 +683,9 @@ def main() -> int:
     if quarantine == target or quarantine.is_relative_to(target):
         parser.error("--quarantine-dir must be outside CARGO_TARGET_DIR")
     quarantine.mkdir(parents=True, exist_ok=True)
+    attempt = os.environ.get("LITCHI_GATE_ATTEMPT", "")
+    quarantine_scope = f"log-dir:{log_dir}\nattempt:{attempt}"
+    quarantine_namespace = _quarantine_namespace(quarantine_scope)
     manifest = quarantine / "manifest.jsonl"
     failures = []
     rows = []
@@ -643,7 +696,14 @@ def main() -> int:
         log = log_dir / f"{index:04d}.log"
         started = time.time()
         try:
-            status, removed, measurement = execute(command, target, log, quarantine, index)
+            status, removed, measurement = execute(
+                command,
+                target,
+                log,
+                quarantine,
+                index,
+                quarantine_scope=quarantine_scope,
+            )
         except Exception as error:
             if not log.exists():
                 log.write_text(f"safe chunked gate blocked: {error!r}\n", encoding="utf-8")
@@ -658,6 +718,8 @@ def main() -> int:
                 "log": str(log),
                 "log_bytes": log.stat().st_size,
                 "log_sha256": digest(log),
+                "quarantine_scope": quarantine_scope,
+                "quarantine_namespace": quarantine_namespace,
             }
             rows.append(row)
             print(json.dumps(row), flush=True)
@@ -672,6 +734,8 @@ def main() -> int:
             "log_bytes": log.stat().st_size,
             "log_sha256": digest(log),
             "pruned": removed,
+            "quarantine_scope": quarantine_scope,
+            "quarantine_namespace": quarantine_namespace,
             "quarantine_manifest": str(manifest),
             **measurement,
         }

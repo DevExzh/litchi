@@ -100,6 +100,73 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             manifest_rows = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(manifest_rows[0]["quarantine"], str(destination))
 
+    def test_shared_quarantine_namespaces_same_chunk_and_artifact_by_suite(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-shared-quarantine-") as raw:
+            directory = Path(raw)
+            command, target, artifact, marker, quarantine, log = self._command(directory, FAKE_COMMAND)
+            safe.MIN_FREE = 0
+            first_status, first_retired, _ = safe.execute(
+                command,
+                target,
+                log,
+                quarantine,
+                0,
+                quarantine_scope="suite-a",
+            )
+            self.assertEqual(first_status, 0)
+            self.assertEqual(len(first_retired), 2)
+            second_status, second_retired, _ = safe.execute(
+                command,
+                target,
+                log,
+                quarantine,
+                0,
+                quarantine_scope="suite-b",
+            )
+            self.assertEqual(second_status, 0)
+            self.assertEqual(len(second_retired), 2)
+            first_paths = {row["quarantine"] for row in first_retired}
+            second_paths = {row["quarantine"] for row in second_retired}
+            self.assertTrue(first_paths.isdisjoint(second_paths))
+            self.assertEqual({row["quarantine_scope"] for row in first_retired}, {"suite-a"})
+            self.assertEqual({row["quarantine_scope"] for row in second_retired}, {"suite-b"})
+            rows = [json.loads(line) for line in (quarantine / "manifest.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(rows), 4)
+            self.assertEqual({row["quarantine_namespace"] for row in rows}, {safe._quarantine_namespace("suite-a"), safe._quarantine_namespace("suite-b")})
+
+    def test_existing_destination_rejects_corruption_without_overwrite(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-corrupt-destination-") as raw:
+            directory = Path(raw)
+            command, target, artifact, marker, quarantine, log = self._command(directory, FAKE_COMMAND)
+            safe.MIN_FREE = 0
+            status, retired, _ = safe.execute(command, target, log, quarantine, 0, quarantine_scope="suite")
+            self.assertEqual(status, 0)
+            self.assertEqual(len(retired), 2)
+            destination = Path(retired[0]["quarantine"])
+            destination.write_bytes(b"corrupt destination")
+            with self.assertRaisesRegex(RuntimeError, "differs from source artifact"):
+                safe.execute(command, target, log, quarantine, 0, quarantine_scope="suite")
+            self.assertTrue(artifact.exists())
+            rows = (quarantine / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(rows), 2)
+
+    def test_internal_symlink_destination_is_rejected_before_reuse(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-symlink-destination-") as raw:
+            directory = Path(raw)
+            command, target, artifact, marker, quarantine, log = self._command(directory, FAKE_COMMAND)
+            safe.MIN_FREE = 0
+            namespace = safe._quarantine_namespace("suite")
+            destination = quarantine / namespace / "0000" / "debug" / "examples" / "fake-example"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            equal_file = directory / "equal-destination"
+            equal_file.write_bytes(b"\x7fELFfake executable bytes")
+            equal_file.chmod(0o751)
+            destination.symlink_to(equal_file)
+            with self.assertRaisesRegex(RuntimeError, "symlink component"):
+                safe.execute(command, target, log, quarantine, 0, quarantine_scope="suite")
+            self.assertTrue(artifact.exists())
+            self.assertFalse((quarantine / "manifest.jsonl").exists())
+
     def test_nonzero_child_keeps_artifact_in_target(self) -> None:
         script = FAKE_COMMAND + "\nsys.exit(7)\n"
         with tempfile.TemporaryDirectory(prefix="safe-chunked-failure-") as raw:
@@ -295,7 +362,7 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             quarantine = directory / "quarantine"
             commands = [("test", ["first"]), ("test", ["second"])]
 
-            def fake_execute(command, _target, log, _quarantine, index):
+            def fake_execute(command, _target, log, _quarantine, index, **_kwargs):
                 log.write_text(f"chunk {index}\n", encoding="utf-8")
                 return (7 if index == 0 else 0), [], {}
 
