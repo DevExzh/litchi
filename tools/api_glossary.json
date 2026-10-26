@@ -20480,6 +20480,217 @@
           ],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::stylesheet",
+          "inputs": [
+            "styles",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::preset",
+          "inputs": [
+            "styles",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::uniform_style",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::boundaries",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::paragraph_starts",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::placements",
+          "inputs": [
+            "storage",
+            "styles",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::boundaries_with_style",
+          "inputs": [
+            "storage",
+            "paragraph",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::replace_boundaries",
+          "inputs": [
+            "storage",
+            "boundaries",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::levels",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::level",
+          "inputs": [
+            "storage",
+            "paragraph",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::with_level",
+          "inputs": [
+            "storage",
+            "paragraph",
+            "level",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::numbering",
+          "inputs": [
+            "storage",
+            "paragraph",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::with_numbering",
+          "inputs": [
+            "storage",
+            "styles",
+            "paragraph",
+            "numbering",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::property",
+          "inputs": [
+            "storage",
+            "styles",
+            "paragraph",
+            "kind",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::standard",
+          "inputs": [
+            "storage",
+            "styles",
+            "paragraph",
+            "kind",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::plan",
+          "inputs": [
+            "storage",
+            "styles",
+            "paragraph",
+            "change",
+            "exclusive",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::plan_collapse",
+          "inputs": [
+            "storage",
+            "styles",
+            "paragraph",
+            "kind",
+            "exclusive",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::find_preset",
+          "inputs": [
+            "candidates",
+            "stylesheet",
+            "preset",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::preset_payload",
+          "inputs": [
+            "stylesheet",
+            "preset",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::list::normalize",
+          "inputs": [
+            "storage",
+            "placements",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
         }
       ]
     },
