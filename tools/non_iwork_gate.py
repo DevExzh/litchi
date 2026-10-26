@@ -51,8 +51,9 @@ import sys
 import tempfile
 import threading
 import time
+import tomllib
 from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import unquote, urlsplit
 
@@ -820,6 +821,36 @@ def _metadata_dependency(
     )
 
 
+def _vendored_package_dirs() -> dict[Path, str]:
+    """Map each vendored package directory to its package name.
+
+    Vendored sources are the root manifest's ``workspace.exclude`` entries
+    under ``vendor/`` that hold a Cargo manifest.
+    """
+
+    try:
+        with (ROOT / "Cargo.toml").open("rb") as stream:
+            root_manifest = tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise GateError(f"cannot read the root Cargo manifest: {error}") from error
+    excluded = root_manifest.get("workspace", {}).get("exclude", [])
+    if not isinstance(excluded, list) or not all(isinstance(e, str) for e in excluded):
+        raise GateError("root Cargo manifest has a malformed workspace.exclude")
+    vendored: dict[Path, str] = {}
+    for entry in excluded:
+        if PurePosixPath(entry).parts[:1] != ("vendor",):
+            continue
+        directory = (ROOT / entry).resolve()
+        try:
+            with (directory / "Cargo.toml").open("rb") as stream:
+                name = tomllib.load(stream).get("package", {}).get("name")
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        if isinstance(name, str) and PACKAGE_NAME_RE.fullmatch(name):
+            vendored[directory] = name
+    return vendored
+
+
 def _metadata_packages(metadata: Mapping[str, Any]) -> dict[str, Package]:
     """Project workspace members and validate their local Cargo identities."""
 
@@ -974,11 +1005,23 @@ def _metadata_packages(metadata: Mapping[str, Any]) -> dict[str, Package]:
     package_dirs = {
         package.manifest_path.parent: package.name for package in packages.values()
     }
+    vendored_dirs = _vendored_package_dirs()
     for package in packages.values():
         for dependency in package.dependencies:
             if dependency.path is None:
                 continue
             dependency_dir = dependency.path.resolve()
+            if dependency_dir in vendored_dirs:
+                # A vendored third-party source (root `workspace.exclude`,
+                # under vendor/) is an external dependency like a registry
+                # crate; it is not a workspace edge.
+                if dependency.original_name != vendored_dirs[dependency_dir]:
+                    raise GateError(
+                        f"package {package.name!r} dependency {dependency.name!r} path "
+                        f"targets vendored {vendored_dirs[dependency_dir]!r}, "
+                        f"not {dependency.original_name!r}"
+                    )
+                continue
             if dependency_dir not in package_dirs:
                 raise GateError(
                     f"package {package.name!r} dependency {dependency.name!r} path "

@@ -1980,6 +1980,39 @@ class NonIworkGateTests(unittest.TestCase):
                 with self.assertRaises(gate.GateError):
                     gate.derive_plan(metadata)
 
+    def test_vendored_path_dependency_is_external(self) -> None:
+        vendored = gate._vendored_package_dirs()
+        flate2 = (ROOT / "vendor/flate2").resolve()
+        self.assertEqual(vendored.get(flate2), "flate2")
+
+        def with_vendored(name: str) -> dict[str, object]:
+            metadata = copy.deepcopy(metadata_fixture())
+            packages = metadata["packages"]
+            assert isinstance(packages, list)
+            package = next(p for p in packages if p["name"] == "litchi-doc")
+            dependencies = package["dependencies"]
+            assert isinstance(dependencies, list)
+            dependencies.append(
+                {
+                    "name": name,
+                    "source": None,
+                    "req": "^1.1.10",
+                    "kind": None,
+                    "rename": None,
+                    "optional": False,
+                    "uses_default_features": False,
+                    "target": None,
+                    "registry": None,
+                    "path": str(flate2),
+                    "features": [],
+                }
+            )
+            return metadata
+
+        gate.derive_plan(with_vendored("flate2"))
+        with self.assertRaisesRegex(gate.GateError, "targets vendored 'flate2'"):
+            gate.derive_plan(with_vendored("zlib-rs"))
+
     def test_bulk_direct_excluded_dependency_is_rejected_regardless_of_edge_shape(self) -> None:
         metadata = copy.deepcopy(metadata_fixture())
         packages = metadata["packages"]
