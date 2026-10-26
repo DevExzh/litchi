@@ -33,7 +33,8 @@
 | `24f47b31ea` | `drawable::lifecycle` `Edit::duplicate(DrawableSelector, TextPosition)` for images, movies and audio: the host's graph clone (fresh identifiers in graph order, reference remaps by message type, CaptionInfo through the shared codec), the 12 pt (audio 30 pt) frame and attachment offset, the new U+FFFC and attachment entry, the z-order append, UUIDs and shared data-reference owners | 3 |
 | `80cba9916f` | `drawable::lifecycle` `Edit::{replace_data, replace_poster, replace_asset}` (the `Data/` member and its `DataInfo` digest and materialized length, identifier kept) and the reads `Package::{media_assets, section_media_assets, extract_media}` on W1-E's embedded-media inventory, with the host's reachability from the document root or a section | 8 |
 | `6c58f19db1` | `Package::body_media` → `drawable::lifecycle::Media` (selector, anchor, data/thumbnail/poster assets, original and natural sizes; frame, properties and playback through `body_drawable_properties`) replaces the host's `body_{images,movies,audio}` | 3 |
-| (media add commit, below) | `drawable::lifecycle` `Edit::{add_image, add_movie, add_audio}`: the host's typed graph (drawable with the theme's first image or movie style preset, two caption stand-ins, attachment), the drawable z-order created when the document has none, new `Data/` members and `DataInfo` records (`stem-identifier.extension`), UUIDs, data-reference owners, the stylesheet external reference and the watermark | 3 |
+| `d67dd4a62a` | `drawable::lifecycle` `Edit::{add_image, add_movie, add_audio}`: the host's typed graph (drawable with the theme's first image or movie style preset, two caption stand-ins, attachment), the drawable z-order created when the document has none, new `Data/` members and `DataInfo` records (`stem-identifier.extension`), UUIDs, data-reference owners, the stylesheet external reference and the watermark | 3 |
+| (section insert commit, below) | `section::lifecycle` `Edit::insert(source, TextPosition, name)`: a section break anywhere in the body, the new section copying the source section's masters (the host's `insert_section`) | 1 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -68,7 +69,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | Date & Time fields | add (B), insert (B), update (A), remove (A) | A/B | queued |
 | number attachments | body insert/update/remove, first-header insert/update/remove | A | queued |
 | titles and captions (image, movie, shape × title, caption) | set: create on an unlabelled drawable, then replace on a host-labelled one; remove on a host-labelled one | B (fresh UUIDs; the replace runs are byte-identical) | queued |
-| section append/remove, sections read | 2 | B (UUIDs, save token) | queued |
+| section append/insert/remove, sections read | 3 | B (UUIDs, save token) | queued |
 | body-table remove | 1 | A | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
@@ -159,6 +160,7 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | image caption remove (host-labelled image) | 710,021,022 | — | 85,975,944 | −87.9% |
 | section append (`body-sections-unicode`) | 589,774,024 | — | 127,211,178 | −78.4% |
 | section remove | 498,795,655 | — | 137,862,844 | −72.4% |
+| section insert (split, `body-sections-unicode`) | 592,827,466 | — | 128,252,805 | −78.4% |
 | body-table remove (`body-table-catalog-native`) | 2,246,224,218 | — | 170,815,958 | −92.4% |
 | image remove (`image-adjustments-native`) | 659,210,379 | — | 66,936,803 | −89.9% |
 | movie remove (source-built) | 36,674,391 | — | 5,525,855 | −84.9% |
@@ -206,7 +208,7 @@ Both pre-commit size checks printed nothing for every commit.
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
 | text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
-| `insert_section` (split at a body position) and `add_table` | 2 | the leaf section add appends an empty section after the selected one (no split); the leaf table creation (record 0329) writes a different graph from the host's `add_table` (random table UUID, its own identifier order, formula-owner type 6267 against the host's 4008), so both stay host-only until one side is aligned |
+| `add_table` | 1 | the leaf table creation (record 0329) writes a different graph from the host's `add_table` (random table UUID, its own identifier order, formula-owner type 6267 against the host's 4008), so both stay host-only until one side is aligned |
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
 | table cell formats, rich text, appearance, conditional highlights, formulas, topology, duplicate/resize, sort execution, comment writes | ~150 | W1-A engines (topology engine landed; formats/styles follow), W1-F formula caches, W1-D paragraph/list engines |
 | Builder `language`, `locale`, `body_table` | 6 | next (W1-C did the Keynote pair) |

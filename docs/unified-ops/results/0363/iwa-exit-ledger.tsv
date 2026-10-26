@@ -1416,7 +1416,7 @@ pages/editor.rs	duplicate_text_box	1	pages	drawable.text_box_lifecycle	host-only
 pages/editor.rs	extract_media	1	pages	media.asset	migrated	litchi_pages::Package::extract_media	pages_media_assets_read_parity	A	-	-
 pages/editor.rs	from_bytes	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	from_package	1	pages	io	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	insert_section	1	pages	section.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	insert_section	1	pages	section.lifecycle	migrated	litchi_pages::Package::edit_section_lifecycle	pages_section_insert_parity	B	-	-
 pages/editor.rs	into_package	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	media_assets	1	pages	media.asset	migrated	litchi_pages::Package::media_assets	pages_media_assets_read_parity	A	-	-
 pages/editor.rs	open	1	pages	io	host-only	litchi-pages	-	-	-	-

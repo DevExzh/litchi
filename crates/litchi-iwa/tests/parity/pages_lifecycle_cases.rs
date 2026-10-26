@@ -283,3 +283,73 @@ fn table_remove_cost_abba() -> TestResult {
         },
     )
 }
+
+/// `insert_section` against the leaf section split: section 0 is copied and
+/// the body breaks inside the first section's text.
+#[test]
+fn pages_section_insert_parity() -> TestResult {
+    let input = fixture(SECTIONS)?;
+    Case::new(
+        "pages_section_insert_parity",
+        Format::Pages,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = pages::Draft::from_bytes(source)?;
+        let id = editor.sections().first().ok_or("no section")?.object_id;
+        drop(editor.insert_section(id, 3, "Split")?);
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        let package = Package::from_bytes(source)?;
+        let commit = package
+            .edit_section_lifecycle()
+            .insert(
+                SectionSelector::index(0),
+                litchi_pages::TextPosition::from_utf16_index(3)?,
+                Some("Split"),
+            )?
+            .commit()?;
+        let restored = commit
+            .package()
+            .apply_section_lifecycle(&commit.patch().inverse())?;
+        Ok(LeafRun::with_inverse(
+            leaf_bytes!(commit.package()),
+            leaf_bytes!(restored.package()),
+        ))
+    })
+    .read("host sections", host_sections)
+    .read("leaf sections", leaf_sections)
+    .read("host body text", body_text)
+    .leaf_structural_metadata()
+    .run()?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn section_insert_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(SECTIONS)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let id = editor.sections().first().ok_or("no section")?.object_id;
+            drop(editor.insert_section(id, 3, "Split")?);
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_section_lifecycle()
+                .insert(
+                    SectionSelector::index(0),
+                    litchi_pages::TextPosition::from_utf16_index(3)?,
+                    Some("Split"),
+                )?
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
