@@ -1,8 +1,8 @@
 //! Numbers cell vocabulary.
 //!
 //! Native Binary Numbers Cell (BNC) storage is an implementation detail. Use
-//! the semantic [`Value`](crate::cell::Value) and
-//! [`data_format`](crate::cell::data_format) APIs instead of depending on its
+//! the semantic [`Value`] and
+//! [`data_format`] APIs instead of depending on its
 //! byte layout.
 
 /// Archive-free direct replies attached to a cell comment.
