@@ -3,12 +3,15 @@
 use litchi_ppt::records::Record;
 use litchi_ppt::{PictureBullet, PictureBulletCollection, PictureBulletLimits, PictureBulletType};
 
+const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
 fn png_blip() -> Vec<u8> {
     let mut blip = Vec::new();
     blip.extend_from_slice(&(0x06e0u16 << 4).to_le_bytes());
     blip.extend_from_slice(&0xf01eu16.to_le_bytes());
-    blip.extend_from_slice(&17u32.to_le_bytes());
+    blip.extend_from_slice(&25u32.to_le_bytes());
     blip.extend_from_slice(&[0; 17]);
+    blip.extend_from_slice(PNG_SIGNATURE);
     blip
 }
 
@@ -22,7 +25,10 @@ fn public_picture_bullet_construction_reads_and_serializes_losslessly() {
         .expect("checked picture-bullet construction");
 
     assert_eq!(bullet.officeart_record.as_ptr(), officeart_pointer);
-    assert_eq!(bullet.blip().expect("read constructed BLIP").data(), &[]);
+    assert_eq!(
+        bullet.blip().expect("read constructed BLIP").data(),
+        PNG_SIGNATURE
+    );
     let record = bullet.to_record().expect("serialize constructed bullet");
     assert_eq!(record.record_type_raw, 2041);
     assert_eq!(
@@ -52,7 +58,7 @@ fn public_picture_bullet_construction_reads_and_serializes_losslessly() {
             .blip()
             .expect("read round-tripped BLIP")
             .data(),
-        &[]
+        PNG_SIGNATURE
     );
 }
 
