@@ -16,8 +16,8 @@
 //!   perpendicular runs shift, split or shorten);
 //! - the table model's row or column count and, for a header or footer
 //!   section edit, its section count;
-//! - the table drawable's layout cache, and the table formula owner's
-//!   table extents;
+//! - the table formula owner's table extents (the drawable's layout cache
+//!   is left for the application to rebuild, as the host editor leaves it);
 //! - every formula coordinate of the calculation engine that addresses the
 //!   table ([`shift`], record 0318): the table's own formulas and their
 //!   dependency records, and other tables' formulas that read it.
@@ -1060,7 +1060,7 @@ fn plan(
 ) -> Result<Planned, Error> {
     let source = working.source();
     let (model_index, model) = message(working, target.model, &[6_001])?;
-    let (info_index, info) = message(working, target.info, &[6_000, 6_003])?;
+    let (_, info) = message(working, target.info, &[6_000, 6_003])?;
     check_features(working, target, model, info, step)?;
     let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
 
@@ -1319,12 +1319,9 @@ fn plan(
     }
     push(target.model, model_index, new_model, Vec::new())?;
 
-    // The drawable's layout cache.
-    if let Some(rewritten) =
-        storage::layout_cache(info, before.rows, before.columns, step.row_axis, step.edit)?
-    {
-        push(target.info, info_index, rewritten, Vec::new())?;
-    }
+    // The drawable's layout cache stays as it is (record 0370): the
+    // application rebuilds a cache that no longer describes the table, and
+    // the host editor, whose output carries the native evidence, leaves it.
 
     // The calculation engine: the shifted payloads, and the table formula
     // owner's extents.
@@ -1463,6 +1460,7 @@ fn run(
     };
     let base = cleared.as_ref().unwrap_or(commented);
     let mut working = Working::new(base)?;
+    working.keep_previews();
     let target = locate(&working, sheet, table)?;
     let planned = plan(&working, &target, step, before, false, drop_cells)?;
     for replacement in planned.replacements {

@@ -1,6 +1,6 @@
 //! Payload rewrites of one table-axis insertion or deletion: storage tiles,
-//! row and column header buckets, the row/column UID map, the stroke
-//! sidecar's border layers and the table drawable's layout cache.
+//! row and column header buckets, the row/column UID map and the stroke
+//! sidecar's border layers.
 //!
 //! Each function maps one native payload to its rewritten form (or `None`
 //! when it is unchanged). Fields a rewrite does not own keep their exact
@@ -393,14 +393,24 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<Option<V
             return Err(Fault::Invalid);
         }
         match splice_offsets(field.payload, columns, edit)? {
-            Some(offsets) => {
+            Some(offsets) if offsets != field.payload => {
                 changed = true;
                 bytes_field(field.number, &offsets).map(Some)
             },
-            None => Ok(None),
+            _ => Ok(None),
         }
     })?;
-    Ok(changed.then_some(rebuilt))
+    if !changed {
+        return Ok(None);
+    }
+    // A rewritten row states its offset width, as the host editor's row
+    // encoder does (record 0370); an absent `has_wide_offsets` reads as
+    // narrow.
+    let mut rebuilt = rebuilt;
+    if single_varint(row, 8)?.is_none() {
+        push_varint_field(&mut rebuilt, 8, 0)?;
+    }
+    Ok(Some(rebuilt))
 }
 
 /// Rewrite the rows of one storage tile for a column edit.
@@ -824,94 +834,6 @@ pub(super) fn strokes<'p>(
         _ => Ok(None),
     })?;
     Ok(StrokePlan { sidecar, layers })
-}
-
-/// Rewrite a table drawable's layout cache (`TST.TableInfoArchive`
-/// `layout_engine`, field 14) for an axis edit: the per-row fitting entries
-/// follow a row edit (a new row copies its neighbour's entry) and the
-/// column count follows a column edit. A cache that does not describe the
-/// table is left as it is (the app rebuilds it).
-pub(super) fn layout_cache(
-    info: &[u8],
-    rows: u32,
-    columns: u32,
-    row_axis: bool,
-    edit: AxisEdit,
-) -> FaultResult<Option<Vec<u8>>> {
-    let Some(engine) = single_bytes(info, 14)? else {
-        return Ok(None);
-    };
-    let Some(cache) = single_bytes(engine, 1)? else {
-        return Ok(None);
-    };
-    let entries = repeated_bytes(cache, 1)?;
-    let count = single_varint(cache, 3)?;
-    let new_cache = if row_axis {
-        if entries.len() != usize::try_from(rows).map_err(|_error| Fault::Invalid)? {
-            return Ok(None);
-        }
-        let mut replacement: Vec<&[u8]> = entries.clone();
-        match edit {
-            AxisEdit::Insert(index) => {
-                let index = usize::try_from(index).map_err(|_error| Fault::Invalid)?;
-                let neighbour = if index > 0 {
-                    entries.get(index - 1)
-                } else {
-                    entries.first()
-                };
-                let Some(neighbour) = neighbour else {
-                    return Ok(None);
-                };
-                reserve(&mut replacement, 1)?;
-                replacement.insert(index, neighbour);
-            },
-            AxisEdit::Remove(index) => {
-                replacement.remove(usize::try_from(index).map_err(|_error| Fault::Invalid)?);
-            },
-        }
-        let mut first = true;
-        rebuild(cache, |field| {
-            if field.number != 1 {
-                return Ok(None);
-            }
-            if !first {
-                return Ok(Some(Vec::new()));
-            }
-            first = false;
-            let mut all = Vec::new();
-            for entry in &replacement {
-                push_bytes_field(&mut all, 1, entry)?;
-            }
-            Ok(Some(all))
-        })?
-    } else {
-        if count != Some(u64::from(columns)) {
-            return Ok(None);
-        }
-        let after = match edit {
-            AxisEdit::Insert(_) => columns + 1,
-            AxisEdit::Remove(_) => columns - 1,
-        };
-        rebuild(cache, |field| {
-            if field.number == 3 {
-                return varint_field(3, u64::from(after)).map(Some);
-            }
-            Ok(None)
-        })?
-    };
-    let new_engine = rebuild(engine, |field| {
-        if field.number == 1 {
-            return bytes_field(1, &new_cache).map(Some);
-        }
-        Ok(None)
-    })?;
-    rebuild(info, |field| {
-        if field.number == 14 {
-            return bytes_field(14, &new_engine).map(Some);
-        }
-        Ok(None)
-    })
-    .map(Some)
 }
 
 #[cfg(test)]
