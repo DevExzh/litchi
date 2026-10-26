@@ -484,3 +484,33 @@ fn numbers_media_extraction_parity() -> TestResult {
         Evidence::Queued,
     )
 }
+
+#[inline(never)]
+fn host_embedded_route(bytes: &[u8]) -> TestResult<String> {
+    host_embedded(bytes)
+}
+
+#[inline(never)]
+fn leaf_embedded_route(bytes: &[u8]) -> TestResult<String> {
+    engine_embedded(bytes)
+}
+
+/// ABBA cost probe of the embedded-media inventory read (record 0375 §5);
+/// toggle `*media_cases::host_embedded_route*` or
+/// `*media_cases::leaf_embedded_route*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn embedded_media_cost_abba() -> TestResult {
+    for path in [
+        "iwork/keynote/slide-movie-geometry-source-native.key",
+        "iwork/pages/image-adjustments-native.pages",
+        "iwork/numbers/table-relocation-native.numbers",
+    ] {
+        let input = fixture(path)?;
+        std::hint::black_box(host_embedded_route(&input.bytes)?);
+        std::hint::black_box(leaf_embedded_route(&input.bytes)?);
+        std::hint::black_box(leaf_embedded_route(&input.bytes)?);
+        std::hint::black_box(host_embedded_route(&input.bytes)?);
+    }
+    Ok(())
+}

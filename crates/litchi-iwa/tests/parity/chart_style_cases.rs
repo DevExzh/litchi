@@ -18,11 +18,12 @@ use litchi_iwa::charts::{
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::{keynote, numbers, pages};
+use litchi_iwa_archive::Limits as ArchiveLimits;
 use litchi_iwa_archive::iwa::{
     Archive as IwaArchive, Limits as CoreLimits, RawMessage, SnappyLimits, SnappyStream,
 };
+use litchi_iwa_archive::package::Catalog as PackageCatalog;
 use litchi_iwa_archive::unstable::EntryEdit;
-use litchi_iwa_archive::{Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::{ChartData, corner, donut, legend, pie, radar};
 use litchi_iwa_common::chart3d::{self, Scale};
@@ -279,15 +280,16 @@ fn property_write(value: Property) -> property::PropertyWrite {
 
 /// Every IWA component of a package, decoded once.
 pub(crate) struct Components {
-    catalog: SourceCatalog,
+    catalog: PackageCatalog,
     archives: Vec<(String, IwaArchive)>,
 }
 
 impl Components {
     pub(crate) fn read(source: &[u8]) -> TestResult<Self> {
-        let catalog = SourceCatalog::from_bytes(source, ArchiveLimits::default())?;
+        // The ZIP member table only: each IWA component is parsed once below.
+        let catalog = PackageCatalog::from_bytes(source, ArchiveLimits::default())?;
         let mut archives = Vec::new();
-        for entry in catalog.package().iter() {
+        for entry in catalog.iter() {
             if !entry.name().ends_with(".iwa") {
                 continue;
             }
@@ -310,7 +312,6 @@ impl Components {
     /// The length of a package member, if present.
     pub(crate) fn member_size(&self, name: &str) -> Option<u64> {
         self.catalog
-            .package()
             .iter()
             .find(|entry| entry.name() == name)
             .map(|entry| entry.data().len() as u64)
