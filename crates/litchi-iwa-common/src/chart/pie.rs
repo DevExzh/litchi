@@ -1,4 +1,5 @@
-//! Archive-free visibility values for native pie and donut charts.
+//! Archive-free visibility and geometry values for native pie and donut
+//! charts.
 
 const DATA_POINT_NAMES_MASK: u8 = 0b01;
 const VALUES_MASK: u8 = 0b10;
@@ -134,6 +135,212 @@ impl Default for LeaderLineVisibility {
     }
 }
 
+const FULL_TURN_DEGREES: f32 = 360.0;
+const PERCENT_SCALE: f32 = 100.0;
+const MAXIMUM_WEDGE_EXPLOSION_PERCENT: f32 = 100.0;
+const MINIMUM_LABEL_DISTANCE_PERCENT: f32 = 30.0;
+const DEFAULT_LABEL_DISTANCE_PERCENT: f32 = 67.0;
+const MAXIMUM_LABEL_DISTANCE_PERCENT: f32 = 200.0;
+
+/// Validation failures of the pie and donut geometry values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// The value was NaN or infinite.
+    #[error("pie chart value must be finite")]
+    NonFinite,
+    /// The value was outside the native inspector's domain.
+    #[error("pie chart value is outside the native inspector range")]
+    OutOfRange,
+}
+
+/// Result type of the pie and donut geometry values.
+pub type Result<T> = std::result::Result<T, Error>;
+
+fn check(value: f32, valid: bool) -> Result<f32> {
+    if !value.is_finite() {
+        return Err(Error::NonFinite);
+    }
+    if !valid {
+        return Err(Error::OutOfRange);
+    }
+    Ok(value)
+}
+
+/// Rotation of the first wedge of a pie or donut chart (the Wedges
+/// inspector's `Rotation Angle`), in clockwise degrees in `0°..360°`.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct StartAngle(f32);
+
+impl StartAngle {
+    /// No rotation, the native default.
+    pub const ZERO: Self = Self(0.0);
+    /// A quarter turn.
+    pub const QUARTER_TURN: Self = Self(90.0);
+    /// A half turn.
+    pub const HALF_TURN: Self = Self(180.0);
+    /// Three quarters of a turn.
+    pub const THREE_QUARTER_TURN: Self = Self(270.0);
+
+    /// Construct an angle accepted by the native inspector.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NonFinite`] or [`Error::OutOfRange`] outside `0°..360°`.
+    pub fn from_degrees(degrees: f32) -> Result<Self> {
+        check(degrees, (0.0..FULL_TURN_DEGREES).contains(&degrees)).map(Self)
+    }
+
+    /// The clockwise degrees displayed by iWork (also the stored value).
+    #[must_use]
+    pub const fn degrees(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for StartAngle {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
+impl TryFrom<f32> for StartAngle {
+    type Error = Error;
+
+    fn try_from(degrees: f32) -> Result<Self> {
+        Self::from_degrees(degrees)
+    }
+}
+
+/// Distance of one wedge from the chart center (the Wedges inspector's
+/// `Explode`), stored as a fraction in `0.0..=1.0` and shown in percent.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct WedgeExplosion(f32);
+
+impl WedgeExplosion {
+    /// The wedge at its unseparated position, the native default.
+    pub const ZERO: Self = Self(0.0);
+    /// The inspector's maximum distance.
+    pub const MAXIMUM: Self = Self(1.0);
+
+    /// Construct a wedge position from an inspector percentage in
+    /// `0%..=100%`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NonFinite`] or [`Error::OutOfRange`].
+    pub fn from_percent(percent: f32) -> Result<Self> {
+        check(
+            percent,
+            (0.0..=MAXIMUM_WEDGE_EXPLOSION_PERCENT).contains(&percent),
+        )
+        .map(|percent| Self(percent / PERCENT_SCALE))
+    }
+
+    /// Construct a wedge position from its stored fraction.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NonFinite`] or [`Error::OutOfRange`] outside `0.0..=1.0`.
+    pub fn from_native(fraction: f32) -> Result<Self> {
+        check(fraction, (0.0..=1.0).contains(&fraction)).map(Self)
+    }
+
+    /// The percentage displayed by iWork.
+    #[must_use]
+    pub fn percent(self) -> f32 {
+        self.0 * PERCENT_SCALE
+    }
+
+    /// The stored fraction.
+    #[must_use]
+    pub const fn native_fraction(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for WedgeExplosion {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
+impl TryFrom<f32> for WedgeExplosion {
+    type Error = Error;
+
+    fn try_from(percent: f32) -> Result<Self> {
+        Self::from_percent(percent)
+    }
+}
+
+/// Zero-based index of one wedge, in chart series order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WedgeIndex(usize);
+
+impl WedgeIndex {
+    /// Construct a zero-based wedge index.
+    #[must_use]
+    pub const fn from_zero_based(index: usize) -> Self {
+        Self(index)
+    }
+
+    /// The zero-based wedge index.
+    #[must_use]
+    pub const fn zero_based(self) -> usize {
+        self.0
+    }
+}
+
+/// Distance of a wedge's label from the chart center, in percent in
+/// `30%..=200%` (stored unchanged).
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct LabelDistance(f32);
+
+impl LabelDistance {
+    /// The nearest position the inspector accepts.
+    pub const MINIMUM: Self = Self(MINIMUM_LABEL_DISTANCE_PERCENT);
+    /// The native position when no override is stored.
+    pub const DEFAULT: Self = Self(DEFAULT_LABEL_DISTANCE_PERCENT);
+    /// The farthest position the inspector accepts.
+    pub const MAXIMUM: Self = Self(MAXIMUM_LABEL_DISTANCE_PERCENT);
+
+    /// Construct a label distance from an inspector percentage.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NonFinite`] or [`Error::OutOfRange`] outside `30%..=200%`.
+    pub fn from_percent(percent: f32) -> Result<Self> {
+        check(
+            percent,
+            (MINIMUM_LABEL_DISTANCE_PERCENT..=MAXIMUM_LABEL_DISTANCE_PERCENT).contains(&percent),
+        )
+        .map(Self)
+    }
+
+    /// The percentage displayed by iWork (also the stored value).
+    #[must_use]
+    pub const fn percent(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for LabelDistance {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl TryFrom<f32> for LabelDistance {
+    type Error = Error;
+
+    fn try_from(percent: f32) -> Result<Self> {
+        Self::from_percent(percent)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
@@ -173,5 +380,56 @@ mod tests {
         }
         assert!(!LeaderLineVisibility::Hidden.is_unsupported());
         assert!(!LeaderLineVisibility::Visible.is_unsupported());
+    }
+}
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::{Error, LabelDistance, StartAngle, WedgeExplosion, WedgeIndex};
+
+    #[test]
+    fn start_angles_are_half_open() {
+        assert_eq!(StartAngle::default(), StartAngle::ZERO);
+        assert_eq!(
+            StartAngle::from_degrees(123.5).map(StartAngle::degrees),
+            Ok(123.5)
+        );
+        assert_eq!(StartAngle::try_from(90.0), Ok(StartAngle::QUARTER_TURN));
+        for invalid in [-0.1, 360.0, 400.0] {
+            assert_eq!(StartAngle::from_degrees(invalid), Err(Error::OutOfRange));
+        }
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(StartAngle::from_degrees(invalid), Err(Error::NonFinite));
+        }
+    }
+
+    #[test]
+    fn wedge_explosions_store_fractions() {
+        let half = WedgeExplosion::from_percent(50.0).unwrap();
+        assert_eq!(half.native_fraction(), 0.5);
+        assert_eq!(half.percent(), 50.0);
+        assert_eq!(
+            WedgeExplosion::from_native(1.0),
+            Ok(WedgeExplosion::MAXIMUM)
+        );
+        assert_eq!(WedgeExplosion::from_percent(100.1), Err(Error::OutOfRange));
+        assert_eq!(WedgeExplosion::from_native(-0.5), Err(Error::OutOfRange));
+        assert_eq!(WedgeExplosion::default(), WedgeExplosion::ZERO);
+        assert_eq!(WedgeIndex::from_zero_based(3).zero_based(), 3);
+    }
+
+    #[test]
+    fn label_distances_are_inclusive_percentages() {
+        assert_eq!(LabelDistance::default().percent(), 67.0);
+        assert_eq!(
+            LabelDistance::from_percent(30.0),
+            Ok(LabelDistance::MINIMUM)
+        );
+        assert_eq!(
+            LabelDistance::from_percent(200.0),
+            Ok(LabelDistance::MAXIMUM)
+        );
+        assert_eq!(LabelDistance::from_percent(29.9), Err(Error::OutOfRange));
+        assert_eq!(LabelDistance::try_from(f32::NAN), Err(Error::NonFinite));
     }
 }

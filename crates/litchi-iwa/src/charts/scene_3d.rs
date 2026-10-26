@@ -5,6 +5,7 @@
 //! extension as a four-component `TSCH.Chart3DVectorArchive`; Z/W are retained
 //! byte-for-byte when an existing vector is updated.
 
+use litchi_iwa_common::chart3d::Rotation;
 use prost::Message;
 
 use crate::charts::non_style::{
@@ -23,52 +24,49 @@ const VECTOR_X_FIELD: u32 = 1;
 const VECTOR_Y_FIELD: u32 = 2;
 const MINIMUM_ROTATION_DEGREES: f32 = -40.0;
 const MAXIMUM_ROTATION_DEGREES: f32 = 40.0;
-const DEFAULT_X_DEGREES: f32 = 18.5;
-const DEFAULT_Y_DEGREES: f32 = -18.125;
 
-/// X/Y orientation of a native 3D chart scene, in inspector degrees.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Chart3dRotation {
-    x_degrees: f32,
-    y_degrees: f32,
+/// X/Y orientation of a native 3D chart scene, in inspector degrees (the
+/// shared `litchi_iwa_common::chart3d::Rotation`, record 0375).
+#[derive(Clone, Copy, PartialEq)]
+pub struct Chart3dRotation(Rotation);
+
+impl std::fmt::Debug for Chart3dRotation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Chart3dRotation")
+            .field("x_degrees", &self.0.x_degrees())
+            .field("y_degrees", &self.0.y_degrees())
+            .finish()
+    }
 }
 
 impl Chart3dRotation {
     /// Orientation used by iWork when no direct rotation vector is stored.
-    pub const DEFAULT: Self = Self {
-        x_degrees: DEFAULT_X_DEGREES,
-        y_degrees: DEFAULT_Y_DEGREES,
-    };
+    pub const DEFAULT: Self = Self(Rotation::DEFAULT);
 
     /// Construct a 3D scene orientation in inspector degrees.
     ///
     /// Both axes must be finite and within the native inspector's inclusive
     /// `-40°..=40°` range.
     pub fn from_degrees(x_degrees: f32, y_degrees: f32) -> Result<Self> {
-        if !valid_rotation(x_degrees) || !valid_rotation(y_degrees) {
-            return Err(Error::InvalidFormat(format!(
-                "chart 3D rotation angles must be finite and within {MINIMUM_ROTATION_DEGREES}°..={MAXIMUM_ROTATION_DEGREES}°"
-            )));
-        }
-        Ok(Self {
-            x_degrees,
-            y_degrees,
-        })
+        Rotation::from_degrees(x_degrees, y_degrees)
+            .map(Self)
+            .map_err(|_| {
+                Error::InvalidFormat(format!(
+                    "chart 3D rotation angles must be finite and within {MINIMUM_ROTATION_DEGREES}°..={MAXIMUM_ROTATION_DEGREES}°"
+                ))
+            })
     }
 
     /// Return the rotation about the scene's X axis, in degrees.
     pub const fn x_degrees(self) -> f32 {
-        self.x_degrees
+        self.0.x_degrees()
     }
 
     /// Return the rotation about the scene's Y axis, in degrees.
     pub const fn y_degrees(self) -> f32 {
-        self.y_degrees
+        self.0.y_degrees()
     }
-}
-
-fn valid_rotation(degrees: f32) -> bool {
-    degrees.is_finite() && (MINIMUM_ROTATION_DEGREES..=MAXIMUM_ROTATION_DEGREES).contains(&degrees)
 }
 
 impl Default for Chart3dRotation {
@@ -174,13 +172,13 @@ fn patch_chart_3d_rotation(data: &[u8], rotation: Chart3dRotation) -> Result<Vec
                     vector,
                     VECTOR_X_FIELD,
                     true,
-                    Some(rotation.x_degrees.to_bits()),
+                    Some(rotation.x_degrees().to_bits()),
                 )?;
                 patch_fixed32_field(
                     &vector,
                     VECTOR_Y_FIELD,
                     true,
-                    Some(rotation.y_degrees.to_bits()),
+                    Some(rotation.y_degrees().to_bits()),
                 )
             })?
         },
@@ -197,8 +195,8 @@ fn patch_chart_3d_rotation(data: &[u8], rotation: Chart3dRotation) -> Result<Vec
 
 const fn native_rotation(rotation: Chart3dRotation) -> tsch::Chart3DVectorArchive {
     tsch::Chart3DVectorArchive {
-        x: rotation.x_degrees,
-        y: rotation.y_degrees,
+        x: rotation.x_degrees(),
+        y: rotation.y_degrees(),
         z: 0.0,
         w: 0.0,
     }
