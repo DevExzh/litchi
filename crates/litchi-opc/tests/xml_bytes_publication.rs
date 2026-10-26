@@ -109,8 +109,12 @@ fn authored_xml_add_checks_attribute_part_and_aggregate_limits_atomically() {
     let mut package = source_package();
     let item = PackURI::new("/item.xml").unwrap();
     let before = package.get_part(&item).unwrap().blob_arc();
+    // `SourceLimitsBuilder::build` keeps relationship targets within the XML
+    // attribute ceiling, so lowering the attribute ceiling lowers both.
     let limits = SourceLimits::builder()
         .max_xml_attribute_bytes(3)
+        .unwrap()
+        .max_relationship_target_bytes(3)
         .unwrap()
         .build()
         .unwrap();

@@ -1374,10 +1374,19 @@ impl History {
     ///
     /// # Errors
     ///
-    /// Returns an error when the origin or any link is stale.
+    /// Returns [`litchi_odf_common::Error::PatchConflict`] when the origin or
+    /// any link is stale.
     pub fn apply(&self, origin: &Package) -> FamilyResult<Package> {
         let mut package = origin.clone();
         for patch in &self.patches {
+            // A stale link is the family's typed conflict, as in `push` and
+            // `Package::apply`, not a wrapped core error.
+            if !patch.is_applicable_to(&package) {
+                return Err(litchi_odf_common::Error::patch_conflict(
+                    "odf_formula.history.apply",
+                    "the package is not the history link's source",
+                ));
+            }
             package = patch.apply(&package)?;
         }
         Ok(package)

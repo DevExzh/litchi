@@ -1176,10 +1176,17 @@ impl Plan {
 
     /// Stage the complete metadata. Fields equal to the snapshot's change
     /// nothing; a changed field lands in the family that stores it.
+    ///
+    /// Setting a value equal to the snapshot's is an exact no-op even when
+    /// the source has no core part: these hosts read an absent part as
+    /// `Metadata::default()`, so creating one would change bytes without
+    /// changing the value (0351 §2.3 *No-op*). A host whose API tells an
+    /// absent core part from an empty one records explicit creation through
+    /// [`Self::set_core_metadata`].
     pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
         self.metadata = Some(metadata);
         self.clear_core = false;
-        self.force_core = self.base.core.present.is_none();
+        self.force_core = false;
         self
     }
 
