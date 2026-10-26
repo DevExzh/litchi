@@ -29205,6 +29205,18 @@
           "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
         },
         {
+          "method": "litchi_iwa_protos::chart_style_codec::legend_frame",
+          "inputs": ["chart_drawable", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::rewrite_legend_frame",
+          "inputs": ["chart_drawable", "frame", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
           "method": "litchi_iwa_protos::chart_style_codec::parent",
           "inputs": ["source", "limits"],
           "limits_argument": "limits",
