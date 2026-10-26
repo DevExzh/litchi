@@ -6183,3 +6183,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   its readiness claim is withdrawn. Root rechecks 75 heads/62 worktrees;
   required controls/baselines and the ODF leaf remain in use. C/P stay frozen,
   full qualification remains open, and nothing is pushed.
+
+  Legacy v3 migrates the omitted tracked consumer and passes independent
+  source review (165e), including all 18 existing tests. Root composes the
+  reviewed protocol patches in an external source copy, reproduces a signed
+  test-header conflict and commits the exact corrected patch; independent
+  review proves equivalent final test bytes. Actual bindings/archives remain
+  pending. Sheet v4 is returned for a stale XLSF3 harness pin, and OPC v3 for
+  a real report producer/consumer mismatch and missing binary linkage. The
+  ODF reuse leaf b3ad6000d7 passes source admission; ODG/ODP preparations are
+  returned for incomplete build-to-binding transitions. The
+  same gate continues facade chunks with 33 checks complete; C/P stay frozen.
+  All 25 actual qualification rows remain required. Nothing is pushed.
