@@ -17,6 +17,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod annotation;
 mod char_style;
 pub mod drop_cap;
 pub mod language;
