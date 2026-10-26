@@ -546,31 +546,16 @@ impl FieldPath {
     /// zero-valued components are valid wire values.
     #[inline]
     pub fn new(path: Vec<u32>, limits: Limits) -> Result<Self> {
-        if limits.is_default_profile() {
-            if path.len() < DEFAULT_FIELD_PATH_COMPONENTS {
-                return Ok(Self { path });
-            }
-            // Rebuild the default profile inside the cold path so a caller
-            // with a constant profile does not materialize it per call.
-            return Self::new_checked_default(path);
-        }
-        Self::new_checked(path, limits)
-    }
-
-    #[cold]
-    #[inline(never)]
-    fn new_checked_default(path: Vec<u32>) -> Result<Self> {
-        Self::new_checked(path, Limits::default())
-    }
-
-    /// Exact admission for every input outside the constant-time default
-    /// certificate. Kept out of line so the common constructor stays a
-    /// single comparison at its call site.
-    #[cold]
-    #[inline(never)]
-    fn new_checked(path: Vec<u32>, limits: Limits) -> Result<Self> {
         let value = Self { path };
-        check_field_path_constructor(&value, limits)?;
+        // The exact admission is out of line and reports only an error, so
+        // the admitted record is built once, directly in the caller's slot.
+        if limits.is_default_profile() {
+            if value.path.len() >= DEFAULT_FIELD_PATH_COMPONENTS {
+                admit_field_path_default(&value)?;
+            }
+        } else {
+            admit_field_path(&value, limits)?;
+        }
         Ok(value)
     }
 
@@ -928,27 +913,14 @@ impl FieldInfo {
     /// absent.
     #[inline]
     pub fn new(path: FieldPath, limits: Limits) -> Result<Self> {
+        // As in `FieldPath::new`, only the error leaves the cold path.
         if limits.is_default_profile() {
-            if path.path.len() < DEFAULT_FIELD_PATH_COMPONENTS {
-                return Ok(Self::minimal(path));
+            if path.path.len() >= DEFAULT_FIELD_PATH_COMPONENTS {
+                admit_minimal_field_info_default(&path)?;
             }
-            return Self::new_checked_default(path);
+        } else {
+            admit_minimal_field_info(&path, limits)?;
         }
-        Self::new_checked(path, limits)
-    }
-
-    #[cold]
-    #[inline(never)]
-    fn new_checked_default(path: FieldPath) -> Result<Self> {
-        Self::new_checked(path, Limits::default())
-    }
-
-    /// Exact admission for every input outside the constant-time default
-    /// certificate, kept out of line like [`FieldPath::new`]'s.
-    #[cold]
-    #[inline(never)]
-    fn new_checked(path: FieldPath, limits: Limits) -> Result<Self> {
-        check_minimal_field_info_constructor(&path, limits)?;
         Ok(Self::minimal(path))
     }
 
@@ -1662,6 +1634,33 @@ const _: () = {
     assert!(2 <= Limits::MAX_HEADER_FIELDS);
     assert!(1 <= Limits::DEFAULT_HEADER_NESTING);
 };
+
+// Exact constructor admission outside the constant-time default
+// certificate. The default profile is rebuilt inside the cold path so a
+// caller with a constant profile does not materialize it per call.
+#[cold]
+#[inline(never)]
+fn admit_field_path_default(path: &FieldPath) -> Result<()> {
+    check_field_path_constructor(path, Limits::default())
+}
+
+#[cold]
+#[inline(never)]
+fn admit_field_path(path: &FieldPath, limits: Limits) -> Result<()> {
+    check_field_path_constructor(path, limits)
+}
+
+#[cold]
+#[inline(never)]
+fn admit_minimal_field_info_default(path: &FieldPath) -> Result<()> {
+    check_minimal_field_info_constructor(path, Limits::default())
+}
+
+#[cold]
+#[inline(never)]
+fn admit_minimal_field_info(path: &FieldPath, limits: Limits) -> Result<()> {
+    check_minimal_field_info_constructor(path, limits)
+}
 
 fn check_field_path_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
     let metadata_items = path.path.len();
