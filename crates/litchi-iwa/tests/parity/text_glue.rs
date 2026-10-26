@@ -333,6 +333,48 @@ impl Workspace {
         self.release_watermark(&[identifier])
     }
 
+    /// The host's `replace_text` for a rewrite that removes no object
+    /// reference (the cases pick such ranges): the text-wire rewrite,
+    /// published preserving the message header.
+    pub fn replace_text(
+        &mut self,
+        located: &Located,
+        range: std::ops::Range<usize>,
+        replacement: &str,
+    ) -> TestResult<bool> {
+        let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
+            &located.payload,
+            range,
+            replacement,
+            litchi_iwa_text_wire::RewriteBehavior::ReplaceSelection,
+            litchi_iwa_text_wire::RewriteLimits::default(),
+        )?;
+        if !rewrite.changed() {
+            return Ok(false);
+        }
+        if !rewrite.removed_object_references().is_empty() {
+            return Err("the glue publishes only rewrites that remove no reference".into());
+        }
+        let data = rewrite.into_bytes();
+        let (object, index, message_type) = (located.object, located.index, located.message_type);
+        self.update(&located.entry, |archive| {
+            let target = archive
+                .object_mut(object)
+                .ok_or_else(|| error("object disappeared"))?;
+            target.replace_message_pruning_object_references_preserving_header(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+                &[],
+                Default::default(),
+            )?;
+            Ok(())
+        })?;
+        Ok(true)
+    }
+
     /// The host's next object identifier: one above every archive object,
     /// the metadata watermark and every identifier the metadata names.
     pub fn next_identifier(&self) -> TestResult<u64> {
