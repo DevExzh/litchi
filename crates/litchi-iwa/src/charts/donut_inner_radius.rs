@@ -5,6 +5,7 @@
 //! scalar uses the inspector percentage while the wire patch preserves every
 //! unrelated field byte-for-byte.
 
+use litchi_iwa_common::chart::donut::InnerRadius;
 use prost::Message;
 
 use crate::charts::non_style::{
@@ -18,56 +19,59 @@ use crate::{Error, HostPackage, Result};
 /// `tschchartinfodefaultinnerradius` in the generated non-style archive.
 const CHART_DONUT_INNER_RADIUS_FIELD: u32 = 27;
 const MINIMUM_DONUT_INNER_RADIUS_PERCENT: f32 = 1.0;
-const DEFAULT_DONUT_INNER_RADIUS_PERCENT: f32 = 75.0;
 const MAXIMUM_DONUT_INNER_RADIUS_PERCENT: f32 = 99.0;
-const PERCENT_SCALE: f32 = 100.0;
 
 /// Size of the center hole in a native donut chart.
 ///
 /// Values use the percentage displayed by the Segments inspector and must be
-/// finite in the inclusive range `1%..=99%`.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartDonutInnerRadius(f32);
+/// finite in the inclusive range `1%..=99%`. The value is the shared
+/// `litchi_iwa_common::chart::donut::InnerRadius` (record 0375).
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ChartDonutInnerRadius(InnerRadius);
+
+impl std::fmt::Debug for ChartDonutInnerRadius {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartDonutInnerRadius")
+            .field(&self.0.native_fraction())
+            .finish()
+    }
+}
 
 impl ChartDonutInnerRadius {
     /// Smallest center hole accepted by the native inspector.
-    pub const MINIMUM: Self = Self(MINIMUM_DONUT_INNER_RADIUS_PERCENT / PERCENT_SCALE);
+    pub const MINIMUM: Self = Self(InnerRadius::MINIMUM);
     /// Native center-hole size used when the property is absent.
-    pub const DEFAULT: Self = Self(DEFAULT_DONUT_INNER_RADIUS_PERCENT / PERCENT_SCALE);
+    pub const DEFAULT: Self = Self(InnerRadius::DEFAULT);
     /// Largest center hole accepted by the native inspector.
-    pub const MAXIMUM: Self = Self(MAXIMUM_DONUT_INNER_RADIUS_PERCENT / PERCENT_SCALE);
+    pub const MAXIMUM: Self = Self(InnerRadius::MAXIMUM);
 
     /// Construct an inner radius from an inspector percentage.
     pub fn from_percent(percent: f32) -> Result<Self> {
-        if !percent.is_finite()
-            || !(MINIMUM_DONUT_INNER_RADIUS_PERCENT..=MAXIMUM_DONUT_INNER_RADIUS_PERCENT)
-                .contains(&percent)
-        {
-            return Err(Error::InvalidFormat(format!(
+        InnerRadius::from_percent(percent).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart donut inner radius must be finite and within {MINIMUM_DONUT_INNER_RADIUS_PERCENT}%..={MAXIMUM_DONUT_INNER_RADIUS_PERCENT}%"
-            )));
-        }
-        Ok(Self(percent / PERCENT_SCALE))
+            ))
+        })
     }
 
     /// Return the percentage displayed by iWork.
     pub fn percent(self) -> f32 {
-        self.0 * PERCENT_SCALE
+        self.0.percent()
     }
 
     fn from_native(fraction: f32) -> Result<Self> {
-        if !fraction.is_finite() || !(Self::MINIMUM.0..=Self::MAXIMUM.0).contains(&fraction) {
-            return Err(Error::InvalidFormat(format!(
+        InnerRadius::from_native(fraction).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "native chart donut inner radius {fraction} must be finite and within {}..={}",
-                Self::MINIMUM.0,
-                Self::MAXIMUM.0
-            )));
-        }
-        Ok(Self(fraction))
+                InnerRadius::MINIMUM.native_fraction(),
+                InnerRadius::MAXIMUM.native_fraction()
+            ))
+        })
     }
 
     const fn native_fraction(self) -> f32 {
-        self.0
+        self.0.native_fraction()
     }
 }
 

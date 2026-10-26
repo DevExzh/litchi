@@ -4,6 +4,7 @@
 //! `Between Series` control for 3D line and area charts. iWork stores the
 //! normalized ratio in the generated chart non-style archive.
 
+use litchi_iwa_common::chart3d::SeriesGap;
 use prost::Message;
 
 use crate::charts::Kind;
@@ -19,45 +20,51 @@ use crate::{Error, HostPackage, Result};
 const CHART_3D_SERIES_GAP_FIELD: u32 = 3;
 const MINIMUM_GAP_PERCENT: u16 = 0;
 const MAXIMUM_GAP_PERCENT: u16 = 200;
-const DEFAULT_GAP_PERCENT: u16 = 100;
 const PERCENT_RATIO: f32 = 100.0;
-/// Accommodates ordinary `f32` division/multiplication noise without
-/// accepting a genuinely fractional native inspector value.
-const NATIVE_WHOLE_PERCENT_TOLERANCE: f32 = 0.001;
 
 /// Spacing between series along the depth axis of a 3D line or area chart.
 ///
 /// iWork exposes only whole percentages in the inclusive `0%..=200%` range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Chart3dSeriesGap(u16);
+/// The value is the shared `litchi_iwa_common::chart3d::SeriesGap` (record
+/// 0375).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Chart3dSeriesGap(SeriesGap);
+
+impl std::fmt::Debug for Chart3dSeriesGap {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("Chart3dSeriesGap")
+            .field(&self.0.percent())
+            .finish()
+    }
+}
 
 impl Chart3dSeriesGap {
     /// No spacing between adjacent series.
-    pub const ZERO: Self = Self(MINIMUM_GAP_PERCENT);
+    pub const ZERO: Self = Self(SeriesGap::ZERO);
 
     /// The native value used when storage is absent.
-    pub const NATIVE_DEFAULT: Self = Self(DEFAULT_GAP_PERCENT);
+    pub const NATIVE_DEFAULT: Self = Self(SeriesGap::NATIVE_DEFAULT);
 
     /// The largest spacing accepted by the native inspector.
-    pub const MAXIMUM: Self = Self(MAXIMUM_GAP_PERCENT);
+    pub const MAXIMUM: Self = Self(SeriesGap::MAXIMUM);
 
     /// Construct a native 3D series-gap percentage.
     pub fn new(percent: u16) -> Result<Self> {
-        if percent > MAXIMUM_GAP_PERCENT {
-            return Err(Error::InvalidFormat(format!(
+        SeriesGap::new(percent).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "3D chart series gap must be within {MINIMUM_GAP_PERCENT}%..={MAXIMUM_GAP_PERCENT}%"
-            )));
-        }
-        Ok(Self(percent))
+            ))
+        })
     }
 
     /// Return the whole percentage displayed by iWork.
     pub const fn percent(self) -> u16 {
-        self.0
+        self.0.percent()
     }
 
-    const fn native_ratio(self) -> f32 {
-        self.0 as f32 / PERCENT_RATIO
+    fn native_ratio(self) -> f32 {
+        self.0.native_ratio()
     }
 
     fn from_native_ratio(ratio: f32) -> Result<Self> {
@@ -66,16 +73,12 @@ impl Chart3dSeriesGap {
                 "native 3D chart series-gap ratio must be finite".to_owned(),
             ));
         }
-        let percent = ratio * PERCENT_RATIO;
-        let rounded = percent.round();
-        if !(f32::from(MINIMUM_GAP_PERCENT)..=f32::from(MAXIMUM_GAP_PERCENT)).contains(&rounded)
-            || (percent - rounded).abs() > NATIVE_WHOLE_PERCENT_TOLERANCE
-        {
-            return Err(Error::InvalidFormat(format!(
-                "native 3D chart series gap {percent}% is outside the whole-percent {MINIMUM_GAP_PERCENT}%..={MAXIMUM_GAP_PERCENT}% range"
-            )));
-        }
-        Ok(Self(rounded as u16))
+        SeriesGap::from_native_ratio(ratio).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
+                "native 3D chart series gap {}% is outside the whole-percent {MINIMUM_GAP_PERCENT}%..={MAXIMUM_GAP_PERCENT}% range",
+                ratio * PERCENT_RATIO
+            ))
+        })
     }
 }
 

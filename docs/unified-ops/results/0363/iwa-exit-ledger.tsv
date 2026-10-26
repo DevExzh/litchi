@@ -3,24 +3,24 @@ charts/archive.rs	decode	1	shared	chart	host-only	litchi-iwa-common::chart (valu
 charts/archive.rs	encode	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/archive.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 charts/archive.rs	reference_lines	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-charts/depth_3d.rs	from_percent	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/donut_inner_radius.rs	from_percent	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/donut_inner_radius.rs	percent	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
+charts/depth_3d.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart3d::Depth::from_percent	keynote_chart_3d_depth_parity	A	-	-
+charts/donut_inner_radius.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart::donut::InnerRadius::from_percent	keynote_chart_donut_inner_radius_parity	A	-	-
+charts/donut_inner_radius.rs	percent	1	shared	chart	migrated	litchi_iwa_common::chart::donut::InnerRadius::percent	numbers_chart_donut_inner_radius_parity	A	-	-
 charts/font.rs	from_points	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/font.rs	named	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/legend_frame.rs	from_points	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/legend_frame.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 charts/legend_frame.rs	new	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/pie_label_distance.rs	from_percent	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/pie_start_angle.rs	from_degrees	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/pie_wedge_explosion.rs	from_percent	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/pie_wedge_explosion.rs	percent	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/radar_start_angle.rs	from_degrees	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/rounded_corners.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/scene_3d.rs	from_degrees	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
+charts/pie_label_distance.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart::pie::LabelDistance::from_percent	keynote_chart_pie_label_distance_parity	A	-	-
+charts/pie_start_angle.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart::pie::StartAngle::from_degrees	keynote_chart_pie_start_angle_parity	A	-	-
+charts/pie_wedge_explosion.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart::pie::WedgeExplosion::from_percent	keynote_chart_pie_wedge_explosion_parity	A	-	-
+charts/pie_wedge_explosion.rs	percent	1	shared	chart	migrated	litchi_iwa_common::chart::pie::WedgeExplosion::percent	numbers_chart_pie_wedge_explosion_parity	A	-	-
+charts/radar_start_angle.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart::radar::StartAngle::from_degrees	keynote_chart_radar_start_angle_parity	A	-	-
+charts/rounded_corners.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::corner::Radius::new	keynote_chart_rounded_corners_parity	A	-	-
+charts/scene_3d.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart3d::Rotation::from_degrees	keynote_chart_3d_rotation_parity	A	-	-
 charts/series_connection_line.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/series_fill.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_gap_3d.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+charts/series_gap_3d.rs	new	1	shared	io	migrated	litchi_iwa_common::chart3d::SeriesGap::new	keynote_chart_3d_series_gap_parity	A	-	-
 charts/series_stroke.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/series_symbol.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/series_symbol.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
