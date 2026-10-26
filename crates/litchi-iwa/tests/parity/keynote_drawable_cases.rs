@@ -649,3 +649,204 @@ fn keynote_slide_drawable_read_parity() -> TestResult {
     }
     Ok(())
 }
+
+fn props() -> litchi_iwa::shapes::DrawableProperties {
+    litchi_iwa::shapes::DrawableProperties {
+        hyperlink_url: Some("https://example.test/box".to_owned()),
+        locked: Some(true),
+        aspect_ratio_locked: Some(false),
+        accessibility_description: None,
+    }
+}
+
+fn leaf_props() -> litchi_keynote::slide::drawable::MediaProperties {
+    litchi_keynote::slide::drawable::MediaProperties::from_parts(
+        Some("https://example.test/box".to_owned()),
+        Some(true),
+        Some(false),
+        None,
+    )
+}
+
+#[test]
+fn keynote_slide_shape_duplicate_parity() -> TestResult {
+    let input = shape_fixture()?;
+    run_on(
+        "keynote_slide_shape_duplicate_parity",
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::Shape)?)?;
+            editor.duplicate_slide_shape(SLIDE, id)?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::Shape)?;
+            leaf_run(source, |edit| {
+                edit.duplicate(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_duplicate_parity() -> TestResult {
+    run(
+        "keynote_slide_text_box_duplicate_parity",
+        TEXT_BOX,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::TextBox)?)?;
+            editor.duplicate_slide_text_box(SLIDE, id, "A copied text box")?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::TextBox)?;
+            leaf_run(source, |edit| {
+                edit.duplicate_with_text(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                    "A copied text box",
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
+
+#[test]
+fn keynote_slide_shape_flip_parity() -> TestResult {
+    let input = shape_fixture()?;
+    run_on(
+        "keynote_slide_shape_flip_parity",
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::Shape)?)?;
+            editor.flip_slide_shape(SLIDE, id, litchi_iwa::shapes::DrawableFlipAxis::Vertical)?;
+            editor.flip_slide_shape(SLIDE, id, litchi_iwa::shapes::DrawableFlipAxis::Horizontal)?;
+            editor.flip_slide_shape(SLIDE, id, litchi_iwa::shapes::DrawableFlipAxis::Vertical)?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::Shape)?;
+            leaf_run(source, |edit| {
+                use litchi_keynote::slide::drawable::FlipAxis;
+                let (slide, drawable) = (
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                );
+                edit.flip(slide, drawable, FlipAxis::Vertical)?
+                    .flip(slide, drawable, FlipAxis::Horizontal)?
+                    .flip(slide, drawable, FlipAxis::Vertical)?;
+                Ok(())
+            })
+        },
+    )
+}
+
+#[test]
+fn keynote_slide_shape_properties_parity() -> TestResult {
+    let input = shape_fixture()?;
+    run_on(
+        "keynote_slide_shape_properties_parity",
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::Shape)?)?;
+            editor.set_slide_shape_properties(SLIDE, id, props())?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::Shape)?;
+            leaf_run(source, |edit| {
+                edit.set_properties(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                    leaf_props(),
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_properties_parity() -> TestResult {
+    run(
+        "keynote_slide_text_box_properties_parity",
+        TEXT_BOX,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::TextBox)?)?;
+            editor.set_slide_text_box_properties(SLIDE, id, props())?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::TextBox)?;
+            leaf_run(source, |edit| {
+                edit.set_properties(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                    leaf_props(),
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
+
+/// Host and leaf property reads of the text box and the shape agree.
+fn properties_agree(bytes: &[u8]) -> TestResult<usize> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let package = Package::from_bytes(bytes)?;
+    let mut count = 0;
+    for kind in [Kind::TextBox, Kind::Shape] {
+        let position = leaf_position(bytes, kind)?;
+        let id = host_id(&editor, bytes, position)?;
+        let host = match kind {
+            Kind::TextBox => editor.slide_text_box_properties(SLIDE, id)?,
+            _ => editor.slide_shape_properties(SLIDE, id)?,
+        };
+        let (leaf, _reflected) = package.slide_drawable_properties(
+            SlideSelector::index(SLIDE),
+            DrawableSelector::index(position),
+        )?;
+        assert_eq!(leaf.hyperlink_url(), host.hyperlink_url.as_deref());
+        assert_eq!(leaf.locked(), host.locked);
+        assert_eq!(leaf.aspect_ratio_locked(), host.aspect_ratio_locked);
+        assert_eq!(
+            leaf.accessibility_description(),
+            host.accessibility_description.as_deref()
+        );
+        count += 1;
+    }
+    Ok(count)
+}
+
+#[test]
+fn keynote_slide_drawable_properties_read_parity() -> TestResult {
+    let input = shape_fixture()?;
+    Case::new(
+        "keynote_slide_drawable_properties_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host and leaf properties agree", properties_agree)
+    .run()?;
+    Ok(())
+}
