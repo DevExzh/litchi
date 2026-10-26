@@ -384,7 +384,8 @@ def build(preparation_path: Path) -> dict[str, Any]:
     guard_before = _quiet_guard(preparation["max_load"], "before-candidate-build")
     event = _stream_command(
         list(command["argv"]), root, logs, "candidate-normal", target, preparation["cpu"],
-        timeout_s=preparation["timeout_s"], environment=command["environment"]["variables"], max_load=preparation["max_load"],
+        timeout_s=preparation["timeout_s"], environment=command["environment"]["variables"],
+        max_output_bytes=MAX_OUTPUT_BYTES, max_load=preparation["max_load"],
     )
     artifact_path = Path(preparation["artifact"]["path"])
     if artifact_path.is_symlink() or not artifact_path.is_file() or not os.access(artifact_path, os.X_OK):

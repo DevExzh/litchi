@@ -136,6 +136,41 @@ class OdpCandidateBuildGateTests(unittest.TestCase):
                 with self.assertRaises(GATE.RunFailure):
                     GATE._load_preparation(output)
 
+    def test_build_passes_the_four_megabyte_output_cap_to_stream_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            preparation_path = root / "preparation.json"
+            preparation_path.write_text("{}", encoding="utf-8")
+            target = root / "target"
+            build_output = root / "build-output"
+            artifact = target / "release" / "odp_native_qualification_probe"
+            preparation = {
+                "candidate": {"root": str(source), "files": {}},
+                "target_dir": str(target), "build_output": str(build_output),
+                "tmpdir": str(root / "tmp"), "cpu": 0, "timeout_s": 1, "max_load": 1000.0,
+                "command": {"argv": ["cargo", "build"], "environment": {"variables": {}}},
+                "artifact": {"path": str(artifact)}, "fixture": {},
+            }
+            guard = {"phase": "guard", "load_1m": 0.0, "max_load": 1000.0, "heavy_processes": [], "checked_unix_ns": 1}
+
+            def stream(*args: object, **kwargs: object) -> dict[str, object]:
+                target_path = args[4]
+                assert isinstance(target_path, Path)
+                artifact_path = target_path / "release" / "odp_native_qualification_probe"
+                artifact_path.parent.mkdir(parents=True)
+                artifact_path.write_bytes(b"#!/bin/sh\nexit 0\n")
+                artifact_path.chmod(0o755)
+                return {"label": "candidate-normal"}
+
+            with mock.patch.object(GATE, "_load_preparation", return_value=preparation), \
+                 mock.patch.object(GATE, "_source_state", side_effect=lambda *args, **kwargs: {"root": str(source)}), \
+                 mock.patch.object(GATE, "_quiet_guard", return_value=guard), \
+                 mock.patch.object(GATE, "_stream_command", side_effect=stream) as streamed:
+                GATE.build(preparation_path)
+            self.assertEqual(streamed.call_args.kwargs["max_output_bytes"], GATE.MAX_OUTPUT_BYTES)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -310,6 +310,21 @@ def _reviewed_file_at_root(
     return actual
 
 
+def _external_reviewed_file(
+    path: Path, expected: Mapping[str, Any], label: str,
+) -> dict[str, Any]:
+    """Bind an approved fixture copied outside both endpoint worktrees."""
+    path = _safe_path(path, label, must_exist=True)
+    actual = _identity(path)
+    binding = {
+        "bytes": _positive_int(expected.get("bytes"), f"approved {label}.bytes"),
+        "sha256": _digest(expected.get("sha256"), f"approved {label}.sha256"),
+    }
+    if actual["bytes"] != binding["bytes"] or actual["sha256"] != binding["sha256"]:
+        raise RunFailure(f"approved {label} bytes differ from the reviewed source binding")
+    return actual
+
+
 def _check_identity(value: Any, label: str, base: Path, root: Path | None = None) -> dict[str, Any]:
     path, expected_bytes, expected_sha = _identity_value(value, label, base)
     if root is not None:
@@ -734,15 +749,18 @@ def _fixture_plan(raw: Mapping[str, Any], base: Path, candidate_root: Path | Non
     _exact_keys(item, {"path", "bytes", "sha256", "provenance"}, "manifest.fixture")
     path = _safe_path(_raw_path(item["path"], "manifest.fixture.path", base), "fixture", must_exist=True)
     source_root = REVIEWED_REPO_ROOT
+    external = False
     if path == REVIEWED_REPO_ROOT / REVIEWED_FIXTURE_RELATIVE:
         source_root = REVIEWED_REPO_ROOT
     elif candidate_root is not None and path == candidate_root / REVIEWED_FIXTURE_RELATIVE:
         source_root = candidate_root
     else:
-        raise RunFailure("fixture is not the reviewed repository test-data/odg/joined-content.xml")
-    actual = _reviewed_file_at_root(
-        path, REVIEWED_FIXTURE_RELATIVE, REVIEWED_FIXTURE_IDENTITY, "fixture", source_root,
-    )
+        external = True
+        actual = _external_reviewed_file(path, REVIEWED_FIXTURE_IDENTITY, "fixture")
+    if not external:
+        actual = _reviewed_file_at_root(
+            path, REVIEWED_FIXTURE_RELATIVE, REVIEWED_FIXTURE_IDENTITY, "fixture", source_root,
+        )
     if actual["bytes"] != _positive_int(item["bytes"], "manifest.fixture.bytes") or actual["sha256"] != _digest(item["sha256"], "manifest.fixture.sha256"):
         raise RunFailure("fixture identity differs from the manifest")
     content = path.read_bytes()
@@ -891,8 +909,6 @@ def _environment_identity(
             "dev": info.st_dev,
             "ino": info.st_ino,
             "mode": info.st_mode,
-            "mtime_ns": info.st_mtime_ns,
-            "ctime_ns": info.st_ctime_ns,
             "ref": ref,
             "tree": tree,
             "source_closure": closure,
@@ -992,6 +1008,19 @@ def _source_binder_reviewed_inputs(
         required = {"path", "bytes", "sha256", "destination"} if destination is not None else {"path", "bytes", "sha256", "provenance"}
         _exact_keys(item, required, f"source binder.reviewed_inputs.{name}")
         path = _safe_path(Path(_string(item.get("path"), f"reviewed input {name}.path")), f"reviewed input {name}", must_exist=True)
+        if name == "fixture":
+            # The final ODG plan rejects fixtures inside either endpoint
+            # worktree. Bind the reviewed external copy by exact bytes and
+            # provenance; do not accept a source-root look-alike here.
+            if path == candidate_root or candidate_root in path.parents:
+                raise RunFailure("reviewed input fixture must be external to the candidate source root")
+            actual = _external_reviewed_file(path, identity, "reviewed input fixture")
+            if item.get("bytes") != actual["bytes"] or item.get("sha256") != actual["sha256"]:
+                raise RunFailure("reviewed input fixture identity differs")
+            if item.get("provenance") != REVIEWED_FIXTURE_PROVENANCE:
+                raise RunFailure("source binder fixture provenance differs")
+            result[name] = {**actual, "provenance": item["provenance"]}
+            continue
         expected_paths = {
             (REVIEWED_REPO_ROOT / relative).resolve(),
             (candidate_root / relative).resolve(),
