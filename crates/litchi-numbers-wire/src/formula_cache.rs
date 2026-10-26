@@ -430,8 +430,6 @@ pub enum Unsupported {
     TextScalar,
     CacheType,
     HeaderNameManager,
-    /// The edited table's formula list is segmented (record 0376).
-    SegmentedFormulaList,
     /// A tile or cell shape outside the shared cell writer (record 0376).
     Storage,
 }

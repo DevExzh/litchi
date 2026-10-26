@@ -152,7 +152,7 @@ fn fixed32_field(output: &mut Vec<u8>, number: u32, value: u32, limits: &Limits)
 pub(crate) struct Field<'a> {
     pub(crate) number: u32,
     pub(crate) wire_type: u8,
-    raw: &'a [u8],
+    pub(crate) raw: &'a [u8],
     pub(crate) payload: &'a [u8],
 }
 

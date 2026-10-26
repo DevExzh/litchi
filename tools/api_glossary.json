@@ -22287,7 +22287,7 @@
         },
         {
           "method": "litchi_numbers_wire::formula_cache::refresh::TileCaches::apply",
-          "inputs": ["self", "tile", "columns", "limits"],
+          "inputs": ["self", "tile", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_numbers_wire::Limits"
         },
