@@ -7,7 +7,9 @@
 pub(crate) mod body_chart_arrangement;
 pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_metadata;
+pub(crate) mod body_drawable_graph;
 pub(crate) mod body_footnote;
+pub(crate) mod body_media_properties;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
 pub(crate) mod body_table_creation;
@@ -29,7 +31,6 @@ pub(crate) mod footnote_text;
 pub(crate) mod header_footer_text;
 pub(crate) mod image_adjustments;
 pub(crate) mod metadata_edit;
-#[cfg(feature = "internal-iwork-source")]
 mod movie_playback;
 pub(crate) mod page_layout;
 mod save;

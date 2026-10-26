@@ -2826,6 +2826,19 @@ not an alias (no second name exists).
 | `litchi_iwa_protos::{theme_codec, keynote_theme_codec, theme_presets_codec, shape_properties_codec, keynote_shape_creation_codec, number_attachment_codec}` | Bounded Buffa codecs ported from the donors; each entry point takes its `DecodeOptions`/`EncodeOptions`; no limit-less twin | ✅ 0368 |
 | `shape_properties_codec::{decode_shape_properties, rewrite_shape_properties}` | banned donor aliases: use `decode_drawable_archive`, `rewrite_drawable_archive` (never ported) | ✅ 0368 |
 
+## Pages body media, shapes and text out of the host (record 0371)
+
+Wave W1-B of record 0363 moves the host's Pages body editors into
+`litchi-pages` families. Host runs of `x()`/`set_x()`/`flip_x()`/`restore_x()`
+collapse into one family with property verbs; selectors carry kind and
+text-flow position, never a native identifier.
+
+| Name | Meaning | Status |
+|---|---|---|
+| `litchi_pages::MediaSelector::{Image, Movie, Audio}` (`image`, `movie`, `audio`, `position`) | One body image, movie or audio clip by kind and zero-based text-flow position among that kind (audio = audio-only movie; live video is neither) | ✅ 0371 |
+| `litchi_pages::drawable::{Geometry, GeometryFlags, Properties, Point, Size, FlipAxis}` | Archive-free drawable frame (optional position, size, layout flags, angle; `Geometry::flipped`), the reflection-bearing flag set, and the four shared drawable properties (hyperlink, locked, aspect-ratio locked, accessibility description) | ✅ 0371 |
+| `litchi_pages::media::properties::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Snapshot}` | Registered family in `pages`; `Package::{body_media_properties, edit_body_media_properties, apply_body_media_properties}`; `Edit::{set_geometry, set_position, flip, restore_original_size, set_properties, set_playback}` replace the host's 20 image/movie/audio geometry, flip, Original Size, property, position and playback methods | ✅ 0371 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

@@ -67,6 +67,7 @@ pub mod metadata {
     };
 }
 mod limits;
+pub mod media;
 pub mod movie;
 mod package;
 pub mod page_layout;
@@ -117,6 +118,6 @@ pub use package::{
     MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
 };
 pub use section::{Section, SectionType};
-pub use selector::{BodyChartSelector, BodyTableSelector, ImageSelector};
+pub use selector::{BodyChartSelector, BodyTableSelector, ImageSelector, MediaSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::merge::Region;
