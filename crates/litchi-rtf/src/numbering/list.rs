@@ -3,7 +3,6 @@
 //! This module provides support for bulleted and numbered lists in RTF documents.
 //! RTF uses a complex two-table system: list table and list override table.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -340,36 +339,36 @@ impl<'a> ListTable<'a> {
     pub(crate) fn set_picture_bullet_picture_indices(
         &mut self,
         indices: Vec<Option<usize>>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if indices.len() > 65_536 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list-picture record count exceeds the safety limit".to_string(),
             ));
         }
         self.picture_bullet_count = u32::try_from(indices.len()).map_err(|_err| {
-            RtfError::MalformedDocument("RTF list-picture count overflow".to_string())
+            crate::Error::MalformedDocument("RTF list-picture count overflow".to_string())
         })?;
         self.picture_bullet_picture_indices = indices;
         Ok(())
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.lists.len() > MAX_LISTS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list count exceeds the safety limit".to_string(),
             ));
         }
         if self.picture_bullet_count > 65_536
             || self.picture_bullet_picture_indices.len() > self.picture_bullet_count as usize
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or oversized RTF list-picture table".to_string(),
             ));
         }
         let mut ids = HashSet::with_capacity(self.lists.len());
         for list in &self.lists {
             if !ids.insert(list.id) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF list ID".to_string(),
                 ));
             }
@@ -382,7 +381,7 @@ impl<'a> ListTable<'a> {
                     .style_priority
                     .is_some_and(|value| !(0..=99).contains(&value))
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid or oversized RTF list definition".to_string(),
                 ));
             }
@@ -397,7 +396,7 @@ impl<'a> ListTable<'a> {
                         .picture_index
                         .is_some_and(|index| index >= self.picture_bullet_count)
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid or oversized RTF list level".to_string(),
                     ));
                 }
@@ -458,9 +457,9 @@ impl ListOverrideTable {
         Some((entry, lists.get(entry.list_id)?))
     }
 
-    pub(crate) fn validate(&self, lists: &ListTable<'_>) -> RtfResult<()> {
+    pub(crate) fn validate(&self, lists: &ListTable<'_>) -> crate::Result<()> {
         if self.overrides.len() > MAX_LISTS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list override count exceeds the safety limit".to_string(),
             ));
         }
@@ -500,7 +499,7 @@ impl ListOverrideTable {
                     .level_count_override
                     .is_some_and(|count| usize::from(count) != entry.levels.len())
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF list override definition".to_string(),
                 ));
             }
@@ -510,7 +509,7 @@ impl ListOverrideTable {
                 .enumerate()
                 .any(|(index, level)| level.level as usize != index)
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF list override levels are out of order".to_string(),
                 ));
             }

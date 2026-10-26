@@ -1,6 +1,5 @@
 //! Inert producer provenance from the RTF `generator` destination.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_GENERATOR_BYTES: usize = 65_536;
@@ -14,25 +13,25 @@ impl<'a> DocumentGenerator<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(value: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(value: Cow<'a, str>) -> crate::Result<Self> {
         let generator = Self { value };
         generator.validate()?;
         Ok(generator)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.value.trim().is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generator value cannot be empty".to_string(),
             ));
         }
         if self.value.len() > MAX_GENERATOR_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generator value exceeds the safety limit".to_string(),
             ));
         }
         if self.value.contains(['\0', '\r', '\n']) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generator value contains a forbidden control character".to_string(),
             ));
         }

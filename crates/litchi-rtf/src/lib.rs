@@ -96,11 +96,10 @@ pub use numbering::list;
 // the source layout. New public code should depend on its responsibility
 // module.
 use api::story;
-use codec::error::{RtfError, RtfResult};
 use codec::{compressed, error, lexer, limits, parser, writer};
 use content::{equation, form_field, math_properties};
 use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
-use metadata::info::RtfTimestamp;
+use metadata::info::Timestamp;
 use metadata::{
     custom_xml, data_store, document_origin, document_variable, external_reference, file_table,
     generator, info, mail_merge, smart_tag, theme, user_property, window_caption,
@@ -142,7 +141,7 @@ pub mod read {
 pub mod write {
     pub use crate::codec::writer::{
         Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy as TabWidth,
-        MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter as Writer, WriterOptions as Options,
+        MAX_DEFAULT_TAB_WIDTH_TWIPS, Options, Writer,
     };
     pub use crate::model::types::Formatting as Format;
 }
@@ -196,7 +195,7 @@ pub mod style {
 
 pub use api::{Document, Package};
 pub use builder::Builder;
-pub use codec::error::{RtfError as Error, RtfResult as Result};
+pub use codec::error::{Error, Result};
 pub use tail_append::{
     DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendPublicationPlan,

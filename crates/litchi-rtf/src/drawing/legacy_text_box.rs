@@ -1,6 +1,5 @@
 //! Inert legacy RTF drawing text boxes.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_LEGACY_TEXT_BOXES: usize = 16_384;
@@ -58,14 +57,14 @@ impl LegacyTextBox<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.text.is_empty() || self.text.len() > MAX_LEGACY_TEXT_BOX_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text-box text is empty or exceeds the safety limit".to_string(),
             ));
         }
         if self.text.contains('\0') {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text-box text contains a NUL character".to_string(),
             ));
         }
@@ -81,7 +80,7 @@ impl LegacyTextBox<'_> {
             || self.height.is_some_and(|value| value <= 0)
             || self.margin.is_some_and(|value| value < 0)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text-box size or margin is outside its valid range".to_string(),
             ));
         }
@@ -92,7 +91,7 @@ impl LegacyTextBox<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'_>) -> RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'_>) -> crate::Result<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape.into_owned());
         let mut order = self.drawing_order.clone();
@@ -117,7 +116,7 @@ impl LegacyTextBox<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'_>) -> RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'_>) -> crate::Result<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group.into_owned());
         let mut order = self.drawing_order.clone();
@@ -156,7 +155,7 @@ impl LegacyTextBox<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         crate::field::push_story_page_break(
             &mut self.story_events,
             self.text.as_ref(),

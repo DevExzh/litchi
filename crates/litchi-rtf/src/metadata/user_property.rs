@@ -5,7 +5,7 @@
     clippy::shadow_same,
     reason = "builder-style helpers deliberately rebind a working value as it is refined"
 )]
-use crate::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 
 pub(crate) const MAX_USER_PROPERTIES: usize = 65_536;
@@ -69,7 +69,7 @@ impl UserPropertyDateTime {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn parse(value: &str) -> RtfResult<Self> {
+    pub fn parse(value: &str) -> crate::Result<Self> {
         let value = value.trim();
         let (date, time) = if let Some(parts) = value.split_once('T') {
             (parts.0, Some(parts.1))
@@ -83,7 +83,7 @@ impl UserPropertyDateTime {
         let month = date_parts.next().and_then(|part| part.parse().ok());
         let day = date_parts.next().and_then(|part| part.parse().ok());
         if date_parts.next().is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF date user property has an invalid date".to_string(),
             ));
         }
@@ -100,7 +100,7 @@ impl UserPropertyDateTime {
                 || values.1.is_none()
                 || values.2.is_none()
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF date user property has an invalid time".to_string(),
                 ));
             }
@@ -110,17 +110,19 @@ impl UserPropertyDateTime {
         };
         let parsed = Self {
             year: year.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF date user property has an invalid year".to_string(),
                 )
             })?,
             month: month.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF date user property has an invalid month".to_string(),
                 )
             })?,
             day: day.ok_or_else(|| {
-                RtfError::MalformedDocument("RTF date user property has an invalid day".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF date user property has an invalid day".to_string(),
+                )
             })?,
             hour,
             minute,
@@ -132,7 +134,7 @@ impl UserPropertyDateTime {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.year == 0
             || !(1..=12).contains(&self.month)
             || self.hour.is_some_and(|value| value > 23)
@@ -141,7 +143,7 @@ impl UserPropertyDateTime {
             || self.hour.is_some() != self.minute.is_some()
             || self.minute.is_some() != self.second.is_some()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF date user property is outside its valid range".to_string(),
             ));
         }
@@ -154,7 +156,7 @@ impl UserPropertyDateTime {
             _ => 31,
         };
         if self.day == 0 || self.day > max_day {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF date user property contains an invalid calendar date".to_string(),
             ));
         }
@@ -198,12 +200,12 @@ impl<'a> UserPropertyValue<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_lexical(type_code: i32, lexical: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
+    pub fn from_lexical(type_code: i32, lexical: impl Into<Cow<'a, str>>) -> crate::Result<Self> {
         let lexical = lexical.into();
         let value = match type_code {
             3 => Self::Integer {
                 value: lexical.parse().map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF integer user property has an invalid value".to_string(),
                     )
                 })?,
@@ -211,12 +213,12 @@ impl<'a> UserPropertyValue<'a> {
             },
             5 => {
                 let value: f64 = lexical.parse().map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF real user property has an invalid value".to_string(),
                     )
                 })?;
                 if !value.is_finite() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF real user property must be finite".to_string(),
                     ));
                 }
@@ -227,7 +229,7 @@ impl<'a> UserPropertyValue<'a> {
                     "0" => false,
                     "1" => true,
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF boolean user property must be 0 or 1".to_string(),
                         ));
                     },
@@ -277,29 +279,29 @@ impl<'a> UserPropertyValue<'a> {
         }
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.lexical().len() > MAX_USER_PROPERTY_VALUE_BYTES {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF user-property value exceeds {MAX_USER_PROPERTY_VALUE_BYTES} bytes"
             )));
         }
         match self {
             Self::Integer { value, lexical } if lexical.parse::<i32>().ok() != Some(*value) => {
-                Err(RtfError::MalformedDocument(
+                Err(crate::Error::MalformedDocument(
                     "RTF integer user-property lexical and typed values disagree".to_string(),
                 ))
             },
             Self::Real { value, lexical }
                 if !value.is_finite() || lexical.parse::<f64>().ok() != Some(*value) =>
             {
-                Err(RtfError::MalformedDocument(
+                Err(crate::Error::MalformedDocument(
                     "RTF real user-property lexical and typed values disagree".to_string(),
                 ))
             },
             Self::Boolean { value, lexical }
                 if lexical.as_ref() != if *value { "1" } else { "0" } =>
             {
-                Err(RtfError::MalformedDocument(
+                Err(crate::Error::MalformedDocument(
                     "RTF boolean user-property lexical and typed values disagree".to_string(),
                 ))
             },
@@ -307,14 +309,14 @@ impl<'a> UserPropertyValue<'a> {
                 if value.validate().is_err()
                     || UserPropertyDateTime::parse(lexical).ok() != Some(*value) =>
             {
-                Err(RtfError::MalformedDocument(
+                Err(crate::Error::MalformedDocument(
                     "RTF date user-property lexical and typed values disagree".to_string(),
                 ))
             },
             Self::Unknown {
                 type_code: 3 | 5 | 11 | 30 | 64,
                 ..
-            } => Err(RtfError::MalformedDocument(
+            } => Err(crate::Error::MalformedDocument(
                 "known RTF user-property type cannot use Unknown".to_string(),
             )),
             Self::Integer { .. }
@@ -372,7 +374,7 @@ impl<'a> UserProperty<'a> {
         name: impl Into<Cow<'a, str>>,
         value: UserPropertyValue<'a>,
         link_value: Option<impl Into<Cow<'a, str>>>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let property = Self {
             name: name.into(),
             value,
@@ -382,14 +384,14 @@ impl<'a> UserProperty<'a> {
         Ok(property)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.name.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF user-property name cannot be empty".to_string(),
             ));
         }
         if self.name.len() > MAX_USER_PROPERTY_NAME_BYTES {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF user-property name exceeds {MAX_USER_PROPERTY_NAME_BYTES} bytes"
             )));
         }
@@ -398,7 +400,7 @@ impl<'a> UserProperty<'a> {
             .as_ref()
             .is_some_and(|link| link.len() > MAX_USER_PROPERTY_VALUE_BYTES)
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF user-property link exceeds {MAX_USER_PROPERTY_VALUE_BYTES} bytes"
             )));
         }

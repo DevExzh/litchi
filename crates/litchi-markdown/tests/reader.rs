@@ -1,7 +1,7 @@
 use litchi_markdown::reader::{
-    BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, OpenOptions, Patch,
-    PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind, ReadLimits, ReferenceKind,
-    Snapshot,
+    BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, LimitKind,
+    OpenOptions, Patch, PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind,
+    ReadLimits, ReferenceKind, Snapshot,
 };
 
 #[test]
@@ -514,7 +514,8 @@ fn replay_keeps_recipient_policy_for_noop_and_changed_commits() -> Result<(), Er
     let mut no_op_edit = producer.edit();
     no_op_edit.replace_block(0, "one")?;
     let no_op = no_op_edit.commit()?;
-    assert!(no_op.patch().is_empty());
+    assert!(no_op.patch().is_noop());
+    assert!(no_op.patch().inverse().is_noop());
     let no_op_replay = recipient.apply(no_op.patch())?;
     assert_eq!(no_op_replay.package().source(), "one");
     assert_eq!(no_op_replay.package().limits(), recipient_limits);
@@ -522,6 +523,7 @@ fn replay_keeps_recipient_policy_for_noop_and_changed_commits() -> Result<(), Er
     let mut changed_edit = producer.edit();
     changed_edit.replace_block(0, "two")?;
     let changed = changed_edit.commit()?;
+    assert!(!changed.patch().is_noop());
     let changed_replay = recipient.apply(changed.patch())?;
     assert_eq!(changed_replay.package().source(), "two");
     assert_eq!(changed_replay.package().limits(), recipient_limits);
@@ -835,8 +837,11 @@ fn reader_refuses_lossy_and_over_budget_inputs() {
     };
     assert!(matches!(
         read_with_policy("", Dialect::CommonMark, invalid_limits),
-        Err(Error::InvalidLimit { name: "max_events" })
+        Err(Error::InvalidLimit {
+            kind: LimitKind::Events,
+        })
     ));
+    assert_eq!(LimitKind::Events.as_str(), "max_events");
 }
 
 #[test]
@@ -883,7 +888,7 @@ fn append_remove_noop_and_conflict_paths_are_typed() -> Result<(), Error> {
     let mut noop_edit = source.edit();
     noop_edit.replace_block(0, "one")?;
     let noop_commit = noop_edit.commit()?;
-    assert!(noop_commit.patch().is_empty());
+    assert!(noop_commit.patch().is_noop());
     assert!(!noop_commit.diagnostics().changed());
     assert!(!noop_commit.diagnostics().full_reparse_performed());
 

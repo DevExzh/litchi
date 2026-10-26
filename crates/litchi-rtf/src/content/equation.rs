@@ -20,7 +20,6 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use crate::error::{RtfError, RtfResult};
 
 /// Maximum number of switched groups in one `EQ` expression.
 const MAX_EQUATION_GROUPS: usize = 256;
@@ -33,8 +32,8 @@ const MAX_SPACING_POINTS: u32 = 16_384;
 /// Upper bound for `\a\co` column counts.
 const MAX_ARRAY_COLUMNS: u8 = 64;
 
-fn malformed(message: impl Into<String>) -> RtfError {
-    RtfError::MalformedDocument(message.into())
+fn malformed(message: impl Into<String>) -> crate::Error {
+    crate::Error::MalformedDocument(message.into())
 }
 
 /// A spacing argument stored by an `EQ` switch, in points.
@@ -48,7 +47,7 @@ impl EquationSpacing {
         self.0
     }
 
-    fn parse(text: &str) -> RtfResult<Self> {
+    fn parse(text: &str) -> crate::Result<Self> {
         let value: u32 = text
             .parse()
             .map_err(|_err| malformed("RTF EQ switch has a non-numeric spacing argument"))?;
@@ -232,7 +231,7 @@ impl<'a> EquationModel<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn parse(expression: &'a str) -> RtfResult<Self> {
+    pub fn parse(expression: &'a str) -> crate::Result<Self> {
         Parser::new(expression).run()
     }
 
@@ -274,7 +273,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn run(mut self) -> RtfResult<EquationModel<'a>> {
+    fn run(mut self) -> crate::Result<EquationModel<'a>> {
         while let Some(byte) = self.remaining()?.as_bytes().first().copied() {
             if byte == b'\\' {
                 self.flush_literal()?;
@@ -292,19 +291,19 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn source_range(&self, start: usize, end: usize) -> RtfResult<&'a str> {
+    fn source_range(&self, start: usize, end: usize) -> crate::Result<&'a str> {
         self.input
             .get(start..end)
             .ok_or_else(|| malformed("RTF EQ parser cursor is not on a UTF-8 boundary"))
     }
 
-    fn remaining(&self) -> RtfResult<&'a str> {
+    fn remaining(&self) -> crate::Result<&'a str> {
         self.input
             .get(self.position..)
             .ok_or_else(|| malformed("RTF EQ parser cursor is not on a UTF-8 boundary"))
     }
 
-    fn flush_literal(&mut self) -> RtfResult<()> {
+    fn flush_literal(&mut self) -> crate::Result<()> {
         if let Some(start) = self.literal_start.take() {
             let text = self.source_range(start, self.position)?.trim();
             if !text.is_empty() {
@@ -314,7 +313,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn advance_char(&mut self) -> RtfResult<()> {
+    fn advance_char(&mut self) -> crate::Result<()> {
         let width = self
             .remaining()?
             .chars()
@@ -328,11 +327,11 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn peek(&self) -> RtfResult<Option<char>> {
+    fn peek(&self) -> crate::Result<Option<char>> {
         Ok(self.remaining()?.chars().next())
     }
 
-    fn expect_backslash(&mut self) -> RtfResult<()> {
+    fn expect_backslash(&mut self) -> crate::Result<()> {
         if self.peek()? == Some('\\') {
             self.position += 1;
             Ok(())
@@ -342,7 +341,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Read exactly two ASCII letters forming a switch or sub-option name.
-    fn read_name(&mut self) -> RtfResult<[u8; 2]> {
+    fn read_name(&mut self) -> crate::Result<[u8; 2]> {
         let bytes = self.input.as_bytes();
         let end = self
             .position
@@ -358,7 +357,7 @@ impl<'a> Parser<'a> {
         Ok([first, second])
     }
 
-    fn read_number(&mut self) -> RtfResult<EquationSpacing> {
+    fn read_number(&mut self) -> crate::Result<EquationSpacing> {
         let start = self.position;
         while self
             .peek()?
@@ -375,7 +374,7 @@ impl<'a> Parser<'a> {
     /// Read the escaped single character argument of `\lc`, `\rc`, `\bc`,
     /// `\fc`, `\vc`: the character follows the option name in `\C` form, so
     /// `\bc\{` selects `{`.
-    fn read_char(&mut self) -> RtfResult<char> {
+    fn read_char(&mut self) -> crate::Result<char> {
         self.expect_backslash()
             .map_err(|_err| malformed("RTF EQ switch option lacks a character argument"))?;
         let Some(character) = self.peek()? else {
@@ -385,7 +384,7 @@ impl<'a> Parser<'a> {
         Ok(character)
     }
 
-    fn parse_group(&mut self) -> RtfResult<()> {
+    fn parse_group(&mut self) -> crate::Result<()> {
         if self.segments.len() >= MAX_EQUATION_GROUPS {
             return Err(malformed("RTF EQ expression exceeds the group limit"));
         }
@@ -437,7 +436,7 @@ impl<'a> Parser<'a> {
         switch: &mut EquationSwitch,
         name: [u8; 2],
         parser: &mut Self,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let alignment = || match name {
             [b'a', b'l'] => Some(EquationAlignment::Left),
             [b'a', b'c'] => Some(EquationAlignment::Center),
@@ -574,7 +573,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the optional parenthesized element list after a switch.
-    fn parse_elements(&mut self) -> RtfResult<Vec<&'a str>> {
+    fn parse_elements(&mut self) -> crate::Result<Vec<&'a str>> {
         if self.peek()? != Some('(') {
             return Ok(Vec::new());
         }
@@ -834,7 +833,7 @@ mod tests {
         parser.position = 1;
         assert!(matches!(
             parser.run(),
-            Err(RtfError::MalformedDocument(message))
+            Err(crate::Error::MalformedDocument(message))
                 if message.contains("UTF-8 boundary")
         ));
     }

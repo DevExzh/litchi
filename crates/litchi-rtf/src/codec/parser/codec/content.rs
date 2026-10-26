@@ -1,8 +1,8 @@
 use super::{
     ControlWord, Cow, Destination, FontCharset, FontRef, MAX_REVISIONS,
-    MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent, Parser, RtfEncoding, RtfError, RtfResult,
-    SmallVec, State, StyleBlock, Token, append_transport_bytes, control_symbol_text,
-    parser_classification_error, require_parameterless,
+    MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent, Parser, RtfEncoding, SmallVec, State,
+    StyleBlock, Token, append_transport_bytes, control_symbol_text, parser_classification_error,
+    require_parameterless,
 };
 
 impl<'a> Parser<'a> {
@@ -21,7 +21,7 @@ impl<'a> Parser<'a> {
         &mut self,
         control: &ControlWord<'a>,
         text_buffer: &mut SmallVec<[u8; 256]>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if matches!(control, ControlWord::Unknown(_, _)) {
             if !text_buffer.is_empty() {
                 self.flush_text_buffer(text_buffer)?;
@@ -42,7 +42,7 @@ impl<'a> Parser<'a> {
         }
         match control {
             ControlWord::HtmlTag(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF htmltag destination must be starred".to_string(),
                 ));
             },
@@ -80,13 +80,13 @@ impl<'a> Parser<'a> {
                         if kind == crate::text::Break::Paragraph {
                             self.body_paragraph_breaks =
                                 self.body_paragraph_breaks.checked_add(1).ok_or_else(|| {
-                                    RtfError::MalformedDocument(
+                                    crate::Error::MalformedDocument(
                                         "RTF body paragraph count overflow".to_string(),
                                     )
                                 })?;
                             self.body_after_last_paragraph_break =
                                 self.body_text_len.checked_add(1).ok_or_else(|| {
-                                    RtfError::MalformedDocument(
+                                    crate::Error::MalformedDocument(
                                         "RTF body paragraph position overflow".to_string(),
                                     )
                                 })?;
@@ -172,12 +172,12 @@ impl<'a> Parser<'a> {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 let height = param.ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF softlheight requires a numeric parameter".to_string(),
                     )
                 })?;
                 if !(-32768..=32767).contains(&height) {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF softlheight is outside -32768..=32767 twips".to_string(),
                     ));
                 }
@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
                 self.apply_control_word(control)?;
             },
             ControlWord::LegacyParagraphNumbering(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF pn control must be the first control in its own destination group"
                         .to_string(),
                 ));
@@ -270,7 +270,7 @@ impl<'a> Parser<'a> {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 let text = control_symbol_text(control).ok_or_else(|| {
-                    RtfError::MalformedDocument("missing RTF control-symbol text".to_string())
+                    crate::Error::MalformedDocument("missing RTF control-symbol text".to_string())
                 })?;
                 self.pos += 1;
                 self.append_semantic_text(text)?;
@@ -289,7 +289,7 @@ impl<'a> Parser<'a> {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 if self.pending_annotation_mark {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate pending RTF annotation marker".to_string(),
                     ));
                 }
@@ -439,7 +439,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse group content (text and control words).
-    pub(super) fn parse_content(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_content(&mut self) -> crate::Result<()> {
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
 
         while let Some(token) = self.tokens.get(self.pos) {
@@ -509,7 +509,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Binary(_) => {
                     if self.current_state()?.revision_type.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF revision text cannot contain binary data".to_string(),
                         ));
                     }
@@ -518,11 +518,14 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     /// Flush text buffer to a style block.
-    pub(super) fn flush_text_buffer(&mut self, buffer: &mut SmallVec<[u8; 256]>) -> RtfResult<()> {
+    pub(super) fn flush_text_buffer(
+        &mut self,
+        buffer: &mut SmallVec<[u8; 256]>,
+    ) -> crate::Result<()> {
         if buffer.is_empty() {
             return Ok(());
         }
@@ -556,7 +559,7 @@ impl<'a> Parser<'a> {
         }
         let block = StyleBlock::new(Cow::Borrowed(text), formatting, paragraph);
         self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF body text length overflow".to_string())
+            crate::Error::MalformedDocument("RTF body text length overflow".to_string())
         })?;
         self.prepare_body_block_push()?;
         self.blocks.push(block);
@@ -571,7 +574,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn effective_text_encoding(&self, state: &State) -> RtfResult<RtfEncoding> {
+    pub(super) fn effective_text_encoding(&self, state: &State) -> crate::Result<RtfEncoding> {
         self.effective_text_encoding_for(state.formatting.font_ref, state.encoding)
     }
 
@@ -579,7 +582,7 @@ impl<'a> Parser<'a> {
         &self,
         font_ref: FontRef,
         fallback_encoding: RtfEncoding,
-    ) -> RtfResult<RtfEncoding> {
+    ) -> crate::Result<RtfEncoding> {
         let fonts = self.font_table.borrow();
         let Some(font) = fonts.get(font_ref) else {
             return Ok(fallback_encoding);
@@ -617,7 +620,7 @@ impl<'a> Parser<'a> {
         &self,
         bytes: &'b [u8],
         resource: &'static str,
-    ) -> RtfResult<Cow<'b, str>> {
+    ) -> crate::Result<Cow<'b, str>> {
         let encoding = self.current_state()?.encoding;
         self.decode_transport_bytes_bounded_with_encoding(bytes, encoding, resource)
     }
@@ -627,14 +630,14 @@ impl<'a> Parser<'a> {
         bytes: &'b [u8],
         encoding: RtfEncoding,
         resource: &'static str,
-    ) -> RtfResult<Cow<'b, str>> {
+    ) -> crate::Result<Cow<'b, str>> {
         let worst_case = if bytes.is_ascii() {
             bytes.len()
         } else {
             bytes.len().saturating_mul(4)
         };
         if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource,
                 observed: worst_case,
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -642,7 +645,7 @@ impl<'a> Parser<'a> {
         }
         let decoded = encoding.decode(bytes);
         if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource,
                 observed: decoded.len(),
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -651,12 +654,15 @@ impl<'a> Parser<'a> {
         Ok(decoded)
     }
 
-    pub(super) fn decode_transport_text(&self, text: &str) -> RtfResult<String> {
+    pub(super) fn decode_transport_text(&self, text: &str) -> crate::Result<String> {
         let encoding = self.current_state()?.encoding;
         self.decode_transport_text_with_encoding(text, encoding)
     }
 
-    pub(super) fn decode_transport_text_for_current_font(&self, text: &str) -> RtfResult<String> {
+    pub(super) fn decode_transport_text_for_current_font(
+        &self,
+        text: &str,
+    ) -> crate::Result<String> {
         let encoding = {
             let state = self.current_state()?;
             self.effective_text_encoding(state)?
@@ -668,7 +674,7 @@ impl<'a> Parser<'a> {
         &self,
         text: &str,
         encoding: RtfEncoding,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         self.decode_transport_text_with_encoding_mode(text, encoding, false)
     }
 
@@ -676,7 +682,7 @@ impl<'a> Parser<'a> {
         &self,
         text: &str,
         encoding: RtfEncoding,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         self.decode_transport_text_with_encoding_mode(text, encoding, true)
     }
 
@@ -685,9 +691,9 @@ impl<'a> Parser<'a> {
         text: &str,
         encoding: RtfEncoding,
         strict: bool,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF transport text",
                 observed: text.len(),
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -696,7 +702,7 @@ impl<'a> Parser<'a> {
         let mut bytes = SmallVec::<[u8; 64]>::new();
         bytes
             .try_reserve_exact(text.len())
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF transport text",
                 requested: text.len(),
             })?;
@@ -708,7 +714,7 @@ impl<'a> Parser<'a> {
                 bytes.len().saturating_mul(4)
             };
             if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
-                return Err(RtfError::LimitExceeded {
+                return Err(crate::Error::LimitExceeded {
                     resource: "RTF decoded transport text",
                     observed: worst_case,
                     limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -723,7 +729,7 @@ impl<'a> Parser<'a> {
             )?
         };
         if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF decoded transport text",
                 observed: decoded.len(),
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -733,7 +739,7 @@ impl<'a> Parser<'a> {
             Cow::Borrowed(value) => {
                 let mut owned = String::new();
                 owned.try_reserve_exact(value.len()).map_err(|_error| {
-                    RtfError::AllocationFailed {
+                    crate::Error::AllocationFailed {
                         resource: "RTF decoded transport text",
                         requested: value.len(),
                     }
@@ -745,7 +751,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(super) fn append_semantic_text(&mut self, text: &str) -> RtfResult<()> {
+    pub(super) fn append_semantic_text(&mut self, text: &str) -> crate::Result<()> {
         self.finalize_table_before_non_table_body_content(!text.is_empty())?;
         let state = self.prepare_revision_event()?;
         if state.destination != Destination::DocumentBody {
@@ -764,7 +770,7 @@ impl<'a> Parser<'a> {
             .body_text_len
             .checked_add(arena_text.len())
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF body text length overflow".to_string())
+                crate::Error::MalformedDocument("RTF body text length overflow".to_string())
             })?;
         self.prepare_body_block_push()?;
         self.blocks.push(StyleBlock::new(
@@ -777,7 +783,7 @@ impl<'a> Parser<'a> {
     }
 
     #[inline]
-    pub(super) fn prepare_body_block_push(&mut self) -> RtfResult<()> {
+    pub(super) fn prepare_body_block_push(&mut self) -> crate::Result<()> {
         if self.blocks.is_empty() {
             let hint = std::mem::take(&mut self.body_block_capacity_hint);
             if hint != 0
@@ -795,10 +801,10 @@ impl<'a> Parser<'a> {
     }
 
     /// Record a nonrequired (soft) break marker in the body story.
-    pub(super) fn record_soft_break(&mut self, kind: crate::SoftBreakKind) -> RtfResult<()> {
+    pub(super) fn record_soft_break(&mut self, kind: crate::SoftBreakKind) -> crate::Result<()> {
         let state = self.current_state()?;
         if state.destination != Destination::DocumentBody || state.in_table {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF soft-break controls are supported only in the main body story".to_string(),
             ));
         }
@@ -811,13 +817,13 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn record_body_page_break(&mut self) -> RtfResult<()> {
+    pub(super) fn record_body_page_break(&mut self) -> crate::Result<()> {
         let (destination, table_nesting_level, in_table) = {
             let state = self.current_state()?;
             (state.destination, state.table_nesting_level, state.in_table)
         };
         if destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF page is not permitted in this destination".to_string(),
             ));
         }
@@ -844,13 +850,13 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn record_body_column_break(&mut self) -> RtfResult<()> {
+    pub(super) fn record_body_column_break(&mut self) -> crate::Result<()> {
         let (destination, table_nesting_level, in_table) = {
             let state = self.current_state()?;
             (state.destination, state.table_nesting_level, state.in_table)
         };
         if destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF column is not permitted in this destination".to_string(),
             ));
         }
@@ -883,18 +889,24 @@ impl<'a> Parser<'a> {
         text: &str,
         start: usize,
         end: usize,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let Some(revision_type) = state.revision_type else {
             return Ok(());
         };
         let id = state.revision_author_id.ok_or_else(|| {
-            RtfError::MalformedDocument("RTF revision text is missing an author index".to_string())
+            crate::Error::MalformedDocument(
+                "RTF revision text is missing an author index".to_string(),
+            )
         })?;
         let index = usize::try_from(id).map_err(|_err| {
-            RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
+            crate::Error::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            )
         })?;
         let author = self.revision_authors.get(index).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF revision author index is outside revtbl".to_string())
+            crate::Error::MalformedDocument(
+                "RTF revision author index is outside revtbl".to_string(),
+            )
         })?;
         let author_name = author.name.clone();
         let date = state
@@ -905,11 +917,13 @@ impl<'a> Parser<'a> {
             .revision_text_bytes
             .checked_add(text.len())
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF aggregate revision text size overflow".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF aggregate revision text size overflow".to_string(),
+                )
             })?;
         if self.revision_text_bytes > super::super::super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF aggregate revision text exceeds the safety limit".to_string(),
             ));
         }
@@ -932,7 +946,7 @@ impl<'a> Parser<'a> {
             if previous.content.len().saturating_add(text.len())
                 > super::super::super::annotation::MAX_REVISION_TEXT_BYTES
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF revision text exceeds the safety limit".to_string(),
                 ));
             }
@@ -943,7 +957,7 @@ impl<'a> Parser<'a> {
                     .revision_event_indices
                     .get_mut(event_id)
                     .ok_or_else(|| {
-                        RtfError::ParserError(
+                        crate::Error::ParserError(
                             "RTF revision event state references a missing slot".to_string(),
                         )
                     })? = Some(self.revisions.len() - 1);
@@ -951,7 +965,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         if self.revisions.len() >= MAX_REVISIONS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision count exceeds the safety limit".to_string(),
             ));
         }
@@ -971,7 +985,7 @@ impl<'a> Parser<'a> {
                 .revision_event_indices
                 .get_mut(event_id)
                 .ok_or_else(|| {
-                    RtfError::ParserError(
+                    crate::Error::ParserError(
                         "RTF revision event state references a missing slot".to_string(),
                     )
                 })? = Some(self.revisions.len() - 1);
@@ -1002,7 +1016,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn prepare_revision_event(&mut self) -> RtfResult<State> {
+    pub(super) fn prepare_revision_event(&mut self) -> crate::Result<State> {
         let mut state = self.current_state()?.clone();
         if let Some(kind) = state.revision_type
             && state.revision_event_id.is_none()
@@ -1030,7 +1044,7 @@ impl<'a> Parser<'a> {
         Ok(state)
     }
 
-    pub(super) fn current_story_position(&mut self) -> RtfResult<usize> {
+    pub(super) fn current_story_position(&mut self) -> crate::Result<usize> {
         let (table_nesting_level, in_table) = {
             let state = self.current_state()?;
             (state.table_nesting_level, state.in_table)
@@ -1051,7 +1065,7 @@ impl<'a> Parser<'a> {
         &mut self,
         raw_level: u8,
         event: crate::CellStoryEvent,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if raw_level >= 2 {
             self.ensure_nested_builder(raw_level)?
                 .cell_story_events
@@ -1062,7 +1076,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn record_revision_end(&mut self, id: usize) -> RtfResult<()> {
+    pub(super) fn record_revision_end(&mut self, id: usize) -> crate::Result<()> {
         let (in_table, table_nesting_level) = {
             let state = self.current_state()?;
             (state.in_table, state.table_nesting_level)
@@ -1074,7 +1088,7 @@ impl<'a> Parser<'a> {
                 .copied()
                 .flatten()
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF revision event has no tracked text".to_string(),
                     )
                 })?;
@@ -1090,7 +1104,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(super) fn close_revision_at_cell_boundary(&mut self, level: u8) -> RtfResult<()> {
+    pub(super) fn close_revision_at_cell_boundary(&mut self, level: u8) -> crate::Result<()> {
         let (revision_type, revision_event_id, in_table, table_nesting_level) = {
             let state = self.current_state()?;
             (

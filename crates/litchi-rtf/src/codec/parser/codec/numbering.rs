@@ -1,19 +1,18 @@
 use super::{
-    ControlWord, Cow, Destination, Parser, RtfError, RtfResult, Token, control_symbol_text,
-    require_parameterless,
+    ControlWord, Cow, Destination, Parser, Token, control_symbol_text, require_parameterless,
 };
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_paragraph_group_table(
         &mut self,
-    ) -> RtfResult<crate::ParagraphGroupPropertyTable> {
+    ) -> crate::Result<crate::ParagraphGroupPropertyTable> {
         if self.states.len() != 3
             || self
                 .blocks
                 .iter()
                 .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pgptbl must occur at document scope before body text".to_string(),
             ));
         }
@@ -22,7 +21,7 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::ParagraphGroupTable))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF pgptbl destination".to_string(),
             ));
         }
@@ -42,7 +41,9 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     let id = u32::try_from(table.entries().len() + 1).map_err(|_err| {
-                        RtfError::MalformedDocument("RTF paragraph-group ID overflow".to_string())
+                        crate::Error::MalformedDocument(
+                            "RTF paragraph-group ID overflow".to_string(),
+                        )
                     })?;
                     let entry = self.parse_paragraph_group_property(id)?;
                     table.push(entry)?;
@@ -50,21 +51,21 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF pgptbl cannot contain fields, objects, or unknown destinations"
                             .to_string(),
                     ));
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid content in RTF pgptbl destination".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     #[allow(
@@ -74,7 +75,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_paragraph_group_property(
         &mut self,
         id: u32,
-    ) -> RtfResult<crate::ParagraphGroupProperty> {
+    ) -> crate::Result<crate::ParagraphGroupProperty> {
         self.pos += 2; // opening brace and pgp
         let mut parent_id = None;
         let mut nesting = None;
@@ -92,28 +93,32 @@ impl<'a> Parser<'a> {
                     let entry = crate::ParagraphGroupProperty {
                         id,
                         parent_id: u32::try_from(parent_id.ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF pgp entry lacks ipgp".to_string())
+                            crate::Error::MalformedDocument("RTF pgp entry lacks ipgp".to_string())
                         })?)
                         .map_err(|_err| {
-                            RtfError::MalformedDocument("invalid RTF ipgp reference".to_string())
+                            crate::Error::MalformedDocument(
+                                "invalid RTF ipgp reference".to_string(),
+                            )
                         })?,
                         table_nesting_level: u8::try_from(nesting.ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF pgp entry lacks itap".to_string())
+                            crate::Error::MalformedDocument("RTF pgp entry lacks itap".to_string())
                         })?)
                         .map_err(|_err| {
-                            RtfError::MalformedDocument("invalid RTF pgp itap value".to_string())
+                            crate::Error::MalformedDocument(
+                                "invalid RTF pgp itap value".to_string(),
+                            )
                         })?,
                         left_indent: left.ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF pgp entry lacks li".to_string())
+                            crate::Error::MalformedDocument("RTF pgp entry lacks li".to_string())
                         })?,
                         right_indent: right.ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF pgp entry lacks ri".to_string())
+                            crate::Error::MalformedDocument("RTF pgp entry lacks ri".to_string())
                         })?,
                         space_before: before.ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF pgp entry lacks sb".to_string())
+                            crate::Error::MalformedDocument("RTF pgp entry lacks sb".to_string())
                         })?,
                         space_after: after.ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF pgp entry lacks sa".to_string())
+                            crate::Error::MalformedDocument("RTF pgp entry lacks sa".to_string())
                         })?,
                         borders,
                     };
@@ -123,7 +128,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(control)) => match control {
                     ControlWord::ParagraphGroupParent(value) => {
                         if !seen.insert("ipgp") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp ipgp".to_string(),
                             ));
                         }
@@ -131,19 +136,19 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::TableNestingLevel(value) => {
                         if !seen.insert("itap") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp itap".to_string(),
                             ));
                         }
                         nesting = Some(value.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF pgp itap requires a numeric parameter".to_string(),
                             )
                         })?);
                     },
                     ControlWord::LeftIndent(value) => {
                         if !seen.insert("li") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp li".to_string(),
                             ));
                         }
@@ -151,7 +156,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::RightIndent(value) => {
                         if !seen.insert("ri") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp ri".to_string(),
                             ));
                         }
@@ -159,7 +164,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::SpaceBefore(value) => {
                         if !seen.insert("sb") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp sb".to_string(),
                             ));
                         }
@@ -167,7 +172,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::SpaceAfter(value) => {
                         if !seen.insert("sa") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp sa".to_string(),
                             ));
                         }
@@ -175,7 +180,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::BorderTop => {
                         if !seen.insert("brdrt") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp top border".to_string(),
                             ));
                         }
@@ -183,7 +188,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::BorderBottom => {
                         if !seen.insert("brdrb") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp bottom border".to_string(),
                             ));
                         }
@@ -191,7 +196,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::BorderLeft => {
                         if !seen.insert("brdrl") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp left border".to_string(),
                             ));
                         }
@@ -199,7 +204,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::BorderRight => {
                         if !seen.insert("brdrr") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp right border".to_string(),
                             ));
                         }
@@ -218,7 +223,7 @@ impl<'a> Parser<'a> {
                             Some(2) => &mut borders.left,
                             Some(3) => &mut borders.right,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF pgp border style has no side".to_string(),
                                 ));
                             },
@@ -226,7 +231,7 @@ impl<'a> Parser<'a> {
                         if border.style != crate::BorderStyle::None
                             && !matches!(control, ControlWord::BorderNone)
                         {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pgp border style".to_string(),
                             ));
                         }
@@ -247,13 +252,13 @@ impl<'a> Parser<'a> {
                             Some(2) => &mut borders.left,
                             Some(3) => &mut borders.right,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF pgp border width has no side".to_string(),
                                 ));
                             },
                         };
                         border.width = value.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF pgp brdrw requires a numeric parameter".to_string(),
                             )
                         })?;
@@ -265,18 +270,20 @@ impl<'a> Parser<'a> {
                             Some(2) => &mut borders.left,
                             Some(3) => &mut borders.right,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF pgp border color has no side".to_string(),
                                 ));
                             },
                         };
                         border.color_ref = u16::try_from(value.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF pgp brdrcf requires a numeric parameter".to_string(),
                             )
                         })?)
                         .map_err(|_err| {
-                            RtfError::MalformedDocument("invalid RTF pgp border color".to_string())
+                            crate::Error::MalformedDocument(
+                                "invalid RTF pgp border color".to_string(),
+                            )
                         })?;
                     },
                     ControlWord::BorderSpace(value) => {
@@ -286,53 +293,53 @@ impl<'a> Parser<'a> {
                             Some(2) => &mut borders.left,
                             Some(3) => &mut borders.right,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF pgp border space has no side".to_string(),
                                 ));
                             },
                         };
                         border.space = value.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF pgp brsp requires a numeric parameter".to_string(),
                             )
                         })?;
                     },
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "unsupported control in RTF pgp entry".to_string(),
                         ));
                     },
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF pgp entry cannot contain nested destinations".to_string(),
                     ));
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid content in RTF pgp entry".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     #[allow(
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_legacy_section_numbering_level(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_legacy_section_numbering_level(&mut self) -> crate::Result<()> {
         if self.states.len() != 3
             || self
                 .blocks
                 .iter()
                 .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl destinations must occur at document scope before body text"
                     .to_string(),
             ));
@@ -341,13 +348,13 @@ impl<'a> Parser<'a> {
         let level_index = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacySectionNumberingLevel(value))) => {
                 u8::try_from(*value).map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF pnseclvl index must be between 1 and 9".to_string(),
                     )
                 })?
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF pnseclvl destination".to_string(),
                 ));
             },
@@ -369,7 +376,7 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     let numbering_format = format.ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF pnseclvl destination has no numbering format".to_string(),
                         )
                     })?;
@@ -393,7 +400,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if !seen.insert("text-before") {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "duplicate RTF pntxtb destination".to_string(),
                         ));
                     }
@@ -408,7 +415,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if !seen.insert("text-after") {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "duplicate RTF pntxta destination".to_string(),
                         ));
                     }
@@ -417,7 +424,7 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF pnseclvl cannot contain nested fields, objects, or destinations"
                             .to_string(),
                     ));
@@ -446,12 +453,12 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::LegacyNumberingStart(value) => {
                             if !seen.insert("start") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF pnstart".to_string(),
                                 ));
                             }
                             start_at = Some(value.ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnstart requires a numeric parameter".to_string(),
                                 )
                             })?);
@@ -460,12 +467,12 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::LegacyNumberingIndent(value) => {
                             if !seen.insert("indent") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF pnindent".to_string(),
                                 ));
                             }
                             indent = Some(value.ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnindent requires a numeric parameter".to_string(),
                                 )
                             })?);
@@ -474,12 +481,12 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::LegacyNumberingSpace(value) => {
                             if !seen.insert("space") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF pnsp".to_string(),
                                 ));
                             }
                             space = Some(value.ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnsp requires a numeric parameter".to_string(),
                                 )
                             })?);
@@ -489,7 +496,7 @@ impl<'a> Parser<'a> {
                         ControlWord::LegacyNumberingHanging(param) => {
                             require_parameterless(*param, "pnhang")?;
                             if !seen.insert("hanging") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF pnhang".to_string(),
                                 ));
                             }
@@ -500,7 +507,7 @@ impl<'a> Parser<'a> {
                         ControlWord::LegacyNumberingPrevious(param) => {
                             require_parameterless(*param, "pnprev")?;
                             if !seen.insert("previous") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF pnprev".to_string(),
                                 ));
                             }
@@ -522,18 +529,18 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::LegacyNumberingFont(value) => {
                             if !seen.insert("font") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF pnf".to_string(),
                                 ));
                             }
                             font_ref = Some(
                                 u16::try_from(value.ok_or_else(|| {
-                                    RtfError::MalformedDocument(
+                                    crate::Error::MalformedDocument(
                                         "RTF pnf requires a numeric parameter".to_string(),
                                     )
                                 })?)
                                 .map_err(|_err| {
-                                    RtfError::MalformedDocument(
+                                    crate::Error::MalformedDocument(
                                         "invalid RTF pnf reference".to_string(),
                                     )
                                 })?,
@@ -542,21 +549,21 @@ impl<'a> Parser<'a> {
                             continue;
                         },
                         _ => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "unsupported control in RTF pnseclvl destination".to_string(),
                             ));
                         },
                     };
                     if key == "format" {
                         if !seen.insert(key) {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pnseclvl numbering format".to_string(),
                             ));
                         }
                         format = new_format;
                     } else {
                         if !seen.insert("alignment") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF pnseclvl alignment".to_string(),
                             ));
                         }
@@ -573,36 +580,36 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid content in RTF pnseclvl destination".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     #[allow(
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_legacy_paragraph_numbering(&mut self) -> RtfResult<()> {
-        fn value(parameter: Option<i32>, name: &str) -> RtfResult<i32> {
+    pub(super) fn parse_legacy_paragraph_numbering(&mut self) -> crate::Result<()> {
+        fn value(parameter: Option<i32>, name: &str) -> crate::Result<i32> {
             parameter.ok_or_else(|| {
-                RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+                crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
             })
         }
         #[allow(
             clippy::wildcard_enum_match_arm,
             reason = "remaining variants share the same fallback by design"
         )]
-        fn toggle(parameter: Option<i32>, name: &str) -> RtfResult<bool> {
+        fn toggle(parameter: Option<i32>, name: &str) -> crate::Result<bool> {
             match parameter {
                 None | Some(1) => Ok(true),
                 Some(0) => Ok(false),
-                Some(_) => Err(RtfError::MalformedDocument(format!(
+                Some(_) => Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} accepts only 0 or 1"
                 ))),
             }
@@ -610,38 +617,38 @@ impl<'a> Parser<'a> {
         let pn_parameter = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyParagraphNumbering(parameter))) => *parameter,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF pn destination".to_string(),
                 ));
             },
         };
         require_parameterless(pn_parameter, "pn")?;
         let parent = self.states.len().checked_sub(2).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF pn destination has no paragraph owner".to_string())
+            crate::Error::MalformedDocument("RTF pn destination has no paragraph owner".to_string())
         })?;
         let owner_state = self.states.get(parent).ok_or_else(|| {
-            RtfError::ParserError("RTF pn paragraph owner state is missing".to_string())
+            crate::Error::ParserError("RTF pn paragraph owner state is missing".to_string())
         })?;
         if owner_state.destination != Destination::DocumentBody
             || owner_state.in_table
             || owner_state.table_nesting_level >= 2
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pn destination must belong to a non-table paragraph".to_string(),
             ));
         }
         if owner_state.paragraph_content_started {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pn destination must precede paragraph content".to_string(),
             ));
         }
         if owner_state.paragraph_numbering_declared {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "duplicate RTF pn destination in one paragraph".to_string(),
             ));
         }
         if self.legacy_paragraph_numbering.len() >= crate::MAX_LEGACY_PARAGRAPH_NUMBERING_RECORDS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF contains too many pn destinations".to_string(),
             ));
         }
@@ -674,7 +681,7 @@ impl<'a> Parser<'a> {
         macro_rules! once {
             ($key:expr, $name:expr) => {
                 if !seen.insert($key) {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "duplicate RTF {} in pn destination",
                         $name
                     )));
@@ -687,7 +694,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let mut record =
                         crate::LegacyParagraphNumbering::new(level.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF pn destination is missing its pnlvl selector".to_string(),
                             )
                         })?);
@@ -717,11 +724,15 @@ impl<'a> Parser<'a> {
                     record.validate()?;
                     let index =
                         u32::try_from(self.legacy_paragraph_numbering.len()).map_err(|_err| {
-                            RtfError::MalformedDocument("RTF pn record index overflow".to_string())
+                            crate::Error::MalformedDocument(
+                                "RTF pn record index overflow".to_string(),
+                            )
                         })?;
                     self.legacy_paragraph_numbering.push(record);
                     let owner = self.states.get_mut(parent).ok_or_else(|| {
-                        RtfError::ParserError("RTF pn paragraph owner state is missing".to_string())
+                        crate::Error::ParserError(
+                            "RTF pn paragraph owner state is missing".to_string(),
+                        )
                     })?;
                     owner.paragraph.legacy_numbering = Some(index);
                     owner.paragraph_numbering_declared = true;
@@ -756,7 +767,7 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF pn destination cannot contain nested active content".to_string(),
                     ));
                 },
@@ -767,7 +778,7 @@ impl<'a> Parser<'a> {
                         let v = value(*parameter, "pnlvl")?;
                         level = Some(crate::LegacyParagraphNumberingLevel::Explicit(
                             u8::try_from(v).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnlvl value must be in 1..=9".to_string(),
                                 )
                             })?,
@@ -853,7 +864,7 @@ impl<'a> Parser<'a> {
                         once!("font", "pnf");
                         font_ref =
                             Some(u16::try_from(value(*parameter, "pnf")?).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnf value must be in 0..=65535".to_string(),
                                 )
                             })?);
@@ -862,7 +873,7 @@ impl<'a> Parser<'a> {
                         once!("font-size", "pnfs");
                         font_size =
                             Some(u16::try_from(value(*parameter, "pnfs")?).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnfs value must be in 1..=65535".to_string(),
                                 )
                             })?);
@@ -871,7 +882,7 @@ impl<'a> Parser<'a> {
                         once!("color", "pncf");
                         color_ref =
                             Some(u16::try_from(value(*parameter, "pncf")?).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pncf value must be in 0..=65535".to_string(),
                                 )
                             })?);
@@ -936,7 +947,7 @@ impl<'a> Parser<'a> {
                         once!("revision-author", "pnrauth");
                         revision.author = Some(
                             u16::try_from(value(*parameter, "pnrauth")?).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnrauth value must be in 0..=65535".to_string(),
                                 )
                             })?,
@@ -963,7 +974,7 @@ impl<'a> Parser<'a> {
                         once!("revision-rgb", "pnrrgb");
                         revision.rgb =
                             Some(u32::try_from(value(*parameter, "pnrrgb")?).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF pnrrgb must be non-negative".to_string(),
                                 )
                             })?);
@@ -981,17 +992,17 @@ impl<'a> Parser<'a> {
                         revision.text_start = Some(value(*parameter, "pnrxst")?);
                     },
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "unsupported control in RTF pn destination".to_string(),
                         ));
                     },
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid content in RTF pn destination".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
@@ -1000,11 +1011,11 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_numbering_text(
         &mut self,
         expected: ControlWord<'a>,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
             || self.tokens.get(self.pos + 1) != Some(&Token::Control(expected))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF legacy-numbering text destination".to_string(),
             ));
         }
@@ -1018,7 +1029,7 @@ impl<'a> Parser<'a> {
                     return Ok(value);
                 },
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy-numbering text cannot contain nested destinations".to_string(),
                     ));
                 },
@@ -1040,19 +1051,19 @@ impl<'a> Parser<'a> {
                     ControlWord::Unknown("dbch", None) | ControlWord::DoubleByteCharacter(None),
                 )) => {},
                 Some(Token::Control(_) | Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy-numbering text contains a non-text control".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
             if value.len() > crate::legacy_numbering::MAX_LEGACY_NUMBERING_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF pnseclvl text exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 }

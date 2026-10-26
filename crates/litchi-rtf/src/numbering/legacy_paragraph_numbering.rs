@@ -1,6 +1,5 @@
 //! Inert legacy paragraph-numbering (`pn`) metadata.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub const MAX_LEGACY_PARAGRAPH_NUMBERING_RECORDS: usize = 65_536;
@@ -157,12 +156,12 @@ impl LegacyParagraphNumbering<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if matches!(
             self.level,
             LegacyParagraphNumberingLevel::Explicit(0 | 10..=u8::MAX)
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnlvl value must be in 1..=9".to_string(),
             ));
         }
@@ -171,7 +170,7 @@ impl LegacyParagraphNumbering<'_> {
             LegacyParagraphNumberingLevel::Body | LegacyParagraphNumberingLevel::Explicit(_)
         ) && self.format.is_none()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pn destination is missing its numbering format".to_string(),
             ));
         }
@@ -179,7 +178,7 @@ impl LegacyParagraphNumbering<'_> {
             .start_at
             .is_some_and(|value| !(0..=32_767).contains(&value))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnstart value must be in 0..=32767".to_string(),
             ));
         }
@@ -189,12 +188,12 @@ impl LegacyParagraphNumbering<'_> {
             .chain(self.space)
             .any(|value| value.unsigned_abs() > MAX_LAYOUT_TWIPS as u32)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pn layout value exceeds the safety limit".to_string(),
             ));
         }
         if self.font_size == Some(0) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnfs value must be in 1..=65535".to_string(),
             ));
         }
@@ -203,7 +202,7 @@ impl LegacyParagraphNumbering<'_> {
             .rgb
             .is_some_and(|value| value > i32::MAX as u32)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnrrgb exceeds the signed RTF parameter range".to_string(),
             ));
         }
@@ -216,7 +215,7 @@ impl LegacyParagraphNumbering<'_> {
                 .as_ref()
                 .is_some_and(|value| value.len() > MAX_LEGACY_PARAGRAPH_NUMBERING_TEXT_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pn text exceeds the safety limit".to_string(),
             ));
         }

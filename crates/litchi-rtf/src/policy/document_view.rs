@@ -1,7 +1,5 @@
 //! Passive RTF document view and zoom metadata.
 
-use crate::{RtfError, RtfResult};
-
 /// Safety bound for a retained `viewscale` percentage.
 pub const MAX_DOCUMENT_VIEW_SCALE_PERCENT: u16 = 10_000;
 
@@ -17,7 +15,7 @@ pub enum DocumentViewKind {
 }
 
 impl DocumentViewKind {
-    pub(crate) fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub(crate) fn from_rtf(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::None),
             1 => Ok(Self::PageLayout),
@@ -25,7 +23,7 @@ impl DocumentViewKind {
             3 => Ok(Self::MasterDocument),
             4 => Ok(Self::Normal),
             5 => Ok(Self::OnlineLayout),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF viewkind must be in 0..=5".to_string(),
             )),
         }
@@ -53,13 +51,13 @@ pub enum DocumentZoomKind {
 }
 
 impl DocumentZoomKind {
-    pub(crate) fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub(crate) fn from_rtf(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::None),
             1 => Ok(Self::FullPage),
             2 => Ok(Self::BestFit),
             3 => Ok(Self::TextWidth),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF viewzk must be in 0..=3".to_string(),
             )),
         }
@@ -92,12 +90,12 @@ impl DocumentView {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .scale_percent
             .is_some_and(|value| value == 0 || value > MAX_DOCUMENT_VIEW_SCALE_PERCENT)
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF viewscale must be in 1..={MAX_DOCUMENT_VIEW_SCALE_PERCENT}"
             )));
         }

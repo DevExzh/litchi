@@ -5,10 +5,10 @@
 
 use super::{
     BodyStoryEvent, CellStoryEvent, Field, FieldOwner, HeaderFooterType, NavigationEntry, Revision,
-    RevisionType, RtfWriter, Section, StoryEvent, StoryField, Table, Tree, Write, field, io,
+    RevisionType, Section, StoryEvent, StoryField, Table, Tree, Write, Writer, field, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     pub(super) fn validate_section_boundary_mapping(
         sections: &[Section<'_>],
         body_story_events: &[BodyStoryEvent],

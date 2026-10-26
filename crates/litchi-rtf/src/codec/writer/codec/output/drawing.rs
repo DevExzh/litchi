@@ -1,12 +1,12 @@
 //! RTF drawing and shape output.
 
 use super::super::{
-    DrawingStoryTextMode, Field, FieldOwner, RtfWriter, Shape, ShapeGroup, ShapeGroupChild,
-    ShapeGroupInfo, ShapeProperty, ShapeResult, ShapeThemeColor, ShapeType, StoryDrawing,
-    StoryEvent, Write, field, invalid_story_reference, io,
+    DrawingStoryTextMode, Field, FieldOwner, Shape, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
+    ShapeProperty, ShapeResult, ShapeThemeColor, ShapeType, StoryDrawing, StoryEvent, Write,
+    Writer, field, invalid_story_reference, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write the unique inert document-background shape destination.
     pub(in super::super) fn write_document_background(
         &mut self,

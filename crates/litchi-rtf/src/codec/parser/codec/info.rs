@@ -1,16 +1,15 @@
 use super::{
     ControlWord, Cow, Destination, DrawingStoryCapture, InfoTextField, InfoTimeField,
-    MAX_GROUP_NESTING_DEPTH, MAX_INFO_TEXT_BYTES, Parser, RtfError, RtfResult, State, Token,
-    control_symbol_text,
+    MAX_GROUP_NESTING_DEPTH, MAX_INFO_TEXT_BYTES, Parser, State, Token, control_symbol_text,
 };
 use std::mem::size_of;
 
 impl<'a> Parser<'a> {
     /// Retain only a bounded, content-free marker when a focused destination
     /// parser encounters syntax it cannot safely interpret.
-    pub(super) fn mark_unknown_syntax(&mut self) -> RtfResult<()> {
+    pub(super) fn mark_unknown_syntax(&mut self) -> crate::Result<()> {
         if self.unknown_syntax_markers >= self.limits.max_opaque_nodes() {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::OpaqueNodes,
                 observed: self.unknown_syntax_markers.saturating_add(1),
                 maximum: self.limits.max_opaque_nodes(),
@@ -20,7 +19,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
+    pub(super) fn parse_info_text(&mut self, field: InfoTextField) -> crate::Result<()> {
         let duplicate = match field {
             InfoTextField::Title => self.info.title.is_some(),
             InfoTextField::Subject => self.info.subject.is_some(),
@@ -35,7 +34,7 @@ impl<'a> Parser<'a> {
             InfoTextField::HyperlinkBase => self.info.hyperlink_base.is_some(),
         };
         if duplicate {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF info text destination occurs more than once".to_string(),
             ));
         }
@@ -47,7 +46,7 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF info nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -85,13 +84,13 @@ impl<'a> Parser<'a> {
                 None => break,
             }
             if value.len() > MAX_INFO_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF info text exceeds the metadata safety limit".to_string(),
                 ));
             }
         }
         if depth != 0 {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         let allocated = self.arena.alloc_str(value.trim_end_matches(['\r', '\n']));
         let text_value = Some(Cow::Borrowed(&*allocated));
@@ -115,7 +114,7 @@ impl<'a> Parser<'a> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_info_time(&mut self, field: InfoTimeField) -> RtfResult<()> {
+    pub(super) fn parse_info_time(&mut self, field: InfoTimeField) -> crate::Result<()> {
         let duplicate = match field {
             InfoTimeField::Creation => self.info.creation_timestamp.is_some(),
             InfoTimeField::Revision => self.info.revision_timestamp.is_some(),
@@ -123,18 +122,18 @@ impl<'a> Parser<'a> {
             InfoTimeField::Backup => self.info.backup_timestamp.is_some(),
         };
         if duplicate {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF info timestamp destination occurs more than once".to_string(),
             ));
         }
         self.pos += 1; // time destination
-        let mut timestamp = crate::RtfTimestamp::default();
+        let mut timestamp = crate::Timestamp::default();
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF info nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -155,7 +154,7 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
         if depth != 0 {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         let serialized = timestamp.legacy_string();
         let allocated = self.arena.alloc_str(&serialized);
@@ -181,23 +180,27 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn set_info_number(slot: &mut Option<u32>, value: i32, name: &str) -> RtfResult<()> {
+    pub(super) fn set_info_number(
+        slot: &mut Option<u32>,
+        value: i32,
+        name: &str,
+    ) -> crate::Result<()> {
         if slot.is_some() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF info numeric control {name} occurs more than once"
             )));
         }
         *slot = Some(u32::try_from(value).map_err(|_err| {
-            RtfError::MalformedDocument(format!(
+            crate::Error::MalformedDocument(format!(
                 "RTF info numeric control {name} cannot be negative"
             ))
         })?);
         Ok(())
     }
 
-    pub(super) fn parse_info_password(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_info_password(&mut self) -> crate::Result<()> {
         if self.info.protection.password_hash.is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "duplicate RTF protection password hash".to_string(),
             ));
         }
@@ -210,7 +213,7 @@ impl<'a> Parser<'a> {
         self.info.protection.validate()
     }
 
-    fn parse_password_hash_hex_group_contents(&mut self, limit: usize) -> RtfResult<Vec<u8>> {
+    fn parse_password_hash_hex_group_contents(&mut self, limit: usize) -> crate::Result<Vec<u8>> {
         // Collect only a fixed header first.  The declared total size is an
         // untrusted field, so it must be checked before reserving or retaining
         // the rest of the payload.
@@ -225,7 +228,7 @@ impl<'a> Parser<'a> {
         let mut declared_size = None;
         loop {
             let token = self.tokens.get(self.pos).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "unterminated RTF modern protection password hash text group".to_string(),
                 )
             })?;
@@ -235,25 +238,25 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Token::OpenBrace => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "nested groups are not allowed in RTF modern protection password hash"
                             .to_string(),
                     ));
                 },
                 Token::Binary(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "binary data is not allowed in RTF modern protection password hash"
                             .to_string(),
                     ));
                 },
                 Token::Text(text) => {
                     encoded_len = encoded_len.checked_add(text.len()).ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF modern protection password hash text size overflows".to_string(),
                         )
                     })?;
                     if encoded_len > limit {
-                        return Err(RtfError::MalformedDocument(format!(
+                        return Err(crate::Error::MalformedDocument(format!(
                             "RTF modern protection password hash text group exceeds {limit} bytes"
                         )));
                     }
@@ -266,7 +269,7 @@ impl<'a> Parser<'a> {
                             b'a'..=b'f' => byte - b'a' + 10,
                             b'A'..=b'F' => byte - b'A' + 10,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF passwordhash payload must be hexadecimal SDATA"
                                         .to_string(),
                                 ));
@@ -274,13 +277,13 @@ impl<'a> Parser<'a> {
                         };
                         if let Some(high) = high_nibble.take() {
                             if declared_size.is_some_and(|total| bytes.len() >= total) {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF passwordhash payload exceeds its declared size"
                                         .to_string(),
                                 ));
                             }
                             if bytes.len() >= crate::info::MAX_PASSWORD_HASH_BYTES {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF passwordhash payload exceeds the safety limit".to_string(),
                                 ));
                             }
@@ -291,12 +294,12 @@ impl<'a> Parser<'a> {
                                     .and_then(|value| <[u8; 4]>::try_from(value).ok())
                                     .map(u32::from_le_bytes)
                                     .ok_or_else(|| {
-                                        RtfError::MalformedDocument(
+                                        crate::Error::MalformedDocument(
                                             "RTF passwordhash size is truncated".to_string(),
                                         )
                                     })?;
                                 let total = usize::try_from(total).map_err(|_err| {
-                                    RtfError::MalformedDocument(
+                                    crate::Error::MalformedDocument(
                                         "RTF passwordhash size is not representable".to_string(),
                                     )
                                 })?;
@@ -304,7 +307,7 @@ impl<'a> Parser<'a> {
                                     ..=crate::info::MAX_PASSWORD_HASH_BYTES)
                                     .contains(&total)
                                 {
-                                    return Err(RtfError::MalformedDocument(
+                                    return Err(crate::Error::MalformedDocument(
                                         "RTF passwordhash declared size is outside the supported payload bounds"
                                             .to_string(),
                                     ));
@@ -324,7 +327,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "active controls are not allowed in RTF modern protection password hash"
                             .to_string(),
                     ));
@@ -332,21 +335,21 @@ impl<'a> Parser<'a> {
             }
         }
         if high_nibble.is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash payload has an odd number of hexadecimal digits".to_string(),
             ));
         }
         if declared_size.is_some_and(|total| bytes.len() != total) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash payload is shorter than its declared size".to_string(),
             ));
         }
         Ok(bytes)
     }
 
-    pub(super) fn parse_info_password_hash(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_info_password_hash(&mut self) -> crate::Result<()> {
         if self.info.protection.password_hash_data.is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "duplicate RTF modern protection password hash".to_string(),
             ));
         }
@@ -360,9 +363,9 @@ impl<'a> Parser<'a> {
         self.info.protection.validate()
     }
 
-    pub(super) fn ensure_protection_scope(&self) -> RtfResult<()> {
+    pub(super) fn ensure_protection_scope(&self) -> crate::Result<()> {
         if self.states.len() != 2 || self.body_text_len != 0 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document protection controls must occur in the root header".to_string(),
             ));
         }
@@ -373,7 +376,7 @@ impl<'a> Parser<'a> {
         slot: &mut Option<bool>,
         value: Option<i32>,
         name: &str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let flag = value.unwrap_or(1);
         Self::set_required_protection_flag(slot, flag, name)
     }
@@ -382,9 +385,9 @@ impl<'a> Parser<'a> {
         slot: &mut Option<bool>,
         value: i32,
         name: &str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if slot.is_some() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "duplicate RTF {name} control"
             )));
         }
@@ -392,7 +395,7 @@ impl<'a> Parser<'a> {
             0 => false,
             1 => true,
             _ => {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} parameter must be 0 or 1"
                 )));
             },
@@ -400,13 +403,13 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn skip_open_info_group(&mut self) -> RtfResult<()> {
+    pub(super) fn skip_open_info_group(&mut self) -> crate::Result<()> {
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF skipped info nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -417,11 +420,13 @@ impl<'a> Parser<'a> {
             }
             self.pos += 1;
         }
-        (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
+        (depth == 0)
+            .then_some(())
+            .ok_or(crate::Error::UnexpectedEof)
     }
 
     /// Skip tokens until closing brace.
-    pub(super) fn skip_until_close_brace(&mut self) -> RtfResult<()> {
+    pub(super) fn skip_until_close_brace(&mut self) -> crate::Result<()> {
         let mut depth = 1;
 
         while depth > 0 {
@@ -431,7 +436,7 @@ impl<'a> Parser<'a> {
             match token {
                 Token::OpenBrace => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF skipped nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -443,11 +448,13 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
 
-        (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
+        (depth == 0)
+            .then_some(())
+            .ok_or(crate::Error::UnexpectedEof)
     }
 
     /// Skip an entire group starting from the `OpenBrace` token.
-    pub(super) fn skip_group(&mut self) -> RtfResult<()> {
+    pub(super) fn skip_group(&mut self) -> crate::Result<()> {
         // Must be positioned at OpenBrace
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
             return Ok(());
@@ -463,7 +470,7 @@ impl<'a> Parser<'a> {
             match token {
                 Token::OpenBrace => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF skipped group nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -475,18 +482,20 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
 
-        (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
+        (depth == 0)
+            .then_some(())
+            .ok_or(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn preserve_unknown_destination(&mut self) -> RtfResult<()> {
+    pub(super) fn preserve_unknown_destination(&mut self) -> crate::Result<()> {
         let start = self.pos.checked_sub(1).ok_or_else(|| {
-            RtfError::ParserError("RTF destination has no opening group".to_string())
+            crate::Error::ParserError("RTF destination has no opening group".to_string())
         })?;
         self.skip_until_close_brace()?;
         self.preserve_opaque_tokens(start, self.pos, crate::opaque::Kind::Destination, None)
     }
 
-    pub(super) fn preserve_unknown_control(&mut self, token: usize) -> RtfResult<()> {
+    pub(super) fn preserve_unknown_control(&mut self, token: usize) -> crate::Result<()> {
         self.preserve_opaque_tokens(
             token,
             token.saturating_add(1),
@@ -498,9 +507,9 @@ impl<'a> Parser<'a> {
     pub(super) fn preserve_unknown_destination_in(
         &mut self,
         context: crate::opaque::Context,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let start = self.pos.checked_sub(1).ok_or_else(|| {
-            RtfError::ParserError("RTF destination has no opening group".to_string())
+            crate::Error::ParserError("RTF destination has no opening group".to_string())
         })?;
         self.skip_until_close_brace()?;
         self.preserve_opaque_tokens(
@@ -515,7 +524,7 @@ impl<'a> Parser<'a> {
         &mut self,
         token: usize,
         context: crate::opaque::Context,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         self.preserve_opaque_tokens(
             token,
             token.saturating_add(1),
@@ -530,7 +539,7 @@ impl<'a> Parser<'a> {
         end_token: usize,
         kind: crate::opaque::Kind,
         forced_context: Option<crate::opaque::Context>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let (Some(source), Some(spans)) = (self.source, self.token_spans) else {
             return Ok(());
         };
@@ -538,20 +547,20 @@ impl<'a> Parser<'a> {
             .get(start_token)
             .map(|span| span.start)
             .ok_or_else(|| {
-                RtfError::ParserError("RTF opaque source start is unavailable".to_string())
+                crate::Error::ParserError("RTF opaque source start is unavailable".to_string())
             })?;
-        let end_index = end_token
-            .checked_sub(1)
-            .ok_or_else(|| RtfError::ParserError("RTF opaque source range is empty".to_string()))?;
+        let end_index = end_token.checked_sub(1).ok_or_else(|| {
+            crate::Error::ParserError("RTF opaque source range is empty".to_string())
+        })?;
         let end = spans.get(end_index).map(|span| span.end).ok_or_else(|| {
-            RtfError::ParserError("RTF opaque source end is unavailable".to_string())
+            crate::Error::ParserError("RTF opaque source end is unavailable".to_string())
         })?;
         let fragment = source.get(start..end).ok_or_else(|| {
-            RtfError::ParserError("RTF opaque source range is invalid".to_string())
+            crate::Error::ParserError("RTF opaque source range is invalid".to_string())
         })?;
         let observed = fragment.chars().count();
         if observed > self.limits.max_opaque_node_bytes() {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::OpaqueNodeBytes,
                 observed,
                 maximum: self.limits.max_opaque_node_bytes(),
@@ -559,7 +568,7 @@ impl<'a> Parser<'a> {
         }
         let node_count = self.opaque_nodes.len().saturating_add(1);
         if node_count > self.limits.max_opaque_nodes() {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::OpaqueNodes,
                 observed: node_count,
                 maximum: self.limits.max_opaque_nodes(),
@@ -568,13 +577,13 @@ impl<'a> Parser<'a> {
         let total = self
             .opaque_bytes
             .checked_add(observed)
-            .ok_or_else(|| RtfError::Limit {
+            .ok_or_else(|| crate::Error::Limit {
                 kind: crate::SourceLimitKind::AggregateOpaqueBytes,
                 observed: usize::MAX,
                 maximum: self.limits.max_aggregate_opaque_bytes(),
             })?;
         if total > self.limits.max_aggregate_opaque_bytes() {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::AggregateOpaqueBytes,
                 observed: total,
                 maximum: self.limits.max_aggregate_opaque_bytes(),
@@ -583,13 +592,13 @@ impl<'a> Parser<'a> {
         let mut bytes = Vec::new();
         bytes
             .try_reserve(observed)
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource: "opaque node bytes",
                 requested: observed,
             })?;
         for character in fragment.chars() {
             let byte = u8::try_from(u32::from(character)).map_err(|_err| {
-                RtfError::InvalidUnicode(
+                crate::Error::InvalidUnicode(
                     "RTF opaque transport contains a non-Latin-1 scalar".to_string(),
                 )
             })?;
@@ -638,7 +647,7 @@ impl<'a> Parser<'a> {
         };
         self.opaque_nodes
             .try_reserve(1)
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource: "opaque nodes",
                 requested: node_count.saturating_mul(size_of::<crate::opaque::Node>()),
             })?;
@@ -649,10 +658,13 @@ impl<'a> Parser<'a> {
     }
 
     /// Expect a specific token.
-    pub(super) fn expect_token(&mut self, expected: &Token<'_>) -> RtfResult<()> {
-        let actual = self.tokens.get(self.pos).ok_or(RtfError::UnexpectedEof)?;
+    pub(super) fn expect_token(&mut self, expected: &Token<'_>) -> crate::Result<()> {
+        let actual = self
+            .tokens
+            .get(self.pos)
+            .ok_or(crate::Error::UnexpectedEof)?;
         if actual != expected {
-            return Err(RtfError::ParserError(format!(
+            return Err(crate::Error::ParserError(format!(
                 "Expected {expected:?}, found {actual:?}"
             )));
         }
@@ -662,30 +674,30 @@ impl<'a> Parser<'a> {
     }
 
     /// Get current state (mutable).
-    pub(super) fn current_state_mut(&mut self) -> RtfResult<&mut State> {
+    pub(super) fn current_state_mut(&mut self) -> crate::Result<&mut State> {
         self.states
             .last_mut()
-            .ok_or_else(|| RtfError::ParserError("No parser state available".to_string()))
+            .ok_or_else(|| crate::Error::ParserError("No parser state available".to_string()))
     }
 
     /// Get current state (immutable).
-    pub(super) fn current_state(&self) -> RtfResult<&State> {
+    pub(super) fn current_state(&self) -> crate::Result<&State> {
         self.states
             .last()
-            .ok_or_else(|| RtfError::ParserError("No parser state available".to_string()))
+            .ok_or_else(|| crate::Error::ParserError("No parser state available".to_string()))
     }
 
-    pub(super) fn current_field_drawing_capture(&self) -> RtfResult<&DrawingStoryCapture<'a>> {
+    pub(super) fn current_field_drawing_capture(&self) -> crate::Result<&DrawingStoryCapture<'a>> {
         self.field_drawing_captures.last().ok_or_else(|| {
-            RtfError::ParserError("No field-result drawing capture available".to_string())
+            crate::Error::ParserError("No field-result drawing capture available".to_string())
         })
     }
 
     pub(super) fn current_field_drawing_capture_mut(
         &mut self,
-    ) -> RtfResult<&mut DrawingStoryCapture<'a>> {
+    ) -> crate::Result<&mut DrawingStoryCapture<'a>> {
         self.field_drawing_captures.last_mut().ok_or_else(|| {
-            RtfError::ParserError("No field-result drawing capture available".to_string())
+            crate::Error::ParserError("No field-result drawing capture available".to_string())
         })
     }
 }

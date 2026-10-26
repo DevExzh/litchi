@@ -2246,7 +2246,7 @@ impl<'a> EquationField<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn model(&self) -> crate::RtfResult<crate::EquationModel<'a>> {
+    pub fn model(&self) -> crate::Result<crate::EquationModel<'a>> {
         crate::EquationModel::parse(self.expression)
     }
 
@@ -5919,7 +5919,7 @@ impl<'a> Field<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new_equation(expression: impl Into<String>) -> crate::RtfResult<Field<'static>> {
+    pub fn new_equation(expression: impl Into<String>) -> crate::Result<Field<'static>> {
         let expression_text = expression.into();
         let instruction = if expression_text.is_empty() {
             "EQ".to_string()
@@ -5927,7 +5927,7 @@ impl<'a> Field<'a> {
             format!("EQ {expression_text}")
         };
         if instruction.len() > MAX_INSTRUCTION_LEN {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF EQ field instruction exceeds the safety limit".to_string(),
             ));
         }
@@ -7246,14 +7246,14 @@ impl<'a> Field<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.position > self.range_end {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generic field range moves backwards".to_string(),
             ));
         }
         if self.position != self.range_end {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generic fields must be zero-width enclosing-story events".to_string(),
             ));
         }
@@ -7270,7 +7270,7 @@ impl<'a> Field<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::Result<()> {
         let mut shapes = self.shapes.clone();
         let mut order = self.drawing_order.clone();
         order.push(crate::StoryDrawing::Shape(shapes.len()));
@@ -7294,7 +7294,7 @@ impl<'a> Field<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::Result<()> {
         let mut groups = self.shape_groups.clone();
         let mut order = self.drawing_order.clone();
         order.push(crate::StoryDrawing::ShapeGroup(groups.len()));
@@ -7333,7 +7333,7 @@ impl<'a> Field<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         push_story_page_break(
             &mut self.result_events,
             self.result.as_ref(),

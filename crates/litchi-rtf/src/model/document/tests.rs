@@ -8,7 +8,6 @@
     reason = "test assertions panic on failure by design, rebind fixture names across steps, and compare exact fixture fractions"
 )]
 
-use super::super::error::RtfError;
 use super::*;
 use crate::codec::limits::OpenOptions;
 use crate::{Alignment, ListFollow, ListJustification, ListLevelType, RevisionType, StyleType};
@@ -266,7 +265,7 @@ fn rejects_excessively_nested_shape_groups() {
         panic!("excessive shape-group nesting should fail")
     };
     assert!(
-        matches!(error, RtfError::MalformedDocument(message) if message.contains("group nesting"))
+        matches!(error, crate::Error::MalformedDocument(message) if message.contains("group nesting"))
     );
 }
 
@@ -405,7 +404,7 @@ fn rejects_invalid_embedded_object_hex() {
         panic!("invalid object hex should fail")
     };
     assert!(
-        matches!(error, RtfError::MalformedDocument(message) if message.contains("non-hexadecimal"))
+        matches!(error, crate::Error::MalformedDocument(message) if message.contains("non-hexadecimal"))
     );
 }
 
@@ -434,7 +433,7 @@ fn rejects_unclosed_document_and_destination_groups() {
     ] {
         let result = Tree::parse(rtf, OpenOptions::default());
         match result {
-            Err(RtfError::UnexpectedEof) => {},
+            Err(crate::Error::UnexpectedEof) => {},
             Err(error) => panic!("unexpected error for {rtf:?}: {error}"),
             Ok(_) => panic!("unexpected success for {rtf:?}"),
         }

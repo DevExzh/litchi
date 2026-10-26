@@ -1,7 +1,5 @@
 //! Document-level defaults for RTF mathematics.
 
-use crate::{RtfError, RtfResult};
-
 macro_rules! numeric_enum {
     ($name:ident { $($value:literal => $variant:ident),+ $(,)? }) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,9 +82,9 @@ impl DocumentMathProperties {
         Self::default()
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.math_font.is_some_and(|font| font > i32::MAX as u32) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF math font index exceeds the signed control-word range".to_string(),
             ));
         }

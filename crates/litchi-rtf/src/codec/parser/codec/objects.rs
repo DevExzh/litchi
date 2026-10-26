@@ -1,18 +1,18 @@
 use super::{
     ControlWord, Cow, Destination, MAX_GROUP_NESTING_DEPTH, MAX_OBJECT_DATA_BYTES,
-    MAX_OBJECT_TEXT_BYTES, Parser, RtfError, RtfResult, Token, control_symbol_text,
+    MAX_OBJECT_TEXT_BYTES, Parser, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
     /// Parse an `object` destination without activating or updating its content.
     pub(super) fn parse_object_destination(
         &mut self,
-    ) -> RtfResult<super::super::super::object::EmbeddedObject<'a>> {
+    ) -> crate::Result<super::super::super::object::EmbeddedObject<'a>> {
         use super::super::super::object::{ObjectKind, ObjectResultKind};
 
         let state = self.current_state()?;
         if state.destination != Destination::DocumentBody || state.in_table {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF object destination may occur only in the non-table document body".to_string(),
             ));
         }
@@ -30,7 +30,7 @@ impl<'a> Parser<'a> {
                 .and_then(|index| self.tokens.get(index)),
             Some(Token::Control(ControlWord::IgnorableDestination))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF object destination must not be starred".to_string(),
             ));
         }
@@ -49,7 +49,7 @@ impl<'a> Parser<'a> {
                         || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object class destination placement".to_string(),
                         ));
                     }
@@ -65,7 +65,7 @@ impl<'a> Parser<'a> {
                         || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object name destination placement".to_string(),
                         ));
                     }
@@ -83,7 +83,7 @@ impl<'a> Parser<'a> {
                         || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object alias destination placement".to_string(),
                         ));
                     }
@@ -100,7 +100,7 @@ impl<'a> Parser<'a> {
                         || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object section destination placement".to_string(),
                         ));
                     }
@@ -115,7 +115,7 @@ impl<'a> Parser<'a> {
                         || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object time destination placement".to_string(),
                         ));
                     }
@@ -131,7 +131,7 @@ impl<'a> Parser<'a> {
                         || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object CLSID destination placement".to_string(),
                         ));
                     }
@@ -144,7 +144,7 @@ impl<'a> Parser<'a> {
                         Some(ControlWord::OleClassId(Some(_)))
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object CLSID destination must not have a parameter".to_string(),
                     ));
                 },
@@ -155,7 +155,7 @@ impl<'a> Parser<'a> {
                     ) || saw_data
                         || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object data destination placement".to_string(),
                         ));
                     }
@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::IgnorableDestination))
                     ) || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid RTF object result destination placement".to_string(),
                         ));
                     }
@@ -186,13 +186,13 @@ impl<'a> Parser<'a> {
                         )
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "parameterized RTF object subdestination is invalid".to_string(),
                     ));
                 },
                 Token::OpenBrace => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF object nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -214,7 +214,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ObjectEmbedded) => {
                     if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid or duplicate RTF object kind".to_string(),
                         ));
                     }
@@ -224,7 +224,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ObjectLink) => {
                     if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid or duplicate RTF object kind".to_string(),
                         ));
                     }
@@ -234,7 +234,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ObjectAutoLink) => {
                     if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid or duplicate RTF object kind".to_string(),
                         ));
                     }
@@ -244,7 +244,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ObjectHtml) => {
                     if object.kind != ObjectKind::Unknown || saw_class_id || saw_data || saw_result
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid or duplicate RTF object kind".to_string(),
                         ));
                     }
@@ -289,13 +289,13 @@ impl<'a> Parser<'a> {
                     | ControlWord::ObjectInstallableCommand(Some(_))
                     | ControlWord::ObjectOleControl(Some(_)),
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object kind control must not have a parameter".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ObjectLinkSelf(None)) => {
                     if object.link_self || saw_class_id || saw_data || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid or duplicate RTF object linkself modifier".to_string(),
                         ));
                     }
@@ -303,7 +303,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ObjectLinkSelf(Some(_))) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object linkself modifier must not have a parameter".to_string(),
                     ));
                 },
@@ -389,7 +389,7 @@ impl<'a> Parser<'a> {
                     | ControlWord::ObjectScaleX(None)
                     | ControlWord::ObjectScaleY(None),
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object numeric modifier requires a parameter".to_string(),
                     ));
                 },
@@ -407,7 +407,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ObjectResultMerge(None)) => {
                     if object.merge_result || saw_class_id || saw_data || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "invalid or duplicate RTF object result merge modifier".to_string(),
                         ));
                     }
@@ -462,12 +462,12 @@ impl<'a> Parser<'a> {
                     | ControlWord::ObjectResultBitmap(Some(_))
                     | ControlWord::ObjectResultHtml(Some(_)),
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object result modifier must not have a parameter".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::InvalidObjectModifierParameter) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object modifier has an invalid parameter".to_string(),
                     ));
                 },
@@ -477,16 +477,16 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     pub(super) fn set_object_kind(
         current: super::super::super::object::ObjectKind,
         value: super::super::super::object::ObjectKind,
         too_late: bool,
-    ) -> RtfResult<super::super::super::object::ObjectKind> {
+    ) -> crate::Result<super::super::super::object::ObjectKind> {
         if current != super::super::super::object::ObjectKind::Unknown || too_late {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or duplicate RTF object kind".to_string(),
             ));
         }
@@ -497,9 +497,9 @@ impl<'a> Parser<'a> {
         target: &mut Option<i32>,
         value: i32,
         too_late: bool,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if target.is_some() || too_late {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or duplicate RTF object numeric modifier".to_string(),
             ));
         }
@@ -511,9 +511,9 @@ impl<'a> Parser<'a> {
         object: &mut super::super::super::object::EmbeddedObject<'_>,
         kind: super::super::super::object::ObjectResultKind,
         too_late: bool,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if object.result_kind.is_some() || too_late {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or duplicate RTF object result kind".to_string(),
             ));
         }
@@ -521,7 +521,9 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_object_result_destination(&mut self) -> RtfResult<(String, Vec<usize>)> {
+    pub(super) fn parse_object_result_destination(
+        &mut self,
+    ) -> crate::Result<(String, Vec<usize>)> {
         let mut text = String::new();
         let mut picture_indices = Vec::new();
         self.pos += 1; // opening brace
@@ -535,7 +537,7 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::Result))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF object result destination".to_string(),
             ));
         }
@@ -581,21 +583,21 @@ impl<'a> Parser<'a> {
                 },
             }
             if text.len() > MAX_OBJECT_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF object result text exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn parse_object_text_destination(&mut self) -> RtfResult<String> {
+    pub(super) fn parse_object_text_destination(&mut self) -> crate::Result<String> {
         let mut text = String::new();
         self.pos += 1; // opening brace
         while let Some(token) = self.tokens.get(self.pos) {
             match token {
                 Token::OpenBrace => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "nested groups are not allowed in RTF object text metadata".to_string(),
                     ));
                 },
@@ -631,30 +633,30 @@ impl<'a> Parser<'a> {
                 },
             }
             if text.len() > MAX_OBJECT_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF embedded object metadata exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     #[allow(
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_object_time_destination(&mut self) -> RtfResult<crate::RtfTimestamp> {
+    pub(super) fn parse_object_time_destination(&mut self) -> crate::Result<crate::Timestamp> {
         self.pos += 2; // opening brace and ignorable marker
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::ObjectTime))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF object time destination".to_string(),
             ));
         }
         self.pos += 1;
-        let mut timestamp = crate::RtfTimestamp::default();
+        let mut timestamp = crate::Timestamp::default();
         loop {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
@@ -669,14 +671,14 @@ impl<'a> Parser<'a> {
                     ControlWord::Minute(value) => timestamp.minute = Some(*value),
                     ControlWord::Second(value) => timestamp.second = Some(*value),
                     _ => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF object time destination contains an active control".to_string(),
                         ));
                     },
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object time destination contains grouped, binary, or text data"
                             .to_string(),
                     ));
@@ -686,7 +688,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(super) fn parse_object_hex_destination(&mut self) -> RtfResult<Vec<u8>> {
+    pub(super) fn parse_object_hex_destination(&mut self) -> crate::Result<Vec<u8>> {
         let mut data = Vec::new();
         let mut high_nibble = None;
         self.pos += 1; // opening brace
@@ -699,7 +701,7 @@ impl<'a> Parser<'a> {
                 Token::CloseBrace => {
                     self.pos += 1;
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF objdata contains an odd number of hexadecimal digits".to_string(),
                         ));
                     }
@@ -714,7 +716,7 @@ impl<'a> Parser<'a> {
                     Self::reserve_object_payload(&mut data, decoded_bytes)?;
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF objdata contains a non-hexadecimal character".to_string(),
                             )
                         })?;
@@ -728,7 +730,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Binary(bytes) => {
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF objdata binary payload splits a hexadecimal byte".to_string(),
                         ));
                     }
@@ -745,10 +747,10 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    fn reserve_object_payload(data: &mut Vec<u8>, additional: usize) -> RtfResult<()> {
+    fn reserve_object_payload(data: &mut Vec<u8>, additional: usize) -> crate::Result<()> {
         Self::reserve_object_payload_with_limit(
             data,
             additional,
@@ -764,13 +766,13 @@ impl<'a> Parser<'a> {
         limit: usize,
         resource: &'static str,
         message: &'static str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let remaining = limit.saturating_sub(data.len());
         if additional > remaining {
-            return Err(RtfError::MalformedDocument(message.to_string()));
+            return Err(crate::Error::MalformedDocument(message.to_string()));
         }
         data.try_reserve_exact(additional)
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource,
                 requested: data.len().saturating_add(additional),
             })?;
