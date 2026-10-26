@@ -132,7 +132,7 @@ mod probe {
     use quick_xml::name::ResolveResult;
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
-    use zip::{HasZipMetadata, ZipArchive};
+    use soapberry_zip::{HasZipMetadata, ZipArchive};
 
     const MAX_ITERATIONS: usize = 128;
     const SOURCE_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>source</text:p></office:text></office:body></office:document-content>"#;
