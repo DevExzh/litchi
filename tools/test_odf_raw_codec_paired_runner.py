@@ -177,9 +177,22 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             self.assertIn(case, probe)
         for proof in ("source_bytes_ok", "facade_bytes_ok", "untouched_members_ok", "negative_cases_ok"):
             self.assertIn(f'"{proof}"', probe)
-        self.assertIn("archive_comment_sha256", probe)
-        self.assertIn("version_needed", probe)
-        self.assertIn("external_attributes", probe)
+        for fidelity_field in (
+            "archive_comment_sha256",
+            "archive_comment_bytes",
+            "name_raw_sha256",
+            "content_sha256",
+            "content_bytes",
+            "declared_uncompressed_bytes",
+            "compressed_bytes",
+            "crc32",
+            "version_needed",
+            "flags",
+            "external_attributes",
+            "comment_raw_sha256",
+            "comment_bytes",
+        ):
+            self.assertIn(fidelity_field, probe)
         self.assertIn("select exactly one raw-codec API era", probe)
         self.assertIn("NAMESPACE_CONTRACT", probe)
         self.assertIn("legacy_unknown_namespace_event", probe)

@@ -132,7 +132,8 @@ mod probe {
     use quick_xml::name::ResolveResult;
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
-    use soapberry_zip::{HasZipMetadata, ZipArchive};
+    use soapberry_zip::office::ArchiveReader;
+    use soapberry_zip::{PreservationIndex, ZipArchive};
 
     const MAX_ITERATIONS: usize = 128;
     const SOURCE_CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><text:p>source</text:p></office:text></office:body></office:document-content>"#;
@@ -403,43 +404,79 @@ mod probe {
     }
 
     fn archive_fingerprint(bytes: &[u8]) -> (Vec<String>, Value) {
-        let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("ZIP archive");
-        let comment_sha256 = digest(archive.comment());
-        let mut names = Vec::with_capacity(archive.len());
-        let mut members = Vec::with_capacity(archive.len());
-        for index in 0..archive.len() {
-            let mut member = archive.by_index(index).expect("ZIP member");
-            let name = member.name().to_owned();
-            let name_raw_sha256 = digest(member.name_raw());
-            let compression = format!("{:?}", member.compression());
-            let compressed_bytes = member.compressed_size();
-            let crc32 = member.crc32();
-            let metadata = member.get_metadata();
-            let version_needed = metadata.version_needed();
-            let flags = metadata.flags;
-            let external_attributes = metadata.external_attributes;
-            let comment = member.comment().to_owned();
-            let mut content = Vec::new();
-            member.read_to_end(&mut content).expect("ZIP payload");
+        let archive = ZipArchive::from_slice(bytes)
+            .expect("ZIP archive")
+            .into_zip_archive();
+        let mut archive_comment = Vec::new();
+        let mut archive_comment_reader = archive.comment();
+        archive_comment_reader
+            .read_to_end(&mut archive_comment)
+            .expect("ZIP archive comment");
+        let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index = PreservationIndex::new(
+            &archive,
+            &mut scratch,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .expect("ZIP preservation index");
+        let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+            .expect("ZIP archive reader");
+        let mut names = Vec::with_capacity(index.entries().len());
+        let mut members = Vec::with_capacity(index.entries().len());
+        for entry in index.entries() {
+            let raw_name = entry.raw_name_bytes();
+            let name = std::str::from_utf8(raw_name)
+                .expect("UTF-8 ZIP member name")
+                .to_owned();
+            let central = entry.central_record();
+            let central_start = usize::try_from(central.start).expect("central record offset");
+            let central_end = usize::try_from(central.end).expect("central record end");
+            let record = bytes
+                .get(central_start..central_end)
+                .expect("central record bytes");
+            assert!(record.len() >= 46, "short ZIP central record");
+            let name_len = usize::from(u16::from_le_bytes([record[28], record[29]]));
+            let extra_len = usize::from(u16::from_le_bytes([record[30], record[31]]));
+            let comment_len = usize::from(u16::from_le_bytes([record[32], record[33]]));
+            let variable_start = 46usize;
+            let variable_end = variable_start
+                .checked_add(name_len)
+                .and_then(|offset| offset.checked_add(extra_len))
+                .and_then(|offset| offset.checked_add(comment_len))
+                .expect("central metadata length");
+            assert_eq!(variable_end, record.len(), "central record metadata length");
+            assert_eq!(raw_name, &record[variable_start..variable_start + name_len]);
+            let member_comment = &record[variable_start + name_len + extra_len..variable_end];
+            let content = reader.read(&name).expect("ZIP payload");
+            let crc32 = u32::from_le_bytes([record[16], record[17], record[18], record[19]]);
+            let version_needed = u16::from_le_bytes([record[6], record[7]]);
+            let flags = u16::from_le_bytes([record[8], record[9]]);
+            let external_attributes =
+                u32::from_le_bytes([record[38], record[39], record[40], record[41]]);
+            let comment = String::from_utf8_lossy(member_comment).into_owned();
             names.push(name.clone());
             members.push(json!({
                 "name": name,
-                "name_raw_sha256": name_raw_sha256,
+                "name_raw_sha256": digest(raw_name),
                 "content_sha256": digest(&content),
                 "content_bytes": content.len(),
-                "compression": compression,
-                "compressed_bytes": compressed_bytes,
+                "declared_uncompressed_bytes": entry.uncompressed_size(),
+                "compression": format!("{:?}", entry.compression_method()),
+                "compressed_bytes": entry.compressed_size(),
                 "crc32": format!("{crc32:08x}"),
                 "version_needed": version_needed,
                 "flags": flags,
                 "external_attributes": external_attributes,
                 "comment": comment,
+                "comment_raw_sha256": digest(member_comment),
+                "comment_bytes": member_comment.len(),
             }));
         }
         (
             names,
             json!({
-                "archive_comment_sha256": comment_sha256,
+                "archive_comment_sha256": digest(&archive_comment),
+                "archive_comment_bytes": archive_comment.len(),
                 "members": members,
             }),
         )
