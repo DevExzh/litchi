@@ -17,27 +17,20 @@ use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 use litchi_iwa_common::shape::geometry::{FlipAxis, Point, Size};
 use litchi_iwa_common::wire::{patch_fixed32_field, transform_length_delimited_field};
-use litchi_iwa_protos::{pages_media_codec, shape_properties_codec as codec};
+use litchi_iwa_protos::shape_properties_codec as codec;
 use thiserror::Error as ThisError;
 
 use super::Package;
 use super::body_drawable_graph::{
-    self as graph, Budget, GraphError, GraphLimit, MessageRewrite, ObjectIndex,
+    self as graph, Budget, GraphError, GraphLimit, MessageRewrite, ObjectIndex, kind_name,
+    message_type,
 };
 use super::movie_playback::{__decode_movie_playback_payload, __rewrite_movie_playback_payload};
 use crate::drawable::{Geometry, GeometryFlags, Properties};
 use crate::selector::DrawableSelector;
 
-const IMAGE_MESSAGE_TYPE: u32 = 3_005;
-const MOVIE_MESSAGE_TYPE: u32 = 3_007;
-const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_INFO_SHAPE_FIELD: u32 = 1;
-const SHAPE_INFO_DEPRECATED_STORAGE_FIELD: u32 = 2;
-const SHAPE_INFO_OWNED_STORAGE_FIELD: u32 = 4;
-const SHAPE_INFO_IS_TEXT_BOX_FIELD: u32 = 6;
-const DRAWABLE_PENCIL_ANNOTATIONS_FIELD: u32 = 9;
 const MEDIA_DRAWABLE_FIELD: u32 = 1;
-const DRAWABLE_PARENT_FIELD: u32 = 2;
 const IMAGE_ORIGINAL_SIZE_FIELD: u32 = 4;
 const IMAGE_NATURAL_SIZE_FIELD: u32 = 9;
 const MOVIE_ORIGINAL_SIZE_FIELD: u32 = 20;
@@ -683,142 +676,32 @@ impl Package {
     }
 }
 
-const fn kind_name(selector: DrawableSelector) -> &'static str {
-    match selector {
-        DrawableSelector::Image(_) => "image",
-        DrawableSelector::Movie(_) => "movie",
-        DrawableSelector::Audio(_) => "audio",
-        DrawableSelector::Shape(_) => "shape",
-    }
-}
-
-const fn message_type(selector: DrawableSelector) -> u32 {
-    match selector {
-        DrawableSelector::Image(_) => IMAGE_MESSAGE_TYPE,
-        DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => MOVIE_MESSAGE_TYPE,
-        DrawableSelector::Shape(_) => SHAPE_INFO_MESSAGE_TYPE,
-    }
-}
-
 fn resolve(package: &Package, selector: DrawableSelector) -> Result<(Target, Snapshot), Error> {
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
     let body = graph::resolve_body(&index, &mut budget)?;
-    let requested = selector.position().get();
-    let mut seen = 0usize;
-    for anchor in &body.anchors {
-        let drawable = index.get(anchor.drawable)?;
-        let message_type = message_type(selector);
-        let Some((message_index, message)) =
-            graph::unique_optional_message(drawable.object, message_type)?
-        else {
-            continue;
-        };
-        let payload = message.data.as_slice();
-        if message_type == MOVIE_MESSAGE_TYPE {
-            let flags = pages_media_codec::decode_movie_media_flags(
-                payload,
-                pages_media_codec::DecodeOptions::for_source(payload),
-            )
-            .map_err(|_| Error::InvalidSource)?;
-            if flags.is_live_video() == Some(true) {
-                continue;
-            }
-            let audio = flags.audio_only() == Some(true);
-            if audio != matches!(selector, DrawableSelector::Audio(_)) {
-                continue;
-            }
-        }
-        if message_type == SHAPE_INFO_MESSAGE_TYPE && !is_ordinary_shape(payload, &mut budget)? {
-            continue;
-        }
-        if seen != requested {
-            seen += 1;
-            continue;
-        }
-        graph::validate_message_metadata(drawable.object, message_index)?;
-        let drawable_payload = drawable_payload(selector, payload, &mut budget)?;
-        let parent = drawable_parent(drawable_payload, &mut budget)?;
-        if parent != Some(body.root.body) {
-            return Err(Error::InvalidSource);
-        }
-        let attachment = index.get(anchor.attachment)?;
-        let snapshot = read_snapshot(selector, payload, drawable_payload, &budget)?;
-        let target = Target {
-            selector,
-            attachment: anchor.attachment,
-            attachment_message: anchor.attachment_message,
-            attachment_component: index.component_name(attachment.component_index)?,
-            drawable: anchor.drawable,
-            drawable_message: message_index,
-            drawable_component: index.component_name(drawable.component_index)?,
-            left_margin_bits: body.root.left_margin.map(f32::to_bits),
-        };
-        return Ok((target, snapshot));
-    }
-    Err(Refusal::NotFound {
-        kind: kind_name(selector),
-        position: selector.position(),
-    }
-    .into())
-}
-
-/// The `TSD.DrawableArchive` of the selected message: field 1 of an
-/// `ImageArchive`/`MovieArchive`, field 1 of field 1 of a `ShapeInfoArchive`.
-fn drawable_payload<'a>(
-    selector: DrawableSelector,
-    payload: &'a [u8],
-    budget: &mut Budget,
-) -> Result<&'a [u8], Error> {
-    let view = budget.parse(payload, 1)?;
-    let outer = graph::unique_field(&view, MEDIA_DRAWABLE_FIELD, 2)?
-        .ok_or(Error::InvalidSource)?
-        .payload();
-    if !matches!(selector, DrawableSelector::Shape(_)) {
-        return Ok(outer);
-    }
-    let shape = budget.parse(outer, 2)?;
-    let drawable = graph::unique_field(&shape, MEDIA_DRAWABLE_FIELD, 2)?
-        .ok_or(Error::InvalidSource)?
-        .payload();
-    let view = budget.parse(drawable, 3)?;
-    if view
-        .fields()
-        .any(|field| field.number() == DRAWABLE_PENCIL_ANNOTATIONS_FIELD)
-    {
-        return Err(Error::InvalidSource);
-    }
-    Ok(drawable)
-}
-
-/// Whether a `ShapeInfoArchive` is an ordinary body shape: an explicit
-/// non-text-box flag and one owned storage recorded in both storage slots.
-fn is_ordinary_shape(payload: &[u8], budget: &mut Budget) -> Result<bool, Error> {
-    let view = budget.parse(payload, 1)?;
-    let text_box = graph::unique_field(&view, SHAPE_INFO_IS_TEXT_BOX_FIELD, 0)?
-        .map(|field| graph::canonical_varint(field.payload()))
-        .transpose()?;
-    if text_box != Some(0) {
-        return Ok(false);
-    }
-    let owned = graph::unique_field(&view, SHAPE_INFO_OWNED_STORAGE_FIELD, 2)?
-        .ok_or(Error::InvalidSource)?;
-    let deprecated = graph::unique_field(&view, SHAPE_INFO_DEPRECATED_STORAGE_FIELD, 2)?
-        .ok_or(Error::InvalidSource)?;
-    if graph::parse_reference(owned.payload(), budget)?
-        != graph::parse_reference(deprecated.payload(), budget)?
-    {
-        return Err(Error::InvalidSource);
-    }
-    Ok(true)
-}
-
-fn drawable_parent(payload: &[u8], budget: &mut Budget) -> Result<Option<NonZeroU64>, Error> {
-    let view = budget.parse(payload, 2)?;
-    match graph::unique_field(&view, DRAWABLE_PARENT_FIELD, 2)? {
-        Some(field) => Ok(Some(graph::parse_reference(field.payload(), budget)?)),
-        None => Ok(None),
-    }
+    let selected =
+        graph::select_drawable(&index, &body, selector, &mut budget)?.ok_or(Refusal::NotFound {
+            kind: kind_name(selector),
+            position: selector.position(),
+        })?;
+    let snapshot = read_snapshot(
+        selector,
+        selected.payload,
+        selected.drawable_payload,
+        &budget,
+    )?;
+    let target = Target {
+        selector,
+        attachment: selected.anchor.attachment,
+        attachment_message: selected.anchor.attachment_message,
+        attachment_component: index.component_name(selected.attachment.component_index)?,
+        drawable: selected.anchor.drawable,
+        drawable_message: selected.message_index,
+        drawable_component: index.component_name(selected.drawable.component_index)?,
+        left_margin_bits: body.root.left_margin.map(f32::to_bits),
+    };
+    Ok((target, snapshot))
 }
 
 fn validate_attachment_offsets(payload: &[u8], budget: &mut Budget) -> Result<(), Error> {

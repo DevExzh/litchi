@@ -37,6 +37,14 @@ pub mod properties {
     };
 }
 
+/// Exact-source plain-text transactions for the storage a body drawable
+/// owns (ordinary shapes).
+pub mod text {
+    pub use crate::package::body_drawable_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
 /// Exact-source transactions for the body drawables' layer order.
 pub mod order {
     pub use crate::package::drawable_order::{

@@ -9,6 +9,7 @@ pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_metadata;
 pub(crate) mod body_drawable_graph;
 pub(crate) mod body_drawable_properties;
+pub(crate) mod body_drawable_text;
 pub(crate) mod body_footnote;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;

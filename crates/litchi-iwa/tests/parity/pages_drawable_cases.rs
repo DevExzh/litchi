@@ -682,3 +682,91 @@ fn media_audio_playback_cost_abba() -> TestResult {
         &Op::Playback(playback()?),
     )
 }
+
+/// One shape-text edit, expressed once for both routes.
+enum TextOp {
+    Replace(usize, usize, &'static str),
+    Set(&'static str),
+    Clear,
+}
+
+fn shape_text_case(name: &'static str, tier: Tier, evidence: Evidence, op: TextOp) -> TestResult {
+    let input = shape_fixture()?;
+    let op = &op;
+    Case::new(name, Format::Pages, Tier::A, Evidence::Queued, &input)
+        .host(|source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let id = editor
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            match *op {
+                TextOp::Replace(start, end, text) => {
+                    editor.replace_body_shape_text(id, start..end, text)?
+                },
+                TextOp::Set(text) => editor.set_body_shape_text(id, text)?,
+                TextOp::Clear => editor.clear_body_shape_text(id)?,
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_text(DrawableSelector::shape(0))?;
+            match *op {
+                TextOp::Replace(start, end, text) => drop(edit.replace(
+                    litchi_pages::TextSpan::new(
+                        litchi_pages::TextPosition::from_utf16_index(start)?,
+                        litchi_pages::TextPosition::from_utf16_index(end)?,
+                    )?,
+                    text,
+                )?),
+                TextOp::Set(text) => drop(edit.set(text)?),
+                TextOp::Clear => drop(edit.clear()?),
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_drawable_text(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host body media", host_media)
+        .read("leaf body_drawable_text", |bytes| {
+            Ok(Package::from_bytes(bytes)?.body_drawable_text(DrawableSelector::shape(0))?)
+        })
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_shape_text_replace_parity() -> TestResult {
+    shape_text_case(
+        "pages_body_shape_text_replace_parity",
+        Tier::A,
+        Evidence::Queued,
+        TextOp::Replace(0, 5, "Ω"),
+    )
+}
+
+#[test]
+fn pages_body_shape_text_set_parity() -> TestResult {
+    shape_text_case(
+        "pages_body_shape_text_set_parity",
+        Tier::A,
+        Evidence::Queued,
+        TextOp::Set("New shape text"),
+    )
+}
+
+#[test]
+fn pages_body_shape_text_clear_parity() -> TestResult {
+    shape_text_case(
+        "pages_body_shape_text_clear_parity",
+        Tier::A,
+        Evidence::Queued,
+        TextOp::Clear,
+    )
+}

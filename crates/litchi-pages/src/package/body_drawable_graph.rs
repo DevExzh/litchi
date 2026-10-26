@@ -17,9 +17,10 @@ use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::wire::{WireFieldView, WireView};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, varint::encoded_len};
 use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
-use litchi_iwa_protos::pages_body_codec;
+use litchi_iwa_protos::{pages_body_codec, pages_media_codec};
 
 use super::Package;
+use crate::selector::DrawableSelector;
 
 pub(crate) const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
 pub(crate) const ROOT_OBJECT_IDENTIFIER: u64 = 1;
@@ -245,7 +246,7 @@ pub(crate) struct Root {
 }
 
 /// One drawable attachment of the body, in text-flow order.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Anchor {
     pub(crate) attachment: NonZeroU64,
     pub(crate) attachment_message: usize,
@@ -668,4 +669,166 @@ pub(crate) fn map_core_error(error: litchi_iwa_core::Error) -> GraphError {
         },
         _ => GraphError::InvalidSource,
     }
+}
+
+const IMAGE_MESSAGE_TYPE: u32 = 3_005;
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const WRAPPED_DRAWABLE_FIELD: u32 = 1;
+const DRAWABLE_PARENT_FIELD: u32 = 2;
+const DRAWABLE_PENCIL_ANNOTATIONS_FIELD: u32 = 9;
+const SHAPE_INFO_DEPRECATED_STORAGE_FIELD: u32 = 2;
+const SHAPE_INFO_OWNED_STORAGE_FIELD: u32 = 4;
+const SHAPE_INFO_IS_TEXT_BOX_FIELD: u32 = 6;
+
+/// The native message type that carries a drawable of the selected kind.
+pub(crate) const fn message_type(selector: DrawableSelector) -> u32 {
+    match selector {
+        DrawableSelector::Image(_) => IMAGE_MESSAGE_TYPE,
+        DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => MOVIE_MESSAGE_TYPE,
+        DrawableSelector::Shape(_) => SHAPE_INFO_MESSAGE_TYPE,
+    }
+}
+
+/// The selector's kind as a static word for refusals.
+pub(crate) const fn kind_name(selector: DrawableSelector) -> &'static str {
+    match selector {
+        DrawableSelector::Image(_) => "image",
+        DrawableSelector::Movie(_) => "movie",
+        DrawableSelector::Audio(_) => "audio",
+        DrawableSelector::Shape(_) => "shape",
+    }
+}
+
+/// One body drawable selected by kind and text-flow position, after the
+/// ownership proof (its parent is the body storage).
+pub(crate) struct Selected<'a> {
+    pub(crate) anchor: Anchor,
+    pub(crate) drawable: Located<'a>,
+    pub(crate) attachment: Located<'a>,
+    pub(crate) message_index: usize,
+    pub(crate) payload: &'a [u8],
+    /// The `TSD.DrawableArchive` inside `payload`.
+    pub(crate) drawable_payload: &'a [u8],
+    /// A shape's owned text storage.
+    pub(crate) storage: Option<NonZeroU64>,
+}
+
+/// Select the drawable of `selector`'s kind at its position among the body's
+/// drawables of that kind, in text-flow order; `None` when there is none.
+pub(crate) fn select_drawable<'a>(
+    index: &ObjectIndex<'a>,
+    body: &Body,
+    selector: DrawableSelector,
+    budget: &mut Budget,
+) -> GraphResult<Option<Selected<'a>>> {
+    let requested = selector.position().get();
+    let message_type = message_type(selector);
+    let mut seen = 0usize;
+    for anchor in &body.anchors {
+        let drawable = index.get(anchor.drawable)?;
+        let Some((message_index, message)) =
+            unique_optional_message(drawable.object, message_type)?
+        else {
+            continue;
+        };
+        let payload = message.data.as_slice();
+        let mut storage = None;
+        match selector {
+            DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => {
+                let flags = pages_media_codec::decode_movie_media_flags(
+                    payload,
+                    pages_media_codec::DecodeOptions::for_source(payload),
+                )
+                .map_err(|_| GraphError::InvalidSource)?;
+                if flags.is_live_video() == Some(true)
+                    || (flags.audio_only() == Some(true))
+                        != matches!(selector, DrawableSelector::Audio(_))
+                {
+                    continue;
+                }
+            },
+            DrawableSelector::Shape(_) => {
+                let Some(owned) = ordinary_shape_storage(payload, budget)? else {
+                    continue;
+                };
+                storage = Some(owned);
+            },
+            DrawableSelector::Image(_) => {},
+        }
+        if seen != requested {
+            seen += 1;
+            continue;
+        }
+        validate_message_metadata(drawable.object, message_index)?;
+        let drawable_payload = drawable_payload(selector, payload, budget)?;
+        let view = budget.parse(drawable_payload, 3)?;
+        let parent = unique_field(&view, DRAWABLE_PARENT_FIELD, 2)?
+            .map(|field| parse_reference(field.payload(), budget))
+            .transpose()?;
+        if parent != Some(body.root.body) {
+            return Err(GraphError::InvalidSource);
+        }
+        let attachment = index.get(anchor.attachment)?;
+        return Ok(Some(Selected {
+            anchor: *anchor,
+            drawable,
+            attachment,
+            message_index,
+            payload,
+            drawable_payload,
+            storage,
+        }));
+    }
+    Ok(None)
+}
+
+/// The `TSD.DrawableArchive` of a drawable message: field 1 of an
+/// `ImageArchive`/`MovieArchive`, field 1 of field 1 of a `ShapeInfoArchive`.
+fn drawable_payload<'a>(
+    selector: DrawableSelector,
+    payload: &'a [u8],
+    budget: &mut Budget,
+) -> GraphResult<&'a [u8]> {
+    let view = budget.parse(payload, 1)?;
+    let outer = unique_field(&view, WRAPPED_DRAWABLE_FIELD, 2)?
+        .ok_or(GraphError::InvalidSource)?
+        .payload();
+    if !matches!(selector, DrawableSelector::Shape(_)) {
+        return Ok(outer);
+    }
+    let shape = budget.parse(outer, 2)?;
+    let drawable = unique_field(&shape, WRAPPED_DRAWABLE_FIELD, 2)?
+        .ok_or(GraphError::InvalidSource)?
+        .payload();
+    let view = budget.parse(drawable, 3)?;
+    if view
+        .fields()
+        .any(|field| field.number() == DRAWABLE_PENCIL_ANNOTATIONS_FIELD)
+    {
+        return Err(GraphError::InvalidSource);
+    }
+    Ok(drawable)
+}
+
+/// The owned storage of an ordinary body shape: an explicit non-text-box
+/// flag and one storage recorded in both storage slots. `None` for a text
+/// box or a shape without the explicit flag.
+fn ordinary_shape_storage(payload: &[u8], budget: &mut Budget) -> GraphResult<Option<NonZeroU64>> {
+    let view = budget.parse(payload, 1)?;
+    let text_box = unique_field(&view, SHAPE_INFO_IS_TEXT_BOX_FIELD, 0)?
+        .map(|field| canonical_varint(field.payload()))
+        .transpose()?;
+    if text_box != Some(0) {
+        return Ok(None);
+    }
+    let owned =
+        unique_field(&view, SHAPE_INFO_OWNED_STORAGE_FIELD, 2)?.ok_or(GraphError::InvalidSource)?;
+    let deprecated = unique_field(&view, SHAPE_INFO_DEPRECATED_STORAGE_FIELD, 2)?
+        .ok_or(GraphError::InvalidSource)?;
+    let owned = parse_reference(owned.payload(), budget)?;
+    if owned != parse_reference(deprecated.payload(), budget)? {
+        return Err(GraphError::InvalidSource);
+    }
+    Ok(Some(owned))
 }
