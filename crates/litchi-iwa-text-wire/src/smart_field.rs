@@ -7,10 +7,16 @@
 //! decides how it is generated. Writes encode canonically; setting changes
 //! keep every other byte of the payload.
 
-use litchi_iwa_common::wire::{patch_length_delimited_field, patch_varint_field};
+use litchi_iwa_common::wire::{
+    patch_length_delimited_field, patch_nested_fixed64_field, patch_varint_field,
+};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::hyperlink_codec;
 use litchi_iwa_text::bookmark::{Name as BookmarkName, Settings as BookmarkSettings, Visibility};
+use litchi_iwa_text::date_time::{
+    Format as DateTimeFormat, FormatterStyle, Instant, LocaleIdentifier,
+    Settings as DateTimeSettings, UpdatePlan,
+};
 use litchi_iwa_text::hyperlink::TextHyperlinkTarget;
 use thiserror::Error as ThisError;
 
@@ -20,6 +26,8 @@ use crate::native::{self, Budget, NativeError, Writer};
 pub const HYPERLINK_MESSAGE_TYPE: u32 = 2_032;
 /// `TSWP.BookmarkFieldArchive`.
 pub const BOOKMARK_MESSAGE_TYPE: u32 = 2_035;
+/// `TSWP.DateTimeSmartFieldArchive`.
+pub const DATE_TIME_MESSAGE_TYPE: u32 = 2_034;
 
 const SUPER_FIELD: u32 = 1;
 const UUID_FIELD: u32 = 1;
@@ -347,4 +355,234 @@ pub fn bookmark_with_settings(
     .map_err(native::common)?;
     admit_output(&rewritten, limits)?;
     Ok(rewritten)
+}
+
+const DATE_FORMAT_FIELD: u32 = 2;
+const DATE_LOCALE_FIELD: u32 = 3;
+const DATE_STYLE_FIELD: u32 = 4;
+const TIME_STYLE_FIELD: u32 = 5;
+const UPDATE_PLAN_FIELD: u32 = 6;
+const NEEDS_UPDATE_FIELD: u32 = 7;
+const DATE_FIELD: u32 = 8;
+const DATE_SECONDS_FIELD: u32 = 1;
+
+#[derive(Default)]
+struct DateTimeFields {
+    uuid: Option<String>,
+    format: Option<String>,
+    locale: Option<String>,
+    date_style: Option<i32>,
+    time_style: Option<i32>,
+    update_plan: Option<i32>,
+    needs_update: Option<bool>,
+    date: Option<f64>,
+}
+
+fn date_time_fields(payload: &[u8], limits: WireLimits) -> Result<DateTimeFields> {
+    let mut budget = Budget::new(limits);
+    let mut fields = DateTimeFields::default();
+    native::fields(payload, 0, &mut budget, |field, budget| {
+        match field.number {
+            SUPER_FIELD => native::fields(field.bytes()?, 1, budget, |inner, budget| {
+                if inner.number == UUID_FIELD {
+                    fields.uuid = Some(inner.string(budget)?);
+                }
+                Ok(())
+            })?,
+            DATE_FORMAT_FIELD => fields.format = Some(field.string(budget)?),
+            DATE_LOCALE_FIELD => fields.locale = Some(field.string(budget)?),
+            DATE_STYLE_FIELD => fields.date_style = Some(field.int32()?),
+            TIME_STYLE_FIELD => fields.time_style = Some(field.int32()?),
+            UPDATE_PLAN_FIELD => fields.update_plan = Some(field.int32()?),
+            NEEDS_UPDATE_FIELD => fields.needs_update = Some(field.bool()?),
+            DATE_FIELD => {
+                let seconds = fields.date.get_or_insert(0.0);
+                native::fields(field.bytes()?, 1, budget, |inner, _| {
+                    if inner.number == DATE_SECONDS_FIELD {
+                        *seconds = inner.double()?;
+                    }
+                    Ok(())
+                })?;
+            },
+            _ => {},
+        }
+        Ok(())
+    })?;
+    Ok(fields)
+}
+
+fn invalid_date_time(_: litchi_iwa_text::date_time::Error) -> Error {
+    Error::InvalidSource {
+        reason: "Date & Time field holds an invalid setting",
+    }
+}
+
+/// The text-attribute UUID and settings of a `TSWP.DateTimeSmartFieldArchive`.
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for a malformed payload, a missing or invalid
+/// UUID or an invalid setting; resource errors as configured.
+pub fn date_time(
+    payload: &[u8],
+    limits: WireLimits,
+) -> Result<(TextAttributeUuid, DateTimeSettings)> {
+    let fields = date_time_fields(payload, limits)?;
+    let uuid = fields.uuid.ok_or(Error::InvalidSource {
+        reason: "Date & Time field is missing its text-attribute UUID",
+    })?;
+    let uuid = TextAttributeUuid::new(&uuid).map_err(|_| Error::InvalidSource {
+        reason: "Date & Time field has an invalid text-attribute UUID",
+    })?;
+    let settings = DateTimeSettings::new(
+        fields
+            .format
+            .map(DateTimeFormat::try_from)
+            .transpose()
+            .map_err(invalid_date_time)?,
+        fields
+            .locale
+            .map(LocaleIdentifier::try_from)
+            .transpose()
+            .map_err(invalid_date_time)?,
+        fields.date_style.map(FormatterStyle::from_raw),
+        fields.time_style.map(FormatterStyle::from_raw),
+        fields.update_plan.map(UpdatePlan::from_raw),
+        fields.needs_update,
+        fields
+            .date
+            .map(Instant::from_reference_date_seconds)
+            .transpose()
+            .map_err(invalid_date_time)?,
+    )
+    .map_err(invalid_date_time)?;
+    Ok((uuid, settings))
+}
+
+/// A canonical `TSWP.DateTimeSmartFieldArchive`.
+///
+/// # Errors
+///
+/// Resource errors as configured.
+pub fn encode_date_time(
+    uuid: &TextAttributeUuid,
+    settings: &DateTimeSettings,
+    limits: WireLimits,
+) -> Result<Vec<u8>> {
+    let mut writer = Writer::new(limits);
+    writer.message(SUPER_FIELD, |writer| {
+        writer.bytes(UUID_FIELD, uuid.as_str().as_bytes())
+    })?;
+    if let Some(format) = settings.format() {
+        writer.bytes(DATE_FORMAT_FIELD, format.as_str().as_bytes())?;
+    }
+    if let Some(locale) = settings.locale_identifier() {
+        writer.bytes(DATE_LOCALE_FIELD, locale.as_str().as_bytes())?;
+    }
+    if let Some(style) = settings.date_style() {
+        writer.int32(DATE_STYLE_FIELD, style.as_raw())?;
+    }
+    if let Some(style) = settings.time_style() {
+        writer.int32(TIME_STYLE_FIELD, style.as_raw())?;
+    }
+    if let Some(plan) = settings.update_plan() {
+        writer.int32(UPDATE_PLAN_FIELD, plan.as_raw())?;
+    }
+    if let Some(needs_update) = settings.needs_update() {
+        writer.bool(NEEDS_UPDATE_FIELD, needs_update)?;
+    }
+    if let Some(instant) = settings.instant() {
+        writer.message(DATE_FIELD, |writer| {
+            writer.double(DATE_SECONDS_FIELD, instant.reference_date_seconds())
+        })?;
+    }
+    Ok(writer.into_bytes())
+}
+
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "protobuf int32 encodes the sign-extended 64-bit value"
+)]
+const fn int32_varint(value: i32) -> u64 {
+    value as i64 as u64
+}
+
+/// `payload` with its settings replaced field by field; every other byte
+/// is kept.
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for a malformed payload; resource errors as
+/// configured.
+pub fn date_time_with_settings(
+    payload: &[u8],
+    settings: &DateTimeSettings,
+    limits: WireLimits,
+) -> Result<Vec<u8>> {
+    let current = date_time_fields(payload, limits)?;
+    let wire = native::common;
+    let mut data = patch_length_delimited_field(
+        payload,
+        DATE_FORMAT_FIELD,
+        current.format.is_some(),
+        settings.format().map(|value| value.as_str().as_bytes()),
+    )
+    .map_err(wire)?;
+    data = patch_length_delimited_field(
+        &data,
+        DATE_LOCALE_FIELD,
+        current.locale.is_some(),
+        settings
+            .locale_identifier()
+            .map(|value| value.as_str().as_bytes()),
+    )
+    .map_err(wire)?;
+    for (number, present, replacement) in [
+        (
+            DATE_STYLE_FIELD,
+            current.date_style.is_some(),
+            settings.date_style().map(FormatterStyle::as_raw),
+        ),
+        (
+            TIME_STYLE_FIELD,
+            current.time_style.is_some(),
+            settings.time_style().map(FormatterStyle::as_raw),
+        ),
+        (
+            UPDATE_PLAN_FIELD,
+            current.update_plan.is_some(),
+            settings.update_plan().map(UpdatePlan::as_raw),
+        ),
+    ] {
+        data = patch_varint_field(&data, number, present, replacement.map(int32_varint))
+            .map_err(wire)?;
+    }
+    data = patch_varint_field(
+        &data,
+        NEEDS_UPDATE_FIELD,
+        current.needs_update.is_some(),
+        settings.needs_update().map(u64::from),
+    )
+    .map_err(wire)?;
+    data = match (current.date, settings.instant()) {
+        (Some(_), Some(instant)) => patch_nested_fixed64_field(
+            &data,
+            &[DATE_FIELD, DATE_SECONDS_FIELD],
+            true,
+            Some(instant.reference_date_seconds().to_bits()),
+        )
+        .map_err(wire)?,
+        (None, Some(instant)) => {
+            let mut writer = Writer::new(limits);
+            writer.double(DATE_SECONDS_FIELD, instant.reference_date_seconds())?;
+            patch_length_delimited_field(&data, DATE_FIELD, false, Some(&writer.into_bytes()))
+                .map_err(wire)?
+        },
+        (Some(_), None) => {
+            patch_length_delimited_field(&data, DATE_FIELD, true, None).map_err(wire)?
+        },
+        (None, None) => data,
+    };
+    admit_output(&data, limits)?;
+    Ok(data)
 }

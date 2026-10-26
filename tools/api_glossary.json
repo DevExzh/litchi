@@ -20348,6 +20348,35 @@
           ],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::smart_field::date_time",
+          "inputs": [
+            "payload",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::smart_field::encode_date_time",
+          "inputs": [
+            "uuid",
+            "settings",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::smart_field::date_time_with_settings",
+          "inputs": [
+            "payload",
+            "settings",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
         }
       ]
     },
