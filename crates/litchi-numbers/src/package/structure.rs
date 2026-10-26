@@ -513,6 +513,21 @@ impl<'p> Working<'p> {
         Ok(removed)
     }
 
+    /// The largest identifier of an object the working set holds (source
+    /// objects not removed, and inserted ones).
+    pub(super) fn maximum_identifier(&self) -> u64 {
+        let source = self
+            .source
+            .state
+            .components
+            .iter_objects()
+            .filter_map(|object| object.archive_info.identifier)
+            .filter(|identifier| !self.removed.contains(identifier))
+            .max()
+            .unwrap_or(0);
+        self.inserted.keys().copied().max().unwrap_or(0).max(source)
+    }
+
     /// Keep the root previews on [`Self::publish`] instead of deleting them
     /// as stale: a cell-level edit (topology, record 0370) leaves them in
     /// place, as the host editor and the native application's own saves
