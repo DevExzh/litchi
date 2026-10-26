@@ -98,6 +98,25 @@ impl EscherTextboxWrapper {
         Self::new_with_interaction_limits_and_report(data, TextInteractionLimits::default(), report)
     }
 
+    /// Create a source-bound wrapper, recording repaired text-style defects.
+    ///
+    /// Shape projections retain the package's [`crate::SourceLimits`] while
+    /// the detached `ClientTextbox` payload is decoded.  Keep those limits
+    /// on this second parse too; otherwise a low event, depth, or record-size
+    /// profile would be silently replaced by the neutral wrapper defaults.
+    pub(crate) fn new_source_bound_with_report(
+        data: Vec<u8>,
+        source_limits: crate::SourceLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        Self::new_with_source_limits_and_interaction_limits_and_report(
+            data,
+            source_limits,
+            crate::text_interaction::limits_for_source(source_limits),
+            report,
+        )
+    }
+
     /// Create a wrapper with explicit text-interaction resource limits,
     /// recording every repaired non-structural text-style defect in `report`.
     ///
@@ -111,6 +130,20 @@ impl EscherTextboxWrapper {
     ) -> Result<Self> {
         // Parse child records from the escher data
         let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        Self::new_with_source_limits_and_interaction_limits_and_report(
+            data,
+            source_limits,
+            limits,
+            report,
+        )
+    }
+
+    fn new_with_source_limits_and_interaction_limits_and_report(
+        data: Vec<u8>,
+        source_limits: crate::SourceLimits,
+        limits: TextInteractionLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
         let child_records = Self::find_child_records(&data, &source_limits)?;
 
         let mut extractor = TextRunExtractor::new();

@@ -295,7 +295,7 @@ impl SlideDirectory {
                     .and_then(|(interactions, refs)| {
                         entries[index].outline_text_interactions = interactions;
                         entries[index].outline_text_refs = refs;
-                        crate::OutlineTextBody::collect(&set.slide_records)
+                        crate::OutlineTextBody::collect(&set.slide_records, limits)
                     });
                 match read {
                     Ok(bodies) => entries[index].outline_text_bodies = bodies,

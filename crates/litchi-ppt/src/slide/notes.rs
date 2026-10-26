@@ -3,7 +3,7 @@
 use super::types::Slide;
 use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
-use crate::package::{Error, Result, SourceLimits};
+use crate::package::{Error, Result, SourceLimitKind, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::{PayloadStore, Record};
 use crate::shapes::ShapeEnum;
@@ -173,6 +173,7 @@ pub struct SpeakerNotes {
     persist_id: u32,
     slide_id_ref: u32,
     record: Record,
+    source_limits: SourceLimits,
     /// Lazily parsed shapes, together with the non-structural defects
     /// repaired while they were parsed.
     shapes: OnceCell<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)>,
@@ -237,6 +238,7 @@ impl SpeakerNotes {
             persist_id: descriptor.persist_id,
             slide_id_ref,
             record,
+            source_limits: limits,
             shapes: OnceCell::new(),
             text: OnceCell::new(),
         })
@@ -358,12 +360,19 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok((Vec::new(), report));
         };
-        let parsed = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
+        let parsed = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for (index, shape) in parsed.iter().enumerate() {
-            if let Some(mut converted_shape) =
-                Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &[], &mut report)?
-            {
+            if let Some(mut converted_shape) = Slide::<'static>::convert_odraw_to_shape_enum(
+                shape,
+                index,
+                &[],
+                self.source_limits,
+                &mut report,
+            )? {
                 converted_shape.mark_source_bound_recursive();
                 shapes.push(converted_shape);
             }
@@ -382,23 +391,28 @@ impl SpeakerNotes {
     /// placeholders (`PlaceholderKind::NotesBody`), in drawing order: the
     /// shapes whose text [`Self::text`] joins.
     pub(crate) fn body_shape_ids(&self) -> Result<Vec<u32>> {
-        const MAX_SHAPES: usize = 1_000_000;
-
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
+        let shapes = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut ids = Vec::new();
         let mut pending = shapes.iter().rev().collect::<Vec<_>>();
         let mut visited = 0usize;
         while let Some(current) = pending.pop() {
-            visited = visited
-                .checked_add(1)
-                .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
-            if visited > MAX_SHAPES {
-                return Err(Error::Corrupted(
-                    "Notes page exceeds the PPT shape limit".to_string(),
-                ));
+            visited = visited.checked_add(1).ok_or(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: usize::MAX,
+                maximum: self.source_limits.max_events(),
+            })?;
+            if visited > self.source_limits.max_events() {
+                return Err(Error::Limit {
+                    kind: SourceLimitKind::Events,
+                    observed: visited,
+                    maximum: self.source_limits.max_events(),
+                });
             }
             if current
                 .placeholder()?
@@ -415,10 +429,21 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(String::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
+        let shapes = crate::odraw::parse(
+            &drawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut text = Vec::new();
+        let mut visited = 0usize;
         for shape in &shapes {
-            collect_notes_body_text(shape, &mut text)?;
+            collect_notes_body_text(
+                shape,
+                &mut text,
+                &mut visited,
+                self.source_limits.max_events(),
+                self.source_limits.max_events().min(u32::MAX as usize) as u32,
+                self.source_limits.max_depth(),
+            )?;
         }
         Ok(text.join("\n"))
     }
@@ -427,24 +452,35 @@ impl SpeakerNotes {
 fn collect_notes_body_text(
     shape: &litchi_odraw::shape::Shape<'_>,
     text: &mut Vec<String>,
+    visited: &mut usize,
+    max_shapes: usize,
+    max_records: u32,
+    max_depth: usize,
 ) -> Result<()> {
-    const MAX_SHAPES: usize = 1_000_000;
-
     let mut pending = vec![shape];
-    let mut visited = 0usize;
     while let Some(current) = pending.pop() {
-        visited = visited
-            .checked_add(1)
-            .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
-        if visited > MAX_SHAPES {
-            return Err(Error::Corrupted(
-                "Notes page exceeds the PPT shape limit".to_string(),
-            ));
+        *visited = (*visited).checked_add(1).ok_or(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: max_shapes,
+        })?;
+        if *visited > max_shapes {
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: *visited,
+                maximum: max_shapes,
+            });
         }
         if current
             .placeholder()?
             .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
-            && let Some(value) = current.text()?.filter(|value| !value.is_empty())
+            && let Some(textbox) = crate::odraw::textbox(current)?
+            && let Some(value) = crate::odraw::text_from_textbox_payload_bounded(
+                textbox.data(),
+                max_records,
+                max_depth,
+            )?
+            && !value.is_empty()
         {
             text.push(value);
         }

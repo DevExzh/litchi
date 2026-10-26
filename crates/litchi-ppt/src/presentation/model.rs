@@ -289,7 +289,7 @@ impl Presentation {
             .iter()
             .filter(|record| record.record_type == RecordType::MainMaster)
         {
-            super::codec::record_drawing_repairs(master, &mut report)?;
+            super::codec::record_drawing_repairs(master, self.inner.source_limits, &mut report)?;
         }
         for slide in self.slides()? {
             slide.shapes_with_report(&mut report)?;
@@ -476,11 +476,13 @@ impl Presentation {
             record: &Record,
             out: &mut Vec<TextMetachar>,
             report: &mut crate::leniency::ToleranceReport,
+            source_limits: SourceLimits,
         ) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
-                for textbox in super::codec::drawing_textboxes(&record.data)? {
-                    let wrapper = crate::EscherTextboxWrapper::new_with_report(
+                for textbox in super::codec::drawing_textboxes(&record.data, source_limits)? {
+                    let wrapper = crate::EscherTextboxWrapper::new_source_bound_with_report(
                         textbox.data().to_vec(),
+                        source_limits,
                         report,
                     )?;
                     out.extend_from_slice(wrapper.metachars());
@@ -501,7 +503,7 @@ impl Presentation {
 
         let mut result = Vec::new();
         for record in self.inner.parser.find_records_ref() {
-            collect(record, &mut result, report)?;
+            collect(record, &mut result, report, self.inner.source_limits)?;
         }
         Ok(result)
     }
@@ -592,11 +594,13 @@ impl Presentation {
             record: &Record,
             out: &mut Vec<OutlineTextRef>,
             report: &mut crate::leniency::ToleranceReport,
+            source_limits: SourceLimits,
         ) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
-                for textbox in super::codec::drawing_textboxes(&record.data)? {
-                    let wrapper = crate::EscherTextboxWrapper::new_with_report(
+                for textbox in super::codec::drawing_textboxes(&record.data, source_limits)? {
+                    let wrapper = crate::EscherTextboxWrapper::new_source_bound_with_report(
                         textbox.data().to_vec(),
+                        source_limits,
                         report,
                     )?;
                     out.extend_from_slice(wrapper.outline_text_refs());
@@ -609,7 +613,7 @@ impl Presentation {
 
         let mut result = Vec::new();
         for record in self.inner.parser.find_records_ref() {
-            collect(record, &mut result, report)?;
+            collect(record, &mut result, report, self.inner.source_limits)?;
         }
         Ok(result)
     }
@@ -1280,7 +1284,9 @@ impl Presentation {
             .filter(|record| record.record_type == RecordType::MainMaster)
             .enumerate()
         {
-            if let Some(display) = super::codec::placeholder_display_from_record(master)? {
+            if let Some(display) =
+                super::codec::placeholder_display_from_record(master, self.inner.source_limits)?
+            {
                 let scope = HeaderFooterScope::Local {
                     parent: HeaderFooterParent::MainMaster,
                     parent_ordinal: HeaderFooterParentOrdinal::new(master_ordinal),
@@ -1309,7 +1315,9 @@ impl Presentation {
                 parent: HeaderFooterParent::Slide,
                 parent_ordinal: HeaderFooterParentOrdinal::new(ordinal),
             };
-            if let Some(display) = super::codec::placeholder_display_from_record(slide)? {
+            if let Some(display) =
+                super::codec::placeholder_display_from_record(slide, self.inner.source_limits)?
+            {
                 if values.has_scope(scope) {
                     values.attach_placeholder_display(scope, display)?;
                 } else {
@@ -1429,6 +1437,7 @@ impl Presentation {
                 let escher_text = crate::odraw::text_from_slide_drawing(
                     &ppdrawing.data,
                     slide_data.outline_text_bodies,
+                    self.inner.source_limits,
                 )?;
                 let escher_trimmed = escher_text.trim();
                 if !escher_trimmed.is_empty() {

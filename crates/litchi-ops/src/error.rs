@@ -2131,13 +2131,26 @@ impl Classify for litchi_ppt::Error {
                 Class::suggest(Code::InvalidArgument, WRONG_PASSWORD_SUGGESTION)
             },
             Self::UnsupportedEncryption(_) => Class::of(Code::UnsupportedCapability),
-            Self::OfficeArt(_)
-            | Self::InvalidFormat(_)
+            Self::OfficeArt(error) => classify_ppt_officeart(error),
+            Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
             | Self::Corrupted(_)
             | Self::MalformedEncryptionHeader(_) => Class::of(Code::CorruptFile),
             _ => Class::of(Code::InternalError),
         }
+    }
+}
+
+#[cfg(feature = "ppt")]
+fn classify_ppt_officeart(error: &litchi_ppt::odraw::Error) -> Class {
+    use litchi_ppt::odraw::Error as OfficeArtError;
+
+    match error {
+        OfficeArtError::LimitExceeded { .. } | OfficeArtError::ImageLimitExceeded { .. } => {
+            Class::of(Code::LimitExceeded)
+        },
+        OfficeArtError::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+        _ => Class::of(Code::CorruptFile),
     }
 }
 

@@ -309,7 +309,10 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(programmable_tags) = shape.programmable_tags_with_limits(limits)? {
@@ -370,7 +373,10 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(projection) = shape.ppt_flags_with(limits)? {
@@ -404,7 +410,10 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut positions = std::collections::HashSet::new();
         let mut result = Vec::new();
         for shape in &escher_shapes {

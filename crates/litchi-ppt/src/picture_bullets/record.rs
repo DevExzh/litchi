@@ -77,6 +77,30 @@ impl PictureBulletLimits {
             ..self.records
         }
     }
+
+    fn image_limits(self) -> litchi_odraw::image::Limits {
+        let records = crate::odraw::limits_for_source(self.records);
+        let max_blip_bytes = self
+            .max_officeart_record_bytes
+            .saturating_sub(8)
+            .min(self.records.max_record_bytes.saturating_sub(8))
+            .min(self.records.max_record_payload_bytes)
+            .min(u32::MAX as usize) as u32;
+        let max_store_entries = self
+            .max_bullets
+            .min(self.records.max_records)
+            .min(usize::from(u16::MAX)) as u16;
+        let max_files = self
+            .max_bullets
+            .min(self.records.max_records)
+            .min(u32::MAX as usize) as u32;
+        litchi_odraw::image::Limits {
+            records,
+            max_blip_bytes,
+            max_store_entries,
+            max_files,
+        }
+    }
 }
 
 /// Preferred native picture format for a `PowerPoint` 9 bullet.
@@ -121,7 +145,7 @@ impl PictureBulletType {
 }
 
 /// One picture bullet from a `BlipEntityAtom`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PictureBullet {
     /// Zero-based bullet index referenced by `TextPFException9`.
     pub index: u16,
@@ -131,9 +155,74 @@ pub struct PictureBullet {
     pub unused: u8,
     /// Complete embedded `OfficeArt` BLIP or FBSE record, including its header.
     pub officeart_record: Vec<u8>,
+    /// The admission policy retained for all later BLIP and FBSE reads. This
+    /// operational policy is intentionally excluded from content equality.
+    limits: PictureBulletLimits,
 }
 
+impl PartialEq for PictureBullet {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+            && self.picture_type == other.picture_type
+            && self.unused == other.unused
+            && self.officeart_record == other.officeart_record
+    }
+}
+
+impl Eq for PictureBullet {}
+
 impl PictureBullet {
+    /// Construct and validate one picture bullet from an owned `OfficeArt`
+    /// BLIP or FBSE record.
+    ///
+    /// The supplied record is consumed without an additional allocation. The
+    /// selected limits are retained for later [`Self::blip`] and
+    /// [`Self::to_record`] calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the index, OfficeArt record, preferred kind, or
+    /// selected limits are invalid.
+    pub fn new(
+        index: u16,
+        picture_type: PictureBulletType,
+        unused: u8,
+        officeart_record: Vec<u8>,
+        limits: PictureBulletLimits,
+    ) -> Result<Self> {
+        limits.validate()?;
+        validate_bullet_index(index, limits)?;
+        validate_officeart_record(
+            picture_type,
+            &officeart_record,
+            limits.max_officeart_record_bytes,
+            limits.image_limits(),
+        )?;
+        Ok(Self::from_admitted(
+            index,
+            picture_type,
+            unused,
+            officeart_record,
+            limits,
+        ))
+    }
+
+    fn from_admitted(
+        index: u16,
+        picture_type: PictureBulletType,
+        unused: u8,
+        officeart_record: Vec<u8>,
+        limits: PictureBulletLimits,
+    ) -> Self {
+        Self {
+            index,
+            picture_type,
+            unused,
+            officeart_record,
+            limits,
+        }
+    }
+
     /// Parses the embedded `OfficeArt` image without copying its file data.
     ///
     /// # Errors
@@ -154,26 +243,24 @@ impl PictureBullet {
     ) -> Result<litchi_odraw::image::Blip<'data>> {
         use litchi_odraw::image::{Blip, Context, Delay, Entry};
 
+        let image_limits = self.limits.image_limits();
         let (record, consumed) =
-            litchi_odraw::Record::parse(&self.officeart_record, 0, litchi_odraw::Limits::default())
-                .map_err(|error| {
-                    Error::Corrupted(format!("Invalid picture-bullet BLIP: {error}"))
-                })?;
+            litchi_odraw::Record::parse(&self.officeart_record, 0, image_limits.records)?;
         if consumed != self.officeart_record.len() {
             return Err(Error::Corrupted(
                 "Picture-bullet BLIP was only partially parsed".to_string(),
             ));
         }
         let blip = if record.kind() == litchi_odraw::RecordKind::Bse {
-            let entry = Entry::parse(record, Default::default())?;
+            let entry = Entry::parse(record, image_limits)?;
             let context = delay.map_or_else(Context::new, |data| {
-                Context::new().with_delay(Delay::new(data, Default::default()))
+                Context::new().with_delay(Delay::new(data, image_limits))
             });
             entry.resolve(context)?.ok_or_else(|| {
                 Error::Corrupted("Picture-bullet FBSE is an empty slot".to_string())
             })?
         } else {
-            Blip::from_record(record, Default::default())?
+            Blip::from_record(record, image_limits)?
         };
         if !picture_type_matches(self.picture_type, blip.kind()) {
             return Err(Error::Corrupted(
@@ -194,7 +281,7 @@ impl PictureBullet {
     /// Returns an error if the index, embedded record, or preferred kind is
     /// outside the MS-PPT picture-bullet grammar.
     pub fn to_record(&self) -> Result<Record> {
-        self.to_record_with_limits(PictureBulletLimits::default())
+        self.to_record_with_limits(self.limits)
     }
 
     /// Validate and serialize this bullet under explicit finite limits.
@@ -210,6 +297,7 @@ impl PictureBullet {
             self.picture_type,
             &self.officeart_record,
             limits.max_officeart_record_bytes,
+            limits.image_limits(),
         )?;
         let payload_len =
             self.officeart_record.len().checked_add(2).ok_or_else(|| {
@@ -479,6 +567,7 @@ fn parse_picture_bullet_with_limits(
         picture_type,
         officeart_record,
         limits.max_officeart_record_bytes,
+        limits.image_limits(),
     )?;
 
     let mut owned_officeart = Vec::new();
@@ -487,12 +576,13 @@ fn parse_picture_bullet_with_limits(
         .map_err(|_err| Error::AllocationFailed("picture-bullet OfficeArt record"))?;
     owned_officeart.extend_from_slice(officeart_record);
 
-    Ok(PictureBullet {
-        index: record.instance,
+    Ok(PictureBullet::from_admitted(
+        record.instance,
         picture_type,
         unused,
-        officeart_record: owned_officeart,
-    })
+        owned_officeart,
+        limits,
+    ))
 }
 
 fn validate_bullet_index(index: u16, _limits: PictureBulletLimits) -> Result<()> {
@@ -508,6 +598,7 @@ fn validate_officeart_record(
     picture_type: PictureBulletType,
     officeart_record: &[u8],
     maximum: usize,
+    image_limits: litchi_odraw::image::Limits,
 ) -> Result<()> {
     if officeart_record.len() < 8 || officeart_record.len() > maximum {
         return Err(if officeart_record.len() > maximum {
@@ -517,16 +608,16 @@ fn validate_officeart_record(
         });
     }
     let (image_record, consumed) =
-        litchi_odraw::Record::parse(officeart_record, 0, litchi_odraw::Limits::default())?;
+        litchi_odraw::Record::parse(officeart_record, 0, image_limits.records)?;
     if consumed != officeart_record.len() {
         return Err(Error::Corrupted(
             "Picture-bullet OfficeArt record has an invalid size".to_string(),
         ));
     }
     let kind = if image_record.kind() == litchi_odraw::RecordKind::Bse {
-        litchi_odraw::image::Entry::parse(image_record, Default::default())?.kind()?
+        litchi_odraw::image::Entry::parse(image_record, image_limits)?.kind()?
     } else {
-        litchi_odraw::image::Blip::from_record(image_record, Default::default())?.kind()
+        litchi_odraw::image::Blip::from_record(image_record, image_limits)?.kind()
     };
     if !picture_type_matches(picture_type, kind) {
         return Err(Error::Corrupted(
@@ -687,7 +778,10 @@ fn collect_source_picture_bullet_references(
         .into_iter()
         .filter(|record| record.record_type == RecordType::PPDrawing)
     {
-        let drawing = crate::odraw::parse(&record.data, &crate::odraw::Limits::default())?;
+        let drawing = crate::odraw::parse(
+            &record.data,
+            &crate::odraw::limits_for_source(presentation.source_limits()),
+        )?;
         for shape in &drawing {
             if let Some(tags) = shape.programmable_tags_with_limits(shape_limits)?
                 && let Some(style) = tags.powerpoint9()
@@ -1981,6 +2075,40 @@ mod tests {
         )
         .unwrap();
         assert_eq!(embedded.get(2).unwrap().blip().unwrap().data(), b"");
+    }
+
+    #[test]
+    fn blip_reuses_the_picture_bullet_admission_limits() {
+        let limits = PictureBulletLimits {
+            max_officeart_record_bytes: 25,
+            ..PictureBulletLimits::default()
+        };
+        let default_bullet = PictureBulletCollection::parse(
+            &collection(png_bullet(3)),
+            &PictureBulletLimits::default(),
+        )
+        .unwrap()
+        .bullets
+        .pop()
+        .unwrap();
+        let mut bullet =
+            PictureBulletCollection::parse_with_limits(&collection(png_bullet(3)), limits)
+                .unwrap()
+                .bullets
+                .pop()
+                .unwrap();
+        assert_eq!(default_bullet, bullet);
+
+        // The source was admitted at the exact encoded size. Lowering the
+        // retained policy after admission proves that `blip()` does not
+        // silently reopen the record with OfficeArt's defaults.
+        bullet.limits.max_officeart_record_bytes = 24;
+        assert!(matches!(
+            bullet.blip(),
+            Err(Error::OfficeArt(
+                litchi_odraw::Error::ImageLimitExceeded { .. }
+            ))
+        ));
     }
 
     #[test]

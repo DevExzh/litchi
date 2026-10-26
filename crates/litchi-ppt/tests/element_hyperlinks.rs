@@ -160,3 +160,80 @@ fn invalid_links_are_refused() {
         assert!(edit.set_shape_hyperlink(target, Some(&click)).is_err());
     }
 }
+
+#[test]
+fn elements_exobjlist_hyperlink_add_reopens_with_chart_and_content_intact() {
+    let source_bytes = fixture("unified-ops/0294/elements.ppt");
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let source_presentation = source.presentation().unwrap();
+    let source_texts = texts(&source);
+    let source_hyperlinks = source_presentation.hyperlinks().unwrap();
+    let source_charts = source_presentation.charts().unwrap();
+    assert_eq!(source_charts.seen(), 1);
+    assert_eq!(source_charts.len(), 1);
+    assert_eq!(source_charts.failures().count(), 0);
+
+    let added = Click {
+        target: Target::Url("https://example.test/added".into()),
+        tooltip: None,
+    };
+    let mut edit = source.edit().unwrap();
+    edit.set_shape_hyperlink(
+        ShapeTarget::new(Position::new(0), Position::new(0)),
+        Some(&added),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let output = commit.package().to_bytes().unwrap();
+    let published = Package::from_bytes(&output).unwrap();
+
+    assert_eq!(click(&published, 0, 0), Some(added));
+    assert_eq!(texts(&published), source_texts);
+
+    let published_presentation = published.presentation().unwrap();
+    let published_hyperlinks = published_presentation.hyperlinks().unwrap();
+    for hyperlink in source_hyperlinks.hyperlinks {
+        assert!(published_hyperlinks.hyperlinks.contains(&hyperlink));
+    }
+    assert!(
+        published_hyperlinks
+            .hyperlinks
+            .iter()
+            .any(|hyperlink| hyperlink.target.as_deref() == Some("https://example.test/added"))
+    );
+
+    let published_charts = published_presentation.charts().unwrap();
+    assert_eq!(published_charts.seen(), source_charts.seen());
+    assert_eq!(published_charts.len(), source_charts.len());
+    assert_eq!(
+        published_charts.failures().count(),
+        source_charts.failures().count()
+    );
+    let source_chart = source_charts.get(0).unwrap();
+    let published_chart = published_charts.get(0).unwrap();
+    assert_eq!(published_chart.kind(), source_chart.kind());
+    assert_eq!(
+        published_chart.info().program(),
+        source_chart.info().program()
+    );
+    assert_eq!(published_chart.info().frame(), source_chart.info().frame());
+    assert_eq!(
+        published_chart.info().object_id(),
+        source_chart.info().object_id()
+    );
+    assert_eq!(
+        published_chart.info().persist_id(),
+        source_chart.info().persist_id()
+    );
+
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        source_bytes
+    );
+}

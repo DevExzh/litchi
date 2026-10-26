@@ -1,11 +1,10 @@
 use litchi_odraw::shape::Shape;
 use litchi_odraw::{Record, RecordKind};
 
-use crate::package::{Error, Result};
+use crate::package::{Error, Result, SourceLimitKind};
 
 pub(super) const CLIENT_DATA_RAW_KIND: u16 = 0xf011;
 pub(super) const CLIENT_TEXTBOX_RAW_KIND: u16 = 0xf00d;
-pub(super) const MAX_HOST_RECORDS: u32 = 1_000_000;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RawRecord<'data> {
@@ -20,15 +19,17 @@ pub(super) struct RawRecords<'data> {
     data: &'data [u8],
     offset: usize,
     seen: u32,
+    max_records: u32,
     failed: bool,
 }
 
 impl<'data> RawRecords<'data> {
-    pub(super) fn new(data: &'data [u8]) -> Self {
+    pub(super) fn new(data: &'data [u8], max_records: u32) -> Self {
         Self {
             data,
             offset: 0,
             seen: 0,
+            max_records,
             failed: false,
         }
     }
@@ -42,10 +43,14 @@ impl<'data> Iterator for RawRecords<'data> {
             return None;
         }
         self.seen = match self.seen.checked_add(1) {
-            Some(seen) if seen <= MAX_HOST_RECORDS => seen,
-            _ => {
+            Some(seen) if seen <= self.max_records => seen,
+            Some(seen) => {
                 self.failed = true;
-                return Some(Err(corrupted("Host payload exceeds the PPT record limit")));
+                return Some(Err(event_limit(seen as usize, self.max_records)));
+            },
+            None => {
+                self.failed = true;
+                return Some(Err(event_limit(usize::MAX, self.max_records)));
             },
         };
         let Some(header_end) = self.offset.checked_add(8) else {
@@ -122,14 +127,23 @@ pub(super) fn advance(offset: usize, consumed: usize, context: &str) -> Result<u
         .ok_or_else(|| corrupted(&format!("{context} offset overflow")))
 }
 
-pub(super) fn visit_host_record(records: &mut u32) -> Result<()> {
-    *records = records
-        .checked_add(1)
-        .ok_or_else(|| corrupted("Host payload record count overflow"))?;
-    if *records > MAX_HOST_RECORDS {
-        return Err(corrupted("Host payload exceeds the PPT record limit"));
+pub(super) fn visit_host_record(records: &mut u32, max_records: u32) -> Result<()> {
+    *records = match records.checked_add(1) {
+        Some(value) => value,
+        None => return Err(event_limit(usize::MAX, max_records)),
+    };
+    if *records > max_records {
+        return Err(event_limit(*records as usize, max_records));
     }
     Ok(())
+}
+
+fn event_limit(observed: usize, maximum: u32) -> Error {
+    Error::Limit {
+        kind: SourceLimitKind::Events,
+        observed,
+        maximum: maximum as usize,
+    }
 }
 
 pub(super) fn corrupted(message: &str) -> Error {
