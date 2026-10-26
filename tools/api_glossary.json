@@ -20880,6 +20880,111 @@
           "replacement": "use media::asset::Limits; no host `Media` prefix (record 0375)"
         },
         {
+          "name": "ChartSeriesStroke",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::Stroke; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesStrokePattern",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::StrokePattern; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesStrokeKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::StrokeFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesFillKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::FillFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesConnectionLine",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::ConnectionLine; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesConnectionLineKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::ConnectionLineFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbol",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::Symbol; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolShape",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolShape; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolSize",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolSize; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolFill",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolFill; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolFillKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolFillFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolOutlineKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolOutlineFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendline",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::Trendline; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendlineType",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::TrendlineType; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendlinePolynomialOrder",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::PolynomialOrder; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendlineMovingAveragePeriod",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::MovingAveragePeriod; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeFill",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::Fill; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeImageFill",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::Image; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeImageFillTechnique",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::ImageTechnique; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeImageDataIdentifier",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::ImageData; no host prefix (record 0375)"
+        },
+        {
           "name": "LineSegment",
           "scope": "litchi_iwa_common",
           "replacement": "use shape::line::Segment (record 0375)"

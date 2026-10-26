@@ -15,6 +15,7 @@ pub mod number_format;
 pub mod pie;
 pub mod radar;
 pub mod reference_line;
+pub mod series;
 pub mod series_labels;
 
 pub use arrangement::ChartArrangement;
