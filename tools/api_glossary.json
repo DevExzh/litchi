@@ -29068,6 +29068,42 @@
           "inputs": ["shape_info", "replacement", "width", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::style_reference",
+          "inputs": ["shape_info", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::color",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::stroke",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::fill",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::shape_style",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::parent",
+          "inputs": ["source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
         }
       ]
     },

@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_style_codec.rs");
     println!("cargo:rerun-if-changed=src/shape_style_codec.rs");
+    println!("cargo:rerun-if-changed=src/shape_style_codec/native.rs");
     println!("cargo:rerun-if-changed=src/chart_data_codec/rewrite.rs");
     println!("cargo:rerun-if-changed=src/chart_grid_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");

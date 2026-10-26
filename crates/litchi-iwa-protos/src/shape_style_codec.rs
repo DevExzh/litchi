@@ -23,6 +23,7 @@ const WIRE_LENGTH_DELIMITED: u8 = 2;
 const WIRE_FIXED32: u8 = 5;
 const SUPER_FIELD: u32 = 1;
 const DRAWABLE_GEOMETRY_FIELD: u32 = 1;
+const SHAPE_STYLE_FIELD: u32 = 2;
 const SHAPE_PATH_SOURCE_FIELD: u32 = 3;
 const GEOMETRY_POSITION_FIELD: u32 = 1;
 const GEOMETRY_SIZE_FIELD: u32 = 2;
@@ -221,6 +222,31 @@ pub fn line(shape_info: &[u8], limits: Limits) -> Result<Option<Line>, Error> {
     }))
 }
 
+/// The style object of a `TSWP.ShapeInfoArchive` payload
+/// (`TSD.ShapeArchive.style`; 0 reads as absent).
+///
+/// # Errors
+///
+/// [`Error::Malformed`] when the shape is absent; framing, duplicate-field,
+/// wire-type and limit errors.
+pub fn style_reference(shape_info: &[u8], limits: Limits) -> Result<Option<u64>, Error> {
+    check_bytes(shape_info.len(), limits)?;
+    let mut budget = Budget::new(limits);
+    let Some((_, shape)) = message(shape_info, SUPER_FIELD, &mut budget)? else {
+        return Err(Error::Malformed {
+            reason: "the shape info has no shape",
+        });
+    };
+    let Some((_, reference)) = message(shape, SHAPE_STYLE_FIELD, &mut budget)? else {
+        return Ok(None);
+    };
+    let Some(identifier) = singular(reference, 1, &mut budget)? else {
+        return Ok(None);
+    };
+    require_wire_type(&identifier, WIRE_VARINT)?;
+    Ok((identifier.varint != 0).then_some(identifier.varint))
+}
+
 /// Apply `edit` to the payload of field `number` (which must be present) and
 /// splice the result back; `None` when nothing changed.
 fn nested(
@@ -417,6 +443,8 @@ pub fn rewrite_line<'source>(
         None => Cow::Borrowed(shape_info),
     }))
 }
+
+pub mod native;
 
 #[cfg(test)]
 mod tests;
