@@ -8,6 +8,8 @@ use prost::Message;
 
 use litchi_iwa_common::media::Type as MediaType;
 
+use litchi_iwa_common::chart::series;
+
 use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
@@ -79,12 +81,12 @@ struct SymbolFillFields {
 
 impl ChartSeriesSymbolFillKind {
     pub fn for_chart_kind(kind: Kind) -> Result<Self> {
-        match kind {
-            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
-            Kind::Bubble2d => Ok(Self::Bubble2d),
-            Kind::Line2d => Ok(Self::Line2d),
-            Kind::Radar2d => Ok(Self::Radar2d),
-            Kind::Scatter2d => Ok(Self::Scatter2d),
+        match series::SymbolFillFamily::for_chart_kind(kind) {
+            Some(series::SymbolFillFamily::Area2d) => Ok(Self::Area2d),
+            Some(series::SymbolFillFamily::Bubble2d) => Ok(Self::Bubble2d),
+            Some(series::SymbolFillFamily::Line2d) => Ok(Self::Line2d),
+            Some(series::SymbolFillFamily::Radar2d) => Ok(Self::Radar2d),
+            Some(series::SymbolFillFamily::Scatter2d) => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol fill family"
             ))),

@@ -5,6 +5,7 @@
 //! native applications may materialize a rectangle whose zero extents retain
 //! automatic measurement while fixing the legend origin.
 
+use litchi_iwa_common::chart::legend;
 use prost::Message;
 
 use crate::archive::RawMessage;
@@ -22,7 +23,8 @@ const POINT_Y_FIELD: u32 = 2;
 const SIZE_WIDTH_FIELD: u32 = 1;
 const SIZE_HEIGHT_FIELD: u32 = 2;
 
-/// A finite point-valued legend-frame coordinate in native chart units.
+/// A finite point-valued legend-frame coordinate in native chart units (the
+/// shared `litchi_iwa_common::chart::legend::Coordinate`, record 0375).
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct ChartLegendCoordinate(f32);
 
@@ -32,12 +34,9 @@ impl ChartLegendCoordinate {
 
     /// Construct a finite coordinate.
     pub fn new(points: f32) -> Result<Self> {
-        if !points.is_finite() {
-            return Err(Error::InvalidFormat(
-                "chart legend coordinate must be finite".to_owned(),
-            ));
-        }
-        Ok(Self(points))
+        legend::Coordinate::new(points)
+            .map(|value| Self(value.points()))
+            .map_err(|_| Error::InvalidFormat("chart legend coordinate must be finite".to_owned()))
     }
 
     /// Return the coordinate in native chart units.
@@ -54,7 +53,8 @@ impl TryFrom<f32> for ChartLegendCoordinate {
     }
 }
 
-/// A finite, non-negative legend-frame extent in native chart units.
+/// A finite, non-negative legend-frame extent in native chart units (the
+/// shared `litchi_iwa_common::chart::legend::Extent`).
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct ChartLegendExtent(f32);
 
@@ -64,12 +64,13 @@ impl ChartLegendExtent {
 
     /// Construct a finite, non-negative extent.
     pub fn new(points: f32) -> Result<Self> {
-        if !points.is_finite() || points < 0.0 {
-            return Err(Error::InvalidFormat(
-                "chart legend extent must be finite and non-negative".to_owned(),
-            ));
-        }
-        Ok(Self(points))
+        legend::Extent::new(points)
+            .map(|value| Self(value.points()))
+            .map_err(|_| {
+                Error::InvalidFormat(
+                    "chart legend extent must be finite and non-negative".to_owned(),
+                )
+            })
     }
 
     /// Return the extent in native chart units.

@@ -26,6 +26,11 @@
 | `a408e00fbd`, `9bac132398` | `litchi_pages::bookmark` — `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add, update, remove}` by position or name; on W1-D's `ranged` and `smart_field` engines | 4 |
 | `c0ec0bac27`, `9bac132398` | `litchi_pages::date_time` — `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add, insert, update, remove}` (insert adds the display text) | 5 |
 | `a9d2af35ca`, `de1dbad71e` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}`; on W1-D's `number_attachment` engine | 6 |
+| `658c8bb696` | `litchi_pages::drawable::caption` — `Package::{body_drawable_caption, edit_body_drawable_caption, apply_body_drawable_caption}` over `DrawableSelector` + `Kind::{Title, Caption}`; `Edit::{set, clear}`. A present label's storage text is rewritten; an absent label gets the native inline graph from the shared `keynote_chart_caption_graph_codec` (style, CaptionInfo, storage, placement; the payloads the host writes); clearing points the drawable at a fresh stand-in and keeps the old graph. New objects get deterministic UUIDs in the document component and raise the watermark (`body_storage_objects::Metadata::registered`) | 15 |
+| `b8116873a5` | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
+| `26ce96d0f7` | parity for existing leaf families: host `append_section`, `remove_section`, `sections` → `Package::{edit_section_lifecycle, sections}` (tier B); host `remove_table` (already delegating) → `Package::edit_body_table_deletion` (tier A) | 4 |
+| `a71731f9f2` | `litchi_pages::drawable::lifecycle` — `Package::{edit_body_media, apply_body_media}`; `Edit::remove(DrawableSelector)` for images, movies and audio: deletes the U+FFFC and attachment entry, the drawable's z-order entry, the drawable/label/attachment graph, its data-reference owners, UUIDs and watermark suffix, and every data asset nothing references any more (`Data/` member and `DataInfo`); a commented drawable is refused. **Host defect fix**: media removal prunes the deleted attachment from the body storage header (§3, item 4) | 3 |
+| (media duplicate commit, below) | `drawable::lifecycle` `Edit::duplicate(DrawableSelector, TextPosition)` for images, movies and audio: the host's graph clone (fresh identifiers in graph order, reference remaps by message type, CaptionInfo through the shared codec), the 12 pt (audio 30 pt) frame and attachment offset, the new U+FFFC and attachment entry, the z-order append, UUIDs and shared data-reference owners | 3 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -58,7 +63,12 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | table values and reads | 4 + one read sweep over four native fixtures | A | reads: `body-table-cells-native-receipt.json`; writes queued |
 | bookmarks | add (B), update (A), remove (A) | A/B | queued |
 | Date & Time fields | add (B), insert (B), update (A), remove (A) | A/B | queued |
-| number attachments | body insert/update, first-header insert/update | A | queued |
+| number attachments | body insert/update/remove, first-header insert/update/remove | A | queued |
+| titles and captions (image, movie, shape × title, caption) | set: create on an unlabelled drawable, then replace on a host-labelled one; remove on a host-labelled one | B (fresh UUIDs; the replace runs are byte-identical) | queued |
+| section append/remove, sections read | 2 | B (UUIDs, save token) | queued |
+| body-table remove | 1 | A | queued |
+| media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
+| media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -79,7 +89,10 @@ corpus has no native file with them.
 
 | Route | Divergence | Owner |
 |---|---|---|
-| `remove_body_number_attachment` (and the header/footer remove) | the host deletes the U+FFFC and its table entry but keeps the attachment object and the storage header's reference to it (its pruning proof fails when the header lists references the payload does not count); the leaf deletes the object with its metadata — `pages_body_number_attachment_remove_divergence_is_reported` | W1-B decides with the owner whether the leaf mirrors the host or the host defect is fixed |
+| `add_table` | the leaf `table::creation` family (record 0329) writes a different graph from the host (random table UUID, its own identifier order, formula owner type 6267 against 4008) — `pages_body_table_add_divergence_is_reported` | W1-B follow-up: align the leaf creation with the host graph, or document the leaf graph as the native one and retire the host |
+
+The number-attachment removal divergence pinned in the first slice was a
+host defect and is fixed (§3, item 3).
 
 ## 3. Host defects found
 
@@ -92,7 +105,29 @@ corpus has no native file with them.
    writer `table_write::header_adjust`; a source that never counted the
    column keeps its bucket. Two host tests that pinned the old counts were
    updated. Both changes are queued for macOS on the three set-cell routes.
-3. **Number-attachment removal** keeps an orphan object (§2), not fixed.
+3. **Number-attachment removal kept an orphan object.** The host deleted
+   the U+FFFC and its table entry, but its text-rewrite pruning proof fails
+   when the storage header lists references the payload does not count
+   (application-saved storages do), so the attachment object, the header
+   reference to it and its metadata stayed. Fixed for Pages storages
+   (`text::number_attachment::prune_exclusive_number_attachment`, reached
+   through `text::Draft::remove_text_number_attachment_pruning` from the
+   three Pages remove routes): after the existing exclusivity proof the
+   header reference is dropped and the object deleted through the existing
+   `remove_unreferenced_number_attachment_objects` (external references, UUID,
+   watermark suffix). The shared Keynote/Numbers text route is unchanged
+   (W1-D's leaf matches it). Body and first-header removal are now tier A
+   (`pages_body_number_attachment_remove_parity`,
+   `pages_header_number_attachment_remove_parity`); queued for macOS.
+
+4. **Media removal failed on native files.** Removing a body image,
+   movie or audio clip deletes the U+FFFC through the shared text rewrite,
+   which leaves the attachment in the body storage header when the header
+   lists references the payload does not count (the item 3 cause);
+   the host's own "remains referenced" check then refused the removal
+   (`image-adjustments-native.pages`). Fixed in the host
+   (`pages::editor::prune_removed_body_attachment`, called by the three
+   remove routes); queued for macOS.
 
 ## 4. Performance
 
@@ -114,6 +149,15 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | number attachment insert (`basic`) | 120,964,310 | 86,901,649 | — | −28.2% (before reopen) |
 | table cell value (`body-table-catalog-native`) | 2,532,811,983 | 78,390,305 | 78,390,305 | −96.9% |
 | table cell values, 16-cell batch | 2,788,732,498 | 110,195,326 | — | −96.1% (before reopen) |
+| number attachment remove (`basic` + host page count) | 159,628,677 | — | 52,679,103 | −67.0% |
+| image title create (`image-adjustments-native`) | 546,895,891 | — | 85,626,043 | −84.3% |
+| image caption remove (host-labelled image) | 710,021,022 | — | 85,975,944 | −87.9% |
+| section append (`body-sections-unicode`) | 589,774,024 | — | 127,211,178 | −78.4% |
+| section remove | 498,795,655 | — | 137,862,844 | −72.4% |
+| body-table remove (`body-table-catalog-native`) | 2,246,224,218 | — | 170,815,958 | −92.4% |
+| image remove (`image-adjustments-native`) | 659,210,379 | — | 66,936,803 | −89.9% |
+| movie remove (source-built) | 36,674,391 | — | 5,525,855 | −84.9% |
+| image duplicate (`image-adjustments-native`) | 511,702,845 | — | 91,585,043 | −82.1% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -153,10 +197,9 @@ Both pre-commit size checks printed nothing for every commit.
 
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
-| number-attachment removal | 3 | owner choice (§2) |
-| text-box attachments and date-time fields | 4 + 5 | text boxes are W2-B |
+| text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
+| `insert_section` (split at a body position) and `add_table` | 2 | the leaf section add appends an empty section after the selected one (no split); the leaf table creation (record 0329) writes a different graph from the host's `add_table` (random table UUID, its own identifier order, formula-owner type 6267 against the host's 4008), so both stay host-only until one side is aligned |
 | media lifecycle (add, duplicate, remove, replace data/poster) | 16 | next; donor `refactor/pages-media-lifecycle-admission-20261024` |
-| image, movie and shape titles/captions | 15 | next |
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
 | table cell formats, rich text, appearance, conditional highlights, formulas, topology, duplicate/resize, sort execution, comment writes | ~150 | W1-A engines (topology engine landed; formats/styles follow), W1-F formula caches, W1-D paragraph/list engines |
 | Builder `language`, `locale`, `body_table` | 6 | next (W1-C did the Keynote pair) |

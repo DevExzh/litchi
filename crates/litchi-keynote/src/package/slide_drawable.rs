@@ -2747,6 +2747,18 @@ pub(in crate::package) fn outgoing_references(
     stage::outgoing(workspace, identifier)
 }
 
+/// The `TSD.DrawableArchive` payload of a new drawable (frame with native
+/// default flags, square text wrap, unlocked, with title and caption
+/// stand-ins), shared with chart creation.
+pub(in crate::package) fn new_drawable_payload(
+    geometry: Geometry,
+    slide: u64,
+    title: u64,
+    caption: u64,
+) -> Vec<u8> {
+    author::drawable_archive(geometry, slide, title, caption).finish()
+}
+
 /// Append a drawable to its slide's owned list and z-order (front).
 pub(in crate::package) fn attach_drawable(
     workspace: &mut Workspace<'_>,

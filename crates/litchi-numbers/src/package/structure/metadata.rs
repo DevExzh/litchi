@@ -287,6 +287,32 @@ pub(in crate::package) struct Transition {
 }
 
 impl Transition {
+    /// Record that component `source` no longer references `object` in
+    /// component `target` (a no-op without that registry edge); an edge
+    /// this transition added is withdrawn.
+    pub(in crate::package) fn remove_reference(
+        &mut self,
+        registry: &Registry,
+        source: u64,
+        target: u64,
+        object: u64,
+    ) -> FaultResult<()> {
+        self.external_additions.retain(|external| {
+            !(external.source == source && external.target == target && external.object == object)
+        });
+        for external in &registry.externals {
+            if external.source == source
+                && external.target == target
+                && external.object == object
+                && !self.external_removals.contains(external)
+            {
+                reserve(&mut self.external_removals, 1)?;
+                self.external_removals.push(*external);
+            }
+        }
+        Ok(())
+    }
+
     /// Lower the watermark over `objects` when the last registered
     /// identifier is one of them (record 0370).
     pub(in crate::package) fn release_suffix(&mut self, objects: &[u64]) -> FaultResult<()> {
@@ -424,6 +450,7 @@ pub(super) fn apply(
         .saturating_add(transition.external_removals.len())
         .saturating_add(transition.external_additions.len());
     let options = options(working, source.len(), additions);
+    let mut restore = None;
     let output = if transition.is_empty() && last == current {
         None
     } else if transition.is_empty() {
@@ -501,6 +528,23 @@ pub(super) fn apply(
         }
         let removes = !uuid_removals.is_empty() || !external_removals.is_empty();
         let adds = !external_additions.is_empty() || !uuid_additions.is_empty();
+        // The addition batches require a rising watermark; a transaction
+        // that adds registry records without allocating (a reference to an
+        // existing style, record 0370b) passes one step up and the
+        // watermark is put back to `last` below.
+        let unraised = adds && last <= current;
+        if unraised {
+            restore = Some(last);
+        }
+        let last = if unraised {
+            current.checked_add(1).ok_or(Fault::Limit {
+                kind: FaultLimit::Identifiers,
+                observed: u64::MAX,
+                maximum: u64::MAX,
+            })?
+        } else {
+            last
+        };
         let output = if removes && !adds && last <= current {
             rewrite_package_metadata_removals_and_save_tokens(
                 source,
@@ -541,6 +585,10 @@ pub(super) fn apply(
         Some(output) => output.into_bytes(),
         None => super::copy_bytes(source)?,
     };
+    if let Some(last) = restore {
+        data = litchi_iwa_common::wire::patch_varint_field(&data, 1, true, Some(last))
+            .map_err(|error| super::map_wire(&error))?;
+    }
     if !emptied.is_empty() {
         let mut selectors = Vec::new();
         reserve(&mut selectors, emptied.len())?;

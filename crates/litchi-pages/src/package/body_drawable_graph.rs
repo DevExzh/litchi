@@ -247,6 +247,8 @@ pub(crate) struct Root {
 /// One drawable attachment of the body, in text-flow order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Anchor {
+    /// The UTF-16 index of the anchoring U+FFFC in the body text.
+    pub(crate) character_index: u32,
     pub(crate) attachment: NonZeroU64,
     pub(crate) attachment_message: usize,
     pub(crate) drawable: NonZeroU64,
@@ -326,7 +328,7 @@ pub(crate) fn resolve_body(index: &ObjectIndex<'_>, budget: &mut Budget) -> Grap
             amount: entries.len(),
         })?;
     let mut drawables = std::collections::HashSet::new();
-    for (_, attachment) in entries {
+    for (character_index, attachment) in entries {
         let located = index.get(attachment)?;
         let Some((attachment_message, message)) =
             unique_optional_message(located.object, DRAWABLE_ATTACHMENT_MESSAGE_TYPE)?
@@ -347,12 +349,66 @@ pub(crate) fn resolve_body(index: &ObjectIndex<'_>, budget: &mut Budget) -> Grap
             return Err(GraphError::InvalidSource);
         }
         anchors.push(Anchor {
+            character_index,
             attachment,
             attachment_message,
             drawable,
         });
     }
     Ok(Body { root, anchors })
+}
+
+/// The document root's drawable z-order object.
+pub(crate) fn root_zorder(
+    package: &Package,
+    budget: &mut Budget,
+) -> GraphResult<Option<NonZeroU64>> {
+    let document = package
+        .state
+        .source
+        .components()
+        .get(DOCUMENT_COMPONENT)
+        .ok_or(GraphError::InvalidSource)?;
+    let root = document
+        .archive()
+        .object(ROOT_OBJECT_IDENTIFIER)
+        .ok_or(GraphError::InvalidSource)?;
+    let (_, root_message) = unique_message(root, ROOT_MESSAGE_TYPE)?;
+    let payload = root_message.data.as_slice();
+    let options = body_options(budget, payload)?;
+    budget.work(payload.len())?;
+    let facts = pages_body_codec::decode_document_root(payload, options)
+        .map_err(|_| GraphError::InvalidSource)?;
+    Ok(facts
+        .drawables_zorder()
+        .map(|reference| reference.identifier()))
+}
+
+/// The document root's theme and document language.
+pub(crate) fn root_theme(
+    package: &Package,
+    budget: &mut Budget,
+) -> GraphResult<(Option<NonZeroU64>, Option<String>)> {
+    let document = package
+        .state
+        .source
+        .components()
+        .get(DOCUMENT_COMPONENT)
+        .ok_or(GraphError::InvalidSource)?;
+    let root = document
+        .archive()
+        .object(ROOT_OBJECT_IDENTIFIER)
+        .ok_or(GraphError::InvalidSource)?;
+    let (_, root_message) = unique_message(root, ROOT_MESSAGE_TYPE)?;
+    let payload = root_message.data.as_slice();
+    let options = body_options(budget, payload)?;
+    budget.work(payload.len())?;
+    let facts = pages_body_codec::decode_document_root(payload, options)
+        .map_err(|_| GraphError::InvalidSource)?;
+    Ok((
+        facts.theme().map(|reference| reference.identifier()),
+        facts.document_language().map(str::to_owned),
+    ))
 }
 
 fn body_options(budget: &Budget, source: &[u8]) -> GraphResult<pages_body_codec::DecodeOptions> {
@@ -580,6 +636,18 @@ pub(crate) fn publish_archives(
     source: &Package,
     archives: Vec<(Arc<str>, Archive)>,
 ) -> GraphResult<Package> {
+    publish_changes(source, archives, &[], &[])
+}
+
+/// Publish a candidate in which the given component archives changed, the
+/// given members were inserted (name, bytes) and the named members deleted,
+/// and reopen it under the source's limits.
+pub(crate) fn publish_changes(
+    source: &Package,
+    archives: Vec<(Arc<str>, Archive)>,
+    insertions: &[(&str, &[u8])],
+    deletions: &[&str],
+) -> GraphResult<Package> {
     let limits = source.state.source.limits();
     let archive_limits = limits
         .effective_archive_limits()
@@ -606,7 +674,15 @@ pub(crate) fn publish_archives(
         .state
         .source
         .package()
-        .reassemble_to_bytes(&edits, limits)
+        .reassemble_with_changes_to_bytes(
+            &insertions
+                .iter()
+                .map(|(name, data)| litchi_iwa_archive::package::EntryInsertion::new(name, data))
+                .collect::<Vec<_>>(),
+            &edits,
+            deletions,
+            limits,
+        )
         .map_err(map_archive_error)?;
     if output.len() as u64 > limits.max_input_bytes() {
         return Err(GraphError::Limit {

@@ -51,6 +51,7 @@ mod save;
 mod sheet;
 pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_order;
+mod storage_list;
 mod structure;
 #[allow(
     dead_code,
@@ -67,6 +68,7 @@ pub(crate) mod table_cell_display_format_native;
 pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;
+pub(crate) mod table_cell_list;
 pub(crate) mod table_cell_number_format;
 pub(crate) mod table_cell_percentage_format;
 pub(crate) mod table_cell_pop_up_menu;

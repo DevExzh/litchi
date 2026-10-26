@@ -586,6 +586,42 @@ pub fn tile_set_cell(
     cell: Option<&[u8]>,
     limits: &Limits,
 ) -> Result<TileCellWrite> {
+    tile_set_cell_placed(tile, local_row, column, columns, cell, false, limits)
+}
+
+/// [`tile_set_cell`], writing a new row after every stored row in field
+/// order: after the last row record, before the tile's storage-version
+/// fields, as the Numbers host writer's encoder places it (record 0370b).
+/// [`tile_set_cell`] appends such a row after them, as the Pages and
+/// Keynote host writers do.
+///
+/// # Errors
+///
+/// As [`tile_set_cell`].
+pub fn tile_set_cell_in_field_order(
+    tile: &[u8],
+    local_row: u32,
+    column: u32,
+    columns: u32,
+    cell: Option<&[u8]>,
+    limits: &Limits,
+) -> Result<TileCellWrite> {
+    tile_set_cell_placed(tile, local_row, column, columns, cell, true, limits)
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "one row rewrite: decode, splice, new row and row count"
+)]
+fn tile_set_cell_placed(
+    tile: &[u8],
+    local_row: u32,
+    column: u32,
+    columns: u32,
+    cell: Option<&[u8]>,
+    field_order: bool,
+    limits: &Limits,
+) -> Result<TileCellWrite> {
     if single_varint(tile, 6, limits)? != Some(5) || single_varint(tile, 7, limits)? != Some(1) {
         return Err(WriteError::Unsupported);
     }
@@ -725,7 +761,30 @@ pub fn tile_set_cell(
     let mut removed = false;
     let mut output = Vec::new();
     reserve(&mut output, tile.len().min(limits.max_output_bytes()))?;
-    for field in fields(tile, limits)? {
+    // In field order, a row after every stored row follows the last row
+    // record (or, in a tile without rows, precedes the storage-version
+    // fields); otherwise it goes last.
+    let all_fields = fields(tile, limits)?;
+    let trailing = if field_order {
+        all_fields
+            .iter()
+            .rposition(|field| field.number == 5)
+            .map(|last| last + 1)
+            .or_else(|| all_fields.iter().position(|field| field.number > 5))
+            .unwrap_or(all_fields.len())
+    } else {
+        all_fields.len()
+    };
+    for (position, field) in all_fields.into_iter().enumerate() {
+        if position == trailing
+            && !exists
+            && insert_before.is_none()
+            && let Some(cell) = cell
+        {
+            let row = new_row(cell)?;
+            append(&mut output, &row, limits)?;
+            inserted = true;
+        }
         if field.number == 5 {
             let this = row_index;
             row_index += 1;

@@ -4,6 +4,8 @@
 //! in sparse series non-style objects. Line and radar charts default to
 //! straight segments; scatter charts default to no connecting lines.
 
+use litchi_iwa_common::chart::series;
+
 use crate::charts::Kind;
 use crate::charts::series_non_style::{
     GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD, NewChartSeriesNonStyleBase,
@@ -65,10 +67,10 @@ pub enum ChartSeriesConnectionLineKind {
 impl ChartSeriesConnectionLineKind {
     /// Resolve the native field family used by a chart kind.
     pub fn for_chart_kind(kind: Kind) -> Result<Self> {
-        match kind {
-            Kind::Line2d => Ok(Self::Line2d),
-            Kind::Radar2d => Ok(Self::Radar2d),
-            Kind::Scatter2d => Ok(Self::Scatter2d),
+        match series::ConnectionLineFamily::for_chart_kind(kind) {
+            Some(series::ConnectionLineFamily::Line2d) => Ok(Self::Line2d),
+            Some(series::ConnectionLineFamily::Radar2d) => Ok(Self::Radar2d),
+            Some(series::ConnectionLineFamily::Scatter2d) => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series connection-line family"
             ))),

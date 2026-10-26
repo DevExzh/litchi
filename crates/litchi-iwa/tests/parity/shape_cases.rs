@@ -210,3 +210,35 @@ fn pages_line_segment_parity() -> TestResult {
         Evidence::Queued,
     )
 }
+
+#[inline(never)]
+fn host_line_route(
+    source: &[u8],
+    target: Target,
+    line: u64,
+    segment: Segment,
+) -> TestResult<Vec<u8>> {
+    host_move(source, target, line, segment)
+}
+
+#[inline(never)]
+fn leaf_line_route(source: &[u8], line: u64, segment: Segment) -> TestResult<Vec<u8>> {
+    engine_move(source, line, segment)
+}
+
+/// ABBA cost probe of the line move route (record 0375 §5); toggle
+/// `*shape_cases::host_line_route*` or `*shape_cases::leaf_line_route*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn line_move_cost_abba() -> TestResult {
+    let segment = Segment::new(point(40.0, 300.0), point(10.0, 90.0))?;
+    for format in [Format::Keynote, Format::Numbers, Format::Pages] {
+        let (input, target, line) = input(format)?;
+        let source = input.bytes.as_slice();
+        std::hint::black_box(host_line_route(source, target, line, segment)?);
+        std::hint::black_box(leaf_line_route(source, line, segment)?);
+        std::hint::black_box(leaf_line_route(source, line, segment)?);
+        std::hint::black_box(host_line_route(source, target, line, segment)?);
+    }
+    Ok(())
+}

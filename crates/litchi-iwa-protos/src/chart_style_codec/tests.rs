@@ -58,7 +58,7 @@ fn extension_of(data: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
-fn float(field: u32, value: Option<f32>) -> Write {
+fn float(field: u32, value: Option<f32>) -> Write<'static> {
     Write::Float { field, value }
 }
 
@@ -809,5 +809,54 @@ fn property_rules_clear_defaults_and_pick_archives() -> TestResult {
         property::Scale3d::Bar.field(),
         chart_non_style::BAR_SCALE_3D
     );
+    Ok(())
+}
+
+#[test]
+fn legend_frames_rewrite_in_place() -> TestResult {
+    let chart = tsch::ChartArchive {
+        legend_frame: Some(tsch::RectArchive {
+            origin: tsp::Point { x: 1.0, y: 2.0 },
+            size: tsp::Size {
+                width: 3.0,
+                height: 4.0,
+            },
+        }),
+        ..Default::default()
+    };
+    let mut drawable = tsch::ChartDrawableArchive::default().encode_to_vec();
+    drawable.extend(length_delimited(EXTENSION_FIELD, &chart.encode_to_vec()));
+    assert_eq!(
+        super::legend_frame(&drawable, Limits::DEFAULT)?,
+        Some([1.0, 2.0, 3.0, 4.0])
+    );
+    let moved =
+        super::rewrite_legend_frame(&drawable, Some([5.0, 6.0, 0.0, 8.0]), Limits::DEFAULT)?;
+    assert_eq!(moved.as_bytes().len(), drawable.len());
+    let mut expected_chart = chart.clone();
+    expected_chart.legend_frame = Some(tsch::RectArchive {
+        origin: tsp::Point { x: 5.0, y: 6.0 },
+        size: tsp::Size {
+            width: 0.0,
+            height: 8.0,
+        },
+    });
+    let mut expected = tsch::ChartDrawableArchive::default().encode_to_vec();
+    expected.extend(length_delimited(
+        EXTENSION_FIELD,
+        &expected_chart.encode_to_vec(),
+    ));
+    assert_eq!(moved.as_bytes(), expected.as_slice());
+    let removed = super::rewrite_legend_frame(&drawable, None, Limits::DEFAULT)?;
+    assert_eq!(
+        super::legend_frame(removed.as_bytes(), Limits::DEFAULT)?,
+        None
+    );
+    let restored = super::rewrite_legend_frame(
+        removed.as_bytes(),
+        Some([1.0, 2.0, 3.0, 4.0]),
+        Limits::DEFAULT,
+    )?;
+    assert_eq!(restored.as_bytes(), drawable.as_slice());
     Ok(())
 }

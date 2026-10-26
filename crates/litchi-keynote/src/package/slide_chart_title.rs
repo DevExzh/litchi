@@ -1140,7 +1140,7 @@ fn map_candidate_verification_error(error: Error) -> Error {
     }
 }
 
-fn resolve_slide_position(
+pub(super) fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
 ) -> Result<Position, Error> {

@@ -19,8 +19,9 @@ use litchi_iwa_common::wire::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject};
 use litchi_iwa_protos::package_metadata_codec::{
-    self, Batch, ComponentDescriptor, ExternalReferenceDescriptor, ObjectUuidDescriptor,
-    PackageMetadataVisitor, RewriteError as MetadataError, RewriteOptions,
+    self, Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceDescriptor,
+    ObjectUuidAddition, ObjectUuidDescriptor, PackageMetadataVisitor,
+    RewriteError as MetadataError, RewriteOptions, UuidBits,
 };
 
 use super::Package;
@@ -142,6 +143,9 @@ pub(crate) struct Metadata {
     max_registered: u64,
     components: Vec<(u64, String, bool)>,
     uuids: Vec<(u64, u64)>,
+    uuid_bits: std::collections::HashSet<(u64, u64)>,
+    /// The object holding the `TSP.DataMetadataMap`, if any.
+    pub(crate) data_metadata_map: Option<u64>,
 }
 
 #[derive(Default)]
@@ -149,6 +153,8 @@ struct FactsVisitor {
     max: u64,
     components: Vec<(u64, String, bool)>,
     uuids: Vec<(u64, u64)>,
+    uuid_bits: std::collections::HashSet<(u64, u64)>,
+    data_metadata_map: Option<u64>,
 }
 
 impl PackageMetadataVisitor for FactsVisitor {
@@ -167,6 +173,8 @@ impl PackageMetadataVisitor for FactsVisitor {
         binding: ObjectUuidDescriptor<'_>,
     ) -> Result<(), MetadataError> {
         self.max = self.max.max(binding.object_identifier());
+        self.uuid_bits
+            .insert((binding.uuid().lower(), binding.uuid().upper()));
         if binding.component().is_current() {
             self.uuids.push((
                 binding.component().identifier(),
@@ -209,6 +217,7 @@ impl PackageMetadataVisitor for FactsVisitor {
         _has_unknown_fields: bool,
     ) -> Result<(), MetadataError> {
         self.max = self.max.max(object_identifier);
+        self.data_metadata_map = Some(object_identifier);
         Ok(())
     }
 }
@@ -273,6 +282,8 @@ pub(crate) fn metadata(package: &Package) -> GraphResult<Option<Metadata>> {
         max_registered: visitor.max,
         components: visitor.components,
         uuids: visitor.uuids,
+        uuid_bits: visitor.uuid_bits,
+        data_metadata_map: visitor.data_metadata_map,
     }))
 }
 
@@ -348,6 +359,65 @@ impl Metadata {
         .map(package_metadata_codec::RewriteOutput::into_bytes)
         .map_err(|_| GraphError::InvalidSource)
     }
+}
+
+impl Metadata {
+    /// The payload with fresh UUID registrations for `objects` in the
+    /// current component `component` and the watermark raised to
+    /// `new_last` (the host's `add_component_object_uuids` followed by
+    /// `set_package_last_object_identifier`). The leaf draws deterministic
+    /// UUIDs, unique within the package, where the host draws random ones.
+    pub(crate) fn registered(
+        &self,
+        package: &Package,
+        component: u64,
+        objects: &[u64],
+        new_last: u64,
+    ) -> GraphResult<Vec<u8>> {
+        let locator = self
+            .components
+            .iter()
+            .filter(|(identifier, _, current)| *current && *identifier == component)
+            .map(|(_, locator, _)| locator.as_str())
+            .collect::<Vec<_>>();
+        let [locator] = locator.as_slice() else {
+            return Err(GraphError::InvalidSource);
+        };
+        if objects.iter().any(|object| {
+            self.uuids
+                .iter()
+                .any(|(_, registered)| registered == object)
+        }) {
+            return Err(GraphError::InvalidSource);
+        }
+        let selector = ComponentSelector::new(component, locator);
+        let mut taken = self.uuid_bits.clone();
+        let mut additions = Vec::with_capacity(objects.len());
+        for object in objects {
+            let uuid = fresh_uuid(&taken, *object);
+            taken.insert((uuid.lower(), uuid.upper()));
+            additions.push(ObjectUuidAddition::new(selector, *object, uuid));
+        }
+        package_metadata_codec::rewrite_package_metadata(
+            &self.payload,
+            Batch::new(self.last, new_last.max(self.last), &additions, &[]),
+            metadata_options(package, self.payload.len())?,
+        )
+        .map(package_metadata_codec::RewriteOutput::into_bytes)
+        .map_err(|_| GraphError::InvalidSource)
+    }
+}
+
+/// A deterministic UUID for a created object, distinct from every `taken`
+/// pair and never nil.
+fn fresh_uuid(taken: &std::collections::HashSet<(u64, u64)>, identifier: u64) -> UuidBits {
+    let mut lower = identifier.max(1);
+    let mut upper = identifier.rotate_left(17) ^ 0x9e37_79b9_7f4a_7c15;
+    while taken.contains(&(lower, upper)) {
+        lower = lower.wrapping_add(1).max(1);
+        upper = upper.rotate_left(7) ^ 0xd1b5_4a32_d192_ed03;
+    }
+    UuidBits::new(lower, upper)
 }
 
 /// Remove `component`'s external references to `object` from a metadata
@@ -567,4 +637,259 @@ pub(crate) fn splice_text(
     storage.payload = rewritten.into_bytes();
     storage.text = text;
     Ok(removed)
+}
+
+const METADATA_VERSIONED_COMPONENTS_FIELD: u32 = 11;
+const METADATA_DATAS_FIELD: u32 = 4;
+const COMPONENT_DATA_REFERENCES_FIELD: u32 = 7;
+const DATA_REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const DATA_REFERENCE_OWNERS_FIELD: u32 = 2;
+const OWNER_OBJECT_FIELD: u32 = 1;
+const OWNER_COUNT_FIELD: u32 = 2;
+const DATA_INFO_IDENTIFIER_FIELD: u32 = 1;
+const DATA_INFO_FILE_NAME_FIELD: u32 = 4;
+
+fn view_varint(payload: &[u8], number: u32) -> litchi_iwa_common::Result<Option<u64>> {
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::default())?;
+    Ok(varint_of(&view, number))
+}
+
+/// Add one count to, or remove one count from, `component`'s
+/// data-reference owner (`data`, `object`) in a metadata payload (the host's
+/// `{add,remove}_component_data_reference`): a removal that empties the
+/// only owner drops the whole data reference, one that empties an owner
+/// drops the owner, and an addition appends a new reference or owner when
+/// none exists.
+pub(crate) fn adjust_data_reference(
+    payload: &[u8],
+    component: u64,
+    data: u64,
+    object: u64,
+    add: bool,
+) -> GraphResult<Vec<u8>> {
+    let mut matched = 0usize;
+    let mut output = payload.to_vec();
+    for field in [
+        METADATA_COMPONENTS_FIELD,
+        METADATA_VERSIONED_COMPONENTS_FIELD,
+    ] {
+        output = transform_length_delimited_fields_at_path(&output, &[field], |info| {
+            if view_varint(info, COMPONENT_IDENTIFIER_FIELD)? != Some(component) {
+                return Ok(info.to_vec());
+            }
+            matched += 1;
+            adjust_component(info, data, object, add)
+        })
+        .map_err(map_wire_error)?;
+    }
+    if matched != 1 {
+        return Err(GraphError::InvalidSource);
+    }
+    Ok(output)
+}
+
+fn adjust_component(
+    info: &[u8],
+    data: u64,
+    object: u64,
+    add: bool,
+) -> litchi_iwa_common::Result<Vec<u8>> {
+    let invalid = || litchi_iwa_common::Error::InvalidFormat("data reference".to_owned());
+    let references = repeated_length_delimited_payloads(info, COMPONENT_DATA_REFERENCES_FIELD)?;
+    let mut matches = Vec::new();
+    for reference in references {
+        if view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)? == Some(data) {
+            matches.push(reference);
+        }
+    }
+    let is_data = |reference: &[u8]| -> litchi_iwa_common::Result<bool> {
+        Ok(view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)? == Some(data))
+    };
+    match (add, matches.as_slice()) {
+        (true, []) => {
+            let mut owner = Vec::new();
+            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_OBJECT_FIELD, object)?;
+            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_COUNT_FIELD, 1)?;
+            let mut reference = Vec::new();
+            litchi_iwa_common::wire::append_varint_field(
+                &mut reference,
+                DATA_REFERENCE_IDENTIFIER_FIELD,
+                data,
+            )?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut reference,
+                DATA_REFERENCE_OWNERS_FIELD,
+                &owner,
+                litchi_iwa_common::WireLimits::default(),
+            )?;
+            litchi_iwa_common::wire::append_repeated_length_delimited_field(
+                info,
+                COMPONENT_DATA_REFERENCES_FIELD,
+                &reference,
+            )
+        },
+        (_, [reference]) => {
+            let owners =
+                repeated_length_delimited_payloads(reference, DATA_REFERENCE_OWNERS_FIELD)?;
+            let mut found = Vec::new();
+            for owner in &owners {
+                if view_varint(owner, OWNER_OBJECT_FIELD)? == Some(object) {
+                    found.push(view_varint(owner, OWNER_COUNT_FIELD)?.unwrap_or(0));
+                }
+            }
+            if !add && found == [1] && owners.len() == 1 {
+                return remove_repeated_length_delimited_field_where(
+                    info,
+                    COMPONENT_DATA_REFERENCES_FIELD,
+                    is_data,
+                );
+            }
+            transform_length_delimited_fields_at_path(
+                info,
+                &[COMPONENT_DATA_REFERENCES_FIELD],
+                |reference| {
+                    if !is_data(reference)? {
+                        return Ok(reference.to_vec());
+                    }
+                    adjust_owner(reference, object, add, &found)
+                },
+            )
+        },
+        _ => Err(invalid()),
+    }
+}
+
+fn adjust_owner(
+    reference: &[u8],
+    object: u64,
+    add: bool,
+    found: &[u64],
+) -> litchi_iwa_common::Result<Vec<u8>> {
+    let is_owner = |owner: &[u8]| -> litchi_iwa_common::Result<bool> {
+        Ok(view_varint(owner, OWNER_OBJECT_FIELD)? == Some(object))
+    };
+    match (add, found) {
+        (true, []) => {
+            let mut owner = Vec::new();
+            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_OBJECT_FIELD, object)?;
+            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_COUNT_FIELD, 1)?;
+            litchi_iwa_common::wire::append_repeated_length_delimited_field(
+                reference,
+                DATA_REFERENCE_OWNERS_FIELD,
+                &owner,
+            )
+        },
+        (false, [1]) => remove_repeated_length_delimited_field_where(
+            reference,
+            DATA_REFERENCE_OWNERS_FIELD,
+            is_owner,
+        ),
+        (_, [count]) => {
+            let count = if add {
+                count.checked_add(1)
+            } else {
+                count.checked_sub(1)
+            }
+            .ok_or_else(|| {
+                litchi_iwa_common::Error::InvalidFormat("data reference count".to_owned())
+            })?;
+            transform_length_delimited_fields_at_path(
+                reference,
+                &[DATA_REFERENCE_OWNERS_FIELD],
+                |owner| {
+                    if !is_owner(owner)? {
+                        return Ok(owner.to_vec());
+                    }
+                    patch_varint_field(owner, OWNER_COUNT_FIELD, true, Some(count))
+                },
+            )
+        },
+        _ => Err(litchi_iwa_common::Error::InvalidFormat(
+            "data reference owner".to_owned(),
+        )),
+    }
+}
+
+/// The data identifiers any component (current or versioned) still
+/// references in a metadata payload.
+pub(crate) fn referenced_data(payload: &[u8]) -> GraphResult<std::collections::HashSet<u64>> {
+    let mut referenced = std::collections::HashSet::new();
+    for field in [
+        METADATA_COMPONENTS_FIELD,
+        METADATA_VERSIONED_COMPONENTS_FIELD,
+    ] {
+        for info in repeated_length_delimited_payloads(payload, field).map_err(map_wire_error)? {
+            for reference in
+                repeated_length_delimited_payloads(info, COMPONENT_DATA_REFERENCES_FIELD)
+                    .map_err(map_wire_error)?
+            {
+                if let Some(data) = view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)
+                    .map_err(map_wire_error)?
+                {
+                    referenced.insert(data);
+                }
+            }
+        }
+    }
+    Ok(referenced)
+}
+
+/// The `Data/` member name of a data entry, from its `DataInfo.file_name`.
+pub(crate) fn data_member(payload: &[u8], data: u64) -> GraphResult<Option<String>> {
+    let mut found = None;
+    for info in
+        repeated_length_delimited_payloads(payload, METADATA_DATAS_FIELD).map_err(map_wire_error)?
+    {
+        if view_varint(info, DATA_INFO_IDENTIFIER_FIELD).map_err(map_wire_error)? != Some(data) {
+            continue;
+        }
+        if found.is_some() {
+            return Err(GraphError::InvalidSource);
+        }
+        let view = WireView::parse(info, litchi_iwa_common::WireLimits::default())
+            .map_err(map_wire_error)?;
+        let name = view
+            .fields()
+            .find(|field| field.number() == DATA_INFO_FILE_NAME_FIELD)
+            .map(|field| std::str::from_utf8(field.payload()).map(str::to_owned))
+            .transpose()
+            .map_err(|_| GraphError::InvalidSource)?;
+        found = Some(name.filter(|name| !name.is_empty()));
+    }
+    let name = found.ok_or(GraphError::InvalidSource)?;
+    match name {
+        Some(name)
+            if !name.contains(['\0', '\\'])
+                && std::path::Path::new(&name)
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_))) =>
+        {
+            Ok(Some(format!("Data/{name}")))
+        },
+        Some(_) => Err(GraphError::InvalidSource),
+        None => Ok(None),
+    }
+}
+
+/// The metadata payload without the `DataInfo` of `data`.
+pub(crate) fn remove_data_info(payload: &[u8], data: u64) -> GraphResult<Vec<u8>> {
+    remove_repeated_length_delimited_field_where(payload, METADATA_DATAS_FIELD, |info| {
+        Ok::<bool, litchi_iwa_common::Error>(
+            view_varint(info, DATA_INFO_IDENTIFIER_FIELD)? == Some(data),
+        )
+    })
+    .map_err(map_wire_error)
+}
+
+/// The data identifiers listed by a `TSP.DataMetadataMap` payload.
+pub(crate) fn data_metadata_entries(payload: &[u8]) -> GraphResult<Vec<u64>> {
+    let mut data = Vec::new();
+    for entry in repeated_length_delimited_payloads(payload, 1).map_err(map_wire_error)? {
+        data.push(
+            view_varint(entry, 1)
+                .map_err(map_wire_error)?
+                .ok_or(GraphError::InvalidSource)?,
+        );
+    }
+    Ok(data)
 }

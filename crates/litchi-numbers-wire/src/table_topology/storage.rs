@@ -323,6 +323,35 @@ fn remove_slot(
 /// removed column's cell from the current (BNC) and pre-BNC storage (its
 /// list references are released by the caller) and lowers the row's cell
 /// count when a BNC cell went.
+/// One row's pre-BNC cell storage and offset table after removing column
+/// `column` of a `columns`-wide table, as the structural column removal
+/// rewrites it (`None` when they are unchanged). Exposed for the host
+/// editor's column removal (record 0370b).
+///
+/// # Errors
+///
+/// [`Error::Invalid`] for a malformed offset table.
+pub fn pre_bnc_remove_column(
+    storage: &[u8],
+    offsets: &[u8],
+    column: u32,
+    columns: u32,
+) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
+    if offsets.is_empty() {
+        return Ok(None);
+    }
+    let index = usize::try_from(column).map_err(|_error| Error::Invalid)?;
+    let columns_usize = usize::try_from(columns).map_err(|_error| Error::Invalid)?;
+    let present = offsets
+        .get(index * 2..index * 2 + 2)
+        .is_some_and(|pair| pair != MISSING);
+    if present {
+        return remove_slot(storage, offsets, 1, index, columns_usize).map(Some);
+    }
+    Ok(splice_offsets(offsets, columns, AxisEdit::Remove(column))?
+        .map(|offsets| (storage.to_vec(), offsets)))
+}
+
 fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
     let columns_usize = usize::try_from(columns).map_err(|_error| Error::Invalid)?;
     if let AxisEdit::Remove(index) = edit {
@@ -354,14 +383,35 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8
                     None => continue,
                 }
             };
+            if new_storage == storage && new_offsets == offsets {
+                continue;
+            }
             replacements.push((storage_field, new_storage));
             replacements.push((offsets_field, new_offsets));
         }
         if replacements.is_empty() {
             return Ok(None);
         }
+        // A BNC row the host's column shift rebuilds (no spare slot, or a
+        // cell after the removed column) states its offset width (record
+        // 0370b).
+        let rebuilt_by_shift = match single_bytes(row, 7)? {
+            Some(offsets) => {
+                let slots = offsets.len() / 2;
+                slots == columns_usize
+                    || offsets
+                        .chunks_exact(2)
+                        .skip(column + 1)
+                        .take(columns_usize.saturating_sub(column + 1))
+                        .any(|pair| pair != MISSING)
+            },
+            None => false,
+        };
+        let state_width = rebuilt_by_shift
+            && replacements.iter().any(|(number, _)| *number == 7)
+            && single_varint(row, 8)?.is_none();
         let count = single_varint(row, 2)?.ok_or(Error::Invalid)?;
-        let rebuilt = rebuild(row, |field| {
+        let mut rebuilt = rebuild(row, |field| {
             if field.number == 2 && removed_bnc {
                 return varint_field(2, count.checked_sub(1).ok_or(Error::Invalid)?).map(Some);
             }
@@ -373,6 +423,9 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8
                 None => Ok(None),
             }
         })?;
+        if state_width {
+            push_varint_field(&mut rebuilt, 8, 0)?;
+        }
         return Ok(Some(rebuilt));
     }
     let mut changed = false;
@@ -406,19 +459,57 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8
 
 /// Rewrite the rows of one storage tile for a column edit.
 pub fn tile_columns(tile: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
+    let original_rows = repeated_bytes(tile, 5)?;
+    let numrows = single_varint(tile, 4)?.ok_or(Error::Invalid)?;
+    let counts_rows = numrows == u64::try_from(original_rows.len()).map_err(|_e| Error::Invalid)?;
     let mut changed = false;
-    let output = rebuild(tile, |field| {
+    let mut dropped = false;
+    let mut kept = 0_u64;
+    let mut maximum = None;
+    let mut output = rebuild(tile, |field| {
         if field.number != 5 {
             return Ok(None);
         }
+        let local = single_varint(field.payload, 1)?.ok_or(Error::Invalid)?;
         match row_columns(field.payload, columns, edit)? {
+            // A row the removal leaves without cells goes, as the host's
+            // cell removal drops it (record 0370b).
+            Some(row)
+                if single_varint(&row, 2)? == Some(0)
+                    && single_varint(field.payload, 2)? != Some(0) =>
+            {
+                changed = true;
+                dropped = true;
+                Ok(Some(Vec::new()))
+            },
             Some(row) => {
                 changed = true;
+                kept += 1;
+                maximum = maximum.max(Some(local));
                 bytes_field(5, &row).map(Some)
             },
-            None => Ok(None),
+            None => {
+                kept += 1;
+                maximum = maximum.max(Some(local));
+                Ok(None)
+            },
         }
     })?;
+    if dropped {
+        let numrows_after = if counts_rows {
+            kept
+        } else {
+            maximum.map_or(0, |maximum| maximum + 1)
+        };
+        if numrows_after != numrows {
+            output = rebuild(&output, |field| {
+                if field.number == 4 {
+                    return varint_field(4, numrows_after).map(Some);
+                }
+                Ok(None)
+            })?;
+        }
+    }
     Ok(changed.then_some(output))
 }
 
@@ -467,6 +558,11 @@ pub fn header_bucket(
             return Ok(None);
         }
         changed = true;
+        // A header left counting no cell and holding nothing else goes, as
+        // the host's cell removal drops it (record 0370b).
+        if cells_after == Some(0) && header_is_bare(field.payload)? {
+            return Ok(Some(Vec::new()));
+        }
         let header = rebuild(field.payload, |inner| match (inner.number, cells_after) {
             (1, _) => varint_field(1, u64::from(shifted)).map(Some),
             (4, Some(cells)) => varint_field(4, cells).map(Some),
@@ -475,6 +571,28 @@ pub fn header_bucket(
         bytes_field(2, &header).map(Some)
     })?;
     Ok(changed.then_some(output))
+}
+
+/// Whether a `TST.HeaderStorageBucket.Header` holds only its index, a zero
+/// size, a visible hiding state and its cell count.
+fn header_is_bare(header: &[u8]) -> Result<bool> {
+    for field in fields(header)? {
+        match field.number {
+            1 | 4 => {},
+            2 => {
+                if field.payload.iter().any(|byte| *byte != 0) {
+                    return Ok(false);
+                }
+            },
+            3 => {
+                if single_varint(header, 3)? != Some(0) {
+                    return Ok(false);
+                }
+            },
+            _ => return Ok(false),
+        }
+    }
+    Ok(true)
 }
 
 /// A `TSP.UUID` as its two halves.
