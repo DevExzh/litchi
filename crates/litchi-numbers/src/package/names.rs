@@ -2345,7 +2345,8 @@ fn rewrite_names(
         .map_err(map_archive_error)?;
     drop(edits);
     drop(rewritten_entries);
-    let candidate = Package::from_shared_profile(output.into(), source.state.options)
+    let candidate = source
+        .reopen_candidate(output.into())
         .map_err(map_candidate_read_error)?;
     Ok((candidate, component_group_count(operations)))
 }

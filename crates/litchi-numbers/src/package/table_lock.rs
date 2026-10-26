@@ -784,7 +784,8 @@ fn rewrite_lock_state(
         )
         .map_err(map_archive_error)?;
     drop(compressed);
-    let candidate = Package::from_shared_profile(output.into(), source.state.options)
+    let candidate = source
+        .reopen_candidate(output.into())
         .map_err(map_candidate_read_error)?;
     if candidate.table_lock_at(sheet_position, table_position)? != after {
         return Err(Error::Verification);
