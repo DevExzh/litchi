@@ -36,6 +36,7 @@ mod keynote_cases;
 mod keynote_chart_cases;
 mod keynote_drawable_cases;
 mod keynote_image_cases;
+mod keynote_named_style_cases;
 mod keynote_slide_cases;
 mod keynote_table_cases;
 mod keynote_text_list_cases;
