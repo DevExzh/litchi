@@ -58,6 +58,7 @@ pub(super) struct FamilyCase {
 impl FamilyCase {
     pub(super) fn remap(&self) -> Remap<'_> {
         Remap::new(&self.object_ids, &self.owner_ids, &self.uuids)
+            .expect("the case remap is sorted and unique")
     }
 }
 
@@ -65,8 +66,8 @@ impl FamilyCase {
 /// with a fixed replacement table UUID and identifiers above the archive's.
 ///
 /// `host_allocation` selects the host's internal-owner allocator (one above
-/// the largest owner object); otherwise the allocator also clears every
-/// owner-map entry, the policy of `litchi_numbers_wire::table_create`.
+/// the largest owner object); otherwise the leaf's map-aware
+/// `litchi_numbers_wire::formula_graph::next_owner_id` allocates.
 pub(super) fn family_case(
     archive: &Archive,
     table_info_id: u64,
@@ -108,24 +109,14 @@ pub(super) fn family_case(
         object_remap.insert(identifier?, next_identifier);
         next_identifier += 1;
     }
-    let mut next_internal = next_internal_owner_id(archive).ok()?;
-    if !host_allocation {
-        let engine =
-            tsce::CalculationEngineArchive::decode(engine_payload(archive).as_slice()).ok()?;
-        let mapped = engine
-            .dependency_tracker
-            .owner_id_map
-            .iter()
-            .flat_map(|map| &map.map_entry)
-            .map(|entry| entry.internal_owner_id)
-            .max()
-            .unwrap_or(0);
-        next_internal = next_internal.max(mapped + 1);
-    }
+    let next_internal = if host_allocation {
+        next_internal_owner_id(archive).ok()?
+    } else {
+        leaf_next_owner_id(archive)
+    };
     let mut internal_remap = HashMap::new();
-    for source in &owners {
-        internal_remap.insert(source.owner.internal_formula_owner_id, next_internal);
-        next_internal += 1;
+    for (source, replacement) in owners.iter().zip(next_internal..) {
+        internal_remap.insert(source.owner.internal_formula_owner_id, replacement);
     }
     // The source table UUID is the inverse of the owner derivation.
     let source_uuid = formula_owner_uuid_for_table(&source_owner_uuid);
@@ -174,6 +165,25 @@ pub(super) fn family_case(
         owner_ids,
         uuids,
     })
+}
+
+/// Every `FormulaOwnerDependenciesArchive` payload of the engine archive.
+fn owner_payloads(archive: &Archive) -> Vec<Vec<u8>> {
+    archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+        .map(|message| message.data.clone())
+        .collect()
+}
+
+/// The leaf's map-aware internal-owner allocation for one engine archive.
+pub(super) fn leaf_next_owner_id(archive: &Archive) -> u32 {
+    let owners = owner_payloads(archive);
+    let owners = owners.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    leaf::next_owner_id(&engine_payload(archive), &owners, &Limits::DEFAULT)
+        .expect("tracked engines admit the leaf allocator")
 }
 
 /// Every table-info identifier with a direct formula owner.
@@ -448,44 +458,71 @@ fn empty_table_owner_is_byte_identical_to_the_host() {
     }
 }
 
-/// The host allocates internal owner identifiers one above the largest owner
-/// object and ignores owner-map entries without an owner object, so on these
-/// fixtures it registers duplicate internal identifiers in the engine's owner
-/// map. The leaf refuses that remap (`InvalidRemap`) instead of publishing a
-/// corrupt map; record 0368 lists the case (stricter admission, §4.2 of 0363).
+/// Documented intentional difference (record 0368a, macOS queue row): the
+/// host allocates internal owner identifiers one above the largest owner
+/// object and ignores owner-map entries without an owner object, so on two
+/// fixtures it registers internal identifiers already in the engine's owner
+/// map — a corrupt map. The leaf's map-aware `next_owner_id` allocates above
+/// the map: on those fixtures its identifiers differ from the host's (its
+/// registration is valid where the host's collides), and on every other
+/// fixture both allocators agree. Under the host's colliding allocation the
+/// leaf registration refuses (`InvalidRemap`) instead of publishing it.
 #[test]
-fn leaf_refuses_the_host_owner_map_collision() {
-    let mut refused = Vec::new();
+fn leaf_allocator_avoids_the_host_owner_map_collision() {
+    let mut differing = Vec::new();
     for path in fixtures() {
         let Some(archive) = engine_archive(&path) else {
             continue;
         };
         let engine = engine_payload(&archive);
+        let decoded = tsce::CalculationEngineArchive::decode(engine.as_slice()).unwrap();
+        let mapped = decoded
+            .dependency_tracker
+            .owner_id_map
+            .iter()
+            .flat_map(|map| &map.map_entry)
+            .map(|entry| entry.internal_owner_id)
+            .collect::<HashSet<_>>();
+        let host_next = next_internal_owner_id(&archive).unwrap();
+        let leaf_next = leaf_next_owner_id(&archive);
+        assert!(leaf_next >= host_next);
+        assert!(mapped.iter().all(|identifier| *identifier < leaf_next));
         for table in direct_owner_tables(&archive) {
-            let Some(case) = family_case(&archive, table, true) else {
+            let (Some(host_case), Some(leaf_case)) = (
+                family_case(&archive, table, true),
+                family_case(&archive, table, false),
+            ) else {
                 continue;
             };
-            let decoded = tsce::CalculationEngineArchive::decode(engine.as_slice()).unwrap();
-            let mapped = decoded
-                .dependency_tracker
-                .owner_id_map
+            let host_collides = host_case
+                .owner_ids
                 .iter()
-                .flat_map(|map| &map.map_entry)
-                .map(|entry| entry.internal_owner_id)
-                .collect::<HashSet<_>>();
-            let collides = case.owner_ids.iter().any(|(_, new)| mapped.contains(new));
-            let result = leaf_engine(&engine, &case);
-            if collides {
-                assert_eq!(result, Err(leaf::Error::InvalidRemap));
-                refused.push(path.file_name().unwrap().to_string_lossy().into_owned());
+                .any(|(_, new)| mapped.contains(new));
+            assert!(
+                !leaf_case
+                    .owner_ids
+                    .iter()
+                    .any(|(_, new)| mapped.contains(new))
+            );
+            let leaf = leaf_engine(&engine, &leaf_case).unwrap();
+            tsce::CalculationEngineArchive::decode(leaf.as_slice()).unwrap();
+            if host_collides {
+                assert_ne!(host_next, leaf_next);
+                assert_eq!(
+                    leaf_engine(&engine, &host_case),
+                    Err(leaf::Error::InvalidRemap)
+                );
+                differing.push(path.file_name().unwrap().to_string_lossy().into_owned());
             } else {
-                assert_eq!(result.unwrap(), host_engine(&engine, &case));
+                assert_eq!(host_next, leaf_next, "{}", path.display());
+                assert_eq!(leaf, host_engine(&engine, &host_case));
             }
         }
     }
-    refused.sort();
+    differing.sort();
+    differing.dedup();
     assert_eq!(
-        refused,
+        differing,
         [
             "chart-arrangement-native.numbers",
             "shared-model-native.numbers"
@@ -527,21 +564,23 @@ fn host_route(cases: &[(Vec<u8>, FamilyCase)]) -> usize {
 fn leaf_route(cases: &[(Vec<u8>, FamilyCase)]) -> usize {
     let mut bytes = 0;
     for (engine, case) in cases {
+        // One checked remap per family, as the host builds its maps once.
+        let remap = case.remap();
         for source in &case.owners {
             let original = &source.object.messages[source.message_index].data;
-            bytes += leaf::remap_owner(original, case.remap(), &Limits::DEFAULT)
+            bytes += leaf::remap_owner(original, remap, &Limits::DEFAULT)
                 .unwrap()
                 .len();
         }
         for source in &case.tiles {
             let original = &source.object.messages[source.message_index].data;
-            bytes += leaf::remap_cell_record_tile(original, case.remap(), &Limits::DEFAULT)
+            bytes += leaf::remap_cell_record_tile(original, remap, &Limits::DEFAULT)
                 .unwrap()
                 .len();
         }
         for source in &case.range_tiles {
             let original = &source.object.messages[source.message_index].data;
-            bytes += leaf::remap_range_precedents_tile(original, case.remap(), &Limits::DEFAULT)
+            bytes += leaf::remap_range_precedents_tile(original, remap, &Limits::DEFAULT)
                 .unwrap()
                 .len();
         }
