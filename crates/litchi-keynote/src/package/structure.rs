@@ -246,7 +246,22 @@ impl Package {
         &self,
         bytes: Vec<u8>,
     ) -> Result<Self, super::ReadError> {
-        let candidate = Self::from_source_with_options(Arc::from(bytes), self.state.options)?;
+        // A structural candidate is an edited reassembly of this package:
+        // unchanged IWA members reuse their parsed archives (the ZIP and
+        // every budget are still checked in full).
+        let candidate = match &self.state.source {
+            PhysicalSource::Package(base) => {
+                let catalog = litchi_iwa_archive::SourceCatalog::__from_shared_bytes_reusing(
+                    Arc::from(bytes),
+                    self.state.options.archive(),
+                    base,
+                )?;
+                Self::from_source_catalog(catalog, self.state.options)?
+            },
+            PhysicalSource::Semantic(_) => {
+                Self::from_source_with_options(Arc::from(bytes), self.state.options)?
+            },
+        };
         candidate.validate()?;
         Ok(candidate)
     }
