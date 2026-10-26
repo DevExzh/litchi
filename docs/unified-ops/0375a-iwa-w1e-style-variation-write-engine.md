@@ -30,6 +30,10 @@
 | `8ecfb4da11` | `litchi-iwa-protos` | `chart_style_codec::rewrite_series_non_styles` (the chart's `series_non_styles` sparse array as a protobuf encoder writes it) |
 | `3e4588dc62` | `litchi-iwa-style` | `graph` (the copy-on-write workspace and registry transitions) and `series` (the series-override graph engine; connection lines, wedge explosions, label distances) |
 | `25bf949c8b` | `litchi-iwa` (tests) | 21 graph-engine cases on three formats, cost probe, three mac-queue rows |
+| `a2f2dc081b` | docs | this record (first version) |
+| `75abec418d` | `litchi-pages` | after the trunk merge: the W1-B body-media lifecycle reads its inventory through `litchi_iwa_style::media` (edge `litchi-pages -> litchi-iwa-style`, ADR 0024 note) |
+| `3d253aea5d` | `litchi-iwa-style` | `series::{StyleProperty, style_values, set_style_values}` (series-style writes with the exclusivity rule), `series::{set_symbols, symbols}`, `property::{SymbolMarks, SymbolSizes, Trendlines}` |
+| `4e1c6f7de2`, `8882bd2cce` | `litchi-iwa` (tests) | 12 data-symbol and trendline cases, two mac-queue rows; probe extended |
 | this commit | docs | this record |
 
 ## 2. The engine
@@ -87,8 +91,18 @@ workspace instead of `HostPackage`:
 holds the Format-panel properties ported from the host:
 `ConnectionLines(ConnectionLineFamily)` (styled; the host's field-order
 patch, scatter visibility included), `WedgeExplosions` and `LabelDistances`
-(unstyled; the `chart_style_codec::property` write rules). Values are the
+(unstyled; the `chart_style_codec::property` write rules), `Trendlines`
+(styled; the host's trendline patch over `common::chart::series::Trendline`)
+and `SymbolMarks` (styled; symbol visibility and shape). Values are the
 `litchi_iwa_common::chart` types.
+
+`series::StyleProperty` is the second half: a property stored in the
+effective series style (the `series_private_styles` override, else the theme
+style), read through the `TSS.StyleArchive.parent` chain and written only to
+a style that one chart alone references (the host's `ensure_exclusive`; a
+shared style is refused, as the host refuses it). `property::SymbolSizes` is
+one; `series::set_symbols` composes marks and sizes as the host's
+`set_*_chart_series_symbols` does.
 
 ## 3. Parity
 
@@ -106,16 +120,19 @@ host's read of the property on both outputs and strictly reopens both.
 | removal with stylesheet unregistration and watermark release (curved → straight, scatter → hidden) | Keynote, Numbers, Pages | A |
 | container member removal (one wedge reset), container deletion (all reset) | Keynote; Numbers, Pages | A |
 | patch of an exploded wedge's override (label distance) | Numbers, Pages | A |
+| data symbols: patch (shape, size; one hidden), removal | Keynote, Pages; Numbers | A |
+| trendlines: patch (linear → polynomial → moving average), removal | Keynote, Numbers; Pages | A |
+| data-symbol and trendline allocation | three formats each | B |
 | styled allocation (line, scatter, radar; and a patch plus allocation) | three formats | B |
 | unstyled allocation in a new object container (wedges, labels) | three formats | B |
 
 Tier B differs only by the documented fresh-UUID policy: the new objects'
 UUIDs (deterministic in the engine, random in the host), and the ZIP local
 layout of the inserted container member and of the members after it (equal
-content). 10 Tier A, 11 Tier B; all pass. The public setters stay
+content). 16 Tier A, 17 Tier B; all pass. The public setters stay
 `host-only` in the ledger: they belong to the format families (W2), which
 wrap this engine with their selectors; three mac-queue rows cover the
-engine routes. Earlier slice 1: 24 Tier A series-style write cases
+engine routes, two more for symbols and trendlines. Earlier slice 1: 24 Tier A series-style write cases
 (`series_write_cases.rs`).
 
 ## 4. Performance
@@ -128,6 +145,7 @@ admission (strict reopen), the host route its own reopen-and-verify.
 |---|---:|---:|---:|
 | `series_style_write_cost_abba` (slice 1: strokes, fills, symbol fills) | 9.86 G | 1.03 G | −89.6% |
 | `series_graph_write_cost_abba` (styled allocation, container allocation, container release) | 8,477,902,285 | 1,876,741,217 | −77.9% |
+| `series_graph_write_cost_abba`, extended with data symbols and a trendline | 15,083,360,713 | 3,164,011,104 | −79.0% |
 
 ```sh
 CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --test parity --no-run
@@ -141,7 +159,6 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*series_graph_cases::ho
 
 | Capability | Engine state | Next |
 |---|---|---|
-| data symbols (visibility and shape in the override; size in the series style) | `series::Property` ready for the override half | the series-style exclusivity engine (private series styles) |
-| trendlines, error bars, value labels and their affixes/number formats, pie label visibility | same engine (`Base::Styled`) | port the per-property patches |
+| error bars, value labels and their affixes/number formats, pie label visibility | same engine (`Base::Styled`) | port the per-property patches |
 | shape-style variations (fill, stroke, shadow, effects, line end, text layout) | `shape_style_codec` readers and encoders | the shape-style variation graph |
 | chart drawable codec and reference lines; chart font | 0375 §6 | coordinate with W1-C; values in `litchi_iwa_text` |
