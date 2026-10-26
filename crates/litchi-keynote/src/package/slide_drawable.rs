@@ -1050,7 +1050,6 @@ impl<'a> Edit<'a> {
             | Operation::Preset { .. }
             | Operation::LineSegment { .. }
             | Operation::TextProperty { .. }
-            | Operation::TableCell { .. } => false,
             | Operation::TableCell { .. }
             | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
