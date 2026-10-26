@@ -65,5 +65,5 @@ No hot path was re-measured.
 - a7d3a14efe: shared metadata no-op (4)
 - 6ec5d40a2c: XLSX join wrapper and lazy slicer tests (5, 6)
 - da5d33cdb7: DrawingML example (1)
-- a56ef7b015: iwa-core refusal diagnostic (7)
+- a56ef7b015: iwa-core refusal diagnostic (7). Trunk landed the same fix independently in 34a672c8cc (`refuse_retained_header`). The merge of trunk into this branch keeps trunk's version, so the hunk from a56ef7b015 is superseded.
 - 04362a8333: odf-formula history conflict (8)

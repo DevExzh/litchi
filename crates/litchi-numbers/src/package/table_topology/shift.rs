@@ -1446,7 +1446,7 @@ fn formula_key(package: &Package, store: &[u8], row: u32, column: u32) -> Out<u6
         if single_varint(stored_row, 1)? != Some(local) {
             continue;
         }
-        for (stored_column, bytes) in bnc_cells(stored_row)? {
+        for (stored_column, bytes) in bnc_cells(stored_row).map_err(Fault::from)? {
             if stored_column != column {
                 continue;
             }

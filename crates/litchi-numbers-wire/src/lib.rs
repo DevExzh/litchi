@@ -44,6 +44,9 @@ pub mod formula_owner;
 /// Source-preserving object-reference rewrites for table duplication and
 /// removal (record 0368).
 pub mod table_lifecycle;
+/// Payload rewrites of table-axis insertions and deletions shared by the
+/// three table owners (record 0370).
+pub mod table_topology;
 
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;

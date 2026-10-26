@@ -691,6 +691,15 @@ pub(crate) fn parse_iwa_components(
     let Some(index_name) = nested_name else {
         return Ok(Vec::new());
     };
+    let index_entry = archive
+        .physical_entries()
+        .find(|entry| entry.name() == index_name)
+        .ok_or_else(|| {
+            Error::InvalidBundle(format!(
+                "legacy package index has no physical member: {index_name}"
+            ))
+        })?;
+    validate_selected_iwa_header_parity(index_entry)?;
     let declared_index_size = archive.reader.metadata(&index_name)?.uncompressed_size();
     validated_limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
     let index_data = archive.read(&index_name)?;
@@ -738,10 +747,18 @@ pub(crate) fn parse_directory_index_components(
 fn parse_direct_iwa_components(archive: &ZipArchive<'_>, limits: Limits) -> Result<Vec<Component>> {
     let mut components = Vec::new();
     let mut decompressed_iwa_bytes = 0;
-    for name in archive.file_names() {
+    for index in archive.physical_indices_in_central_order() {
+        let Some(entry) = archive.physical_entry(index) else {
+            continue;
+        };
+        let name = entry.name();
         if !is_iwa_name(name) {
             continue;
         }
+        // A reader decodes from the local header, while preservation and
+        // diagnostics use the central record: both must describe the same
+        // member before any payload byte is read.
+        validate_selected_iwa_header_parity(entry)?;
         let compressed_data = archive.read(name)?;
         if let Some((component, decompressed_bytes)) =
             parse_component(name, &compressed_data, limits)?
@@ -753,6 +770,27 @@ fn parse_direct_iwa_components(archive: &ZipArchive<'_>, limits: Limits) -> Resu
     }
     components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
     Ok(components)
+}
+
+fn validate_selected_iwa_header_parity(entry: &PhysicalEntry) -> Result<()> {
+    let local = entry.local_header();
+    let central = entry.central_header();
+    if local.name != central.name {
+        return Err(Error::InvalidBundle(
+            "selected IWA member has mismatched local and central names".to_owned(),
+        ));
+    }
+    if local.flags != central.flags {
+        return Err(Error::InvalidBundle(
+            "selected IWA member has mismatched local and central flags".to_owned(),
+        ));
+    }
+    if local.compression_method != central.compression_method {
+        return Err(Error::InvalidBundle(
+            "selected IWA member has mismatched local and central compression methods".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn is_encrypted(archive: &ZipArchive<'_>) -> bool {
@@ -907,6 +945,36 @@ mod tests {
             max_entry_size: u64::MAX,
             max_total_size: u64::MAX,
         }
+    }
+
+    #[test]
+    fn direct_and_nested_iwa_parse_reject_flag_mismatch_before_reads() -> Result<()> {
+        for name in [b"Index/Document.iwa".as_slice(), b"legacy.pages/Index.zip"] {
+            let mut bytes = physical_zip(name, b"", name, b"", b"", b"invalid payload");
+            let central = bytes
+                .windows(4)
+                .position(|window| window == b"PK\x01\x02")
+                .ok_or_else(|| Error::InvalidBundle("central test record is missing".to_owned()))?;
+            bytes[6..8].copy_from_slice(&0x0008_u16.to_le_bytes());
+            bytes[central + 8..central + 10].copy_from_slice(&0_u16.to_le_bytes());
+            let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;
+            reset_test_entry_read_count();
+            assert!(matches!(
+                parse_iwa_components(&archive, Limits::default()),
+                Err(Error::InvalidBundle(message))
+                    if message.contains("selected IWA member has mismatched local and central flags")
+            ));
+            assert_eq!(test_entry_read_count(), 0);
+            if name.ends_with(b".iwa") {
+                assert!(matches!(
+                    parse_directory_index_components(&archive, Limits::default()),
+                    Err(Error::InvalidBundle(message))
+                        if message.contains("selected IWA member has mismatched local and central flags")
+                ));
+                assert_eq!(test_entry_read_count(), 0);
+            }
+        }
+        Ok(())
     }
 
     #[test]

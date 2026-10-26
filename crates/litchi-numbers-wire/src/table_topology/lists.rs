@@ -9,8 +9,8 @@
 
 use std::collections::BTreeMap;
 
-use super::super::structure::{Fault, FaultResult, references, reserve};
 use super::wire::{bytes_field, rebuild, single_bytes, single_varint, varint_field};
+use super::{Error, Result, reference_identifier, reserve};
 
 /// Entry fields that hold a `TSP.Reference`: `reference`,
 /// `rich_text_payload`, `comment_storage`.
@@ -21,20 +21,20 @@ const REFERENCE_FIELDS: [u32; 3] = [4, 9, 10];
 ///
 /// Returns the rewritten payload (`None` when the list holds none of the
 /// keys) and the object references the dropped entries held.
-pub(in crate::package) fn release(
+pub fn release(
     list: &[u8],
     remaining: &mut BTreeMap<u32, u32>,
-) -> FaultResult<(Option<Vec<u8>>, Vec<u64>)> {
+) -> Result<(Option<Vec<u8>>, Vec<u64>)> {
     release_with(list, remaining, false)
 }
 
 /// [`release`], handing back the list's last key when its entry goes
 /// (`reclaim`; record 0329), as the cell writer does for a string list.
-pub(in crate::package) fn release_with(
+pub fn release_with(
     list: &[u8],
     remaining: &mut BTreeMap<u32, u32>,
     reclaim: bool,
-) -> FaultResult<(Option<Vec<u8>>, Vec<u64>)> {
+) -> Result<(Option<Vec<u8>>, Vec<u64>)> {
     let mut pruned = Vec::new();
     let mut changed = false;
     let mut dropped = Vec::new();
@@ -43,18 +43,18 @@ pub(in crate::package) fn release_with(
             return Ok(None);
         }
         if field.wire_type != 2 {
-            return Err(Fault::Invalid);
+            return Err(Error::Invalid);
         }
-        let key = u32::try_from(single_varint(field.payload, 1)?.ok_or(Fault::Invalid)?)
-            .map_err(|_error| Fault::Invalid)?;
+        let key = u32::try_from(single_varint(field.payload, 1)?.ok_or(Error::Invalid)?)
+            .map_err(|_error| Error::Invalid)?;
         let Some(release) = remaining.remove(&key) else {
             return Ok(None);
         };
         changed = true;
-        let count = single_varint(field.payload, 2)?.ok_or(Fault::Invalid)?;
+        let count = single_varint(field.payload, 2)?.ok_or(Error::Invalid)?;
         let after = count
             .checked_sub(u64::from(release))
-            .ok_or(Fault::Unsupported)?;
+            .ok_or(Error::Unsupported)?;
         if after > 0 {
             let entry = rebuild(field.payload, |inner| {
                 if inner.number == 2 {
@@ -67,7 +67,7 @@ pub(in crate::package) fn release_with(
         for number in REFERENCE_FIELDS {
             if let Some(reference) = single_bytes(field.payload, number)? {
                 reserve(&mut pruned, 1)?;
-                pruned.push(references::reference_identifier(reference)?);
+                pruned.push(reference_identifier(reference)?);
             }
         }
         reserve(&mut dropped, 1)?;
@@ -76,7 +76,7 @@ pub(in crate::package) fn release_with(
     })?;
     let mut output = output;
     if reclaim && !dropped.is_empty() {
-        let current = single_varint(&output, 2)?.ok_or(Fault::Invalid)?;
+        let current = single_varint(&output, 2)?.ok_or(Error::Invalid)?;
         let mut next = current;
         dropped.sort_unstable();
         for key in dropped {
@@ -101,7 +101,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::release;
-    use crate::package::table_topology::wire::{bytes_field, push_varint_field};
+    use crate::table_topology::wire::{bytes_field, push_varint_field};
 
     fn entry(key: u64, count: u64, reference: Option<u64>) -> Vec<u8> {
         let mut payload = Vec::new();

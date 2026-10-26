@@ -23,10 +23,12 @@
 //! The harness lives in the host's tests so that W3 deletes it with the host.
 
 mod archive_diff;
+mod cost_probes;
 mod harness;
 mod known_fields;
 
 mod keynote_cases;
 mod numbers_cases;
 mod pages_cases;
+mod physical_cases;
 mod self_test;
