@@ -883,10 +883,17 @@ fn cell_fonts_are_written() {
             .bold,
         Some(true)
     );
-    let error = file
+    // An empty cell takes a style-only cell (record 0370).
+    let styled_empty = file
         .set("/sheet[1]/table[1]/D4", props! { "font.bold" => true })
-        .expect_err("empty cell");
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+        .expect("empty cell");
+    assert_eq!(
+        leaf(&styled_empty)
+            .table_cell_text_style(0, 0, litchi_numbers::At::new(3, 3))
+            .expect("style")
+            .bold,
+        Some(true)
+    );
 }
 
 /// Three sheets; the first holds the tables `Table 1`, `B` and `C`, the

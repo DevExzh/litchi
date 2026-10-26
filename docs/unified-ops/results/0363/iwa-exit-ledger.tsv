@@ -866,7 +866,7 @@ numbers/editor/semantic/table.rs	set_table_cell_text_ligatures	1	numbers	table.c
 numbers/editor/semantic/table.rs	set_table_cell_text_outline	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_script	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_shadow	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_style	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text_style	numbers_cell_text_style_parity	B	-	-
 numbers/editor/semantic/table.rs	table_cell_borders	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_data_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
@@ -900,7 +900,7 @@ numbers/editor/semantic/table.rs	table_cell_text_ligatures	1	numbers	table.cell_
 numbers/editor/semantic/table.rs	table_cell_text_outline	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_text_script	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_text_shadow	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_style	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text_style	numbers_cell_text_style_read_parity	A	-	-
 numbers/editor/semantic/table.rs	unmerge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_unmerge_parity	A	-	-
 numbers/editor/semantic/text_box.rs	add_sheet_text_box_comment	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	add_sheet_text_box_comment_reply	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
@@ -1052,8 +1052,8 @@ numbers/editor/semantic/workbook.rs	remove_table	1	numbers	table.lifecycle	host-
 numbers/editor/semantic/workbook.rs	resize_table	1	numbers	table.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	set_formula	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	set_formula_with_cached_value	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::sheets	numbers_workbook_catalog_read_parity	A	-	-
+numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	migrated	litchi_numbers::Sheet::tables	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/sheet_audio.rs	add_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_audio.rs	duplicate_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_audio.rs	remove_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
