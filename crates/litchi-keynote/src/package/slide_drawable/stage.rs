@@ -114,7 +114,10 @@ pub(super) fn set_geometry(
 
 /// Every object reference held by one staged object: the header's aggregate
 /// and field lists, and the schema walk of admitted payloads.
-fn outgoing(workspace: &Workspace<'_>, identifier: u64) -> Result<Vec<u64>, StructureError> {
+pub(super) fn outgoing(
+    workspace: &Workspace<'_>,
+    identifier: u64,
+) -> Result<Vec<u64>, StructureError> {
     let object = workspace.require(identifier)?;
     let mut found = BTreeSet::new();
     for (message, info) in object

@@ -575,7 +575,9 @@ impl<'p> Working<'p> {
             .reassemble_with_changes_to_bytes(&[], &edits, &deleted, self.catalog.limits())
             .map_err(|error| map_archive(&error))?;
         let bytes: Arc<[u8]> = output.into();
-        let candidate = Package::from_shared_profile(Arc::clone(&bytes), self.source.state.options)
+        let candidate = self
+            .source
+            .reopen_candidate(Arc::clone(&bytes))
             .map_err(|_error| Fault::Verification)?;
         verify_locality(self.catalog, &candidate, &encoded, &deleted)?;
         Ok(Published {

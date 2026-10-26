@@ -33,6 +33,7 @@
 
 mod convert;
 mod inherit;
+pub mod named;
 mod overrides;
 mod storage;
 
@@ -444,6 +445,27 @@ pub enum Error {
     /// engine invariant).
     #[error("paragraph-style plan failed its read-back check")]
     Internal,
+    /// The request is well formed but the named-style catalog refuses it.
+    #[error("paragraph-style request refused: {0:?}")]
+    Refused(Refusal),
+}
+
+/// Why a named-style request is refused ([`named`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The style is not a named style of the storage's stylesheet.
+    NotNamed,
+    /// Another named style already has the requested name.
+    NameTaken,
+    /// A theme must keep at least one named paragraph style.
+    LastStyle,
+    /// The storage has no overrides on its applied named style.
+    NoOverrides,
+    /// The storage does not currently use the named style.
+    NotApplied,
+    /// A deleted style needs a different replacement.
+    SameReplacement,
 }
 
 impl From<NativeError> for Error {
