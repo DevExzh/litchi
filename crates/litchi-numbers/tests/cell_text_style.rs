@@ -114,15 +114,18 @@ fn refusals_are_typed() -> TestResult {
             litchi_numbers::cell::text_style::Refusal::CellNotFound
         ))
     ));
-    assert!(matches!(
-        package
-            .edit_table_cell_text_style(0, 0)?
-            .set(At::new(3, 3), bold())?
-            .commit(),
-        Err(Error::Refused(
-            litchi_numbers::cell::text_style::Refusal::EmptyCell
-        ))
-    ));
+    // An empty cell takes a style-only cell (record 0370).
+    let commit = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(At::new(3, 3), bold())?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_text_style(0, 0, At::new(3, 3))?
+            .bold,
+        Some(true)
+    );
     assert!(matches!(
         package.edit_table_cell_text_style(0, 0)?.commit(),
         Err(Error::Refused(
@@ -176,10 +179,9 @@ fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {
                 styled += 1;
             },
             Err(
-                error @ (Error::Refused(
+                error @ Error::Refused(
                     litchi_numbers::cell::text_style::Refusal::UnsupportedDependency,
-                )
-                | Error::Refused(litchi_numbers::cell::text_style::Refusal::EmptyCell)),
+                ),
             ) => {
                 refused.push((path, error));
             },

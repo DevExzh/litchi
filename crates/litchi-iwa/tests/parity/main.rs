@@ -23,11 +23,16 @@
 //! The harness lives in the host's tests so that W3 deletes it with the host.
 
 mod archive_diff;
+mod chart_style_cases;
 mod cost_probes;
 mod harness;
 mod known_fields;
 
+mod keynote_builder_cases;
 mod keynote_cases;
+mod keynote_drawable_cases;
+mod keynote_slide_cases;
+mod keynote_w1c_cost;
 mod numbers_cases;
 mod numbers_owner_allocation;
 mod pages_cases;
@@ -37,3 +42,7 @@ mod pages_table_cases;
 mod pages_text_cases;
 mod physical_cases;
 mod self_test;
+mod text_annotation_cases;
+mod text_glue;
+mod text_language_cases;
+mod text_style_cases;

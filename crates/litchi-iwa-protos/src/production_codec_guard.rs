@@ -738,6 +738,7 @@ mod tests {
         ),
         ("chart_metadata", include_str!("chart_metadata_codec.rs")),
         ("chart_data", include_str!("chart_data_codec.rs")),
+        ("chart_style", include_str!("chart_style_codec.rs")),
         (
             "chart_data_rewrite",
             include_str!("chart_data_codec/rewrite.rs"),

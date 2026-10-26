@@ -611,7 +611,14 @@ The `iwa-text-wire` profile (record 0361g) applies the same rule to raw text
 projection, validation, decoding, boundary scans and rewrites. `from_bytes`
 requires `Limits`; the other raw operations require `RewriteLimits`, including
 the `with_behavior` variants. Their former `_with_limits` and `_and_limits`
-names are removed, with no default-policy twin.
+names are removed, with no default-policy twin. The storage-scoped text
+engines of record 0374 follow it too: `paragraph_style::{effective, plan,
+uniform_style, repoint, stylesheet_with_variation,
+stylesheet_without_variation}` take a required `WireLimits` and are pinned
+as `required_signatures`. An engine owns payloads only; a set/reset run of
+one host property is one `paragraph_style::Change::{Set(Property),
+Reset(PropertyKind)}`, and its `Plan` (`Rewrite`, `Derive`, `Collapse`) is
+published by the format package's own family.
 
 `families` lists fully qualified public module paths that have completed the
 shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,

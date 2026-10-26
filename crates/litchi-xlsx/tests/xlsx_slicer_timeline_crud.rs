@@ -375,20 +375,36 @@ fn raw_slicer_rejects_a_misdeclared_lazy_member_without_mutation() {
     let mut edit = source
         .edit_slicers_with_options(slicer::EditOptions::default())
         .unwrap();
-    let error = edit
-        .insert_cache(slicer::raw::Cache {
-            relationship_id: "rIdMisdeclared".into(),
-            part_name: "/xl/slicerCaches/misdeclared.xml".into(),
-            definition: slicer_cache("Misdeclared", "State"),
-        })
-        .expect_err("raw edit must reject the declared-versus-decoded mismatch");
-    assert!(matches!(error, Error::Package(OpcError::ZipError(_))));
+    // Staging plans relationships from part metadata only (d692fa25ac), so
+    // the unrelated lazy member stays cold until publication needs its bytes.
+    edit.insert_cache(slicer::raw::Cache {
+        relationship_id: "rIdMisdeclared".into(),
+        part_name: "/xl/slicerCaches/misdeclared.xml".into(),
+        definition: slicer_cache("Misdeclared", "State"),
+    })
+    .expect("staging does not hydrate the unrelated lazy member");
     assert_eq!(
         edit.opc().deferred_decode_counters(),
         before_counters,
+        "staging must leave the unrelated deferred payload cold"
+    );
+    let error = edit
+        .commit()
+        .expect_err("raw edit must reject the declared-versus-decoded mismatch");
+    assert!(matches!(error, Error::Package(OpcError::ZipError(_))));
+    assert_eq!(
+        source.clone().into_plain_opc().deferred_decode_counters(),
+        before_counters,
         "the bounded mismatch probe must not charge a failed payload"
     );
-    assert!(edit.cache("Misdeclared").unwrap().is_none());
+    assert!(
+        source
+            .edit_slicers()
+            .unwrap()
+            .cache("Misdeclared")
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]

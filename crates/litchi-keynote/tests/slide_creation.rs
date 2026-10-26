@@ -531,3 +531,35 @@ fn slide_layout_list_names_each_slides_layout() -> TestResult {
     assert_eq!(assigned[0], assigned[1]);
     Ok(())
 }
+
+#[test]
+fn set_layout_reassigns_a_slide_and_keeps_its_text() -> TestResult {
+    let package = basic()?;
+    let before = texts(&package, 0)?;
+    for layout in package.slide_layouts()?.iter() {
+        let name = layout.name().ok_or("unnamed layout")?;
+        let mut edit = package.edit_slide_creation();
+        edit.set_layout(SlideSelector::index(0), name)?;
+        let commit = edit.commit()?;
+        let edited = commit.package();
+        let assigned = edited.slide_layout_list()?;
+        assert_eq!(assigned[0].as_ref().and_then(Layout::name), Some(name));
+        assert_eq!(texts(edited, 0)?, before, "{name}: slide text changed");
+        assert_eq!(edited.slides()?.len(), package.slides()?.len());
+        let restored = edited.apply_slide_creation(&commit.patch().inverse())?;
+        assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    }
+    // Reassigning a slide to its own layout stages nothing.
+    let current = package.slide_layout_list()?[0]
+        .clone()
+        .ok_or("slide 0 has a layout")?;
+    let mut edit = package.edit_slide_creation();
+    edit.set_layout(
+        SlideSelector::index(0),
+        LayoutSelector::Position(current.position()),
+    )?;
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    Ok(())
+}

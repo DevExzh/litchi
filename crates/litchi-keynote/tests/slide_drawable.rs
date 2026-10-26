@@ -162,6 +162,98 @@ fn remove_drops_the_text_box_and_its_private_objects() -> TestResult {
 }
 
 #[test]
+fn removing_an_image_culls_its_final_owner_data() -> TestResult {
+    let package = open("image-adjustments-native.key")?;
+    let image = list(&package, 0)?
+        .iter()
+        .position(|drawable| drawable.kind() == Kind::Image)
+        .ok_or("fixture has an image")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(image))?;
+    let commit = edit.commit()?;
+    // The image and its three derived renditions had no other owner
+    // (record 0372; host `remove_slide_image` parity).
+    assert_eq!(commit.diagnostics().removed_data(), 4);
+    let output = bytes(commit.package())?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output, Default::default())?;
+    assert!(
+        !catalog
+            .iter()
+            .any(|entry| entry.name().starts_with("Data/abstract1"))
+    );
+    let restored = commit
+        .package()
+        .apply_slide_drawables(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn removing_the_newest_drawable_releases_the_identifier_watermark() -> TestResult {
+    let package = open("basic.key")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.add_shape(
+        SlideSelector::index(0),
+        Preset::Star {
+            points: litchi_keynote::slide::drawable::StarPoints::new(5)?,
+            inner_radius: litchi_keynote::slide::drawable::InnerRadiusRatio::new(0.5)?,
+        },
+        Geometry::new(10.0, 10.0, 100.0, 100.0),
+        "",
+    )?;
+    let added = edit.commit()?.into_package();
+    let star = list(&added, 0)?.len() - 1;
+    let mut edit = added.edit_slide_drawables();
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(star))?;
+    let removed = edit.commit()?.into_package();
+    // A new shape after the removal takes the identifiers the star had.
+    let mut again = removed.edit_slide_drawables();
+    again.add_shape(
+        SlideSelector::index(0),
+        Preset::Rectangle,
+        Geometry::new(10.0, 10.0, 100.0, 100.0),
+        "",
+    )?;
+    let first = again.commit()?.into_package();
+    let source = watermark(&package)?;
+    assert!(watermark(&added)? > source);
+    assert_eq!(watermark(&removed)?, source);
+    // The rectangle reuses the identifiers the star released.
+    assert_eq!(watermark(&first)?, watermark(&added)?);
+    assert_eq!(
+        reopen(&first)?
+            .slide_drawable_list(SlideSelector::index(0))?
+            .len(),
+        4
+    );
+    Ok(())
+}
+
+/// `TSP.PackageMetadata.last_object_identifier`.
+fn watermark(package: &Package) -> TestResult<u64> {
+    use prost::Message as _;
+    let output = bytes(package)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output, Default::default())?;
+    let member = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Metadata.iwa")
+        .ok_or("metadata member")?;
+    let stream = litchi_iwa_core::SnappyStream::decompress(member.data(), Default::default())?;
+    let archive = litchi_iwa_core::Archive::parse(&stream.into_bytes(), Default::default())?;
+    for object in &archive.objects {
+        for message in &object.messages {
+            if message.type_ == 11_006 {
+                return Ok(litchi_iwa_protos::tsp::PackageMetadata::decode(
+                    message.data.as_slice(),
+                )?
+                .last_object_identifier);
+            }
+        }
+    }
+    Err("no package metadata".into())
+}
+
+#[test]
 fn move_to_reorders_the_z_order_only() -> TestResult {
     let package = open("basic.key")?;
     let mut edit = package.edit_slide_drawables();

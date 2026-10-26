@@ -72,3 +72,65 @@ fn numbers_topology_insert_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+#[inline(never)]
+fn host_text_style(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    use litchi_iwa::text::{TextPointSize, TextStyle};
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = editor
+        .package()
+        .iwa_entry_names()
+        .find_map(|name| {
+            editor
+                .package()
+                .archive(name)
+                .ok()?
+                .objects
+                .into_iter()
+                .find_map(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .any(|message| message.type_ == 6_001)
+                        .then_some(object.archive_info.identifier)
+                        .flatten()
+                })
+        })
+        .ok_or("no table model")?;
+    let style = TextStyle::new(TextPointSize::from_points(18.0)?).with_bold(true);
+    for (row, column) in cells {
+        editor.set_table_cell_text_style(id, *row as usize, *column as usize, style)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_text_style(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    use litchi_numbers::cell::text_style::CharacterProperties;
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let mut properties = CharacterProperties::new();
+    properties.size = Some(18.0);
+    properties.bold = Some(true);
+    let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
+    for (row, column) in cells {
+        edit = edit.set(
+            litchi_numbers::table::At::new(*row, *column),
+            properties.clone(),
+        )?;
+    }
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Whole-cell text style on `basic.numbers`: one cell, then two.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_text_style_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    for cells in [&[(1, 1)][..], &[(1, 1), (2, 1)][..]] {
+        black_box(host_text_style(&input.bytes, cells)?);
+        black_box(leaf_text_style(&input.bytes, cells)?);
+        black_box(leaf_text_style(&input.bytes, cells)?);
+        black_box(host_text_style(&input.bytes, cells)?);
+    }
+    Ok(())
+}

@@ -5,6 +5,7 @@
 //! scalar rejects values the inspector cannot represent while the wire patch
 //! preserves every unrelated field byte-for-byte.
 
+use litchi_iwa_common::chart::pie::StartAngle;
 use prost::Message;
 
 use crate::charts::non_style::{
@@ -23,31 +24,38 @@ const FULL_TURN_DEGREES: f32 = 360.0;
 /// Rotation of the first wedge in a native pie or donut chart.
 ///
 /// Angles use the clockwise degrees displayed by the iWork inspector. Values
-/// must be finite and lie in the half-open range `0°..360°`.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartPieStartAngle(f32);
+/// must be finite and lie in the half-open range `0°..360°`. The value is the
+/// shared `litchi_iwa_common::chart::pie::StartAngle` (record 0375).
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ChartPieStartAngle(StartAngle);
+
+impl std::fmt::Debug for ChartPieStartAngle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartPieStartAngle")
+            .field(&self.0.degrees())
+            .finish()
+    }
+}
 
 impl ChartPieStartAngle {
-    pub const ZERO: Self = Self(MINIMUM_PIE_START_ANGLE_DEGREES);
-    pub const QUARTER_TURN: Self = Self(90.0);
-    pub const HALF_TURN: Self = Self(180.0);
-    pub const THREE_QUARTER_TURN: Self = Self(270.0);
+    pub const ZERO: Self = Self(StartAngle::ZERO);
+    pub const QUARTER_TURN: Self = Self(StartAngle::QUARTER_TURN);
+    pub const HALF_TURN: Self = Self(StartAngle::HALF_TURN);
+    pub const THREE_QUARTER_TURN: Self = Self(StartAngle::THREE_QUARTER_TURN);
 
     /// Construct an angle accepted by the native Wedges inspector.
     pub fn from_degrees(degrees: f32) -> Result<Self> {
-        if !degrees.is_finite()
-            || !(MINIMUM_PIE_START_ANGLE_DEGREES..FULL_TURN_DEGREES).contains(&degrees)
-        {
-            return Err(Error::InvalidFormat(format!(
+        StartAngle::from_degrees(degrees).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart pie start angle must be finite and within {MINIMUM_PIE_START_ANGLE_DEGREES}°..{FULL_TURN_DEGREES}°"
-            )));
-        }
-        Ok(Self(degrees))
+            ))
+        })
     }
 
     /// Return the clockwise degrees displayed by iWork.
     pub const fn degrees(self) -> f32 {
-        self.0
+        self.0.degrees()
     }
 
     fn from_native(degrees: f32) -> Result<Self> {
