@@ -6801,12 +6801,13 @@ mod error_classification_tests {
         assert!(expected(source_chain));
 
         let wrapped = Error::from(join);
-        assert!(matches!(&wrapped, Error::Join(_)));
-        let join = std::error::Error::source(&wrapped)
-            .expect("wrapped join source")
-            .downcast_ref::<JoinError>()
-            .expect("typed JoinError");
-        let source_chain = std::error::Error::source(join)
+        let Error::Join(join) = &wrapped else {
+            panic!("JoinError converts to Error::Join");
+        };
+        assert!(join.normalization_source().is_some_and(&expected));
+        // `Error::Join` is `#[error(transparent)]`: its standard source is the
+        // `JoinError`'s own source, the retained typed leaf.
+        let source_chain = std::error::Error::source(&wrapped)
             .expect("wrapped normalization source")
             .downcast_ref::<Error>()
             .expect("typed wrapped normalization source");
