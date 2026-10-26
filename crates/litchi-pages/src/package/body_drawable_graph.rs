@@ -636,7 +636,7 @@ pub(crate) fn publish_archives(
     source: &Package,
     archives: Vec<(Arc<str>, Archive)>,
 ) -> GraphResult<Package> {
-    publish_changes(source, archives, &[], &[])
+    publish_changes(source, archives, &[], &[], &[])
 }
 
 /// Publish a candidate in which the given component archives changed, the
@@ -646,6 +646,7 @@ pub(crate) fn publish_changes(
     source: &Package,
     archives: Vec<(Arc<str>, Archive)>,
     insertions: &[(&str, &[u8])],
+    replacements: &[(&str, &[u8])],
     deletions: &[&str],
 ) -> GraphResult<Package> {
     let limits = source.state.source.limits();
@@ -669,6 +670,11 @@ pub(crate) fn publish_changes(
     let edits = payloads
         .iter()
         .map(|(name, data)| EntryEdit::new(name.as_ref(), data))
+        .chain(
+            replacements
+                .iter()
+                .map(|(name, data)| EntryEdit::new(name, data)),
+        )
         .collect::<Vec<_>>();
     let output = source
         .state
