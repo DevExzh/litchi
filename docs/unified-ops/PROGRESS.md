@@ -6268,3 +6268,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   W6 v3 and flat-parts v2 are returned for executable producer/admission
   defects; both are in repair. C/P remain frozen, 25 of 28 preparations are
   source-ready, and all actual qualification remains pending. No push.
+
+
+  The isolated Clippy diagnostic passes after all seven test-only fixes
+  (165i). Root verifies its logs, unchanged source/locks and resource records,
+  then merges Q472a into trunk. A separate remaining-29 diagnostic is being
+  prepared; final full65 acceptance is still required. Root starts bounded
+  ordinary/allocator compilation of the ODF raw example after materializing
+  its tracked dependencies. W6 v4 enters independent review, and flat-parts
+  v3 remains in repair. C/P stay frozen; no native acceptance or push.
