@@ -6431,3 +6431,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   incorrectly orders DOCX after candidate selection. A concrete v14 repair
   is required before actual final-source binding. All 29 native groups and
   final all-65 remain pending. Nothing is pushed.
+
+  All 29 Clippy feature profiles also pass (165ua), with source/lock/log and
+  resource evidence verified. Fuzz stops before compilation because the
+  diagnostic source lacks its standalone lock files under the required
+  offline/locked policy. Three approved historical seeds are available;
+  current-graph checks and a fresh RTF lock are required before a new run.
+  The diagnostic continues to golden checks. Protocol v14 now materializes
+  the composed outputs and passes 20+20 controls, but review returns stale
+  source metadata and a producer recipe still fixed to C33. A concrete
+  source-rebinding repair is in progress. DOCX builds remain queued; all
+  final qualification remains required. Nothing is pushed.
