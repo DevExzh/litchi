@@ -8,7 +8,9 @@ raw-codec manifest.  The build phase creates four fixed role/variant
 artifacts (baseline/candidate × normal/allocator).  The ABBA phase consumes
 only those hashed artifacts and runs the ten raw-codec routes in the exact
 baseline, candidate, candidate, baseline order.  Receipts are protocol
-evidence only and make no acceptance claim.
+evidence only and make no acceptance claim.  Final-C identity is admitted
+from a separate protocol-P-sealed identity envelope; this runner never takes
+a free-standing candidate commit or lock argument.
 """
 
 from __future__ import annotations
@@ -37,8 +39,10 @@ import native_qualification_runner as generic  # noqa: E402
 from native_qualification import odf_shared_triad_paired_runner as reviewed  # noqa: E402
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v1"
-PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v2"
+SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v2"
+PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v3"
+IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v1"
+CANDIDATE_MODE = "integrated_final_c"
 ROLES = ("baseline", "candidate")
 VARIANTS = ("normal", "allocator")
 ABBA_ORDER = ("baseline", "candidate", "candidate", "baseline")
@@ -54,10 +58,12 @@ PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
 PRODUCTION_MANIFEST = Path("crates/litchi-ops/Cargo.toml")
 LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
+CANDIDATE_CONSUMER_MANIFEST_SHA256 = "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a"
+CANDIDATE_CONSUMER_MANIFEST_BYTES = 8181
+CANDIDATE_PROBE_SHA256 = "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
+CANDIDATE_PROBE_BYTES = 65903
 CANDIDATE_LOCK_SHA256 = "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4"
 CANDIDATE_LOCK_BYTES = 57961
-CANDIDATE_LOCK_BEFORE_SHA256 = "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea"
-CANDIDATE_LOCK_BEFORE_BYTES = 56941
 BUILD_PROFILE = "release"
 BUILD_FLAG = "--release"
 BUILD_BINARY_DIRECTORY = "release"
@@ -70,7 +76,6 @@ EXPECTED_BUILD = {
         "allocator": {"allocator_feature": "raw-codec-allocator"},
     },
 }
-CANDIDATE_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
 PROBE_NAME = PROBE_PATH.stem
 ROUTE_IDS = (
     "archive_catalog_and_raw_split",
@@ -245,6 +250,71 @@ def _load_json(path: Path, label: str) -> tuple[dict[str, Any], str, int]:
     return data, _sha256_bytes(raw), len(raw)
 
 
+def _canonical_json(value: Mapping[str, Any]) -> bytes:
+    return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _candidate_identity_digest(candidate: Mapping[str, Any]) -> str:
+    return _sha256_bytes(_canonical_json(candidate))
+
+
+def _validate_candidate_identity(data: Mapping[str, Any], manifest: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(data, Mapping) or set(data) != {"schema", "sealed_by", "candidate"}:
+        raise RunnerError("candidate identity envelope has unexpected fields")
+    if data.get("schema") != IDENTITY_SCHEMA or data.get("schema") != manifest["source"]["candidate_identity_schema"]:
+        raise RunnerError("candidate identity schema differs")
+    sealed_by = data.get("sealed_by")
+    if not isinstance(sealed_by, Mapping) or set(sealed_by) != {"role", "commit", "tree", "candidate_sha256"}:
+        raise RunnerError("candidate identity seal is incomplete")
+    if sealed_by.get("role") != "protocol-P":
+        raise RunnerError("candidate identity must be sealed by protocol P")
+    _require_sha(sealed_by.get("commit"), "candidate identity seal commit", 40)
+    _require_sha(sealed_by.get("tree"), "candidate identity seal tree", 40)
+    seal = _require_sha(sealed_by.get("candidate_sha256"), "candidate identity seal digest", 64)
+    candidate = data.get("candidate")
+    required = {"mode", "commit", "tree", "production_source_tree_sha256", "consumer_manifest", "probe", "perf_lock"}
+    if not isinstance(candidate, Mapping) or set(candidate) != required:
+        raise RunnerError("candidate identity fields are incomplete")
+    if candidate.get("mode") != CANDIDATE_MODE:
+        raise RunnerError("candidate identity mode is not integrated final C")
+    _require_sha(candidate.get("commit"), "candidate identity candidate commit", 40)
+    _require_sha(candidate.get("tree"), "candidate identity candidate tree", 40)
+    _require_sha(candidate.get("production_source_tree_sha256"), "candidate identity production source closure", 64)
+    files = (
+        ("consumer_manifest", CONSUMER_MANIFEST),
+        ("probe", PROBE_PATH),
+        ("perf_lock", LOCK_PATH),
+    )
+    for key, expected_path in files:
+        value = candidate.get(key)
+        if not isinstance(value, Mapping) or set(value) != {"path", "sha256", "bytes"}:
+            raise RunnerError(f"candidate identity {key} fields are incomplete")
+        if value.get("path") != str(expected_path):
+            raise RunnerError(f"candidate identity {key} path differs")
+        _require_sha(value.get("sha256"), f"candidate identity {key} SHA", 64)
+        size = value.get("bytes")
+        if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
+            raise RunnerError(f"candidate identity {key} byte count is invalid")
+    if candidate["consumer_manifest"]["sha256"] != manifest["source"]["candidate_consumer_manifest_sha256"] or candidate["consumer_manifest"]["bytes"] != manifest["source"]["candidate_consumer_manifest_bytes"]:
+        raise RunnerError("candidate consumer manifest does not match the reviewed manifest")
+    if candidate["probe"]["sha256"] != manifest["probe"]["sha256"] or candidate["probe"]["bytes"] != manifest["probe"]["bytes"]:
+        raise RunnerError("candidate probe does not match the reviewed manifest")
+    if candidate["perf_lock"]["sha256"] != manifest["source"]["candidate_lock_sha256"] or candidate["perf_lock"]["bytes"] != manifest["source"]["candidate_lock_bytes"]:
+        raise RunnerError("candidate performance lock does not match the reviewed manifest")
+    if seal != _candidate_identity_digest(candidate):
+        raise RunnerError("candidate identity seal digest does not match the candidate object")
+    return {"schema": IDENTITY_SCHEMA, "sealed_by": dict(sealed_by), "candidate": {key: (dict(value) if isinstance(value, Mapping) else value) for key, value in candidate.items()}}
+
+
+def _load_candidate_identity(path: Path, *, manifest: Mapping[str, Any], roots: tuple[Path, ...]) -> tuple[dict[str, Any], str, int, Path]:
+    path = _resolve(path)
+    if any(path == root or _under(path, root) for root in roots):
+        raise RunnerError("candidate identity must be outside every source endpoint")
+    data, digest, size = _load_json(path, "candidate identity")
+    identity = _validate_candidate_identity(data, manifest)
+    return identity, digest, size, path
+
+
 def _require_sha(value: Any, label: str, length: int) -> str:
     if not isinstance(value, str) or len(value) != length or value != value.lower():
         raise RunnerError(f"{label} must be a lowercase {length}-character digest")
@@ -377,16 +447,13 @@ EXPECTED_OUTPUT_PROOF = [
 
 
 def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != "litchi.odf.raw-codec-qualification.manifest.v1":
+    if data.get("schema") != "litchi.odf.raw-codec-qualification.manifest.v2":
         raise RunnerError("manifest schema is not the ODF raw-codec schema")
     if data.get("lane") != "odf-raw-codec":
         raise RunnerError("manifest lane is not odf-raw-codec")
     _require_sha(data.get("baseline_commit"), "baseline_commit", 40)
-    candidate = _require_sha(data.get("candidate_commit"), "candidate_commit", 40)
-    if candidate == "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee":
-        raise RunnerError("historical 15ab candidate is not admissible")
-    if candidate != CANDIDATE_COMMIT:
-        raise RunnerError(f"candidate production pin must remain {CANDIDATE_COMMIT}")
+    if "candidate_commit" in data:
+        raise RunnerError("manifest must not self-pin the final-C commit")
     source = data.get("source")
     if not isinstance(source, Mapping):
         raise RunnerError("manifest source identity is missing")
@@ -395,30 +462,38 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         "production_manifest": str(PRODUCTION_MANIFEST),
         "lock_path": str(LOCK_PATH),
         "baseline_overlay": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
-        "candidate_overlay": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
+        "candidate_overlay": [],
+        "candidate_integrated_files": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
+        "candidate_mode": CANDIDATE_MODE,
+        "candidate_identity_schema": IDENTITY_SCHEMA,
+        "adapter_provenance_scope": "three consumer files only; production closure is not equated to final C",
     }
     for key, expected in expected_source.items():
         if source.get(key) != expected:
             raise RunnerError(f"manifest source.{key} differs from the canonical path")
     consumer_sha = _require_sha(source.get("candidate_consumer_manifest_sha256"), "source.candidate_consumer_manifest_sha256", 64)
+    consumer_bytes = source.get("candidate_consumer_manifest_bytes")
+    if isinstance(consumer_bytes, bool) or not isinstance(consumer_bytes, int) or consumer_bytes <= 0:
+        raise RunnerError("source.candidate_consumer_manifest_bytes must be a positive integer")
     lock_sha = _require_sha(source.get("candidate_lock_sha256"), "source.candidate_lock_sha256", 64)
     lock_bytes = source.get("candidate_lock_bytes")
     if isinstance(lock_bytes, bool) or not isinstance(lock_bytes, int) or lock_bytes <= 0:
         raise RunnerError("source.candidate_lock_bytes must be a positive integer")
+    if consumer_sha != CANDIDATE_CONSUMER_MANIFEST_SHA256 or consumer_bytes != CANDIDATE_CONSUMER_MANIFEST_BYTES:
+        raise RunnerError("manifest candidate consumer identity is not the reviewed consumer file")
     if lock_sha != CANDIDATE_LOCK_SHA256 or lock_bytes != CANDIDATE_LOCK_BYTES:
-        raise RunnerError("manifest candidate lock identity is not the reviewed repaired lock")
-    lock_before_sha = _require_sha(source.get("candidate_lock_before_sha256"), "source.candidate_lock_before_sha256", 64)
-    lock_before_bytes = source.get("candidate_lock_before_bytes")
-    if isinstance(lock_before_bytes, bool) or not isinstance(lock_before_bytes, int) or lock_before_bytes <= 0:
-        raise RunnerError("source.candidate_lock_before_bytes must be a positive integer")
-    if lock_before_sha != CANDIDATE_LOCK_BEFORE_SHA256 or lock_before_bytes != CANDIDATE_LOCK_BEFORE_BYTES:
-        raise RunnerError("manifest candidate pre-overlay lock identity is not the pinned C33 lock")
+        raise RunnerError("manifest candidate lock identity is not the reviewed final-C lock")
     probe = data.get("probe")
     if not isinstance(probe, Mapping) or probe.get("path") != str(PROBE_PATH):
         raise RunnerError("manifest probe path differs")
     probe_sha = _require_sha(probe.get("sha256"), "probe.sha256", 64)
+    probe_bytes = probe.get("bytes")
+    if isinstance(probe_bytes, bool) or not isinstance(probe_bytes, int) or probe_bytes <= 0:
+        raise RunnerError("probe.bytes must be a positive integer")
     if probe.get("features") != ["raw-codec-original", "raw-codec-current", "raw-codec-allocator"]:
         raise RunnerError("manifest feature adapter set differs")
+    if probe_sha != CANDIDATE_PROBE_SHA256 or probe_bytes != CANDIDATE_PROBE_BYTES:
+        raise RunnerError("manifest probe identity is not the reviewed consumer probe")
     if probe.get("api_eras") != list(API_ERAS) or probe.get("namespace_contracts") != NAMESPACE_CONTRACTS:
         raise RunnerError("manifest API-era namespace contract differs")
     if probe.get("modes") != ["validate", "timed", "allocator"] or probe.get("max_iterations") != PROBE_ITERATIONS:
@@ -471,29 +546,44 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         raise RunnerError("manifest must be explicitly non-acceptance")
     normalized = dict(data)
     normalized["routes"] = routes
+    normalized["candidate_mode"] = CANDIDATE_MODE
     normalized["candidate_lock_sha256"] = lock_sha
     normalized["candidate_lock_bytes"] = lock_bytes
-    normalized["candidate_lock_before_sha256"] = lock_before_sha
-    normalized["candidate_lock_before_bytes"] = lock_before_bytes
     normalized["candidate_consumer_manifest_sha256"] = consumer_sha
+    normalized["candidate_consumer_manifest_bytes"] = consumer_bytes
     normalized["probe_sha256"] = probe_sha
-    normalized["candidate_commit"] = candidate
+    normalized["probe_bytes"] = probe_bytes
     return normalized
 
 
-def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Mapping[str, Any], baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_commit: str, candidate_lock_sha256: str) -> dict[str, Any]:
+def _validate_preparation(
+    data: Mapping[str, Any],
+    digest: str,
+    *,
+    manifest: Mapping[str, Any],
+    baseline_root: Path,
+    candidate_root: Path,
+    adapter_root: Path,
+    candidate_identity: Mapping[str, Any],
+    candidate_identity_path: Path,
+    candidate_identity_sha256: str,
+    candidate_identity_bytes: int,
+) -> dict[str, Any]:
     if data.get("schema") != PREPARATION_SCHEMA or data.get("lane") != "odf-raw-codec":
         raise RunnerError("preparation schema/lane differs")
-    if candidate_lock_sha256 != manifest["candidate_lock_sha256"]:
-        raise RunnerError("candidate Cargo.lock argument differs from the manifest identity")
     baseline = data.get("baseline")
     candidate = data.get("candidate")
-    if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping):
+    adapter = data.get("adapter")
+    if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping) or not isinstance(adapter, Mapping):
         raise RunnerError("preparation endpoints are missing")
+    identity_record = data.get("candidate_identity")
+    if not isinstance(identity_record, Mapping) or identity_record.get("path") != str(candidate_identity_path) or identity_record.get("sha256") != candidate_identity_sha256 or identity_record.get("bytes") != candidate_identity_bytes or identity_record.get("value") != candidate_identity:
+        raise RunnerError("preparation candidate identity handoff differs")
+
     before = baseline.get("before")
     after = baseline.get("after_overlay")
     if not isinstance(before, Mapping) or not isinstance(after, Mapping):
-        raise RunnerError("preparation source states are missing")
+        raise RunnerError("preparation baseline source states are missing")
     if _resolve(str(before.get("root"))) != baseline_root or before.get("head") != manifest["baseline_commit"] or before.get("clean") is not True:
         raise RunnerError("preparation baseline before-state differs")
     if after.get("tree") != before.get("tree"):
@@ -501,101 +591,115 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
     if baseline.get("commit") != manifest["baseline_commit"] or baseline.get("production_tree_sha256") != reviewed._production_tree(baseline_root):
         raise RunnerError("preparation baseline identity differs")
     overlay = baseline.get("overlay_paths")
-    if sorted(overlay or []) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]):
-        raise RunnerError("preparation baseline overlay is not exactly consumer, lock plus probe")
-    if _resolve(str(candidate.get("root"))) != candidate_root or candidate.get("commit") != candidate_commit:
-        raise RunnerError("preparation candidate identity differs")
+    allowed_overlay = {str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)}
+    if not isinstance(overlay, list) or str(CONSUMER_MANIFEST) not in overlay or str(PROBE_PATH) not in overlay or not set(overlay).issubset(allowed_overlay):
+        raise RunnerError("preparation baseline overlay is outside the reviewed consumer paths")
+
+    expected_candidate = candidate_identity["candidate"]
+    if _resolve(str(candidate.get("root"))) != candidate_root or candidate.get("mode") != CANDIDATE_MODE or candidate.get("commit") != expected_candidate["commit"] or candidate.get("tree") != expected_candidate["tree"]:
+        raise RunnerError("preparation candidate identity differs from the P-sealed final-C source")
     candidate_before = candidate.get("before")
-    candidate_after = candidate.get("after_overlay")
+    candidate_after = candidate.get("after")
     if not isinstance(candidate_before, Mapping) or not isinstance(candidate_after, Mapping):
         raise RunnerError("preparation candidate source states are missing")
-    if _resolve(str(candidate_before.get("root"))) != candidate_root or candidate_before.get("head") != manifest["candidate_commit"] or candidate_before.get("clean") is not True:
-        raise RunnerError("preparation candidate production before-state differs")
-    if _resolve(str(candidate_after.get("root"))) != candidate_root or candidate_after.get("tree") != candidate_before.get("tree") or sorted(_status_paths(str(candidate_after.get("status", "")))) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]) or sorted(candidate.get("overlay_paths") or []) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]):
-        raise RunnerError("preparation candidate overlay differs")
-    if candidate.get("production_source_tree_before_sha256") != candidate.get("production_source_tree_sha256"):
-        raise RunnerError("candidate consumer overlay changed the recorded production source tree")
-    if candidate.get("production_tree_sha256") != reviewed._production_tree(candidate_root):
-        raise RunnerError("preparation candidate production tree differs")
-    adapter = data.get("adapter")
-    if not isinstance(adapter, Mapping) or _resolve(str(adapter.get("root"))) != adapter_root:
+    if _resolve(str(candidate_before.get("root"))) != candidate_root or candidate_before.get("head") != expected_candidate["commit"] or candidate_before.get("tree") != expected_candidate["tree"] or candidate_before.get("clean") is not True:
+        raise RunnerError("preparation candidate before-state differs")
+    if _resolve(str(candidate_after.get("root"))) != candidate_root or candidate_after.get("head") != expected_candidate["commit"] or candidate_after.get("tree") != expected_candidate["tree"] or candidate_after.get("clean") is not True or candidate_after.get("status"):
+        raise RunnerError("preparation candidate was changed during admission")
+    if candidate.get("overlay_paths") != [] or candidate.get("production_source_tree_before_sha256") != expected_candidate["production_source_tree_sha256"] or candidate.get("production_source_tree_sha256") != expected_candidate["production_source_tree_sha256"] or candidate.get("production_tree_sha256") != reviewed._production_tree(candidate_root):
+        raise RunnerError("preparation candidate final-C source closure differs")
+
+    if _resolve(str(adapter.get("root"))) != adapter_root or adapter_root in {baseline_root, candidate_root} or _under(adapter_root, baseline_root) or _under(adapter_root, candidate_root) or _under(baseline_root, adapter_root) or _under(candidate_root, adapter_root):
         raise RunnerError("preparation adapter endpoint is missing or overlaps a source endpoint")
-    if adapter_root in {baseline_root, candidate_root} or _under(adapter_root, baseline_root) or _under(adapter_root, candidate_root) or _under(baseline_root, adapter_root) or _under(candidate_root, adapter_root):
-        raise RunnerError("preparation adapter endpoint overlaps a source endpoint")
     adapter_state = _source_state(adapter_root)
     if adapter_state.get("commit") != adapter.get("head") or adapter_state.get("tree") != adapter.get("tree") or adapter_state.get("status_paths"):
         raise RunnerError("consumer adapter endpoint changed or is dirty")
-    if adapter.get("production_source_tree_sha256") != candidate.get("production_source_tree_sha256"):
-        raise RunnerError("adapter production source does not match the pinned candidate")
-    if adapter.get("production_source_tree_sha256") != _production_source_tree(adapter_root) or candidate.get("production_source_tree_sha256") != _production_source_tree(candidate_root):
-        raise RunnerError("adapter or candidate production source tree is not bound")
-    if candidate_commit != manifest["candidate_commit"] or candidate_commit == "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee":
-        raise RunnerError("preparation candidate is stale or differs from manifest")
+    if adapter.get("consumer_provenance_scope") != "three consumer files only; production closure is not equated to final C":
+        raise RunnerError("adapter provenance scope is not consumer-file-only")
+
     candidate_consumer = candidate.get("consumer_manifest")
     candidate_probe = candidate.get("probe")
     candidate_lock = candidate.get("lock")
-    candidate_lock_before = candidate.get("lock_before_overlay")
     baseline_probe = baseline.get("probe")
     baseline_lock = baseline.get("lock")
     baseline_consumer = baseline.get("consumer_manifest")
-    for value, label in ((candidate_consumer, "candidate consumer manifest"), (candidate_probe, "candidate probe"), (candidate_lock, "candidate lock"), (candidate_lock_before, "candidate pre-overlay lock"), (baseline_consumer, "baseline consumer manifest"), (baseline_probe, "baseline probe"), (baseline_lock, "baseline lock")):
-        if not isinstance(value, Mapping):
-            raise RunnerError(f"preparation {label} identity is missing")
-        _require_sha(value.get("sha256"), f"preparation {label} SHA", 64)
-        if not isinstance(value.get("bytes"), int) or value["bytes"] <= 0:
-            raise RunnerError(f"preparation {label} size is invalid")
-    if candidate_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or candidate_probe["sha256"] != manifest["probe_sha256"] or candidate_lock["sha256"] != candidate_lock_sha256 or candidate_lock["bytes"] != manifest["candidate_lock_bytes"] or candidate_lock_before["sha256"] != manifest["candidate_lock_before_sha256"] or candidate_lock_before["bytes"] != manifest["candidate_lock_before_bytes"] or baseline_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or baseline_probe["sha256"] != manifest["probe_sha256"]:
-        raise RunnerError("preparation adapter/lock does not match selected manifest")
-    if _resolve(str(candidate_consumer.get("path"))) != _resolve(CONSUMER_MANIFEST, base=candidate_root):
-        raise RunnerError("preparation candidate consumer manifest path is not canonical")
-    if _resolve(str(baseline_consumer.get("source_path"))) != _resolve(str(adapter["consumer_manifest"]["path"])):
-        raise RunnerError("preparation baseline consumer source is not the selected adapter manifest")
-    if _resolve(str(candidate_probe.get("path"))) != _resolve(PROBE_PATH, base=candidate_root):
-        raise RunnerError("preparation candidate probe path is not canonical")
-    if _resolve(str(candidate_lock.get("path"))) != _resolve(LOCK_PATH, base=candidate_root):
-        raise RunnerError("preparation candidate lock path is not canonical")
-    if _resolve(str(candidate_lock_before.get("path"))) != _resolve(LOCK_PATH, base=candidate_root):
-        raise RunnerError("preparation candidate pre-overlay lock path is not canonical")
-    if _resolve(str(baseline_probe.get("source_path"))) != _resolve(str(adapter["probe"]["path"])):
-        raise RunnerError("preparation baseline probe source is not the selected adapter probe")
     adapter_consumer = adapter.get("consumer_manifest")
     adapter_probe = adapter.get("probe")
     adapter_lock = adapter.get("lock")
-    for value, label in ((adapter_consumer, "adapter consumer manifest"), (adapter_probe, "adapter probe"), (adapter_lock, "adapter lock")):
-        if not isinstance(value, Mapping) or _resolve(str(value.get("path"))).is_symlink():
-            raise RunnerError(f"preparation {label} identity is missing or symlinked")
-        observed, size = _sha256_file(_resolve(str(value["path"])))
-        if observed != value.get("sha256") or size != value.get("bytes"):
+    for value, label in (
+        (candidate_consumer, "candidate consumer manifest"),
+        (candidate_probe, "candidate probe"),
+        (candidate_lock, "candidate performance lock"),
+        (baseline_consumer, "baseline consumer manifest"),
+        (baseline_probe, "baseline probe"),
+        (baseline_lock, "baseline lock"),
+        (adapter_consumer, "adapter consumer manifest"),
+        (adapter_probe, "adapter probe"),
+        (adapter_lock, "adapter performance lock"),
+    ):
+        if not isinstance(value, Mapping):
+            raise RunnerError(f"preparation {label} identity is missing")
+        _require_sha(value.get("sha256"), f"preparation {label} SHA", 64)
+        if isinstance(value.get("bytes"), bool) or not isinstance(value.get("bytes"), int) or value["bytes"] <= 0:
+            raise RunnerError(f"preparation {label} size is invalid")
+
+    expected_files = {
+        "consumer_manifest": (candidate_consumer, expected_candidate["consumer_manifest"], adapter_consumer, manifest["candidate_consumer_manifest_sha256"], manifest["candidate_consumer_manifest_bytes"]),
+        "probe": (candidate_probe, expected_candidate["probe"], adapter_probe, manifest["probe_sha256"], manifest["probe_bytes"]),
+        "perf_lock": (candidate_lock, expected_candidate["perf_lock"], adapter_lock, manifest["candidate_lock_sha256"], manifest["candidate_lock_bytes"]),
+    }
+    for label, (candidate_value, expected, adapter_value, manifest_sha, manifest_bytes) in expected_files.items():
+        if candidate_value["sha256"] != expected["sha256"] or candidate_value["bytes"] != expected["bytes"] or candidate_value["sha256"] != manifest_sha or candidate_value["bytes"] != manifest_bytes:
+            raise RunnerError(f"preparation candidate {label} does not match the P-sealed manifest identity")
+        if adapter_value["sha256"] != manifest_sha or adapter_value["bytes"] != manifest_bytes:
+            raise RunnerError(f"preparation adapter {label} does not match the manifest identity")
+        relative = {"consumer_manifest": CONSUMER_MANIFEST, "probe": PROBE_PATH, "perf_lock": LOCK_PATH}[label]
+        if _resolve(str(adapter_value["path"])) != _resolve(relative, base=adapter_root):
+            raise RunnerError(f"preparation adapter {label} path is not inside the selected adapter endpoint")
+        observed, size = _sha256_file(_resolve(str(adapter_value["path"])))
+        if (observed, size) != (manifest_sha, manifest_bytes):
+            raise RunnerError(f"preparation adapter {label} bytes differ")
+
+    for value, relative, root, label in (
+        (candidate_consumer, CONSUMER_MANIFEST, candidate_root, "candidate consumer manifest"),
+        (candidate_probe, PROBE_PATH, candidate_root, "candidate probe"),
+        (candidate_lock, LOCK_PATH, candidate_root, "candidate performance lock"),
+    ):
+        expected_path = _resolve(relative, base=root)
+        if _resolve(str(value.get("path"))) != expected_path or _resolve(str(value.get("source_path"))) != expected_path:
+            raise RunnerError(f"preparation {label} path is not the committed candidate path")
+        observed, size = _sha256_file(expected_path)
+        if (observed, size) != (value["sha256"], value["bytes"]):
             raise RunnerError(f"preparation {label} bytes differ")
-    if adapter_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or adapter_probe["sha256"] != manifest["probe_sha256"] or adapter_lock["sha256"] != manifest["candidate_lock_sha256"] or adapter_lock["bytes"] != manifest["candidate_lock_bytes"]:
-        raise RunnerError("adapter overlay bytes differ from the manifest")
-    if _resolve(str(candidate_consumer.get("source_path"))) != _resolve(str(adapter_consumer["path"])) or _resolve(str(candidate_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])) or _resolve(str(candidate_lock.get("source_path"))) != _resolve(str(adapter_lock["path"])):
-        raise RunnerError("candidate overlay source is not the selected adapter")
-    baseline_lock_source = _resolve(str(baseline_lock.get("source_path")))
-    if _under(baseline_lock_source, baseline_root) or _under(baseline_lock_source, candidate_root) or _under(baseline_lock_source, adapter_root):
-        raise RunnerError("preparation baseline lock source must be external to every source endpoint")
-    source_lock_sha, source_lock_bytes = _sha256_file(baseline_lock_source)
-    if source_lock_sha != baseline_lock["sha256"] or source_lock_bytes != baseline_lock["bytes"]:
-        raise RunnerError("preparation baseline lock source bytes differ")
+
     for value, relative, root, label in (
         (baseline_consumer, CONSUMER_MANIFEST, baseline_root, "baseline consumer manifest"),
         (baseline_probe, PROBE_PATH, baseline_root, "baseline probe"),
         (baseline_lock, LOCK_PATH, baseline_root, "baseline lock"),
     ):
         destination = _resolve(str(value.get("destination_path")))
-        expected = _resolve(relative, base=root)
-        if destination != expected or not destination.is_file():
+        expected_path = _resolve(relative, base=root)
+        if destination != expected_path or not destination.is_file():
             raise RunnerError(f"preparation {label} destination differs")
         observed, size = _sha256_file(destination)
-        if observed != value["sha256"] or size != value["bytes"]:
+        if (observed, size) != (value["sha256"], value["bytes"]):
             raise RunnerError(f"preparation {label} bytes differ")
+
+    if _resolve(str(baseline_consumer.get("source_path"))) != _resolve(str(adapter_consumer["path"])) or _resolve(str(baseline_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])):
+        raise RunnerError("baseline consumer overlay is not sourced from the selected adapter")
+    baseline_lock_source = _resolve(str(baseline_lock.get("source_path")))
+    if _under(baseline_lock_source, baseline_root) or _under(baseline_lock_source, candidate_root) or _under(baseline_lock_source, adapter_root):
+        raise RunnerError("preparation baseline lock source must be external to every source endpoint")
+    source_lock_sha, source_lock_bytes = _sha256_file(baseline_lock_source)
+    if (source_lock_sha, source_lock_bytes) != (baseline_lock["sha256"], baseline_lock["bytes"]):
+        raise RunnerError("preparation baseline lock source bytes differ")
     claim = data.get("claim_scope")
     if not isinstance(claim, str) or NON_ACCEPTANCE not in claim:
         raise RunnerError("preparation is not explicitly non-acceptance")
-    return {"schema": data["schema"], "sha256": digest, "baseline": baseline, "candidate": candidate, "adapter": adapter}
+    return {"schema": data["schema"], "sha256": digest, "baseline": baseline, "candidate": candidate, "adapter": adapter, "candidate_identity": identity_record}
 
 
-def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation: Mapping[str, Any], candidate_commit: str, candidate_lock_sha256: str) -> dict[str, Any]:
+def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation: Mapping[str, Any], candidate_identity: Mapping[str, Any]) -> dict[str, Any]:
     state = _source_state(root)
     package = _package_identity(root, PRODUCTION_MANIFEST, "litchi-ops")
     consumer = _package_identity(root, CONSUMER_MANIFEST, "litchi-perf-baseline")
@@ -611,11 +715,12 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
         if consumer["sha256"] != preparation["baseline"]["consumer_manifest"]["sha256"] or probe["sha256"] != manifest["probe_sha256"] or lock["sha256"] != preparation["baseline"]["lock"]["sha256"]:
             raise RunnerError("baseline overlay file identity differs")
     elif role == "candidate":
-        if state.get("commit") != candidate_commit or sorted(state["status_paths"]) != sorted(preparation["candidate"]["overlay_paths"]):
-            raise RunnerError("candidate source is stale or has an unexpected overlay")
-        if state.get("production_tree_sha256") != preparation["candidate"]["production_tree_sha256"] or _production_source_tree(root) != preparation["candidate"]["production_source_tree_sha256"]:
+        expected = candidate_identity["candidate"]
+        if state.get("commit") != expected["commit"] or state.get("tree") != expected["tree"] or state.get("status_paths") != [] or preparation["candidate"].get("overlay_paths") != []:
+            raise RunnerError("candidate source is stale or has an unexpected write")
+        if state.get("production_tree_sha256") != preparation["candidate"]["production_tree_sha256"] or _production_source_tree(root) != expected["production_source_tree_sha256"]:
             raise RunnerError("candidate production source identity differs")
-        if consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or probe["sha256"] != manifest["probe_sha256"] or lock["sha256"] != candidate_lock_sha256 or lock["bytes"] != manifest["candidate_lock_bytes"]:
+        if consumer["sha256"] != expected["consumer_manifest"]["sha256"] or consumer["bytes"] != expected["consumer_manifest"]["bytes"] or probe["sha256"] != expected["probe"]["sha256"] or probe["bytes"] != expected["probe"]["bytes"] or lock["sha256"] != expected["perf_lock"]["sha256"] or lock["bytes"] != expected["perf_lock"]["bytes"]:
             raise RunnerError("candidate probe/lock identity differs")
     else:
         raise RunnerError(f"unknown endpoint role {role!r}")
@@ -684,7 +789,7 @@ def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
 
 
 class PairedRunner:
-    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_commit: str, candidate_lock_sha256: str, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
+    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
         if phase not in {"build", "abba"}:
             raise RunnerError("phase must be build or abba")
         if not isinstance(cpu, int) or cpu < 0 or cpu >= (os.cpu_count() or 1):
@@ -695,17 +800,17 @@ class PairedRunner:
         self.baseline_root = _resolve(baseline_root)
         self.candidate_root = _resolve(candidate_root)
         self.adapter_root = _resolve(adapter_root)
-        self.candidate_commit = _require_sha(candidate_commit, "candidate_commit", 40)
-        self.candidate_lock_sha256 = _require_sha(candidate_lock_sha256, "candidate_lock_sha256", 64)
+        self.candidate_identity_path = _resolve(candidate_identity_path)
         self.output = _resolve(output)
         self.target_root = _resolve(target_root)
         self.tmp_root = _resolve(tmp_root)
         self.cpu = cpu
-        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
+        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
+        self.candidate_identity, self.candidate_identity_sha256, self.candidate_identity_bytes, self.candidate_identity_path = _load_candidate_identity(self.candidate_identity_path, manifest=self.manifest, roots=(self.baseline_root, self.candidate_root, self.adapter_root))
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
-        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, candidate_commit=self.candidate_commit, candidate_lock_sha256=self.candidate_lock_sha256)
+        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
         self.runner_sha256, _ = _sha256_file(Path(__file__).resolve())
         self.guard = generic.ProcessGuard()
         self.endpoint_cache: dict[str, dict[str, Any]] = {}
@@ -756,7 +861,7 @@ class PairedRunner:
             if _cheap_snapshot(root) != cached["cheap"]:
                 raise RunnerError(f"{role} source changed between operations")
             return cached["endpoint"]
-        endpoint = _endpoint(self.manifest, role=role, root=root, preparation=self.preparation, candidate_commit=self.candidate_commit, candidate_lock_sha256=self.candidate_lock_sha256)
+        endpoint = _endpoint(self.manifest, role=role, root=root, preparation=self.preparation, candidate_identity=self.candidate_identity)
         self.endpoint_cache[role] = {"endpoint": endpoint, "cheap": _cheap_snapshot(root)}
         return endpoint
 
@@ -1095,7 +1200,7 @@ class PairedRunner:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "candidate-commit", "candidate-lock-sha256", "output", "target-root", "tmp-root"):
+    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "candidate-identity", "output", "target-root", "tmp-root"):
         parser.add_argument(f"--{name}", required=True, type=Path if name.endswith(("manifest", "preparation", "root", "output")) else str)
     parser.add_argument("--cpu", required=True, type=int)
     parser.add_argument("--phase", required=True, choices=("build", "abba"))
@@ -1105,7 +1210,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, candidate_commit=args.candidate_commit, candidate_lock_sha256=args.candidate_lock_sha256, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
+        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
         if args.phase == "build":
             runner.build()
         else:

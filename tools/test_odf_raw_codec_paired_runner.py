@@ -30,10 +30,9 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["paired"]["warmup_iterations_per_leg"], runner.WARMUPS)
         self.assertEqual(value["paired"]["samples_per_leg"], runner.SAMPLES)
         self.assertEqual(value["paired"]["probe_iterations"], runner.PROBE_ITERATIONS)
-        self.assertEqual(
-            value["source"]["candidate_overlay"],
-            [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)],
-        )
+        self.assertEqual(value["source"]["candidate_overlay"], [])
+        self.assertEqual(value["source"]["candidate_mode"], runner.CANDIDATE_MODE)
+        self.assertEqual(value["source"]["candidate_integrated_files"], [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)])
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
 
     def test_manifest_hashes_match_live_adapter_sources(self) -> None:
@@ -47,10 +46,10 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             value["source"]["candidate_consumer_manifest_sha256"],
             digest(str(runner.CONSUMER_MANIFEST)),
         )
+        self.assertEqual(value["source"]["candidate_consumer_manifest_bytes"], (ROOT / runner.CONSUMER_MANIFEST).stat().st_size)
         self.assertEqual(value["source"]["candidate_lock_sha256"], digest(str(runner.LOCK_PATH)))
         self.assertEqual(value["source"]["candidate_lock_bytes"], (ROOT / runner.LOCK_PATH).stat().st_size)
-        self.assertEqual(value["source"]["candidate_lock_before_sha256"], runner.CANDIDATE_LOCK_BEFORE_SHA256)
-        self.assertEqual(value["source"]["candidate_lock_before_bytes"], runner.CANDIDATE_LOCK_BEFORE_BYTES)
+        self.assertEqual(value["probe"]["bytes"], (ROOT / runner.PROBE_PATH).stat().st_size)
         self.assertEqual(value["build"], runner.EXPECTED_BUILD)
 
     def test_rust_route_descriptors_match_manifest(self) -> None:
@@ -84,10 +83,6 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             runner.validate_manifest(value)
         value = manifest()
         value["source"]["candidate_lock_bytes"] += 1
-        with self.assertRaises(runner.RunnerError):
-            runner.validate_manifest(value)
-        value = manifest()
-        value["source"]["candidate_lock_before_bytes"] += 1
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
         value = manifest()
