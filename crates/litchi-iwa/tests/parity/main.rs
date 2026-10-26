@@ -36,4 +36,5 @@ mod physical_cases;
 mod self_test;
 mod text_annotation_cases;
 mod text_glue;
+mod text_language_cases;
 mod text_style_cases;
