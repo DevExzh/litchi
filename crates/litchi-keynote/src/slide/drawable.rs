@@ -50,6 +50,12 @@ pub use crate::package::slide_drawable::{
 pub use crate::slide::media::MediaProperties;
 /// The axis of an Arrange Flip ([`Edit::flip`]).
 pub use litchi_iwa_common::shape::geometry::FlipAxis;
+/// Whole-text character and paragraph properties
+/// ([`Edit::set_text_property`], [`Edit::reset_text_property`]), the shared
+/// W1-D paragraph-style vocabulary.
+pub mod text_property {
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
 /// A straight line's segment ([`Edit::set_line_segment`]).
 pub use litchi_iwa_common::shape::line::Segment;
 /// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
