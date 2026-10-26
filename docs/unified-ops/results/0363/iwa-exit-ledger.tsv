@@ -530,7 +530,7 @@ keynote/editor/slide_shapes/caption.rs	set_slide_shape_title	1	keynote	drawable.
 keynote/editor/slide_shapes/caption.rs	slide_shape_title_caption	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	add_slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	cell_count	1	keynote	table.cells	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	clear_slide_table_cell	1	keynote	table.cells	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	clear_slide_table_cell	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_clear_parity	B	-	-
 keynote/editor/slide_tables.rs	clear_slide_table_cell_border	1	keynote	table.cell_appearance	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	comment_count	1	keynote	table.cells	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	duplicate_slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
@@ -584,7 +584,7 @@ keynote/editor/slide_tables.rs	reset_slide_table_cell_text_script	1	keynote	tabl
 keynote/editor/slide_tables.rs	reset_slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_text_style	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	resize_slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell	1	keynote	table.cells	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_border	1	keynote	table.cell_appearance	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_checkbox_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_currency_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
@@ -1890,7 +1890,7 @@ pages/editor/tables/formula.rs	set_table_formula	1	pages	table.formula	host-only
 pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	migrated	litchi_pages::table::values::Edit::set	pages_body_table_formula_refresh_clear_parity	B	-	-
 pages/editor/tables/semantic.rs	clear_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	comment_count	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	duplicate_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
@@ -1945,7 +1945,7 @@ pages/editor/tables/semantic.rs	reset_table_cell_text_script	1	pages	table.cell_
 pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	migrated	litchi_pages::table::values::Edit::set	pages_body_table_formula_refresh_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
