@@ -26350,6 +26350,7 @@
         "litchi_keynote::slide::table::headers::transaction",
         "litchi_keynote::slide::table::physical_sort::transaction",
         "litchi_keynote::slide::creation",
+        "litchi_keynote::slide::build",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -26423,6 +26424,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_creation",
           "ok": "litchi_keynote::slide::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_builds",
+          "ok": "litchi_keynote::slide::build::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_deletion",
@@ -27940,6 +27945,7 @@
         "litchi_keynote::slide::table::headers::transaction",
         "litchi_keynote::slide::table::physical_sort::transaction",
         "litchi_keynote::slide::creation",
+        "litchi_keynote::slide::build",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -28013,6 +28019,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_creation",
           "ok": "litchi_keynote::slide::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_builds",
+          "ok": "litchi_keynote::slide::build::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_deletion",

@@ -17,6 +17,7 @@ pub(crate) mod show_settings;
 mod slide_audio_creation;
 pub(crate) mod slide_audio_position;
 pub(crate) mod slide_background;
+pub(crate) mod slide_build;
 pub(crate) mod slide_build_order;
 pub(crate) mod slide_chart_arrangement;
 pub(crate) mod slide_chart_axis_title;
