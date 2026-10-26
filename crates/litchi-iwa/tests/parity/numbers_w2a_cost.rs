@@ -55,6 +55,7 @@ const ROUTES: &[(&str, Kind, usize)] = &[
     ("text_box_add", Kind::TextBox, 0),
     ("shape_add", Kind::TextBox, 0),
     ("text_box_set_text", Kind::TextBox, 0),
+    ("chart_rounded_corners", Kind::Chart, 0),
 ];
 
 fn playback() -> MediaPlaybackSettings {
@@ -96,6 +97,14 @@ fn w2a_host_route(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult
             editor.set_sheet_text_box_paragraph_alignment(sheet, id, Alignment::Center)?;
         },
         "text_box_set_text" => editor.set_sheet_text_box_text(sheet, id, "Replaced text")?,
+        "chart_rounded_corners" => editor.set_sheet_chart_rounded_corners(
+            sheet,
+            id,
+            litchi_iwa::charts::ChartRoundedCorners::new(
+                litchi_iwa::charts::ChartCornerRadius::new(30.0)?,
+                true,
+            ),
+        )?,
         "text_box_add" => drop(editor.add_sheet_text_box(sheet, "Added", POINT, SIZE)?),
         "shape_add" => {
             drop(editor.add_sheet_shape(sheet, "Added", POINT, SIZE, Preset::Ellipse)?)
@@ -117,6 +126,15 @@ fn w2a_leaf_route(route: &str, source: &[u8], selector: DrawableSelector) -> Tes
                 "shape_add" => drop(edit.add_shape(Preset::Ellipse, FRAME, "Added")?),
                 _ => drop(edit.remove(selector)?),
             }
+            edit.commit()?.into_package()
+        },
+        "chart_rounded_corners" => {
+            use litchi_numbers::sheet::chart::style::{Property as Style, corner};
+            let mut edit = package.edit_sheet_chart_style(0, 0)?;
+            edit.set(Style::RoundedCorners(corner::Rounding::new(
+                corner::Radius::new(30.0)?,
+                true,
+            )))?;
             edit.commit()?.into_package()
         },
         "text_box_set_text" => {

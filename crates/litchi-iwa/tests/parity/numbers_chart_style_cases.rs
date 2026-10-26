@@ -1,0 +1,280 @@
+//! Numbers sheet-chart style parity (wave W2-A, record 0378): the host
+//! `set_sheet_chart_*`/`sheet_chart_*` chart-level property routes against
+//! `litchi_numbers::Package::edit_sheet_chart_style` (the W1-E chart style
+//! engine wrapped by the Numbers family).
+
+use litchi_iwa::charts::{
+    Chart3dDepth, Chart3dRotation, Chart3dSeriesGap, ChartCornerRadius, ChartDonutInnerRadius,
+    ChartPieStartAngle, ChartRadarStartAngle, ChartRoundedCorners,
+};
+use litchi_iwa::numbers;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::chart::ChartData;
+use litchi_iwa_common::chart::kind::Kind;
+use litchi_numbers::Package;
+use litchi_numbers::sheet::chart::style::{
+    Property, PropertyKind, chart3d, corner, donut, pie, radar,
+};
+
+use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
+use crate::leaf_bytes;
+
+const CHARTS: &str = "iwork/numbers/chart-data-native.numbers";
+/// The host-added chart follows the fixture's native chart.
+const CHART: usize = 1;
+
+fn data_for(kind: Kind) -> TestResult<ChartData> {
+    if kind.supports_pie_start_angle() {
+        return Ok(ChartData::new(
+            vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+            vec!["Revenue".to_owned()],
+            vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+        )?);
+    }
+    Ok(ChartData::new(
+        vec!["Region 1".to_owned(), "Region 2".to_owned()],
+        vec!["April".to_owned(), "May".to_owned(), "June".to_owned()],
+        vec![
+            vec![Some(17.0), Some(26.0), Some(53.0)],
+            vec![Some(55.0), Some(43.0), Some(70.0)],
+        ],
+    )?)
+}
+
+/// `chart-data-native.numbers` with one host-added chart of `kind`, and
+/// the host identifiers of the sheet and the chart.
+fn input(kind: Kind) -> TestResult<(Fixture, u64, u64)> {
+    let mut editor = numbers::Draft::from_bytes(&fixture(CHARTS)?.bytes)?;
+    let sheet = editor.sheets()?.first().ok_or("no sheet")?.id();
+    let chart = editor.add_sheet_chart(
+        sheet,
+        kind,
+        data_for(kind)?,
+        DrawablePoint { x: 120.0, y: 140.0 },
+        DrawableSize {
+            width: 360.0,
+            height: 240.0,
+        },
+    )?;
+    Ok((
+        Fixture {
+            path: "chart-data-native.numbers + add_sheet_chart",
+            bytes: editor.to_bytes()?,
+        },
+        sheet,
+        chart.drawable_object_id,
+    ))
+}
+
+fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestResult<Vec<u8>> {
+    let mut e = numbers::Draft::from_bytes(source)?;
+    match value {
+        Property::PieStartAngle(v) => e.set_sheet_chart_pie_start_angle(
+            sheet,
+            chart,
+            ChartPieStartAngle::from_degrees(v.degrees())?,
+        )?,
+        Property::DonutInnerRadius(v) => e.set_sheet_chart_donut_inner_radius(
+            sheet,
+            chart,
+            ChartDonutInnerRadius::from_percent(v.percent())?,
+        )?,
+        Property::RadarStartAngle(v) => e.set_sheet_chart_radar_start_angle(
+            sheet,
+            chart,
+            ChartRadarStartAngle::from_degrees(v.degrees())?,
+        )?,
+        Property::SeriesGap3d(v) => {
+            e.set_sheet_chart_3d_series_gap(sheet, chart, Chart3dSeriesGap::new(v.percent())?)?;
+        },
+        Property::Rotation3d(v) => e.set_sheet_chart_3d_rotation(
+            sheet,
+            chart,
+            Chart3dRotation::from_degrees(v.x_degrees(), v.y_degrees())?,
+        )?,
+        Property::Depth3d(v) => {
+            e.set_sheet_chart_3d_depth(sheet, chart, Chart3dDepth::from_percent(v.percent())?)?;
+        },
+        Property::RoundedCorners(v) => e.set_sheet_chart_rounded_corners(
+            sheet,
+            chart,
+            ChartRoundedCorners::new(
+                ChartCornerRadius::new(v.radius().percent())?,
+                v.outside_corners_only(),
+            ),
+        )?,
+        _ => return Err("unmapped property".into()),
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    Ok(match kind {
+        PropertyKind::PieStartAngle => {
+            format!(
+                "{:?}",
+                e.sheet_chart_pie_start_angle(sheet, chart)?.degrees()
+            )
+        },
+        PropertyKind::DonutInnerRadius => {
+            format!(
+                "{:?}",
+                e.sheet_chart_donut_inner_radius(sheet, chart)?.percent()
+            )
+        },
+        PropertyKind::RadarStartAngle => {
+            format!(
+                "{:?}",
+                e.sheet_chart_radar_start_angle(sheet, chart)?.degrees()
+            )
+        },
+        PropertyKind::SeriesGap3d => {
+            format!("{:?}", e.sheet_chart_3d_series_gap(sheet, chart)?.percent())
+        },
+        PropertyKind::Rotation3d => {
+            let rotation = e.sheet_chart_3d_rotation(sheet, chart)?;
+            format!("{:?}", (rotation.x_degrees(), rotation.y_degrees()))
+        },
+        PropertyKind::Depth3d => format!("{:?}", e.sheet_chart_3d_depth(sheet, chart)?.percent()),
+        PropertyKind::RoundedCorners => {
+            let corners = e.sheet_chart_rounded_corners(sheet, chart)?;
+            format!(
+                "{:?}",
+                (corners.radius().percent(), corners.outside_corners_only())
+            )
+        },
+        _ => return Err("unmapped kind".into()),
+    })
+}
+
+/// The leaf read in the host read's rendering.
+fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
+    let value = Package::from_bytes(bytes)?.sheet_chart_style(0, CHART, kind)?;
+    Ok(match value {
+        Property::PieStartAngle(v) => format!("{:?}", v.degrees()),
+        Property::DonutInnerRadius(v) => format!("{:?}", v.percent()),
+        Property::RadarStartAngle(v) => format!("{:?}", v.degrees()),
+        Property::SeriesGap3d(v) => format!("{:?}", v.percent()),
+        Property::Rotation3d(v) => format!("{:?}", (v.x_degrees(), v.y_degrees())),
+        Property::Depth3d(v) => format!("{:?}", v.percent()),
+        Property::RoundedCorners(v) => {
+            format!("{:?}", (v.radius().percent(), v.outside_corners_only()))
+        },
+        _ => return Err("unmapped property".into()),
+    })
+}
+
+/// Set `value` on a host-added chart of `kind` (or reset it after a host
+/// set) through both routes.
+fn style_case(name: &'static str, kind: Kind, value: Property, reset: bool) -> TestResult {
+    let (mut input, sheet, chart) = input(kind)?;
+    let property = value.kind();
+    if reset {
+        input.bytes = host_write(&input.bytes, sheet, chart, value)?;
+    }
+    let target = if reset {
+        property.native_default()
+    } else {
+        value
+    };
+    Case::new(name, Format::Numbers, Tier::A, Evidence::Queued, &input)
+        .host(|source| host_write(source, sheet, chart, target))
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_sheet_chart_style(0, CHART)?;
+            if reset {
+                edit.reset(property)?;
+            } else {
+                edit.set(value)?;
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_chart_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host chart property", move |bytes| {
+            host_read(bytes, sheet, chart, property)
+        })
+        .read("leaf sheet_chart_style", move |bytes| {
+            leaf_read(bytes, property)
+        })
+        .run()?;
+    Ok(())
+}
+
+fn cases() -> TestResult<Vec<(Kind, Property)>> {
+    Ok(vec![
+        (
+            Kind::Pie2d,
+            Property::PieStartAngle(pie::StartAngle::from_degrees(123.5)?),
+        ),
+        (
+            Kind::Donut2d,
+            Property::DonutInnerRadius(donut::InnerRadius::from_percent(40.0)?),
+        ),
+        (
+            Kind::Radar2d,
+            Property::RadarStartAngle(radar::StartAngle::from_degrees(45.0)?),
+        ),
+        (
+            Kind::Line3d,
+            Property::SeriesGap3d(chart3d::SeriesGap::new(150)?),
+        ),
+        (
+            Kind::Column3d,
+            Property::Rotation3d(chart3d::Rotation::from_degrees(12.0, -30.0)?),
+        ),
+        (
+            Kind::Bar3d,
+            Property::Depth3d(chart3d::Depth::from_percent(62.5)?),
+        ),
+        (
+            Kind::Column2d,
+            Property::RoundedCorners(corner::Rounding::new(corner::Radius::new(30.0)?, true)),
+        ),
+    ])
+}
+
+#[test]
+fn numbers_sheet_chart_style_set_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    for (kind, value) in cases()? {
+        style_case("numbers_sheet_chart_style_set_parity", kind, value, false)
+            .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_style_reset_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    for (kind, value) in cases()? {
+        style_case("numbers_sheet_chart_style_reset_parity", kind, value, true)
+            .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_style_read_parity() -> TestResult {
+    for (kind, value) in cases()? {
+        let (input, sheet, chart) = input(kind)?;
+        for bytes in [
+            input.bytes.clone(),
+            host_write(&input.bytes, sheet, chart, value)?,
+        ] {
+            assert_eq!(
+                host_read(&bytes, sheet, chart, value.kind())?,
+                leaf_read(&bytes, value.kind())?,
+                "{kind:?} {value:?}"
+            );
+        }
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
