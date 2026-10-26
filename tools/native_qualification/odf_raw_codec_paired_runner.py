@@ -54,6 +54,20 @@ PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
 PRODUCTION_MANIFEST = Path("crates/litchi-ops/Cargo.toml")
 LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
+CANDIDATE_LOCK_SHA256 = "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4"
+CANDIDATE_LOCK_BYTES = 57961
+BUILD_PROFILE = "release"
+BUILD_FLAG = "--release"
+BUILD_BINARY_DIRECTORY = "release"
+EXPECTED_BUILD = {
+    "profile": BUILD_PROFILE,
+    "cargo_flag": BUILD_FLAG,
+    "binary_directory": BUILD_BINARY_DIRECTORY,
+    "variants": {
+        "normal": {"allocator_feature": None},
+        "allocator": {"allocator_feature": "raw-codec-allocator"},
+    },
+}
 CANDIDATE_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
 PROBE_NAME = PROBE_PATH.stem
 ROUTE_IDS = (
@@ -386,6 +400,11 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
             raise RunnerError(f"manifest source.{key} differs from the canonical path")
     consumer_sha = _require_sha(source.get("candidate_consumer_manifest_sha256"), "source.candidate_consumer_manifest_sha256", 64)
     lock_sha = _require_sha(source.get("candidate_lock_sha256"), "source.candidate_lock_sha256", 64)
+    lock_bytes = source.get("candidate_lock_bytes")
+    if isinstance(lock_bytes, bool) or not isinstance(lock_bytes, int) or lock_bytes <= 0:
+        raise RunnerError("source.candidate_lock_bytes must be a positive integer")
+    if lock_sha != CANDIDATE_LOCK_SHA256 or lock_bytes != CANDIDATE_LOCK_BYTES:
+        raise RunnerError("manifest candidate lock identity is not the reviewed repaired lock")
     probe = data.get("probe")
     if not isinstance(probe, Mapping) or probe.get("path") != str(PROBE_PATH):
         raise RunnerError("manifest probe path differs")
@@ -396,6 +415,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         raise RunnerError("manifest API-era namespace contract differs")
     if probe.get("modes") != ["validate", "timed", "allocator"] or probe.get("max_iterations") != PROBE_ITERATIONS:
         raise RunnerError("manifest probe mode/iteration contract differs")
+    if data.get("build") != EXPECTED_BUILD:
+        raise RunnerError("manifest optimized build profile/path contract differs")
     routes = _validate_route_descriptors(data.get("routes"))
     if data.get("families") != list(FAMILY_IDS):
         raise RunnerError("manifest ODF family order differs")
@@ -443,6 +464,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     normalized = dict(data)
     normalized["routes"] = routes
     normalized["candidate_lock_sha256"] = lock_sha
+    normalized["candidate_lock_bytes"] = lock_bytes
     normalized["candidate_consumer_manifest_sha256"] = consumer_sha
     normalized["probe_sha256"] = probe_sha
     normalized["candidate_commit"] = candidate
@@ -509,7 +531,7 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
         _require_sha(value.get("sha256"), f"preparation {label} SHA", 64)
         if not isinstance(value.get("bytes"), int) or value["bytes"] <= 0:
             raise RunnerError(f"preparation {label} size is invalid")
-    if candidate_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or candidate_probe["sha256"] != manifest["probe_sha256"] or candidate_lock["sha256"] != candidate_lock_sha256 or baseline_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or baseline_probe["sha256"] != manifest["probe_sha256"]:
+    if candidate_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or candidate_probe["sha256"] != manifest["probe_sha256"] or candidate_lock["sha256"] != candidate_lock_sha256 or candidate_lock["bytes"] != manifest["candidate_lock_bytes"] or baseline_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or baseline_probe["sha256"] != manifest["probe_sha256"]:
         raise RunnerError("preparation adapter/lock does not match selected manifest")
     if _resolve(str(candidate_consumer.get("path"))) != _resolve(CONSUMER_MANIFEST, base=candidate_root):
         raise RunnerError("preparation candidate consumer manifest path is not canonical")
@@ -577,7 +599,7 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
             raise RunnerError("candidate source is stale or has an unexpected overlay")
         if state.get("production_tree_sha256") != preparation["candidate"]["production_tree_sha256"] or _production_source_tree(root) != preparation["candidate"]["production_source_tree_sha256"]:
             raise RunnerError("candidate production source identity differs")
-        if consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or probe["sha256"] != manifest["probe_sha256"] or lock["sha256"] != candidate_lock_sha256:
+        if consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or probe["sha256"] != manifest["probe_sha256"] or lock["sha256"] != candidate_lock_sha256 or lock["bytes"] != manifest["candidate_lock_bytes"]:
             raise RunnerError("candidate probe/lock identity differs")
     else:
         raise RunnerError(f"unknown endpoint role {role!r}")
@@ -853,10 +875,10 @@ class PairedRunner:
         features = [adapter]
         if variant == "allocator":
             features.append("raw-codec-allocator")
-        return ["cargo", "build", "--offline", "--locked", "--jobs", "1", "--manifest-path", str(CONSUMER_MANIFEST), "-p", "litchi-perf-baseline", "--example", PROBE_NAME, "--no-default-features", "--features", ",".join(features)]
+        return ["cargo", "build", BUILD_FLAG, "--offline", "--locked", "--jobs", "1", "--manifest-path", str(CONSUMER_MANIFEST), "-p", "litchi-perf-baseline", "--example", PROBE_NAME, "--no-default-features", "--features", ",".join(features)]
 
     def _binary(self, role: str, variant: str) -> Path:
-        return self._target(role, variant) / "debug" / "examples" / PROBE_NAME
+        return self._target(role, variant) / BUILD_BINARY_DIRECTORY / "examples" / PROBE_NAME
 
     def _build_one(self, role: str, variant: str) -> dict[str, Any]:
         root = self.baseline_root if role == "baseline" else self.candidate_root
@@ -881,7 +903,7 @@ class PairedRunner:
         target_bytes = generic._directory_size(target)
         if target_bytes > TARGET_PREFLIGHT_BYTES:
             raise RunnerError(f"{role}/{variant} target exceeded preflight limit")
-        return {"role": role, "variant": variant, "command": command, "environment": self._recorded_environment(env), "toolchain": toolchain, "source": endpoint, "binary": {"path": str(binary), "sha256": binary_sha, "bytes": binary_bytes}, "target": {"path": str(target), "bytes": target_bytes}, "tmpdir": str(tmpdir), "event": event}
+        return {"role": role, "variant": variant, "profile": self.manifest["build"]["profile"], "command": command, "environment": self._recorded_environment(env), "toolchain": toolchain, "source": endpoint, "binary": {"path": str(binary), "sha256": binary_sha, "bytes": binary_bytes}, "target": {"path": str(target), "bytes": target_bytes}, "tmpdir": str(tmpdir), "event": event}
 
     def _write_fresh(self, path: Path, value: Mapping[str, Any], label: str) -> None:
         self._fresh_file(path, label)
@@ -897,7 +919,7 @@ class PairedRunner:
         for variant in VARIANTS:
             for role in ROLES:
                 builds[f"{role}/{variant}"] = self._build_one(role, variant)
-        receipt = {"schema": SCHEMA, "phase": "build", "status": "passed", "manifest": {"path": str(self.manifest_path), "sha256": self.manifest_sha256}, "preparation": {"path": str(self.preparation_path), **self.preparation}, "runner": {"path": str(Path(__file__).resolve()), "sha256": self.runner_sha256}, "cpu_affinity": self.cpu, "features": ["raw-codec-odf", "raw-codec-original", "raw-codec-current", "raw-codec-allocator"], "routes": self.manifest["routes"], "families": list(FAMILY_IDS), "paired": {key: self.manifest["paired"][key] for key in ("abba_order", "warmup_iterations_per_leg", "samples_per_leg", "probe_iterations", "roles", "variants")}, "endpoints": endpoints, "builds": builds, "event_journal": _journal([builds[key]["event"] for key in _build_keys()]), "claim_scope": "build identity only; no native acceptance claim"}
+        receipt = {"schema": SCHEMA, "phase": "build", "status": "passed", "manifest": {"path": str(self.manifest_path), "sha256": self.manifest_sha256}, "preparation": {"path": str(self.preparation_path), **self.preparation}, "runner": {"path": str(Path(__file__).resolve()), "sha256": self.runner_sha256}, "build": self.manifest["build"], "cpu_affinity": self.cpu, "features": ["raw-codec-odf", "raw-codec-original", "raw-codec-current", "raw-codec-allocator"], "routes": self.manifest["routes"], "families": list(FAMILY_IDS), "paired": {key: self.manifest["paired"][key] for key in ("abba_order", "warmup_iterations_per_leg", "samples_per_leg", "probe_iterations", "roles", "variants")}, "endpoints": endpoints, "builds": builds, "event_journal": _journal([builds[key]["event"] for key in _build_keys()]), "claim_scope": "build identity only; no native acceptance claim"}
         self._write_fresh(self.output / "build-receipt.json", receipt, "build receipt")
 
     def _load_build_receipt(self) -> dict[str, Any]:
@@ -906,6 +928,8 @@ class PairedRunner:
             raise RunnerError("build receipt is not a passed non-acceptance receipt")
         if receipt.get("manifest", {}).get("sha256") != self.manifest_sha256 or receipt.get("preparation", {}).get("sha256") != self.preparation["sha256"] or receipt.get("runner", {}).get("sha256") != self.runner_sha256:
             raise RunnerError("build handoff identity differs")
+        if receipt.get("build") != self.manifest["build"]:
+            raise RunnerError("build handoff optimized profile differs")
         if receipt.get("cpu_affinity") != self.cpu or receipt.get("routes") != self.manifest["routes"] or receipt.get("families") != list(FAMILY_IDS):
             raise RunnerError("build handoff route/cpu identity differs")
         events = _journal_events(receipt.get("event_journal"))
@@ -922,6 +946,8 @@ class PairedRunner:
                 build = builds[key]
                 if not isinstance(build, Mapping) or build.get("role") != role or build.get("variant") != variant or build.get("source") != current:
                     raise RunnerError(f"build handoff source differs for {key}")
+                if build.get("profile") != self.manifest["build"]["profile"]:
+                    raise RunnerError(f"build handoff profile differs for {key}")
                 target = self._target(role, variant)
                 tmpdir = self._tmp(role, variant)
                 binary = self._binary(role, variant)

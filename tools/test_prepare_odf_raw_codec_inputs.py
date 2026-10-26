@@ -97,13 +97,20 @@ class OdfRawPreparationTests(unittest.TestCase):
             manifest["candidate_commit"] = candidate_ref
             manifest["source"]["candidate_consumer_manifest_sha256"] = value["candidate"]["consumer_manifest"]["sha256"]
             manifest["source"]["candidate_lock_sha256"] = value["candidate"]["lock"]["sha256"]
+            manifest["source"]["candidate_lock_bytes"] = value["candidate"]["lock"]["bytes"]
             manifest["probe"]["sha256"] = value["candidate"]["probe"]["sha256"]
             old_runner_candidate = runner.CANDIDATE_COMMIT
+            old_runner_lock_sha = runner.CANDIDATE_LOCK_SHA256
+            old_runner_lock_bytes = runner.CANDIDATE_LOCK_BYTES
             runner.CANDIDATE_COMMIT = candidate_ref
+            runner.CANDIDATE_LOCK_SHA256 = value["candidate"]["lock"]["sha256"]
+            runner.CANDIDATE_LOCK_BYTES = value["candidate"]["lock"]["bytes"]
             try:
                 manifest = runner.validate_manifest(manifest)
             finally:
                 runner.CANDIDATE_COMMIT = old_runner_candidate
+                runner.CANDIDATE_LOCK_SHA256 = old_runner_lock_sha
+                runner.CANDIDATE_LOCK_BYTES = old_runner_lock_bytes
             checked = runner._validate_preparation(
                 value,
                 hashlib.sha256(output.read_bytes()).hexdigest(),
@@ -226,6 +233,7 @@ class OdfRawPreparationTests(unittest.TestCase):
                 (adapter / prep.CONSUMER_MANIFEST).read_bytes()
             ).hexdigest()
             manifest["source"]["candidate_lock_sha256"] = hashlib.sha256(b"candidate\n").hexdigest()
+            manifest["source"]["candidate_lock_bytes"] = len(b"candidate\n")
             manifest["probe"]["sha256"] = hashlib.sha256(
                 (adapter / prep.PROBE_PATH).read_bytes()
             ).hexdigest()
@@ -235,10 +243,14 @@ class OdfRawPreparationTests(unittest.TestCase):
             old_baseline = prep.BASELINE_COMMIT
             old_candidate = prep.CANDIDATE_COMMIT
             old_runner_candidate = runner.CANDIDATE_COMMIT
+            old_runner_lock_sha = runner.CANDIDATE_LOCK_SHA256
+            old_runner_lock_bytes = runner.CANDIDATE_LOCK_BYTES
             old_build = runner.PairedRunner.build
             prep.BASELINE_COMMIT = baseline_ref
             prep.CANDIDATE_COMMIT = candidate_ref
             runner.CANDIDATE_COMMIT = candidate_ref
+            runner.CANDIDATE_LOCK_SHA256 = manifest["source"]["candidate_lock_sha256"]
+            runner.CANDIDATE_LOCK_BYTES = manifest["source"]["candidate_lock_bytes"]
 
             def admit_endpoints(instance: runner.PairedRunner) -> None:
                 instance._endpoint("baseline", full=True)
@@ -307,6 +319,8 @@ class OdfRawPreparationTests(unittest.TestCase):
             finally:
                 runner.PairedRunner.build = old_build
                 runner.CANDIDATE_COMMIT = old_runner_candidate
+                runner.CANDIDATE_LOCK_SHA256 = old_runner_lock_sha
+                runner.CANDIDATE_LOCK_BYTES = old_runner_lock_bytes
                 prep.BASELINE_COMMIT = old_baseline
                 prep.CANDIDATE_COMMIT = old_candidate
 

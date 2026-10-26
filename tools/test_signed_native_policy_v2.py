@@ -410,6 +410,15 @@ print(identity["sha256"])
             with self.assertRaises(policy.PolicyError):
                 policy._safe_relative(value, "fixture")
 
+    def test_checked_in_candidate_perf_lock_tracks_the_repaired_consumer_lock(self) -> None:
+        expected = policy.ROLE_LOCKS["perf"]["candidate"]
+        manifest = json.loads(
+            (ROOT / "tools/native_qualification/manifests/signed-native-v2.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(manifest["candidate"]["role_locks"]["perf"]["candidate"], expected)
+
 
 if __name__ == "__main__":
     unittest.main()

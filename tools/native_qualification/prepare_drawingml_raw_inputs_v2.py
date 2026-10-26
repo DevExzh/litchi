@@ -77,8 +77,8 @@ ROLE_LOCKS: dict[str, dict[str, dict[str, Any]]] = {
             "bytes": 57_227,
         },
         "candidate": {
-            "sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
-            "bytes": 56_941,
+            "sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",
+            "bytes": 57_961,
         },
     },
     "native": {

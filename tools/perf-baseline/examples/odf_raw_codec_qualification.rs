@@ -8,7 +8,10 @@
 //! route order in both roles.  Correctness mode runs every proof and negative
 //! case; timed and allocator modes measure only the route operation named by
 //! the manifest boundary.  Report construction happens after the allocator
-//! observer has stopped.
+//! observer has stopped.  The paired producer builds both ordinary and
+//! allocator variants with Cargo's explicit optimized `--release` profile;
+//! their binaries are consumed from the matching `release/examples` target
+//! path.
 
 #[cfg(all(feature = "raw-codec-original", feature = "raw-codec-current"))]
 compile_error!("select exactly one raw-codec API era");

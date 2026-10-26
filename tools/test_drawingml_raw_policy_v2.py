@@ -144,6 +144,30 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
             policy.ROLE_LOCKS["workspace"]["baseline"]["bytes"],
         )
 
+    def test_perf_candidate_lock_is_canonical_in_all_v2_consumers(self) -> None:
+        expected = {
+            "sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",
+            "bytes": 57961,
+        }
+        self.assertEqual(policy.ROLE_LOCKS["perf"]["candidate"], expected)
+        manifest = json.loads(
+            (ROOT / "tools/native_qualification/manifests/drawingml-raw-v2.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(manifest["candidate"]["locks"]["tools/perf-baseline/Cargo.lock"], expected)
+        self.assertEqual(manifest["role_locks"]["perf"]["candidate"], expected)
+        self.assertEqual(manifest["candidate_perf_lock_sha256"], expected["sha256"])
+        self.assertEqual(manifest["candidate_perf_lock_bytes"], expected["bytes"])
+        self.assertEqual(
+            manifest["baseline_perf_lock_sha256"],
+            policy.ROLE_LOCKS["perf"]["baseline"]["sha256"],
+        )
+        self.assertEqual(
+            manifest["baseline_perf_lock_bytes"],
+            policy.ROLE_LOCKS["perf"]["baseline"]["bytes"],
+        )
+
     def test_dependency_policy_contains_exact_three_path_transitions(self) -> None:
         self.assertEqual(len(policy.DEPENDENCY_PATH_TRANSITIONS), 3)
         self.assertEqual(

@@ -48,6 +48,8 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             digest(str(runner.CONSUMER_MANIFEST)),
         )
         self.assertEqual(value["source"]["candidate_lock_sha256"], digest(str(runner.LOCK_PATH)))
+        self.assertEqual(value["source"]["candidate_lock_bytes"], (ROOT / runner.LOCK_PATH).stat().st_size)
+        self.assertEqual(value["build"], runner.EXPECTED_BUILD)
 
     def test_rust_route_descriptors_match_manifest(self) -> None:
         source = (ROOT / "tools/perf-baseline/examples/odf_raw_codec_qualification.rs").read_text(encoding="utf-8")
@@ -76,6 +78,14 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
     def test_manifest_rejects_stale_hashes_and_route_mutation(self) -> None:
         value = manifest()
         value["source"]["candidate_lock_sha256"] = None
+        with self.assertRaises(runner.RunnerError):
+            runner.validate_manifest(value)
+        value = manifest()
+        value["source"]["candidate_lock_bytes"] += 1
+        with self.assertRaises(runner.RunnerError):
+            runner.validate_manifest(value)
+        value = manifest()
+        value["build"]["profile"] = "dev"
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
         value = manifest()
@@ -117,6 +127,24 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         broken["events"][1], broken["events"][2] = broken["events"][2], broken["events"][1]
         with self.assertRaises(runner.RunnerError):
             runner._journal_events(broken)
+
+    def test_ordinary_and_allocator_commands_use_the_optimized_profile(self) -> None:
+        instance = runner.PairedRunner.__new__(runner.PairedRunner)
+        instance.target_root = Path("/tmp/odf-raw-release-target")
+        normal = instance._build_command("baseline", "normal")
+        allocator = instance._build_command("candidate", "allocator")
+        self.assertIn("--release", normal)
+        self.assertIn("--release", allocator)
+        self.assertNotIn("--debug", normal)
+        self.assertEqual(
+            instance._binary("baseline", "normal"),
+            instance._target("baseline", "normal") / "release" / "examples" / runner.PROBE_NAME,
+        )
+        self.assertEqual(
+            instance._binary("candidate", "allocator"),
+            instance._target("candidate", "allocator") / "release" / "examples" / runner.PROBE_NAME,
+        )
+        self.assertIn("raw-codec-allocator", allocator[-1])
 
     def test_fresh_file_rejects_existing_and_symlinked_ancestors(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-runner-") as directory:
