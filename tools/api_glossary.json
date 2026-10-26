@@ -21434,6 +21434,36 @@
       "banned_names": [],
       "required_signatures": [
         {
+          "method": "litchi_numbers_wire::formula_graph::remap_owner",
+          "inputs": ["source", "remap", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_graph::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_graph::remap_cell_record_tile",
+          "inputs": ["source", "remap", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_graph::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_graph::remap_range_precedents_tile",
+          "inputs": ["source", "remap", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_graph::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_graph::append_owners_to_engine",
+          "inputs": ["source", "owner_object_ids", "owner_map_entries", "formula_count", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_graph::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_owner::encode_empty_table",
+          "inputs": ["table_uuid", "table_info", "internal_owner_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::BncCell::parse",
           "inputs": ["data", "limits"],
           "limits_argument": "limits",
