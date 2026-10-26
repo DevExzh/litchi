@@ -368,3 +368,136 @@ pub fn shape_style(data: &[u8], limits: Limits) -> Result<ShapeStyle<'_>, Error>
         stroke,
     })
 }
+
+// ---- encoders -----------------------------------------------------------
+//
+// Each encoder writes the fields a protobuf encoder writes for the stored
+// value, in field-number order: required fields always, optional fields when
+// present, repeated scalars unpacked (proto2).
+
+fn key(output: &mut Vec<u8>, number: u32, wire_type: u8) {
+    crate::chart_style_codec::push_varint(output, (u64::from(number) << 3) | u64::from(wire_type));
+}
+
+fn put_float(output: &mut Vec<u8>, number: u32, value: Option<f32>) {
+    if let Some(value) = value {
+        key(output, number, WIRE_FIXED32);
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+}
+
+fn put_varint(output: &mut Vec<u8>, number: u32, value: Option<u64>) {
+    if let Some(value) = value {
+        key(output, number, WIRE_VARINT);
+        crate::chart_style_codec::push_varint(output, value);
+    }
+}
+
+fn put_enum(output: &mut Vec<u8>, number: u32, value: Option<i32>) {
+    put_varint(output, number, value.map(|value| i64::from(value) as u64));
+}
+
+fn put_message(output: &mut Vec<u8>, number: u32, message: &[u8]) {
+    key(output, number, WIRE_LENGTH_DELIMITED);
+    crate::chart_style_codec::push_varint(output, message.len() as u64);
+    output.extend_from_slice(message);
+}
+
+/// Encode a `TSP.Color` (`model` is required: absent encodes as 0).
+#[must_use]
+pub fn encode_color(value: &Color) -> Vec<u8> {
+    let mut output = Vec::with_capacity(32);
+    put_enum(&mut output, 1, Some(value.model.unwrap_or(0)));
+    for (number, channel) in (3..).zip(value.rgba) {
+        put_float(&mut output, number, channel);
+    }
+    put_enum(&mut output, 12, value.rgb_space);
+    output
+}
+
+/// Encode a `TSD.StrokeArchive` (smart, frame and patterned strokes are not
+/// encodable: `is_special` is ignored).
+#[must_use]
+pub fn encode_stroke(value: &Stroke) -> Vec<u8> {
+    let mut output = Vec::with_capacity(80);
+    if let Some(color) = &value.color {
+        put_message(&mut output, 1, &encode_color(color));
+    }
+    put_float(&mut output, 2, value.width);
+    put_enum(&mut output, 3, value.cap);
+    put_enum(&mut output, 4, value.join);
+    put_float(&mut output, 5, value.miter_limit);
+    if let Some(pattern) = &value.pattern {
+        let mut nested = Vec::with_capacity(40);
+        put_enum(&mut nested, 1, pattern.kind);
+        put_float(&mut nested, 2, pattern.phase);
+        put_varint(&mut nested, 3, pattern.count.map(u64::from));
+        for length in &pattern.lengths {
+            put_float(&mut nested, 4, Some(*length));
+        }
+        put_message(&mut output, 6, &nested);
+    }
+    output
+}
+
+fn encode_gradient(value: &Gradient) -> Vec<u8> {
+    let mut output = Vec::with_capacity(96);
+    put_enum(&mut output, 1, value.kind);
+    for stop in &value.stops {
+        let mut nested = Vec::with_capacity(48);
+        if let Some(color) = &stop.color {
+            put_message(&mut nested, 1, &encode_color(color));
+        }
+        put_float(&mut nested, 2, stop.fraction);
+        put_float(&mut nested, 3, stop.inflection);
+        put_message(&mut output, 2, &nested);
+    }
+    put_float(&mut output, 3, value.opacity);
+    put_varint(&mut output, 4, value.advanced.map(u64::from));
+    if let Some(angle) = value.angle {
+        let mut nested = Vec::with_capacity(5);
+        put_float(&mut nested, 2, Some(angle));
+        put_message(&mut output, 5, &nested);
+    }
+    output
+}
+
+fn encode_image(value: &ImageFill) -> Vec<u8> {
+    let mut output = Vec::with_capacity(64);
+    put_enum(&mut output, 2, value.technique);
+    if let Some(tint) = &value.tint {
+        put_message(&mut output, 3, &encode_color(tint));
+    }
+    if let Some([width, height]) = value.fill_size {
+        let mut nested = Vec::with_capacity(10);
+        put_float(&mut nested, 1, Some(width));
+        put_float(&mut nested, 2, Some(height));
+        put_message(&mut output, 4, &nested);
+    }
+    let mut reference = Vec::with_capacity(10);
+    put_varint(&mut reference, 1, Some(value.data.unwrap_or(0)));
+    put_message(&mut output, 6, &reference);
+    put_varint(&mut output, 8, value.generic.map(u64::from));
+    if let Some(color) = &value.reference_color {
+        put_message(&mut output, 9, &encode_color(color));
+    }
+    output
+}
+
+/// Encode a `TSD.FillArchive` (an image fill always carries its data
+/// reference, 0 for the placeholder; legacy image references are not
+/// encodable).
+#[must_use]
+pub fn encode_fill(value: &Fill) -> Vec<u8> {
+    let mut output = Vec::with_capacity(96);
+    if let Some(color) = &value.color {
+        put_message(&mut output, 1, &encode_color(color));
+    }
+    if let Some(gradient) = &value.gradient {
+        put_message(&mut output, 2, &encode_gradient(gradient));
+    }
+    if let Some(image) = &value.image {
+        put_message(&mut output, 3, &encode_image(image));
+    }
+    output
+}

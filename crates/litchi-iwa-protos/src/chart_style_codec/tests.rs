@@ -58,7 +58,7 @@ fn extension_of(data: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
-fn float(field: u32, value: Option<f32>) -> Write {
+fn float(field: u32, value: Option<f32>) -> Write<'static> {
     Write::Float { field, value }
 }
 
