@@ -3258,6 +3258,26 @@
   {
    "record": "0362ul52",
    "reason": "Crypto raw-policy source and consumer migration with scoped correctness, compiler and Clippy receipts, including preserved failed and resource-bound attempts. Command target sizes and durations are validation provenance; no native or leaf-versus-unified performance measurement was performed."
+  },
+  {
+   "record": "0362ul165e",
+   "reason": "Protocol consumer-composition source and handoff validation only. The signed-test patch and composition receipts contain no leaf-versus-unified timing or allocation pair; actual producer binding and native qualification remain required."
+  },
+  {
+   "record": "0362ul165g",
+   "reason": "Final-gate verifier and negative-control source validation only. The verifier checks row/provenance protocol behavior, not a leaf-versus-unified operation measurement, so no performance acceptance is claimed."
+  },
+  {
+   "record": "0362ul165j",
+   "reason": "ODF compiler and remaining-gate diagnostic handoff receipts only. Release compiler checks and diagnostic runner preparation contain no leaf-versus-unified timing or allocation pair; native qualification remains required."
+  },
+  {
+   "record": "0362ul165k",
+   "reason": "ODF consumer/compiler repair and diagnostic-runner validation only. The release builds and focused tests establish source/tool correctness, not a leaf-versus-unified performance pair; historical and candidate native qualification remain required."
+  },
+  {
+   "record": "0362ul79f",
+   "reason": "Raw-census tooling-row registration and build-free runner checks only. The tracked runner patch changes command coverage but records no leaf-versus-unified timing or allocation measurement."
   }
  ]
 }

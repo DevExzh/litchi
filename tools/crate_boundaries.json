@@ -237,7 +237,8 @@
       "litchi-core",
       "litchi-crypto",
       "litchi-opc",
-      "litchi-vba"
+      "litchi-vba",
+      "soapberry-zip"
     ],
     "litchi-opc": [
       "litchi-core",
@@ -281,6 +282,7 @@
       "litchi-rtf",
       "litchi-sheet-text",
       "litchi-sign",
+      "litchi-vba",
       "litchi-xls",
       "litchi-xlsb",
       "litchi-xlsx",
@@ -426,6 +428,10 @@
     },
     {
       "dependent": "litchi-odg",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-ooxml-common",
       "dependency": "soapberry-zip"
     },
     {

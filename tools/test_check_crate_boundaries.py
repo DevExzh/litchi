@@ -8849,6 +8849,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     boundaries.Edge("litchi-odc", "soapberry-zip"),
                     boundaries.Edge("litchi-odf-formula", "soapberry-zip"),
                     boundaries.Edge("litchi-odg", "soapberry-zip"),
+                    boundaries.Edge("litchi-ooxml-common", "soapberry-zip"),
                     boundaries.Edge("litchi-oth", "soapberry-zip"),
                     boundaries.Edge("litchi-ppt", "soapberry-zip"),
                     boundaries.Edge("litchi-pptx", "soapberry-zip"),

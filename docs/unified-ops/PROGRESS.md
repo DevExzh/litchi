@@ -6,6 +6,10 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0362ul165uh | [Post-diagnostic build prerequisites](0362ul165uh-post-diagnostic-build-prerequisites.md) | DOCX sparse vendor closure repaired and release builds active; fuzz cache fetch/offline validation and canonical API tests source-ready and queued; two more obsolete worktrees retired |
+| 0362ul165ue | [Terminal diagnostic and leaf cleanup](0362ul165ue-diagnostic-returns-and-leaf-cleanup.md) | Twenty checks complete: thirteen pass, seven preserved failures, all five runtime supplements pass; two reviewed leaves merged and retired; final qualification pending |
+| 0362ul165uf | [Tooling import and adapter identities](0362ul165uf-tooling-identity-repair.md) | Merged leaf `ed12bd5528`: consistent PPT protocol exception imports and reviewed current ODF consumer manifest pin; focused Python checks pass; launch PATH repair and final gate pending |
+| 0362ul165ug | [Gate dependency and evidence registrations](0362ul165ug-gate-registry-repair.md) | Merged leaf `d9979bf2ff`: explicit shared ZIP dev edge and optional operations VBA edge; five validation-only evidence dispositions; focused policy and matrix checks pass; native/final gate pending |
 | 0349 | [Workspace gate hygiene and canonical durable JSON](0349-workspace-gate-hygiene.md) | Merged (R19 `uo2/ws-hygiene`, `55517a5d02`): feature-unification determinism fix, workspace clippy/test/doc clean |
 | 0348 | [PPTX batch budget](0348-pptx-batch-budget.md) | Merged (R19 `uo2/pptx-batch`, `b70dd3e182`): every PPTX batch within 2× with batch equivalence; bench TSV split |
 | 0347 | [Numbers swap, Python Commit.patch, XLSX picture single read](0347-numbers-swap-python-patch-xlsx-picture.md) | Merged (R18 `uo2/cross-small`, `0a2c9d0314`): Numbers sheet/table swap (no whole-format verb refusal left), Python `Commit.patch`, XLSX picture `set src` 1.27 → 1.07 |
@@ -6452,3 +6456,49 @@ See [0063](0063-source-pptx-modern-comments.md).
   blobs must be hydrated before its metadata commands can run. The DOCX
   release builds remain queued, and all native/final qualification remains
   required. Nothing is pushed.
+
+  The current-7c diagnostic completes rows 46–52 with API and tooling findings.
+  The iWork leaf API and corpus-disposition checks pass. The API glossary
+  reports 711 RTF canonical-definition findings and 36 other rows; isolated
+  RTF and Markdown/checker repairs are committed and awaiting Rust validation.
+  Tooling exposes an import-identity mismatch, a stale DrawingML manifest pin,
+  missing dependency/evidence registrations, and a systemd PATH that omits
+  rustc. Root merges the reviewed registry repair (165ug): two real dependency
+  edges and precise dispositions for five validation-only records, with
+  focused Python tests passing. Original failed rows remain preserved, and
+  runtime supplements continue on immutable 7c. Final source selection and
+  qualification remain pending. Nothing is pushed.
+
+  Root also merges tooling leaf ed12bd5528 (165uf). Package-qualified imports
+  now share the same PPT guard exception class in combined Python runs. The
+  DrawingML preparer binds the accepted current ODF consumer manifest; the
+  historical RTF manifest remains independently pinned. Direct/combined PPT,
+  DrawingML and legacy protocol checks pass. DOCX integration must update
+  that current manifest pin together with its two new probe registrations.
+  The missing-rustc diagnostic remains a launch PATH issue to repair before
+  rerun. Runtime PPTX minimal-feature tests (58 chunks), batch equivalence
+  and OOXML metadata pass; facade runtime checks continue. Nothing is pushed.
+
+  The twenty-check diagnostic is terminal (165ue): thirteen checks pass,
+  seven ordinary/prerequisite failures remain recorded, and all five runtime
+  supplements pass. Root verifies every log/trace, source and lock identity,
+  resource/process guard and all 58 nested PPTX chunks. The merged registry
+  and tooling worktrees/refs are retired, bringing cumulative cleanup to
+  286 worktrees/448 refs; all 70 excluded office refs remain unchanged.
+  Canonical RTF/Markdown leaves are independently source-reviewed and queued
+  for Rust validation. Fresh fuzz lock preparation and the four DOCX release
+  compiler checks can now use the serial heavy slot. All native and final
+  candidate acceptance remains required. Nothing is pushed.
+
+  Post-diagnostic compilation exposes two preparation gaps (165uh): the DOCX
+  baseline lacks a vendored manifest, and offline fuzz metadata needs five
+  locked registry archives. Both failures are preserved. Exact DOCX source
+  materialization passes independent review and the v3 release builds are
+  running with explicit toolchain PATH. Fuzz v4 separates reviewed locked
+  cache hydration from fresh offline validation; canonical API validation v2
+  uses the current bounded runner/helper and is queued. Three-way previews
+  preserve current ODF work; DOCX will update its coupled DrawingML manifest
+  pin in the integration commit. Two superseded fuzz worktrees are retired,
+  reaching 288 worktrees/448 refs removed. A newly created concurrent IWA plan
+  leaf is retained for review. All 70 excluded office refs remain unchanged;
+  final native/source/gate acceptance is still pending. Nothing is pushed.
