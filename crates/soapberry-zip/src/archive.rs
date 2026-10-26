@@ -143,6 +143,38 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
         }
     }
 
+    /// Read one central-directory record at a previously observed absolute
+    /// record offset, without rescanning preceding records or allocating.
+    ///
+    /// The offset must identify a record boundary obtained from `entries()`.
+    /// This validates the record framing and directory bounds, not its ordinal
+    /// or the corresponding local payload's integrity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an end-of-file error when the offset is outside the central
+    /// directory or the record there is truncated or malformed.
+    pub fn central_record_at(&self, offset: u64) -> Result<ZipFileHeaderRecord<'_>, Error> {
+        if offset < self.eocd.directory_offset() || offset >= self.eocd.directory_end_offset() {
+            return Err(Error::from(ErrorKind::Eof));
+        }
+        let start = usize::try_from(offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+        let end = usize::try_from(self.eocd.directory_end_offset())
+            .map_err(|_| Error::from(ErrorKind::Eof))?;
+        let entry_data = self
+            .data
+            .as_ref()
+            .get(start..end)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        ZipSliceEntries {
+            entry_data,
+            base_offset: self.eocd.base_offset(),
+            current_offset: offset,
+        }
+        .next_entry()?
+        .ok_or_else(|| Error::from(ErrorKind::Eof))
+    }
+
     /// Returns the byte slice that represents the zip file.
     ///
     /// This will include the entire input slice.
@@ -4060,6 +4092,34 @@ impl ZipFileHeaderFixed {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn central_record_lookup_matches_iteration_and_rejects_invalid_offsets() {
+        let mut writer = crate::office::StreamingArchiveWriter::new(
+            crate::office::StreamingArchiveLimits::default(),
+        );
+        for name in ["first", "長い名前/second", "third"] {
+            writer.write_stored(name, b"content").unwrap();
+        }
+        let bytes = writer.finish_to_bytes().unwrap();
+        let archive = crate::ZipArchive::from_slice(bytes.as_slice()).unwrap();
+        for record in archive.entries() {
+            let record = record.unwrap();
+            let direct = archive
+                .central_record_at(record.central_directory_offset())
+                .unwrap();
+            assert_eq!(direct.wayfinder(), record.wayfinder());
+            assert_eq!(direct.file_path().as_ref(), record.file_path().as_ref());
+        }
+        assert!(archive.central_record_at(0).is_err());
+        assert!(
+            archive
+                .central_record_at(archive.directory_offset() + 1)
+                .is_err()
+        );
+        assert!(archive.central_record_at(archive.eocd_offset()).is_err());
+        assert!(archive.central_record_at(u64::MAX).is_err());
+    }
+
     #[test]
     fn complete_descriptor_rejects_ambiguous_signature() {
         let signature = DataDescriptor::SIGNATURE;
