@@ -316,14 +316,14 @@ impl Edit {
             custom,
             remove_custom,
         } = self;
-        let (package, changed, parts, core, parts_first) =
+        let (package, changed, parts, core) =
             source.publish_metadata(staged.as_ref(), app, custom, remove_custom)?;
         let patch = Patch {
             base,
             target: staged,
             parts,
             core,
-            parts_first,
+            parts_first: true,
         };
         Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }

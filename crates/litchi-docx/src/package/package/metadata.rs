@@ -167,13 +167,7 @@ impl Package {
         app: Option<Option<app::Props>>,
         custom: Option<CustomProps>,
         remove_custom: bool,
-    ) -> Result<(
-        Self,
-        bool,
-        families::Patch,
-        families::Patch,
-        families::Patch,
-    )> {
+    ) -> Result<(Self, bool, families::Patch, families::Patch)> {
         let core = self.metadata() != target;
         let has_parts = app.is_some() || custom.is_some() || remove_custom;
         if !core && !has_parts {
@@ -182,16 +176,14 @@ impl Package {
                 false,
                 families::Patch::default(),
                 families::Patch::default(),
-                true,
             ));
         }
         if core && let Some(props) = target {
             admit(props)?;
         }
 
-        // Always retain a source-scoped public projection. A core edit also
-        // gets a second, private parts patch below because a core creation or
-        // removal can change which relationship IDs are available.
+        // Retain one source-scoped application/custom patch. A core edit is
+        // planned after this patch has been applied to the candidate.
         let source_parts = if has_parts {
             self.property_parts_patch(app.clone(), custom.clone(), remove_custom)?
         } else {
@@ -202,13 +194,7 @@ impl Package {
         if !core {
             let parts = source_parts;
             if parts.is_noop() {
-                return Ok((
-                    self.clone(),
-                    false,
-                    parts.clone(),
-                    families::Patch::default(),
-                    parts,
-                ));
+                return Ok((self.clone(), false, parts, families::Patch::default()));
             }
             if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
                 return Err(Error::Signed);
@@ -232,13 +218,7 @@ impl Package {
                 return Err(Error::Properties(error));
             }
             published?;
-            return Ok((
-                package,
-                true,
-                parts.clone(),
-                families::Patch::default(),
-                true,
-            ));
+            return Ok((package, true, parts, families::Patch::default()));
         }
 
         if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
@@ -296,7 +276,6 @@ impl Package {
             !core_patch.is_noop() || !source_parts.is_noop(),
             source_parts,
             core_patch,
-            true,
         ))
     }
 }
