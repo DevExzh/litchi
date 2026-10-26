@@ -1,0 +1,20 @@
+// Wire-only projection derived from `TSWPArchives.proto`:
+// `NumberAttachmentArchive` and its textual attachment envelope.
+//
+// The generated view is private to the neutral codec. Callers retain the
+// original payload, including fields outside this semantic projection.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message TextualAttachmentArchive {
+  optional string string_equivalent = 1;
+  optional int32 kind = 2;
+}
+
+message NumberAttachmentArchive {
+  optional .LitchiIwaProjection.TextualAttachmentArchive super = 1;
+  optional uint32 number_format = 2;
+  optional string string_value = 3;
+  optional string number_format_name = 4;
+}
