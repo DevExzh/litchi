@@ -169,3 +169,113 @@ fn movie_remove_cost_abba() -> TestResult {
         },
     )
 }
+
+fn host_duplicate(source: &[u8], selector: DrawableSelector, anchor: usize) -> TestResult<Vec<u8>> {
+    let mut editor = pages::Draft::from_bytes(source)?;
+    match selector {
+        DrawableSelector::Image(position) => {
+            let id = editor.body_images()?[position.get()].drawable_object_id;
+            drop(editor.duplicate_body_image(DrawableId::try_from(id)?, anchor)?);
+        },
+        DrawableSelector::Movie(position) => {
+            let id = editor.body_movies()?[position.get()].drawable_object_id;
+            drop(editor.duplicate_body_movie(id, anchor)?);
+        },
+        DrawableSelector::Audio(position) => {
+            let id = editor.body_audio()?[position.get()].drawable_object_id;
+            drop(editor.duplicate_body_audio(id, anchor)?);
+        },
+        _ => return Err("not media".into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_duplicate(source: &[u8], selector: DrawableSelector, anchor: usize) -> TestResult<LeafRun> {
+    let package = Package::from_bytes(source)?;
+    let mut edit = package.edit_body_media();
+    edit.duplicate(
+        selector,
+        litchi_pages::TextPosition::from_utf16_index(anchor)?,
+    )?;
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_body_media(&commit.patch().inverse())?;
+    Ok(LeafRun::with_inverse(
+        leaf_bytes!(commit.package()),
+        leaf_bytes!(restored.package()),
+    ))
+}
+
+fn duplicate_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &Fixture,
+    selector: DrawableSelector,
+) -> TestResult {
+    Case::new(name, Format::Pages, tier, evidence, input)
+        .host(|source| host_duplicate(source, selector, 0))
+        .leaf(|source| leaf_duplicate(source, selector, 0))
+        .read("host media", host_media)
+        .read("leaf plain text", leaf_text)
+        .leaf_structural_metadata()
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_image_duplicate_parity() -> TestResult {
+    duplicate_case(
+        "pages_body_image_duplicate_parity",
+        Tier::B,
+        Evidence::Queued,
+        &image_fixture()?,
+        DrawableSelector::image(0),
+    )?;
+    duplicate_case(
+        "pages_body_image_duplicate_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(IMAGES)?,
+        DrawableSelector::image(0),
+    )
+}
+
+#[test]
+fn pages_body_movie_duplicate_parity() -> TestResult {
+    duplicate_case(
+        "pages_body_movie_duplicate_parity",
+        Tier::B,
+        Evidence::Queued,
+        &movie_fixture()?,
+        DrawableSelector::movie(0),
+    )
+}
+
+#[test]
+fn pages_body_audio_duplicate_parity() -> TestResult {
+    duplicate_case(
+        "pages_body_audio_duplicate_parity",
+        Tier::B,
+        Evidence::Queued,
+        &audio_fixture()?,
+        DrawableSelector::audio(0),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn image_duplicate_cost_abba() -> TestResult {
+    let selector = DrawableSelector::image(0);
+    crate::pages_cost_probes::abba(
+        &fixture(IMAGES)?,
+        |source| host_duplicate(source, selector, 0),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_media();
+            edit.duplicate(selector, litchi_pages::TextPosition::from_utf16_index(0)?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

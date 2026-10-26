@@ -37,7 +37,7 @@ pub mod properties {
     };
 }
 
-/// Exact-source lifecycle transactions (removal) for body images, movies
+/// Exact-source lifecycle transactions (removal, duplication) for body images, movies
 /// and audio clips.
 pub mod lifecycle {
     pub use crate::package::body_media_lifecycle::{

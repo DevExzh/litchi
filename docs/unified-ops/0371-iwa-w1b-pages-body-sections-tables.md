@@ -29,7 +29,8 @@
 | `658c8bb696` | `litchi_pages::drawable::caption` — `Package::{body_drawable_caption, edit_body_drawable_caption, apply_body_drawable_caption}` over `DrawableSelector` + `Kind::{Title, Caption}`; `Edit::{set, clear}`. A present label's storage text is rewritten; an absent label gets the native inline graph from the shared `keynote_chart_caption_graph_codec` (style, CaptionInfo, storage, placement; the payloads the host writes); clearing points the drawable at a fresh stand-in and keeps the old graph. New objects get deterministic UUIDs in the document component and raise the watermark (`body_storage_objects::Metadata::registered`) | 15 |
 | `b8116873a5` | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
 | `26ce96d0f7` | parity for existing leaf families: host `append_section`, `remove_section`, `sections` → `Package::{edit_section_lifecycle, sections}` (tier B); host `remove_table` (already delegating) → `Package::edit_body_table_deletion` (tier A) | 4 |
-| (media removal commit, below) | `litchi_pages::drawable::lifecycle` — `Package::{edit_body_media, apply_body_media}`; `Edit::remove(DrawableSelector)` for images, movies and audio: deletes the U+FFFC and attachment entry, the drawable's z-order entry, the drawable/label/attachment graph, its data-reference owners, UUIDs and watermark suffix, and every data asset nothing references any more (`Data/` member and `DataInfo`); a commented drawable is refused. **Host defect fix**: media removal prunes the deleted attachment from the body storage header (§3, item 4) | 3 |
+| `a71731f9f2` | `litchi_pages::drawable::lifecycle` — `Package::{edit_body_media, apply_body_media}`; `Edit::remove(DrawableSelector)` for images, movies and audio: deletes the U+FFFC and attachment entry, the drawable's z-order entry, the drawable/label/attachment graph, its data-reference owners, UUIDs and watermark suffix, and every data asset nothing references any more (`Data/` member and `DataInfo`); a commented drawable is refused. **Host defect fix**: media removal prunes the deleted attachment from the body storage header (§3, item 4) | 3 |
+| (media duplicate commit, below) | `drawable::lifecycle` `Edit::duplicate(DrawableSelector, TextPosition)` for images, movies and audio: the host's graph clone (fresh identifiers in graph order, reference remaps by message type, CaptionInfo through the shared codec), the 12 pt (audio 30 pt) frame and attachment offset, the new U+FFFC and attachment entry, the z-order append, UUIDs and shared data-reference owners | 3 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -67,6 +68,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | section append/remove, sections read | 2 | B (UUIDs, save token) | queued |
 | body-table remove | 1 | A | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
+| media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -155,6 +157,7 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | body-table remove (`body-table-catalog-native`) | 2,246,224,218 | — | 170,815,958 | −92.4% |
 | image remove (`image-adjustments-native`) | 659,210,379 | — | 66,936,803 | −89.9% |
 | movie remove (source-built) | 36,674,391 | — | 5,525,855 | −84.9% |
+| image duplicate (`image-adjustments-native`) | 511,702,845 | — | 91,585,043 | −82.1% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
