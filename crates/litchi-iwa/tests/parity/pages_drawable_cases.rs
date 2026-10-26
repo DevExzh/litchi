@@ -17,7 +17,7 @@ use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier,
 use crate::leaf_bytes;
 
 pub(crate) const IMAGES: &str = "iwork/pages/image-adjustments-native.pages";
-const AUDIO: &str = "iwork/pages/audio-playback-native.pages";
+pub(crate) const AUDIO: &str = "iwork/pages/audio-playback-native.pages";
 
 const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
 const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nsource-built-pages-poster";
@@ -27,7 +27,7 @@ const AUDIO_DATA: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-pages-audio";
 ///
 /// The host's spatial and property audio routes refuse the native
 /// fixture's attachment offset bases, so they run on host-authored audio.
-fn audio_fixture() -> TestResult<Fixture> {
+pub(crate) fn audio_fixture() -> TestResult<Fixture> {
     let mut editor = pages::Draft::create_with_text("Quarterly report")?;
     let anchor = "Quarterly report".encode_utf16().count();
     let options = litchi_pages::audio::Options::new(
