@@ -780,3 +780,82 @@ fn pages_header_number_attachment_update_parity() -> TestResult {
         true,
     )
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn text_bookmark_add_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(BASIC)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            editor.add_body_bookmark(
+                litchi_pages::bookmark::TextRange::from_utf16_indexes(2, 7)?,
+                bookmark_settings("Methods")?,
+            )?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_bookmarks()?;
+            edit.add(
+                litchi_pages::bookmark::TextRange::from_utf16_indexes(2, 7)?,
+                bookmark_settings("Methods")?,
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn text_date_time_insert_cost_abba() -> TestResult {
+    use litchi_pages::date_time::DisplayText;
+    crate::pages_cost_probes::abba(
+        &fixture(BASIC)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            editor.insert_body_date_time_field(
+                litchi_pages::TextPosition::from_utf16_index(3)?,
+                DisplayText::new("2026-10-26")?,
+                date_settings(820_000_000.0)?,
+            )?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_date_time_fields()?;
+            edit.insert(
+                litchi_pages::TextPosition::from_utf16_index(3)?,
+                DisplayText::new("2026-10-26")?,
+                date_settings(820_000_000.0)?,
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn text_number_attachment_insert_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(BASIC)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            editor.insert_body_number_attachment(
+                litchi_pages::TextPosition::from_utf16_index(3)?,
+                page_count(),
+            )?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_number_attachments(litchi_pages::number_attachment::Target::Body)?;
+            edit.insert(
+                litchi_pages::TextPosition::from_utf16_index(3)?,
+                page_count(),
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

@@ -770,3 +770,27 @@ fn pages_body_shape_text_clear_parity() -> TestResult {
         TextOp::Clear,
     )
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn shape_text_set_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &shape_fixture()?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let id = editor
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            editor.set_body_shape_text(id, "New shape text")?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_text(DrawableSelector::shape(0))?;
+            edit.set("New shape text")?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

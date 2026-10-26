@@ -35,10 +35,13 @@ pub fn abba(
 
 #[inline(never)]
 fn probe_host(route: &dyn Fn(&[u8]) -> TestResult<Vec<u8>>, input: &[u8]) -> TestResult<usize> {
+    // Distinct bodies keep the linker from folding the two probe symbols.
+    black_box(0x5a_u8);
     Ok(black_box(route(black_box(input))?).len())
 }
 
 #[inline(never)]
 fn probe_leaf(route: &dyn Fn(&[u8]) -> TestResult<Vec<u8>>, input: &[u8]) -> TestResult<usize> {
+    black_box(0xa5_u16);
     Ok(black_box(route(black_box(input))?).len())
 }

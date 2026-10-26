@@ -232,3 +232,63 @@ fn pages_body_table_reads_parity() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn table_cell_value_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(CATALOG)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            editor.set_table_cell(model, 1, 3, CellValue::Text("Zürich".to_owned()))?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_table_values(TABLE)?;
+            edit.set(1, 3, Value::Text("Zürich".to_owned()))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn table_cell_value_batch_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(CATALOG)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let updates = (0..1_000)
+                .map(|index| {
+                    TableCellUpdate::new(
+                        1 + index % 4,
+                        index / 4 % 4,
+                        CellValue::Text(format!("v{index}")),
+                    )
+                })
+                .collect::<Vec<_>>();
+            // Later updates of one coordinate replace earlier ones; keep one per cell.
+            let mut seen = std::collections::BTreeMap::new();
+            for update in updates {
+                seen.insert((update.row, update.column), update);
+            }
+            editor.set_table_cells(model, seen.into_values())?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_table_values(TABLE)?;
+            let mut seen = std::collections::BTreeMap::new();
+            for index in 0..1_000u32 {
+                seen.insert((1 + index % 4, index / 4 % 4), format!("v{index}"));
+            }
+            for ((row, column), text) in seen {
+                edit.set(row, column, Value::Text(text))?;
+            }
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

@@ -489,10 +489,13 @@ impl TransactionBudget {
             .limits()
             .snappy_limits()
             .map_err(map_archive_error)?;
-        let source_archive_bytes = component
-            .archive()
-            .encoded_len(archive_limits)
-            .map_err(map_core_error)?;
+        let source_archive_bytes = match parsed_archive_len(component.archive()) {
+            Some(length) => length,
+            None => component
+                .archive()
+                .encoded_len(archive_limits)
+                .map_err(map_core_error)?,
+        };
         let message_count = component
             .archive()
             .objects
@@ -1228,11 +1231,20 @@ pub(super) fn editable_archive(
         source.limits().snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
-    archive
+    // The catalog already holds this component parsed from the same bytes:
+    // check the stream's framing and clone that archive rather than parsing
+    // it again (record 0371).
+    let parsed = source
+        .components()
+        .get(component_name)
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?
+        .archive();
+    parsed
         .validate_canonical_object_framing(stream.as_bytes(), limits)
         .map_err(map_core_error)?;
-    Ok((archive, limits))
+    Ok((parsed.clone(), limits))
 }
 
 pub(super) fn compress_archive(
@@ -1764,5 +1776,55 @@ mod tests {
         assert_eq!(attempted_usage.output_allocations, 0);
         assert_eq!(attempted_usage.candidate_reopens, 0);
         Ok(())
+    }
+}
+
+/// The stream length of an archive parsed from source and not yet mutated:
+/// every object's retained header length (its varint frame included) plus
+/// its message payloads. `None` when an object carries no source header (it was
+/// constructed in memory), where the encoder must measure it.
+///
+/// This replaces a full header re-encode (`Archive::encoded_len`) in the
+/// physical preflight of every section and body text edit (record 0371).
+fn parsed_archive_len(archive: &Archive) -> Option<usize> {
+    let mut length = 0usize;
+    for object in &archive.objects {
+        if object.header_length == 0 {
+            return None;
+        }
+        let header = usize::try_from(object.header_length).ok()?;
+        length = length.checked_add(header)?;
+        for message in &object.messages {
+            length = length.checked_add(message.data.len())?;
+        }
+    }
+    Some(length)
+}
+
+#[cfg(test)]
+mod parsed_archive_len_tests {
+    #[test]
+    fn parsed_length_equals_the_encoder_on_native_fixtures() {
+        for fixture in [
+            &include_bytes!("../../../../test-data/iwork/pages/basic.pages")[..],
+            &include_bytes!("../../../../test-data/iwork/pages/body-sections-unicode.pages")[..],
+            &include_bytes!("../../../../test-data/iwork/pages/body-table-cells-native.pages")[..],
+        ] {
+            let package = crate::Package::from_bytes(fixture).unwrap();
+            let limits = package
+                .state
+                .source
+                .limits()
+                .effective_archive_limits()
+                .unwrap();
+            for component in package.state.source.components().iter() {
+                assert_eq!(
+                    super::parsed_archive_len(component.archive()),
+                    Some(component.archive().encoded_len(limits).unwrap()),
+                    "{}",
+                    component.name()
+                );
+            }
+        }
     }
 }
