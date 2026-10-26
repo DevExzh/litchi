@@ -69,13 +69,45 @@ const MAX_CAPTION_BYTES: usize = 64 * 1024 * 1024;
 
 /// Native drawable edge whose caption reference is being transitioned.
 ///
-/// Charts and movies share the graph, Metadata, and preview transaction. Only
-/// the drawable message type and strict edge codec differ.
+/// Charts, movies and images share the graph, Metadata, and preview
+/// transaction. Only the drawable message type and strict edge codec differ;
+/// images use the movie edge codec (both wrap `TSD.DrawableArchive` in field
+/// 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CaptionEdgeKind {
     Chart,
     Movie,
     MovieTitle,
+    Image,
+    ImageTitle,
+}
+
+impl CaptionEdgeKind {
+    /// Whether the edge belongs to a media drawable (movie or image).
+    const fn is_media(self) -> bool {
+        !matches!(self, Self::Chart)
+    }
+
+    /// Whether the edge is a title rather than a caption.
+    const fn is_title(self) -> bool {
+        matches!(self, Self::MovieTitle | Self::ImageTitle)
+    }
+
+    /// Whether the drawable's header also lists the new graph's style
+    /// (movies). Images, like the migration host, list only the graph root,
+    /// which replaces the old edge in place.
+    const fn lists_graph_style(self) -> bool {
+        matches!(self, Self::Movie | Self::MovieTitle)
+    }
+
+    /// The message type of the drawable that owns the edge.
+    const fn drawable_message_type(self) -> u32 {
+        match self {
+            Self::Chart => CHART_MESSAGE_TYPE,
+            Self::Movie | Self::MovieTitle => 3_007,
+            Self::Image | Self::ImageTitle => 3_005,
+        }
+    }
 }
 
 /// Operation-local accounting for the chart-caption owner.
@@ -1960,11 +1992,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
                 ids,
                 ids.info,
                 objects,
-                matches!(
-                    edge_kind,
-                    CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle
-                )
-                .then_some(ids.style),
+                edge_kind.lists_graph_style().then_some(ids.style),
             )
         } else {
             let standin = first_identifier;
@@ -2752,9 +2780,10 @@ fn caption_graph_objects(
                 .min(u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX)),
         )
         .with_max_allocations(budget.remaining_allocations());
-    let graph_kind = match edge_kind {
-        CaptionEdgeKind::MovieTitle => graph_codec::CaptionGraphKind::Title,
-        CaptionEdgeKind::Chart | CaptionEdgeKind::Movie => graph_codec::CaptionGraphKind::Caption,
+    let graph_kind = if edge_kind.is_title() {
+        graph_codec::CaptionGraphKind::Title
+    } else {
+        graph_codec::CaptionGraphKind::Caption
     };
     let output = graph_codec::encode_caption_graph_with_kind_with_report(
         graph_codec::CaptionGraphWrite {
@@ -2815,6 +2844,13 @@ struct CaptionTheme {
     stylesheet: u64,
     paragraph_style: u64,
     language: Option<String>,
+}
+
+/// The theme objects a new caption graph references (stylesheet and caption
+/// paragraph style), for owners that register them before creation.
+pub(super) fn caption_dependencies(package: &Package) -> Result<[u64; 2], Error> {
+    let theme = caption_theme(package)?;
+    Ok([theme.stylesheet, theme.paragraph_style])
 }
 
 fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
@@ -2987,11 +3023,7 @@ fn patch_caption_edge(
     edge_kind: CaptionEdgeKind,
     graph_style_identifier: Option<u64>,
 ) -> Result<(), Error> {
-    let missing_movie_edge = expected_identifier.is_none()
-        && matches!(
-            edge_kind,
-            CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle
-        );
+    let missing_movie_edge = expected_identifier.is_none() && edge_kind.is_media();
     let mut expected_identifier = expected_identifier;
     if replacement_identifier == 0 {
         return Err(Error::InvalidSource);
@@ -2999,10 +3031,7 @@ fn patch_caption_edge(
     let source_object = archive
         .object(drawable_identifier)
         .ok_or(Error::InvalidSource)?;
-    let message_type = match edge_kind {
-        CaptionEdgeKind::Chart => CHART_MESSAGE_TYPE,
-        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => 3_007,
-    };
+    let message_type = edge_kind.drawable_message_type();
     if source_object.messages.len() != 1 || source_object.messages[0].type_ != message_type {
         return Err(Error::InvalidSource);
     }
@@ -3069,16 +3098,7 @@ fn patch_caption_edge(
         {
             return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
-        let edge_field = match edge_kind {
-            CaptionEdgeKind::Chart => 11,
-            CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => {
-                if edge_kind == CaptionEdgeKind::MovieTitle {
-                    10
-                } else {
-                    11
-                }
-            },
-        };
+        let edge_field = if edge_kind.is_title() { 10 } else { 11 };
         if count != 0
             && (!matches!(field.path.path.as_slice(), [number, 1] if *number == edge_field)
                 && !matches!(field.path.path.as_slice(), [1, number, 1] if *number == edge_field)
@@ -3131,7 +3151,7 @@ fn patch_caption_edge(
                 report.scratch_bytes(),
             )
         },
-        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle if missing_movie_edge => {
+        _ if missing_movie_edge => {
             let limits = package.wire_limits().map_err(map_wire_error)?;
             let rewritten = insert_movie_caption_edge(
                 &payload,
@@ -3174,16 +3194,12 @@ fn patch_caption_edge(
                 output_bytes,
             )
         },
-        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => {
+        _ => {
             let options = movie_caption_rewrite_options(package, &payload, budget)?;
-            let write = match edge_kind {
-                CaptionEdgeKind::Movie => {
-                    keynote_movie_caption_codec::MovieCaptionWrite::caption(replacement_identifier)
-                },
-                CaptionEdgeKind::MovieTitle => {
-                    keynote_movie_caption_codec::MovieCaptionWrite::title(replacement_identifier)
-                },
-                CaptionEdgeKind::Chart => unreachable!(),
+            let write = if edge_kind.is_title() {
+                keynote_movie_caption_codec::MovieCaptionWrite::title(replacement_identifier)
+            } else {
+                keynote_movie_caption_codec::MovieCaptionWrite::caption(replacement_identifier)
             };
             let (rewritten, report) =
                 keynote_movie_caption_codec::rewrite_movie_caption_with_report(
@@ -3214,6 +3230,24 @@ fn patch_caption_edge(
     let mut aggregate_after = aggregate_before.clone();
     aggregate_after.retain(|identifier| *identifier != expected_identifier);
     aggregate_after.push(replacement_identifier);
+    // Images, like the migration host, keep the new root in the old edge's
+    // header slot.
+    let in_place = matches!(
+        edge_kind,
+        CaptionEdgeKind::Image | CaptionEdgeKind::ImageTitle
+    )
+    .then(|| {
+        aggregate_before
+            .iter()
+            .map(|identifier| {
+                if *identifier == expected_identifier {
+                    replacement_identifier
+                } else {
+                    *identifier
+                }
+            })
+            .collect::<Vec<_>>()
+    });
     if let Some(style_identifier) = graph_style_identifier {
         if style_identifier == 0 || aggregate_before.contains(&style_identifier) {
             return Err(Error::Refused(Refusal::UnsupportedDependency));
@@ -3241,12 +3275,25 @@ fn patch_caption_edge(
             0,
             RawMessage {
                 type_: message_type,
-                data: rewritten,
+                data: rewritten.clone(),
             },
             transition,
             archive_limits,
         )
         .map_err(map_core_error)?;
+    if let Some(order) = in_place {
+        rewritten_object
+            .replace_message_reordering_object_references_preserving_header(
+                0,
+                RawMessage {
+                    type_: message_type,
+                    data: rewritten,
+                },
+                &order,
+                archive_limits,
+            )
+            .map_err(map_core_error)?;
+    }
     *archive
         .object_mut(drawable_identifier)
         .ok_or(Error::InvalidSource)? = rewritten_object;
@@ -3273,11 +3320,10 @@ fn insert_movie_caption_edge(
     let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
     let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
-    let edge_field = match edge_kind {
-        CaptionEdgeKind::Movie => 11,
-        CaptionEdgeKind::MovieTitle => 10,
-        CaptionEdgeKind::Chart => return Err(Error::InvalidSource),
-    };
+    if !edge_kind.is_media() {
+        return Err(Error::InvalidSource);
+    }
+    let edge_field = if edge_kind.is_title() { 10 } else { 11 };
     if drawable.fields().any(|field| field.number() == edge_field) {
         return Err(Error::InvalidSource);
     }
@@ -3336,10 +3382,10 @@ fn insert_movie_caption_edge(
         .with_max_output_bytes(limits.max_output_bytes()),
     )
     .map_err(map_movie_caption_codec_error)?;
-    let actual = match edge_kind {
-        CaptionEdgeKind::Movie => snapshot.caption_identifier(),
-        CaptionEdgeKind::MovieTitle => snapshot.title_identifier(),
-        CaptionEdgeKind::Chart => None,
+    let actual = if edge_kind.is_title() {
+        snapshot.title_identifier()
+    } else {
+        snapshot.caption_identifier()
     };
     if actual != Some(replacement_identifier) {
         return Err(Error::Verification);
