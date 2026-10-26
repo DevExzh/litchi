@@ -64,7 +64,27 @@ pub(crate) fn body_storage(package: &Package) -> GraphResult<(Storage, Budget)> 
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
     let body = graph::resolve_body(&index, &mut budget)?;
-    let located = index.get(body.root.body)?;
+    Ok((storage_at(package, &index, body.root.body)?, budget))
+}
+
+/// Resolve one text storage by its native identifier (found through a
+/// semantic selector by the caller) and decode its text.
+pub(crate) fn storage_by_identifier(package: &Package, identifier: u64) -> GraphResult<Storage> {
+    let mut budget = Budget::new(package)?;
+    let index = ObjectIndex::new(package, &mut budget)?;
+    storage_at(
+        package,
+        &index,
+        NonZeroU64::new(identifier).ok_or(GraphError::InvalidSource)?,
+    )
+}
+
+fn storage_at(
+    package: &Package,
+    index: &ObjectIndex<'_>,
+    identifier: NonZeroU64,
+) -> GraphResult<Storage> {
+    let located = index.get(identifier)?;
     let mut selected = None;
     for (message_index, message) in located.object.messages.iter().enumerate() {
         if matches!(message.type_, 2_001 | 2_022)
@@ -86,17 +106,14 @@ pub(crate) fn body_storage(package: &Package) -> GraphResult<(Storage, Budget)> 
     .map_err(|_| GraphError::InvalidSource)?;
     let text = litchi_iwa_text_wire::from_bytes(&message.data, text_limits)
         .map_err(|_| GraphError::InvalidSource)?;
-    Ok((
-        Storage {
-            identifier: body.root.body,
-            component: index.component_name(located.component_index)?,
-            message_index,
-            message_type: message.type_,
-            payload: message.data.clone(),
-            text: text.text().to_owned(),
-        },
-        budget,
-    ))
+    Ok(Storage {
+        identifier,
+        component: index.component_name(located.component_index)?,
+        message_index,
+        message_type: message.type_,
+        payload: message.data.clone(),
+        text: text.text().to_owned(),
+    })
 }
 
 /// One boundary of an `ObjectAttributeTable`: the object that starts at a
@@ -744,4 +761,59 @@ pub(crate) fn valid_text_attribute_uuid(uuid: &str) -> bool {
             8 | 13 | 18 | 23 => byte == b'-',
             _ => byte.is_ascii_hexdigit(),
         })
+}
+
+/// Replace the UTF-16 `start..end` of a storage's text through the shared
+/// TSWP rewrite (the host's `replace_storage_text` splice), returning the
+/// object references the splice removed.
+pub(crate) fn splice_text(
+    package: &Package,
+    storage: &mut Storage,
+    start: u32,
+    end: u32,
+    replacement: &str,
+) -> GraphResult<Vec<u64>> {
+    if start > end || end > storage.utf16_len() || !scalar_boundaries(&storage.text, [start, end]) {
+        return Err(GraphError::InvalidSource);
+    }
+    let limits = super::storage_rewrite_limits(package.state.source.limits())
+        .map_err(|_| GraphError::InvalidSource)?;
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
+        &storage.payload,
+        start as usize..end as usize,
+        replacement,
+        litchi_iwa_text_wire::RewriteBehavior::ReplaceSelection,
+        limits,
+    )
+    .map_err(|_| GraphError::InvalidSource)?;
+    let requirements = prepared.execution_requirements();
+    let rewritten = prepared
+        .execute(litchi_iwa_text_wire::StorageRewriteExecutionLimits {
+            max_output_bytes: requirements.output_bytes(),
+            max_retained_elements: requirements.retained_elements(),
+            max_retained_bytes: requirements.retained_bytes(),
+            max_peak_scratch_bytes: requirements.peak_scratch_bytes(),
+            max_allocations: requirements.allocations(),
+            max_work: requirements.work(),
+        })
+        .map_err(|_| GraphError::InvalidSource)?;
+    let removed = rewritten.removed_object_references().to_vec();
+    let byte = |units: u32| {
+        let mut count = 0u32;
+        for (index, character) in storage.text.char_indices() {
+            if count == units {
+                return index;
+            }
+            count += character.len_utf16() as u32;
+        }
+        storage.text.len()
+    };
+    let (from, to) = (byte(start), byte(end));
+    let mut text = String::with_capacity(storage.text.len() + replacement.len());
+    text.push_str(&storage.text[..from]);
+    text.push_str(replacement);
+    text.push_str(&storage.text[to..]);
+    storage.payload = rewritten.into_bytes();
+    storage.text = text;
+    Ok(removed)
 }

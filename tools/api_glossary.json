@@ -24701,7 +24701,8 @@
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::bookmark",
-        "litchi_pages::date_time"
+        "litchi_pages::date_time",
+        "litchi_pages::number_attachment"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
