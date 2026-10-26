@@ -318,3 +318,147 @@ fn numbers_sheet_text_box_property_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- languages -----------------------------------------------------------
+
+use litchi_numbers::sheet::drawable::language::{TextLanguage, TextPosition};
+
+#[derive(Clone, Debug)]
+enum LanguageChange {
+    Set(usize, &'static str),
+    Remove(usize),
+    Reset,
+}
+
+fn host_languages(bytes: &[u8]) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    Ok(format!("{:?}", e.sheet_text_box_text_languages(s, d)?))
+}
+
+fn leaf_languages(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:?}",
+        Package::from_bytes(bytes)?
+            .sheet_drawable_text_languages(0, DrawableSelector::text_box(0))?
+    ))
+}
+
+fn host_language_change(source: &[u8], change: &LanguageChange) -> TestResult<Vec<u8>> {
+    let mut e = numbers::Draft::from_bytes(source)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    match change {
+        LanguageChange::Set(position, tag) => e.set_sheet_text_box_text_language(
+            s,
+            d,
+            TextPosition::from_utf16_index(*position)?,
+            TextLanguage::tag(*tag)?,
+        )?,
+        LanguageChange::Remove(position) => drop(e.remove_sheet_text_box_text_language_boundary(
+            s,
+            d,
+            TextPosition::from_utf16_index(*position)?,
+        )?),
+        LanguageChange::Reset => drop(e.reset_sheet_text_box_text_languages(s, d)?),
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn language_case(name: &'static str, input: &Fixture, change: LanguageChange) -> TestResult {
+    let change = &change;
+    Case::new(name, Format::Numbers, Tier::A, Evidence::Queued, input)
+        .host(|source| host_language_change(source, change))
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_text_languages(0, DrawableSelector::text_box(0))?;
+            match change {
+                LanguageChange::Set(position, tag) => drop(edit.set(
+                    TextPosition::from_utf16_index(*position)?,
+                    TextLanguage::tag(*tag)?,
+                )?),
+                LanguageChange::Remove(position) => {
+                    drop(edit.remove_boundary(TextPosition::from_utf16_index(*position)?)?);
+                },
+                LanguageChange::Reset => drop(edit.reset()?),
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_text_languages(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host languages", host_languages)
+        .read("leaf languages", leaf_languages)
+        .run()?;
+    Ok(())
+}
+
+/// The authored fixture with French from 6 set by the host.
+fn with_boundary() -> TestResult<Fixture> {
+    let input = authored_fixture()?;
+    Ok(Fixture {
+        path: "authored + host French boundary at 6",
+        bytes: host_language_change(&input.bytes, &LanguageChange::Set(6, "fr"))?,
+    })
+}
+
+#[test]
+fn numbers_sheet_text_box_language_set_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    language_case(
+        "numbers_sheet_text_box_language_set_parity",
+        &authored_fixture()?,
+        LanguageChange::Set(6, "fr"),
+    )?;
+    language_case(
+        "numbers_sheet_text_box_language_set_parity",
+        &with_boundary()?,
+        LanguageChange::Set(0, "de"),
+    )
+}
+
+#[test]
+fn numbers_sheet_text_box_language_remove_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    language_case(
+        "numbers_sheet_text_box_language_remove_parity",
+        &with_boundary()?,
+        LanguageChange::Remove(6),
+    )
+}
+
+#[test]
+fn numbers_sheet_text_box_language_reset_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    language_case(
+        "numbers_sheet_text_box_language_reset_parity",
+        &with_boundary()?,
+        LanguageChange::Reset,
+    )
+}
+
+#[test]
+fn numbers_sheet_text_box_language_read_parity() -> TestResult {
+    for input in [authored_fixture()?, with_boundary()?] {
+        assert_eq!(host_languages(&input.bytes)?, leaf_languages(&input.bytes)?);
+        let e = numbers::Draft::from_bytes(&input.bytes)?;
+        let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+        for position in [0, 3, 6, 8] {
+            let position = TextPosition::from_utf16_index(position)?;
+            assert_eq!(
+                e.sheet_text_box_text_language(s, d, position)?,
+                Package::from_bytes(&input.bytes)?.sheet_drawable_text_language(
+                    0,
+                    DrawableSelector::text_box(0),
+                    position
+                )?
+            );
+        }
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

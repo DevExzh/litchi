@@ -913,7 +913,7 @@ numbers/editor/semantic/text_box.rs	remove_sheet_text_box_comment_reply	1	number
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_highlight	1	numbers	text.highlight	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_hyperlink	1	numbers	text.hyperlink	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/text_box.rs	remove_sheet_text_box_text_language_boundary	1	numbers	text.language	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	remove_sheet_text_box_text_language_boundary	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::remove_boundary	numbers_sheet_text_box_language_remove_parity	A	-	-
 numbers/editor/semantic/text_box.rs	replace_sheet_text_box_text	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::replace	numbers_sheet_text_box_text_replace_parity	A	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_columns	1	numbers	drawable.text_box_properties	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_paragraph_alignment	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
@@ -943,7 +943,7 @@ numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_character_spacing	
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_color	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_decorations	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_font	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
-numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_languages	1	numbers	text.language	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_languages	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::reset	numbers_sheet_text_box_language_reset_parity	A	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_layout	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_ligatures	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_outline	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
@@ -983,7 +983,7 @@ numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_character_spacing	1	
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_color	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_decorations	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_font	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
-numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_language	1	numbers	text.language	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_language	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::set	numbers_sheet_text_box_language_set_parity	A	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_layout	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_ligatures	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_outline	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
@@ -1028,8 +1028,8 @@ numbers/editor/semantic/text_box.rs	sheet_text_box_text_character_spacing	1	numb
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_color	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_decorations	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_font	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
-numbers/editor/semantic/text_box.rs	sheet_text_box_text_language	1	numbers	text.language	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/text_box.rs	sheet_text_box_text_languages	1	numbers	text.language	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	sheet_text_box_text_language	1	numbers	text.language	migrated	litchi_numbers::Package::sheet_drawable_text_language	numbers_sheet_text_box_language_read_parity	A	-	-
+numbers/editor/semantic/text_box.rs	sheet_text_box_text_languages	1	numbers	text.language	migrated	litchi_numbers::Package::sheet_drawable_text_languages	numbers_sheet_text_box_language_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_layout	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_ligatures	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_outline	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
