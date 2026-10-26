@@ -4159,6 +4159,15 @@ fn set_cell_with_context(
         )?;
     }
 
+    // Host defect fixed with record 0370b: a cell dropped by an axis
+    // removal kept its style, text-style, conditional-style, control and
+    // format entries counting it.
+    if matches!(encoded_value, EncodedValue::Clear)
+        && let Some(cell) = old_bnc.as_ref()
+    {
+        release_dropped_cell_metadata(package, object_locations, &descriptor.model, cell)?;
+    }
+
     update_tile_and_headers(
         package,
         object_locations,
@@ -4170,6 +4179,53 @@ fn set_cell_with_context(
         column,
         encoded_value,
     )
+}
+
+/// Release one reference of every metadata list entry a dropped cell held.
+fn release_dropped_cell_metadata(
+    package: &mut HostPackage,
+    locations: &HashMap<u64, String>,
+    model: &TableModelArchive,
+    cell: &BncCell,
+) -> Result<()> {
+    use litchi_numbers_wire::ListKind;
+    use tst::table_data_list::ListType;
+    let store = &model.base_data_store;
+    for (kind, key) in cell.list_keys() {
+        let (list, list_type) = match kind {
+            ListKind::Style => (Some(store.style_table.identifier), ListType::Style),
+            ListKind::ConditionalStyle => (
+                store.conditionalstyletable.as_ref().map(|r| r.identifier),
+                ListType::ConditionalStyle,
+            ),
+            ListKind::ControlCellSpec => (
+                store.control_cell_spec_table.as_ref().map(|r| r.identifier),
+                ListType::ControlCellSpec,
+            ),
+            ListKind::Format => (
+                store.format_table.as_ref().map(|r| r.identifier),
+                ListType::Format,
+            ),
+            _ => continue,
+        };
+        let list = list.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers cell references a missing {list_type:?} list"
+            ))
+        })?;
+        let resolved = storage::resolve_table_data_list(package, locations, list, list_type)?;
+        let located = resolved
+            .entries
+            .iter()
+            .find(|located| located.entry.key == key)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers {list_type:?} list has no entry {key}"))
+            })?;
+        storage::decrement_table_data_list_entry(
+            package, locations, &resolved, located, list_type,
+        )?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
