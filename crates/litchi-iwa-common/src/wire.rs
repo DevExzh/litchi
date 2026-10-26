@@ -4495,7 +4495,7 @@ mod tests {
             .collect();
 
         assert!(matches!(
-            patch_nested_fields_batched(&[], &edits),
+            patch_nested_fields_batched(&[], &edits, WireLimits::DEFAULT),
             Err(Error::LimitExceeded {
                 kind: LimitKind::RewriteWork,
                 observed,

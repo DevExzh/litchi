@@ -868,9 +868,10 @@ impl Package {
                 "Package entry {normalized} is not an IWA component"
             )));
         }
-        let snappy = if self.entry(normalized).is_some_and(|compressed| {
-            !is_legacy_operation_storage(normalized, compressed)
-        }) {
+        let snappy = if self
+            .entry(normalized)
+            .is_some_and(|compressed| !is_legacy_operation_storage(normalized, compressed))
+        {
             self.limits.snappy_limits()?
         } else {
             SnappyLimits::default()
