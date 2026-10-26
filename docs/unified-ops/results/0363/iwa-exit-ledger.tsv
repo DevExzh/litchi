@@ -2078,7 +2078,7 @@ text/editor.rs	delete_applied_named_paragraph_style_with_replacement	1	shared	te
 text/editor.rs	delete_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	insert_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::encode_date_time	text_date_time_insert_parity	B	-	rewrite_storage_text_with_behavior then ranged::rewrite(Change::Add) and smart_field::encode_date_time; host kept as the oracle (record 0374)
-text/editor.rs	insert_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	insert_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::anchor	text_number_attachment_insert_parity	A	-	U+FFFC insertion by rewrite_storage_text_with_behavior, number_attachment::anchor and number_attachment::encode; host kept as the oracle (record 0374)
 text/editor.rs	named_paragraph_styles	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Alignment); host kept as the oracle (record 0374)
@@ -2116,7 +2116,7 @@ text/editor.rs	remove_text_date_time_field	1	shared	text.date_time_field	migrate
 text/editor.rs	remove_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_language_boundary	1	shared	text.language	migrated	litchi_iwa_text_wire::language::rewrite	text_language_remove_parity	A	-	language::rewrite(Change::RemoveBoundary); host kept as the oracle (record 0374)
-text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_number_attachment_remove_parity	A	-	deleting the U+FFFC drops the anchor; the format package prunes and drops the orphan object; host kept as the oracle (record 0374)
 text/editor.rs	rename_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	replace_text	1	shared	text.shared	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_replace_parity	A	-	host delegates the payload rewrite; object cleanup of removed references is the format package publication (record 0374)
 text/editor.rs	reset_paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Alignment)); host kept as the oracle (record 0374)
@@ -2210,7 +2210,7 @@ text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	migrated	litchi_iwa_text_
 text/editor.rs	text_language	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::at	text_language_read_parity	A	-	host kept as the oracle (record 0374)
 text/editor.rs	text_languages	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::runs	text_language_read_parity	A	-	host kept as the oracle (record 0374)
 text/editor.rs	text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextLigatures); host kept as the oracle (record 0374)
-text/editor.rs	text_number_attachments	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_number_attachments	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::anchors	text_number_attachment_read_parity	A	-	number_attachment::anchors plus number_attachment::settings; host kept as the oracle (record 0374)
 text/editor.rs	text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextOutline); host kept as the oracle (record 0374)
 text/editor.rs	text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextScript); host kept as the oracle (record 0374)
 text/editor.rs	text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextShadow); host kept as the oracle (record 0374)
@@ -2222,7 +2222,7 @@ text/editor.rs	update_text_comment_reply	1	shared	text.comment	host-only	litchi-
 text/editor.rs	update_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::date_time_with_settings	text_date_time_update_parity	A	-	ranged::rewrite(Change::Move) plus smart_field::date_time_with_settings; host kept as the oracle (record 0374)
 text/editor.rs	update_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	update_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
-text/editor.rs	update_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::with_settings	text_number_attachment_update_parity	A	-	host kept as the oracle (record 0374)
 text/extractor.rs	extract_from_bundle	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/extractor.rs	extract_from_object	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/extractor.rs	get_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
