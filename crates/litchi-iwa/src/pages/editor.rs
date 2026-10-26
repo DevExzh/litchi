@@ -4724,6 +4724,39 @@ where
     })
 }
 
+/// Drop a removed body attachment's reference from the body storage's
+/// message metadata.
+///
+/// Deleting the anchoring U+FFFC removes the attachment's table entry, but
+/// the text rewrite prunes the header reference only when the storage
+/// header lists exactly the payload's references; a native storage whose
+/// header also lists references the payload does not count kept the
+/// reference, and media removal then failed because the deleted
+/// attachment stayed referenced (host defect, record 0371). The graph proof
+/// already showed the attachment belongs to this drawable alone.
+fn prune_removed_body_attachment(
+    package: &mut HostPackage,
+    body_storage_id: u64,
+    attachment_id: u64,
+) -> Result<()> {
+    let archive_name = find_object_archive(package, body_storage_id)?;
+    package.update_archive(&archive_name, |archive| {
+        let object = archive.object_mut(body_storage_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Pages body storage {body_storage_id} is missing"))
+        })?;
+        for info in &mut object.archive_info.message_infos {
+            info.object_references
+                .retain(|identifier| *identifier != attachment_id);
+            for field in &mut info.field_infos {
+                field
+                    .object_references
+                    .retain(|identifier| *identifier != attachment_id);
+            }
+        }
+        Ok(())
+    })
+}
+
 fn update_reference_list(references: &mut Vec<u64>, old: Option<u64>, new: Option<u64>) {
     if let Some(old) = old {
         references.retain(|identifier| *identifier != old);

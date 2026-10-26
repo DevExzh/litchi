@@ -37,6 +37,14 @@ pub mod properties {
     };
 }
 
+/// Exact-source lifecycle transactions (removal, duplication) for body images, movies
+/// and audio clips.
+pub mod lifecycle {
+    pub use crate::package::body_media_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
 /// Exact-source title and caption transactions for body images, movies and
 /// shapes.
 pub mod caption {

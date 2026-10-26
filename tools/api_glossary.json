@@ -25724,6 +25724,7 @@
         "litchi_pages::table::creation",
         "litchi_pages::table::deletion",
         "litchi_pages::drawable::caption",
+        "litchi_pages::drawable::lifecycle",
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::bookmark",
