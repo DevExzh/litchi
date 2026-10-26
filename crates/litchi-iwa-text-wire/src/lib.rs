@@ -18,6 +18,7 @@
 #![forbid(unsafe_code)]
 
 mod char_style;
+pub mod drop_cap;
 pub mod language;
 mod native;
 pub mod number_attachment;

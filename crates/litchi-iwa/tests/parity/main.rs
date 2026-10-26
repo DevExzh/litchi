@@ -40,6 +40,7 @@ mod physical_cases;
 mod self_test;
 mod text_annotation_cases;
 mod text_attachment_cases;
+mod text_drop_cap_cases;
 mod text_field_cases;
 mod text_glue;
 mod text_language_cases;
