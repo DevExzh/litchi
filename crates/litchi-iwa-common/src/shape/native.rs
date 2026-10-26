@@ -298,6 +298,193 @@ pub fn fill(
     }
 }
 
+// ---- the stored form of the shared values (the encode direction) -------
+
+/// The stored fields of a `TSP.Color`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StoredColor {
+    /// `model` (RGB).
+    pub model: i32,
+    /// `r`, `g`, `b`, `a`.
+    pub rgba: [f32; 4],
+    /// `rgbspace`.
+    pub rgb_space: i32,
+}
+
+/// The stored fields of a `TSD.StrokeArchive` (pattern with its six native
+/// slots).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StoredStroke {
+    /// `color`.
+    pub color: StoredColor,
+    /// `width`.
+    pub width: f32,
+    /// `cap`.
+    pub cap: i32,
+    /// `join`.
+    pub join: i32,
+    /// `miter_limit`.
+    pub miter_limit: f32,
+    /// `pattern.type`.
+    pub pattern_kind: i32,
+    /// `pattern.count`.
+    pub pattern_count: u32,
+    /// `pattern.pattern` (always six slots).
+    pub pattern_lengths: [f32; 6],
+}
+
+/// The stored fields of a gradient stop.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StoredStop {
+    /// `color`.
+    pub color: StoredColor,
+    /// `fraction`.
+    pub fraction: f32,
+    /// `inflection`.
+    pub inflection: f32,
+}
+
+/// The stored fields of a `TSD.GradientArchive` (angle in radians).
+#[derive(Debug, Clone, PartialEq)]
+pub struct StoredGradient {
+    /// `type`.
+    pub kind: i32,
+    /// `stops`.
+    pub stops: Vec<StoredStop>,
+    /// `opacity`.
+    pub opacity: f32,
+    /// `advancedGradient`.
+    pub advanced: bool,
+    /// `anglegradient.gradientangle`.
+    pub angle: f32,
+}
+
+/// The stored fields of a `TSD.ImageFillArchive` (`data` 0 for the
+/// placeholder).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StoredImage {
+    /// `imagedata.identifier`.
+    pub data: u64,
+    /// `technique`.
+    pub technique: i32,
+    /// `tint`.
+    pub tint: Option<StoredColor>,
+    /// `fillsize`.
+    pub fill_size: [f32; 2],
+    /// `interpretsUntaggedImageDataAsGeneric`.
+    pub generic: bool,
+    /// `referencecolor`.
+    pub reference_color: Option<StoredColor>,
+}
+
+/// The stored fields of a `TSD.FillArchive`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct StoredFill {
+    /// `color`.
+    pub color: Option<StoredColor>,
+    /// `gradient`.
+    pub gradient: Option<StoredGradient>,
+    /// `image`.
+    pub image: Option<StoredImage>,
+}
+
+/// The stored form of a color.
+#[must_use]
+pub fn stored_color(color: Rgba) -> StoredColor {
+    StoredColor {
+        model: RGB_MODEL,
+        rgba: [color.red(), color.green(), color.blue(), color.alpha()],
+        rgb_space: match color.color_space() {
+            RgbColorSpace::Srgb => SRGB_SPACE,
+            RgbColorSpace::DisplayP3 => P3_SPACE,
+        },
+    }
+}
+
+/// The stored form of a stroke; `None` stores the native hidden stroke (a
+/// one-point black solid stroke with the empty pattern).
+#[must_use]
+pub fn stored_stroke(stroke: Option<Stroke>) -> StoredStroke {
+    let (stroke, hidden) = match stroke {
+        Some(stroke) => (stroke, false),
+        None => (Stroke::new(Rgba::black(), Width::ONE, Pattern::Solid), true),
+    };
+    let (kind, count, lengths) = match stroke.pattern {
+        Pattern::Solid => (PATTERN_KIND_SOLID, 0, [0.0, 0.0]),
+        Pattern::ShortDash => (PATTERN_KIND_DASH, 2, SHORT_DASH),
+        Pattern::MediumDash => (PATTERN_KIND_DASH, 2, MEDIUM_DASH),
+        Pattern::LongDash => (PATTERN_KIND_DASH, 2, LONG_DASH),
+        Pattern::RoundedDash => (PATTERN_KIND_DASH, 2, ROUNDED_DASH),
+    };
+    let (kind, count, lengths) = if hidden {
+        (PATTERN_KIND_EMPTY, 0, [0.0, 0.0])
+    } else {
+        (kind, count, lengths)
+    };
+    StoredStroke {
+        color: stored_color(stroke.color),
+        width: stroke.width.points(),
+        cap: match stroke.cap {
+            Cap::Butt => 0,
+            Cap::Round => 1,
+            Cap::Square => 2,
+        },
+        join: match stroke.join {
+            Join::Miter => 0,
+            Join::Round => 1,
+            Join::Bevel => 2,
+        },
+        miter_limit: stroke.miter_limit.ratio(),
+        pattern_kind: kind,
+        pattern_count: count,
+        pattern_lengths: [lengths[0], lengths[1], 0.0, 0.0, 0.0, 0.0],
+    }
+}
+
+/// The stored form of a fill.
+#[must_use]
+pub fn stored_fill(fill: &fill::Fill) -> StoredFill {
+    match fill {
+        fill::Fill::None => StoredFill::default(),
+        fill::Fill::Solid(color) => StoredFill {
+            color: Some(stored_color(*color)),
+            ..StoredFill::default()
+        },
+        fill::Fill::Gradient(gradient) => StoredFill {
+            gradient: Some(StoredGradient {
+                kind: match gradient.kind() {
+                    Kind::Linear => 0,
+                    Kind::Radial => 1,
+                },
+                stops: gradient
+                    .stops()
+                    .iter()
+                    .map(|stop| StoredStop {
+                        color: stored_color(stop.color()),
+                        fraction: stop.position().get(),
+                        inflection: stop.midpoint().get(),
+                    })
+                    .collect(),
+                opacity: gradient.opacity().get(),
+                advanced: gradient.is_advanced(),
+                angle: gradient.angle().radians(),
+            }),
+            ..StoredFill::default()
+        },
+        fill::Fill::Image(image) => StoredFill {
+            image: Some(StoredImage {
+                data: image.data().map_or(0, ImageData::get),
+                technique: image.technique().native_value(),
+                tint: image.tint().map(stored_color),
+                fill_size: [image.fill_size().width, image.fill_size().height],
+                generic: image.interprets_untagged_image_as_generic(),
+                reference_color: image.reference_color().map(stored_color),
+            }),
+            ..StoredFill::default()
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Error, StoredPattern, color, fill, image, stroke};
@@ -357,6 +544,11 @@ mod tests {
         assert_eq!(placeholder.data(), None);
         assert_eq!(placeholder.technique(), ImageTechnique::ScaleToFit);
         assert_eq!(fill(None, None, None), Ok(Fill::None));
+        let hidden = super::stored_stroke(None);
+        assert_eq!((hidden.pattern_kind, hidden.width), (2, 1.0));
+        let stored = super::stored_stroke(Some(stroke_value));
+        assert_eq!((stored.pattern_kind, stored.pattern_lengths[0]), (0, 2.0));
+        assert_eq!(super::stored_color(red).rgb_space, 1);
         assert!(fill(Some(red), None, Some(placeholder)).is_err());
     }
 }
