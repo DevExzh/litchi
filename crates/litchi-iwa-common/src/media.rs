@@ -1,9 +1,13 @@
 //! Compact media-kind vocabulary shared by concrete iWork owners.
 //!
-//! This module only classifies filenames and bounded byte prefixes. It does
-//! not open archives, inspect protobuf records, or own package transactions.
+//! This module classifies filenames and bounded byte prefixes and catalogs
+//! materialized `Data/*` members ([`asset`]). It does not open archives,
+//! inspect protobuf records, or own package transactions.
 
+pub mod asset;
 pub mod playback;
+
+pub use asset::{Asset, Catalog, Stats};
 
 /// The media families recognized by iWork package assets.
 #[repr(u8)]

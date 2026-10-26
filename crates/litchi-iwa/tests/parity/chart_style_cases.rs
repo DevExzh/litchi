@@ -278,13 +278,13 @@ fn property_write(value: Property) -> property::PropertyWrite {
 }
 
 /// Every IWA component of a package, decoded once.
-struct Components {
+pub(crate) struct Components {
     catalog: SourceCatalog,
     archives: Vec<(String, IwaArchive)>,
 }
 
 impl Components {
-    fn read(source: &[u8]) -> TestResult<Self> {
+    pub(crate) fn read(source: &[u8]) -> TestResult<Self> {
         let catalog = SourceCatalog::from_bytes(source, ArchiveLimits::default())?;
         let mut archives = Vec::new();
         for entry in catalog.package().iter() {
@@ -300,7 +300,7 @@ impl Components {
 
     /// `(component index, message index)` of the unique `message_type`
     /// message of object `identifier`.
-    fn locate(&self, identifier: u64, message_type: u32) -> TestResult<(usize, usize)> {
+    pub(crate) fn locate(&self, identifier: u64, message_type: u32) -> TestResult<(usize, usize)> {
         let mut found = None;
         for (component, (_, archive)) in self.archives.iter().enumerate() {
             let Some(object) = archive.object(identifier) else {
@@ -317,7 +317,11 @@ impl Components {
         found.ok_or_else(|| format!("object {identifier} has no {message_type} message").into())
     }
 
-    fn payload(&self, identifier: u64, (component, index): (usize, usize)) -> TestResult<&[u8]> {
+    pub(crate) fn payload(
+        &self,
+        identifier: u64,
+        (component, index): (usize, usize),
+    ) -> TestResult<&[u8]> {
         let object = self.archives[component]
             .1
             .object(identifier)
@@ -335,45 +339,27 @@ impl Components {
     }
 }
 
-/// Engine read of one chart property.
-fn engine_read(bytes: &[u8], chart: u64, property: Property) -> TestResult<Property> {
-    let components = Components::read(bytes)?;
-    let archive = property.archive();
-    let style = components.style_object(chart, archive)?;
-    let location = components.locate(style, archive.message_type())?;
-    let properties = codec::decode(
-        components.payload(style, location)?,
-        archive,
-        Limits::DEFAULT,
-    )?;
-    read(&properties, property)
-}
-
-/// Rewrite style objects and republish every changed component once.
-/// Each edit names the object, its archive, the writes and the
-/// empty-extension policy; unchanged payloads leave the source as is.
-fn engine_rewrite(
+/// Replace the payload of message `message_type` of each object and
+/// republish every changed component once through exact-source reassembly.
+pub(crate) fn publish(
     source: &[u8],
     mut components: Components,
-    edits: &[(u64, Archive, Vec<Write>, EmptyExtension)],
+    replacements: Vec<(u64, u32, Vec<u8>)>,
 ) -> TestResult<Vec<u8>> {
     let mut changed = std::collections::BTreeSet::new();
-    for (object, archive, writes, empty) in edits {
-        let (component, index) = components.locate(*object, archive.message_type())?;
-        let payload = components.payload(*object, (component, index))?;
-        let rewritten = codec::rewrite(payload, *archive, writes, *empty, Limits::DEFAULT)?;
-        if !rewritten.changed() {
+    for (object, message_type, data) in replacements {
+        let (component, index) = components.locate(object, message_type)?;
+        if components.payload(object, (component, index))? == data.as_slice() {
             continue;
         }
-        let data = rewritten.into_bytes().into_owned();
         components.archives[component]
             .1
-            .object_mut(*object)
+            .object_mut(object)
             .ok_or("object vanished")?
             .replace_message_preserving_header(
                 index,
                 RawMessage {
-                    type_: archive.message_type(),
+                    type_: message_type,
                     data,
                 },
                 CoreLimits::default(),
@@ -401,6 +387,44 @@ fn engine_rewrite(
         .prepare_reassembly(&edits, ArchiveLimits::default())?;
     let requirements = prepared.execution_requirements();
     Ok(prepared.execute(requirements.exact_limits())?)
+}
+
+/// Engine read of one chart property.
+fn engine_read(bytes: &[u8], chart: u64, property: Property) -> TestResult<Property> {
+    let components = Components::read(bytes)?;
+    let archive = property.archive();
+    let style = components.style_object(chart, archive)?;
+    let location = components.locate(style, archive.message_type())?;
+    let properties = codec::decode(
+        components.payload(style, location)?,
+        archive,
+        Limits::DEFAULT,
+    )?;
+    read(&properties, property)
+}
+
+/// Rewrite style objects and republish every changed component once.
+/// Each edit names the object, its archive, the writes and the
+/// empty-extension policy; unchanged payloads leave the source as is.
+fn engine_rewrite(
+    source: &[u8],
+    components: Components,
+    edits: &[(u64, Archive, Vec<Write>, EmptyExtension)],
+) -> TestResult<Vec<u8>> {
+    let mut replacements = Vec::new();
+    for (object, archive, writes, empty) in edits {
+        let location = components.locate(*object, archive.message_type())?;
+        let payload = components.payload(*object, location)?;
+        let rewritten = codec::rewrite(payload, *archive, writes, *empty, Limits::DEFAULT)?;
+        if rewritten.changed() {
+            replacements.push((
+                *object,
+                archive.message_type(),
+                rewritten.into_bytes().into_owned(),
+            ));
+        }
+    }
+    publish(source, components, replacements)
 }
 
 /// Engine write of one chart property; an equal value is an exact no-op.

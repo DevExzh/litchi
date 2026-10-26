@@ -194,6 +194,318 @@ impl Workspace {
         })
     }
 
+    /// Replace one message payload, adding and removing one object
+    /// reference of its metadata (the host's ranged-table bookkeeping).
+    pub fn replace_with_references(
+        &mut self,
+        located: &Located,
+        payload: Vec<u8>,
+        added: Option<u64>,
+        removed: Option<u64>,
+    ) -> TestResult {
+        let (object, index, message_type) = (located.object, located.index, located.message_type);
+        self.update(&located.entry, |archive| {
+            let target = archive
+                .object_mut(object)
+                .ok_or_else(|| error("object disappeared"))?;
+            target.replace_message(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data: payload,
+                },
+                Default::default(),
+            )?;
+            let info = &mut target.archive_info.message_infos.as_mut_slice()[index];
+            if let Some(identifier) = added {
+                if info.object_references.contains(&identifier) {
+                    return Err(error("reference already present"));
+                }
+                info.object_references.push(identifier);
+            }
+            if let Some(identifier) = removed {
+                let count = info
+                    .object_references
+                    .iter()
+                    .filter(|candidate| **candidate == identifier)
+                    .count();
+                if count != 1 {
+                    return Err(error(format!("{count} references to {identifier}")));
+                }
+                info.object_references
+                    .retain(|candidate| *candidate != identifier);
+                for field in &mut info.field_infos {
+                    field
+                        .object_references
+                        .retain(|candidate| *candidate != identifier);
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// The host's Drop Cap reference bookkeeping: top-level references and
+    /// the field infos whose path starts at `table_field`.
+    pub fn replace_with_table_references(
+        &mut self,
+        located: &Located,
+        payload: Vec<u8>,
+        added: Option<u64>,
+        removed: Option<u64>,
+        table_field: u32,
+    ) -> TestResult {
+        let (object, index, message_type) = (located.object, located.index, located.message_type);
+        self.update(&located.entry, |archive| {
+            let target = archive
+                .object_mut(object)
+                .ok_or_else(|| error("object disappeared"))?;
+            target.replace_message(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data: payload,
+                },
+                Default::default(),
+            )?;
+            let info = &mut target.archive_info.message_infos.as_mut_slice()[index];
+            if let Some(old) = removed {
+                let count = info.object_references.iter().filter(|&&r| r == old).count();
+                if count != 1 {
+                    return Err(error(format!("{count} references to {old}")));
+                }
+                info.object_references.retain(|&r| r != old);
+                for field in &mut info.field_infos {
+                    if field.path.path.first() == Some(&table_field) {
+                        field.object_references.retain(|&r| r != old);
+                    }
+                }
+            }
+            if let Some(new) = added {
+                if info.object_references.contains(&new) {
+                    return Err(error("reference already present"));
+                }
+                info.object_references.push(new);
+                for field in &mut info.field_infos {
+                    if field.path.path.first() == Some(&table_field)
+                        && !field.object_references.contains(&new)
+                    {
+                        field.object_references.push(new);
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Replace the single message of object `identifier` in `entry`.
+    pub fn replace_object_message(
+        &mut self,
+        entry: &str,
+        identifier: u64,
+        message_type: u32,
+        payload: Vec<u8>,
+    ) -> TestResult {
+        self.update(entry, |archive| {
+            let object = archive
+                .object_mut(identifier)
+                .ok_or_else(|| error("object disappeared"))?;
+            let index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == message_type)
+                .ok_or_else(|| error("message disappeared"))?;
+            object.replace_message(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data: payload,
+                },
+                Default::default(),
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Insert a plain one-message object (default archive metadata).
+    pub fn insert_plain(
+        &mut self,
+        entry: &str,
+        identifier: u64,
+        message_type: u32,
+        payload: Vec<u8>,
+    ) -> TestResult {
+        let object = ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: message_type,
+                data: payload,
+            }],
+            Default::default(),
+        )?;
+        self.update(entry, |archive| {
+            archive.insert_object(object, Default::default())?;
+            Ok(())
+        })
+    }
+
+    pub fn remove_object(&mut self, entry: &str, identifier: u64) -> TestResult {
+        self.update(entry, |archive| {
+            archive
+                .remove_object(identifier)
+                .ok_or_else(|| error("object disappeared"))?;
+            Ok(())
+        })
+    }
+
+    /// The component whose UUID map lists `identifier`.
+    pub fn uuid_component(&self, identifier: u64) -> TestResult<Option<u64>> {
+        let Some(metadata) = self.metadata()? else {
+            return Ok(None);
+        };
+        Ok(metadata
+            .components
+            .iter()
+            .find(|component| {
+                component
+                    .object_uuid_map_entries
+                    .iter()
+                    .any(|entry| entry.identifier == identifier)
+            })
+            .map(|component| component.identifier))
+    }
+
+    /// The host's removal bookkeeping of an object owned by `entry`.
+    pub fn forget_object(&mut self, entry: &str, identifier: u64) -> TestResult {
+        let registered = self.uuid_component(identifier)?;
+        if let Some(component) = self.component(entry)? {
+            self.remove_external_references_to(component, identifier)?;
+        }
+        if let Some(component) = registered {
+            self.remove_object_uuid(component, identifier)?;
+        }
+        self.release_watermark(&[identifier])
+    }
+
+    /// The host's `replace_text` for a rewrite that removes no object
+    /// reference (the cases pick such ranges): the text-wire rewrite,
+    /// published preserving the message header.
+    pub fn replace_text(
+        &mut self,
+        located: &Located,
+        range: std::ops::Range<usize>,
+        replacement: &str,
+    ) -> TestResult<bool> {
+        let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
+            &located.payload,
+            range,
+            replacement,
+            litchi_iwa_text_wire::RewriteBehavior::ReplaceSelection,
+            litchi_iwa_text_wire::RewriteLimits::default(),
+        )?;
+        if !rewrite.changed() {
+            return Ok(false);
+        }
+        if !rewrite.removed_object_references().is_empty() {
+            return Err("the glue publishes only rewrites that remove no reference".into());
+        }
+        let data = rewrite.into_bytes();
+        let (object, index, message_type) = (located.object, located.index, located.message_type);
+        self.update(&located.entry, |archive| {
+            let target = archive
+                .object_mut(object)
+                .ok_or_else(|| error("object disappeared"))?;
+            target.replace_message_pruning_object_references_preserving_header(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+                &[],
+                Default::default(),
+            )?;
+            Ok(())
+        })?;
+        Ok(true)
+    }
+
+    /// The host's `replace_text` when the rewrite drops object references
+    /// that only the storage message's top-level metadata lists: those
+    /// references are pruned, and the objects nothing else references are
+    /// returned for the caller's cleanup.
+    pub fn replace_text_pruning(
+        &mut self,
+        located: &Located,
+        range: std::ops::Range<usize>,
+        replacement: &str,
+    ) -> TestResult<Vec<u64>> {
+        let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
+            &located.payload,
+            range,
+            replacement,
+            litchi_iwa_text_wire::RewriteBehavior::ReplaceSelection,
+            litchi_iwa_text_wire::RewriteLimits::default(),
+        )?;
+        if !rewrite.changed() {
+            return Ok(Vec::new());
+        }
+        let archive = self.edit.archive(&located.entry)?;
+        let info = archive
+            .object(located.object)
+            .ok_or("storage disappeared")?
+            .archive_info
+            .message_infos
+            .as_slice()[located.index]
+            .clone();
+        let mut indexed = info.object_references.clone();
+        indexed.sort_unstable();
+        let complete = indexed == rewrite.object_reference_occurrences_before();
+        let mut prunable: Vec<u64> = rewrite.removed_object_references().to_vec();
+        prunable.sort_unstable();
+        prunable.dedup();
+        if rewrite.has_unknown_wire_fields() {
+            prunable.clear();
+        }
+        prunable.retain(|identifier| {
+            info.object_references.contains(identifier)
+                && complete
+                && !info
+                    .field_infos
+                    .iter()
+                    .any(|field| field.object_references.contains(identifier))
+        });
+        let data = rewrite.into_bytes();
+        let (object, index, message_type) = (located.object, located.index, located.message_type);
+        let pruned = prunable.clone();
+        self.update(&located.entry, |archive| {
+            let target = archive
+                .object_mut(object)
+                .ok_or_else(|| error("object disappeared"))?;
+            target.replace_message_pruning_object_references_preserving_header(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+                &pruned,
+                Default::default(),
+            )?;
+            Ok(())
+        })?;
+        let mut referenced = std::collections::BTreeSet::new();
+        for (_, archive) in self.archives()? {
+            for object in &archive.objects {
+                for info in object.archive_info.message_infos.as_slice() {
+                    referenced.extend(info.object_references.iter().copied());
+                    for field in &info.field_infos {
+                        referenced.extend(field.object_references.iter().copied());
+                    }
+                }
+            }
+        }
+        prunable.retain(|identifier| !referenced.contains(identifier));
+        Ok(prunable)
+    }
+
     /// The host's next object identifier: one above every archive object,
     /// the metadata watermark and every identifier the metadata names.
     pub fn next_identifier(&self) -> TestResult<u64> {
@@ -388,6 +700,176 @@ impl Workspace {
                 })
             })
         })
+    }
+
+    /// Remove the `source → target` reference to `object`, if present.
+    pub fn remove_external_reference(
+        &mut self,
+        source: u64,
+        target: u64,
+        object: u64,
+    ) -> TestResult {
+        self.per_component(source, |data| {
+            remove_repeated_length_delimited_field_where(data, 6, |payload| {
+                let reference = tsp::ComponentExternalReference::decode(payload)?;
+                Ok(reference.component_identifier == target
+                    && reference.object_identifier == Some(object))
+            })
+        })
+    }
+
+    /// The host's `unregister_owner_reference_if_unused`.
+    pub fn unregister_owner_reference_if_unused(
+        &mut self,
+        owner_entry: &str,
+        style_entry: &str,
+        style: u64,
+    ) -> TestResult {
+        let (Some(style_component), Some(owner_component)) =
+            (self.component(style_entry)?, self.component(owner_entry)?)
+        else {
+            return Ok(());
+        };
+        if owner_component == style_component {
+            return Ok(());
+        }
+        for (entry, archive) in self.archives()? {
+            if self.component(&entry)? == Some(owner_component)
+                && archive.objects.iter().any(|object| {
+                    object
+                        .archive_info
+                        .message_infos
+                        .iter()
+                        .any(|info| info.object_references.contains(&style))
+                })
+            {
+                return Ok(());
+            }
+        }
+        self.remove_external_reference(owner_component, style_component, style)
+    }
+
+    /// The host's `insert_style_variation`: register `style` under
+    /// `parent` in `stylesheet` (message 401 of `entry`) and insert it.
+    pub fn insert_style_variation(
+        &mut self,
+        entry: &str,
+        stylesheet: u64,
+        parent: u64,
+        object: ArchiveObject,
+    ) -> TestResult {
+        let style = object
+            .archive_info
+            .identifier
+            .ok_or("new style has no identifier")?;
+        let sheet = self.message(stylesheet, STYLESHEET_TYPE)?;
+        let data = litchi_iwa_text_wire::paragraph_style::stylesheet_with_variation(
+            &sheet.payload,
+            parent,
+            style,
+            WireLimits::DEFAULT,
+        )?;
+        self.update(entry, |archive| {
+            let sheet_object = archive
+                .object_mut(stylesheet)
+                .ok_or_else(|| error("stylesheet disappeared"))?;
+            sheet_object.replace_message(
+                sheet.index,
+                RawMessage {
+                    type_: STYLESHEET_TYPE,
+                    data,
+                },
+                Default::default(),
+            )?;
+            sheet_object.archive_info.message_infos.as_mut_slice()[sheet.index]
+                .object_references
+                .push(style);
+            archive.insert_object(object, Default::default())?;
+            Ok(())
+        })
+    }
+
+    /// The host's `remove_style_variation`.
+    pub fn remove_style_variation(
+        &mut self,
+        entry: &str,
+        stylesheet: u64,
+        parent: u64,
+        style: u64,
+    ) -> TestResult {
+        let sheet = self.message(stylesheet, STYLESHEET_TYPE)?;
+        let data = litchi_iwa_text_wire::paragraph_style::stylesheet_without_variation(
+            &sheet.payload,
+            parent,
+            style,
+            WireLimits::DEFAULT,
+        )?;
+        self.update(entry, |archive| {
+            let sheet_object = archive
+                .object_mut(stylesheet)
+                .ok_or_else(|| error("stylesheet disappeared"))?;
+            sheet_object.replace_message(
+                sheet.index,
+                RawMessage {
+                    type_: STYLESHEET_TYPE,
+                    data,
+                },
+                Default::default(),
+            )?;
+            let info = &mut sheet_object.archive_info.message_infos.as_mut_slice()[sheet.index];
+            info.object_references
+                .retain(|&reference| reference != style);
+            for field in &mut info.field_infos {
+                field
+                    .object_references
+                    .retain(|&reference| reference != style);
+            }
+            archive
+                .remove_object(style)
+                .ok_or_else(|| error("style disappeared"))?;
+            Ok(())
+        })
+    }
+
+    /// The host's `register_private_style`.
+    pub fn register_private_style(
+        &mut self,
+        owner_entry: &str,
+        style_entry: &str,
+        style: u64,
+    ) -> TestResult {
+        let Some(style_component) = self.component(style_entry)? else {
+            return Ok(());
+        };
+        self.add_object_uuid(style_component, style)?;
+        if let Some(owner) = self.component(owner_entry)?
+            && owner != style_component
+        {
+            self.add_external_reference(owner, style_component, style)?;
+        }
+        Ok(())
+    }
+
+    /// The host's `unregister_private_style`.
+    pub fn unregister_private_style(
+        &mut self,
+        owner_entry: &str,
+        style_entry: &str,
+        style: u64,
+        replacement: Option<u64>,
+    ) -> TestResult {
+        let Some(style_component) = self.component(style_entry)? else {
+            return Ok(());
+        };
+        self.remove_object_uuid(style_component, style)?;
+        self.remove_external_references_to(style_component, style)?;
+        if let Some(replacement) = replacement
+            && let Some(owner) = self.component(owner_entry)?
+            && owner != style_component
+        {
+            self.add_external_reference(owner, style_component, replacement)?;
+        }
+        Ok(())
     }
 
     /// Raise the watermark to `identifier` (the host's `Batch` rewrite).
