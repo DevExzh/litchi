@@ -16,6 +16,55 @@ from tools.native_qualification import prepare_odf_raw_codec_inputs as prep
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 
+BASELINE_CONSUMER_MANIFEST_TEXT = """[package]
+name = "litchi-odf-raw-codec-consumer"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# This is the historical 70d consumer overlay.  That source commit has no
+# tracked vendor tree, so its own lock must retain the historical registry
+# flate2/zlib-rs entries.  It is deliberately not the integrated candidate
+# manifest, whose vendored Deflate patches are bound to the final source.
+[features]
+default = []
+raw-codec-odf = [
+    "litchi-ops/odt",
+    "litchi-ops/ods",
+    "litchi-ops/odp",
+    "litchi-ops/odg",
+    "litchi-ops/odc",
+    "litchi-ops/odi",
+    "litchi-ops/odb",
+    "litchi-ops/odf-formula",
+    "litchi-ops/oth",
+    "litchi-ops/odm",
+]
+raw-codec-original = ["raw-codec-odf"]
+raw-codec-current = ["raw-codec-odf"]
+raw-codec-allocator = []
+
+[[example]]
+name = "odf_raw_codec_qualification"
+path = "../perf-baseline/examples/odf_raw_codec_qualification.rs"
+required-features = ["raw-codec-odf"]
+
+[dependencies]
+litchi-core = { path = "../../crates/litchi-core" }
+litchi-odf-common = { path = "../../crates/litchi-odf-common" }
+litchi-ops = { path = "../../crates/litchi-ops", default-features = false }
+quick-xml = "0.41"
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../crates/soapberry-zip" }
+
+[profile.release]
+lto = true
+panic = "abort"
+
+[workspace]
+"""
+
 
 def git(root: Path, *args: str) -> str:
     result = subprocess.run(
@@ -42,7 +91,10 @@ def repository(
     git(root, "init", "-q", "--initial-branch=main")
     git(root, "config", "user.email", "odf-raw-prep@example.invalid")
     git(root, "config", "user.name", "ODF raw preparation test")
-    (root / "Cargo.toml").write_text("[workspace]\nmembers=[]\n", encoding="utf-8")
+    root_manifest = "[workspace]\nmembers=[]\n"
+    if consumer:
+        root_manifest += "\n[patch.crates-io]\nflate2 = { path = \"vendor/flate2\" }\nzlib-rs = { path = \"vendor/zlib-rs\" }\n"
+    (root / "Cargo.toml").write_text(root_manifest, encoding="utf-8")
     production = root / "crates/litchi-ops/Cargo.toml"
     production.parent.mkdir(parents=True, exist_ok=True)
     production.write_text(
@@ -55,8 +107,6 @@ def repository(
     examples = root / prep.PROBE_PATH.parent
     examples.mkdir(parents=True, exist_ok=True)
     if baseline:
-        perf.write_text('[package]\nname = "litchi-odf-raw-codec-consumer"\nversion = "0.0.1"\n', encoding="utf-8")
-        (root / prep.LOCK_PATH).write_bytes(b"baseline old lock\n")
         (examples / ".keep").write_text("\n", encoding="utf-8")
     elif consumer:
         if consumer_manifest is None:
@@ -69,6 +119,10 @@ def repository(
         perf.write_bytes(consumer_manifest)
         (root / prep.LOCK_PATH).write_bytes(lock)
         (root / prep.PROBE_PATH).write_bytes(probe)
+        for relative in ("vendor/flate2/Cargo.toml", "vendor/zlib-rs/Cargo.toml"):
+            vendor_file = root / relative
+            vendor_file.parent.mkdir(parents=True, exist_ok=True)
+            vendor_file.write_text("[package]\nname = \"fixture\"\nversion = \"0.0.0\"\n", encoding="utf-8")
     git(root, "add", ".")
     git(root, "commit", "-qm", "fixture")
     return git(root, "rev-parse", "HEAD")
@@ -120,7 +174,7 @@ class OdfRawPreparationTests(unittest.TestCase):
     def tearDown(self) -> None:
         prep.BASELINE_COMMIT = self._old_baseline
 
-    def fixture(self, root: Path) -> tuple[Path, Path, Path, Path, Path, Path, Path, dict]:
+    def fixture(self, root: Path) -> tuple[Path, Path, Path, Path, Path, Path, Path, Path, dict]:
         baseline = root / "baseline"
         candidate = root / "candidate"
         protocol_p = root / "protocol-p"
@@ -141,6 +195,8 @@ class OdfRawPreparationTests(unittest.TestCase):
         self.assertNotEqual(p1_ref, git(protocol_p, "rev-parse", "HEAD"))
         baseline_ref = repository(baseline, consumer=False, baseline=True, production_marker="baseline")
         repository(adapter, consumer=True, production_marker="adapter-3401")
+        baseline_manifest = root / "baseline-consumer.Cargo.toml"
+        baseline_manifest.write_text(BASELINE_CONSUMER_MANIFEST_TEXT, encoding="utf-8")
         external_lock = root / "baseline.lock"
         external_lock.write_bytes(b"baseline lock\n")
         pin = {
@@ -155,27 +211,28 @@ class OdfRawPreparationTests(unittest.TestCase):
         identity_path = root / "candidate-identity.json"
         identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
         prep.BASELINE_COMMIT = baseline_ref
-        return baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity
+        return baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, identity
 
-    def run_prepare(self, root: Path) -> tuple[dict, Path, Path, Path, Path, Path, Path, Path]:
-        baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, _ = self.fixture(root)
+    def run_prepare(self, root: Path) -> tuple[dict, Path, Path, Path, Path, Path, Path, Path, Path]:
+        baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, _ = self.fixture(root)
         output = root / "preparation.json"
         value = prep.prepare(
             baseline_root=baseline,
             candidate_root=candidate,
             adapter_root=adapter,
+            baseline_consumer_manifest=baseline_manifest,
             protocol_p_root=protocol_p,
             protocol_p_pin_path=pin_path,
             candidate_identity_path=identity_path,
             baseline_lock=external_lock,
             output=output,
         )
-        return value, baseline, candidate, adapter, protocol_p, pin_path, identity_path, output
+        return value, baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, identity_path, output
 
     def test_integrated_candidate_is_clean_and_candidate_is_never_written(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-integrated-") as directory:
             root = Path(directory)
-            value, baseline, candidate, adapter, protocol_p, pin_path, identity_path, output = self.run_prepare(root)
+            value, baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, identity_path, output = self.run_prepare(root)
             self.assertEqual(value["candidate"]["mode"], prep.CANDIDATE_MODE)
             self.assertEqual(value["candidate"]["overlay_paths"], [])
             self.assertEqual(value["candidate"]["before"], value["candidate"]["after"])
@@ -185,17 +242,20 @@ class OdfRawPreparationTests(unittest.TestCase):
             self.assertEqual(value["protocol_p_anchor"]["current_commit"], git(protocol_p, "rev-parse", "HEAD"))
             self.assertNotEqual(value["protocol_p_anchor"]["p1_commit"], value["protocol_p_anchor"]["current_commit"])
             self.assertEqual(value["adapter"]["consumer_provenance_scope"], "three consumer files only; production closure is not equated to final C")
+            self.assertEqual(value["baseline"]["consumer_manifest"]["source_path"], str(baseline_manifest.resolve()))
+            self.assertEqual(value["baseline"]["consumer_manifest_policy"]["root_patch_resolution"], "historical_registry")
+            self.assertEqual(value["candidate"]["consumer_manifest_policy"]["root_patch_resolution"], "integrated_vendored")
             self.assertNotEqual(prep._production_source_tree(candidate), prep._production_source_tree(adapter))
             self.assertEqual((candidate / prep.PROBE_PATH).read_bytes(), (adapter / prep.PROBE_PATH).read_bytes())
             self.assertEqual(sorted(prep._status_paths(value["baseline"]["after_overlay"]["status"])), sorted([str(prep.CONSUMER_MANIFEST), str(prep.LOCK_PATH), str(prep.PROBE_PATH)]))
             self.assertTrue(output.is_file())
 
-    def test_six_admission_refusals(self) -> None:
-        cases = ("old-lock", "missing-probe", "stale-c", "unexpected", "symlink", "proof-drift")
+    def test_admission_refusals(self) -> None:
+        cases = ("old-lock", "missing-probe", "stale-c", "unexpected", "symlink", "proof-drift", "wrong-role-manifest", "missing-baseline-manifest", "missing-vendor", "root-patch-drift")
         for case in cases:
             with self.subTest(case=case), tempfile.TemporaryDirectory(prefix=f"odf-raw-{case}-") as directory:
                 root = Path(directory)
-                baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+                baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, identity = self.fixture(root)
                 mutated = copy.deepcopy(identity)
                 if case == "old-lock":
                     old = b"old pre-final-C lock\n"
@@ -217,16 +277,28 @@ class OdfRawPreparationTests(unittest.TestCase):
                     probe.symlink_to(adapter / prep.LOCK_PATH)
                 elif case == "proof-drift":
                     mutated["sealed_by"]["candidate_sha256"] = "0" * 64
+                elif case == "wrong-role-manifest":
+                    baseline_manifest.write_bytes((SOURCE_ROOT / prep.CONSUMER_MANIFEST).read_bytes())
+                elif case == "missing-baseline-manifest":
+                    baseline_manifest.unlink()
+                elif case == "missing-vendor":
+                    git(adapter, "rm", "-q", "vendor/flate2/Cargo.toml")
+                    git(adapter, "commit", "-qm", "remove vendored dependency")
+                elif case == "root-patch-drift":
+                    root_manifest = adapter / "Cargo.toml"
+                    root_manifest.write_text(root_manifest.read_text(encoding="utf-8").replace('path = "vendor/flate2"', 'path = "vendor/other"'), encoding="utf-8")
+                    git(adapter, "add", "Cargo.toml")
+                    git(adapter, "commit", "-qm", "drift root patch policy")
                 identity_path.write_text(json.dumps(mutated, indent=2) + "\n", encoding="utf-8")
                 with self.assertRaises(prep.PreparationError):
-                    prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / f"{case}.json")
+                    prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, baseline_consumer_manifest=baseline_manifest, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / f"{case}.json")
                 self.assertFalse((baseline / prep.PROBE_PATH).exists(), "refusal must precede baseline writes")
 
     def test_rejects_mismatched_p1_envelope_root_tree_and_ancestry(self) -> None:
         for field in ("root", "p1", "source_candidate", "ancestry"):
             with self.subTest(field=field), tempfile.TemporaryDirectory(prefix=f"odf-raw-p1-{field}-") as directory:
                 root = Path(directory)
-                baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+                baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, identity = self.fixture(root)
                 pin = json.loads(pin_path.read_text(encoding="utf-8"))
                 if field == "root":
                     pin["root"] = str(root / "other-p")
@@ -245,39 +317,41 @@ class OdfRawPreparationTests(unittest.TestCase):
                     identity["sealed_by"]["p1_pin_sha256"] = sha(pin_path)
                     identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
                 with self.assertRaises(prep.PreparationError):
-                    prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / f"{field}.json")
+                    prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, baseline_consumer_manifest=baseline_manifest, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / f"{field}.json")
 
     def test_rejects_assume_unchanged_production_edit_at_prepare(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-assume-unchanged-") as directory:
             root = Path(directory)
-            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, _ = self.fixture(root)
+            baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, _ = self.fixture(root)
             production = candidate / "crates/litchi-ops/Cargo.toml"
             production.write_text(production.read_text(encoding="utf-8") + "# hidden edit\n", encoding="utf-8")
             git(candidate, "update-index", "--assume-unchanged", str(production.relative_to(candidate)))
             with self.assertRaises(prep.PreparationError):
-                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "assume-unchanged.json")
+                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, baseline_consumer_manifest=baseline_manifest, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "assume-unchanged.json")
 
     def test_rejects_p1_seal_fields_that_do_not_equal_the_pin(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-p1-seal-") as directory:
             root = Path(directory)
-            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+            baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, identity = self.fixture(root)
             identity["sealed_by"]["commit"] = "f" * 40
             identity["sealed_by"]["tree"] = "e" * 40
             identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
             with self.assertRaises(prep.PreparationError):
-                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "bad-seal.json")
+                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, baseline_consumer_manifest=baseline_manifest, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "bad-seal.json")
 
     def test_public_prepare_to_runner_positive_and_identity_rejection(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-cli-composition-") as directory:
             root = Path(directory)
-            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+            baseline, candidate, adapter, protocol_p, baseline_manifest, pin_path, external_lock, identity_path, identity = self.fixture(root)
             preparation_path = root / "preparation.json"
-            self.assertEqual(prep.main(["--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--baseline-lock", str(external_lock), "--output", str(preparation_path)]), 0)
+            self.assertEqual(prep.main(["--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--baseline-consumer-manifest", str(baseline_manifest), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--baseline-lock", str(external_lock), "--output", str(preparation_path)]), 0)
             value = json.loads(preparation_path.read_text(encoding="utf-8"))
             manifest = json.loads((SOURCE_ROOT / "tools/native_qualification/manifests/odf-raw-codec.json").read_text(encoding="utf-8"))
             manifest["baseline_commit"] = git(baseline, "rev-parse", "HEAD")
-            manifest["source"]["candidate_consumer_manifest_sha256"] = value["candidate"]["consumer_manifest"]["sha256"]
-            manifest["source"]["candidate_consumer_manifest_bytes"] = value["candidate"]["consumer_manifest"]["bytes"]
+            manifest["source"]["consumer_manifest_identities"]["baseline"]["sha256"] = value["baseline"]["consumer_manifest"]["sha256"]
+            manifest["source"]["consumer_manifest_identities"]["baseline"]["bytes"] = value["baseline"]["consumer_manifest"]["bytes"]
+            manifest["source"]["consumer_manifest_identities"]["candidate"]["sha256"] = value["candidate"]["consumer_manifest"]["sha256"]
+            manifest["source"]["consumer_manifest_identities"]["candidate"]["bytes"] = value["candidate"]["consumer_manifest"]["bytes"]
             manifest["source"]["consumer_lock_status"] = "ready"
             manifest["source"]["candidate_consumer_lock_sha256"] = value["candidate"]["lock"]["sha256"]
             manifest["source"]["candidate_consumer_lock_bytes"] = value["candidate"]["lock"]["bytes"]
@@ -295,7 +369,7 @@ class OdfRawPreparationTests(unittest.TestCase):
 
             runner.PairedRunner.build = admit_endpoints  # type: ignore[method-assign]
             try:
-                args = ["--manifest", str(manifest_path), "--preparation", str(preparation_path), "--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--output", str(root / "runner-output"), "--target-root", str(root / "target"), "--tmp-root", str(root / "tmp"), "--cpu", "0", "--phase", "build"]
+                args = ["--manifest", str(manifest_path), "--preparation", str(preparation_path), "--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--baseline-consumer-manifest", str(baseline_manifest), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--output", str(root / "runner-output"), "--target-root", str(root / "target"), "--tmp-root", str(root / "tmp"), "--cpu", "0", "--phase", "build"]
                 self.assertEqual(runner.main(args), 0)
                 self.assertEqual(len(instances), 1)
                 bad_seal = copy.deepcopy(identity)

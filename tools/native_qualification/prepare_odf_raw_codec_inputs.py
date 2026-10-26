@@ -3,12 +3,13 @@
 
 This is source preparation only.  It never invokes Cargo, Rust, a probe, or
 timing code.  The baseline is the exact pre-migration commit; its only
-overlay is the reviewed consumer adapter and a separately hashed baseline
-lockfile.  The candidate is an already-integrated final-C worktree.  Its
-commit, tree, production closure, and three consumer files are supplied by a
-separate protocol-P1-sealed identity.  P1 is independently pinned and may
-have a later clean P2 binding installed on the protocol worktree; the
-preparer never writes to either source endpoint.
+overlay is the canonical probe, an explicitly supplied historical consumer
+manifest, and a separately hashed baseline lockfile.  The candidate is an
+already-integrated final-C worktree.  Its commit, tree, production closure,
+and three consumer files are supplied by a separate protocol-P1-sealed
+identity.  P1 is independently pinned and may have a later clean P2 binding
+installed on the protocol worktree; the preparer never writes to either
+source endpoint.
 """
 
 from __future__ import annotations
@@ -22,10 +23,11 @@ import re
 import shutil
 import subprocess
 import tempfile
+import tomllib
 from typing import Any, Mapping
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v5"
+SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v6"
 IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v3"
 PROTOCOL_P_PIN_SCHEMA = "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1"
 CANDIDATE_MODE = "integrated_final_c"
@@ -38,6 +40,26 @@ PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/odf-raw-codec-consumer/Cargo.toml")
 LOCK_PATH = Path("tools/odf-raw-codec-consumer/Cargo.lock")
 CONSUMER_LOCK_KEY = "consumer_lock"
+BASELINE_CONSUMER_MANIFEST_SHA256 = "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70"
+BASELINE_CONSUMER_MANIFEST_BYTES = 1300
+CANDIDATE_CONSUMER_MANIFEST_SHA256 = "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d"
+CANDIDATE_CONSUMER_MANIFEST_BYTES = 2056
+CONSUMER_MANIFEST_POLICIES = {
+    "baseline": {
+        "root_patch_resolution": "historical_registry",
+        "patches": {},
+        "production_dependency_projection": "70d root has no [patch.crates-io]; flate2 and zlib-rs remain registry-resolved",
+    },
+    "candidate": {
+        "root_patch_resolution": "integrated_vendored",
+        "patches": {"flate2": "../../vendor/flate2", "zlib-rs": "../../vendor/zlib-rs"},
+        "production_dependency_projection": "integrated root [patch.crates-io] binds flate2 and zlib-rs to vendor paths",
+    },
+}
+ROOT_PATCH_POLICIES = {
+    "baseline": {},
+    "candidate": {"flate2": "vendor/flate2", "zlib-rs": "vendor/zlib-rs"},
+}
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 UPSTREAM_COMPONENT = "3rd" + "party"
@@ -235,6 +257,62 @@ def _file_identity(value: Any, label: str, expected_path: Path) -> dict[str, Any
     return {"path": str(expected_path), "sha256": digest, "bytes": size}
 
 
+def _validate_consumer_manifest_file(path: Path, role: str) -> tuple[str, int]:
+    if role not in CONSUMER_MANIFEST_POLICIES:
+        raise PreparationError(f"unknown consumer manifest role {role!r}")
+    try:
+        document = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise PreparationError(f"cannot parse {role} consumer manifest: {error}") from error
+    package = document.get("package")
+    if not isinstance(package, Mapping) or package.get("name") != "litchi-odf-raw-codec-consumer":
+        raise PreparationError(f"{role} consumer manifest package differs")
+    examples = document.get("example")
+    if not isinstance(examples, list) or len(examples) != 1 or not isinstance(examples[0], Mapping) or examples[0].get("path") != "../perf-baseline/examples/odf_raw_codec_qualification.rs":
+        raise PreparationError(f"{role} consumer manifest does not bind the canonical probe")
+    patch_table = document.get("patch", {}).get("crates-io", {}) if isinstance(document.get("patch"), Mapping) else {}
+    expected_patches = CONSUMER_MANIFEST_POLICIES[role]["patches"]
+    if patch_table != {name: {"path": value} for name, value in expected_patches.items()}:
+        raise PreparationError(f"{role} consumer manifest patch resolution differs")
+    if role == "candidate":
+        for package_name in ("flate2", "zlib-rs"):
+            vendor_root = _resolve(expected_patches[package_name], base=path.parent)
+            vendor_manifest = vendor_root / "Cargo.toml"
+            if not vendor_root.is_dir() or vendor_root.is_symlink() or vendor_manifest.is_symlink() or not vendor_manifest.is_file():
+                raise PreparationError(f"candidate vendored {package_name} dependency is missing")
+    digest, size = _sha256(path)
+    expected = (CANDIDATE_CONSUMER_MANIFEST_SHA256, CANDIDATE_CONSUMER_MANIFEST_BYTES) if role == "candidate" else (BASELINE_CONSUMER_MANIFEST_SHA256, BASELINE_CONSUMER_MANIFEST_BYTES)
+    if (digest, size) != expected:
+        raise PreparationError(f"{role} consumer manifest identity differs")
+    return digest, size
+
+
+def _validate_root_patch_resolution(root: Path, role: str) -> dict[str, str]:
+    """Bind the consumer patch policy to the selected endpoint's root Cargo.toml."""
+
+    try:
+        document = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise PreparationError(f"cannot parse {role} root Cargo.toml: {error}") from error
+    patch_table = document.get("patch", {}).get("crates-io", {}) if isinstance(document.get("patch"), Mapping) else {}
+    if not isinstance(patch_table, Mapping):
+        raise PreparationError(f"{role} root Cargo patch table is malformed")
+    expected = ROOT_PATCH_POLICIES[role]
+    observed: dict[str, str] = {}
+    for package_name, relative in expected.items():
+        entry = patch_table.get(package_name)
+        if not isinstance(entry, Mapping) or entry.get("path") != relative:
+            raise PreparationError(f"{role} root Cargo.toml does not bind {package_name} to {relative}")
+        target = _resolve(relative, base=root)
+        if target.is_symlink() or not (target / "Cargo.toml").is_file() or (target / "Cargo.toml").is_symlink():
+            raise PreparationError(f"{role} root patch target for {package_name} is missing")
+        observed[package_name] = relative
+    for package_name in ("flate2", "zlib-rs"):
+        if package_name not in expected and package_name in patch_table:
+            raise PreparationError(f"{role} root Cargo.toml unexpectedly patches {package_name}")
+    return observed
+
+
 def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the small identity envelope sealed by protocol P1.
 
@@ -417,6 +495,7 @@ def prepare(
     baseline_root: Path,
     candidate_root: Path,
     adapter_root: Path,
+    baseline_consumer_manifest: Path,
     protocol_p_root: Path,
     protocol_p_pin_path: Path,
     candidate_identity_path: Path,
@@ -426,6 +505,7 @@ def prepare(
     baseline_root = _resolve(baseline_root)
     candidate_root = _resolve(candidate_root)
     adapter_root = _resolve(adapter_root)
+    baseline_consumer_manifest = _resolve(baseline_consumer_manifest)
     protocol_p_root = _resolve(protocol_p_root)
     protocol_p_pin, protocol_p_pin_sha256, protocol_p_pin_bytes, protocol_p_pin_path = _load_protocol_p_pin(
         protocol_p_pin_path,
@@ -463,8 +543,16 @@ def prepare(
         raise PreparationError("consumer adapter endpoint must be clean")
     if baseline["skip_worktree_count"] or candidate["skip_worktree_count"] or adapter["skip_worktree_count"]:
         raise PreparationError("sparse/skip-worktree source is not admissible for preparation")
+    _validate_root_patch_resolution(baseline_root, "baseline")
+    _validate_root_patch_resolution(candidate_root, "candidate")
+    _validate_root_patch_resolution(adapter_root, "candidate")
     if len({baseline_root, candidate_root, adapter_root}) != 3:
         raise PreparationError("baseline, candidate production, and adapter endpoints must be disjoint")
+    if any(_under(baseline_consumer_manifest, root) or baseline_consumer_manifest == root for root in (baseline_root, candidate_root, adapter_root, protocol_p_root)):
+        raise PreparationError("baseline consumer manifest must be outside every source endpoint")
+    if baseline_consumer_manifest.is_symlink() or not baseline_consumer_manifest.is_file():
+        raise PreparationError("baseline consumer manifest must be a regular external file")
+    _validate_consumer_manifest_file(baseline_consumer_manifest, "baseline")
     if any(protocol_p_root == root or _under(protocol_p_root, root) or _under(root, protocol_p_root) for root in (baseline_root, candidate_root, adapter_root)):
         raise PreparationError("protocol-P anchor endpoint must be disjoint from source endpoints")
     candidate_production_source_tree = _production_source_tree(candidate_root)
@@ -477,6 +565,8 @@ def prepare(
     candidate_probe = _require_tracked_regular(candidate_root, PROBE_PATH, "candidate probe")
     candidate_consumer = _require_tracked_regular(candidate_root, CONSUMER_MANIFEST, "candidate consumer manifest")
     candidate_lock = _require_tracked_regular(candidate_root, LOCK_PATH, "candidate performance lock")
+    _validate_consumer_manifest_file(adapter_consumer, "candidate")
+    _validate_consumer_manifest_file(candidate_consumer, "candidate")
     baseline_probe = _resolve(PROBE_PATH, base=baseline_root)
     baseline_consumer = _resolve(CONSUMER_MANIFEST, base=baseline_root)
     baseline_lock_destination = _resolve(LOCK_PATH, base=baseline_root)
@@ -519,7 +609,7 @@ def prepare(
         baseline_consumer.parent.mkdir(parents=True, exist_ok=True)
         baseline_lock_destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(adapter_probe, baseline_probe)
-        shutil.copyfile(adapter_consumer, baseline_consumer)
+        shutil.copyfile(baseline_consumer_manifest, baseline_consumer)
         shutil.copyfile(external_lock, baseline_lock_destination)
     except BaseException:
         for path, content in backups.items():
@@ -533,8 +623,9 @@ def prepare(
     prepared_lock_sha, prepared_lock_size = _sha256(baseline_lock_destination)
     if (prepared_probe_sha, prepared_probe_bytes) != (adapter_probe_sha, adapter_probe_bytes):
         raise PreparationError("baseline adapter differs from the reviewed adapter probe")
-    if (prepared_consumer_sha, prepared_consumer_bytes) != (adapter_consumer_sha, adapter_consumer_bytes):
-        raise PreparationError("baseline consumer manifest differs from the reviewed adapter")
+    baseline_manifest_sha, baseline_manifest_bytes = _sha256(baseline_consumer_manifest)
+    if (prepared_consumer_sha, prepared_consumer_bytes) != (baseline_manifest_sha, baseline_manifest_bytes):
+        raise PreparationError("baseline consumer manifest differs from the reviewed baseline manifest")
     if (prepared_lock_sha, prepared_lock_size) != (baseline_lock_sha, baseline_lock_bytes):
         raise PreparationError("baseline Cargo.lock differs from pinned external lock")
 
@@ -562,7 +653,8 @@ def prepare(
             "production_tree_sha256": _production_tree(baseline_root),
             "overlay_paths": allowed_status,
             "probe": {"source_path": str(adapter_probe), "destination_path": str(baseline_probe), "sha256": prepared_probe_sha, "bytes": prepared_probe_bytes},
-            "consumer_manifest": {"source_path": str(adapter_consumer), "destination_path": str(baseline_consumer), "sha256": prepared_consumer_sha, "bytes": prepared_consumer_bytes},
+            "consumer_manifest": {"source_path": str(baseline_consumer_manifest), "destination_path": str(baseline_consumer), "sha256": prepared_consumer_sha, "bytes": prepared_consumer_bytes},
+            "consumer_manifest_policy": CONSUMER_MANIFEST_POLICIES["baseline"],
             "lock": {"source_path": str(external_lock), "destination_path": str(baseline_lock_destination), "sha256": prepared_lock_sha, "bytes": prepared_lock_size},
         },
         "candidate": {
@@ -577,6 +669,7 @@ def prepare(
             "production_source_tree_sha256": candidate_production_source_tree_after,
             "overlay_paths": [],
             "consumer_manifest": {"source_path": str(candidate_consumer), "path": str(candidate_consumer), "sha256": candidate_identity["consumer_manifest"]["sha256"], "bytes": candidate_identity["consumer_manifest"]["bytes"]},
+            "consumer_manifest_policy": CONSUMER_MANIFEST_POLICIES["candidate"],
             "probe": {"source_path": str(candidate_probe), "path": str(candidate_probe), "sha256": candidate_identity["probe"]["sha256"], "bytes": candidate_identity["probe"]["bytes"]},
             "lock": {"source_path": str(candidate_lock), "path": str(candidate_lock), "sha256": candidate_identity[CONSUMER_LOCK_KEY]["sha256"], "bytes": candidate_identity[CONSUMER_LOCK_KEY]["bytes"]},
         },
@@ -586,6 +679,7 @@ def prepare(
             "tree": adapter["tree"],
             "consumer_provenance_scope": "three consumer files only; production closure is not equated to final C",
             "consumer_manifest": {"path": str(adapter_consumer), "sha256": adapter_consumer_sha, "bytes": adapter_consumer_bytes},
+            "consumer_manifest_policy": CONSUMER_MANIFEST_POLICIES["candidate"],
             "probe": {"path": str(adapter_probe), "sha256": adapter_probe_sha, "bytes": adapter_probe_bytes},
             "lock": {"path": str(adapter_lock), "sha256": adapter_lock_sha, "bytes": adapter_lock_bytes},
         },
@@ -613,6 +707,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline-root", type=Path, required=True)
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--adapter-root", type=Path, required=True)
+    parser.add_argument("--baseline-consumer-manifest", type=Path, required=True)
     parser.add_argument("--protocol-p-root", type=Path, required=True)
     parser.add_argument("--protocol-p-pin", type=Path, required=True)
     parser.add_argument("--candidate-identity", type=Path, required=True)
@@ -624,6 +719,7 @@ def main(argv: list[str] | None = None) -> int:
             baseline_root=args.baseline_root,
             candidate_root=args.candidate_root,
             adapter_root=args.adapter_root,
+            baseline_consumer_manifest=args.baseline_consumer_manifest,
             protocol_p_root=args.protocol_p_root,
             protocol_p_pin_path=args.protocol_p_pin,
             candidate_identity_path=args.candidate_identity,

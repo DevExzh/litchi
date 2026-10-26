@@ -41,8 +41,8 @@ import native_qualification_runner as generic  # noqa: E402
 from native_qualification import odf_shared_triad_paired_runner as reviewed  # noqa: E402
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v3"
-PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v5"
+SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v4"
+PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v6"
 IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v3"
 PROTOCOL_P_PIN_SCHEMA = "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1"
 CANDIDATE_MODE = "integrated_final_c"
@@ -64,11 +64,39 @@ LOCK_PATH = Path("tools/odf-raw-codec-consumer/Cargo.lock")
 CONSUMER_PACKAGE = "litchi-odf-raw-codec-consumer"
 CANDIDATE_CONSUMER_MANIFEST_SHA256 = "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d"
 CANDIDATE_CONSUMER_MANIFEST_BYTES = 2056
+BASELINE_CONSUMER_MANIFEST_SHA256 = "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70"
+BASELINE_CONSUMER_MANIFEST_BYTES = 1300
 CANDIDATE_PROBE_SHA256 = "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
 CANDIDATE_PROBE_BYTES = 65903
 CONSUMER_LOCK_KEY = "consumer_lock"
 CONSUMER_LOCK_STATUS_PENDING = "pending_metadata"
 CONSUMER_LOCK_STATUS_READY = "ready"
+CONSUMER_MANIFEST_IDENTITIES = {
+    "baseline": {
+        "path": str(CONSUMER_MANIFEST),
+        "sha256": BASELINE_CONSUMER_MANIFEST_SHA256,
+        "bytes": BASELINE_CONSUMER_MANIFEST_BYTES,
+        "policy": {
+            "root_patch_resolution": "historical_registry",
+            "patches": {},
+            "production_dependency_projection": "70d root has no [patch.crates-io]; flate2 and zlib-rs remain registry-resolved",
+        },
+    },
+    "candidate": {
+        "path": str(CONSUMER_MANIFEST),
+        "sha256": CANDIDATE_CONSUMER_MANIFEST_SHA256,
+        "bytes": CANDIDATE_CONSUMER_MANIFEST_BYTES,
+        "policy": {
+            "root_patch_resolution": "integrated_vendored",
+            "patches": {"flate2": "../../vendor/flate2", "zlib-rs": "../../vendor/zlib-rs"},
+            "production_dependency_projection": "integrated root [patch.crates-io] binds flate2 and zlib-rs to vendor paths",
+        },
+    },
+}
+ROOT_PATCH_POLICIES = {
+    "baseline": {},
+    "candidate": {"flate2": "vendor/flate2", "zlib-rs": "vendor/zlib-rs"},
+}
 BUILD_PROFILE = "release"
 BUILD_FLAG = "--release"
 BUILD_BINARY_DIRECTORY = "release"
@@ -335,7 +363,8 @@ def _validate_candidate_identity(data: Mapping[str, Any], manifest: Mapping[str,
         size = value.get("bytes")
         if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
             raise RunnerError(f"candidate identity {key} byte count is invalid")
-    if candidate["consumer_manifest"]["sha256"] != manifest["source"]["candidate_consumer_manifest_sha256"] or candidate["consumer_manifest"]["bytes"] != manifest["source"]["candidate_consumer_manifest_bytes"]:
+    candidate_manifest = manifest["source"]["consumer_manifest_identities"]["candidate"]
+    if candidate["consumer_manifest"]["sha256"] != candidate_manifest["sha256"] or candidate["consumer_manifest"]["bytes"] != candidate_manifest["bytes"]:
         raise RunnerError("candidate consumer manifest does not match the reviewed manifest")
     if candidate["probe"]["sha256"] != manifest["probe"]["sha256"] or candidate["probe"]["bytes"] != manifest["probe"]["bytes"]:
         raise RunnerError("candidate probe does not match the reviewed manifest")
@@ -557,6 +586,69 @@ def _package_identity(root: Path, relative: Path, expected_name: str) -> dict[st
     return {"path": str(path), "relative": str(relative), "name": expected_name, "sha256": digest, "bytes": size}
 
 
+def _validate_consumer_manifest_file(root: Path, role: str, *, manifest_path: Path | None = None) -> dict[str, Any]:
+    """Validate the role-specific consumer manifest and its patch closure."""
+
+    if role not in CONSUMER_MANIFEST_IDENTITIES:
+        raise RunnerError(f"unknown consumer manifest role {role!r}")
+    path = _resolve(manifest_path) if manifest_path is not None else _resolve(CONSUMER_MANIFEST, base=root)
+    try:
+        document = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise RunnerError(f"cannot parse {role} consumer manifest {path}: {error}") from error
+    package = document.get("package")
+    if not isinstance(package, Mapping) or package.get("name") != CONSUMER_PACKAGE:
+        raise RunnerError(f"{role} consumer manifest has the wrong package")
+    examples = document.get("example")
+    if not isinstance(examples, list) or len(examples) != 1 or not isinstance(examples[0], Mapping):
+        raise RunnerError(f"{role} consumer manifest example target is incomplete")
+    if examples[0].get("path") != "../perf-baseline/examples/odf_raw_codec_qualification.rs":
+        raise RunnerError(f"{role} consumer manifest does not bind the canonical probe")
+    policy = CONSUMER_MANIFEST_IDENTITIES[role]["policy"]
+    actual_patches = document.get("patch", {}).get("crates-io", {}) if isinstance(document.get("patch"), Mapping) else {}
+    if not isinstance(actual_patches, Mapping):
+        raise RunnerError(f"{role} consumer manifest patch table is malformed")
+    if actual_patches != {name: {"path": path_value} for name, path_value in policy["patches"].items()}:
+        raise RunnerError(f"{role} consumer manifest patch resolution differs from its endpoint policy")
+    if role == "candidate":
+        for package_name in ("flate2", "zlib-rs"):
+            vendor_root = _resolve(policy["patches"][package_name], base=path.parent)
+            vendor_manifest = vendor_root / "Cargo.toml"
+            if not vendor_root.is_dir() or vendor_root.is_symlink() or vendor_manifest.is_symlink() or not vendor_manifest.is_file():
+                raise RunnerError(f"candidate vendored {package_name} dependency is missing")
+    identity = CONSUMER_MANIFEST_IDENTITIES[role]
+    digest, size = _sha256_file(path)
+    if (digest, size) != (identity["sha256"], identity["bytes"]):
+        raise RunnerError(f"{role} consumer manifest identity differs from the reviewed endpoint")
+    return {"path": str(path), "relative": str(CONSUMER_MANIFEST), "name": CONSUMER_PACKAGE, "sha256": digest, "bytes": size, "policy": policy}
+
+
+def _validate_root_patch_resolution(root: Path, role: str) -> dict[str, str]:
+    """Bind the consumer manifest policy to the selected endpoint root."""
+
+    try:
+        document = tomllib.loads((_resolve("Cargo.toml", base=root)).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise RunnerError(f"cannot parse {role} root Cargo.toml: {error}") from error
+    patch_table = document.get("patch", {}).get("crates-io", {}) if isinstance(document.get("patch"), Mapping) else {}
+    if not isinstance(patch_table, Mapping):
+        raise RunnerError(f"{role} root Cargo patch table is malformed")
+    expected = ROOT_PATCH_POLICIES[role]
+    observed: dict[str, str] = {}
+    for package_name, relative in expected.items():
+        entry = patch_table.get(package_name)
+        if not isinstance(entry, Mapping) or entry.get("path") != relative:
+            raise RunnerError(f"{role} root Cargo.toml does not bind {package_name} to {relative}")
+        target = _resolve(relative, base=root)
+        if target.is_symlink() or not (target / "Cargo.toml").is_file() or (target / "Cargo.toml").is_symlink():
+            raise RunnerError(f"{role} root patch target for {package_name} is missing")
+        observed[package_name] = relative
+    for package_name in ("flate2", "zlib-rs"):
+        if package_name not in expected and package_name in patch_table:
+            raise RunnerError(f"{role} root Cargo.toml unexpectedly patches {package_name}")
+    return observed
+
+
 def _validate_route_descriptors(routes: Any) -> list[dict[str, Any]]:
     if routes != list(EXPECTED_ROUTES):
         raise RunnerError("manifest route protocol differs from the reviewed ODF raw-codec contract")
@@ -586,7 +678,7 @@ EXPECTED_OUTPUT_PROOF = [
 
 
 def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != "litchi.odf.raw-codec-qualification.manifest.v3":
+    if data.get("schema") != "litchi.odf.raw-codec-qualification.manifest.v4":
         raise RunnerError("manifest schema is not the ODF raw-codec schema")
     if data.get("lane") != "odf-raw-codec":
         raise RunnerError("manifest lane is not odf-raw-codec")
@@ -612,10 +704,10 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     for key, expected in expected_source.items():
         if source.get(key) != expected:
             raise RunnerError(f"manifest source.{key} differs from the canonical path")
-    consumer_sha = _require_sha(source.get("candidate_consumer_manifest_sha256"), "source.candidate_consumer_manifest_sha256", 64)
-    consumer_bytes = source.get("candidate_consumer_manifest_bytes")
-    if isinstance(consumer_bytes, bool) or not isinstance(consumer_bytes, int) or consumer_bytes <= 0:
-        raise RunnerError("source.candidate_consumer_manifest_bytes must be a positive integer")
+    if source.get("consumer_manifest_identities") != CONSUMER_MANIFEST_IDENTITIES:
+        raise RunnerError("source consumer manifest identities or patch policies differ")
+    consumer_sha = CONSUMER_MANIFEST_IDENTITIES["candidate"]["sha256"]
+    consumer_bytes = CONSUMER_MANIFEST_IDENTITIES["candidate"]["bytes"]
     lock_status = source.get("consumer_lock_status")
     if lock_status == CONSUMER_LOCK_STATUS_PENDING:
         if source.get("candidate_consumer_lock_sha256") is not None or source.get("candidate_consumer_lock_bytes") is not None:
@@ -629,8 +721,6 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
             raise RunnerError("source.candidate_consumer_lock_bytes must be a positive integer")
     else:
         raise RunnerError("source.consumer_lock_status must be pending_metadata or ready")
-    if consumer_sha != CANDIDATE_CONSUMER_MANIFEST_SHA256 or consumer_bytes != CANDIDATE_CONSUMER_MANIFEST_BYTES:
-        raise RunnerError("manifest candidate consumer identity is not the reviewed consumer file")
     if lock_status == CONSUMER_LOCK_STATUS_READY and (lock_sha is None or lock_bytes is None):
         raise RunnerError("ready consumer lock identity is incomplete")
     probe = data.get("probe")
@@ -700,8 +790,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     normalized["consumer_lock_status"] = lock_status
     normalized["candidate_consumer_lock_sha256"] = lock_sha
     normalized["candidate_consumer_lock_bytes"] = lock_bytes
-    normalized["candidate_consumer_manifest_sha256"] = consumer_sha
-    normalized["candidate_consumer_manifest_bytes"] = consumer_bytes
+    normalized["consumer_manifest_identities"] = CONSUMER_MANIFEST_IDENTITIES
     normalized["probe_sha256"] = probe_sha
     normalized["probe_bytes"] = probe_bytes
     return normalized
@@ -715,6 +804,7 @@ def _validate_preparation(
     baseline_root: Path,
     candidate_root: Path,
     adapter_root: Path,
+    baseline_consumer_manifest: Path,
     protocol_p_root: Path,
     protocol_p_pin: Mapping[str, Any],
     protocol_p_pin_path: Path,
@@ -787,6 +877,9 @@ def _validate_preparation(
 
     if _resolve(str(adapter.get("root"))) != adapter_root or adapter_root in {baseline_root, candidate_root} or _under(adapter_root, baseline_root) or _under(adapter_root, candidate_root) or _under(baseline_root, adapter_root) or _under(candidate_root, adapter_root):
         raise RunnerError("preparation adapter endpoint is missing or overlaps a source endpoint")
+    _validate_root_patch_resolution(baseline_root, "baseline")
+    _validate_root_patch_resolution(candidate_root, "candidate")
+    _validate_root_patch_resolution(adapter_root, "candidate")
     adapter_state = _source_state(adapter_root)
     if adapter_state.get("commit") != adapter.get("head") or adapter_state.get("tree") != adapter.get("tree") or adapter_state.get("status_paths"):
         raise RunnerError("consumer adapter endpoint changed or is dirty")
@@ -819,8 +912,17 @@ def _validate_preparation(
         if isinstance(value.get("bytes"), bool) or not isinstance(value.get("bytes"), int) or value["bytes"] <= 0:
             raise RunnerError(f"preparation {label} size is invalid")
 
+    manifest_identities = manifest["source"]["consumer_manifest_identities"]
+    if baseline.get("consumer_manifest_policy") != manifest_identities["baseline"]["policy"]:
+        raise RunnerError("preparation baseline consumer policy differs")
+    if candidate.get("consumer_manifest_policy") != manifest_identities["candidate"]["policy"]:
+        raise RunnerError("preparation candidate consumer policy differs")
+    if adapter.get("consumer_manifest_policy") != manifest_identities["candidate"]["policy"]:
+        raise RunnerError("preparation adapter consumer policy differs")
+    _validate_consumer_manifest_file(candidate_root, "candidate")
+    _validate_consumer_manifest_file(adapter_root, "candidate")
     expected_files = {
-        "consumer_manifest": (candidate_consumer, expected_candidate["consumer_manifest"], adapter_consumer, manifest["candidate_consumer_manifest_sha256"], manifest["candidate_consumer_manifest_bytes"]),
+        "consumer_manifest": (candidate_consumer, expected_candidate["consumer_manifest"], adapter_consumer, manifest_identities["candidate"]["sha256"], manifest_identities["candidate"]["bytes"]),
         "probe": (candidate_probe, expected_candidate["probe"], adapter_probe, manifest["probe_sha256"], manifest["probe_bytes"]),
         CONSUMER_LOCK_KEY: (candidate_lock, expected_candidate[CONSUMER_LOCK_KEY], adapter_lock, manifest["candidate_consumer_lock_sha256"], manifest["candidate_consumer_lock_bytes"]),
     }
@@ -862,8 +964,17 @@ def _validate_preparation(
         if (observed, size) != (value["sha256"], value["bytes"]):
             raise RunnerError(f"preparation {label} bytes differ")
 
-    if _resolve(str(baseline_consumer.get("source_path"))) != _resolve(str(adapter_consumer["path"])) or _resolve(str(baseline_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])):
-        raise RunnerError("baseline consumer overlay is not sourced from the selected adapter")
+    baseline_manifest_path = _resolve(baseline_consumer_manifest)
+    if _resolve(str(baseline_consumer.get("source_path"))) != baseline_manifest_path:
+        raise RunnerError("baseline consumer overlay is not sourced from the selected baseline manifest")
+    if _resolve(str(baseline_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])):
+        raise RunnerError("baseline probe overlay is not sourced from the selected adapter")
+    if _under(baseline_manifest_path, baseline_root) or _under(baseline_manifest_path, candidate_root) or _under(baseline_manifest_path, adapter_root):
+        raise RunnerError("baseline consumer manifest source must be external to every source endpoint")
+    baseline_manifest_identity = manifest_identities["baseline"]
+    if baseline_consumer.get("sha256") != baseline_manifest_identity["sha256"] or baseline_consumer.get("bytes") != baseline_manifest_identity["bytes"]:
+        raise RunnerError("baseline consumer manifest does not match the role-specific manifest policy")
+    _validate_consumer_manifest_file(baseline_root, "baseline")
     baseline_lock_source = _resolve(str(baseline_lock.get("source_path")))
     if _under(baseline_lock_source, baseline_root) or _under(baseline_lock_source, candidate_root) or _under(baseline_lock_source, adapter_root):
         raise RunnerError("preparation baseline lock source must be external to every source endpoint")
@@ -878,8 +989,9 @@ def _validate_preparation(
 
 def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation: Mapping[str, Any], candidate_identity: Mapping[str, Any]) -> dict[str, Any]:
     state = _source_state(root)
+    _validate_root_patch_resolution(root, role)
     package = _package_identity(root, PRODUCTION_MANIFEST, "litchi-ops")
-    consumer = _package_identity(root, CONSUMER_MANIFEST, CONSUMER_PACKAGE)
+    consumer = _validate_consumer_manifest_file(root, role)
     probe = _file_identity(root, PROBE_PATH, "probe")
     lock = _file_identity(root, LOCK_PATH, "Cargo.lock")
     if role == "baseline":
@@ -914,6 +1026,7 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
         "tracked_closure": state["tracked_closure"],
         "cargo_configs": state["cargo_configs"],
         "consumer_manifest": consumer,
+        "consumer_manifest_policy": manifest["source"]["consumer_manifest_identities"][role]["policy"],
         "production_manifest": package,
         "probe": probe,
         "lock": lock,
@@ -966,7 +1079,7 @@ def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
 
 
 class PairedRunner:
-    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, protocol_p_root: Path, protocol_p_pin_path: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
+    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, baseline_consumer_manifest: Path, protocol_p_root: Path, protocol_p_pin_path: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
         if phase not in {"build", "abba"}:
             raise RunnerError("phase must be build or abba")
         if not isinstance(cpu, int) or cpu < 0 or cpu >= (os.cpu_count() or 1):
@@ -977,6 +1090,7 @@ class PairedRunner:
         self.baseline_root = _resolve(baseline_root)
         self.candidate_root = _resolve(candidate_root)
         self.adapter_root = _resolve(adapter_root)
+        self.baseline_consumer_manifest = _resolve(baseline_consumer_manifest)
         self.protocol_p_root = _resolve(protocol_p_root)
         self.protocol_p_pin_path = _resolve(protocol_p_pin_path)
         self.candidate_identity_path = _resolve(candidate_identity_path)
@@ -984,11 +1098,14 @@ class PairedRunner:
         self.target_root = _resolve(target_root)
         self.tmp_root = _resolve(tmp_root)
         self.cpu = cpu
-        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "protocol_p": self.protocol_p_root, "protocol_p_pin": self.protocol_p_pin_path, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
+        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "baseline_consumer_manifest": self.baseline_consumer_manifest, "protocol_p": self.protocol_p_root, "protocol_p_pin": self.protocol_p_pin_path, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
         if self.manifest["source"]["consumer_lock_status"] != CONSUMER_LOCK_STATUS_READY:
             raise RunnerError("consumer lock metadata is pending; build and ABBA are not admissible")
+        baseline_manifest = _validate_consumer_manifest_file(self.baseline_root, "baseline", manifest_path=self.baseline_consumer_manifest)
+        if baseline_manifest["sha256"] != self.manifest["source"]["consumer_manifest_identities"]["baseline"]["sha256"] or baseline_manifest["bytes"] != self.manifest["source"]["consumer_manifest_identities"]["baseline"]["bytes"]:
+            raise RunnerError("baseline consumer manifest does not match the reviewed role identity")
         self.protocol_p_pin, self.protocol_p_pin_sha256, self.protocol_p_pin_bytes, self.protocol_p_pin_path = _load_protocol_p_pin(
             self.protocol_p_pin_path,
             protocol_p_root=self.protocol_p_root,
@@ -1005,7 +1122,7 @@ class PairedRunner:
         self.protocol_p_anchor = _verify_protocol_p_pin(self.protocol_p_root, self.protocol_p_pin, self.candidate_identity["candidate"])
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
         self.preparation_sha256 = prep_sha
-        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, protocol_p_root=self.protocol_p_root, protocol_p_pin=self.protocol_p_pin, protocol_p_pin_path=self.protocol_p_pin_path, protocol_p_pin_sha256=self.protocol_p_pin_sha256, protocol_p_pin_bytes=self.protocol_p_pin_bytes, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
+        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, baseline_consumer_manifest=self.baseline_consumer_manifest, protocol_p_root=self.protocol_p_root, protocol_p_pin=self.protocol_p_pin, protocol_p_pin_path=self.protocol_p_pin_path, protocol_p_pin_sha256=self.protocol_p_pin_sha256, protocol_p_pin_bytes=self.protocol_p_pin_bytes, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
         self.runner_sha256, _ = _sha256_file(Path(__file__).resolve())
         self.guard = generic.ProcessGuard()
         self.endpoint_cache: dict[str, dict[str, Any]] = {}
@@ -1092,6 +1209,7 @@ class PairedRunner:
             baseline_root=self.baseline_root,
             candidate_root=self.candidate_root,
             adapter_root=self.adapter_root,
+            baseline_consumer_manifest=self.baseline_consumer_manifest,
             protocol_p_root=self.protocol_p_root,
             protocol_p_pin=self.protocol_p_pin,
             protocol_p_pin_path=self.protocol_p_pin_path,
@@ -1109,6 +1227,7 @@ class PairedRunner:
         for path, expected, label in (
             (self.manifest_path, self.manifest_sha256, "manifest"),
             (self.preparation_path, self.preparation_sha256, "preparation"),
+            (self.baseline_consumer_manifest, self.manifest["source"]["consumer_manifest_identities"]["baseline"]["sha256"], "baseline consumer manifest"),
             (self.protocol_p_pin_path, self.protocol_p_pin_sha256, "protocol-P1 pin"),
             (self.candidate_identity_path, self.candidate_identity_sha256, "candidate identity"),
         ):
@@ -1130,7 +1249,7 @@ class PairedRunner:
 
     def _assert_endpoint(self, role: str, expected: Mapping[str, Any], *, full: bool = False) -> None:
         actual = self._endpoint(role, full=full)
-        for key in ("commit", "tree", "production_tree_sha256", "production_source_tree_sha256", "source_tree_sha256", "status_sha256", "status_paths", "tracked_closure", "cargo_configs", "consumer_manifest", "production_manifest", "probe", "lock", "features", "api_era", "namespace_contract", "routes", "families"):
+        for key in ("commit", "tree", "production_tree_sha256", "production_source_tree_sha256", "source_tree_sha256", "status_sha256", "status_paths", "tracked_closure", "cargo_configs", "consumer_manifest", "consumer_manifest_policy", "production_manifest", "probe", "lock", "features", "api_era", "namespace_contract", "routes", "families"):
             if actual.get(key) != expected.get(key):
                 raise RunnerError(f"{role} source identity changed: {key}")
 
@@ -1492,7 +1611,7 @@ class PairedRunner:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "protocol-p-root", "protocol-p-pin", "candidate-identity", "output", "target-root", "tmp-root"):
+    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "baseline-consumer-manifest", "protocol-p-root", "protocol-p-pin", "candidate-identity", "output", "target-root", "tmp-root"):
         parser.add_argument(f"--{name}", required=True, type=Path if name.endswith(("manifest", "preparation", "root", "output")) else str)
     parser.add_argument("--cpu", required=True, type=int)
     parser.add_argument("--phase", required=True, choices=("build", "abba"))
@@ -1502,7 +1621,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, protocol_p_root=args.protocol_p_root, protocol_p_pin_path=args.protocol_p_pin, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
+        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, baseline_consumer_manifest=args.baseline_consumer_manifest, protocol_p_root=args.protocol_p_root, protocol_p_pin_path=args.protocol_p_pin, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
         if args.phase == "build":
             runner.build()
         else:

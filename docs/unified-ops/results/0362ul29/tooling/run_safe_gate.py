@@ -75,6 +75,7 @@ def lock_hashes(root: Path) -> dict[str, str]:
     relative_paths = (
         "Cargo.lock",
         "tools/perf-baseline/Cargo.lock",
+        "tools/odf-raw-codec-consumer/Cargo.lock",
         "tools/native-resave/Cargo.lock",
         "crates/litchi-core/fuzz/Cargo.lock",
         "crates/litchi-ops/fuzz/Cargo.lock",

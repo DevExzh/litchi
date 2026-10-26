@@ -1,5 +1,5 @@
 {
-  "schema": "litchi.odf.raw-codec-qualification.manifest.v3",
+  "schema": "litchi.odf.raw-codec-qualification.manifest.v4",
   "lane": "odf-raw-codec",
   "baseline_commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
   "source": {
@@ -10,8 +10,31 @@
     "candidate_mode": "integrated_final_c",
     "candidate_identity_schema": "litchi.odf.raw-codec-qualification.candidate-identity.v3",
     "protocol_p_pin_schema": "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1",
-    "candidate_consumer_manifest_sha256": "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d",
-    "candidate_consumer_manifest_bytes": 2056,
+    "consumer_manifest_identities": {
+      "baseline": {
+        "path": "tools/odf-raw-codec-consumer/Cargo.toml",
+        "sha256": "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70",
+        "bytes": 1300,
+        "policy": {
+          "root_patch_resolution": "historical_registry",
+          "patches": {},
+          "production_dependency_projection": "70d root has no [patch.crates-io]; flate2 and zlib-rs remain registry-resolved"
+        }
+      },
+      "candidate": {
+        "path": "tools/odf-raw-codec-consumer/Cargo.toml",
+        "sha256": "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d",
+        "bytes": 2056,
+        "policy": {
+          "root_patch_resolution": "integrated_vendored",
+          "patches": {
+            "flate2": "../../vendor/flate2",
+            "zlib-rs": "../../vendor/zlib-rs"
+          },
+          "production_dependency_projection": "integrated root [patch.crates-io] binds flate2 and zlib-rs to vendor paths"
+        }
+      }
+    },
     "consumer_lock_status": "ready",
     "candidate_consumer_lock_sha256": "d2575e2194d6d8968a76913fe872aebba1857fe8ae79b99221d79925bd3cb38b",
     "candidate_consumer_lock_bytes": 43635,
