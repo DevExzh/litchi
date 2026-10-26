@@ -510,6 +510,23 @@ impl<'p> Working<'p> {
         Ok(())
     }
 
+    /// Replace object `identifier` in place in component `name`, or insert
+    /// it there when the component does not hold it.
+    pub(super) fn upsert(&mut self, name: &str, object: ArchiveObject) -> FaultResult<()> {
+        let identifier = object.archive_info.identifier.ok_or(Fault::Invalid)?;
+        match self.locate(identifier)? {
+            Some(current) if current == name => {
+                let limits = self.archive_limits;
+                self.archive_mut(name)?
+                    .upsert_object(object, limits)
+                    .map_err(|error| map_core(&error))?;
+                Ok(())
+            },
+            Some(_) => Err(Fault::Invalid),
+            None => self.insert(name, object),
+        }
+    }
+
     /// Remove object `identifier` from the component holding it.
     pub(super) fn remove(&mut self, identifier: u64) -> FaultResult<ArchiveObject> {
         let name = self.locate(identifier)?.ok_or(Fault::Invalid)?;
