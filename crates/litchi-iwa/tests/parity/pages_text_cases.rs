@@ -599,9 +599,11 @@ fn attachment_case(
                     page_count(),
                 )?),
                 AttachmentOp::Update => {
-                    drop(edit.update(litchi_core::Position::new(0), page_count())?)
+                    edit.update(litchi_core::Position::new(0), page_count())?;
                 },
-                AttachmentOp::Remove => drop(edit.remove(litchi_core::Position::new(0))?),
+                AttachmentOp::Remove => {
+                    edit.remove(litchi_core::Position::new(0))?;
+                },
             }
             let commit = edit.commit()?;
             let restored = commit
