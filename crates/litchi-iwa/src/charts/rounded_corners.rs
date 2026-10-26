@@ -5,6 +5,7 @@
 //! public types model those inspector values directly while this module
 //! preserves every unrelated protobuf field byte-for-byte.
 
+use litchi_iwa_common::chart::corner::{Radius, Rounding};
 use prost::Message;
 
 use crate::charts::style::{
@@ -24,51 +25,53 @@ const CHART_OUTSIDE_CORNERS_ONLY_FIELD: u32 = 123;
 const MINIMUM_CORNER_RADIUS_PERCENT: f32 = 0.0;
 /// The largest selectable chart corner-radius percentage.
 const MAXIMUM_CORNER_RADIUS_PERCENT: f32 = 100.0;
-/// The native stored ratio corresponding to a 100% inspector radius.
-const MAXIMUM_NATIVE_CORNER_RADIUS: f32 = 1.0;
 
 /// A chart corner radius shown by iWork as a percentage.
 ///
 /// The native archive stores this as a normalized ratio. This type keeps that
 /// ratio internally so values read from a document compare exactly with values
-/// supplied through [`Self::new`].
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartCornerRadius(f32);
+/// supplied through [`Self::new`]. The value is the shared
+/// `litchi_iwa_common::chart::corner::Radius` (record 0375).
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ChartCornerRadius(Radius);
+
+impl std::fmt::Debug for ChartCornerRadius {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartCornerRadius")
+            .field(&self.0.native_fraction())
+            .finish()
+    }
+}
 
 impl ChartCornerRadius {
     /// Square chart corners.
-    pub const ZERO: Self = Self(MINIMUM_CORNER_RADIUS_PERCENT);
+    pub const ZERO: Self = Self(Radius::ZERO);
 
     /// Build a native chart corner radius from the inspector percentage.
     pub fn new(percent: f32) -> Result<Self> {
-        if !percent.is_finite()
-            || !(MINIMUM_CORNER_RADIUS_PERCENT..=MAXIMUM_CORNER_RADIUS_PERCENT).contains(&percent)
-        {
-            return Err(Error::InvalidFormat(format!(
+        Radius::new(percent).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart corner radius must be finite and within {MINIMUM_CORNER_RADIUS_PERCENT}%..={MAXIMUM_CORNER_RADIUS_PERCENT}%"
-            )));
-        }
-        Ok(Self(percent / MAXIMUM_CORNER_RADIUS_PERCENT))
+            ))
+        })
     }
 
     /// Return the percentage displayed by iWork's `Corner Radius` field.
     pub const fn percent(self) -> f32 {
-        self.0 * MAXIMUM_CORNER_RADIUS_PERCENT
+        self.0.percent()
     }
 
     fn from_native(value: f32) -> Result<Self> {
-        if !value.is_finite()
-            || !(MINIMUM_CORNER_RADIUS_PERCENT..=MAXIMUM_NATIVE_CORNER_RADIUS).contains(&value)
-        {
-            return Err(Error::InvalidFormat(
+        Radius::from_native(value).map(Self).map_err(|_| {
+            Error::InvalidFormat(
                 "native chart corner radius must be a finite normalized percentage".to_owned(),
-            ));
-        }
-        Ok(Self(value))
+            )
+        })
     }
 
     const fn native(self) -> f32 {
-        self.0
+        self.0.native_fraction()
     }
 }
 
@@ -80,33 +83,38 @@ impl TryFrom<f32> for ChartCornerRadius {
     }
 }
 
-/// Native rounded-corner settings for a chart.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ChartRoundedCorners {
-    radius: ChartCornerRadius,
-    outside_corners_only: bool,
+/// Native rounded-corner settings for a chart (the shared
+/// `litchi_iwa_common::chart::corner::Rounding`, record 0375).
+#[derive(Clone, Copy, PartialEq)]
+pub struct ChartRoundedCorners(Rounding);
+
+impl std::fmt::Debug for ChartRoundedCorners {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ChartRoundedCorners")
+            .field("radius", &self.radius())
+            .field("outside_corners_only", &self.0.outside_corners_only())
+            .finish()
+    }
 }
 
 impl ChartRoundedCorners {
     /// The native default: square corners with no outside-corners override.
-    pub const NONE: Self = Self::new(ChartCornerRadius::ZERO, false);
+    pub const NONE: Self = Self(Rounding::NONE);
 
     /// Construct rounded-corner settings from an inspector radius and switch.
     pub const fn new(radius: ChartCornerRadius, outside_corners_only: bool) -> Self {
-        Self {
-            radius,
-            outside_corners_only,
-        }
+        Self(Rounding::new(radius.0, outside_corners_only))
     }
 
     /// Return the chart's `Corner Radius` setting.
     pub const fn radius(self) -> ChartCornerRadius {
-        self.radius
+        ChartCornerRadius(self.0.radius())
     }
 
     /// Return whether `Outside Corners Only` is enabled.
     pub const fn outside_corners_only(self) -> bool {
-        self.outside_corners_only
+        self.0.outside_corners_only()
     }
 }
 

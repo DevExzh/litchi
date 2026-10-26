@@ -18,7 +18,10 @@
 #![forbid(unsafe_code)]
 
 mod char_style;
+mod native;
+pub mod paragraph_style;
 mod rewrite;
+mod values;
 
 pub use char_style::{
     CharStyleError, CharStyleRun, CharacterProperties, char_style_runs, character_style_parent,
