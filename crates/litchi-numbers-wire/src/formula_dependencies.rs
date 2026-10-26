@@ -2161,7 +2161,7 @@ fn coalesce_hosts(
             host.ranges.extend(candidate.ranges);
             host.raw_range_records.extend(candidate.raw_range_records);
         }
-        normalize_range_records(&mut host)?;
+        normalize_range_records(&mut host, table_owner)?;
         output.push(host);
     }
     ensure_limit(LimitKind::Hosts, output.len(), limits.max_hosts)?;
@@ -2169,7 +2169,7 @@ fn coalesce_hosts(
     Ok(())
 }
 
-fn normalize_range_records(host: &mut OwnedHost<'_>) -> Result<(), Error> {
+fn normalize_range_records(host: &mut OwnedHost<'_>, table_owner: u32) -> Result<(), Error> {
     if host.raw_range_records.len() != host.ranges.len() {
         return Err(Error::InvalidGraph);
     }
@@ -2183,7 +2183,20 @@ fn normalize_range_records(host: &mut OwnedHost<'_>) -> Result<(), Error> {
         pairs.push((range, raw));
     }
     pairs.sort_unstable_by_key(|pair| pair.0);
-    if pairs.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+    // Numbers mirrors a range declaration inline and in a range-precedents
+    // tile, as it mirrors cell records. A non-table owner (a table's merge
+    // owner) keeps both containers unchanged, so its mirror (two different
+    // source records) is admitted. A repeated range of the selected table,
+    // whose containers this rewrite regenerates, stays an authority conflict
+    // (record 0376a).
+    if pairs.windows(2).any(|pair| {
+        pair[0].0 == pair[1].0
+            && (host.key.owner == table_owner
+                || match (pair[0].1, pair[1].1) {
+                    (Some(first), Some(second)) => first == second,
+                    _ => true,
+                })
+    }) {
         return Err(Error::InvalidGraph);
     }
     host.ranges.clear();

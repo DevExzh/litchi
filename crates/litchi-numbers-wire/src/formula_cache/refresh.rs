@@ -484,15 +484,15 @@ pub fn plan<'a>(
 }
 
 /// The tiles and formula list of one table's data store.
-struct TableStorage<'a> {
+pub(super) struct TableStorage<'a> {
     /// `(tile object, first table row, payload)`.
-    tiles: Vec<(u64, u32, &'a [u8])>,
-    tile_rows: u64,
-    formula_list: Option<u64>,
+    pub(super) tiles: Vec<(u64, u32, &'a [u8])>,
+    pub(super) tile_rows: u64,
+    pub(super) formula_list: Option<u64>,
 }
 
 impl<'a> TableStorage<'a> {
-    fn read(
+    pub(super) fn read(
         model: &'a [u8],
         object: &dyn Fn(u64) -> Option<&'a [u8]>,
         limits: &Limits,
@@ -635,7 +635,7 @@ impl CacheBaseline for Baseline {
     }
 }
 
-fn geometry(
+pub(super) fn geometry(
     identity: TableIdentity,
     model: &[u8],
     limits: &Limits,
@@ -657,7 +657,11 @@ fn geometry(
 }
 
 /// The identifier of the `TSP.Reference` in field `number` of `payload`.
-fn reference(payload: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>, Error> {
+pub(super) fn reference(
+    payload: &[u8],
+    number: u32,
+    limits: &Limits,
+) -> Result<Option<u64>, Error> {
     table_write::single_bytes(payload, number, limits)
         .map_err(map_write)?
         .map(|reference| {
@@ -670,7 +674,11 @@ fn reference(payload: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>
 
 /// The tile references of an owner's tiled dependency envelope (field
 /// `number`: 13 for cell-record tiles, 15 for range-precedent tiles).
-fn tiled_references(owner: &[u8], number: u32, limits: &Limits) -> Result<Vec<u64>, Error> {
+pub(super) fn tiled_references(
+    owner: &[u8],
+    number: u32,
+    limits: &Limits,
+) -> Result<Vec<u64>, Error> {
     let mut references = Vec::new();
     let Some(envelope) = table_write::single_bytes(owner, number, limits).map_err(map_write)?
     else {
@@ -733,7 +741,7 @@ fn without_table_references(
     Ok(Some(output))
 }
 
-fn push<T>(values: &mut Vec<T>, value: T) -> Result<(), Error> {
+pub(super) fn push<T>(values: &mut Vec<T>, value: T) -> Result<(), Error> {
     values
         .try_reserve(1)
         .map_err(|_| Error::Allocation { amount: 1 })?;
@@ -741,7 +749,7 @@ fn push<T>(values: &mut Vec<T>, value: T) -> Result<(), Error> {
     Ok(())
 }
 
-fn extend<T>(values: &mut Vec<T>, more: Vec<T>) -> Result<(), Error> {
+pub(super) fn extend<T>(values: &mut Vec<T>, more: Vec<T>) -> Result<(), Error> {
     values
         .try_reserve(more.len())
         .map_err(|_| Error::Allocation { amount: more.len() })?;
@@ -749,7 +757,7 @@ fn extend<T>(values: &mut Vec<T>, more: Vec<T>) -> Result<(), Error> {
     Ok(())
 }
 
-fn copy(bytes: &[u8]) -> Result<Vec<u8>, Error> {
+pub(super) fn copy(bytes: &[u8]) -> Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(bytes.len())
@@ -760,7 +768,7 @@ fn copy(bytes: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
-fn map_write(error: WriteError) -> Error {
+pub(super) fn map_write(error: WriteError) -> Error {
     match error {
         WriteError::Unsupported => Error::UnsupportedDependency(Unsupported::Storage),
         WriteError::LimitExceeded {
@@ -902,6 +910,7 @@ mod tests {
                         identifier: OWNER_OBJECT,
                         ..Default::default()
                     }],
+                    number_of_formulas: Some(1),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -989,6 +998,183 @@ mod tests {
         BncCellView::parse(&cell, &Limits::DEFAULT)
             .unwrap()
             .cached_scalar()
+    }
+
+    fn author_object<'d>(
+        document: &'d Document,
+        identifier: u64,
+    ) -> Option<super::super::author::Object<'d>> {
+        document
+            .objects
+            .iter()
+            .find(|(candidate, _)| *candidate == identifier)
+            .map(|(identifier, payload)| super::super::author::Object {
+                identifier: *identifier,
+                payload,
+                references: &[],
+            })
+    }
+
+    fn author_plan(
+        document: &Document,
+        row: u32,
+        column: u32,
+        change: super::super::author::Change<'_>,
+    ) -> Result<super::super::author::Edit, Error> {
+        use super::super::author;
+        let owners = [author::Object {
+            identifier: OWNER_OBJECT,
+            payload: &document.owner,
+            references: &[],
+        }];
+        let object = |identifier: u64| author_object(document, identifier);
+        author::plan(
+            author::Source {
+                engine: author::Object {
+                    identifier: 100,
+                    payload: &document.engine,
+                    references: &[OWNER_OBJECT],
+                },
+                owners: &owners,
+                table: INFO,
+            },
+            row,
+            column,
+            change,
+            1_000,
+            &object,
+            &Limits::DEFAULT,
+        )
+    }
+
+    #[test]
+    fn authoring_adds_the_inline_record_and_a_list_entry() {
+        use super::super::author;
+        use litchi_iwa_common::formula::{
+            FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
+        };
+        let document = Document::new(false);
+        let object = |identifier: u64| author_object(&document, identifier);
+        let source = author::Source {
+            engine: author::Object {
+                identifier: 100,
+                payload: &document.engine,
+                references: &[OWNER_OBJECT],
+            },
+            owners: &[author::Object {
+                identifier: OWNER_OBJECT,
+                payload: &document.owner,
+                references: &[],
+            }],
+            table: INFO,
+        };
+        assert_eq!(
+            author::table_owner(source, &object, &Limits::DEFAULT).unwrap(),
+            Some((OWNER, 2, 2))
+        );
+        let expression = FormulaExpression::binary(
+            FormulaBinaryOperator::Add,
+            FormulaExpression::Cell(FormulaCellReference::relative(0, 0)),
+            FormulaExpression::Number(2.0),
+        );
+        let formula = author::encode(&expression, OWNER, 1, 1, 2, 2, &Limits::DEFAULT).unwrap();
+        let edit = author_plan(&document, 1, 1, author::Change::Author(&formula)).unwrap();
+        assert_eq!(edit.key, Some(2));
+        assert_eq!(edit.owner, OWNER_OBJECT);
+        assert_eq!(edit.created_tile, None);
+        assert_eq!(edit.removed_tile, None);
+        let owner = edit
+            .payloads
+            .iter()
+            .find(|(identifier, _)| *identifier == OWNER_OBJECT)
+            .map(|(_, payload)| {
+                tsce::FormulaOwnerDependenciesArchive::decode(payload.as_slice()).unwrap()
+            })
+            .unwrap();
+        let records = owner.cell_dependencies.unwrap().cell_record;
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| (record.row, record.column))
+                .collect::<Vec<_>>(),
+            vec![(0, 1), (1, 1)]
+        );
+        let list = edit
+            .payloads
+            .iter()
+            .find(|(identifier, _)| *identifier == LIST)
+            .map(|(_, payload)| payload.clone())
+            .unwrap();
+        let entries = table_write::fields(&list, &Limits::DEFAULT)
+            .unwrap()
+            .iter()
+            .filter(|field| field.number == 3)
+            .count();
+        assert_eq!(entries, 2);
+    }
+
+    #[test]
+    fn removal_drops_the_record_and_releases_the_list_key() {
+        use super::super::author;
+        let document = Document::new(false);
+        let edit = author_plan(&document, 0, 1, author::Change::Remove).unwrap();
+        assert_eq!(edit.key, None);
+        let owner = edit
+            .payloads
+            .iter()
+            .find(|(identifier, _)| *identifier == OWNER_OBJECT)
+            .map(|(_, payload)| {
+                tsce::FormulaOwnerDependenciesArchive::decode(payload.as_slice()).unwrap()
+            })
+            .unwrap();
+        // The emptied inline envelope stays, as the host keeps it.
+        assert_eq!(
+            owner.cell_dependencies.map(|cells| cells.cell_record.len()),
+            Some(0)
+        );
+        let list = edit
+            .payloads
+            .iter()
+            .find(|(identifier, _)| *identifier == LIST)
+            .map(|(_, payload)| payload.clone())
+            .unwrap();
+        let fields = table_write::fields(&list, &Limits::DEFAULT).unwrap();
+        assert!(!fields.iter().any(|field| field.number == 3));
+        // The released key was just below nextListID: nextListID drops to it.
+        assert_eq!(
+            table_write::single_varint(&list, 2, &Limits::DEFAULT).unwrap(),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn removal_of_a_cell_without_a_formula_is_refused() {
+        use super::super::author;
+        let document = Document::new(false);
+        assert!(matches!(
+            author_plan(&document, 0, 0, author::Change::Remove),
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
+        ));
+    }
+
+    #[test]
+    fn a_reference_to_another_table_is_refused() {
+        use super::super::author;
+        use litchi_iwa_common::formula::{FormulaCellReference, FormulaExpression};
+        let expression = FormulaExpression::TableCell {
+            table_id: 99,
+            reference: FormulaCellReference::relative(0, 0),
+        };
+        assert!(matches!(
+            author::encode(&expression, OWNER, 1, 1, 2, 2, &Limits::DEFAULT),
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
+        ));
+        let unknown =
+            FormulaExpression::function("NO-SUCH-FUNCTION", [FormulaExpression::Number(1.0)]);
+        assert!(matches!(
+            author::encode(&unknown, OWNER, 1, 1, 2, 2, &Limits::DEFAULT),
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
+        ));
     }
 
     #[test]
