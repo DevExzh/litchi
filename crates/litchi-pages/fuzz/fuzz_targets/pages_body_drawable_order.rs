@@ -581,7 +581,8 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> BuildResult<ArchiveObje
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-     Default::default(),)?)
+        Default::default(),
+    )?)
 }
 
 fn exact_bytes(package: &Package) -> BuildResult<Vec<u8>> {
