@@ -161,7 +161,7 @@ impl Geometry {
         self
     }
 
-    fn is_valid(self) -> bool {
+    pub(in crate::package) fn is_valid(self) -> bool {
         self.x.is_finite()
             && self.y.is_finite()
             && self.width.is_finite()
@@ -2596,4 +2596,81 @@ fn map_read_error(error: ReadError) -> Error {
         ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         _ => Error::InvalidSource,
     }
+}
+
+/// Edit the nested message of `payload` at `path` (shared with other
+/// structural families).
+pub(in crate::package) fn edit_nested_payload(
+    payload: &[u8],
+    path: &[u32],
+    wire: litchi_iwa_common::WireLimits,
+    edit: &mut dyn FnMut(&mut super::structure::wire::Fields) -> Result<(), StructureError>,
+) -> Result<Vec<u8>, StructureError> {
+    stage::edit_nested(payload, path, wire, edit)
+}
+
+/// Patch a `TSD.GeometryArchive` field list in place.
+pub(in crate::package) fn patch_geometry_fields(
+    fields: &mut super::structure::wire::Fields,
+    geometry: Geometry,
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<(), StructureError> {
+    stage::patch_geometry(fields, geometry, wire)
+}
+
+/// Read a `TSD.DrawableArchive`'s frame.
+pub(in crate::package) fn read_geometry(
+    drawable: &[u8],
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<Geometry>, StructureError> {
+    let fields = super::structure::wire::Fields::parse(drawable, wire)?;
+    match fields.unique(1)? {
+        Some(geometry) => inventory::read_geometry(geometry.message()?, wire),
+        None => Ok(None),
+    }
+}
+
+/// Replace the unique `message_type` payload of `identifier`, keeping the
+/// header.
+pub(in crate::package) fn replace_message_payload(
+    workspace: &mut Workspace<'_>,
+    identifier: u64,
+    message_type: u32,
+    data: Vec<u8>,
+) -> Result<(), StructureError> {
+    let index = workspace
+        .require(identifier)?
+        .messages
+        .iter()
+        .position(|message| message.type_ == message_type)
+        .ok_or(StructureError::Unexpected("message type"))?;
+    stage::replace_payload(workspace, identifier, index, message_type, data)
+}
+
+/// Remove one slide-owned drawable and its private closure (shared with the
+/// chart lifecycle). Returns the removed object count and culled data.
+pub(in crate::package) fn remove_drawable_closure(
+    workspace: &mut Workspace<'_>,
+    slide: u64,
+    drawable: u64,
+) -> Result<(usize, usize), Error> {
+    let removal = stage::remove(workspace, slide, drawable)?;
+    Ok((removal.objects, removal.data))
+}
+
+/// Every object reference one staged object holds (headers and payloads).
+pub(in crate::package) fn outgoing_references(
+    workspace: &Workspace<'_>,
+    identifier: u64,
+) -> Result<Vec<u64>, StructureError> {
+    stage::outgoing(workspace, identifier)
+}
+
+/// Append a drawable to its slide's owned list and z-order (front).
+pub(in crate::package) fn attach_drawable(
+    workspace: &mut Workspace<'_>,
+    slide: u64,
+    drawable: u64,
+) -> Result<(), StructureError> {
+    author::attach(workspace, slide, drawable)
 }

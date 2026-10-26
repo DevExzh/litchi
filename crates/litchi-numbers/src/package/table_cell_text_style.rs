@@ -145,7 +145,7 @@ impl From<Refusal> for Error {
     }
 }
 
-fn from_topology(error: topology::Error) -> Error {
+pub(super) fn from_topology(error: topology::Error) -> Error {
     use topology::Error as E;
     match error {
         E::Refused(crate::package::table_topology::Refusal::SheetNotFound) => {
@@ -178,7 +178,9 @@ fn from_style(error: litchi_iwa_text_wire::CharStyleError) -> Error {
     }
 }
 
-fn style_wire_limits(working: &Working<'_>) -> Result<litchi_iwa_common::WireLimits, Error> {
+pub(super) fn style_wire_limits(
+    working: &Working<'_>,
+) -> Result<litchi_iwa_common::WireLimits, Error> {
     let maximum = working.archive_limits().max_message_bytes();
     litchi_iwa_common::WireLimits::default()
         .with_input_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES))
@@ -277,15 +279,15 @@ impl Edit<'_> {
 }
 
 /// One stored BNC cell located in the table's tiles.
-struct Located {
-    tile: u64,
-    tile_index: usize,
+pub(super) struct Located {
+    pub(super) tile: u64,
+    pub(super) tile_index: usize,
     /// The field index of the cell's row record among the tile's fields.
-    row_field: usize,
-    bytes: Vec<u8>,
+    pub(super) row_field: usize,
+    pub(super) bytes: Vec<u8>,
 }
 
-fn locate_cell(
+pub(super) fn locate_cell(
     working: &Working<'_>,
     store: &[u8],
     position: At,
@@ -323,7 +325,11 @@ fn locate_cell(
 }
 
 /// The entry of `key` in the style list (root or segments): its reference.
-fn list_reference(working: &Working<'_>, list: &[u8], key: u32) -> Result<Option<u64>, Error> {
+pub(super) fn list_reference(
+    working: &Working<'_>,
+    list: &[u8],
+    key: u32,
+) -> Result<Option<u64>, Error> {
     let find = |data: &[u8]| -> FaultResult<Option<Option<u64>>> {
         for entry in repeated_bytes(data, 3)? {
             if single_varint(entry, 1)? == Some(u64::from(key)) {
@@ -347,7 +353,11 @@ fn list_reference(working: &Working<'_>, list: &[u8], key: u32) -> Result<Option
 }
 
 /// The section base text style of `position`.
-fn base_style(model: &[u8], geometry: topology::Geometry, position: At) -> Result<u64, Error> {
+pub(super) fn base_style(
+    model: &[u8],
+    geometry: topology::Geometry,
+    position: At,
+) -> Result<u64, Error> {
     let field = if position.row() < geometry.header_rows {
         25
     } else if position.row() >= geometry.rows.saturating_sub(geometry.footer_rows) {
@@ -362,7 +372,7 @@ fn base_style(model: &[u8], geometry: topology::Geometry, position: At) -> Resul
 
 /// The current text style object of the stored cell at `position` (its
 /// key's entry, else its section's base style).
-fn current_style(
+pub(super) fn current_style(
     working: &Working<'_>,
     sheet: usize,
     table: usize,
@@ -435,7 +445,7 @@ fn text_style(
 const PARAGRAPH_PROPERTIES_FIELD: u32 = 12;
 
 /// `style` with an empty `para_properties` when it has none.
-fn with_paragraph_properties(mut style: Vec<u8>) -> Result<Vec<u8>, Error> {
+pub(super) fn with_paragraph_properties(mut style: Vec<u8>) -> Result<Vec<u8>, Error> {
     if single_bytes(&style, PARAGRAPH_PROPERTIES_FIELD)?.is_none() {
         push_bytes_field(&mut style, PARAGRAPH_PROPERTIES_FIELD, &[])?;
     }
@@ -489,7 +499,7 @@ fn minimal(
 }
 
 /// The stylesheet a paragraph style belongs to (`super.stylesheet`).
-fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
+pub(super) fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
     let (_, data) =
         topology::message(working, style, &[PARAGRAPH_STYLE_MESSAGE_TYPE]).map_err(Error::from)?;
     let base = single_bytes(data, 1)?.ok_or(Error::InvalidSource)?;
@@ -497,7 +507,7 @@ fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
 }
 
 /// Replace one message, transitioning its aggregate object references.
-fn replace_with_references(
+pub(super) fn replace_with_references(
     working: &mut Working<'_>,
     identifier: u64,
     index: usize,
@@ -510,7 +520,7 @@ fn replace_with_references(
     references::replace(object, index, data, removed, appended, &[], limits)
 }
 
-fn replace_message(
+pub(super) fn replace_message(
     working: &mut Working<'_>,
     identifier: u64,
     index: usize,
@@ -766,7 +776,7 @@ fn publish(
 
 /// Store a style-only cell for the empty cell at `position` (its row's and
 /// column's headers count it), pointing at text-style key `key`.
-fn materialize(
+pub(super) fn materialize(
     working: &mut Working<'_>,
     store: &[u8],
     columns: u32,

@@ -23063,6 +23063,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::text",
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
@@ -23168,6 +23169,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_text",
+          "ok": "litchi_numbers::cell::text::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_style",
@@ -23864,6 +23869,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::text",
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
@@ -23969,6 +23975,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_text",
+          "ok": "litchi_numbers::cell::text::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_style",
@@ -25519,7 +25529,12 @@
         "litchi_pages::table::lock",
         "litchi_pages::section::paragraphs",
         "litchi_pages::table::creation",
-        "litchi_pages::table::deletion"
+        "litchi_pages::table::deletion",
+        "litchi_pages::drawable::properties",
+        "litchi_pages::drawable::text",
+        "litchi_pages::bookmark",
+        "litchi_pages::date_time",
+        "litchi_pages::number_attachment"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
@@ -26287,32 +26302,32 @@
         {
           "name": "SlideMediaPropertiesCommit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Commit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesDiagnostics",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesEdit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Edit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesError",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Error (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesLimitKind",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesPatch",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Patch (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMovieCaptionCommit",
@@ -27052,6 +27067,7 @@
         "litchi_keynote::slide::table::physical_sort::transaction",
         "litchi_keynote::slide::creation",
         "litchi_keynote::slide::build",
+        "litchi_keynote::chart::lifecycle",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -27131,6 +27147,10 @@
           "ok": "litchi_keynote::slide::build::Commit"
         },
         {
+          "method": "litchi_keynote::Package::apply_slide_chart_lifecycle",
+          "ok": "litchi_keynote::chart::lifecycle::Commit"
+        },
+        {
           "method": "litchi_keynote::Package::apply_slide_deletion",
           "ok": "litchi_keynote::slide::delete::Commit"
         },
@@ -27156,7 +27176,7 @@
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_properties",
-          "ok": "litchi_keynote::slide::media::properties::Commit"
+          "ok": "litchi_keynote::slide::drawable::properties::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_movie_caption",
@@ -27882,32 +27902,32 @@
         {
           "name": "SlideMediaPropertiesCommit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Commit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesDiagnostics",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesEdit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Edit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesError",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Error (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesLimitKind",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesPatch",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::drawable::properties::Patch (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMovieCaptionCommit",
@@ -28647,6 +28667,7 @@
         "litchi_keynote::slide::table::physical_sort::transaction",
         "litchi_keynote::slide::creation",
         "litchi_keynote::slide::build",
+        "litchi_keynote::chart::lifecycle",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -28726,6 +28747,10 @@
           "ok": "litchi_keynote::slide::build::Commit"
         },
         {
+          "method": "litchi_keynote::Package::apply_slide_chart_lifecycle",
+          "ok": "litchi_keynote::chart::lifecycle::Commit"
+        },
+        {
           "method": "litchi_keynote::Package::apply_slide_deletion",
           "ok": "litchi_keynote::slide::delete::Commit"
         },
@@ -28751,7 +28776,7 @@
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_properties",
-          "ok": "litchi_keynote::slide::media::properties::Commit"
+          "ok": "litchi_keynote::slide::drawable::properties::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_movie_caption",
