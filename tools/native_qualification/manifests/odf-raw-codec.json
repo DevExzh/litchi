@@ -1,28 +1,103 @@
 {
-  "schema": "litchi.odf.raw-codec-qualification.manifest.v2",
+  "schema": "litchi.odf.raw-codec-qualification.manifest.v4",
   "lane": "odf-raw-codec",
   "baseline_commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
   "source": {
-    "consumer_manifest": "tools/perf-baseline/Cargo.toml",
+    "consumer_manifest": "tools/odf-raw-codec-consumer/Cargo.toml",
+    "consumer_package": "litchi-odf-raw-codec-consumer",
     "production_manifest": "crates/litchi-ops/Cargo.toml",
-    "lock_path": "tools/perf-baseline/Cargo.lock",
+    "lock_path": "tools/odf-raw-codec-consumer/Cargo.lock",
     "candidate_mode": "integrated_final_c",
-    "candidate_identity_schema": "litchi.odf.raw-codec-qualification.candidate-identity.v2",
+    "candidate_identity_schema": "litchi.odf.raw-codec-qualification.candidate-identity.v3",
     "protocol_p_pin_schema": "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1",
-    "candidate_consumer_manifest_sha256": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
-    "candidate_consumer_manifest_bytes": 8181,
-    "candidate_lock_sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",
-    "candidate_lock_bytes": 57961,
+    "consumer_manifest_identities": {
+      "baseline": {
+        "path": "tools/odf-raw-codec-consumer/Cargo.toml",
+        "sha256": "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70",
+        "bytes": 1300,
+        "policy": {
+          "root_patch_resolution": "historical_registry",
+          "patches": {},
+          "production_dependency_projection": "70d root has no [patch.crates-io]; flate2 and zlib-rs remain registry-resolved"
+        }
+      },
+      "candidate": {
+        "path": "tools/odf-raw-codec-consumer/Cargo.toml",
+        "sha256": "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d",
+        "bytes": 2056,
+        "policy": {
+          "root_patch_resolution": "integrated_vendored",
+          "patches": {
+            "flate2": "../../vendor/flate2",
+            "zlib-rs": "../../vendor/zlib-rs"
+          },
+          "production_dependency_projection": "integrated root [patch.crates-io] binds flate2 and zlib-rs to vendor paths"
+        }
+      }
+    },
+    "baseline_lock_identity": {
+      "schema": "litchi.odf.raw-codec.baseline-lock-provenance.v1",
+      "sha256": "5ad5000eef2a0a9038f77e16e3347ba757be932e830fe07855c267fcd695cc2a",
+      "bytes": 43921,
+      "seed": {
+        "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "bytes": 57158,
+        "registry_entries": 204
+      },
+      "source": {
+        "commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+        "tree": "4d716d79263612541988f2e30198f7f8e59e520c",
+        "manifest_sha256": "dfd25f62a5c22e10d03f3a210c257c5421ce081627598a50d2f17b45e99ebb70",
+        "manifest_bytes": 1300,
+        "probe_sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002",
+        "probe_bytes": 65903
+      },
+      "policy": {
+        "root_patch_resolution": "historical_registry",
+        "patches": {},
+        "required_registry": {
+          "flate2": {
+            "version": "1.1.10",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+          },
+          "zlib-rs": {
+            "version": "0.6.7",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "34b31d188d9d685a4f9c7b46d6e36631b07058d2cfe190267adce54dc230bf12"
+          }
+        }
+      },
+      "resolution": {
+        "registry_entries": 170,
+        "registry_added": 0,
+        "registry_removed": 34,
+        "registry_changed": 5,
+        "local_packages_added": [
+          "litchi-odb",
+          "litchi-odc",
+          "litchi-odf-formula",
+          "litchi-odf-raw-codec-consumer",
+          "litchi-odg",
+          "litchi-odi",
+          "litchi-odm",
+          "litchi-oth"
+        ]
+      }
+    },
+    "consumer_lock_status": "ready",
+    "candidate_consumer_lock_sha256": "d2575e2194d6d8968a76913fe872aebba1857fe8ae79b99221d79925bd3cb38b",
+    "candidate_consumer_lock_bytes": 43635,
     "candidate_probe_bytes": 65903,
     "baseline_overlay": [
-      "tools/perf-baseline/Cargo.toml",
-      "tools/perf-baseline/Cargo.lock",
+      "tools/odf-raw-codec-consumer/Cargo.toml",
+      "tools/odf-raw-codec-consumer/Cargo.lock",
       "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
     ],
     "candidate_overlay": [],
     "candidate_integrated_files": [
-      "tools/perf-baseline/Cargo.toml",
-      "tools/perf-baseline/Cargo.lock",
+      "tools/odf-raw-codec-consumer/Cargo.toml",
+      "tools/odf-raw-codec-consumer/Cargo.lock",
       "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
     ],
     "adapter_provenance_scope": "three consumer files only; production closure is not equated to final C"
@@ -45,9 +120,13 @@
     "sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
   },
   "build": {
+    "package": "litchi-odf-raw-codec-consumer",
     "profile": "release",
     "cargo_flag": "--release",
     "binary_directory": "release",
+    "lto": "fat",
+    "panic": "abort",
+    "allocator_feature": "raw-codec-allocator",
     "variants": {
       "normal": {"allocator_feature": null},
       "allocator": {"allocator_feature": "raw-codec-allocator"}

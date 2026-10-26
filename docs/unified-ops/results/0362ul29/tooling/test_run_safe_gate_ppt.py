@@ -92,6 +92,17 @@ EXPECTED_NORMAL_STEP_NAMES = (
 
 
 class PptGateWiringTests(unittest.TestCase):
+    def test_lock_hashes_includes_dedicated_odf_consumer_lock(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-consumer-lock-hash-") as temporary:
+            root = Path(temporary)
+            lock = root / "tools/odf-raw-codec-consumer/Cargo.lock"
+            lock.parent.mkdir(parents=True)
+            lock.write_bytes(b"dedicated odf consumer lock")
+            self.assertEqual(
+                GATE.lock_hashes(root),
+                {"tools/odf-raw-codec-consumer/Cargo.lock": hashlib.sha256(lock.read_bytes()).hexdigest()},
+            )
+
     def test_ppt_steps_use_host_guard_and_shared_release_target(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ppt-gate-steps-") as temporary:
             state = Path(temporary) / "state"

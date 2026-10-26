@@ -6376,3 +6376,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   leaf retirement brings cumulative cleanup to 280 worktrees/442 refs, with
   all 70 excluded refs unchanged. Final rebinding, all-65 and native
   qualification remain pending. Nothing is pushed.
+
+  The isolated ODF raw-codec consumer is merged at leaf fa1d7b6c47 (165q).
+  It keeps all ten ODF facade families and the canonical probe, with separate
+  historical/candidate manifests and independently pinned baseline-lock
+  provenance. The preparer, runner, manifest, tests and gate lock registry
+  migrate together. Independent review and 21 focused Python tests pass;
+  all four ordinary/allocator release compiler checks pass. Root verifies
+  that the historical overlay changes only three consumer files, with no
+  production implementation edits. These are compilation results, not
+  native or performance acceptance. The DOCX repair worktree/ref and about
+  851 MB of debug artifacts are retired, reaching cumulative cleanup of 281
+  worktrees/443 refs. The historical 28 preparation groups are source-ready;
+  the newly required DOCX metadata group is under review. All 29 groups,
+  final rebinding and final all-65 remain required. Nothing is pushed.
