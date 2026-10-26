@@ -8,7 +8,6 @@
 
 use std::io::Cursor;
 
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
 
 use super::{Package, PackageError, PackageResult};
@@ -88,6 +87,6 @@ pub(crate) fn rewrite(
     }
     let limits = package.state.source.limits();
     let output = catalog.reassemble_with_changes_to_bytes(&insertions, &edits, &[], limits)?;
-    let source = SourceCatalog::from_shared_bytes(output.into(), limits)?;
+    let source = package.state.source.reopen(output.into())?;
     Package::from_source_catalog(source)
 }

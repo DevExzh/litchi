@@ -239,12 +239,6 @@ fn pages_body_table_cell_write_corpus_parity() -> TestResult {
                             failures.push(format!("{label}: tier B violations\n{}", diff.render()));
                         }
                     },
-                    // Listed refusal (record 0370 §5): cells of a table with
-                    // formulas wait for W1-F's shared formula planner
-                    // (record 0376).
-                    (Ok(_), Err(error)) if error.to_string().contains("formula graph") => {
-                        eprintln!("{label}: listed refusal: {error}");
-                    },
                     (Ok(_), Err(error)) => failures.push(format!(
                         "{label}: the leaf refuses what the host edits: {error}"
                     )),

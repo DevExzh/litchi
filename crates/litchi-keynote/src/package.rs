@@ -32,6 +32,8 @@ pub(crate) mod slide_creation;
 pub(crate) mod slide_delete;
 pub(crate) mod slide_drawable;
 pub(crate) mod slide_drawable_comments;
+pub(crate) mod slide_image_lifecycle;
+pub(crate) mod slide_image_text;
 pub(crate) mod slide_media_lifecycle;
 pub(crate) mod slide_media_properties;
 pub(crate) mod slide_media_replacement;

@@ -887,6 +887,36 @@ impl Package {
     }
 }
 
+/// The identity of one selected slide image, shared with the image
+/// lifecycle family (record 0372).
+#[derive(Debug, Clone, Copy)]
+pub(super) struct SelectedImage {
+    pub(super) slide_position: Position,
+    pub(super) image_position: Position,
+    pub(super) slide_identifier: u64,
+    pub(super) image_identifier: u64,
+    /// Whether the image was materialized from the slide's layout.
+    pub(super) layout: bool,
+}
+
+/// Resolve one slide image under this family's strict ownership checks.
+pub(super) fn select_slide_image(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    image_selector: ImageSelector,
+) -> Result<SelectedImage, Error> {
+    let mut budget = ImageBudget::for_package(package)?;
+    let selection =
+        select_image_with_budget(package, slide_selector, image_selector, false, &mut budget)?;
+    Ok(SelectedImage {
+        slide_position: selection.slide_position,
+        image_position: selection.image_position,
+        slide_identifier: selection.slide_identifier,
+        image_identifier: selection.image_identifier,
+        layout: selection.layout,
+    })
+}
+
 /// Decode one borrowed complete `TSD.ImageArchive` payload for the legacy host.
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]

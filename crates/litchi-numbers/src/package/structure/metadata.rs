@@ -281,9 +281,20 @@ pub(in crate::package) struct Transition {
     pub(in crate::package) uuid_removals: Vec<Uuid>,
     pub(in crate::package) external_removals: Vec<External>,
     pub(in crate::package) external_additions: Vec<External>,
+    /// Removed objects whose identifiers may lower the watermark when they
+    /// are its suffix (the host editor's `release_package_identifier_suffix`).
+    pub(in crate::package) released: Vec<u64>,
 }
 
 impl Transition {
+    /// Lower the watermark over `objects` when the last registered
+    /// identifier is one of them (record 0370).
+    pub(in crate::package) fn release_suffix(&mut self, objects: &[u64]) -> FaultResult<()> {
+        reserve(&mut self.released, objects.len())?;
+        self.released.extend_from_slice(objects);
+        Ok(())
+    }
+
     fn is_empty(&self) -> bool {
         self.uuid_additions.is_empty()
             && self.uuid_removals.is_empty()
@@ -398,7 +409,10 @@ pub(super) fn apply(
     };
     let registry = registry(working)?.ok_or(Fault::Invalid)?;
     let current = registry.last_object_identifier;
-    let last = allocated.map_or(current, |allocated| allocated.max(current));
+    let mut last = allocated.map_or(current, |allocated| allocated.max(current));
+    if allocated.is_none() && transition.released.contains(&current) {
+        last = working.maximum_identifier();
+    }
     if transition.is_empty() && last == current && emptied.is_empty() {
         return Ok(());
     }
@@ -487,11 +501,12 @@ pub(super) fn apply(
         }
         let removes = !uuid_removals.is_empty() || !external_removals.is_empty();
         let adds = !external_additions.is_empty() || !uuid_additions.is_empty();
-        let output = if removes && !adds && last == current {
+        let output = if removes && !adds && last <= current {
             rewrite_package_metadata_removals_and_save_tokens(
                 source,
                 RemovalSaveTokenBatch::new(
-                    RemovalBatch::new(current, &uuid_removals, &external_removals, &[]),
+                    RemovalBatch::new(current, &uuid_removals, &external_removals, &[])
+                        .with_new_last_object_identifier(last),
                     SaveTokenBatch::new(&tokens),
                 ),
                 options,

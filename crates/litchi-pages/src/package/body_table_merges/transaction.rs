@@ -7,7 +7,6 @@
 
 use std::{fmt, sync::Arc};
 
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_core::RawMessage;
 use litchi_numbers_wire::table_merges::{self, ReadLimits};
@@ -577,8 +576,7 @@ fn rewrite_model(
     if output.len() != requirements.output_bytes() {
         return Err(Error::Verification);
     }
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
-        .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     table_lock::charge_reopen_work(&candidate_source, budget).map_err(map_lock_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
@@ -747,9 +745,11 @@ fn reopen_candidate(
         .charge_output_bytes(bytes.len())
         .and_then(|_| budget.charge_payload_work(bytes.len()))
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes(Arc::<[u8]>::from(bytes), source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::<[u8]>::from(bytes))
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .and_then(|_| table_lock::charge_reopen_work(&catalog, budget))

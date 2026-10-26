@@ -15,7 +15,6 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_common::wire::{RawWireFields, RawWireLimits};
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len};
 use litchi_iwa_core::archive::ObjectReferenceTransition;
@@ -4287,7 +4286,10 @@ fn reopen(
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
         .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)

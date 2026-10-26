@@ -1046,11 +1046,11 @@ impl Package {
         budget.charge(LimitKind::OutputBytes, patch.target_bytes.len())?;
         budget.charge(LimitKind::RetainedBytes, patch.target_bytes.len())?;
         budget.charge(LimitKind::Allocations, 1)?;
-        let candidate_source = SourceCatalog::from_shared_bytes(
-            Arc::clone(&patch.target_bytes),
-            self.state.source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source = self
+            .state
+            .source
+            .reopen(Arc::clone(&patch.target_bytes))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         let target_sequence = footnote_sequence(&candidate)?;
@@ -2252,7 +2252,8 @@ fn insert_lifecycle(
     let previews = preview_names(source);
     let output = reassemble_candidate(source_catalog, &edits, &previews, &mut budget)?;
     budget.charge(LimitKind::Allocations, 1)?;
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), source_catalog.limits())
+    let candidate_source = source_catalog
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     let expected = Footnote::with_custom_mark(
@@ -2362,7 +2363,8 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
     let previews = preview_names(source);
     let output = reassemble_candidate(source_catalog, &edits, &previews, &mut budget)?;
     budget.charge(LimitKind::Allocations, 1)?;
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), source_catalog.limits())
+    let candidate_source = source_catalog
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }

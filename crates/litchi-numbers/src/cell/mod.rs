@@ -10,6 +10,15 @@ pub mod comment;
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
+/// One character or paragraph property of whole cells' text (record 0370),
+/// started by [`crate::Package::edit_table_cell_text`] and read by
+/// [`crate::Package::table_cell_text`].
+pub mod text {
+    pub use crate::package::table_cell_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
 /// Character properties of cells' text (record 0309), started by
 /// [`crate::Package::edit_table_cell_text_style`].
 pub mod text_style {

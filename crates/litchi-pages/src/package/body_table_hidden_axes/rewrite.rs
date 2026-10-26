@@ -7,7 +7,7 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::archive::ObjectReferenceTransition;
 use litchi_iwa_core::{
@@ -2666,9 +2666,11 @@ fn rewrite(
     if output.len() > package_output_bound {
         return Err(Error::Verification);
     }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = source
+        .state
+        .source
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
     let added_object_ids = creation_plan.as_ref().map_or_else(
         || Arc::from(Vec::<u64>::new()),
         |plan| Arc::clone(&plan.object_ids),

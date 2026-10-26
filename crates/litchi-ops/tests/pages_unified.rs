@@ -200,10 +200,15 @@ fn tables_read_cells_and_remove() {
         file.query("tc[type=text]").expect("query").next().is_some(),
         "the fixture holds text cells"
     );
-    let error = file
+    // The table takes part in a formula graph; a value write refreshes the
+    // formulas that read it (record 0376).
+    let written = file
         .set("/body/tbl[1]/tr[1]/tc[1]", props! { "text" => "x" })
-        .unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+        .expect("a value write into a formula table");
+    assert_eq!(
+        prop(&reopen(&written), "/body/tbl[1]/tr[1]/tc[1]", "text").as_deref(),
+        Some("x")
+    );
     let tables = prop(&file, "/", "tableCount").expect("tables");
     let removed = file.remove("/body/tbl[1]").expect("remove the table");
     let reopened = reopen(&removed);

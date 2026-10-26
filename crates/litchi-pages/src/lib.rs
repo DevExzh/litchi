@@ -48,8 +48,10 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
+pub mod bookmark;
 pub mod builder;
 pub mod chart;
+pub mod date_time;
 mod document;
 pub mod document_options;
 /// Combined document and footnote formatter settings.
@@ -100,6 +102,7 @@ pub mod metadata {
 }
 mod limits;
 pub mod movie;
+pub mod number_attachment;
 mod package;
 pub mod page_layout;
 pub mod section;
@@ -149,6 +152,6 @@ pub use package::{
     MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
 };
 pub use section::{Section, SectionType};
-pub use selector::{BodyChartSelector, BodyTableSelector, ImageSelector};
+pub use selector::{BodyChartSelector, BodyTableSelector, DrawableSelector, ImageSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::merge::Region;
