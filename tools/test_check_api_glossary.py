@@ -589,6 +589,65 @@ class RustdocTests(unittest.TestCase):
         }
         self.assertEqual(len(gate.violations(ambiguous, checked)), 1)
 
+    def test_external_odf_xml_limits_reexport_uses_its_defining_identity(self):
+        """ODF's root XmlStreamLimits spelling is a common-crate re-export."""
+        document = {
+            "root": "0", "includes_private": False,
+            "index": {"0": {
+                "name": "fixture", "crate_id": 0, "visibility": "public",
+                "inner": {"module": {"items": [], "is_crate": True}},
+            }},
+            "paths": {"0": {"crate_id": 0, "path": ["fixture"], "kind": "module"}},
+        }
+        method_id = "odf-limit-method"
+        defining_id = "odf-limit-defining-item"
+        document["index"]["0"]["inner"]["module"]["items"].append(method_id)
+        document["index"][method_id] = {
+            "name": "open_odf", "crate_id": 0, "visibility": "public",
+            "inner": {"function": {
+                "sig": {"inputs": [
+                    ["source", {"primitive": "unit"}],
+                    ["limits", {"borrowed_ref": {
+                        "lifetime": None, "is_mutable": False,
+                        "type": {"resolved_path": {
+                            "path": "litchi_odf_common::XmlStreamLimits",
+                            "id": defining_id, "args": None,
+                        }},
+                    }}],
+                ], "output": {"primitive": "unit"}},
+                "generics": {"params": []},
+            }},
+        }
+        document["paths"][method_id] = {
+            "crate_id": 0, "path": ["fixture", "open_odf"], "kind": "function",
+        }
+        document["paths"][defining_id] = {
+            "crate_id": 81,
+            "path": ["litchi_odf_common", "core", "stream_xml", "XmlStreamLimits"],
+            "kind": "struct",
+        }
+        rule = {
+            "method": "fixture::open_odf", "inputs": ["source", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "litchi_odf_common::XmlStreamLimits",
+        }
+        checked = profile(id="fixture", package="fixture", required_signatures=[rule])
+        self.assertEqual(gate.violations(document, checked), [])
+
+        wrong = copy.deepcopy(document)
+        wrong["paths"][defining_id]["path"] = [
+            "litchi_odf_common", "core", "other", "XmlStreamLimits"
+        ]
+        self.assertEqual(len(gate.violations(wrong, checked)), 1)
+
+        ambiguous = copy.deepcopy(document)
+        ambiguous["paths"]["odf-limit-duplicate"] = {
+            "crate_id": 82,
+            "path": ["litchi_odf_common", "core", "stream_xml", "XmlStreamLimits"],
+            "kind": "struct",
+        }
+        self.assertEqual(len(gate.violations(ambiguous, checked)), 1)
+
     def _namespace_collision_document(self, *, macro_first=False, conflict=False):
         document = copy.deepcopy(self.document)
         root = str(document["root"])

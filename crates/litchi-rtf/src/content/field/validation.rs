@@ -7,7 +7,7 @@ pub(crate) fn validate_story_events(
     drawing_order: &[crate::StoryDrawing],
     events: &[StoryEvent],
     label: &str,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     crate::shape::validate_story_drawings(text, shapes, shape_groups, drawing_order, label)?;
     let mut drawings = Vec::with_capacity(drawing_order.len());
     let mut fields = std::collections::BTreeSet::new();
@@ -16,7 +16,7 @@ pub(crate) fn validate_story_events(
         let position = match *event {
             StoryEvent::PageBreak(value) => {
                 if text.get(value.position..value.position).is_none() {
-                    return Err(crate::RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {label} page break is not at a UTF-8 boundary"
                     )));
                 }
@@ -33,7 +33,7 @@ pub(crate) fn validate_story_events(
                     },
                 }
                 .ok_or_else(|| {
-                    crate::RtfError::MalformedDocument(format!(
+                    crate::Error::MalformedDocument(format!(
                         "RTF {label} story order has an invalid drawing reference"
                     ))
                 })?
@@ -42,7 +42,7 @@ pub(crate) fn validate_story_events(
                 if !fields.insert(field.field_index)
                     || text.get(field.position..field.position).is_none()
                 {
-                    return Err(crate::RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF {label} story order has an invalid or duplicate field reference"
                     )));
                 }
@@ -50,14 +50,14 @@ pub(crate) fn validate_story_events(
             },
         };
         if previous.is_some_and(|value| value > position) {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {label} story order moves backwards"
             )));
         }
         previous = Some(position);
     }
     if drawings != drawing_order {
-        return Err(crate::RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {label} story order is incomplete or changes drawing order"
         )));
     }
@@ -69,9 +69,9 @@ pub(crate) fn push_story_page_break(
     text: &str,
     position: usize,
     label: &str,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     if text.get(position..position).is_none() {
-        return Err(crate::RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {label} page break is not at a UTF-8 boundary"
         )));
     }

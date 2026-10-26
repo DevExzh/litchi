@@ -17,7 +17,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use super::error::{RtfError, RtfResult};
+
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::{
     FromBytes as DeriveFromBytes, Immutable, IntoBytes as DeriveIntoBytes, KnownLayout,
@@ -60,12 +60,12 @@ const POSITION_BUCKETS: usize = u8::MAX as usize + 1;
 const _: () = assert!(INIT_DICT_SIZE <= MAX_DICT_SIZE);
 const _: () = assert!(MAX_DICT_SIZE.is_multiple_of(POSITION_WORD_BITS));
 
-fn codec_invariant(message: &'static str) -> RtfError {
-    RtfError::InvalidStructure(format!("compressed-RTF codec invariant failed: {message}"))
+fn codec_invariant(message: &'static str) -> crate::Error {
+    crate::Error::InvalidStructure(format!("compressed-RTF codec invariant failed: {message}"))
 }
 
-fn allocation_failed(resource: &'static str, requested: usize) -> RtfError {
-    RtfError::AllocationFailed {
+fn allocation_failed(resource: &'static str, requested: usize) -> crate::Error {
+    crate::Error::AllocationFailed {
         resource,
         requested,
     }
@@ -75,7 +75,7 @@ fn reserve_exact_bytes(
     output: &mut Vec<u8>,
     capacity: usize,
     resource: &'static str,
-) -> RtfResult<()> {
+) -> crate::Result<()> {
     output
         .try_reserve_exact(capacity)
         .map_err(|_err| allocation_failed(resource, capacity))
@@ -86,7 +86,7 @@ fn extend_bytes(
     bytes: &[u8],
     limits: CompressionLimits,
     resource: &'static str,
-) -> RtfResult<()> {
+) -> crate::Result<()> {
     let requested = output
         .len()
         .checked_add(bytes.len())
@@ -95,7 +95,7 @@ fn extend_bytes(
         .checked_add(requested)
         .ok_or_else(|| codec_invariant("compressed RTF frame size overflow"))?;
     if frame_size > limits.max_output_bytes {
-        return Err(RtfError::LimitExceeded {
+        return Err(crate::Error::LimitExceeded {
             resource: "compressed RTF output",
             observed: frame_size,
             limit: limits.max_output_bytes,
@@ -230,13 +230,15 @@ pub fn is_compressed_rtf(data: &[u8]) -> bool {
 ///
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
-pub fn decompress(data: &[u8], limits: DecompressionLimits) -> RtfResult<Vec<u8>> {
+pub fn decompress(data: &[u8], limits: DecompressionLimits) -> crate::Result<Vec<u8>> {
     let (header, contents) = parse_frame(data)?;
     let raw_size = usize::try_from(header.get_raw_size()).map_err(|_err| {
-        RtfError::InvalidStructure("RTF RAWSIZE is not representable on this target".to_string())
+        crate::Error::InvalidStructure(
+            "RTF RAWSIZE is not representable on this target".to_string(),
+        )
     })?;
     if raw_size > limits.max_output_bytes {
-        return Err(RtfError::Limit {
+        return Err(crate::Error::Limit {
             kind: crate::SourceLimitKind::DecompressedBytes,
             observed: raw_size,
             maximum: limits.max_output_bytes,
@@ -248,44 +250,46 @@ pub fn decompress(data: &[u8], limits: DecompressionLimits) -> RtfResult<Vec<u8>
     } else if header.is_uncompressed() {
         decompress_uncompressed(contents, &header, raw_size)
     } else {
-        Err(RtfError::InvalidStructure(format!(
+        Err(crate::Error::InvalidStructure(format!(
             "unknown compressed-RTF compression type: {:?}",
             header.compression_type
         )))
     }
 }
 
-fn parse_frame(data: &[u8]) -> RtfResult<(CompressedRtfHeader, &[u8])> {
+fn parse_frame(data: &[u8]) -> crate::Result<(CompressedRtfHeader, &[u8])> {
     let bytes = data.get(..HEADER_SIZE).ok_or_else(|| {
-        RtfError::InvalidStructure(format!(
+        crate::Error::InvalidStructure(format!(
             "compressed-RTF header requires {HEADER_SIZE} bytes, found {}",
             data.len()
         ))
     })?;
     let header = *<CompressedRtfHeader as FromBytes>::ref_from_bytes(bytes).map_err(|_err| {
-        RtfError::InvalidStructure("failed to parse compressed-RTF header".to_string())
+        crate::Error::InvalidStructure("failed to parse compressed-RTF header".to_string())
     })?;
     let compressed_size = usize::try_from(header.get_compressed_size()).map_err(|_err| {
-        RtfError::InvalidStructure("RTF COMPSIZE is not representable on this target".to_string())
+        crate::Error::InvalidStructure(
+            "RTF COMPSIZE is not representable on this target".to_string(),
+        )
     })?;
     if compressed_size < COUNTED_HEADER_SIZE {
-        return Err(RtfError::InvalidStructure(format!(
+        return Err(crate::Error::InvalidStructure(format!(
             "RTF COMPSIZE {compressed_size} is smaller than the {COUNTED_HEADER_SIZE}-byte counted header"
         )));
     }
     let declared_total = compressed_size
         .checked_add(HEADER_SIZE - COUNTED_HEADER_SIZE)
         .ok_or_else(|| {
-            RtfError::InvalidStructure("compressed-RTF total size overflow".to_string())
+            crate::Error::InvalidStructure("compressed-RTF total size overflow".to_string())
         })?;
     if declared_total != data.len() {
-        return Err(RtfError::InvalidStructure(format!(
+        return Err(crate::Error::InvalidStructure(format!(
             "RTF COMPSIZE declares {declared_total} total bytes, found {}",
             data.len()
         )));
     }
     let contents = data.get(HEADER_SIZE..).ok_or_else(|| {
-        RtfError::InvalidStructure("compressed-RTF content boundary is invalid".to_string())
+        crate::Error::InvalidStructure("compressed-RTF content boundary is invalid".to_string())
     })?;
     Ok((header, contents))
 }
@@ -295,10 +299,10 @@ fn decompress_lzfu(
     data: &[u8],
     header: &CompressedRtfHeader,
     raw_size: usize,
-) -> RtfResult<Vec<u8>> {
+) -> crate::Result<Vec<u8>> {
     let calculated_crc = crc32(data)?;
     if calculated_crc != header.get_crc32() {
-        return Err(RtfError::InvalidStructure(format!(
+        return Err(crate::Error::InvalidStructure(format!(
             "compressed-RTF CRC32 mismatch: expected {:#010x}, got {calculated_crc:#010x}",
             header.get_crc32()
         )));
@@ -316,7 +320,7 @@ fn decompress_lzfu(
         for bit in 0..8 {
             if control & (1 << bit) == 0 {
                 let literal = *data.get(cursor).ok_or_else(|| {
-                    RtfError::InvalidStructure(
+                    crate::Error::InvalidStructure(
                         "compressed RTF ends inside a literal token".to_string(),
                     )
                 })?;
@@ -343,13 +347,13 @@ fn decompress_lzfu(
             let token_bytes: [u8; 2] = data
                 .get(cursor..token_end)
                 .ok_or_else(|| {
-                    RtfError::InvalidStructure(
+                    crate::Error::InvalidStructure(
                         "compressed RTF ends inside a dictionary reference".to_string(),
                     )
                 })?
                 .try_into()
                 .map_err(|_err| {
-                    RtfError::InvalidStructure(
+                    crate::Error::InvalidStructure(
                         "invalid compressed-RTF dictionary reference".to_string(),
                     )
                 })?;
@@ -363,7 +367,7 @@ fn decompress_lzfu(
                 return Err(raw_size_mismatch(output.len(), raw_size));
             }
             if !dictionary.contains(offset) {
-                return Err(RtfError::InvalidStructure(format!(
+                return Err(crate::Error::InvalidStructure(format!(
                     "compressed RTF references unavailable dictionary offset {offset}"
                 )));
             }
@@ -383,23 +387,23 @@ fn decompress_lzfu(
         }
     }
 
-    Err(RtfError::InvalidStructure(
+    Err(crate::Error::InvalidStructure(
         "compressed RTF has no terminating dictionary reference".to_string(),
     ))
 }
 
-fn ensure_output_growth(current: usize, additional: usize, declared: usize) -> RtfResult<()> {
-    let observed = current
-        .checked_add(additional)
-        .ok_or_else(|| RtfError::InvalidStructure("decompressed RTF size overflow".to_string()))?;
+fn ensure_output_growth(current: usize, additional: usize, declared: usize) -> crate::Result<()> {
+    let observed = current.checked_add(additional).ok_or_else(|| {
+        crate::Error::InvalidStructure("decompressed RTF size overflow".to_string())
+    })?;
     if observed > declared {
         return Err(raw_size_mismatch(observed, declared));
     }
     Ok(())
 }
 
-fn raw_size_mismatch(observed: usize, declared: usize) -> RtfError {
-    RtfError::InvalidStructure(format!(
+fn raw_size_mismatch(observed: usize, declared: usize) -> crate::Error {
+    crate::Error::InvalidStructure(format!(
         "RTF RAWSIZE declares {declared} bytes, decoder produced {observed}"
     ))
 }
@@ -409,9 +413,9 @@ fn decompress_uncompressed(
     data: &[u8],
     header: &CompressedRtfHeader,
     raw_size: usize,
-) -> RtfResult<Vec<u8>> {
+) -> crate::Result<Vec<u8>> {
     if header.get_crc32() != 0 {
-        return Err(RtfError::InvalidStructure(
+        return Err(crate::Error::InvalidStructure(
             "CRC32 must be 0x00000000 for uncompressed RTF".to_string(),
         ));
     }
@@ -447,14 +451,14 @@ impl DecodeDictionary {
         offset < self.len || self.len == MAX_DICT_SIZE
     }
 
-    fn read(&self, offset: usize) -> RtfResult<u8> {
+    fn read(&self, offset: usize) -> crate::Result<u8> {
         self.bytes
             .get(offset)
             .copied()
             .ok_or_else(|| codec_invariant("dictionary read offset is out of range"))
     }
 
-    fn write(&mut self, byte: u8) -> RtfResult<()> {
+    fn write(&mut self, byte: u8) -> crate::Result<()> {
         let slot = self
             .bytes
             .get_mut(self.write_offset)
@@ -490,7 +494,7 @@ impl EncodeRun {
         }
     }
 
-    fn mark_reference(&mut self, bit: usize) -> RtfResult<()> {
+    fn mark_reference(&mut self, bit: usize) -> crate::Result<()> {
         if bit >= u8::BITS as usize {
             return Err(codec_invariant("encode-run control bit is out of range"));
         }
@@ -502,7 +506,7 @@ impl EncodeRun {
         Ok(())
     }
 
-    fn push_literal(&mut self, literal: u8) -> RtfResult<()> {
+    fn push_literal(&mut self, literal: u8) -> crate::Result<()> {
         let slot = self
             .bytes
             .get_mut(self.len)
@@ -515,7 +519,7 @@ impl EncodeRun {
         Ok(())
     }
 
-    fn push_reference(&mut self, bit: usize, reference: [u8; 2]) -> RtfResult<()> {
+    fn push_reference(&mut self, bit: usize, reference: [u8; 2]) -> crate::Result<()> {
         self.mark_reference(bit)?;
         let end = self
             .len
@@ -530,7 +534,7 @@ impl EncodeRun {
         Ok(())
     }
 
-    fn as_bytes(&self) -> RtfResult<&[u8]> {
+    fn as_bytes(&self) -> crate::Result<&[u8]> {
         self.bytes
             .get(..self.len)
             .ok_or_else(|| codec_invariant("encode-run length is out of range"))
@@ -543,7 +547,7 @@ struct EncodeDictionary {
 }
 
 impl EncodeDictionary {
-    fn new() -> RtfResult<Self> {
+    fn new() -> crate::Result<Self> {
         let ring = DecodeDictionary::new();
         let position_bytes = POSITION_BUCKETS
             .checked_mul(size_of::<[u64; POSITION_WORDS]>())
@@ -562,7 +566,7 @@ impl EncodeDictionary {
         Ok(Self { ring, positions })
     }
 
-    fn write(&mut self, byte: u8) -> RtfResult<()> {
+    fn write(&mut self, byte: u8) -> crate::Result<()> {
         let offset = self.ring.write_offset;
         if self.ring.len == MAX_DICT_SIZE {
             let previous = self.ring.read(offset)?;
@@ -583,7 +587,7 @@ impl EncodeDictionary {
     /// Find the spec-defined longest match while mirroring each newly proven
     /// byte into the ring. That mutation is what lets references overlap the
     /// current write position during decoding.
-    fn find_longest_match(&mut self, input: &[u8]) -> RtfResult<Option<DictionaryMatch>> {
+    fn find_longest_match(&mut self, input: &[u8]) -> crate::Result<Option<DictionaryMatch>> {
         let Some((&first, _)) = input.split_first() else {
             return Ok(None);
         };
@@ -617,7 +621,7 @@ impl EncodeDictionary {
         end: usize,
         input: &[u8],
         best: &mut Option<DictionaryMatch>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let mut next = start;
         loop {
             let offset = {
@@ -648,7 +652,7 @@ impl EncodeDictionary {
         Ok(())
     }
 
-    fn match_at(&mut self, offset: usize, input: &[u8], best_len: usize) -> RtfResult<usize> {
+    fn match_at(&mut self, offset: usize, input: &[u8], best_len: usize) -> crate::Result<usize> {
         let max_len = input.len().min(17);
         let mut dictionary_offset = offset;
         let mut match_len = 0usize;
@@ -673,7 +677,7 @@ impl EncodeDictionary {
     }
 }
 
-fn set_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> RtfResult<()> {
+fn set_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> crate::Result<()> {
     let word = words
         .get_mut(offset / POSITION_WORD_BITS)
         .ok_or_else(|| codec_invariant("position-set offset is out of range"))?;
@@ -681,7 +685,7 @@ fn set_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> RtfResult<(
     Ok(())
 }
 
-fn clear_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> RtfResult<()> {
+fn clear_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> crate::Result<()> {
     let word = words
         .get_mut(offset / POSITION_WORD_BITS)
         .ok_or_else(|| codec_invariant("position-clear offset is out of range"))?;
@@ -693,7 +697,7 @@ fn next_position(
     words: &[u64; POSITION_WORDS],
     start: usize,
     end: usize,
-) -> RtfResult<Option<usize>> {
+) -> crate::Result<Option<usize>> {
     if start > end || end > MAX_DICT_SIZE {
         return Err(codec_invariant("position scan range is invalid"));
     }
@@ -745,7 +749,7 @@ fn next_position(
 ///
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
-pub fn compress(data: &[u8], compress: bool, limits: CompressionLimits) -> RtfResult<Vec<u8>> {
+pub fn compress(data: &[u8], compress: bool, limits: CompressionLimits) -> crate::Result<Vec<u8>> {
     if compress {
         compress_lzfu(data, limits)
     } else {
@@ -754,7 +758,7 @@ pub fn compress(data: &[u8], compress: bool, limits: CompressionLimits) -> RtfRe
 }
 
 /// Compress data using `LZFu` algorithm
-fn compress_lzfu(data: &[u8], limits: CompressionLimits) -> RtfResult<Vec<u8>> {
+fn compress_lzfu(data: &[u8], limits: CompressionLimits) -> crate::Result<Vec<u8>> {
     checked_u32_size(data.len(), "uncompressed RTF")?;
     let mut dictionary = EncodeDictionary::new()?;
     let mut output = Vec::new();
@@ -824,33 +828,33 @@ fn compress_lzfu(data: &[u8], limits: CompressionLimits) -> RtfResult<Vec<u8>> {
 }
 
 /// Compress data without compression (just add header)
-fn compress_uncompressed(data: &[u8], limits: CompressionLimits) -> RtfResult<Vec<u8>> {
+fn compress_uncompressed(data: &[u8], limits: CompressionLimits) -> crate::Result<Vec<u8>> {
     build_frame(data.len(), data, *UNCOMPRESSED_SIGNATURE, 0, limits)
 }
 
-fn dictionary_reference(offset: usize, length: usize) -> RtfResult<[u8; 2]> {
+fn dictionary_reference(offset: usize, length: usize) -> crate::Result<[u8; 2]> {
     if offset >= MAX_DICT_SIZE {
-        return Err(RtfError::InvalidStructure(format!(
+        return Err(crate::Error::InvalidStructure(format!(
             "dictionary offset {offset} is not representable in compressed RTF"
         )));
     }
     if length != 0 && !(2..=17).contains(&length) {
-        return Err(RtfError::InvalidStructure(format!(
+        return Err(crate::Error::InvalidStructure(format!(
             "dictionary match length {length} is not representable in compressed RTF"
         )));
     }
     let offset = u16::try_from(offset).map_err(|_err| {
-        RtfError::InvalidStructure("compressed-RTF dictionary offset overflow".to_string())
+        crate::Error::InvalidStructure("compressed-RTF dictionary offset overflow".to_string())
     })?;
     let encoded_length = u16::try_from(length.saturating_sub(2)).map_err(|_err| {
-        RtfError::InvalidStructure("compressed-RTF match length overflow".to_string())
+        crate::Error::InvalidStructure("compressed-RTF match length overflow".to_string())
     })?;
     Ok(((offset << 4) | encoded_length).to_be_bytes())
 }
 
-fn checked_u32_size(value: usize, description: &str) -> RtfResult<u32> {
+fn checked_u32_size(value: usize, description: &str) -> crate::Result<u32> {
     u32::try_from(value).map_err(|_err| {
-        RtfError::InvalidStructure(format!(
+        crate::Error::InvalidStructure(format!(
             "{description} size {value} exceeds the compressed-RTF 32-bit wire limit"
         ))
     })
@@ -862,18 +866,18 @@ fn build_frame(
     compression_type: [u8; 4],
     crc32: u32,
     limits: CompressionLimits,
-) -> RtfResult<Vec<u8>> {
+) -> crate::Result<Vec<u8>> {
     let raw_size = checked_u32_size(raw_len, "uncompressed RTF")?;
     let counted_size = contents
         .len()
         .checked_add(COUNTED_HEADER_SIZE)
-        .ok_or_else(|| RtfError::InvalidStructure("RTF COMPSIZE overflow".to_string()))?;
+        .ok_or_else(|| crate::Error::InvalidStructure("RTF COMPSIZE overflow".to_string()))?;
     let compressed_size = checked_u32_size(counted_size, "compressed RTF")?;
-    let total_size = HEADER_SIZE
-        .checked_add(contents.len())
-        .ok_or_else(|| RtfError::InvalidStructure("compressed-RTF size overflow".to_string()))?;
+    let total_size = HEADER_SIZE.checked_add(contents.len()).ok_or_else(|| {
+        crate::Error::InvalidStructure("compressed-RTF size overflow".to_string())
+    })?;
     if total_size > limits.max_output_bytes {
-        return Err(RtfError::LimitExceeded {
+        return Err(crate::Error::LimitExceeded {
             resource: "compressed RTF output",
             observed: total_size,
             limit: limits.max_output_bytes,
@@ -887,14 +891,14 @@ fn build_frame(
     Ok(result)
 }
 
-fn crc32(data: &[u8]) -> RtfResult<u32> {
+fn crc32(data: &[u8]) -> crate::Result<u32> {
     // [MS-OXRTFCP] uses the reflected ISO polynomial with an all-zero
     // initial state and no final XOR. `crc-fast` supplies the accelerated
     // polynomial implementation; remove its ISO-HDLC final XOR here.
     let mut digest = crc_fast::Digest::new_with_init_state(crc_fast::CrcAlgorithm::Crc32IsoHdlc, 0);
     digest.update(data);
     u32::try_from(digest.finalize() ^ u64::from(u32::MAX))
-        .map_err(|_err| RtfError::InvalidStructure("compressed-RTF CRC32 overflow".to_string()))
+        .map_err(|_err| crate::Error::InvalidStructure("compressed-RTF CRC32 overflow".to_string()))
 }
 
 #[cfg(test)]
@@ -1031,7 +1035,7 @@ mod tests {
         stored[0..4].copy_from_slice(&14u32.to_le_bytes());
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("COMPSIZE")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("COMPSIZE")
         ));
 
         let stored = build_frame(
@@ -1044,7 +1048,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
 
         let stored = build_frame(
@@ -1057,7 +1061,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
     }
 
@@ -1069,7 +1073,7 @@ mod tests {
         assert_eq!(limits.max_output_bytes(), 1024);
         assert!(matches!(
             decompress(&stored, limits),
-            Err(RtfError::Limit {
+            Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::DecompressedBytes,
                 observed,
                 maximum: 1024,
@@ -1084,7 +1088,7 @@ mod tests {
 
         assert!(matches!(
             error,
-            RtfError::AllocationFailed {
+            crate::Error::AllocationFailed {
                 resource: "test output",
                 requested: usize::MAX,
             }
@@ -1118,7 +1122,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&missing_end, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("ends")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("ends")
         ));
 
         let truncated_reference = build_frame(
@@ -1131,7 +1135,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&truncated_reference, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("dictionary reference")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("dictionary reference")
         ));
 
         let unavailable_reference = build_frame(
@@ -1144,7 +1148,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&unavailable_reference, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("unavailable")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("unavailable")
         ));
 
         let oversized_literal = build_frame(
@@ -1157,7 +1161,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&oversized_literal, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
 
         let duplicate_artificial_literal_contents = [0x04, 0x00, 0x00, 0x0d, 0x10];
@@ -1171,7 +1175,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&duplicate_artificial_literal, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
     }
 
@@ -1198,7 +1202,7 @@ mod tests {
         compressed[12] ^= 0x80;
         assert!(matches!(
             decompress(&compressed, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("CRC32")
         ));
 
         let stored = build_frame(
@@ -1211,7 +1215,7 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&stored, DecompressionLimits::default()),
-            Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
+            Err(crate::Error::InvalidStructure(message)) if message.contains("CRC32")
         ));
     }
 
@@ -1255,7 +1259,7 @@ mod tests {
         let one_under = CompressionLimits::new(encoded.len() - 1);
         assert!(matches!(
             compress(SPEC_RAW, false, one_under),
-            Err(RtfError::LimitExceeded {
+            Err(crate::Error::LimitExceeded {
                 resource: "compressed RTF output",
                 observed,
                 limit,

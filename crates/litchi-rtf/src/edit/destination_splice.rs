@@ -14,7 +14,7 @@
 //! every retained story before it is published.
 
 use super::{Error, HeaderFooterParagraph, Operation, Package};
-use crate::RtfError;
+
 use crate::lexer::{Lexer, Token};
 use crate::model::provenance::StorySource;
 use bumpalo::Bump;
@@ -655,7 +655,7 @@ fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Re
 }
 
 fn allocation_error(resource: &'static str, requested: usize) -> Error {
-    Error::Rtf(RtfError::AllocationFailed {
+    Error::Rtf(crate::Error::AllocationFailed {
         resource,
         requested,
     })

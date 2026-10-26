@@ -11,7 +11,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use super::super::error::{RtfError, RtfResult, try_reserve_one};
+use super::super::error::try_reserve_one;
 use super::super::lexer::Lexer;
 use super::super::limits::{OpenOptions, SourceLimits};
 use super::super::parser::Parser;
@@ -30,7 +30,7 @@ const MAX_ROOT_SHAPES: usize = 65_536;
 const MAX_ROOT_SHAPE_GROUPS: usize = 16_384;
 const FILE_READ_CHUNK_BYTES: usize = 16 * 1024;
 
-fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8>> {
+fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> crate::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     let mut chunk = [0_u8; FILE_READ_CHUNK_BYTES];
     loop {
@@ -39,7 +39,7 @@ fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8
                 Ok(read) => break read,
                 Err(error) if error.kind() == ErrorKind::Interrupted => continue,
                 Err(error) => {
-                    return Err(RtfError::ParserError(format!(
+                    return Err(crate::Error::ParserError(format!(
                         "Failed to read file: {error}"
                     )));
                 },
@@ -50,15 +50,15 @@ fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8
         }
 
         let read_chunk = chunk.get(..read).ok_or_else(|| {
-            RtfError::ParserError("file reader returned an invalid byte count".to_string())
+            crate::Error::ParserError("file reader returned an invalid byte count".to_string())
         })?;
-        let observed = bytes.len().checked_add(read).ok_or(RtfError::Limit {
+        let observed = bytes.len().checked_add(read).ok_or(crate::Error::Limit {
             kind: crate::SourceLimitKind::InputBytes,
             observed: usize::MAX,
             maximum: limit,
         })?;
         if observed > limit {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
                 observed,
                 maximum: limit,
@@ -67,7 +67,7 @@ fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8
 
         bytes
             .try_reserve(read)
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "source bytes",
                 requested: observed,
             })?;
@@ -76,14 +76,14 @@ fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8
     Ok(bytes)
 }
 
-fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
+fn read_file_with_limit(path: &Path, limit: usize) -> crate::Result<Vec<u8>> {
     let file = File::open(path)
-        .map_err(|error| RtfError::ParserError(format!("Failed to open file: {error}")))?;
+        .map_err(|error| crate::Error::ParserError(format!("Failed to open file: {error}")))?;
 
     if let Ok(metadata) = file.metadata() {
         let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
         if metadata.len() > limit_u64 {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
                 observed: usize::try_from(metadata.len()).unwrap_or(usize::MAX),
                 maximum: limit,
@@ -100,7 +100,7 @@ fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
 
 pub(crate) fn owned_table(
     table: &super::super::table::Table<'_>,
-) -> RtfResult<super::super::table::Table<'static>> {
+) -> crate::Result<super::super::table::Table<'static>> {
     let mut output = super::super::table::Table::new();
     output.set_direction(table.direction());
     for row in table.rows() {
@@ -400,7 +400,7 @@ impl<'a> Tree<'a> {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn parse(input: &str, options: OpenOptions) -> RtfResult<Tree<'static>> {
+    pub fn parse(input: &str, options: OpenOptions) -> crate::Result<Tree<'static>> {
         Self::parse_internal(input.as_bytes(), options)
     }
 
@@ -415,7 +415,7 @@ impl<'a> Tree<'a> {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn parse_bytes(input: &[u8], options: OpenOptions) -> RtfResult<Tree<'static>> {
+    pub fn parse_bytes(input: &[u8], options: OpenOptions) -> crate::Result<Tree<'static>> {
         Self::parse_internal(input, options)
     }
 
@@ -432,7 +432,7 @@ impl<'a> Tree<'a> {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions) -> RtfResult<Tree<'static>> {
+    pub fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions) -> crate::Result<Tree<'static>> {
         Self::parse_internal_owned(bytes, options)
     }
 
@@ -444,10 +444,10 @@ impl<'a> Tree<'a> {
     /// phase source-free is important for compressed RTF: the retained source
     /// must remain the original LZFu/MELA frame while the decompressed bytes
     /// remain a temporary parser input.
-    fn parse_transport(bytes: &[u8], options: OpenOptions) -> RtfResult<Tree<'static>> {
+    fn parse_transport(bytes: &[u8], options: OpenOptions) -> crate::Result<Tree<'static>> {
         let limits = options.source_limits_value();
         if bytes.len() > limits.max_input_bytes() {
-            return Err(RtfError::Limit {
+            return Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
                 observed: bytes.len(),
                 maximum: limits.max_input_bytes(),
@@ -477,7 +477,9 @@ impl<'a> Tree<'a> {
         // The parser will detect \ansicpg and use the proper encoding for text.
         let input_str = if input_bytes.is_ascii() {
             Cow::Borrowed(std::str::from_utf8(input_bytes.as_ref()).map_err(|error| {
-                RtfError::InvalidUnicode(format!("ASCII RTF transport conversion failed: {error}"))
+                crate::Error::InvalidUnicode(format!(
+                    "ASCII RTF transport conversion failed: {error}"
+                ))
             })?)
         } else {
             Cow::Owned(Self::decode_latin1_transport(input_bytes.as_ref())?)
@@ -501,12 +503,12 @@ impl<'a> Tree<'a> {
 
     /// Parse borrowed transport bytes and retain an independent copy for
     /// exact-source writing.
-    fn parse_internal(bytes: &[u8], options: OpenOptions) -> RtfResult<Tree<'static>> {
+    fn parse_internal(bytes: &[u8], options: OpenOptions) -> crate::Result<Tree<'static>> {
         let mut document = Self::parse_transport(bytes, options)?;
         let mut source = Vec::new();
         source
             .try_reserve(bytes.len())
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource: "preserved RTF source",
                 requested: bytes.len(),
             })?;
@@ -517,7 +519,7 @@ impl<'a> Tree<'a> {
 
     /// Parse an owned transport allocation and move that exact allocation into
     /// the retained source after the detached model has been built.
-    fn parse_internal_owned(bytes: Vec<u8>, options: OpenOptions) -> RtfResult<Tree<'static>> {
+    fn parse_internal_owned(bytes: Vec<u8>, options: OpenOptions) -> crate::Result<Tree<'static>> {
         let mut document = Self::parse_transport(&bytes, options)?;
         document.preserved_source = Some(bytes);
         Ok(document)
@@ -532,21 +534,22 @@ impl<'a> Tree<'a> {
     /// two UTF-8 bytes in the temporary string.  Reserve before every push
     /// that could exhaust the current capacity so allocation failure becomes
     /// a typed parser error instead of an abort.
-    fn decode_latin1_transport(bytes: &[u8]) -> RtfResult<String> {
+    fn decode_latin1_transport(bytes: &[u8]) -> crate::Result<String> {
         let mut text = String::new();
         text.try_reserve(bytes.len())
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF transport text",
                 requested: bytes.len(),
             })?;
         for &byte in bytes {
             let encoded_width = if byte.is_ascii() { 1 } else { 2 };
             if text.capacity().saturating_sub(text.len()) < encoded_width {
-                text.try_reserve(encoded_width)
-                    .map_err(|_error| RtfError::AllocationFailed {
+                text.try_reserve(encoded_width).map_err(|_error| {
+                    crate::Error::AllocationFailed {
                         resource: "RTF transport text",
                         requested: text.len().saturating_add(encoded_width),
-                    })?;
+                    }
+                })?;
             }
             text.push(char::from(byte));
         }
@@ -558,7 +561,7 @@ impl<'a> Tree<'a> {
         input: &str,
         options: OpenOptions,
         retain_ordinary_body_source_span: bool,
-    ) -> RtfResult<Tree<'static>> {
+    ) -> crate::Result<Tree<'static>> {
         let limits = options.source_limits_value();
         // Create arena for temporary allocations during parsing
         let arena = Bump::new();
@@ -609,7 +612,7 @@ impl<'a> Tree<'a> {
             .tables
             .into_iter()
             .map(|table| owned_table(&table))
-            .collect::<RtfResult<_>>()?;
+            .collect::<crate::Result<_>>()?;
 
         // Convert pictures to owned
         let owned_pictures: Vec<super::super::picture::Picture<'static>> = parsed
@@ -888,7 +891,7 @@ impl<'a> Tree<'a> {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn open<P: AsRef<Path>>(path: P, options: OpenOptions) -> RtfResult<Tree<'static>> {
+    pub fn open<P: AsRef<Path>>(path: P, options: OpenOptions) -> crate::Result<Tree<'static>> {
         let bytes = read_file_with_limit(
             path.as_ref(),
             options.source_limits_value().max_input_bytes(),
@@ -913,7 +916,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_bytes(bytes: &[u8], options: OpenOptions) -> RtfResult<Tree<'static>> {
+    pub fn from_bytes(bytes: &[u8], options: OpenOptions) -> crate::Result<Tree<'static>> {
         Self::parse_bytes(bytes, options)
     }
 
@@ -1061,7 +1064,7 @@ impl<'a> Tree<'a> {
     pub(crate) fn table_cell_mut(
         &mut self,
         path: &crate::TableCellPath,
-    ) -> RtfResult<&mut crate::Cell<'a>> {
+    ) -> crate::Result<&mut crate::Cell<'a>> {
         let root = path.root;
         let mut cell = self
             .tables
@@ -1069,7 +1072,7 @@ impl<'a> Tree<'a> {
             .and_then(|table| table.rows_mut().get_mut(root.row_index))
             .and_then(|row| row.cells_mut().get_mut(root.cell_index))
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF table-cell path is outside the document".to_string(),
                 )
             })?;
@@ -1080,7 +1083,7 @@ impl<'a> Tree<'a> {
                 .and_then(|nested| nested.table.rows_mut().get_mut(coordinate.row_index))
                 .and_then(|row| row.cells_mut().get_mut(coordinate.cell_index))
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF nested table-cell path is outside the document".to_string(),
                     )
                 })?;
@@ -1145,7 +1148,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_file_table(&mut self, table: crate::FileTable<'a>) -> RtfResult<()> {
+    pub fn set_file_table(&mut self, table: crate::FileTable<'a>) -> crate::Result<()> {
         table.validate()?;
         self.file_table = Some(table);
         Ok(())
@@ -1335,12 +1338,12 @@ impl<'a> Tree<'a> {
         &mut self,
         picture_index: usize,
         properties: Option<crate::PictureShapeProperties<'a>>,
-    ) -> RtfResult<Option<crate::PictureShapeProperties<'a>>> {
+    ) -> crate::Result<Option<crate::PictureShapeProperties<'a>>> {
         if let Some(properties) = &properties {
             properties.validate()?;
         }
         let picture = self.pictures.get_mut(picture_index).ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF picture shape-property mutation references a missing picture".to_string(),
             )
         })?;
@@ -1369,11 +1372,11 @@ impl<'a> Tree<'a> {
     pub fn push_picture_compatibility_record(
         &mut self,
         record: crate::PictureCompatibilityRecord,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let body = self.text();
         record.validate(&body, self.pictures.len())?;
         if self.picture_compatibility_records.len() >= crate::MAX_PICTURE_COMPATIBILITY_RECORDS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility record count exceeds the safety limit".to_string(),
             ));
         }
@@ -1385,7 +1388,7 @@ impl<'a> Tree<'a> {
                     || (previous.position == record.position && previous.kind == record.kind)
             })
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility records are duplicated or out of body order".to_string(),
             ));
         }
@@ -2487,14 +2490,14 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_field(&mut self, field: super::super::field::Field<'a>) -> RtfResult<()> {
+    pub fn push_field(&mut self, field: super::super::field::Field<'a>) -> crate::Result<()> {
         if !matches!(field.owner, crate::FieldOwner::Body) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "document-level generic fields must be owned by the body story".to_string(),
             ));
         }
         if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generic field count exceeds the safety limit".to_string(),
             ));
         }
@@ -2502,7 +2505,7 @@ impl<'a> Tree<'a> {
         let field_safety = crate::validation::classify_field(&field);
         let body = self.text();
         if body.get(field.position..field.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generic field position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -2510,7 +2513,7 @@ impl<'a> Tree<'a> {
             .last_body_story_position()?
             .is_some_and(|position| position > field.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF body story order moves backwards".to_string(),
             ));
         }
@@ -2524,17 +2527,17 @@ impl<'a> Tree<'a> {
     pub(crate) fn push_story_field_metadata(
         &mut self,
         field: super::super::field::Field<'a>,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         if matches!(
             field.owner,
             crate::FieldOwner::Body | crate::FieldOwner::Detached
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "nested-story field metadata requires a retained story owner".to_string(),
             ));
         }
         if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generic field count exceeds the safety limit".to_string(),
             ));
         }
@@ -2569,7 +2572,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_generator(&mut self, generator: crate::DocumentGenerator<'a>) -> RtfResult<()> {
+    pub fn set_generator(&mut self, generator: crate::DocumentGenerator<'a>) -> crate::Result<()> {
         generator.validate()?;
         self.generator = Some(generator);
         Ok(())
@@ -2593,7 +2596,7 @@ impl<'a> Tree<'a> {
     pub fn set_revision_save_metadata(
         &mut self,
         metadata: crate::RevisionSaveMetadata,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         metadata.validate()?;
         self.revision_save = Some(metadata);
         Ok(())
@@ -2634,29 +2637,28 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         tag: crate::SmartTag<'a>,
-    ) -> RtfResult<crate::SmartTag<'a>> {
+    ) -> crate::Result<crate::SmartTag<'a>> {
         tag.validate()?;
-        let current = self
-            .smart_tags
-            .get(index)
-            .ok_or_else(|| RtfError::MalformedDocument("SmartTag index is out of range".into()))?;
+        let current = self.smart_tags.get(index).ok_or_else(|| {
+            crate::Error::MalformedDocument("SmartTag index is out of range".into())
+        })?;
         if current.position != tag.position || current.content != tag.content {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "SmartTag edits cannot change its body range".to_string(),
             ));
         }
         Ok(std::mem::replace(
             self.smart_tags.get_mut(index).ok_or_else(|| {
-                RtfError::MalformedDocument("SmartTag index is out of range".into())
+                crate::Error::MalformedDocument("SmartTag index is out of range".into())
             })?,
             tag,
         ))
     }
 
     /// Remove one SmartTag's inert markers while retaining body text.
-    pub fn remove_smart_tag(&mut self, index: usize) -> RtfResult<crate::SmartTag<'a>> {
+    pub fn remove_smart_tag(&mut self, index: usize) -> crate::Result<crate::SmartTag<'a>> {
         if index >= self.smart_tags.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "SmartTag index is out of range".into(),
             ));
         }
@@ -2717,7 +2719,7 @@ impl<'a> Tree<'a> {
     pub fn set_xml_namespaces(
         &mut self,
         namespaces: Vec<crate::XmlNamespace<'a>>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         Self::validate_xml_namespaces(&namespaces)?;
         self.xml_namespaces = Some(namespaces);
         Ok(())
@@ -2727,7 +2729,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_xml_namespace(&mut self, namespace: crate::XmlNamespace<'a>) -> RtfResult<()> {
+    pub fn push_xml_namespace(&mut self, namespace: crate::XmlNamespace<'a>) -> crate::Result<()> {
         namespace.validate()?;
         let was_present = self.xml_namespaces.is_some();
         let mut namespaces = self.xml_namespaces.take().unwrap_or_default();
@@ -2759,7 +2761,7 @@ impl<'a> Tree<'a> {
     pub fn set_protection_user_table(
         &mut self,
         table: crate::ProtectionUserTable<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         table.validate()?;
         self.protection_user_table = Some(table);
         Ok(())
@@ -2780,7 +2782,10 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_hyphenation(&mut self, hyphenation: crate::DocumentHyphenation) -> RtfResult<()> {
+    pub fn set_hyphenation(
+        &mut self,
+        hyphenation: crate::DocumentHyphenation,
+    ) -> crate::Result<()> {
         hyphenation.validate()?;
         self.hyphenation = hyphenation;
         Ok(())
@@ -2804,7 +2809,7 @@ impl<'a> Tree<'a> {
     pub fn set_external_references(
         &mut self,
         references: crate::DocumentExternalReferences<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         references.validate()?;
         self.external_references = references;
         Ok(())
@@ -2825,7 +2830,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_document_view(&mut self, view: crate::DocumentView) -> RtfResult<()> {
+    pub fn set_document_view(&mut self, view: crate::DocumentView) -> crate::Result<()> {
         view.validate()?;
         self.document_view = view;
         Ok(())
@@ -2874,7 +2879,7 @@ impl<'a> Tree<'a> {
     pub fn set_window_caption(
         &mut self,
         caption: crate::DocumentWindowCaption<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         caption.validate()?;
         self.window_caption = Some(caption);
         Ok(())
@@ -2898,7 +2903,7 @@ impl<'a> Tree<'a> {
     pub fn set_xsl_transform(
         &mut self,
         transform: crate::DocumentXslTransform<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         transform.validate()?;
         self.xsl_transform = Some(transform);
         Ok(())
@@ -2938,7 +2943,7 @@ impl<'a> Tree<'a> {
     pub fn set_style_list_filter(
         &mut self,
         filter: crate::DocumentStyleListFilter,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         filter.validate()?;
         self.style_list_filter = Some(filter);
         Ok(())
@@ -3000,7 +3005,7 @@ impl<'a> Tree<'a> {
     pub fn set_write_reservations(
         &mut self,
         reservations: crate::DocumentWriteReservations<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         reservations.validate()?;
         self.write_reservations = reservations;
         Ok(())
@@ -3117,7 +3122,7 @@ impl<'a> Tree<'a> {
     pub fn set_print_layout_settings(
         &mut self,
         settings: crate::DocumentPrintLayoutSettings,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         settings.validate()?;
         self.print_layout_settings = settings;
         Ok(())
@@ -3127,7 +3132,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> RtfResult<()> {
+    pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> crate::Result<()> {
         let mut candidate = self.print_layout_settings;
         candidate.set_document_gutter_twips(value)?;
         self.print_layout_settings = candidate;
@@ -3407,7 +3412,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_theme(&mut self, theme: crate::DocumentTheme<'a>) -> RtfResult<()> {
+    pub fn set_theme(&mut self, theme: crate::DocumentTheme<'a>) -> crate::Result<()> {
         theme.validate()?;
         self.theme = Some(theme);
         Ok(())
@@ -3428,7 +3433,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_latent_styles(&mut self, styles: crate::LatentStyles<'a>) -> RtfResult<()> {
+    pub fn set_latent_styles(&mut self, styles: crate::LatentStyles<'a>) -> crate::Result<()> {
         styles.validate()?;
         self.latent_styles = Some(styles);
         Ok(())
@@ -3449,7 +3454,10 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_data_store(&mut self, data_store: crate::DocumentDataStore<'a>) -> RtfResult<()> {
+    pub fn set_data_store(
+        &mut self,
+        data_store: crate::DocumentDataStore<'a>,
+    ) -> crate::Result<()> {
         data_store.validate()?;
         self.data_store = Some(data_store);
         Ok(())
@@ -3470,7 +3478,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_mail_merge(&mut self, mail_merge: crate::MailMerge<'a>) -> RtfResult<()> {
+    pub fn set_mail_merge(&mut self, mail_merge: crate::MailMerge<'a>) -> crate::Result<()> {
         mail_merge.validate()?;
         self.mail_merge = Some(mail_merge);
         Ok(())
@@ -3494,7 +3502,7 @@ impl<'a> Tree<'a> {
     pub fn set_math_properties(
         &mut self,
         properties: crate::DocumentMathProperties,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         properties.validate()?;
         self.math_properties = Some(properties);
         Ok(())
@@ -3521,7 +3529,7 @@ impl<'a> Tree<'a> {
     pub fn set_default_formatting(
         &mut self,
         value: crate::DocumentDefaultFormatting,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         value.validate()?;
         self.default_formatting = value;
         Ok(())
@@ -3537,7 +3545,7 @@ impl<'a> Tree<'a> {
     pub fn set_language_defaults(
         &mut self,
         defaults: crate::DocumentLanguageDefaults,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         defaults.validate()?;
         self.language_defaults = defaults;
         Ok(())
@@ -3567,9 +3575,9 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_default_tab_width_twips(&mut self, width: u32) -> RtfResult<()> {
+    pub fn set_default_tab_width_twips(&mut self, width: u32) -> crate::Result<()> {
         if width > crate::MAX_DEFAULT_TAB_WIDTH_TWIPS {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF deftab width {width} exceeds {}",
                 crate::MAX_DEFAULT_TAB_WIDTH_TWIPS
             )));
@@ -3610,15 +3618,15 @@ impl<'a> Tree<'a> {
         self.gutter_on_right = enabled;
     }
 
-    fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> RtfResult<()> {
+    fn validate_xml_namespaces(namespaces: &[crate::XmlNamespace<'_>]) -> crate::Result<()> {
         if namespaces.len() > crate::xml_namespace::MAX_XML_NAMESPACES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF XML namespace count exceeds the safety limit".to_string(),
             ));
         }
         let mut ids = HashSet::new();
         ids.try_reserve(namespaces.len())
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource: "XML namespace IDs",
                 requested: namespaces.len().saturating_mul(size_of::<u32>()),
             })?;
@@ -3626,19 +3634,19 @@ impl<'a> Tree<'a> {
         for namespace in namespaces {
             namespace.validate()?;
             if !ids.insert(namespace.id) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF XML namespace IDs must be unique".to_string(),
                 ));
             }
             total = total
                 .checked_add(namespace.namespace.len())
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF XML namespace aggregate size overflow".to_string(),
                     )
                 })?;
             if total > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF XML namespace aggregate text exceeds the safety limit".to_string(),
                 ));
             }
@@ -3653,21 +3661,21 @@ impl<'a> Tree<'a> {
     pub fn push_form_field(
         &mut self,
         field: super::super::form_field::FormField<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         field.validate()?;
         if self.form_fields.len() >= super::super::form_field::MAX_FORM_FIELDS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field count exceeds the safety limit".to_string(),
             ));
         }
         let body = self.text();
         let result = body.get(field.position..field.range_end).ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF form-field range is outside body text or splits a character".to_string(),
             )
         })?;
         if result != field.result_text {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field result does not match its visible body range".to_string(),
             ));
         }
@@ -3678,7 +3686,7 @@ impl<'a> Tree<'a> {
                     && existing.position < field.range_end
             })
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field result ranges cannot overlap".to_string(),
             ));
         }
@@ -3690,10 +3698,12 @@ impl<'a> Tree<'a> {
                 |total, existing| total.checked_add(existing.text_bytes()?),
             )
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF form-field aggregate size overflow".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF form-field aggregate size overflow".to_string(),
+                )
             })?;
         if total > super::super::form_field::MAX_FORM_FIELD_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field aggregate text exceeds the safety limit".to_string(),
             ));
         }
@@ -3748,9 +3758,9 @@ impl<'a> Tree<'a> {
     pub fn push_object(
         &mut self,
         object: super::super::object::EmbeddedObject<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if self.objects.len() >= super::super::object::MAX_EMBEDDED_OBJECTS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object count exceeds the safety limit".to_string(),
             ));
         }
@@ -3761,7 +3771,7 @@ impl<'a> Tree<'a> {
             .last()
             .is_some_and(|previous| previous.position > object.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded objects are not ordered by body position".to_string(),
             ));
         }
@@ -3791,11 +3801,11 @@ impl<'a> Tree<'a> {
     pub fn push_document_variable(
         &mut self,
         variable: super::super::document_variable::DocumentVariable<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         variable.validate()?;
         if self.document_variables.len() >= super::super::document_variable::MAX_DOCUMENT_VARIABLES
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document-variable count limit exceeded".to_string(),
             ));
         }
@@ -3809,7 +3819,7 @@ impl<'a> Tree<'a> {
         if aggregate.is_none_or(|size| {
             size > super::super::document_variable::MAX_DOCUMENT_VARIABLE_TEXT_BYTES
         }) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document-variable aggregate text limit exceeded".to_string(),
             ));
         }
@@ -3835,10 +3845,10 @@ impl<'a> Tree<'a> {
     pub fn push_user_property(
         &mut self,
         property: super::super::user_property::UserProperty<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         property.validate()?;
         if self.user_properties.len() >= super::super::user_property::MAX_USER_PROPERTIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF user-property count limit exceeded".to_string(),
             ));
         }
@@ -3847,7 +3857,7 @@ impl<'a> Tree<'a> {
             .iter()
             .any(|existing| existing.name == property.name)
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "duplicate RTF user-property name: {}",
                 property.name
             )));
@@ -3862,7 +3872,7 @@ impl<'a> Tree<'a> {
         if aggregate
             .is_none_or(|size| size > super::super::user_property::MAX_USER_PROPERTY_TEXT_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF user-property aggregate text limit exceeded".to_string(),
             ));
         }
@@ -3894,18 +3904,18 @@ impl<'a> Tree<'a> {
     pub fn push_generated_list_marker(
         &mut self,
         marker: crate::GeneratedListMarker<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         marker.validate()?;
         if self.generated_list_markers.len()
             >= crate::generated_list_marker::MAX_GENERATED_LIST_MARKERS
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list-marker count exceeds the safety limit".to_string(),
             ));
         }
         let body = self.text();
         if body.get(marker.position..marker.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list-marker position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -3913,7 +3923,7 @@ impl<'a> Tree<'a> {
             previous.position > marker.position
                 || (previous.position == marker.position && previous.kind == marker.kind)
         }) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list markers are duplicated or out of body order".to_string(),
             ));
         }
@@ -3924,12 +3934,12 @@ impl<'a> Tree<'a> {
                 total.checked_add(entry.text.len())
             })
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF generated list-marker text size overflow".to_string(),
                 )
             })?;
         if total > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list-marker text exceeds the aggregate safety limit".to_string(),
             ));
         }
@@ -3952,17 +3962,17 @@ impl<'a> Tree<'a> {
     pub fn push_navigation_entry(
         &mut self,
         entry: super::super::navigation_entry::NavigationEntry<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         entry.validate()?;
         let body = self.text();
         if body.get(entry.position()..entry.position()).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry position is outside body text or splits a character"
                     .to_string(),
             ));
         }
         if self.navigation_entries.len() >= super::super::navigation_entry::MAX_NAVIGATION_ENTRIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry count limit exceeded".to_string(),
             ));
         }
@@ -3976,7 +3986,7 @@ impl<'a> Tree<'a> {
         if aggregate.is_none_or(|size| {
             size > super::super::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
         }) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry aggregate text limit exceeded".to_string(),
             ));
         }
@@ -3993,10 +4003,10 @@ impl<'a> Tree<'a> {
     pub fn push_cell_navigation_entry_metadata(
         &mut self,
         entry: super::super::navigation_entry::NavigationEntry<'a>,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         entry.validate()?;
         if self.navigation_entries.len() >= super::super::navigation_entry::MAX_NAVIGATION_ENTRIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry count limit exceeded".to_string(),
             ));
         }
@@ -4010,7 +4020,7 @@ impl<'a> Tree<'a> {
         if aggregate.is_none_or(|size| {
             size > super::super::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
         }) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry aggregate text limit exceeded".to_string(),
             ));
         }
@@ -4027,7 +4037,7 @@ impl<'a> Tree<'a> {
         &mut self,
         path: &crate::TableCellPath,
         entry: super::super::navigation_entry::NavigationEntry<'a>,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         let position = entry.position();
         if self
             .table_cell_mut(path)?
@@ -4035,7 +4045,7 @@ impl<'a> Tree<'a> {
             .get(position..position)
             .is_none()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry position is outside its table-cell story".to_string(),
             ));
         }
@@ -4094,13 +4104,13 @@ impl<'a> Tree<'a> {
     pub fn set_list_picture_bullet_indices(
         &mut self,
         indices: Vec<Option<usize>>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if indices
             .iter()
             .flatten()
             .any(|index| *index >= self.pictures.len())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list-picture index is outside the document picture store".to_string(),
             ));
         }
@@ -4122,7 +4132,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn clear_list_picture_bullets(&mut self) -> RtfResult<()> {
+    pub fn clear_list_picture_bullets(&mut self) -> crate::Result<()> {
         self.set_list_picture_bullet_indices(Vec::new())
     }
 
@@ -4173,7 +4183,7 @@ impl<'a> Tree<'a> {
     pub fn set_paragraph_group_table(
         &mut self,
         table: crate::ParagraphGroupPropertyTable,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         table.validate()?;
         self.paragraph_group_table = Some(table);
         Ok(())
@@ -4191,7 +4201,7 @@ impl<'a> Tree<'a> {
     pub fn set_legacy_section_numbering(
         &mut self,
         numbering: crate::LegacySectionNumbering<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         numbering.validate()?;
         self.legacy_section_numbering = numbering;
         Ok(())
@@ -4275,32 +4285,32 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         bookmark: crate::MoveBookmark<'a>,
-    ) -> RtfResult<crate::MoveBookmark<'a>> {
+    ) -> crate::Result<crate::MoveBookmark<'a>> {
         bookmark.validate()?;
         let current = self.move_bookmarks.get(index).ok_or_else(|| {
-            RtfError::MalformedDocument("move-bookmark index is out of range".into())
+            crate::Error::MalformedDocument("move-bookmark index is out of range".into())
         })?;
         if current.kind != bookmark.kind
             || current.tag != bookmark.tag
             || current.position != bookmark.position
             || current.content != bookmark.content
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "move-bookmark edits cannot change its identity or body range".to_string(),
             ));
         }
         Ok(std::mem::replace(
             self.move_bookmarks.get_mut(index).ok_or_else(|| {
-                RtfError::MalformedDocument("move-bookmark index is out of range".into())
+                crate::Error::MalformedDocument("move-bookmark index is out of range".into())
             })?,
             bookmark,
         ))
     }
 
     /// Remove one tracked-move bookmark marker pair while retaining body text.
-    pub fn remove_move_bookmark(&mut self, index: usize) -> RtfResult<crate::MoveBookmark<'a>> {
+    pub fn remove_move_bookmark(&mut self, index: usize) -> crate::Result<crate::MoveBookmark<'a>> {
         if index >= self.move_bookmarks.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "move-bookmark index is out of range".into(),
             ));
         }
@@ -4336,14 +4346,14 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         text: Cow<'a, str>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let mut candidate = self.shapes.get(index).cloned().ok_or_else(|| {
-            RtfError::MalformedDocument("RTF shape index is outside the body store".to_string())
+            crate::Error::MalformedDocument("RTF shape index is outside the body store".to_string())
         })?;
         candidate.set_text(text);
         candidate.validate()?;
         *self.shapes.get_mut(index).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF shape index is outside the body store".to_string())
+            crate::Error::MalformedDocument("RTF shape index is outside the body store".to_string())
         })? = candidate;
         Ok(())
     }
@@ -4438,10 +4448,10 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         let body = self.text();
         if body.get(position..position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF page-break position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -4470,10 +4480,10 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_column_break(&mut self, position: usize) -> RtfResult<()> {
+    pub fn push_column_break(&mut self, position: usize) -> crate::Result<()> {
         let body = self.text();
         if body.get(position..position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF column-break position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -4491,21 +4501,21 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: super::super::shape::Shape<'a>) -> RtfResult<()> {
+    pub fn push_shape(&mut self, shape: super::super::shape::Shape<'a>) -> crate::Result<()> {
         if shape.is_background {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background shapes must use set_background_shape".to_string(),
             ));
         }
         if self.shapes.len() >= MAX_ROOT_SHAPES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape count exceeds the safety limit".to_string(),
             ));
         }
         shape.validate()?;
         let body = self.text();
         if body.get(shape.position..shape.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -4516,7 +4526,7 @@ impl<'a> Tree<'a> {
             .find(|shape| !shape.is_background)
             .is_some_and(|previous| previous.position > shape.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shapes are out of body order".to_string(),
             ));
         }
@@ -4524,7 +4534,7 @@ impl<'a> Tree<'a> {
             .last_drawing_position()?
             .is_some_and(|position| position > shape.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF body drawing order moves backwards".to_string(),
             ));
         }
@@ -4532,7 +4542,7 @@ impl<'a> Tree<'a> {
             .last_body_story_position()?
             .is_some_and(|position| position > shape.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF body story order moves backwards".to_string(),
             ));
         }
@@ -4552,7 +4562,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add_shape(&mut self, shape: super::super::shape::Shape<'a>) -> RtfResult<usize> {
+    pub fn add_shape(&mut self, shape: super::super::shape::Shape<'a>) -> crate::Result<usize> {
         let index = self.shapes.len();
         self.push_shape(shape)?;
         Ok(index)
@@ -4566,27 +4576,27 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         replacement: super::super::shape::Shape<'a>,
-    ) -> RtfResult<super::super::shape::Shape<'a>> {
+    ) -> crate::Result<super::super::shape::Shape<'a>> {
         let current_position = self
             .shapes
             .get(index)
             .ok_or_else(|| {
-                RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
+                crate::Error::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
             })?
             .position;
         if self.background_shape_index == Some(index) || replacement.is_background {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background shape must use set_background_shape".to_string(),
             ));
         }
         if replacement.position != current_position {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape replacement cannot relocate its body anchor".to_string(),
             ));
         }
         replacement.validate()?;
         let current = self.shapes.get_mut(index).ok_or_else(|| {
-            RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
+            crate::Error::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
         })?;
         Ok(std::mem::replace(current, replacement))
     }
@@ -4595,14 +4605,14 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn remove_shape(&mut self, index: usize) -> RtfResult<super::super::shape::Shape<'a>> {
+    pub fn remove_shape(&mut self, index: usize) -> crate::Result<super::super::shape::Shape<'a>> {
         if index >= self.shapes.len() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF shape index {index} is out of bounds"
             )));
         }
         if self.background_shape_index == Some(index) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background shape must use clear_background_shape".to_string(),
             ));
         }
@@ -4666,19 +4676,19 @@ impl<'a> Tree<'a> {
     pub fn set_background_shape(
         &mut self,
         mut shape: super::super::shape::Shape<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         Self::validate_background_shape(&shape)?;
         shape.is_background = true;
         if let Some(index) = self.background_shape_index {
             let current = self.shapes.get_mut(index).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF background shape index is out of bounds".to_string(),
                 )
             })?;
             *current = shape;
         } else {
             if self.shapes.len() >= MAX_ROOT_SHAPES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape count exceeds the safety limit".to_string(),
                 ));
             }
@@ -4712,21 +4722,21 @@ impl<'a> Tree<'a> {
         Some(removed)
     }
 
-    fn validate_background_shape(shape: &super::super::shape::Shape<'_>) -> RtfResult<()> {
+    fn validate_background_shape(shape: &super::super::shape::Shape<'_>) -> crate::Result<()> {
         if shape.properties.len() > 65_536 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background shape property count exceeds the safety limit".to_string(),
             ));
         }
         if shape.text.len() > 16 * 1_048_576 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background shape text exceeds the safety limit".to_string(),
             ));
         }
         for property in &shape.properties {
             property.validate()?;
             if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF background shape property exceeds the safety limit".to_string(),
                 ));
             }
@@ -4739,7 +4749,7 @@ impl<'a> Tree<'a> {
             .x
             .checked_add(shape.geometry.width)
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF background shape horizontal geometry overflows".to_string(),
                 )
             })?;
@@ -4748,7 +4758,7 @@ impl<'a> Tree<'a> {
             .y
             .checked_add(shape.geometry.height)
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF background shape vertical geometry overflows".to_string(),
                 )
             })?;
@@ -4763,16 +4773,19 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_legacy_text_box(&mut self, text_box: crate::LegacyTextBox<'a>) -> RtfResult<()> {
+    pub fn push_legacy_text_box(
+        &mut self,
+        text_box: crate::LegacyTextBox<'a>,
+    ) -> crate::Result<()> {
         text_box.validate()?;
         if self.legacy_text_boxes.len() >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text-box count exceeds the safety limit".to_string(),
             ));
         }
         let body = self.text();
         if body.get(text_box.position..text_box.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text-box position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -4781,7 +4794,7 @@ impl<'a> Tree<'a> {
             .last()
             .is_some_and(|previous| previous.position > text_box.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text boxes are out of body order".to_string(),
             ));
         }
@@ -4792,10 +4805,10 @@ impl<'a> Tree<'a> {
                 total.checked_add(entry.text.len())
             })
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF legacy text-box size overflow".to_string())
+                crate::Error::MalformedDocument("RTF legacy text-box size overflow".to_string())
             })?;
         if total > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy text-box text exceeds the aggregate safety limit".to_string(),
             ));
         }
@@ -4819,16 +4832,16 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_legacy_drawing(&mut self, drawing: crate::LegacyDrawing<'a>) -> RtfResult<()> {
+    pub fn push_legacy_drawing(&mut self, drawing: crate::LegacyDrawing<'a>) -> crate::Result<()> {
         drawing.validate()?;
         if self.legacy_drawings.len() >= crate::MAX_LEGACY_DRAWINGS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing count exceeds the safety limit".to_string(),
             ));
         }
         let body = self.text();
         if body.get(drawing.position..drawing.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -4837,7 +4850,7 @@ impl<'a> Tree<'a> {
             .last()
             .is_some_and(|previous| previous.position > drawing.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawings are out of body order".to_string(),
             ));
         }
@@ -4868,9 +4881,9 @@ impl<'a> Tree<'a> {
     pub fn push_shape_group(
         &mut self,
         group: super::super::shape::ShapeGroup<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if self.shape_groups.len() >= MAX_ROOT_SHAPE_GROUPS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group count exceeds the safety limit".to_string(),
             ));
         }
@@ -4882,7 +4895,7 @@ impl<'a> Tree<'a> {
                 .last()
                 .is_some_and(|previous| previous.position > group.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape groups are outside or out of body order".to_string(),
             ));
         }
@@ -4890,7 +4903,7 @@ impl<'a> Tree<'a> {
             .last_drawing_position()?
             .is_some_and(|position| position > group.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF body drawing order moves backwards".to_string(),
             ));
         }
@@ -4898,7 +4911,7 @@ impl<'a> Tree<'a> {
             .last_body_story_position()?
             .is_some_and(|position| position > group.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF body story order moves backwards".to_string(),
             ));
         }
@@ -4921,7 +4934,7 @@ impl<'a> Tree<'a> {
     pub fn add_shape_group(
         &mut self,
         group: super::super::shape::ShapeGroup<'a>,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         let index = self.shape_groups.len();
         self.push_shape_group(group)?;
         Ok(index)
@@ -4935,24 +4948,26 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         replacement: super::super::shape::ShapeGroup<'a>,
-    ) -> RtfResult<super::super::shape::ShapeGroup<'a>> {
+    ) -> crate::Result<super::super::shape::ShapeGroup<'a>> {
         let current_position = self
             .shape_groups
             .get(index)
             .ok_or_else(|| {
-                RtfError::MalformedDocument(format!(
+                crate::Error::MalformedDocument(format!(
                     "RTF shape-group index {index} is out of bounds"
                 ))
             })?
             .position;
         if replacement.position != current_position {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-group replacement cannot relocate its body anchor".to_string(),
             ));
         }
         replacement.validate()?;
         let current = self.shape_groups.get_mut(index).ok_or_else(|| {
-            RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds"))
+            crate::Error::MalformedDocument(format!(
+                "RTF shape-group index {index} is out of bounds"
+            ))
         })?;
         Ok(std::mem::replace(current, replacement))
     }
@@ -4964,9 +4979,9 @@ impl<'a> Tree<'a> {
     pub fn remove_shape_group(
         &mut self,
         index: usize,
-    ) -> RtfResult<super::super::shape::ShapeGroup<'a>> {
+    ) -> crate::Result<super::super::shape::ShapeGroup<'a>> {
         if index >= self.shape_groups.len() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF shape-group index {index} is out of bounds"
             )));
         }
@@ -4996,9 +5011,9 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn move_drawing(&mut self, from: usize, to: usize) -> RtfResult<()> {
+    pub fn move_drawing(&mut self, from: usize, to: usize) -> crate::Result<()> {
         if from >= self.drawing_order.len() || to >= self.drawing_order.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF drawing reorder index is out of bounds".to_string(),
             ));
         }
@@ -5008,15 +5023,19 @@ impl<'a> Tree<'a> {
         let start = from.min(to);
         let end = from.max(to);
         let drawing = self.drawing_order.get(from).copied().ok_or_else(|| {
-            RtfError::MalformedDocument("RTF drawing reorder index is out of bounds".to_string())
+            crate::Error::MalformedDocument(
+                "RTF drawing reorder index is out of bounds".to_string(),
+            )
         })?;
         let anchor = self.root_drawing_position(drawing)?;
         let range = self.drawing_order.get(start..=end).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF drawing reorder range is out of bounds".to_string())
+            crate::Error::MalformedDocument(
+                "RTF drawing reorder range is out of bounds".to_string(),
+            )
         })?;
         for &drawing in range {
             if self.root_drawing_position(drawing)? != anchor {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF drawings at different body anchors cannot be reordered".to_string(),
                 ));
             }
@@ -5027,7 +5046,7 @@ impl<'a> Tree<'a> {
             .filter(|event| matches!(event, crate::BodyStoryEvent::Drawing(_)))
             .count();
         if event_count != self.drawing_order.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF drawing event order is incomplete or contains extra events".to_string(),
             ));
         }
@@ -5046,14 +5065,14 @@ impl<'a> Tree<'a> {
         Ok(())
     }
 
-    fn root_drawing_position(&self, drawing: crate::StoryDrawing) -> RtfResult<usize> {
+    fn root_drawing_position(&self, drawing: crate::StoryDrawing) -> crate::Result<usize> {
         match drawing {
             crate::StoryDrawing::Shape(index) => self
                 .shapes
                 .get(index)
                 .map(|shape| shape.position)
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF drawing order references a missing shape".to_string(),
                     )
                 }),
@@ -5062,7 +5081,7 @@ impl<'a> Tree<'a> {
                 .get(index)
                 .map(|group| group.position)
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF drawing order references a missing shape group".to_string(),
                     )
                 }),
@@ -5082,7 +5101,7 @@ impl<'a> Tree<'a> {
         });
     }
 
-    fn last_drawing_position(&self) -> RtfResult<Option<usize>> {
+    fn last_drawing_position(&self) -> crate::Result<Option<usize>> {
         self.drawing_order
             .last()
             .copied()
@@ -5090,7 +5109,7 @@ impl<'a> Tree<'a> {
             .transpose()
     }
 
-    fn last_body_story_position(&self) -> RtfResult<Option<usize>> {
+    fn last_body_story_position(&self) -> crate::Result<Option<usize>> {
         for event in self.body_story_events.iter().rev() {
             if matches!(
                 *event,
@@ -5104,7 +5123,7 @@ impl<'a> Tree<'a> {
                     .body_story_event_position(*event)
                     .map(Some)
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF body story event references missing metadata".to_string(),
                         )
                     });
@@ -5194,23 +5213,25 @@ impl<'a> Tree<'a> {
         })
     }
 
-    fn checked_body_story_event_insertion_index(&self, position: usize) -> RtfResult<usize> {
+    fn checked_body_story_event_insertion_index(&self, position: usize) -> crate::Result<usize> {
         let mut at = 0usize;
         let mut previous_position = None;
         for (index, event) in self.body_story_events.iter().enumerate() {
             let event_position = self.body_story_event_position(*event).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF body story event references missing metadata".to_string(),
                 )
             })?;
             if previous_position.is_some_and(|previous| previous > event_position) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF body story events are out of order".to_string(),
                 ));
             }
             if event_position <= position {
                 at = index.checked_add(1).ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF body story event index overflows".to_string())
+                    crate::Error::MalformedDocument(
+                        "RTF body story event index overflows".to_string(),
+                    )
                 })?;
             }
             previous_position = Some(event_position);
@@ -5218,9 +5239,9 @@ impl<'a> Tree<'a> {
         Ok(at)
     }
 
-    fn insert_body_story_event(&mut self, event: crate::BodyStoryEvent) -> RtfResult<()> {
+    fn insert_body_story_event(&mut self, event: crate::BodyStoryEvent) -> crate::Result<()> {
         let position = self.body_story_event_position(event).ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF body story event references missing metadata".to_string(),
             )
         })?;
@@ -5266,7 +5287,10 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_protection(&mut self, protection: crate::DocumentProtection<'a>) -> RtfResult<()> {
+    pub fn set_protection(
+        &mut self,
+        protection: crate::DocumentProtection<'a>,
+    ) -> crate::Result<()> {
         protection.validate()?;
         self.info.protection = protection;
         Ok(())
@@ -5289,9 +5313,9 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         text: Cow<'a, str>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let mut candidate = self.annotations.get(index).cloned().ok_or_else(|| {
-            RtfError::MalformedDocument("RTF annotation index is outside the store".to_string())
+            crate::Error::MalformedDocument("RTF annotation index is outside the store".to_string())
         })?;
         candidate.text = text;
         candidate.validate()?;
@@ -5309,12 +5333,12 @@ impl<'a> Tree<'a> {
         if aggregate
             .is_none_or(|size| size > super::super::annotation::MAX_ANNOTATION_TEXT_TOTAL_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation aggregate text limit exceeded".to_string(),
             ));
         }
         *self.annotations.get_mut(index).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF annotation index is outside the store".to_string())
+            crate::Error::MalformedDocument("RTF annotation index is outside the store".to_string())
         })? = candidate;
         Ok(())
     }
@@ -5326,19 +5350,19 @@ impl<'a> Tree<'a> {
     pub fn push_annotation(
         &mut self,
         annotation: super::super::annotation::Annotation<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         annotation.validate()?;
         let body = self.text();
         if body
             .get(annotation.position..annotation.range_end)
             .is_none()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation range is outside body text or splits a character".to_string(),
             ));
         }
         if self.annotations.len() >= super::super::annotation::MAX_ANNOTATIONS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation count limit exceeded".to_string(),
             ));
         }
@@ -5348,7 +5372,7 @@ impl<'a> Tree<'a> {
                 .iter()
                 .any(|existing| existing.has_reference && existing.id == annotation.id)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "duplicate RTF annotation reference".to_string(),
             ));
         }
@@ -5360,7 +5384,7 @@ impl<'a> Tree<'a> {
         if aggregate
             .is_none_or(|size| size > super::super::annotation::MAX_ANNOTATION_TEXT_TOTAL_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation aggregate text limit exceeded".to_string(),
             ));
         }
@@ -5391,7 +5415,7 @@ impl<'a> Tree<'a> {
     /// Convert list table to owned
     fn convert_list_table_to_owned(
         table: &super::super::list::ListTable<'_>,
-    ) -> RtfResult<super::super::list::ListTable<'static>> {
+    ) -> crate::Result<super::super::list::ListTable<'static>> {
         let mut owned = super::super::list::ListTable::new();
         for list in table.lists() {
             owned.add(super::super::list::List {
@@ -5743,9 +5767,9 @@ impl<'a> Tree<'a> {
         &mut self,
         index: usize,
         content: Cow<'a, str>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let mut candidate = self.notes.get(index).cloned().ok_or_else(|| {
-            RtfError::MalformedDocument("RTF note index is outside the store".to_string())
+            crate::Error::MalformedDocument("RTF note index is outside the store".to_string())
         })?;
         candidate.content = content;
         candidate.validate()?;
@@ -5761,12 +5785,12 @@ impl<'a> Tree<'a> {
                 })
             });
         if aggregate.is_none_or(|size| size > super::super::section::MAX_NOTE_TEXT_TOTAL_BYTES) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note aggregate text exceeds the safety limit".to_string(),
             ));
         }
         *self.notes.get_mut(index).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF note index is outside the store".to_string())
+            crate::Error::MalformedDocument("RTF note index is outside the store".to_string())
         })? = candidate;
         Ok(())
     }
@@ -5775,7 +5799,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_note(&mut self, note: super::super::section::Note<'a>) -> RtfResult<()> {
+    pub fn push_note(&mut self, note: super::super::section::Note<'a>) -> crate::Result<()> {
         note.validate()?;
         if self.text().get(note.position..note.position).is_none()
             || self
@@ -5783,12 +5807,12 @@ impl<'a> Tree<'a> {
                 .last()
                 .is_some_and(|previous| previous.position > note.position)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF notes are outside or out of main-story order".to_string(),
             ));
         }
         if self.notes.len() >= super::super::section::MAX_NOTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note count exceeds the safety limit".to_string(),
             ));
         }
@@ -5798,7 +5822,7 @@ impl<'a> Tree<'a> {
             })
         });
         if aggregate.is_none_or(|size| size > super::super::section::MAX_NOTE_TEXT_TOTAL_BYTES) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note aggregate text exceeds the safety limit".to_string(),
             ));
         }
@@ -5825,7 +5849,7 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_note_options(&mut self, options: crate::NoteOptions) -> RtfResult<()> {
+    pub fn set_note_options(&mut self, options: crate::NoteOptions) -> crate::Result<()> {
         options.validate()?;
         self.note_options = options;
         Ok(())
@@ -5844,7 +5868,7 @@ impl<'a> Tree<'a> {
     pub fn set_note_separators(
         &mut self,
         separators: crate::NoteSeparatorTable<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         separators.validate()?;
         self.note_separators = separators;
         Ok(())
@@ -5886,10 +5910,10 @@ impl<'a> Tree<'a> {
     pub fn push_revision_author(
         &mut self,
         author: super::super::annotation::RevisionAuthor<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         author.validate()?;
         if self.revision_authors.len() >= super::super::annotation::MAX_REVISION_AUTHORS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author count exceeds the safety limit".to_string(),
             ));
         }
@@ -5900,12 +5924,12 @@ impl<'a> Tree<'a> {
                 total.checked_add(existing.name.len())
             })
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF aggregate revision-author size overflow".to_string(),
                 )
             })?;
         if total > super::super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF aggregate revision-author text exceeds the safety limit".to_string(),
             ));
         }
@@ -5917,9 +5941,9 @@ impl<'a> Tree<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn clear_revision_authors(&mut self) -> RtfResult<()> {
+    pub fn clear_revision_authors(&mut self) -> crate::Result<()> {
         if !self.revisions.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "cannot clear an RTF revision-author table while revisions reference it"
                     .to_string(),
             ));
@@ -5935,21 +5959,25 @@ impl<'a> Tree<'a> {
     pub fn push_revision(
         &mut self,
         revision: super::super::annotation::Revision<'a>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         revision.validate()?;
         if self.revisions.len() >= super::super::annotation::MAX_REVISIONS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision count exceeds the safety limit".to_string(),
             ));
         }
         let author_index = usize::try_from(revision.id).map_err(|_err| {
-            RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
+            crate::Error::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            )
         })?;
         let author = self.revision_authors.get(author_index).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF revision author index is outside revtbl".to_string())
+            crate::Error::MalformedDocument(
+                "RTF revision author index is outside revtbl".to_string(),
+            )
         })?;
         if author.name != revision.author {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author does not match its revtbl entry".to_string(),
             ));
         }
@@ -5960,13 +5988,13 @@ impl<'a> Tree<'a> {
                 let content = body
                     .get(revision.position..revision.range_end)
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF insertion range is outside body text or splits a character"
                                 .to_string(),
                         )
                     })?;
                 if content != revision.content {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF insertion content does not match its visible body range".to_string(),
                     ));
                 }
@@ -5975,14 +6003,14 @@ impl<'a> Tree<'a> {
                         && revision.position < existing.range_end
                         && existing.position < revision.range_end
                 }) {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF insertion ranges cannot overlap".to_string(),
                     ));
                 }
             },
             super::super::annotation::RevisionType::Deletion => {
                 if body.get(..revision.position).is_none() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF deletion position is outside body text or splits a character"
                             .to_string(),
                     ));
@@ -5991,7 +6019,7 @@ impl<'a> Tree<'a> {
             super::super::annotation::RevisionType::FormatChange
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
@@ -6003,10 +6031,10 @@ impl<'a> Tree<'a> {
                 total.checked_add(existing.content.len())
             })
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF aggregate revision size overflow".to_string())
+                crate::Error::MalformedDocument("RTF aggregate revision size overflow".to_string())
             })?;
         if total > super::super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF aggregate revision text exceeds the safety limit".to_string(),
             ));
         }
@@ -6025,7 +6053,7 @@ impl<'a> Tree<'a> {
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
                 self.revisions.pop();
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
@@ -6040,22 +6068,24 @@ impl<'a> Tree<'a> {
     pub fn push_cell_revision_metadata(
         &mut self,
         revision: super::super::annotation::Revision<'a>,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         revision.validate()?;
         if self.revisions.len() >= super::super::annotation::MAX_REVISIONS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision count exceeds the safety limit".to_string(),
             ));
         }
         let author_index = usize::try_from(revision.id).map_err(|_err| {
-            RtfError::MalformedDocument("RTF revision author index cannot be negative".to_string())
+            crate::Error::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            )
         })?;
         if self
             .revision_authors
             .get(author_index)
             .is_none_or(|author| author.name != revision.author)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author is missing from or does not match revtbl".to_string(),
             ));
         }
@@ -6067,7 +6097,7 @@ impl<'a> Tree<'a> {
             });
         if total.is_none_or(|total| total > super::super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF aggregate revision text exceeds the safety limit".to_string(),
             ));
         }
@@ -6084,7 +6114,7 @@ impl<'a> Tree<'a> {
         &mut self,
         path: &crate::TableCellPath,
         revision: super::super::annotation::Revision<'a>,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         let kind = revision.revision_type;
         let position = revision.position;
         let range_end = revision.range_end;
@@ -6095,19 +6125,19 @@ impl<'a> Tree<'a> {
             super::super::annotation::RevisionType::Deletion
                 if cell.text().get(position..position).is_some() => {},
             super::super::annotation::RevisionType::Insertion => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF insertion revision does not match its table-cell range".to_string(),
                 ));
             },
             super::super::annotation::RevisionType::Deletion => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF deletion revision is outside its table-cell story".to_string(),
                 ));
             },
             super::super::annotation::RevisionType::FormatChange
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
@@ -6124,7 +6154,7 @@ impl<'a> Tree<'a> {
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
                 self.revisions.pop();
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
@@ -6155,7 +6185,7 @@ impl<'a> Tree<'a> {
 
 #[cfg(test)]
 mod source_tests {
-    use super::{RtfError, SourceLimits, Tree, read_limited_source};
+    use super::{SourceLimits, Tree, read_limited_source};
     use std::io::{self, Read};
     use std::path::PathBuf;
 
@@ -6310,7 +6340,7 @@ mod source_tests {
                     .build()
                     .expect("source limits"))
             ),
-            Err(RtfError::Limit {
+            Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
                 observed,
                 maximum,
@@ -6327,7 +6357,7 @@ mod source_tests {
                     .build()
                     .expect("source limits"))
             ),
-            Err(RtfError::Limit {
+            Err(crate::Error::Limit {
                 kind: crate::SourceLimitKind::DecompressedBytes,
                 observed,
                 maximum,
@@ -6374,7 +6404,7 @@ mod source_tests {
         let error = read_limited_source(reader, 2).expect_err("source limit must be enforced");
         assert!(matches!(
             error,
-            RtfError::Limit {
+            crate::Error::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
                 observed: 9,
                 maximum: 2,

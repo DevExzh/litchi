@@ -1,5 +1,3 @@
-use crate::{RtfError, RtfResult};
-
 /// Largest supported document gutter width, in twips.
 pub const MAX_DOCUMENT_GUTTER_TWIPS: u32 = 31_680;
 
@@ -30,12 +28,12 @@ impl DocumentPrintLayoutSettings {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .document_gutter_twips
             .is_some_and(|value| value > MAX_DOCUMENT_GUTTER_TWIPS)
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF document gutter must be in 0..={MAX_DOCUMENT_GUTTER_TWIPS} twips"
             )));
         }
@@ -45,7 +43,7 @@ impl DocumentPrintLayoutSettings {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> RtfResult<()> {
+    pub fn set_document_gutter_twips(&mut self, value: Option<u32>) -> crate::Result<()> {
         let mut candidate = *self;
         candidate.document_gutter_twips = value;
         candidate.validate()?;

@@ -1,6 +1,6 @@
 //! Paragraph-group property table (`pgptbl`) metadata.
 
-use crate::{Borders, RtfError, RtfResult};
+use crate::Borders;
 use std::collections::HashSet;
 
 pub(crate) const MAX_PARAGRAPH_GROUP_PROPERTIES: usize = 4_096;
@@ -25,14 +25,14 @@ impl ParagraphGroupProperty {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.id == 0 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph-group IDs are one-based".to_string(),
             ));
         }
         if self.table_nesting_level > 63 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph-group table nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -45,7 +45,7 @@ impl ParagraphGroupProperty {
         .into_iter()
         .any(|value| value.unsigned_abs() > MAX_LAYOUT_TWIPS as u32)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph-group layout value exceeds the safety limit".to_string(),
             ));
         }
@@ -60,7 +60,7 @@ impl ParagraphGroupProperty {
                 || border.space < 0
                 || border.space > MAX_LAYOUT_TWIPS
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF paragraph-group border value exceeds the safety limit".to_string(),
                 ));
             }
@@ -99,14 +99,14 @@ impl ParagraphGroupPropertyTable {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push(&mut self, entry: ParagraphGroupProperty) -> RtfResult<()> {
+    pub fn push(&mut self, entry: ParagraphGroupProperty) -> crate::Result<()> {
         if self.entries.len() >= MAX_PARAGRAPH_GROUP_PROPERTIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph-group table exceeds the entry limit".to_string(),
             ));
         }
         if entry.id as usize != self.entries.len() + 1 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph-group IDs are out of order".to_string(),
             ));
         }
@@ -117,16 +117,16 @@ impl ParagraphGroupPropertyTable {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.entries.is_empty() || self.entries.len() > MAX_PARAGRAPH_GROUP_PROPERTIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph-group table has an invalid entry count".to_string(),
             ));
         }
         for (index, entry) in self.entries.iter().enumerate() {
             entry.validate()?;
             if entry.id as usize != index + 1 || entry.parent_id as usize > self.entries.len() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF paragraph-group ID or parent reference".to_string(),
                 ));
             }
@@ -136,14 +136,14 @@ impl ParagraphGroupPropertyTable {
             let mut current = entry.id;
             while current != 0 {
                 if !visited.insert(current) {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF paragraph-group parent references contain a cycle".to_string(),
                     ));
                 }
                 current = self
                     .get(current)
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "invalid RTF paragraph-group parent reference".to_string(),
                         )
                     })?

@@ -543,7 +543,7 @@ fn root_plan(
 
 fn canonical_candidate(
     target: &Package,
-    mutation: impl FnOnce(&mut crate::document::Tree<'static>) -> crate::RtfResult<()>,
+    mutation: impl FnOnce(&mut crate::document::Tree<'static>) -> crate::Result<()>,
 ) -> Result<Vec<u8>, Error> {
     if !target.opaque().is_empty() {
         return Err(Error::unsupported_source(
@@ -1317,7 +1317,7 @@ fn table_cell_depth(path: &TableCellPath) -> Result<u8, Error> {
 fn remap_table_field_indices(
     table: &mut crate::Table<'static>,
     indices: &BTreeMap<usize, usize>,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     for row in table.rows_mut() {
         for cell in row.cells_mut() {
             for nested in cell.nested_tables_mut() {
@@ -1327,7 +1327,7 @@ fn remap_table_field_indices(
             for event in &mut events {
                 if let crate::CellStoryEvent::Field(field) = event {
                     field.field_index = *indices.get(&field.field_index).ok_or_else(|| {
-                        crate::RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "nested-table field remapping is incomplete".to_string(),
                         )
                     })?;

@@ -1,8 +1,8 @@
 use super::{
     Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, HashSet,
-    MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParsedDocument, Parser, Range, RefCell, RtfError,
-    RtfResult, SmallVec, SourceLimits, State, Token, control_symbol_text,
-    disables_body_block_reservation, initial_body_block_capacity,
+    MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParsedDocument, Parser, Range, RefCell, SmallVec,
+    SourceLimits, State, Token, control_symbol_text, disables_body_block_reservation,
+    initial_body_block_capacity,
 };
 
 impl<'a> Parser<'a> {
@@ -279,7 +279,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the token stream into a document.
-    pub(crate) fn parse(mut self) -> RtfResult<ParsedDocument<'a>> {
+    pub(crate) fn parse(mut self) -> crate::Result<ParsedDocument<'a>> {
         // Validate document structure
         #[allow(
             clippy::struct_excessive_bools,
@@ -296,7 +296,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.tokens.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "Empty token stream".to_string(),
             ));
         }
@@ -310,7 +310,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::Rtf(1)))
             )
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document must begin with the supported \\rtf1 root header".to_string(),
             ));
         }
@@ -503,7 +503,7 @@ impl<'a> Parser<'a> {
                     | ControlWord::FootnoteNumbering(_)
                     | ControlWord::EndnoteNumbering(_),
                 ) if contexts.len() != 1 => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF note options must be root document-format controls".to_string(),
                     ));
                 },
@@ -522,7 +522,7 @@ impl<'a> Parser<'a> {
                             || context.inert_section_format
                     }) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF section note options must be root controls or visible field-result formatting"
                             .to_string(),
                     ));
@@ -570,7 +570,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF document contains trailing non-whitespace tokens".to_string(),
                     ));
                 },
@@ -592,7 +592,7 @@ impl<'a> Parser<'a> {
                 self.body_text_len > self.body_after_last_paragraph_break,
             ))
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF body paragraph count overflow".to_string())
+                crate::Error::MalformedDocument("RTF body paragraph count overflow".to_string())
             })?;
         let body_story_events = self.finalize_body_story_events()?;
 
@@ -610,7 +610,7 @@ impl<'a> Parser<'a> {
                 mapping.map(Cow::Owned),
             )?),
             (None, Some(_)) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF color-scheme mapping is orphaned without theme data".to_string(),
                 ));
             },

@@ -15,7 +15,6 @@
     reason = "items stay grouped by RTF SmartTag vocabulary"
 )]
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_SMART_TAGS: usize = 65_536;
@@ -26,19 +25,19 @@ pub(crate) const MAX_SMART_TAG_ATTRIBUTE_NAME_BYTES: usize = 1_024;
 pub(crate) const MAX_SMART_TAG_ATTRIBUTE_VALUE_BYTES: usize = 65_536;
 pub(crate) const MAX_SMART_TAG_TOTAL_BYTES: usize = 16 * 1_048_576;
 
-fn validate_name(kind: &str, value: &str, limit: usize) -> RtfResult<()> {
+fn validate_name(kind: &str, value: &str, limit: usize) -> crate::Result<()> {
     if value.trim().is_empty() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF SmartTag {kind} cannot be empty"
         )));
     }
     if value.len() > limit {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF SmartTag {kind} exceeds the safety limit"
         )));
     }
     if value.contains(['\0', '\r', '\n']) {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF SmartTag {kind} contains a forbidden control character"
         )));
     }
@@ -58,7 +57,11 @@ pub struct SmartTagAttribute<'a> {
 
 impl<'a> SmartTagAttribute<'a> {
     /// Construct a validated inert SmartTag attribute.
-    pub fn new(namespace: Option<u32>, name: Cow<'a, str>, value: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(
+        namespace: Option<u32>,
+        name: Cow<'a, str>,
+        value: Cow<'a, str>,
+    ) -> crate::Result<Self> {
         let attribute = Self {
             namespace,
             name,
@@ -68,14 +71,14 @@ impl<'a> SmartTagAttribute<'a> {
         Ok(attribute)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         let Some(namespace) = self.namespace else {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag attributes require xmlattrnsN".to_string(),
             ));
         };
         if namespace > i32::MAX as u32 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag attribute namespace exceeds the signed RTF range".to_string(),
             ));
         }
@@ -85,12 +88,12 @@ impl<'a> SmartTagAttribute<'a> {
             MAX_SMART_TAG_ATTRIBUTE_NAME_BYTES,
         )?;
         if self.value.len() > MAX_SMART_TAG_ATTRIBUTE_VALUE_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag attribute value exceeds the safety limit".to_string(),
             ));
         }
         if self.value.contains(['\0', '\r', '\n']) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag attribute value contains a forbidden control character".to_string(),
             ));
         }
@@ -134,7 +137,7 @@ impl<'a> SmartTag<'a> {
         attributes: Vec<SmartTagAttribute<'a>>,
         position: usize,
         content: Cow<'a, str>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let tag = Self {
             name,
             namespace,
@@ -146,20 +149,20 @@ impl<'a> SmartTag<'a> {
         Ok(tag)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         validate_name("factoid name", self.name.as_ref(), MAX_SMART_TAG_NAME_BYTES)?;
         let Some(_) = self.namespace else {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag xmlopen requires xmlnsN".to_string(),
             ));
         };
         if self.namespace.is_some_and(|id| id > i32::MAX as u32) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag XML namespace exceeds the signed RTF range".to_string(),
             ));
         }
         if self.attributes.len() > MAX_SMART_TAG_ATTRIBUTES_PER_TAG {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag attribute count exceeds the safety limit".to_string(),
             ));
         }
@@ -167,7 +170,7 @@ impl<'a> SmartTag<'a> {
             attribute.validate()?;
         }
         if self.content.len() > MAX_SMART_TAG_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF SmartTag content exceeds the safety limit".to_string(),
             ));
         }

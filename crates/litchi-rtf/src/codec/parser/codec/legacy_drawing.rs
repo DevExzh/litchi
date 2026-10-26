@@ -1,6 +1,6 @@
 use super::{
     ControlWord, Cow, Destination, LegacyPropertiesBuilder, LegacySimpleKind, LegacyTextBoxBuilder,
-    Parser, RtfError, RtfResult, Token, control_symbol_text, require_parameterless,
+    Parser, Token, control_symbol_text, require_parameterless,
 };
 
 impl<'a> Parser<'a> {
@@ -11,11 +11,11 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_legacy_text_box_control(
         builder: &mut LegacyTextBoxBuilder,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         macro_rules! set_once {
             ($slot:expr, $value:expr, $name:literal) => {{
                 if $slot.is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         concat!("duplicate RTF legacy text-box ", $name).to_string(),
                     ));
                 }
@@ -97,9 +97,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub(super) fn parse_legacy_text_box(&mut self) -> RtfResult<Option<crate::LegacyTextBox<'a>>> {
+    pub(super) fn parse_legacy_text_box(
+        &mut self,
+    ) -> crate::Result<Option<crate::LegacyTextBox<'a>>> {
         if self.current_state()?.destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing text box may occur only in the document body".to_string(),
             ));
         }
@@ -113,7 +115,7 @@ impl<'a> Parser<'a> {
                         return Ok(None);
                     }
                     let text = builder.text.ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF legacy text box lacks dptxbxtext".to_string(),
                         )
                     })?;
@@ -139,7 +141,7 @@ impl<'a> Parser<'a> {
                     text_box.validate()?;
                     if self.legacy_text_boxes.len() >= crate::legacy_text_box::MAX_LEGACY_TEXT_BOXES
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF legacy text-box count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -147,14 +149,14 @@ impl<'a> Parser<'a> {
                         .legacy_text_box_text_bytes
                         .checked_add(text_box.text.len())
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF legacy text-box text size overflow".to_string(),
                             )
                         })?;
                     if self.legacy_text_box_text_bytes
                         > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_TOTAL_BYTES
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF legacy text-box text exceeds the aggregate safety limit"
                                 .to_string(),
                         ));
@@ -168,12 +170,12 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if !builder.saw_text_box {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF legacy drawing dptxbxtext must follow dptxbx".to_string(),
                         ));
                     }
                     if builder.text.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF legacy text box contains duplicate dptxbxtext".to_string(),
                         ));
                     }
@@ -182,7 +184,7 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => self.skip_group()?,
                 Some(Token::Control(ControlWord::LegacyTextBox)) => {
                     if builder.saw_text_box {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF legacy drawing contains duplicate dptxbx".to_string(),
                         ));
                     }
@@ -195,16 +197,16 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
                 Some(Token::Text(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy drawing contains orphan text".to_string(),
                     ));
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy drawing cannot contain binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -212,7 +214,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_text_box_text(
         &mut self,
         builder: &mut LegacyTextBoxBuilder,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         self.pos += 2; // opening brace and dptxbxtext
         let mut depth = 0usize;
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
@@ -283,7 +285,7 @@ impl<'a> Parser<'a> {
                                 | ControlWord::FormField
                         ))
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF legacy text box contains an active nested destination".to_string(),
                         ));
                     }
@@ -330,7 +332,7 @@ impl<'a> Parser<'a> {
                     | ControlWord::Shape(_)
                     | ControlWord::FormField,
                 )) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy text box contains active content".to_string(),
                     ));
                 },
@@ -340,14 +342,14 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy text box cannot contain binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if text.len() > crate::legacy_text_box::MAX_LEGACY_TEXT_BOX_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF legacy text-box text exceeds the safety limit".to_string(),
                 ));
             }
@@ -453,9 +455,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(super) fn parse_legacy_drawing(&mut self) -> RtfResult<Option<crate::LegacyDrawing<'a>>> {
+    pub(super) fn parse_legacy_drawing(
+        &mut self,
+    ) -> crate::Result<Option<crate::LegacyDrawing<'a>>> {
         if self.current_state()?.destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing may occur only in the document body".to_string(),
             ));
         }
@@ -465,7 +469,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_drawing_at(
         &mut self,
         position: usize,
-    ) -> RtfResult<Option<crate::LegacyDrawing<'a>>> {
+    ) -> crate::Result<Option<crate::LegacyDrawing<'a>>> {
         self.pos += 2;
         let mut horizontal_anchor = None;
         let mut vertical_anchor = None;
@@ -521,7 +525,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     return Err(Self::legacy_error("invalid or out-of-order dohead control"));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
@@ -550,18 +554,22 @@ impl<'a> Parser<'a> {
         Ok(Some(drawing))
     }
 
-    pub(super) fn legacy_error(message: &str) -> RtfError {
-        RtfError::MalformedDocument(format!("RTF legacy drawing {message}"))
+    pub(super) fn legacy_error(message: &str) -> crate::Error {
+        crate::Error::MalformedDocument(format!("RTF legacy drawing {message}"))
     }
 
-    pub(super) fn set_legacy_once<T>(slot: &mut Option<T>, value: T, name: &str) -> RtfResult<()> {
+    pub(super) fn set_legacy_once<T>(
+        slot: &mut Option<T>,
+        value: T,
+        name: &str,
+    ) -> crate::Result<()> {
         if slot.replace(value).is_some() {
             return Err(Self::legacy_error(&format!("contains duplicate {name}")));
         }
         Ok(())
     }
 
-    pub(super) fn parse_legacy_geometry(&mut self) -> RtfResult<crate::LegacyDrawingGeometry> {
+    pub(super) fn parse_legacy_geometry(&mut self) -> crate::Result<crate::LegacyDrawingGeometry> {
         self.skip_legacy_whitespace();
         let x = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyDrawingX(value))) => *value,
@@ -596,7 +604,7 @@ impl<'a> Parser<'a> {
         Ok(geometry)
     }
 
-    pub(super) fn parse_legacy_point(&mut self) -> RtfResult<crate::LegacyDrawingPoint> {
+    pub(super) fn parse_legacy_point(&mut self) -> crate::Result<crate::LegacyDrawingPoint> {
         self.skip_legacy_whitespace();
         let x = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyDrawingPointX(value))) => *value,
@@ -615,7 +623,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_primitive(
         &mut self,
         depth: usize,
-    ) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+    ) -> crate::Result<crate::LegacyDrawingPrimitive<'a>> {
         if depth > crate::MAX_LEGACY_DRAWING_DEPTH {
             return Err(Self::legacy_error("nesting exceeds the safety limit"));
         }
@@ -633,7 +641,7 @@ impl<'a> Parser<'a> {
             .tokens
             .get(self.pos)
             .cloned()
-            .ok_or(RtfError::UnexpectedEof)?;
+            .ok_or(crate::Error::UnexpectedEof)?;
         self.pos += 1;
         match control {
             Token::Control(ControlWord::LegacyDrawingGroup) => self.parse_legacy_group(depth),
@@ -690,7 +698,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_group(
         &mut self,
         depth: usize,
-    ) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+    ) -> crate::Result<crate::LegacyDrawingPrimitive<'a>> {
         self.skip_legacy_whitespace();
         let declared = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::LegacyDrawingCount(value))) if *value > 0 => {
@@ -712,7 +720,7 @@ impl<'a> Parser<'a> {
                     children.push(self.parse_legacy_primitive(depth + 1)?);
                 },
                 Some(_) => return Err(Self::legacy_error("invalid content in dpgroup")),
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
         if declared != children.len() && declared != children.len().saturating_add(1) {
@@ -726,7 +734,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub(super) fn parse_legacy_polyline(&mut self) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+    pub(super) fn parse_legacy_polyline(
+        &mut self,
+    ) -> crate::Result<crate::LegacyDrawingPrimitive<'a>> {
         self.skip_legacy_whitespace();
         let closed = if matches!(
             self.tokens.get(self.pos),
@@ -774,7 +784,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_nested_legacy_text_box(
         &mut self,
-    ) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+    ) -> crate::Result<crate::LegacyDrawingPrimitive<'a>> {
         let mut margin = None;
         let mut direction = None;
         let mut text = None;
@@ -888,7 +898,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_callout(
         &mut self,
         depth: usize,
-    ) -> RtfResult<crate::LegacyDrawingPrimitive<'a>> {
+    ) -> crate::Result<crate::LegacyDrawingPrimitive<'a>> {
         let mut callout_type = None;
         let mut angle = None;
         let mut attachment = None;
@@ -1004,7 +1014,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_legacy_simple_tail(
         &mut self,
         kind: LegacySimpleKind,
-    ) -> RtfResult<(
+    ) -> crate::Result<(
         crate::LegacyDrawingGeometry,
         crate::LegacyDrawingProperties,
         u8,
@@ -1044,7 +1054,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_legacy_properties_until_boundary(
         &mut self,
-    ) -> RtfResult<crate::LegacyDrawingProperties> {
+    ) -> crate::Result<crate::LegacyDrawingProperties> {
         let mut builder = LegacyPropertiesBuilder::default();
         loop {
             self.skip_legacy_whitespace();

@@ -3,13 +3,13 @@
 use super::super::{
     ASCII_CONTROL_LIMIT, DrawingStoryTextMode, EndnoteRestart, Field, FieldOwner, FieldType,
     FootnoteRestart, HeaderFooter, HeaderFooterType, Note, NoteNumberingStyle, PageBorders,
-    PageOrientation, Revision, RevisionType, RtfWriter, Section, SectionBreakType,
-    SectionFootnotePlacement, SectionLineNumberRestart, SectionNoteOptions, SectionRendering,
-    Shape, ShapeGroup, StoryDrawing, StoryEvent, TextDirection, VerticalAlignment, Write, field,
+    PageOrientation, Revision, RevisionType, Section, SectionBreakType, SectionFootnotePlacement,
+    SectionLineNumberRestart, SectionNoteOptions, SectionRendering, Shape, ShapeGroup,
+    StoryDrawing, StoryEvent, TextDirection, VerticalAlignment, Write, Writer, field,
     invalid_story_reference, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write a control word
     ///
     /// # Errors

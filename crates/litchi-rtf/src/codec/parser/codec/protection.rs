@@ -1,7 +1,7 @@
 use super::{
     ControlWord, Cow, Destination, EditableRegionSpan, MAX_BOOKMARK_NAME_BYTES, OpenEditableRegion,
-    OpenProtectionRange, ParsedBodyStoryEvent, Parser, ProtectionRangeSpan, RtfError, RtfResult,
-    Token, control_symbol_text,
+    OpenProtectionRange, ParsedBodyStoryEvent, Parser, ProtectionRangeSpan, Token,
+    control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
@@ -28,9 +28,9 @@ impl<'a> Parser<'a> {
     /// stories) the destinations are rejected rather than silently dropped.
     ///
     /// Expects `self.pos` at the group's opening brace.
-    pub(super) fn reject_non_body_custom_xml_markup_group(&self) -> RtfResult<()> {
+    pub(super) fn reject_non_body_custom_xml_markup_group(&self) -> crate::Result<()> {
         if self.is_custom_xml_markup_group() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF custom XML markup destinations are supported only in the main body story"
                     .to_string(),
             ));
@@ -44,13 +44,13 @@ impl<'a> Parser<'a> {
     /// markers (RTF 1.9.1 Word 2003 document protection); matching open and
     /// close markers are paired by identifier like bookmarks, and unclosed
     /// markers extend to the end of the body story.
-    pub(super) fn parse_protection_range_destination(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_protection_range_destination(&mut self) -> crate::Result<()> {
         self.pos += 1; // ignorable-destination marker
         let is_start = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::ProtectionRangeStart)) => true,
             Some(Token::Control(ControlWord::ProtectionRangeEnd)) => false,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF protection-range destination".to_string(),
                 ));
             },
@@ -65,7 +65,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
                 _ => {
                     if !self.consume_destination_text_token(
                         &mut id,
@@ -73,13 +73,13 @@ impl<'a> Parser<'a> {
                         &mut fallback_skip,
                         "protection-range identifier",
                     )? {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF protection-range destination contains grouped, binary, or active data"
                                 .to_string(),
                         ));
                     }
                     if id.len() > crate::protection_range::MAX_PROTECTION_RANGE_ID_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF protection-range identifier exceeds the safety limit".to_string(),
                         ));
                     }
@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
 
         if is_start {
             if self.next_protection_range_order >= crate::protection_range::MAX_PROTECTION_RANGES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF protection-range count exceeds the safety limit".to_string(),
                 ));
             }
@@ -124,7 +124,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn finalize_protection_ranges(&mut self) -> RtfResult<()> {
+    pub(super) fn finalize_protection_ranges(&mut self) -> crate::Result<()> {
         for ranges in self.open_protection_ranges.values_mut() {
             for range in ranges.drain(..) {
                 self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
@@ -148,7 +148,7 @@ impl<'a> Parser<'a> {
         }
         for span in self.protection_range_spans.drain(..) {
             let content = body.get(span.range.position..span.end).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "protection range does not align to body text".to_string(),
                 )
             })?;
@@ -165,16 +165,16 @@ impl<'a> Parser<'a> {
     ///
     /// The marks carry no identifier and therefore pair positionally: each
     /// `\ebcend` closes the innermost open `\ebcstart`.
-    pub(super) fn record_editable_region_boundary(&mut self, is_start: bool) -> RtfResult<()> {
+    pub(super) fn record_editable_region_boundary(&mut self, is_start: bool) -> crate::Result<()> {
         let state = self.current_state()?;
         if state.destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF editable-region marks are supported only in the main body story".to_string(),
             ));
         }
         if is_start {
             if self.next_editable_region_order >= crate::editable_region::MAX_EDITABLE_REGIONS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF editable-region count exceeds the safety limit".to_string(),
                 ));
             }
@@ -189,7 +189,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         let Some(open) = self.open_editable_regions.pop() else {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF ebcend has no matching ebcstart".to_string(),
             ));
         };
@@ -204,9 +204,9 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn finalize_editable_regions(&mut self) -> RtfResult<()> {
+    pub(super) fn finalize_editable_regions(&mut self) -> crate::Result<()> {
         if !self.open_editable_regions.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF ebcstart has no matching ebcend".to_string(),
             ));
         }
@@ -222,7 +222,7 @@ impl<'a> Parser<'a> {
         }
         for span in self.editable_region_spans.drain(..) {
             let content = body.get(span.position..span.end).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "editable region does not align to body text".to_string(),
                 )
             })?;
@@ -238,7 +238,10 @@ impl<'a> Parser<'a> {
     ///
     /// Expects `self.pos` at the ignorable-destination marker and consumes
     /// tokens through the group's closing brace.
-    pub(super) fn parse_kinsoku_destination(&mut self, following: bool) -> RtfResult<Cow<'a, str>> {
+    pub(super) fn parse_kinsoku_destination(
+        &mut self,
+        following: bool,
+    ) -> crate::Result<Cow<'a, str>> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
@@ -256,7 +259,7 @@ impl<'a> Parser<'a> {
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::UnicodeSkip(_)))
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF kinsoku destination contains an unsupported group".to_string(),
                         ));
                     }
@@ -267,7 +270,7 @@ impl<'a> Parser<'a> {
                                 self.pos += 1;
                                 break;
                             },
-                            None => return Err(RtfError::UnexpectedEof),
+                            None => return Err(crate::Error::UnexpectedEof),
                             _ => {
                                 if !self.consume_destination_text_token(
                                     &mut value,
@@ -275,7 +278,7 @@ impl<'a> Parser<'a> {
                                     &mut fallback_skip,
                                     "kinsoku character set",
                                 )? {
-                                    return Err(RtfError::MalformedDocument(
+                                    return Err(crate::Error::MalformedDocument(
                                         "RTF kinsoku encoding-switch group contains grouped, binary, or active data"
                                             .to_string(),
                                     ));
@@ -284,7 +287,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
                 _ => {
                     if !self.consume_destination_text_token(
                         &mut value,
@@ -292,13 +295,13 @@ impl<'a> Parser<'a> {
                         &mut fallback_skip,
                         "kinsoku character set",
                     )? {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF kinsoku destination contains grouped, binary, or active data"
                                 .to_string(),
                         ));
                     }
                     if value.len() > crate::kinsoku::MAX_KINSOKU_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF kinsoku character set exceeds the safety limit".to_string(),
                         ));
                     }
@@ -321,7 +324,7 @@ impl<'a> Parser<'a> {
         clippy::cast_sign_loss,
         reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
     )]
-    pub(super) fn parse_ignorable_text_destination(&mut self) -> RtfResult<String> {
+    pub(super) fn parse_ignorable_text_destination(&mut self) -> crate::Result<String> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();
         let mut depth = 1usize;
@@ -356,13 +359,13 @@ impl<'a> Parser<'a> {
             }
             self.pos += 1;
             if value.len() > MAX_BOOKMARK_NAME_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF annotation destination exceeds the safety limit".to_string(),
                 ));
             }
         }
         if depth != 0 {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         Ok(value.trim_end_matches(['\r', '\n']).to_string())
     }

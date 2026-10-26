@@ -15,7 +15,7 @@
 use crate::write::Writer;
 use crate::{
     Alignment, CharacterBaseline, CharacterExpansion, HeaderFooterType, Package, ParagraphFrame,
-    RtfError, TableCellPath, UnderlineStyle,
+    TableCellPath, UnderlineStyle,
 };
 use bumpalo::Bump;
 use litchi_core::Position;
@@ -1361,7 +1361,7 @@ pub enum Error {
     /// The common bounded history refused a transition.
     History(String),
     /// Candidate parsing or validation failed.
-    Rtf(RtfError),
+    Rtf(crate::Error),
     /// Candidate transport construction failed before publication.
     Write(String),
 
@@ -1593,8 +1593,8 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<RtfError> for Error {
-    fn from(error: RtfError) -> Self {
+impl From<crate::Error> for Error {
+    fn from(error: crate::Error) -> Self {
         Self::Rtf(error)
     }
 }
@@ -5107,12 +5107,12 @@ impl Edit {
             Cow::Owned(value) => Ok(value),
             Cow::Borrowed(value) => {
                 let mut owned = String::new();
-                owned
-                    .try_reserve_exact(value.len())
-                    .map_err(|_| RtfError::AllocationFailed {
+                owned.try_reserve_exact(value.len()).map_err(|_| {
+                    crate::Error::AllocationFailed {
                         resource: "edit replacement text",
                         requested: value.len(),
-                    })?;
+                    }
+                })?;
                 owned.push_str(value);
                 Ok(owned)
             },
@@ -10266,9 +10266,9 @@ fn effective_baseline(formatting: &crate::types::Formatting) -> CharacterBaselin
     }
 }
 
-fn map_positioning_error(error: RtfError, fallback: &'static str) -> Error {
+fn map_positioning_error(error: crate::Error, fallback: &'static str) -> Error {
     match error {
-        RtfError::MalformedDocument(message) => match message.as_str() {
+        crate::Error::MalformedDocument(message) => match message.as_str() {
             "RTF legacy character spacing is out of range" => {
                 Error::unsupported_source("legacy character spacing is out of range")
             },

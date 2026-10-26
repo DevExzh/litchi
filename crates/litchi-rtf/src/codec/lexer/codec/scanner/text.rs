@@ -1,11 +1,11 @@
 use super::super::lexer::Lexer;
 use super::super::model::Token;
-use crate::codec::error::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 
 impl<'a> Lexer<'a> {
     /// Parse hexadecimal character escape (\').
-    pub(super) fn parse_hex_char(&mut self) -> RtfResult<Token<'a>> {
+    pub(super) fn parse_hex_char(&mut self) -> crate::Result<Token<'a>> {
         let mut bytes = String::new();
         let lenient = self.leniency.tolerates_malformed_hex_escapes();
         loop {
@@ -24,14 +24,15 @@ impl<'a> Lexer<'a> {
                 .input
                 .as_bytes()
                 .get(self.pos..self.pos + 2)
-                .ok_or_else(|| RtfError::InvalidUnicode("Incomplete hex escape".to_string()))?;
+                .ok_or_else(|| crate::Error::InvalidUnicode("Incomplete hex escape".to_string()))?;
             // A mutation or split multi-byte scalar yields non-ASCII bytes
             // here; treat them as an invalid escape rather than a slice panic.
             let hex = std::str::from_utf8(pair)
-                .map_err(|_err| RtfError::InvalidUnicode("Invalid hex escape".to_string()))?;
+                .map_err(|_err| crate::Error::InvalidUnicode("Invalid hex escape".to_string()))?;
             self.pos += 2;
-            let byte = u8::from_str_radix(hex, 16)
-                .map_err(|_err| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
+            let byte = u8::from_str_radix(hex, 16).map_err(|_err| {
+                crate::Error::InvalidUnicode(format!("Invalid hex escape: {hex}"))
+            })?;
             bytes.push(char::from(byte));
             if !self.remaining()?.starts_with("\\'") {
                 break;
@@ -56,7 +57,7 @@ impl<'a> Lexer<'a> {
     /// its digits spell, or `None` when it has none.
     ///
     /// [`SyntaxDefect::MalformedHexEscape`]: crate::leniency::SyntaxDefect::MalformedHexEscape
-    fn lenient_hex_byte(&mut self) -> RtfResult<Option<u8>> {
+    fn lenient_hex_byte(&mut self) -> crate::Result<Option<u8>> {
         let backslash = self.pos.saturating_sub(2);
         let mut value = 0u8;
         let mut digits = 0u8;
@@ -89,7 +90,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Parse plain text until special character.
-    pub(super) fn parse_text(&mut self) -> RtfResult<Token<'a>> {
+    pub(super) fn parse_text(&mut self) -> crate::Result<Token<'a>> {
         let mut start = self.pos;
 
         while self.pos < self.input.len() {
