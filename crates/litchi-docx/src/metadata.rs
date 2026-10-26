@@ -462,6 +462,11 @@ mod tests {
             soapberry_zip::office::ArchiveLimits::default(),
         )
         .expect("index ZIP members");
+        assert_eq!(
+            central_entries.len(),
+            index.entries().len(),
+            "ZIP central and preservation indexes must cover the same members"
+        );
         let reader = soapberry_zip::office::ArchiveReader::new(
             bytes,
             soapberry_zip::office::ArchiveLimits::default(),
@@ -478,6 +483,11 @@ mod tests {
             if let Some(offset) = &entry.zip64_local_header_offset {
                 central_record[offset.clone()].fill(0);
             }
+            assert_eq!(
+                entry.raw_name.as_slice(),
+                preserved.raw_name_bytes(),
+                "ZIP central and preservation indexes must agree on member names"
+            );
             let payload = if entry.directory {
                 Vec::new()
             } else {
@@ -809,7 +819,7 @@ mod tests {
         let replayed_bytes = replayed.to_bytes()?;
         assert_eq!(replayed.metadata(), next.metadata());
         assert_eq!(replayed.app_props()?, next.app_props()?);
-        assert_eq!(replayed.custom_props(), next.custom_props());
+        assert!(replayed.custom_props().same_values(next.custom_props()));
         assert_eq!(
             archive_fidelity(&replayed_bytes),
             archive_fidelity(&next_bytes)
