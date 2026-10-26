@@ -16,7 +16,7 @@ use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::wire::{WireFieldView, WireView};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, varint::encoded_len};
-use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{pages_body_codec, pages_media_codec};
 
 use super::Package;
@@ -526,44 +526,66 @@ pub(crate) struct MessageRewrite {
 /// Publish a candidate in which only the given messages changed, and reopen
 /// it under the source's limits.
 pub(crate) fn publish(source: &Package, rewrites: Vec<MessageRewrite>) -> GraphResult<Package> {
-    let limits = source.state.source.limits();
-    let archive_limits = limits
+    let archive_limits = source
+        .state
+        .source
+        .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let snappy_limits = limits.snappy_limits().map_err(map_archive_error)?;
-    let mut components: Vec<(Arc<str>, Vec<MessageRewrite>)> = Vec::new();
+    let mut archives: Vec<(Arc<str>, Archive)> = Vec::new();
     for rewrite in rewrites {
-        match components
-            .iter_mut()
-            .find(|(name, _)| name.as_ref() == rewrite.component.as_ref())
+        let position = match archives
+            .iter()
+            .position(|(name, _)| name.as_ref() == rewrite.component.as_ref())
         {
-            Some((_, group)) => group.push(rewrite),
-            None => components.push((Arc::clone(&rewrite.component), vec![rewrite])),
-        }
+            Some(position) => position,
+            None => {
+                archives.push((
+                    Arc::clone(&rewrite.component),
+                    editable_archive(source, &rewrite.component)?,
+                ));
+                archives.len() - 1
+            },
+        };
+        archives[position]
+            .1
+            .object_mut(rewrite.object.get())
+            .ok_or(GraphError::InvalidSource)?
+            .replace_message_preserving_header(
+                rewrite.message_index,
+                RawMessage {
+                    type_: rewrite.message_type,
+                    data: rewrite.data,
+                },
+                archive_limits,
+            )
+            .map_err(map_core_error)?;
     }
-    let mut payloads = Vec::with_capacity(components.len());
-    for (name, group) in components {
-        let component = source
-            .state
-            .source
-            .components()
-            .get(name.as_ref())
-            .ok_or(GraphError::InvalidSource)?;
-        let mut archive = component.archive().clone();
-        for rewrite in group {
-            archive
-                .object_mut(rewrite.object.get())
-                .ok_or(GraphError::InvalidSource)?
-                .replace_message_preserving_header(
-                    rewrite.message_index,
-                    RawMessage {
-                        type_: rewrite.message_type,
-                        data: rewrite.data,
-                    },
-                    archive_limits,
-                )
-                .map_err(map_core_error)?;
-        }
+    publish_archives(source, archives)
+}
+
+/// A clone of one component's archive for staging.
+pub(crate) fn editable_archive(source: &Package, component: &str) -> GraphResult<Archive> {
+    source
+        .state
+        .source
+        .components()
+        .get(component)
+        .map(|component| component.archive().clone())
+        .ok_or(GraphError::InvalidSource)
+}
+
+/// Publish a candidate in which only the given component archives changed,
+/// and reopen it under the source's limits.
+pub(crate) fn publish_archives(
+    source: &Package,
+    archives: Vec<(Arc<str>, Archive)>,
+) -> GraphResult<Package> {
+    let limits = source.state.source.limits();
+    let archive_limits = limits.effective_archive_limits().map_err(map_archive_error)?;
+    let snappy_limits = limits.snappy_limits().map_err(map_archive_error)?;
+    let mut payloads = Vec::with_capacity(archives.len());
+    for (name, archive) in archives {
         let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         if compressed.len() as u64 > limits.max_entry_bytes() {
