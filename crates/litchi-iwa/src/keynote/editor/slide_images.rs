@@ -591,7 +591,19 @@ fn set_slide_image_caption(
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = crate::text::Draft::from_package(editor.package().clone());
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
-        text_editor.into_package()
+        let mut staged = text_editor.into_package();
+        // The slide's thumbnail shows the changed text: invalidate it, as
+        // layout reassignment does (host fix of record 0372).
+        let node = editor
+            .slides()?
+            .get(slide_index)
+            .ok_or_else(|| Error::ParseError(format!("Keynote slide {slide_index} is missing")))?
+            .native_ids()?
+            .node
+            .get();
+        let node_archive = ObjectGraph::read(&staged)?.archive_name(node)?.to_owned();
+        super::slide_layout_update::invalidate_slide_preview(&mut staged, &node_archive, node)?;
+        staged
     } else {
         let context = image_creation_context(editor, slide_index)?;
         let image_width = source
@@ -615,6 +627,24 @@ fn set_slide_image_caption(
             ids,
         )?;
         add_component_object_uuids(&mut staged, source.component_id, &ids.all())?;
+        // The new graph references the theme stylesheet and caption
+        // paragraph style; register both edges when they leave the slide
+        // component (host fix of record 0372: they were written
+        // unregistered).
+        let graph = ObjectGraph::read(&staged)?;
+        for dependency in [
+            context.caption_theme.stylesheet_id,
+            context.caption_theme.paragraph_style_id,
+        ] {
+            let archive = graph.archive_name(dependency)?;
+            if archive == source.archive_name {
+                continue;
+            }
+            let target = component_identifier_for_entry(&staged, archive)?.ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote component {archive} is not registered"))
+            })?;
+            add_component_external_reference(&mut staged, source.component_id, target, dependency)?;
+        }
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
