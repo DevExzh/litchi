@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import sys
 import tempfile
 import time
 import unittest
@@ -159,7 +160,8 @@ class ODGSourceBuildHandoffTests(unittest.TestCase):
             parsed = RUNTIME.load_manifest(final_manifest)
             runtime_output = root / "runtime-output"
             runtime_output.mkdir()
-            with mock.patch.object(BUILDER, "PRISTINE_BASELINE_REF", self.baseline_ref):
+            with mock.patch.object(BUILDER, "PRISTINE_BASELINE_REF", self.baseline_ref), \
+                 mock.patch.dict(sys.modules, {"odg_joined_qualification_builder": BUILDER}):
                 identity = RUNTIME.runtime_identity(parsed, runtime_output, require_build_receipt=True)
             self.assertEqual(identity["fixture"]["path"], str(self._reviewed_fixture()))
             self.assertEqual(
