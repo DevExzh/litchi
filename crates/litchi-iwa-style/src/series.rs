@@ -37,6 +37,7 @@ const CHART_STYLE_MESSAGE_TYPES: [u32; 8] =
     [5_022, 5_023, 5_024, 5_025, 5_026, 5_027, 5_028, 5_029];
 
 const STYLE_PARENT_FIELD: u32 = 1;
+const STYLE_PARENT_REFERENCE_FIELD: u32 = 3;
 const STYLE_STYLESHEET_FIELD: u32 = 5;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const STYLESHEET_STYLES_FIELD: u32 = 1;
@@ -952,16 +953,274 @@ pub fn set_values<P: Property>(
     Ok(true)
 }
 
+/// One per-series property stored in the series styles (inherited through
+/// the `TSS.StyleArchive.parent` chain).
+pub trait StyleProperty {
+    /// The stored value.
+    type Item: Clone + PartialEq;
+
+    /// The value a style payload defines itself (`None`: inherited).
+    ///
+    /// # Errors
+    ///
+    /// The payload is invalid or stores an unsupported value.
+    fn read_local(&self, payload: &[u8]) -> Result<Option<Self::Item>>;
+
+    /// Define (`Some`) or clear (`None`) the value in a style payload,
+    /// keeping every other byte.
+    ///
+    /// # Errors
+    ///
+    /// The payload is invalid or the value cannot be stored.
+    fn patch(&self, payload: &[u8], value: Option<&Self::Item>) -> Result<Vec<u8>>;
+}
+
+/// The effective series style of each of the first `series_count` series:
+/// the private override of `series_private_styles`, else the theme style.
+fn style_slots(workspace: &Workspace<'_>, chart: u64, series_count: usize) -> Result<Vec<u64>> {
+    let (_, payload) = chart_payload(workspace, chart)?;
+    let references = codec::references(payload, CodecLimits::DEFAULT)?;
+    let mut styles = references.series_theme_styles().to_vec();
+    if styles.is_empty() {
+        return Err(Error::Invalid("the chart has no series styles"));
+    }
+    let mut seen = HashSet::new();
+    if styles
+        .iter()
+        .any(|identifier| *identifier == 0 || !seen.insert(*identifier))
+    {
+        return Err(Error::Invalid(
+            "a series theme style is invalid or repeated",
+        ));
+    }
+    if let Some(private) = references.series_private_styles() {
+        if usize::try_from(private.count()).ok() != Some(private.entries().len()) {
+            return Err(Error::Invalid(
+                "a chart's series_private_styles count disagrees with its entries",
+            ));
+        }
+        let mut indices = HashSet::new();
+        for &(index, identifier) in private.entries() {
+            let index = usize::try_from(index)
+                .map_err(|_| Error::Invalid("a series index exceeds usize"))?;
+            if index >= styles.len() || !indices.insert(index) || !seen.insert(identifier) {
+                return Err(Error::Invalid("a private series style is invalid"));
+            }
+            styles[index] = identifier;
+        }
+    }
+    if styles.len() < series_count {
+        return Err(Error::Invalid(
+            "the chart has fewer series styles than series",
+        ));
+    }
+    styles.truncate(series_count);
+    for &style in &styles {
+        workspace.unique_payload(
+            style,
+            SERIES_STYLE_MESSAGE_TYPE,
+            "a series style must have exactly one payload",
+        )?;
+    }
+    Ok(styles)
+}
+
+fn inherited<P: StyleProperty>(
+    workspace: &Workspace<'_>,
+    style: u64,
+    property: &P,
+) -> Result<Option<P::Item>> {
+    let mut identifier = style;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(identifier) {
+            return Err(Error::Invalid("a series style parent chain has a cycle"));
+        }
+        let (_, payload) = workspace.unique_payload(
+            identifier,
+            SERIES_STYLE_MESSAGE_TYPE,
+            "a series style must have exactly one payload",
+        )?;
+        if let Some(value) = property.read_local(payload)? {
+            return Ok(Some(value));
+        }
+        let parent = graph::repeated(payload, STYLE_PARENT_FIELD)?;
+        let parent = match parent.last() {
+            Some(style) => match graph::repeated(style, STYLE_PARENT_REFERENCE_FIELD)?.last() {
+                Some(reference) => graph::varint(reference, REFERENCE_IDENTIFIER_FIELD)?
+                    .filter(|identifier| *identifier != 0),
+                None => None,
+            },
+            None => None,
+        };
+        let Some(parent) = parent else {
+            return Ok(None);
+        };
+        identifier = parent;
+    }
+}
+
+/// Read `property` (inherited) for each of the `series_count` series.
+///
+/// # Errors
+///
+/// An invalid chart or series style, or a value the property rejects.
+pub fn style_values<P: StyleProperty>(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    series_count: usize,
+    property: &P,
+) -> Result<Vec<Option<P::Item>>> {
+    style_slots(workspace, chart, series_count)?
+        .into_iter()
+        .map(|style| inherited(workspace, style, property))
+        .collect()
+}
+
+/// Refuse a write to a series style another chart also uses.
+fn ensure_exclusive(workspace: &Workspace<'_>, style: u64) -> Result<()> {
+    let mut owners = 0usize;
+    for location in workspace.locations() {
+        for candidate in &workspace.archive_at(location)?.objects {
+            for message in &candidate.messages {
+                if message.type_ != CHART_MESSAGE_TYPE {
+                    continue;
+                }
+                let references = codec::references(&message.data, CodecLimits::DEFAULT)?;
+                let private = references
+                    .series_private_styles()
+                    .is_some_and(|sparse| sparse.entries().iter().any(|(_, id)| *id == style));
+                if private || references.series_theme_styles().contains(&style) {
+                    owners += 1;
+                }
+            }
+        }
+    }
+    if owners != 1 {
+        return Err(Error::Invalid("a series style is shared by several charts"));
+    }
+    Ok(())
+}
+
+/// Write `property` in the effective series style of every series whose
+/// inherited value differs (`expected.len()` is the series count). Returns
+/// `false` when nothing changes.
+///
+/// # Errors
+///
+/// An invalid chart or series style, a style another chart shares, a value
+/// the property rejects, or a write that does not read back.
+pub fn set_style_values<P: StyleProperty>(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    property: &P,
+    expected: &[Option<P::Item>],
+) -> Result<bool> {
+    let styles = style_slots(workspace, chart, expected.len())?;
+    let mut changed = false;
+    for (&style, replacement) in styles.iter().zip(expected) {
+        if inherited(workspace, style, property)? == *replacement {
+            continue;
+        }
+        ensure_exclusive(workspace, style)?;
+        let (message, payload) = workspace.unique_payload(
+            style,
+            SERIES_STYLE_MESSAGE_TYPE,
+            "a series style must have exactly one payload",
+        )?;
+        let data = property.patch(payload, replacement.as_ref())?;
+        workspace.replace_payload(style, message, data)?;
+        changed = true;
+    }
+    if changed && style_values(workspace, chart, expected.len(), property)? != expected {
+        return Err(Error::Invalid("a series style write does not read back"));
+    }
+    Ok(changed)
+}
+
+/// Write the data symbol of every series: visibility and shape in the
+/// overrides, size in the series styles (`expected.len()` is the series
+/// count; `None` hides the symbol). Returns `false` when nothing changes.
+///
+/// # Errors
+///
+/// The [`set_values`] and [`set_style_values`] errors.
+pub fn set_symbols(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    family: litchi_iwa_common::chart::series::SymbolFamily,
+    expected: &[Option<litchi_iwa_common::chart::series::Symbol>],
+) -> Result<bool> {
+    let marks = expected
+        .iter()
+        .map(|symbol| {
+            symbol.map_or(property::Mark::HIDDEN, |symbol| property::Mark {
+                visible: true,
+                shape: symbol.shape,
+            })
+        })
+        .collect::<Vec<_>>();
+    let marked = set_values(workspace, chart, &property::SymbolMarks(family), &marks)?;
+    let sizes = expected
+        .iter()
+        .map(|symbol| symbol.and_then(|symbol| symbol.size))
+        .collect::<Vec<_>>();
+    let sized = set_style_values(workspace, chart, &property::SymbolSizes(family), &sizes)?;
+    if symbols(workspace, chart, family, expected.len())? != expected {
+        return Err(Error::Invalid("a data-symbol write does not read back"));
+    }
+    Ok(marked || sized)
+}
+
+/// Read the data symbol of each of the `series_count` series.
+///
+/// # Errors
+///
+/// The [`values`] and [`style_values`] errors.
+pub fn symbols(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    family: litchi_iwa_common::chart::series::SymbolFamily,
+    series_count: usize,
+) -> Result<Vec<Option<litchi_iwa_common::chart::series::Symbol>>> {
+    let marks = values(
+        workspace,
+        chart,
+        series_count,
+        &property::SymbolMarks(family),
+    )?;
+    let sizes = style_values(
+        workspace,
+        chart,
+        series_count,
+        &property::SymbolSizes(family),
+    )?;
+    Ok(marks
+        .into_iter()
+        .zip(sizes)
+        .map(|(mark, size)| {
+            mark.visible
+                .then_some(litchi_iwa_common::chart::series::Symbol {
+                    shape: mark.shape,
+                    size,
+                })
+        })
+        .collect())
+}
+
 /// The per-series properties of the chart Format panel.
 pub mod property {
     use litchi_iwa_common::chart::pie::{LabelDistance, WedgeExplosion};
-    use litchi_iwa_common::chart::series::{ConnectionLine, ConnectionLineFamily};
+    use litchi_iwa_common::chart::series::{
+        ConnectionLine, ConnectionLineFamily, SymbolFamily, SymbolShape, SymbolSize, Trendline,
+        TrendlineType,
+    };
     use litchi_iwa_common::wire;
     use litchi_iwa_protos::chart_style_codec::{
         self as codec, Archive, Limits as CodecLimits, field, property as rules,
     };
 
-    use super::{Base, Property};
+    use super::{Base, Property, StyleProperty};
     use crate::graph::{Error, Result};
 
     fn extension(payload: &[u8]) -> Result<Option<&[u8]>> {
@@ -1163,6 +1422,254 @@ pub mod property {
 
         fn patch(&self, payload: &[u8], value: &LabelDistance) -> Result<Vec<u8>> {
             rewrite(payload, &rules::pie_label_distance(value.percent()))
+        }
+    }
+
+    /// A series' data-symbol visibility and shape (the override half of a
+    /// data symbol; the size lives in the series style).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct Mark {
+        /// Whether the symbol is drawn.
+        pub visible: bool,
+        /// The marker shape.
+        pub shape: SymbolShape,
+    }
+
+    impl Mark {
+        /// No symbol (the native default).
+        pub const HIDDEN: Self = Self {
+            visible: false,
+            shape: SymbolShape::Circle,
+        };
+    }
+
+    /// Data-symbol visibility and shape (area, line, radar and scatter
+    /// charts).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct SymbolMarks(pub SymbolFamily);
+
+    impl Property for SymbolMarks {
+        type Value = Mark;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> Mark {
+            Mark::HIDDEN
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<Mark> {
+            let Some(extension) = extension(payload)? else {
+                return Ok(Mark::HIDDEN);
+            };
+            let visible = strict_bool(extension, self.0.show_field())?.unwrap_or(false);
+            let shape =
+                SymbolShape::from_native(strict_enum(extension, self.0.type_field())?.unwrap_or(0))
+                    .map_err(|_| Error::Invalid("an unsupported stored symbol shape"))?;
+            Ok(Mark { visible, shape })
+        }
+
+        fn patch(&self, payload: &[u8], value: &Mark) -> Result<Vec<u8>> {
+            let existing = extension(payload)?;
+            let source = existing.unwrap_or_default();
+            let show_present = strict_bool(source, self.0.show_field())?.is_some();
+            let type_present = strict_enum(source, self.0.type_field())?.is_some();
+            let extension = wire::patch_varint_field(
+                source,
+                self.0.show_field(),
+                show_present,
+                value.visible.then_some(1),
+            )?;
+            let native = u64::try_from(value.shape.native_value())
+                .map_err(|_| Error::Invalid("a negative symbol shape"))?;
+            let extension = wire::patch_varint_field(
+                &extension,
+                self.0.type_field(),
+                type_present,
+                (value.shape != SymbolShape::Circle).then_some(native),
+            )?;
+            let patched = wire::patch_length_delimited_field(
+                payload,
+                codec::EXTENSION_FIELD,
+                existing.is_some(),
+                (!extension.is_empty()).then_some(extension.as_slice()),
+            )?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid("a data-symbol write does not read back"));
+            }
+            Ok(patched)
+        }
+    }
+
+    /// Data-symbol size in the series style (`None`: automatic).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct SymbolSizes(pub SymbolFamily);
+
+    impl StyleProperty for SymbolSizes {
+        type Item = SymbolSize;
+
+        fn read_local(&self, payload: &[u8]) -> Result<Option<SymbolSize>> {
+            codec::decode(payload, Archive::SeriesStyle, CodecLimits::DEFAULT)?
+                .float(self.0.size_field())?
+                .map(SymbolSize::new)
+                .transpose()
+                .map_err(|_| Error::Invalid("a stored symbol size is not positive"))
+        }
+
+        fn patch(&self, payload: &[u8], value: Option<&SymbolSize>) -> Result<Vec<u8>> {
+            rewrite(
+                payload,
+                &rules::symbol_size(self.0.size_field(), value.map(|size| size.points())),
+            )
+        }
+    }
+
+    const SHOW_TRENDLINE: u32 = 37;
+    const TRENDLINE_LABEL: u32 = 54;
+    const POLYNOMIAL_ORDER: u32 = 55;
+    const MOVING_AVERAGE_PERIOD: u32 = 56;
+    const SHOW_EQUATION: u32 = 59;
+    const SHOW_LABEL: u32 = 60;
+    const SHOW_R_SQUARED: u32 = 61;
+    const TRENDLINE_TYPE: u32 = 62;
+
+    fn strict_bytes(extension: &[u8], number: u32) -> Result<Option<&[u8]>> {
+        let mut found = None;
+        for candidate in crate::graph::fields(extension)? {
+            if candidate.number() != number {
+                continue;
+            }
+            if found.is_some() {
+                return Err(Error::Invalid("a singular override field is repeated"));
+            }
+            if candidate.wire_type() != 2 {
+                return Err(Error::Invalid("an override string has the wrong wire type"));
+            }
+            found = Some(&extension[candidate.payload_start()..candidate.end()]);
+        }
+        Ok(found)
+    }
+
+    fn patch_varint(data: &[u8], number: u32, value: Option<u64>) -> Result<Vec<u8>> {
+        let present = strict_varint(data, number)?.is_some();
+        Ok(wire::patch_varint_field(data, number, present, value)?)
+    }
+
+    fn patch_bytes(data: &[u8], number: u32, value: Option<&[u8]>) -> Result<Vec<u8>> {
+        let present = strict_bytes(data, number)?.is_some();
+        Ok(wire::patch_length_delimited_field(
+            data, number, present, value,
+        )?)
+    }
+
+    /// The trendline of each series.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct Trendlines;
+
+    impl Property for Trendlines {
+        type Value = Trendline;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> Trendline {
+            Trendline::none()
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<Trendline> {
+            let Some(extension) = extension(payload)? else {
+                return Ok(Trendline::none());
+            };
+            let label = strict_bytes(extension, TRENDLINE_LABEL)?
+                .map(|bytes| {
+                    std::str::from_utf8(bytes)
+                        .map(str::to_owned)
+                        .map_err(|_| Error::Invalid("a trendline label is not UTF-8"))
+                })
+                .transpose()?;
+            Trendline::from_native(
+                strict_varint(extension, SHOW_TRENDLINE)?,
+                strict_varint(extension, TRENDLINE_TYPE)?,
+                strict_varint(extension, POLYNOMIAL_ORDER)?,
+                strict_varint(extension, MOVING_AVERAGE_PERIOD)?,
+                strict_varint(extension, SHOW_LABEL)?,
+                strict_varint(extension, SHOW_EQUATION)?,
+                strict_varint(extension, SHOW_R_SQUARED)?,
+                label,
+            )
+            .map_err(|_| Error::Invalid("an unsupported stored trendline"))
+        }
+
+        fn patch(&self, payload: &[u8], value: &Trendline) -> Result<Vec<u8>> {
+            value
+                .validate()
+                .map_err(|_| Error::Invalid("an invalid trendline"))?;
+            let existing = extension(payload)?;
+            if existing.is_none() && *value == Trendline::none() {
+                return Ok(payload.to_vec());
+            }
+            let kind = value.trendline_type();
+            let visible = kind.is_visible();
+            let mut extension = existing.unwrap_or_default().to_vec();
+            extension = patch_varint(&extension, SHOW_TRENDLINE, visible.then_some(1))?;
+            extension = patch_varint(
+                &extension,
+                TRENDLINE_TYPE,
+                visible.then_some(i64::from(kind.native_value()) as u64),
+            )?;
+            if visible {
+                extension = patch_bytes(
+                    &extension,
+                    TRENDLINE_LABEL,
+                    value.custom_name().map(str::as_bytes),
+                )?;
+                extension = patch_varint(
+                    &extension,
+                    SHOW_LABEL,
+                    value.shows_name_in_legend().then_some(1),
+                )?;
+                match kind {
+                    TrendlineType::Polynomial(order) => {
+                        extension = patch_varint(
+                            &extension,
+                            POLYNOMIAL_ORDER,
+                            Some(u64::from(order.get())),
+                        )?;
+                    },
+                    TrendlineType::MovingAverage(period) => {
+                        extension = patch_varint(
+                            &extension,
+                            MOVING_AVERAGE_PERIOD,
+                            Some(u64::from(period.get())),
+                        )?;
+                    },
+                    _ => {},
+                }
+                if kind.supports_equation() {
+                    extension = patch_varint(
+                        &extension,
+                        SHOW_EQUATION,
+                        value.shows_equation().then_some(1),
+                    )?;
+                    extension = patch_varint(
+                        &extension,
+                        SHOW_R_SQUARED,
+                        value.shows_r_squared().then_some(1),
+                    )?;
+                }
+            }
+            let patched = wire::patch_length_delimited_field(
+                payload,
+                codec::EXTENSION_FIELD,
+                existing.is_some(),
+                (!extension.is_empty()).then_some(extension.as_slice()),
+            )?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid("a trendline write does not read back"));
+            }
+            Ok(patched)
         }
     }
 }
