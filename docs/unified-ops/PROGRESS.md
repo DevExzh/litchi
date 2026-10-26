@@ -24,7 +24,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 | 0334 | [Facade feature gates, feature-matrix check, batch-payload fuzz targets](0334-facade-features-and-batch-fuzz.md) | Merged (R16 `uo2/facade-fuzz`, `d165759e4a`): facade features from Cargo, feature matrix, batch fuzz targets |
 | 0333 | [PPTX P0 residue (audit WP3)](0333-pptx-p0-residue.md) | Merged (R16 `uo2/pptx-p0`, `e39d0a75a4`): PPTX paragraph/run/row CRUD, cell fill, comment remove, picture set, coalesced batches |
 | 0332 | [OfficeCLI parity dispositions and the v1 corpus subset (audit WP1 + WP13)](0332-officecli-parity-dispositions.md) | Merged (R15 `uo2/dispositions`, `0056b9cccd`): OfficeCLI parity dispositions, v1 corpus subset |
-| 0331 | [Owner decision memo (2026-10-17)](0331-owner-decision-memo.md) | Awaiting owner confirmation; every item is already in effect as the adopted default |
+| 0331 | [Owner decision memo (2026-10-17)](0331-owner-decision-memo.md) | Confirmed by owner; item 22 redaction audit alone is deferred; items 14–20, 23, 24, 26 and 29 remain required engineering work (0350/0351) |
 | 0330 | [Registry self-consistency and the XLSX cell link bug (audit WP2)](0330-registry-self-consistency.md) | Merged (R15 `uo2/registry-consistency`, `d761892de3`): element claims match property flags, XLSX batched cell links |
 | 0329 | [Keynote and Pages table creation, Numbers `#REF!`, shared-formula splits, structural clears, comment edge cases, Keynote notes run styles](0329-iwork-table-creation-and-ref-errors.md) | Merged (R15 `uo2/iwork-tables2`, `84ef2cd65e`): Keynote/Pages table creation, Numbers #REF!, notes run styles |
 | 0328 | [ODT, ODP and RTF element gaps against the DOCX and PPTX vocabularies](0328-odf-rtf-gaps.md) | Merged (R15 `uo2/odf-rtf-gaps`, `3bec513e6a`): ODT/ODP/RTF element gaps |
@@ -6089,3 +6089,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   the owned PPT record fidelity test (160a). Root verifies logs, target
   traces, unchanged source/locks and clean process exits. PPT 158a and final
   corrected-source qualification remain open; no acceptance or push.
+
+  PPT158–158h merges at ac36f3099c and the accumulated integration fast-forwards
+  onto feat/unified-ops-api (161). Approved runs pass 1,249 PPT library tests
+  (one existing ignored), nine OfficeArt tests, five integration tests, typed
+  Ops limit classification and all-format CRUD with zero unreached claims.
+  Earlier compiler failures remain preserved; no oracle is changed. Root
+  retires the merged PPT checkout/ref and its test cache, reaching 277
+  worktrees and 439 refs removed; 61 worktrees and 74 heads remain. The local
+  untracked probe and old ignored lock are preserved before trunk integration.
+  Rawv12a passes independent source review and 18 tests. Corrected C2 freeze,
+  full65/isolated rustdoc, final census and native performance remain open.
+  The remaining unified refs are merged controls. Nothing is pushed.
