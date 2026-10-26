@@ -89,7 +89,7 @@ All cases are in `crates/litchi-iwa/tests/parity/formula_refresh_cases.rs`.
 | `pages_body_table_formula_clear_parity`, `pages_body_table_formula_replace_parity` | the host-authored C3 | B | pass |
 | `pages_body_table_formula_read_parity` | native B4 (receipt) and host-authored C3 | A | pass |
 | `keynote_native_commented_formula_clear_is_refused` | the native D2 carries a comment: host refuses (field 11), leaf refuses `TableStorage` | — | pinned |
-| `pages_body_table_formula_author_mirrored_range_divergence_is_reported` | `body-table-cells-native.pages`: the selected table's SUM range is mirrored inline and in a range tile; host authors C3, leaf refuses `Formulas` | — | pinned divergence |
+| `pages_body_table_formula_author_graph_parity` | `body-table-cells-native.pages` C3, in the table whose `SUM(B2:B3)` range is mirrored inline and in a range tile (§4) | B | pass |
 
 `known_fields` registers the TSCE schemas 4000, 4008, 4009 and 4010 for
 every format: they belong to the calculation engine all three applications
@@ -115,9 +115,16 @@ authoring and removal. `iwa_exit_ledger.py --check` passes.
 table's merge owner) mirrors inline and in a range-precedents tile: two
 different source records, both containers preserved. Numbers refused such
 graphs before, so this is a capability the Numbers formula path gains
-where a document has such a merge owner. A mirrored range of the selected
-table stays refused, because the rewrite regenerates the selected table's
-containers. Every `litchi-numbers` test passes unchanged (1,020).
+where a document has such a merge owner. When the selected table mirrors its
+range records (the inline copy equals the tiled facts), the inline copy is
+set aside at decode and regenerated beside the rewritten tiles; any other
+repeated range stays refused. The range-tile verifier now reads an omitted
+size dimension as one, as the source decode does. Numbers refused both
+shapes before, so these are capabilities the Numbers formula path gains;
+every `litchi-numbers` test passes unchanged (1,025).
+
+Follow-up `ed…` (this record's last code commit): the Pages SUM-table
+authoring case, refused in the first 0376a slice, now passes tier B.
 
 ## 5. Performance
 
@@ -149,7 +156,6 @@ taskset -c 3 valgrind --tool=callgrind \
 | Gap | Note |
 |---|---|
 | Cross-table references in an authored formula | `FormulaExpression::TableCell { table_id: u64 }` names a native object; a selector-first table reference (as in Numbers' `formula::Table`) belongs in the shared vocabulary first (W1-A/W1-D) |
-| The selected table's mirrored ranges (Pages SUM tables) | the shared rewrite regenerates the selected owner's range containers from one record set, and the native mirror carries two different raw records; authoring or removing a formula there is refused (pinned divergence) |
 | Commented formula cells | the shared cell writer's existing refusal (`TableStorage`/`UnsupportedStorage`) |
 | Date and duration caches of an authored formula | refused at staging (`CellInput` has no date or duration) |
 | Dependents of an authored formula | not refreshed, as in the host; the Numbers owner validates and refreshes them |
