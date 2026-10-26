@@ -170,14 +170,12 @@ const COMMENTS: &str = "iwork/pages/body-table-comment-hidden-native-saved.pages
 /// `body_table_merges`, `body_table_cells`) on native fixtures.
 #[test]
 fn pages_body_table_reads_parity() -> TestResult {
-    let input = fixture(COMMENTS)?;
+    let input = fixture(CELLS)?;
     Case::new(
         "pages_body_table_reads_parity",
         Format::Pages,
         Tier::A,
-        Evidence::Native(
-            "test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json",
-        ),
+        Evidence::Native("test-data/iwork/pages/body-table-cells-native-receipt.json"),
         &input,
     )
     .read_only()
