@@ -19,6 +19,18 @@ pub mod text {
     };
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
+/// Ordered conditional-highlight rules of cells (record 0370d), started by
+/// [`crate::Package::edit_table_cell_conditional_highlights`] and read by
+/// [`crate::Package::table_cell_conditional_highlight`].
+pub mod conditional_highlight {
+    pub use crate::package::conditional_highlight::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::conditional_highlight::{
+        Condition, Date, DateRange, Error as ValueError, Number, Offset, OffsetDirection, Period,
+        PeriodUnit, Range, Rule, Style, Text,
+    };
+}
 /// Paragraph lists of cells' text (record 0370b), started by
 /// [`crate::Package::edit_table_cell_lists`]: a plain cell is promoted to
 /// rich text on its first list change.

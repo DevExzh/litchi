@@ -795,9 +795,9 @@ numbers/editor/semantic/media.rs	sheet_media_assets	1	numbers	media.asset	host-o
 numbers/editor/semantic/media.rs	to_bytes	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
+numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
+numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
 numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
@@ -833,7 +833,7 @@ numbers/editor/semantic/table.rs	reset_table_cell_text_shadow	1	numbers	table.ce
 numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
