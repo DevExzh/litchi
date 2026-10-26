@@ -5,7 +5,6 @@ use crate::package::{Error, Result, SourceLimitKind};
 
 pub(super) const CLIENT_DATA_RAW_KIND: u16 = 0xf011;
 pub(super) const CLIENT_TEXTBOX_RAW_KIND: u16 = 0xf00d;
-pub(super) const MAX_HOST_RECORDS: u32 = 1_000_000;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RawRecord<'data> {

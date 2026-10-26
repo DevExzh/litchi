@@ -7,6 +7,8 @@
 use super::codec::text_from_ppt_records;
 use super::{Container, RecordKind, anchor, parse, parse_drawing, text_from_drawing};
 
+const MAX_HOST_RECORDS: u32 = 1_000_000;
+
 fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
@@ -32,7 +34,7 @@ fn ppt_text_atoms_use_their_specified_encodings() {
     text_from_ppt_records(
         &bytes,
         &mut text,
-        super::package::MAX_HOST_RECORDS,
+        MAX_HOST_RECORDS,
         crate::SourceLimits::DEFAULT_MAX_DEPTH,
     )
     .unwrap();
@@ -47,7 +49,7 @@ fn malformed_embedded_record_stops_without_panicking() {
         text_from_ppt_records(
             &[0; 7],
             &mut text,
-            super::package::MAX_HOST_RECORDS,
+            MAX_HOST_RECORDS,
             crate::SourceLimits::DEFAULT_MAX_DEPTH,
         )
         .is_err()
