@@ -127,24 +127,19 @@ pub enum Error {
 /// A replayable document-properties change: the core-properties value the
 /// edit started from and the value it published (`None` is an absent
 /// core-properties part), and the exact part changes of the application and
-/// custom properties. The exact core delta and the exact application/custom
-/// delta planned over the post-core graph are retained privately for
-/// byte-faithful replay and inversion; [`Patch::parts`] remains a separate
-/// application/custom-properties projection over the original source graph.
+/// custom properties. The exact core delta planned over the post-parts graph
+/// and the source-scoped application/custom delta are retained for
+/// byte-faithful replay and inversion.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     base: Option<Metadata>,
     target: Option<Metadata>,
     parts: families::Patch,
-    /// The exact shared-codec core patch over the original source graph.
+    /// The exact shared-codec core patch over the graph after `parts` has
+    /// been applied.
     core: families::Patch,
-    /// The exact shared-codec application/custom patch over the package after
-    /// `core` has been applied. Keeping this separate preserves error-family
-    /// classification and avoids allocating a second composed descriptor.
-    replay_parts: families::Patch,
-    /// Whether replay must apply the private parts patch before the core
-    /// patch. Forward edits are core-first; inverses are parts-first so a
-    /// no-op scope remains anchored to its intermediate graph.
+    /// Whether replay must apply the application/custom patch before the core
+    /// patch. Forward edits are parts-first; inverses are core-first.
     parts_first: bool,
 }
 
@@ -172,10 +167,6 @@ impl Patch {
         &self.core
     }
 
-    pub(crate) const fn replay_parts(&self) -> &families::Patch {
-        &self.replay_parts
-    }
-
     pub(crate) const fn parts_first(&self) -> bool {
         self.parts_first
     }
@@ -183,7 +174,7 @@ impl Patch {
     /// Whether applying the patch leaves every package byte unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.base == self.target && self.core.is_noop() && self.replay_parts.is_noop()
+        self.base == self.target && self.core.is_noop() && self.parts.is_noop()
     }
 
     /// The patch that restores the base value.
@@ -194,7 +185,6 @@ impl Patch {
             target: self.base.clone(),
             parts: self.parts.inverse(),
             core: self.core.inverse(),
-            replay_parts: self.replay_parts.inverse(),
             parts_first: !self.parts_first,
         }
     }
@@ -326,15 +316,14 @@ impl Edit {
             custom,
             remove_custom,
         } = self;
-        let (package, changed, parts, core, replay_parts) =
+        let (package, changed, parts, core, parts_first) =
             source.publish_metadata(staged.as_ref(), app, custom, remove_custom)?;
         let patch = Patch {
             base,
             target: staged,
             parts,
             core,
-            replay_parts,
-            parts_first: false,
+            parts_first,
         };
         Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }

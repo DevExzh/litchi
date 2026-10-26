@@ -7,7 +7,7 @@
 use litchi_core::metadata::{Field, Metadata, Timestamp};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcError, OpcPackage, PackURI, TargetMode};
+use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
 
 use super::{Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
@@ -35,6 +35,19 @@ fn full() -> OpcPackage {
     let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.set_custom_props(props);
     edit.commit().unwrap().into_package()
+}
+
+fn app_only() -> OpcPackage {
+    let mut package = OpcPackage::new();
+    let core = Core::new().title("Before").creator("Ada");
+    write_core(&mut package, core).unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        PackURI::new("/docProps/app.xml").unwrap(),
+        ct::OFC_EXTENDED_PROPERTIES.to_owned(),
+        APP.as_bytes().to_vec(),
+    )));
+    package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
+    package
 }
 
 fn sign(package: &mut OpcPackage) {
@@ -803,6 +816,36 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     assert_eq!(
         bytes(&different_gap_result, "/docProps/custom.xml"),
         bytes(&source, "/docProps/custom.xml")
+    );
+}
+
+#[test]
+fn one_plan_reserves_removed_relationship_ids_for_later_creations() {
+    let source = app_only();
+    let before = PackageWriter::to_bytes(&source).unwrap();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let mut plan = snapshot.plan();
+    plan.set_app_props(None);
+    let mut custom_props = custom::Props::new();
+    custom_props.insert("Created", "yes").unwrap();
+    plan.set_custom_props(custom_props);
+    let (_, patch, _) = plan.finish().unwrap();
+
+    let mut changed = source.clone();
+    assert!(patch.apply_in_place(&mut changed).unwrap());
+    let changed_snapshot = Snapshot::read(&changed, Host::Word).unwrap();
+    assert!(changed_snapshot.app_props().unwrap().is_none());
+    assert_eq!(
+        changed_snapshot.custom_props().get("Created"),
+        Some(&Value::Text("yes".into()))
+    );
+
+    let mut restored = changed.clone();
+    assert!(patch.inverse().apply_in_place(&mut restored).unwrap());
+    assert_eq!(
+        PackageWriter::to_bytes(&restored).unwrap(),
+        before,
+        "a delete/create plan must replay and invert byte-for-byte"
     );
 }
 

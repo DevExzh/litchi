@@ -71,10 +71,7 @@ impl Package {
                 .core_patch()
                 .check(&self.opc)
                 .map_err(crate::Error::from)?;
-            patch
-                .replay_parts()
-                .check(&self.opc)
-                .map_err(Error::Properties)?;
+            patch.parts().check(&self.opc).map_err(Error::Properties)?;
             return Ok(crate::metadata::Commit::new(
                 self.clone(),
                 patch.clone(),
@@ -88,7 +85,7 @@ impl Package {
         let mut parts_failure = None;
         let published = package.edit_semantic_opc("apply_metadata", |opc| {
             if patch.parts_first() {
-                if let Err(error) = apply_metadata_parts(opc, patch.replay_parts()) {
+                if let Err(error) = apply_metadata_parts(opc, patch.parts()) {
                     parts_failure = Some(error);
                     return Err(crate::Error::InvalidFormat(
                         "document-property parts refused the patch".to_owned(),
@@ -97,7 +94,7 @@ impl Package {
                 apply_metadata_core(opc, patch.core_patch())?;
             } else {
                 apply_metadata_core(opc, patch.core_patch())?;
-                if let Err(error) = apply_metadata_parts(opc, patch.replay_parts()) {
+                if let Err(error) = apply_metadata_parts(opc, patch.parts()) {
                     parts_failure = Some(error);
                     return Err(crate::Error::InvalidFormat(
                         "document-property parts refused the patch".to_owned(),
@@ -161,9 +158,9 @@ impl Package {
     }
 
     /// Publish the staged core, application and custom properties as one
-    /// atomic package edit. The public application/custom projection is
-    /// planned over the source graph; the private replay parts are planned
-    /// after the core family so package relationship IDs cannot collide.
+    /// atomic package edit. The application/custom family is published first
+    /// from the source-scoped patch; the core family is then planned over the
+    /// intermediate graph so relationship IDs cannot collide.
     pub(crate) fn publish_metadata(
         &self,
         target: Option<&Props>,
@@ -185,7 +182,7 @@ impl Package {
                 false,
                 families::Patch::default(),
                 families::Patch::default(),
-                families::Patch::default(),
+                true,
             ));
         }
         if core && let Some(props) = target {
@@ -240,7 +237,7 @@ impl Package {
                 true,
                 parts.clone(),
                 families::Patch::default(),
-                parts,
+                true,
             ));
         }
 
@@ -251,8 +248,28 @@ impl Package {
         let mut package = self.clone();
         let mut parts_failure = None;
         let mut core_patch = families::Patch::default();
-        let mut replay_parts = families::Patch::default();
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
+            if source_parts.is_noop() {
+                if has_parts && let Err(error) = source_parts.check(opc) {
+                    parts_failure = Some(error);
+                    return Err(crate::Error::InvalidFormat(
+                        "document-property parts refused the patch".to_owned(),
+                    ));
+                }
+            } else {
+                match source_parts.apply(opc) {
+                    Ok(commit) => {
+                        *opc = commit.into_package();
+                    },
+                    Err(error) => {
+                        parts_failure = Some(error);
+                        return Err(crate::Error::InvalidFormat(
+                            "document-property parts refused the patch".to_owned(),
+                        ));
+                    },
+                }
+            }
+
             let mut core_edit = families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
             match target {
                 Some(props) => {
@@ -268,52 +285,6 @@ impl Package {
             let (core_package, committed_core_patch) = core_commit.into_parts();
             *opc = core_package;
             core_patch = committed_core_patch;
-
-            if has_parts {
-                let snapshot = match families::Snapshot::read(opc, Host::Word) {
-                    Ok(snapshot) => snapshot,
-                    Err(error) => {
-                        parts_failure = Some(error);
-                        return Err(crate::Error::InvalidFormat(
-                            "document-property parts refused the patch".to_owned(),
-                        ));
-                    },
-                };
-                let mut parts_plan = snapshot.plan();
-                if let Some(app) = app {
-                    parts_plan.set_app_props(app);
-                }
-                if let Some(custom) = custom {
-                    if remove_custom {
-                        parts_plan.remove_custom_props();
-                    } else {
-                        parts_plan.set_custom_props(custom);
-                    }
-                }
-                let committed_parts_patch = match parts_plan.finish() {
-                    Ok((_, patch, _)) => patch,
-                    Err(error) => {
-                        parts_failure = Some(error);
-                        return Err(crate::Error::InvalidFormat(
-                            "document-property parts refused the patch".to_owned(),
-                        ));
-                    },
-                };
-                if !committed_parts_patch.is_noop() {
-                    match committed_parts_patch.apply(opc) {
-                        Ok(commit) => {
-                            *opc = commit.into_package();
-                        },
-                        Err(error) => {
-                            parts_failure = Some(error);
-                            return Err(crate::Error::InvalidFormat(
-                                "document-property parts refused the patch".to_owned(),
-                            ));
-                        },
-                    }
-                }
-                replay_parts = committed_parts_patch;
-            }
             Ok(())
         });
         if let Some(error) = parts_failure {
@@ -322,10 +293,10 @@ impl Package {
         published?;
         Ok((
             package,
-            !core_patch.is_noop() || !replay_parts.is_noop(),
+            !core_patch.is_noop() || !source_parts.is_noop(),
             source_parts,
             core_patch,
-            replay_parts,
+            true,
         ))
     }
 }
