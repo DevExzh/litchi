@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import resource
 import shutil
 import signal
@@ -29,7 +30,7 @@ import time
 from typing import Any, Mapping
 
 try:
-    from odp_native_qualification import (
+    from tools.odp_native_qualification import (
         MAX_CHILD_OUTPUT,
         RunFailure,
         _digest,
@@ -43,7 +44,7 @@ try:
         load_average,
         process_scan,
     )
-    from odg_joined_qualification_bindings import (
+    from tools.odg_joined_qualification_bindings import (
         REVIEWED_FIXTURE_IDENTITY,
         REVIEWED_FIXTURE_PROVENANCE,
         REVIEWED_FIXTURE_RELATIVE,
@@ -52,7 +53,7 @@ try:
         REVIEWED_REPO_ROOT,
     )
 except ImportError:  # pragma: no cover - direct tools import.
-    from tools.odp_native_qualification import (  # type: ignore[no-redef]
+    from odp_native_qualification import (  # type: ignore[no-redef]
         MAX_CHILD_OUTPUT,
         RunFailure,
         _digest,
@@ -66,7 +67,7 @@ except ImportError:  # pragma: no cover - direct tools import.
         load_average,
         process_scan,
     )
-    from tools.odg_joined_qualification_bindings import (  # type: ignore[no-redef]
+    from odg_joined_qualification_bindings import (  # type: ignore[no-redef]
         REVIEWED_FIXTURE_IDENTITY,
         REVIEWED_FIXTURE_PROVENANCE,
         REVIEWED_FIXTURE_RELATIVE,
@@ -79,7 +80,14 @@ except ImportError:  # pragma: no cover - direct tools import.
 PREPARE_SCHEMA = "litchi.odg.joined-native-qualification.prepare.v4"
 BUILD_SCHEMA = "litchi.odg.joined-native-qualification.build.v4"
 BUILDER_REVISION = "odg-joined-builder-v4-closure-environment-target-bound"
+SOURCE_BINDER_SCHEMA = "litchi.odg.joined-native-qualification.c2a-source-binder.v1"
+SOURCE_PREPARATION_SCHEMA = "litchi.odg.joined-native-qualification.source-preparation.v1"
+SOURCE_BUILD_SCHEMA = "litchi.odg.joined-native-qualification.source-build.v1"
+REVISION = re.compile(r"[0-9a-f]{40}\Z")
 PRISTINE_BASELINE_REF = "ad52437f5e5e2c71ea476eedd5ddcf61aee2021d"
+# The returned handoff identifies the rejected implementation only by its
+# reviewed 15ab prefix; do not invent a full object ID that was never pinned.
+HISTORICAL_CANDIDATE_PREFIX = "15ab"
 EXPECTED_EXAMPLE = "litchi-perf-odg-joined-qualification"
 EXPECTED_PACKAGE = "litchi-odg"
 EXPECTED_CARGO_PROFILE = "release"
@@ -90,6 +98,12 @@ EXPECTED_SOURCE_NAMES = {
     "allocator": "odg_joined_qualification_allocator.rs",
     "baseline": "odg_joined_qualification_ad524_probe.rs",
     "candidate": "odg_joined_qualification_probe.rs",
+}
+SOURCE_COMPOSITION_LIMITS = {
+    "max_sub_edits": 8,
+    "max_effects_per_sub_edit": 8,
+    "max_total_effects": 32,
+    "max_conflicts": 16,
 }
 MAX_BUILD_OUTPUT = 64 * 1024 * 1024
 MEMORY_LIMIT_BYTES = 20_000_000_000
@@ -178,7 +192,29 @@ def _write_fresh_json(path: Path, value: Any, label: str) -> None:
 
 
 def _manifest_sha(path: Path) -> str:
-    return _sha256_file(path)[0]
+    """Hash a manifest without making its receipt hash self-referential.
+
+    The receipt identity is an observed post-build artifact.  It therefore
+    cannot participate in the manifest identity that the receipt records:
+    doing so would make sealing require a cryptographic fixed point.  Keep
+    the path in the canonical identity, but replace the observed bytes/hash
+    with fixed sentinels.  The final verifier still checks the real receipt
+    bytes against ``manifest.build.receipt_identity`` separately.
+    """
+    raw = _load_json(path)
+    build = raw.get("build")
+    if isinstance(build, dict):
+        identity = build.get("receipt_identity")
+        if isinstance(identity, dict):
+            identity = dict(identity)
+            identity["bytes"] = 0
+            identity["sha256"] = "0" * 64
+            build = dict(build)
+            build["receipt_identity"] = identity
+            raw = dict(raw)
+            raw["build"] = build
+    encoded = json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _raw_manifest(path: Path) -> dict[str, Any]:
@@ -249,11 +285,20 @@ def _receipt_binding(value: Any, label: str, base: Path, expected_path: Path) ->
 def _reviewed_file(path: Path, relative: Path, expected: Mapping[str, Any], label: str) -> dict[str, Any]:
     """Bind an overlay/fixture to the reviewed repository input itself."""
 
+    return _reviewed_file_at_root(path, relative, expected, label, REVIEWED_REPO_ROOT)
+
+
+def _reviewed_file_at_root(
+    path: Path, relative: Path, expected: Mapping[str, Any], label: str, source_root: Path,
+) -> dict[str, Any]:
+    """Bind a reviewed input to an explicitly selected clean source root."""
+
     path = _safe_path(path, label, must_exist=True)
-    approved = _safe_path(REVIEWED_REPO_ROOT / relative, f"approved {label}", must_exist=True)
+    source_root = _safe_path(source_root, f"approved {label} source root", must_exist=True)
+    approved = _safe_path(source_root / relative, f"approved {label}", must_exist=True)
     if path != approved:
         raise RunFailure(f"{label} must use the reviewed repository path {relative}")
-    status = _run_git_bytes(REVIEWED_REPO_ROOT, "ls-files", "-v", "-z", "--", str(relative))
+    status = _run_git_bytes(source_root, "ls-files", "-v", "-z", "--", str(relative))
     records = [item for item in status.split(b"\0") if item]
     if records != [b"H " + str(relative).encode()]:
         raise RunFailure(f"approved {label} is not an ordinary tracked worktree file")
@@ -281,6 +326,11 @@ def _check_identity(value: Any, label: str, base: Path, root: Path | None = None
 def _outside(path: Path, root: Path, label: str) -> None:
     if path == root or root in path.parents:
         raise RunFailure(f"{label} must be outside source root {root}")
+
+
+def _under(path: Path, parent: Path) -> bool:
+    """Return whether ``path`` is equal to or below ``parent``."""
+    return path == parent or parent in path.parents
 
 
 def _git_output(root: Path, *args: str) -> str:
@@ -657,27 +707,42 @@ def _probe_plan(raw: Mapping[str, Any], base: Path, roots: tuple[Path, Path]) ->
         item = _object(sources.get(name), f"manifest.probe_sources.{name}")
         _exact_keys(item, {"path", "bytes", "sha256", "destination"}, f"manifest.probe_sources.{name}")
         path = _safe_path(_raw_path(item["path"], f"manifest.probe_sources.{name}.path", base), f"probe {name}", must_exist=True)
-        if path != REVIEWED_REPO_ROOT / REVIEWED_PROBE_RELATIVES[name]:
+        candidate_root = roots[1]
+        if path == REVIEWED_REPO_ROOT / REVIEWED_PROBE_RELATIVES[name]:
+            source_root = REVIEWED_REPO_ROOT
+        elif path == candidate_root / REVIEWED_PROBE_RELATIVES[name]:
+            source_root = candidate_root
+        else:
             raise RunFailure(f"probe {name} is not the reviewed repository adapter")
         if item["destination"] != expected_destinations[name]:
             raise RunFailure(f"probe {name} has an unreviewed destination")
-        for root in roots:
-            if path == root or root in path.parents:
-                raise RunFailure(f"probe {name} must not come from an endpoint worktree")
-        actual = _reviewed_file(path, REVIEWED_PROBE_RELATIVES[name], REVIEWED_PROBE_IDENTITIES[name], f"probe {name}")
+        baseline_root = roots[0]
+        if path == baseline_root or baseline_root in path.parents:
+            raise RunFailure(f"probe {name} must not come from the baseline endpoint worktree")
+        actual = _reviewed_file_at_root(
+            path, REVIEWED_PROBE_RELATIVES[name], REVIEWED_PROBE_IDENTITIES[name],
+            f"probe {name}", source_root,
+        )
         if actual["bytes"] != _positive_int(item["bytes"], f"probe {name}.bytes") or actual["sha256"] != _digest(item["sha256"], f"probe {name}.sha256"):
             raise RunFailure(f"probe {name} identity differs from the manifest")
         result.append({"name": name, **actual, "destination": item["destination"]})
     return result
 
 
-def _fixture_plan(raw: Mapping[str, Any], base: Path) -> dict[str, Any]:
+def _fixture_plan(raw: Mapping[str, Any], base: Path, candidate_root: Path | None = None) -> dict[str, Any]:
     item = _object(raw.get("fixture"), "manifest.fixture")
     _exact_keys(item, {"path", "bytes", "sha256", "provenance"}, "manifest.fixture")
     path = _safe_path(_raw_path(item["path"], "manifest.fixture.path", base), "fixture", must_exist=True)
-    if path != REVIEWED_REPO_ROOT / REVIEWED_FIXTURE_RELATIVE:
+    source_root = REVIEWED_REPO_ROOT
+    if path == REVIEWED_REPO_ROOT / REVIEWED_FIXTURE_RELATIVE:
+        source_root = REVIEWED_REPO_ROOT
+    elif candidate_root is not None and path == candidate_root / REVIEWED_FIXTURE_RELATIVE:
+        source_root = candidate_root
+    else:
         raise RunFailure("fixture is not the reviewed repository test-data/odg/joined-content.xml")
-    actual = _reviewed_file(path, REVIEWED_FIXTURE_RELATIVE, REVIEWED_FIXTURE_IDENTITY, "fixture")
+    actual = _reviewed_file_at_root(
+        path, REVIEWED_FIXTURE_RELATIVE, REVIEWED_FIXTURE_IDENTITY, "fixture", source_root,
+    )
     if actual["bytes"] != _positive_int(item["bytes"], "manifest.fixture.bytes") or actual["sha256"] != _digest(item["sha256"], "manifest.fixture.sha256"):
         raise RunFailure("fixture identity differs from the manifest")
     content = path.read_bytes()
@@ -856,6 +921,550 @@ def _command(endpoint: Mapping[str, Any], *, allocator: bool, cpu: int) -> dict[
     }
 
 
+def _source_binder_endpoint(raw: Mapping[str, Any], name: str) -> dict[str, Any]:
+    value = _object(raw.get(name), f"source binder.{name}")
+    expected = {
+        "root", "ref", "tree", "profile", "features", "source_manifest",
+        "source_closure", "lock", "toolchain", "cargo_config", "cargo_manifest",
+        "binary", "allocator_binary",
+    }
+    _exact_keys(value, expected, f"source binder.{name}")
+    ref = _string(value.get("ref"), f"source binder.{name}.ref")
+    tree = _string(value.get("tree"), f"source binder.{name}.tree")
+    if REVISION.fullmatch(ref) is None or REVISION.fullmatch(tree) is None:
+        raise RunFailure(f"source binder.{name} ref/tree are not immutable revisions")
+    profile = _string(value.get("profile"), f"source binder.{name}.profile")
+    expected_profile = "legacy-apply-joined" if name == "baseline" else "current-edit-join-commit"
+    if profile != expected_profile:
+        raise RunFailure(f"source binder.{name}.profile is not the reviewed paired profile")
+    features = value.get("features")
+    if (not isinstance(features, list) or any(not isinstance(item, str) or not item for item in features)
+            or features != sorted(set(features))):
+        raise RunFailure(f"source binder.{name}.features are not a sorted unique list")
+    for field in ("source_manifest", "source_closure"):
+        if field == "source_manifest":
+            _check_tree_manifest(value[field], _check_tree_manifest_shape(value[field], f"source binder.{name}.{field}"), f"source binder.{name}.{field}")
+        else:
+            _closure_binding(value[field], f"source binder.{name}.{field}")
+    for field in ("lock", "toolchain", "cargo_config", "cargo_manifest"):
+        item = _object(value.get(field), f"source binder.{name}.{field}")
+        _exact_keys(item, {"path", "bytes", "sha256"}, f"source binder.{name}.{field}")
+        _positive_int(item.get("bytes"), f"source binder.{name}.{field}.bytes")
+        _digest(item.get("sha256"), f"source binder.{name}.{field}.sha256")
+    for field in ("binary", "allocator_binary"):
+        item = _object(value.get(field), f"source binder.{name}.{field}")
+        _exact_keys(item, {"path", "bytes", "sha256", "status"}, f"source binder.{name}.{field}")
+        path = _safe_path(Path(_string(item.get("path"), f"source binder.{name}.{field}.path")), f"{name}.{field}")
+        if path.name != EXPECTED_EXAMPLE or path.parent.name != "examples" or path.parent.parent.name != "release":
+            raise RunFailure(f"source binder.{name}.{field} is not the reviewed release example path")
+        if item.get("bytes") is not None or item.get("sha256") is not None:
+            raise RunFailure(f"source binder.{name}.{field} carries an invented pre-build artifact identity")
+        role = "baseline" if name == "baseline" else "C2a"
+        if item.get("status") != "pending " + role + " " + ("allocator" if field == "allocator_binary" else "normal") + " build":
+            raise RunFailure(f"source binder.{name}.{field} is not pending its reviewed build")
+    return dict(value)
+
+
+def _check_tree_manifest_shape(value: Any, label: str) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"entries", "bytes", "sha256"}, label)
+    return {
+        "entries": _positive_int(item.get("entries"), f"{label}.entries"),
+        "bytes": _positive_int(item.get("bytes"), f"{label}.bytes"),
+        "sha256": _digest(item.get("sha256"), f"{label}.sha256"),
+    }
+
+
+def _source_binder_reviewed_inputs(
+    raw: Mapping[str, Any], candidate_root: Path,
+) -> dict[str, dict[str, Any]]:
+    values = _object(raw.get("reviewed_inputs"), "source binder.reviewed_inputs")
+    expected = {
+        "fixture": (REVIEWED_FIXTURE_RELATIVE, REVIEWED_FIXTURE_IDENTITY, None),
+        "common": (REVIEWED_PROBE_RELATIVES["common"], REVIEWED_PROBE_IDENTITIES["common"], EXPECTED_COMMON_DESTINATION),
+        "allocator": (REVIEWED_PROBE_RELATIVES["allocator"], REVIEWED_PROBE_IDENTITIES["allocator"], "crates/litchi-odg/examples/odg_joined_qualification_allocator.rs"),
+        "baseline_adapter": (REVIEWED_PROBE_RELATIVES["baseline"], REVIEWED_PROBE_IDENTITIES["baseline"], EXPECTED_OVERLAY_DESTINATION),
+        "candidate_adapter": (REVIEWED_PROBE_RELATIVES["candidate"], REVIEWED_PROBE_IDENTITIES["candidate"], EXPECTED_OVERLAY_DESTINATION),
+    }
+    result: dict[str, dict[str, Any]] = {}
+    for name, (relative, identity, destination) in expected.items():
+        item = _object(values.get(name), f"source binder.reviewed_inputs.{name}")
+        required = {"path", "bytes", "sha256", "destination"} if destination is not None else {"path", "bytes", "sha256", "provenance"}
+        _exact_keys(item, required, f"source binder.reviewed_inputs.{name}")
+        path = _safe_path(Path(_string(item.get("path"), f"reviewed input {name}.path")), f"reviewed input {name}", must_exist=True)
+        expected_paths = {
+            (REVIEWED_REPO_ROOT / relative).resolve(),
+            (candidate_root / relative).resolve(),
+        }
+        if path not in expected_paths:
+            raise RunFailure(f"reviewed input {name} is not the pinned repository file")
+        # The source binder was reviewed from the frozen candidate worktree,
+        # while the builder itself lives in a separate consumer leaf.  Accept
+        # either exact reviewed location, but require an ordinary tracked file
+        # and the fixed reviewed bytes in both cases.
+        source_root = candidate_root if path == (candidate_root / relative).resolve() else REVIEWED_REPO_ROOT
+        status = _run_git_bytes(source_root, "ls-files", "-v", "-z", "--", str(relative))
+        if [item for item in status.split(b"\0") if item] != [b"H " + str(relative).encode()]:
+            raise RunFailure(f"reviewed input {name} is not an ordinary tracked file")
+        actual = _identity(path)
+        binding = {"bytes": _positive_int(identity.get("bytes"), f"reviewed input {name}.bytes"),
+                   "sha256": _digest(identity.get("sha256"), f"reviewed input {name}.sha256")}
+        if actual["bytes"] != binding["bytes"] or actual["sha256"] != binding["sha256"]:
+            raise RunFailure(f"reviewed input {name} bytes differ from the reviewed source binding")
+        if item.get("bytes") != actual["bytes"] or item.get("sha256") != actual["sha256"]:
+            raise RunFailure(f"reviewed input {name} identity differs")
+        if destination is not None and item.get("destination") != destination:
+            raise RunFailure(f"reviewed input {name} destination differs")
+        if name == "fixture" and item.get("provenance") != REVIEWED_FIXTURE_PROVENANCE:
+            raise RunFailure("source binder fixture provenance differs")
+        result[name] = {**actual, **({"destination": destination} if destination else {"provenance": item["provenance"]})}
+    return result
+
+
+def _source_endpoint_state(raw_endpoint: Mapping[str, Any], name: str) -> dict[str, Any]:
+    root = _safe_path(Path(_string(raw_endpoint["root"], f"source binder.{name}.root")), f"{name}.root", must_exist=True)
+    shape = _check_worktree_shape(root, name)
+    head = _git_output(root, "rev-parse", "--verify", "HEAD")
+    tree = _git_output(root, "rev-parse", "--verify", "HEAD^{tree}")
+    if head != raw_endpoint["ref"] or tree != raw_endpoint["tree"]:
+        raise RunFailure(f"{name}: source HEAD/tree differs from the source binder")
+    status = _git_output(root, "status", "--porcelain", "--untracked-files=all")
+    if status:
+        raise RunFailure(f"{name}: source root must be clean before the bounded build")
+    actual_manifest = _tree_manifest(root, head)
+    expected_manifest = _check_tree_manifest_shape(raw_endpoint["source_manifest"], f"{name}.source_manifest")
+    if actual_manifest != expected_manifest:
+        raise RunFailure(f"{name}: complete Git tree differs from the source binder")
+    files: dict[str, dict[str, Any]] = {}
+    for field, relative in (
+        ("lock", "Cargo.lock"),
+        ("toolchain", "rust-toolchain.toml"),
+        ("cargo_config", ".cargo/config.toml"),
+        ("cargo_manifest", "Cargo.toml"),
+    ):
+        expected = raw_endpoint[field]
+        path = root / relative
+        actual = _identity(path)
+        if actual["bytes"] != expected["bytes"] or actual["sha256"] != expected["sha256"]:
+            raise RunFailure(f"{name}.{field} differs from the source binder")
+        files[field] = actual
+    return {
+        "name": name, "root": str(root), "ref": head, "tree": tree, "profile": raw_endpoint["profile"],
+        "features": list(raw_endpoint["features"]), "source_shape": shape,
+        "source_manifest": expected_manifest,
+        "source_closure": _closure_binding(raw_endpoint["source_closure"], f"{name}.source_closure"),
+        "lock": files["lock"], "toolchain": files["toolchain"],
+        "cargo_config": files["cargo_config"], "cargo_manifest": files["cargo_manifest"],
+    }
+
+
+def _source_preparation_plan(
+    binder_path: Path,
+    *,
+    target_root: Path,
+    build_output: Path,
+    tmpdir: Path,
+    cpu: int,
+    max_load: float,
+    max_iterations: int,
+    timeout_s: float,
+    allow_existing_build_paths: bool = False,
+) -> dict[str, Any]:
+    binder_path = _safe_path(binder_path.absolute(), "source binder", must_exist=True)
+    raw = _raw_manifest(binder_path)
+    if raw.get("schema") != SOURCE_BINDER_SCHEMA:
+        raise RunFailure(f"source binder schema must be {SOURCE_BINDER_SCHEMA!r}")
+    if raw.get("claim_scope") != "source/fixture/lock/probe binding only; normal and allocator binaries are pending the authorized C2a build":
+        raise RunFailure("source binder claim scope is not the reviewed pending-build scope")
+    target_root = _safe_path(target_root.absolute(), "ODG target root")
+    build_output = _safe_path(build_output.absolute(), "ODG build output")
+    tmpdir = _safe_path(tmpdir.absolute(), "ODG build TMPDIR")
+    if (target_root.exists() or build_output.exists()) and not allow_existing_build_paths:
+        raise RunFailure("source preparation target/output paths must be fresh and absent")
+    if allow_existing_build_paths:
+        for path, label in ((target_root, "ODG target root"), (build_output, "ODG build output")):
+            if path.exists() and (not path.is_dir() or path.is_symlink()):
+                raise RunFailure(f"{label} is not a regular external directory")
+    if not tmpdir.is_dir() or tmpdir.is_symlink():
+        raise RunFailure("ODG build TMPDIR must be an existing regular directory")
+    baseline_raw = _source_binder_endpoint(raw, "baseline")
+    candidate_raw = _source_binder_endpoint(raw, "candidate")
+    if baseline_raw["ref"] != PRISTINE_BASELINE_REF:
+        raise RunFailure(f"source binder baseline must be pristine pinned ref {PRISTINE_BASELINE_REF}")
+    if candidate_raw["ref"].startswith(HISTORICAL_CANDIDATE_PREFIX):
+        raise RunFailure("historical 15ab candidate is not admissible")
+    baseline = _source_endpoint_state(baseline_raw, "baseline")
+    candidate = _source_endpoint_state(candidate_raw, "candidate")
+    if baseline["root"] == candidate["root"] or baseline["ref"] == candidate["ref"]:
+        raise RunFailure("ODG source endpoints must be distinct")
+    for root in (Path(baseline["root"]), Path(candidate["root"])):
+        _outside(target_root, root, "ODG target root")
+        _outside(build_output, root, "ODG build output")
+        _outside(tmpdir, root, "ODG build TMPDIR")
+    if any(_under(left, right) or _under(right, left) for left, right in (
+        (target_root, build_output), (target_root, tmpdir), (build_output, tmpdir)
+    )):
+        raise RunFailure("ODG target/output/TMPDIR paths must be pairwise disjoint")
+    reviewed = _source_binder_reviewed_inputs(raw, Path(candidate["root"]))
+    endpoints: dict[str, dict[str, Any]] = {}
+    commands: dict[str, dict[str, dict[str, Any]]] = {}
+    for name, endpoint_raw, endpoint_state in (
+        ("baseline", baseline_raw, baseline), ("candidate", candidate_raw, candidate)
+    ):
+        normal_target = target_root / f"{name}-normal"
+        allocator_target = target_root / f"{name}-allocator"
+        endpoint = {
+            "root": endpoint_state["root"],
+            "target_dir": str(normal_target),
+            "allocator_target_dir": str(allocator_target),
+            "features": list(endpoint_raw["features"]),
+        }
+        endpoint_state = {
+            **endpoint_state,
+            "target_dir": str(normal_target),
+            "allocator_target_dir": str(allocator_target),
+            "binary": str(normal_target / "release" / "examples" / EXPECTED_EXAMPLE),
+            "allocator_binary": str(allocator_target / "release" / "examples" / EXPECTED_EXAMPLE),
+        }
+        endpoints[name] = endpoint_state
+        commands[name] = {}
+        for kind, allocator in (("normal", False), ("allocator", True)):
+            command = _command(endpoint, allocator=allocator, cpu=cpu)
+            overrides = dict(command["environment"])
+            overrides.update({
+                "CARGO_BUILD_JOBS": "1",
+                "CARGO_PROFILE_RELEASE_DEBUG": "0",
+                "LITCHI_MEM_MAX": "20G",
+                "TMPDIR": str(tmpdir),
+            })
+            command["environment_overrides"] = overrides
+            command["environment"] = _environment_identity(
+                Path(endpoint_state["root"]), ref=endpoint_state["ref"],
+                tree=endpoint_state["tree"], source_closure=endpoint_state["source_closure"],
+                overrides=overrides,
+            )
+            commands[name][kind] = command
+    overlays = [
+        {"source": reviewed["common"]["path"], "destination": EXPECTED_COMMON_DESTINATION},
+        {"source": reviewed["allocator"]["path"], "destination": "crates/litchi-odg/examples/odg_joined_qualification_allocator.rs"},
+        {"source": reviewed["baseline_adapter"]["path"], "destination": EXPECTED_OVERLAY_DESTINATION, "endpoint": "baseline"},
+        {"source": reviewed["candidate_adapter"]["path"], "destination": EXPECTED_OVERLAY_DESTINATION, "endpoint": "candidate"},
+    ]
+    return {
+        "schema": SOURCE_PREPARATION_SCHEMA,
+        "builder_revision": BUILDER_REVISION,
+        "builder_source": _identity(Path(__file__).resolve()),
+        "status": "source_prepared",
+        # The source binder has no self-referential build receipt.  Bind its
+        # actual file bytes here; `_manifest_sha` is reserved for manifests
+        # whose observed receipt identity is deliberately normalized.
+        "source_binder": {"path": str(binder_path), "bytes": binder_path.stat().st_size, "sha256": _sha256_file(binder_path)[0]},
+        "baseline": endpoints["baseline"],
+        "candidate": endpoints["candidate"],
+        "reviewed_inputs": reviewed,
+        "overlays": overlays,
+        "commands": commands,
+        "target_root": str(target_root),
+        "build_output": str(build_output),
+        "tmpdir": str(tmpdir),
+        "cpu": cpu,
+        "max_load": max_load,
+        "max_iterations": max_iterations,
+        "timeout_s": timeout_s,
+        "abba_order": ["a1", "b1", "b2", "a2"],
+        "blocks": 2,
+        "warmups": 20,
+        "samples_per_fresh_child": 1,
+        "target_ms": 500,
+        "minimum_ms": 150,
+        "composition_limits": SOURCE_COMPOSITION_LIMITS,
+        "closure_policy": "full tracked source closure is revalidated immediately before and after every bounded build job",
+        "claim_scope": "source preparation only; no build, binary, correctness, timing, or acceptance claim",
+    }
+
+
+def prepare_source(
+    binder_path: Path,
+    *,
+    target_root: Path,
+    build_output: Path,
+    tmpdir: Path,
+    cpu: int,
+    max_load: float,
+    max_iterations: int,
+    timeout_s: float,
+    output: Path,
+) -> dict[str, Any]:
+    if type(cpu) is not int or cpu < 0:
+        raise RunFailure("source preparation CPU must be a nonnegative integer")
+    if type(max_load) not in (int, float) or max_load <= 0:
+        raise RunFailure("source preparation max_load must be positive")
+    if type(max_iterations) is not int or max_iterations <= 0:
+        raise RunFailure("source preparation max_iterations must be positive")
+    if type(timeout_s) not in (int, float) or timeout_s <= 0:
+        raise RunFailure("source preparation timeout_s must be positive")
+    output = _safe_path(output.absolute(), "source preparation receipt")
+    if output.exists() or output.is_symlink():
+        raise RunFailure(f"refusing to overwrite source preparation receipt: {output}")
+    plan = _source_preparation_plan(
+        binder_path, target_root=target_root, build_output=build_output, tmpdir=tmpdir,
+        cpu=cpu, max_load=max_load, max_iterations=max_iterations, timeout_s=timeout_s,
+    )
+    for root in (Path(plan["baseline"]["root"]), Path(plan["candidate"]["root"])):
+        _outside(output, root, "source preparation receipt")
+    if any(_under(output, Path(value)) or _under(Path(value), output)
+           for value in (plan["target_root"], plan["build_output"], plan["tmpdir"])):
+        raise RunFailure("source preparation receipt must be disjoint from build paths")
+    plan["source_preparation"] = {"path": str(output)}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    return plan
+
+
+def _load_source_preparation(path: Path) -> dict[str, Any]:
+    path = _safe_path(path.absolute(), "source preparation receipt", must_exist=True)
+    raw = _raw_manifest(path)
+    if raw.get("schema") != SOURCE_PREPARATION_SCHEMA or raw.get("status") != "source_prepared":
+        raise RunFailure("source preparation receipt schema/status differs")
+    source_path = _object(raw.get("source_preparation"), "source preparation receipt.source_preparation")
+    if source_path.get("path") != str(path):
+        raise RunFailure("source preparation receipt path differs")
+    binder = _object(raw.get("source_binder"), "source preparation receipt.source_binder")
+    binder_path = _safe_path(Path(_string(binder.get("path"), "source binder path")), "source binder", must_exist=True)
+    binder_sha, binder_bytes = _sha256_file(binder_path)
+    if binder_sha != binder.get("sha256") or binder_bytes != binder.get("bytes"):
+        raise RunFailure("source binder changed after preparation")
+    current = _source_preparation_plan(
+        binder_path,
+        target_root=Path(_string(raw.get("target_root"), "source preparation.target_root")),
+        build_output=Path(_string(raw.get("build_output"), "source preparation.build_output")),
+        tmpdir=Path(_string(raw.get("tmpdir"), "source preparation.tmpdir")),
+        cpu=_nonnegative_int(raw.get("cpu"), "source preparation.cpu"),
+        max_load=float(raw.get("max_load")),
+        max_iterations=_positive_int(raw.get("max_iterations"), "source preparation.max_iterations"),
+        timeout_s=float(raw.get("timeout_s")),
+        allow_existing_build_paths=True,
+    )
+    current["source_preparation"] = source_path
+    if raw != current:
+        raise RunFailure("source preparation receipt differs from its current source/builder plan")
+    return raw
+
+
+def _source_identity_for_event(endpoint: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "ref": endpoint["ref"],
+        "tree": endpoint["tree"],
+        "source_manifest": endpoint["source_manifest"],
+        "source_closure": endpoint["source_closure"],
+        "lock": endpoint["lock"],
+        "toolchain": endpoint["toolchain"],
+        "cargo_config": endpoint["cargo_config"],
+        "cargo_manifest": endpoint["cargo_manifest"],
+    }
+
+
+def build_source(preparation_path: Path) -> dict[str, Any]:
+    preparation_path = _safe_path(preparation_path.absolute(), "source preparation receipt", must_exist=True)
+    preparation = _load_source_preparation(preparation_path)
+    build_output = _safe_path(Path(preparation["build_output"]), "ODG build output")
+    target_root = _safe_path(Path(preparation["target_root"]), "ODG target root")
+    if build_output.exists() or target_root.exists():
+        raise RunFailure("ODG source build requires fresh output and target roots")
+    target_root.mkdir(parents=True, exist_ok=False)
+    build_output.mkdir(parents=True, exist_ok=False)
+    logs_dir = build_output / "logs"
+    logs_dir.mkdir()
+    events: list[dict[str, Any]] = []
+    endpoints = (("baseline", preparation["baseline"]), ("candidate", preparation["candidate"]))
+    for name, endpoint in endpoints:
+        root = Path(endpoint["root"])
+        source_cache = _source_closure(root, endpoint["ref"], endpoint["source_closure"])
+        for kind, target_key in (("normal", "target_dir"), ("allocator", "allocator_target_dir")):
+            target = Path(endpoint[target_key])
+            _fresh_dir(target, f"{name}/{kind} target directory")
+            overlay_paths: list[str] = []
+            event: dict[str, Any] | None = None
+            try:
+                _validate_source_closure(root, source_cache, endpoint["source_closure"])
+                source_before = _source_identity_for_event(endpoint)
+                for overlay in preparation["overlays"]:
+                    if overlay.get("endpoint") not in (None, name):
+                        continue
+                    relative = str(overlay["destination"])
+                    _overlay_copy(Path(overlay["source"]), root / relative, root)
+                    overlay_paths.append(relative)
+                command_spec = preparation["commands"][name][kind]
+                guard_before = _quiet_guard(preparation["max_load"], f"before-{name}-{kind}")
+                event = _stream_command(
+                    list(command_spec["argv"]), root, logs_dir, f"{name}-{kind}", target,
+                    preparation["cpu"], timeout_s=preparation["timeout_s"],
+                    environment=command_spec["environment"]["variables"],
+                    max_load=preparation["max_load"],
+                )
+                event["environment"] = command_spec["environment"]
+                event["guard_before"] = guard_before
+                event["guard_after"] = _quiet_guard(preparation["max_load"], f"after-{name}-{kind}")
+                artifact_path = Path(endpoint["binary"] if kind == "normal" else endpoint["allocator_binary"])
+                if artifact_path.is_symlink() or not artifact_path.is_file() or not os.access(artifact_path, os.X_OK):
+                    raise RunFailure(f"{name}/{kind}: bounded build did not produce an executable")
+                event["artifact"] = _identity(artifact_path)
+                event["source_before"] = source_before
+            finally:
+                for relative in reversed(overlay_paths):
+                    _remove_overlay(root, relative)
+                shape = _check_worktree_shape(root, name)
+                if shape["root"] != endpoint["root"]:
+                    raise RunFailure(f"{name}: source root changed during bounded build")
+                if event is not None:
+                    _validate_source_closure(root, source_cache, endpoint["source_closure"], force_full=True)
+                    event["source_after"] = _source_identity_for_event(endpoint)
+                    events.append(event)
+    receipt = {
+        "schema": SOURCE_BUILD_SCHEMA,
+        "builder_revision": BUILDER_REVISION,
+        "status": "passed",
+        "preparation": {"path": str(preparation_path), "bytes": preparation_path.stat().st_size, "sha256": _sha256_file(preparation_path)[0]},
+        "events": events,
+        "event_order": ["baseline-normal", "baseline-allocator", "candidate-normal", "candidate-allocator"],
+        "claim_scope": "bounded source build only; binary identities are observed outputs, with no correctness, timing, or acceptance claim",
+        "completed_unix_ns": time.time_ns(),
+    }
+    receipt_path = build_output / "source-build-receipt.json"
+    with receipt_path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    receipt["receipt"] = {"path": str(receipt_path), "bytes": receipt_path.stat().st_size, "sha256": _sha256_file(receipt_path)[0]}
+    return receipt
+
+
+def seal_source_build(
+    preparation_path: Path,
+    *,
+    output_manifest: Path,
+) -> dict[str, Any]:
+    """Bind observed source-build artifacts into the final ODG manifest.
+
+    This is deliberately a post-build operation.  Artifact bytes and hashes
+    come only from the fresh build receipt; no executable identity is accepted
+    from the source binder.  The resulting manifest uses the ordinary ODG
+    schema and is checked by the unchanged final receipt validator.
+    """
+    preparation_path = _safe_path(preparation_path.absolute(), "source preparation receipt", must_exist=True)
+    preparation = _load_source_preparation(preparation_path)
+    build_path = Path(preparation["build_output"]) / "source-build-receipt.json"
+    build_path = _safe_path(build_path, "source build receipt", must_exist=True)
+    source_build = _raw_manifest(build_path)
+    if source_build.get("schema") != SOURCE_BUILD_SCHEMA or source_build.get("status") != "passed":
+        raise RunFailure("source build receipt is not a passed bounded-build receipt")
+    prep_identity = source_build.get("preparation")
+    if not isinstance(prep_identity, dict):
+        raise RunFailure("source build receipt preparation identity is missing")
+    prep_sha, prep_bytes = _sha256_file(preparation_path)
+    if prep_identity.get("path") != str(preparation_path) or prep_identity.get("sha256") != prep_sha or prep_identity.get("bytes") != prep_bytes:
+        raise RunFailure("source build receipt is bound to a different preparation")
+    events = source_build.get("events")
+    expected_labels = ["baseline-normal", "baseline-allocator", "candidate-normal", "candidate-allocator"]
+    if not isinstance(events, list) or [event.get("label") for event in events] != expected_labels:
+        raise RunFailure("source build receipt event order is incomplete or changed")
+    event_by_label = {event["label"]: event for event in events}
+    for event in events:
+        artifact = _object(event.get("artifact"), f"source build {event['label']}.artifact")
+        path = _safe_path(Path(_string(artifact.get("path"), f"source build {event['label']}.artifact.path")), f"source build {event['label']}.artifact", must_exist=True)
+        actual = _identity(path)
+        if actual != artifact or not os.access(path, os.X_OK):
+            raise RunFailure(f"source build {event['label']} artifact changed or is not executable")
+
+    def endpoint_manifest(name: str) -> dict[str, Any]:
+        endpoint = preparation[name]
+        normal = event_by_label[f"{name}-normal"]["artifact"]
+        allocator = event_by_label[f"{name}-allocator"]["artifact"]
+        return {
+            "root": endpoint["root"], "ref": endpoint["ref"], "tree": endpoint["tree"],
+            "profile": endpoint["profile"], "features": endpoint["features"],
+            "binary": normal["path"], "target_dir": endpoint["target_dir"],
+            "allocator_binary": allocator["path"], "allocator_target_dir": endpoint["allocator_target_dir"],
+            "lock": endpoint["lock"], "toolchain": endpoint["toolchain"],
+            "cargo_config": endpoint["cargo_config"], "cargo_manifest": endpoint["cargo_manifest"],
+            "source_manifest": endpoint["source_manifest"], "source_closure": endpoint["source_closure"],
+            "binary_identity": {"bytes": normal["bytes"], "sha256": normal["sha256"]},
+            "allocator_binary_identity": {"bytes": allocator["bytes"], "sha256": allocator["sha256"]},
+        }
+
+    reviewed = preparation["reviewed_inputs"]
+    manifest_path = _safe_path(output_manifest.absolute(), "final ODG manifest")
+    if manifest_path.exists() or manifest_path.is_symlink():
+        raise RunFailure(f"refusing to overwrite final ODG manifest: {manifest_path}")
+    build_output = Path(preparation["build_output"])
+    prepare_receipt = build_output / "preparation-receipt.json"
+    final_build_receipt = build_output / "build-receipt.json"
+    if prepare_receipt.exists() or final_build_receipt.exists():
+        raise RunFailure("final ODG receipt paths must be fresh before sealing")
+    probe_sources = {
+        "common": {key: reviewed["common"][key] for key in ("path", "bytes", "sha256", "destination")},
+        "allocator": {key: reviewed["allocator"][key] for key in ("path", "bytes", "sha256", "destination")},
+        "baseline": {key: reviewed["baseline_adapter"][key] for key in ("path", "bytes", "sha256", "destination")},
+        "candidate": {key: reviewed["candidate_adapter"][key] for key in ("path", "bytes", "sha256", "destination")},
+    }
+    raw = {
+        "schema": "litchi.odg.joined-native-qualification.input.v3",
+        "fixture": {key: reviewed["fixture"][key] for key in ("path", "bytes", "sha256", "provenance")},
+        "baseline": endpoint_manifest("baseline"),
+        "candidate": endpoint_manifest("candidate"),
+        "probe_sources": probe_sources,
+        "protocol": {
+            "cpu": preparation["cpu"], "blocks": preparation["blocks"], "warmups": preparation["warmups"],
+            "target_ms": preparation["target_ms"], "minimum_ms": preparation["minimum_ms"],
+            "max_load": preparation["max_load"], "max_iterations": preparation["max_iterations"],
+            "timeout_s": preparation["timeout_s"],
+        },
+        "runtime": {"tmpdir": preparation["tmpdir"]},
+        "composition_limits": preparation["composition_limits"],
+        "build": {
+            "prepare_receipt": str(prepare_receipt), "receipt": str(final_build_receipt),
+            "receipt_identity": {"path": str(final_build_receipt), "bytes": 1, "sha256": "0" * 64},
+            "final_candidate_ref": preparation["candidate"]["ref"], "cpu": preparation["cpu"],
+        },
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    with manifest_path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(raw, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    plan = prepare_plan(manifest_path, allow_built_artifacts=True)
+    with prepare_receipt.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    receipt = {
+        "schema": BUILD_SCHEMA,
+        "builder_revision": BUILDER_REVISION,
+        "status": "passed",
+        "manifest": str(manifest_path),
+        "manifest_sha256": plan["manifest_sha256"],
+        "prepare_receipt": str(prepare_receipt),
+        "prepare_sha256": _manifest_sha(prepare_receipt),
+        "plan": plan,
+        "events": events,
+        "completed_unix_ns": time.time_ns(),
+    }
+    with final_build_receipt.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    final_identity = _identity(final_build_receipt)
+    raw["build"]["receipt_identity"] = {
+        "path": str(final_build_receipt), "bytes": final_identity["bytes"], "sha256": final_identity["sha256"]
+    }
+    manifest_path.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    validate_build_receipt(manifest_path)
+    return raw
+
+
 def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) -> dict[str, Any]:
     manifest_path = _safe_path(manifest_path.absolute(), "manifest", must_exist=True)
     raw = _raw_manifest(manifest_path)
@@ -866,7 +1475,7 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
     candidate = _endpoint_identity(raw, "candidate", base, build, allow_built_artifacts=allow_built_artifacts)
     if baseline["root"] == candidate["root"] or baseline["ref"] == candidate["ref"]:
         raise RunFailure("baseline and candidate source identities must differ")
-    fixture = _fixture_plan(raw, base)
+    fixture = _fixture_plan(raw, base, Path(candidate["root"]))
     for root in (Path(baseline["root"]), Path(candidate["root"])):
         _outside(Path(fixture["path"]), root, "fixture")
     probes = _probe_plan(raw, base, (Path(baseline["root"]), Path(candidate["root"])))
@@ -914,7 +1523,10 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
             {"source": next(item for item in probes if item["name"] == "candidate")["path"], "destination": EXPECTED_OVERLAY_DESTINATION, "endpoint": "candidate"},
         ],
         "commands": commands,
-        "receipts": {"prepare": str(prepare_receipt), "build": receipt_binding},
+        # The build receipt identity is checked directly against the manifest
+        # by the final verifier.  The plan carries only its path so sealing a
+        # post-build artifact cannot create a receipt/manifest hash cycle.
+        "receipts": {"prepare": str(prepare_receipt), "build": {"path": str(receipt)}},
     }
     return plan
 
@@ -1487,8 +2099,10 @@ def build(manifest_path: Path) -> dict[str, Any]:
     }
     _write_fresh_json(build_receipt, receipt, "build receipt")
     actual_receipt = _identity(build_receipt)
-    expected_receipt = plan["receipts"]["build"]
-    if actual_receipt != expected_receipt:
+    expected_receipt = build_value["receipt_identity"]
+    if (actual_receipt["path"] != str(build_receipt)
+            or actual_receipt["bytes"] != expected_receipt["bytes"]
+            or actual_receipt["sha256"] != expected_receipt["sha256"]):
         raise RunFailure("build receipt differs from its externally bound receipt identity")
     return receipt
 
@@ -1659,18 +2273,54 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", required=True, type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--binder", type=Path)
+    parser.add_argument("--preparation", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--target-root", type=Path)
+    parser.add_argument("--build-output", type=Path)
+    parser.add_argument("--tmpdir", type=Path)
+    parser.add_argument("--cpu", type=int)
+    parser.add_argument("--max-load", type=float, default=1.0)
+    parser.add_argument("--max-iterations", type=int, default=100000)
+    parser.add_argument("--timeout-s", type=float, default=300.0)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--prepare", action="store_true")
     group.add_argument("--build", action="store_true")
     group.add_argument("--validate", action="store_true")
+    group.add_argument("--prepare-source", action="store_true")
+    group.add_argument("--build-source", action="store_true")
+    group.add_argument("--seal-source", action="store_true")
     args = parser.parse_args(argv)
     try:
-        if args.prepare:
+        if args.prepare_source:
+            required = (args.binder, args.output, args.target_root, args.build_output, args.tmpdir, args.cpu)
+            if any(value is None for value in required):
+                parser.error("--prepare-source requires --binder, --output, --target-root, --build-output, --tmpdir, and --cpu")
+            prepare_source(
+                args.binder, target_root=args.target_root, build_output=args.build_output,
+                tmpdir=args.tmpdir, cpu=args.cpu, max_load=args.max_load,
+                max_iterations=args.max_iterations, timeout_s=args.timeout_s, output=args.output,
+            )
+        elif args.build_source:
+            if args.preparation is None:
+                parser.error("--build-source requires --preparation")
+            build_source(args.preparation)
+        elif args.seal_source:
+            if args.preparation is None or args.output is None:
+                parser.error("--seal-source requires --preparation and --output")
+            seal_source_build(args.preparation, output_manifest=args.output)
+        elif args.prepare:
+            if args.manifest is None:
+                parser.error("--prepare requires --manifest")
             prepare(args.manifest)
         elif args.build:
+            if args.manifest is None:
+                parser.error("--build requires --manifest")
             build(args.manifest)
         else:
+            if args.manifest is None:
+                parser.error("--validate requires --manifest")
             validate_build_receipt(args.manifest)
     except (RunFailure, OSError, ValueError) as error:
         print(str(error), file=sys.stderr)
