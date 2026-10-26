@@ -2081,17 +2081,17 @@ text/editor.rs	insert_text_date_time_field	1	shared	text.date_time_field	host-on
 text/editor.rs	insert_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	named_paragraph_styles	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-text/editor.rs	paragraph_alignment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_background	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_borders	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_decimal_tab_character	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_default_tab_interval	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Alignment); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::ParagraphBackground); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_borders	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Borders); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_decimal_tab_character	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::DecimalTabCharacter); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_default_tab_interval	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::DefaultTabInterval); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	paragraph_drop_caps	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_flow	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_following_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_indents	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_line_spacing	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+text/editor.rs	paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Flow); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::FollowingStyle); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Indents); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_line_spacing	1	shared	drawable.shape	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::LineSpacing); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_list	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	paragraph_list_bullet	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	paragraph_list_bullet_geometry	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
@@ -2104,9 +2104,9 @@ text/editor.rs	paragraph_list_number_scale	1	shared	text.shared	host-only	litchi
 text/editor.rs	paragraph_list_number_tiering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	paragraph_list_numbering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	paragraph_lists	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_spacing	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_tab_stops	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_writing_direction	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Spacing); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TabStops); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::WritingDirection); host kept as the oracle (record 0374)
 text/editor.rs	redefine_applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	remove_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
@@ -2119,15 +2119,15 @@ text/editor.rs	remove_text_language_boundary	1	shared	text.language	host-only	li
 text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	rename_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	replace_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_alignment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_background	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_borders	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_decimal_tab_character	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_default_tab_interval	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_flow	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_following_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_indents	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_line_spacing	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+text/editor.rs	reset_paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Alignment)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::ParagraphBackground)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_borders	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Borders)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_decimal_tab_character	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::DecimalTabCharacter)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_default_tab_interval	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::DefaultTabInterval)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Flow)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::FollowingStyle)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Indents)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_line_spacing	1	shared	drawable.shape	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::LineSpacing)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_list	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	reset_paragraph_list_bullet	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	reset_paragraph_list_bullet_geometry	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
@@ -2137,33 +2137,33 @@ text/editor.rs	reset_paragraph_list_level	1	shared	text.shared	host-only	litchi-
 text/editor.rs	reset_paragraph_list_number_format	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	reset_paragraph_list_number_scale	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	reset_paragraph_list_number_tiering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_spacing	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_tab_stops	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_writing_direction	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_background	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_baseline_shift	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_capitalization	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_character_spacing	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_color	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_decorations	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_font	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	reset_paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Spacing)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TabStops)); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::WritingDirection)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextBackground)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_baseline_shift	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextBaselineShift)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextCapitalization)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_character_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextCharacterSpacing)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextColor)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextDecorations)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextFont)); host kept as the oracle (record 0374)
 text/editor.rs	reset_text_languages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_ligatures	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_outline	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_script	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_shadow	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_text_style	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	reset_text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextLigatures)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextOutline)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextScript)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextShadow)); host kept as the oracle (record 0374)
+text/editor.rs	reset_text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TextStyle)); host kept as the oracle (record 0374)
 text/editor.rs	save	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-text/editor.rs	set_paragraph_alignment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_background	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_borders	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_decimal_tab_character	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_default_tab_interval	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Alignment)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::ParagraphBackground)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_borders	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Borders)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_decimal_tab_character	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::DecimalTabCharacter)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_default_tab_interval	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::DefaultTabInterval)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_drop_cap	1	shared	text.drop_cap	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_flow	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_following_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_indents	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_line_spacing	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+text/editor.rs	set_paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Flow)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::FollowingStyle)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Indents)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_line_spacing	1	shared	drawable.shape	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::LineSpacing)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_list	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	set_paragraph_list_bullet	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	set_paragraph_list_bullet_geometry	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
@@ -2175,46 +2175,46 @@ text/editor.rs	set_paragraph_list_number_scale	1	shared	text.shared	host-only	li
 text/editor.rs	set_paragraph_list_number_tiering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	set_paragraph_list_numbering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	set_paragraph_lists	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_spacing	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_tab_stops	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_writing_direction	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Spacing)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TabStops)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::WritingDirection)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_background	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_baseline_shift	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_capitalization	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_character_spacing	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_color	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_decorations	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_font	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_text_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextBackground)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_baseline_shift	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextBaselineShift)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextCapitalization)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_character_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextCharacterSpacing)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextColor)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextDecorations)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextFont)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_text_language	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_ligatures	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_outline	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_script	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_shadow	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_text_style	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextLigatures)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextOutline)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextScript)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextShadow)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TextStyle)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	storage	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	storages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_background	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_baseline_shift	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextBackground); host kept as the oracle (record 0374)
+text/editor.rs	text_baseline_shift	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextBaselineShift); host kept as the oracle (record 0374)
 text/editor.rs	text_bookmarks	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_capitalization	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_character_spacing	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_color	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCapitalization); host kept as the oracle (record 0374)
+text/editor.rs	text_character_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCharacterSpacing); host kept as the oracle (record 0374)
+text/editor.rs	text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextColor); host kept as the oracle (record 0374)
 text/editor.rs	text_comment_replies	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_comments	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_date_time_fields	1	shared	text.date_time_field	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_decorations	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_font	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextDecorations); host kept as the oracle (record 0374)
+text/editor.rs	text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextFont); host kept as the oracle (record 0374)
 text/editor.rs	text_highlights	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_language	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	text_languages	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_ligatures	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_ligatures	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextLigatures); host kept as the oracle (record 0374)
 text/editor.rs	text_number_attachments	1	shared	text.number_attachment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_outline	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_script	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_shadow	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_style	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_outline	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextOutline); host kept as the oracle (record 0374)
+text/editor.rs	text_script	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextScript); host kept as the oracle (record 0374)
+text/editor.rs	text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextShadow); host kept as the oracle (record 0374)
+text/editor.rs	text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextStyle); host kept as the oracle (record 0374)
 text/editor.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	update_text_bookmark	1	shared	text.bookmark	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
 text/editor.rs	update_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
