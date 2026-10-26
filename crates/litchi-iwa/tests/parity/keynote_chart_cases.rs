@@ -227,3 +227,118 @@ fn keynote_slide_chart_duplicate_parity() -> TestResult {
         },
     )
 }
+
+/// A complete replacement (new labels and shape) through
+/// `chart::lifecycle::Edit::set_data`, and a same-shape update, which the
+/// host delegates to `edit_slide_chart_data`.
+#[test]
+fn keynote_slide_chart_data_set_parity() -> TestResult {
+    use litchi_iwa_common::chart::data::ChartData;
+    let reshaped = ChartData::new(
+        vec!["Q1".into(), "Q2".into(), "Q3".into()],
+        vec!["Revenue".into(), "Cost".into()],
+        vec![
+            vec![Some(10.0), Some(4.0)],
+            vec![Some(12.5), None],
+            vec![Some(9.0), Some(3.5)],
+        ],
+    )?;
+    let reshaped_leaf = reshaped.clone();
+    run(
+        "keynote_slide_chart_data_set_parity",
+        Tier::B,
+        Evidence::Queued,
+        |editor| {
+            editor.set_slide_chart_data(SLIDE, ChartSelector::index(0), reshaped)?;
+            Ok(())
+        },
+        |source| {
+            leaf_run(source, |edit| {
+                edit.set_data(
+                    SlideSelector::index(SLIDE),
+                    ChartSelector::index(0),
+                    reshaped_leaf,
+                )?;
+                Ok(())
+            })
+        },
+    )?;
+    let same_shape = ChartData::new(
+        vec!["2025".into(), "2026".into()],
+        vec!["North".into(), "South".into(), "West".into()],
+        vec![
+            vec![Some(7.0), Some(8.0), Some(9.0)],
+            vec![None, Some(5.0), Some(6.0)],
+        ],
+    )?;
+    let same_shape_leaf = same_shape.clone();
+    run(
+        "keynote_slide_chart_data_set_parity",
+        Tier::B,
+        Evidence::Queued,
+        |editor| {
+            editor.set_slide_chart_data(SLIDE, ChartSelector::index(0), same_shape)?;
+            Ok(())
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_slide_chart_data(SlideSelector::index(SLIDE), ChartSelector::index(0))?
+                .set(same_shape_leaf)
+                .commit()?;
+            let restored = commit
+                .package()
+                .apply_slide_chart_data(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        },
+    )
+}
+
+/// Host `slide_charts` against the leaf chart reads (metadata kind,
+/// direction, data, frame) on the host-created chart and native charts.
+fn charts_agree(bytes: &[u8]) -> TestResult<usize> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let host = editor.slide_charts(SLIDE)?;
+    let package = Package::from_bytes(bytes)?;
+    let slide = SlideSelector::index(SLIDE);
+    let drawables = package.slide_drawable_list(slide)?;
+    let frames = drawables
+        .iter()
+        .filter(|drawable| drawable.kind() == litchi_keynote::slide::drawable::Kind::Chart)
+        .collect::<Vec<_>>();
+    if host.len() != package.slide_chart_catalog(slide)?.len() {
+        return Err("chart count differs".into());
+    }
+    for (index, chart) in host.iter().enumerate() {
+        let chart_selector = ChartSelector::index(index);
+        let metadata = package.slide_chart_metadata(slide, chart_selector)?;
+        let data = package.slide_chart_data(slide, chart_selector)?;
+        let direction = package.slide_chart_direction(slide, chart_selector)?;
+        if metadata.kind() != chart.kind || direction != chart.direction || data != chart.data {
+            return Err(format!("chart {index}: host {chart:?}").into());
+        }
+        let _ = &frames;
+    }
+    Ok(host.len())
+}
+
+#[test]
+fn keynote_slide_chart_read_parity() -> TestResult {
+    let input = chart_fixture()?;
+    Case::new(
+        "keynote_slide_chart_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host and leaf charts agree", charts_agree)
+    .run()?;
+    Ok(())
+}

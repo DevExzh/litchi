@@ -31,6 +31,8 @@ const DRAWABLE_GEOMETRY: u32 = 1;
 const CHART_UNITY: u32 = 10_000;
 const CHART_TYPE: u32 = 1;
 const CHART_SERIES_DIRECTION: u32 = 5;
+const CHART_GRID: u32 = 7;
+const CHART_IS_DIRTY: u32 = 24;
 
 /// A finite resource governed by a chart-lifecycle transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +97,9 @@ pub enum Refusal {
     /// The frame is not finite with positive dimensions.
     #[error("the chart frame must be finite with positive dimensions")]
     InvalidGeometry,
+    /// The data grid cannot be encoded (labels or values out of range).
+    #[error("the chart data grid cannot be encoded")]
+    InvalidData,
     /// The chart's graph is referenced from outside the chart.
     #[error("the Keynote chart is referenced from outside its private graph")]
     SharedGraph,
@@ -107,15 +112,17 @@ impl Refusal {
         use litchi_core::edit::RefusalKind;
         match self {
             Self::UnsupportedSource | Self::SharedGraph => RefusalKind::UnsupportedContent,
-            Self::UnsupportedKind | Self::UnsupportedDirection | Self::InvalidGeometry => {
-                RefusalKind::InvalidValue
-            },
+            Self::UnsupportedKind
+            | Self::UnsupportedDirection
+            | Self::InvalidGeometry
+            | Self::InvalidData => RefusalKind::InvalidValue,
         }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Change {
+    Data(litchi_iwa_common::chart::data::ChartData),
     Kind(Kind),
     Direction(Direction),
     Geometry(Geometry),
@@ -123,7 +130,7 @@ enum Change {
     Duplicate,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Operation {
     chart: u64,
     slide: crate::Position,
@@ -253,6 +260,23 @@ impl<'a> Edit<'a> {
         self.stage(slide.into(), chart.into(), Change::Remove)
     }
 
+    /// Stage a complete replacement of the chart's inline data grid, its
+    /// labels and dimensions included (host `set_slide_chart_data`; a
+    /// same-shape value update is also available through
+    /// [`crate::Package::edit_slide_chart_data`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors.
+    pub fn set_data<'s, 'c>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        chart: impl Into<ChartSelector<'c>>,
+        data: litchi_iwa_common::chart::data::ChartData,
+    ) -> Result<&mut Self, Error> {
+        self.stage(slide.into(), chart.into(), Change::Data(data))
+    }
+
     /// Stage a copy of one chart on its slide, offset by ten points (host
     /// `duplicate_slide_chart`): the copy gets fresh drawable, title and
     /// caption, style and preset identities, registered like the source's,
@@ -380,19 +404,41 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
             .payload(operation.chart, CHART_MESSAGE_TYPE)
             .map_err(lift)?
             .to_vec();
-        let data = match operation.change {
+        let data = match &operation.change {
             Change::Remove | Change::Duplicate => unreachable!("handled above"),
-            Change::Kind(kind) => edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
+            Change::Data(data) => {
+                let request =
+                    litchi_iwa_protos::chart_grid_creation_codec::ChartGridCreationRequest::new(
+                        data.row_names(),
+                        data.column_names(),
+                        data.values(),
+                        operation.chart,
+                    );
+                let options =
+                    litchi_iwa_protos::chart_grid_creation_codec::EncodeOptions::for_request(
+                        &request,
+                    );
+                let grid = litchi_iwa_protos::chart_grid_creation_codec::encode_chart_grid(
+                    request, options,
+                )
+                .map_err(|_error| Error::Refused(Refusal::InvalidData))?;
+                edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
+                    fields.set_message(CHART_GRID, grid.bytes());
+                    fields.set_varint(CHART_IS_DIRTY, 0);
+                    Ok(())
+                })
+            },
+            &Change::Kind(kind) => edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
                 fields.set_varint(CHART_TYPE, native(kind.native_value()));
                 Ok(())
             }),
-            Change::Direction(direction) => {
+            &Change::Direction(direction) => {
                 edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
                     fields.set_varint(CHART_SERIES_DIRECTION, native(direction.native_value()));
                     Ok(())
                 })
             },
-            Change::Geometry(geometry) => {
+            &Change::Geometry(geometry) => {
                 let current = chart_values(&payload, wire)?.2;
                 let geometry = Geometry {
                     rotation: geometry
@@ -444,10 +490,19 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
             .find(|message| message.type_ == CHART_MESSAGE_TYPE)
             .ok_or(Error::Verification)?;
         let (kind, direction, geometry) = chart_values(&payload.data, wire)?;
-        let ok = match operation.change {
-            Change::Kind(expected) => kind == Some(native(expected.native_value())),
-            Change::Direction(expected) => direction == Some(native(expected.native_value())),
-            Change::Geometry(expected) => geometry.is_some_and(|geometry| {
+        let ok = match &operation.change {
+            Change::Data(expected) => {
+                candidate
+                    .slide_chart_data(
+                        SlideSelector::position(operation.slide),
+                        ChartSelector::index(operation.position.get()),
+                    )
+                    .map_err(|_error| Error::Verification)?
+                    == *expected
+            },
+            &Change::Kind(expected) => kind == Some(native(expected.native_value())),
+            &Change::Direction(expected) => direction == Some(native(expected.native_value())),
+            &Change::Geometry(expected) => geometry.is_some_and(|geometry| {
                 (geometry.x, geometry.y, geometry.width, geometry.height)
                     == (expected.x, expected.y, expected.width, expected.height)
             }),

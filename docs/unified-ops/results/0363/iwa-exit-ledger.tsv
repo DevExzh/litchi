@@ -297,12 +297,12 @@ keynote/editor/named_paragraph_styles.rs	slide_text_box_named_paragraph_styles	1
 keynote/editor/slide_charts.rs	add_slide_chart	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	duplicate_slide_chart	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::duplicate	keynote_slide_chart_duplicate_parity	B	-	-
 keynote/editor/slide_charts.rs	remove_slide_chart	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::remove	keynote_slide_chart_remove_parity	B	-	-
-keynote/editor/slide_charts.rs	set_slide_chart_data	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts.rs	set_slide_chart_data	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_data	keynote_slide_chart_data_set_parity	B	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_direction	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_direction	keynote_slide_chart_direction_parity	B	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_geometry	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_geometry	keynote_slide_chart_geometry_parity	B	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_kind	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_kind	keynote_slide_chart_kind_parity	B	-	-
 keynote/editor/slide_charts.rs	slide_chart_catalog	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts.rs	slide_charts	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts.rs	slide_charts	1	keynote	chart.lifecycle	migrated	litchi_keynote::Package::slide_chart_metadata	keynote_slide_chart_read_parity	A	-	-
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
