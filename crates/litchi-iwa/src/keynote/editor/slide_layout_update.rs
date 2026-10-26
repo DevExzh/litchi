@@ -59,7 +59,7 @@ fn slide_preview_wire_limits_for(
         })
 }
 
-fn invalidate_slide_preview(
+pub(super) fn invalidate_slide_preview(
     package: &mut HostPackage,
     archive_name: &str,
     node_id: u64,

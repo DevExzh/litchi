@@ -46,6 +46,9 @@ pub(in crate::package) struct Workspace<'p> {
     deleted: BTreeSet<String>,
     /// Source objects removed by this transaction and not re-inserted.
     removed: BTreeSet<u64>,
+    /// Existing non-archive source members (data) whose bytes this
+    /// transaction replaces.
+    replaced: BTreeMap<String, Vec<u8>>,
 }
 
 impl<'p> Workspace<'p> {
@@ -104,6 +107,7 @@ impl<'p> Workspace<'p> {
             members: BTreeMap::new(),
             deleted: BTreeSet::new(),
             removed: BTreeSet::new(),
+            replaced: BTreeMap::new(),
         })
     }
 
@@ -219,7 +223,11 @@ impl<'p> Workspace<'p> {
     /// (the registry member included).
     pub(in crate::package) fn touched_members(&self) -> usize {
         let registry = usize::from(!self.changed.contains_key(METADATA_MEMBER));
-        self.changed.len() + self.created.len() + self.members.len() + registry
+        self.changed.len()
+            + self.created.len()
+            + self.members.len()
+            + self.replaced.len()
+            + registry
     }
 
     /// Insert a new object into an existing or created component.
@@ -310,6 +318,23 @@ impl<'p> Workspace<'p> {
             return Err(StructureError::Registry("package member exists"));
         }
         self.members.insert(member.to_owned(), bytes);
+        Ok(())
+    }
+
+    /// Replace the bytes of one existing non-archive source member (data).
+    pub(in crate::package) fn replace_member(
+        &mut self,
+        member: &str,
+        bytes: Vec<u8>,
+    ) -> Result<(), StructureError> {
+        if !self.package.structure_has_member(member)
+            || self.deleted.contains(member)
+            || self.changed.contains_key(member)
+            || self.replaced.contains_key(member)
+        {
+            return Err(StructureError::Registry("package member to replace"));
+        }
+        self.replaced.insert(member.to_owned(), bytes);
         Ok(())
     }
 
@@ -470,6 +495,11 @@ impl<'p> Workspace<'p> {
             .iter()
             .filter(|(member, _)| self.changed.contains_key(member))
             .map(|(member, bytes)| EntryEdit::new(member, bytes))
+            .chain(
+                self.replaced
+                    .iter()
+                    .map(|(member, bytes)| EntryEdit::new(member, bytes)),
+            )
             .collect::<Vec<_>>();
         let insertions = encoded
             .iter()

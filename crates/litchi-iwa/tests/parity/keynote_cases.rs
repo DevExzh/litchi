@@ -238,15 +238,6 @@ fn keynote_slide_table_cell_write_corpus_parity() -> TestResult {
                                     .push(format!("{label}: tier B violations\n{}", diff.render()));
                             }
                         },
-                        // Listed refusal (record 0370 §5): the leaf does not yet
-                        // remove a formula from the calculation graph, so it
-                        // refuses to clear a formula cell the host clears.
-                        (Ok(_), Err(error))
-                            if label.contains(" clear ")
-                                && error.to_string().contains("formula graph") =>
-                        {
-                            eprintln!("{label}: listed refusal: {error}");
-                        },
                         (Ok(_), Err(error)) => failures.push(format!(
                             "{label}: the leaf refuses what the host edits: {error}"
                         )),

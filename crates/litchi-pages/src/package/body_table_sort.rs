@@ -15,7 +15,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
-use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
+use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind};
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len};
 use litchi_iwa_core::{Error as CoreError, LimitKind as CoreLimitKind, RawMessage};
 use litchi_iwa_protos::table_sort_order_codec as codec;
@@ -1042,8 +1042,7 @@ fn rewrite_model(
     let output = prepared_reassembly
         .execute(reassembly_requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
-        .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     table_lock::charge_reopen_work(&candidate_source, budget).map_err(map_lock_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
@@ -1162,11 +1161,11 @@ fn reopen_candidate(
         .charge_output_bytes(bytes.len())
         .and_then(|_| budget.charge_payload_work(bytes.len()))
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(
-        Arc::<[u8]>::from(bytes.as_ref()),
-        source.state.source.limits(),
-    )
-    .map_err(map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::<[u8]>::from(bytes.as_ref()))
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .and_then(|_| table_lock::charge_reopen_work(&catalog, budget))

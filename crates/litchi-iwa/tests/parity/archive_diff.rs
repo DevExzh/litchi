@@ -342,7 +342,12 @@ fn compare_objects(
         let host_untouched = source.is_some_and(|source| source.raw == h.raw);
         let leaf_untouched = source.is_some_and(|source| source.raw == l.raw);
         let label = format!("{member} object {id} ({})", types(h));
-        if host_untouched {
+        // A documented metadata policy also covers routes whose host
+        // never rewrites the registry (for example a text-only rewrite):
+        // the leaf's advanced save token is normalised below.
+        let policy_metadata =
+            policy.any() && h.messages.iter().any(|message| message.type_ == 11_006);
+        if host_untouched && !policy_metadata {
             diff.violations.push(format!(
                 "{label}: the leaf changed an object the host left untouched"
             ));

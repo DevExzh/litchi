@@ -798,9 +798,11 @@ fn reopen_candidate(
     budget
         .charge_payload_work(bytes.len())
         .map_err(map_lock_error)?;
-    let catalog =
-        litchi_iwa_archive::SourceCatalog::from_shared_bytes(bytes, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(bytes)
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .and_then(|_| table_lock::charge_reopen_work(&catalog, budget))
