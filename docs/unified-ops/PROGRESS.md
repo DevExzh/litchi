@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0362ul165ue | [Terminal diagnostic and leaf cleanup](0362ul165ue-diagnostic-returns-and-leaf-cleanup.md) | Twenty checks complete: thirteen pass, seven preserved failures, all five runtime supplements pass; two reviewed leaves merged and retired; final qualification pending |
 | 0362ul165uf | [Tooling import and adapter identities](0362ul165uf-tooling-identity-repair.md) | Merged leaf `ed12bd5528`: consistent PPT protocol exception imports and reviewed current ODF consumer manifest pin; focused Python checks pass; launch PATH repair and final gate pending |
 | 0362ul165ug | [Gate dependency and evidence registrations](0362ul165ug-gate-registry-repair.md) | Merged leaf `d9979bf2ff`: explicit shared ZIP dev edge and optional operations VBA edge; five validation-only evidence dispositions; focused policy and matrix checks pass; native/final gate pending |
 | 0349 | [Workspace gate hygiene and canonical durable JSON](0349-workspace-gate-hygiene.md) | Merged (R19 `uo2/ws-hygiene`, `55517a5d02`): feature-unification determinism fix, workspace clippy/test/doc clean |
@@ -6476,3 +6477,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   The missing-rustc diagnostic remains a launch PATH issue to repair before
   rerun. Runtime PPTX minimal-feature tests (58 chunks), batch equivalence
   and OOXML metadata pass; facade runtime checks continue. Nothing is pushed.
+
+  The twenty-check diagnostic is terminal (165ue): thirteen checks pass,
+  seven ordinary/prerequisite failures remain recorded, and all five runtime
+  supplements pass. Root verifies every log/trace, source and lock identity,
+  resource/process guard and all 58 nested PPTX chunks. The merged registry
+  and tooling worktrees/refs are retired, bringing cumulative cleanup to
+  286 worktrees/448 refs; all 70 excluded office refs remain unchanged.
+  Canonical RTF/Markdown leaves are independently source-reviewed and queued
+  for Rust validation. Fresh fuzz lock preparation and the four DOCX release
+  compiler checks can now use the serial heavy slot. All native and final
+  candidate acceptance remains required. Nothing is pushed.
