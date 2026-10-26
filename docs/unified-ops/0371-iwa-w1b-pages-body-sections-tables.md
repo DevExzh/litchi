@@ -25,7 +25,8 @@
 | `b8599dfd3b`, `96bdc43cd2`, `1d0ddd2e3e` | host `set_table_cell`/`set_table_cells`/`clear_table_cell` → `Package::edit_body_table_values` (the clear after W1-A's writer and host fix); the cell, table-list, merge and comment reads (`tables`, `table`, `get_cell`, `iter_cells`, `cell_count`, `get_comment`, `iter_comments`, `comment_count`, `merges`, `table_cell_comment[_replies]`) → `body_tables`, `body_table_cells`, `body_table_merges` | 14 |
 | `a408e00fbd`, `9bac132398` | `litchi_pages::bookmark` — `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add, update, remove}` by position or name; on W1-D's `ranged` and `smart_field` engines | 4 |
 | `c0ec0bac27`, `9bac132398` | `litchi_pages::date_time` — `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add, insert, update, remove}` (insert adds the display text) | 5 |
-| `a9d2af35ca` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}` | 6 |
+| `a9d2af35ca`, `de1dbad71e` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}`; on W1-D's `number_attachment` engine | 6 |
+| `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
 A private engine `package::body_storage_objects` holds what creating and
@@ -139,7 +140,9 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*probe_host*' \
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pages` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages` | 0 |
 | `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` (1,289) | 0 |
-| `python3 tools/{officecli_capability_delta,officecli_corpus,unified_bench_matrix,iwa_exit_ledger}.py --check`; `non_iwork_gate.py verify`; `check_feature_matrix.py` | 0 each |
+| `python3 tools/{officecli_capability_delta,officecli_corpus,unified_bench_matrix,iwa_exit_ledger}.py --check`; `check_crate_boundaries.py`; `non_iwork_gate.py verify`; `check_feature_matrix.py` | 0 each |
+| `cargo test -p litchi-ops --all-features` in chunks: `--lib` (1,022), `--doc` and nine groups of up to 20 `--test` targets (1,702) | 0 each |
+| `crates/pyo3-litchi/tests/run_tests.sh` (301) | 0 |
 | `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
 
 No litchi-ops code, capability or corpus-visible behaviour changed, so the
@@ -157,4 +160,3 @@ Both pre-commit size checks printed nothing for every commit.
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
 | table cell formats, rich text, appearance, conditional highlights, formulas, topology, duplicate/resize, sort execution, comment writes | ~150 | W1-A engines (topology engine landed; formats/styles follow), W1-F formula caches, W1-D paragraph/list engines |
 | Builder `language`, `locale`, `body_table` | 6 | next (W1-C did the Keynote pair) |
-| W1-D's `number_attachment` engine landed after this family; move the private attachment code onto it | — | refactor |
