@@ -342,6 +342,30 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertNotIn("CARGO_HOME", env)
             self.assertNotIn("CARGO_CONFIG", env)
 
+    def test_environment_replaces_inherited_target_dir(self) -> None:
+        # Session env.sh files and the coordinator gate export
+        # CARGO_TARGET_DIR; that is not a manifest override (record 0365).
+        with tempfile.TemporaryDirectory(prefix="native-qual-env-") as directory:
+            root = Path(directory)
+            safe = runner.SafeRunner(
+                {
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "legs": {"before": {"target_dir": str(root / "target")}},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+            )
+            with mock.patch.dict(os.environ, {"CARGO_TARGET_DIR": str(root / "elsewhere")}):
+                env = safe._environment({}, {"target_dir": root / "target"})
+            self.assertEqual(env["CARGO_TARGET_DIR"], str(root / "target"))
+            with self.assertRaisesRegex(runner.RunnerError, "cannot override"):
+                safe._environment(
+                    {"environment": {"CARGO_TARGET_DIR": str(root / "elsewhere")}},
+                    {"target_dir": root / "target"},
+                )
+
     def test_build_output_must_be_fresh(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-stale-") as directory:
             root = Path(directory)

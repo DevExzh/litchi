@@ -9,7 +9,6 @@
 //! The sets are parsed and stored as passive metadata only; no line-breaking
 //! rule is ever evaluated or applied.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_KINSOKU_BYTES: usize = 65_536;
@@ -26,26 +25,26 @@ pub struct DocumentKinsoku<'a> {
 }
 
 impl DocumentKinsoku<'_> {
-    pub(crate) fn validate_characters(kind: &str, characters: &str) -> RtfResult<()> {
+    pub(crate) fn validate_characters(kind: &str, characters: &str) -> crate::Result<()> {
         if characters.is_empty() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {kind} kinsoku character set cannot be empty"
             )));
         }
         if characters.len() > MAX_KINSOKU_BYTES {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {kind} kinsoku character set exceeds the safety limit"
             )));
         }
         if characters.contains(['\0', '\r', '\n']) {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {kind} kinsoku character set contains a forbidden control character"
             )));
         }
         Ok(())
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if let Some(following) = &self.following {
             Self::validate_characters("following", following)?;
         }

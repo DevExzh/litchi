@@ -1,6 +1,5 @@
 //! Inert external document names from RTF document-format destinations.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::ops::Range;
 
@@ -38,7 +37,7 @@ impl DocumentExternalReferences<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         let mut total = 0usize;
         for (kind, raw_value) in [
             ("next-file", self.next_file.as_deref()),
@@ -46,28 +45,28 @@ impl DocumentExternalReferences<'_> {
         ] {
             let Some(value) = raw_value else { continue };
             if value.trim().is_empty() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {kind} name cannot be empty"
                 )));
             }
             if value.len() > MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {kind} name exceeds the safety limit"
                 )));
             }
             if value.contains(['\0', '\r', '\n']) {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {kind} name contains a forbidden control character"
                 )));
             }
             total = total.checked_add(value.len()).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF external-reference aggregate size overflow".to_string(),
                 )
             })?;
         }
         if total > MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF external-reference aggregate text exceeds the safety limit".to_string(),
             ));
         }

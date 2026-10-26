@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use crate::{RtfError, RtfResult};
-
 pub const MAX_WRITE_RESERVATION_BYTES: usize = 65_536;
 
 /// Opaque deprecated `writereservation` payload.
@@ -14,7 +12,7 @@ impl<'a> LegacyWriteReservation<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(data: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(data: Cow<'a, str>) -> crate::Result<Self> {
         let value = Self { data };
         value.validate()?;
         Ok(value)
@@ -22,14 +20,14 @@ impl<'a> LegacyWriteReservation<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.data.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy write-reservation payload must not be empty".to_string(),
             ));
         }
         if self.data.len() > MAX_WRITE_RESERVATION_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy write-reservation payload exceeds the resource limit".to_string(),
             ));
         }
@@ -38,7 +36,7 @@ impl<'a> LegacyWriteReservation<'a> {
             .chars()
             .any(|character| matches!(character, '\0' | '\r' | '\n'))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy write-reservation payload contains a forbidden character".to_string(),
             ));
         }
@@ -62,7 +60,7 @@ impl<'a> WriteReservationHash<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(data: Cow<'a, [u8]>) -> RtfResult<Self> {
+    pub fn new(data: Cow<'a, [u8]>) -> crate::Result<Self> {
         let value = Self { data };
         value.validate()?;
         Ok(value)
@@ -70,14 +68,14 @@ impl<'a> WriteReservationHash<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.data.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF write-reservation hash must not be empty".to_string(),
             ));
         }
         if self.data.len() > MAX_WRITE_RESERVATION_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF write-reservation hash exceeds the resource limit".to_string(),
             ));
         }
@@ -102,7 +100,7 @@ impl DocumentWriteReservations<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if let Some(legacy) = &self.legacy {
             legacy.validate()?;
         }

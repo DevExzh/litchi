@@ -1,7 +1,5 @@
 //! RTF document and character language metadata.
 
-use crate::{RtfError, RtfResult};
-
 /// An RTF language identifier from the specification's standard language table.
 ///
 /// Unknown identifiers remain representable so long as they fit the unsigned
@@ -15,17 +13,17 @@ impl LanguageId {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(value: u32) -> RtfResult<Self> {
+    pub fn new(value: u32) -> crate::Result<Self> {
         u16::try_from(value).map(Self).map_err(|_err| {
-            RtfError::MalformedDocument("RTF language ID must be in 0..=65535".to_string())
+            crate::Error::MalformedDocument("RTF language ID must be in 0..=65535".to_string())
         })
     }
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub fn from_rtf(value: i32) -> crate::Result<Self> {
         let raw = u32::try_from(value).map_err(|_err| {
-            RtfError::MalformedDocument("RTF language ID must be in 0..=65535".to_string())
+            crate::Error::MalformedDocument("RTF language ID must be in 0..=65535".to_string())
         })?;
         Self::new(raw)
     }
@@ -60,7 +58,7 @@ impl DocumentLanguageDefaults {
         clippy::unnecessary_wraps,
         reason = "keeps the metadata validate() call symmetry; language defaults currently have no fallible checks"
     )]
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         Ok(())
     }
 }

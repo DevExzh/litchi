@@ -13,8 +13,8 @@ use super::super::{
     LegacyParagraphNumberingUnderline, NavigationEntry, Paragraph, ParagraphFontAlignment,
     ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
     ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
-    ParagraphFrameWrap, ParagraphWrapping, RevisionMetadata, RtfWriter, Shading, ShadingPattern,
-    StyleBlock, TabAlignment, TabLeader, TabStop, TextDirection, UnderlineStyle, Write, io,
+    ParagraphFrameWrap, ParagraphWrapping, RevisionMetadata, Shading, ShadingPattern, StyleBlock,
+    TabAlignment, TabLeader, TabStop, TextDirection, UnderlineStyle, Write, Writer, io,
 };
 use crate::ParagraphDropCap;
 
@@ -57,7 +57,7 @@ fn explicit_shading_pattern_word(
     Ok(word)
 }
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write one inert generated list-marker destination.
     ///
     /// # Errors

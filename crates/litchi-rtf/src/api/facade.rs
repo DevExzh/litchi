@@ -1,7 +1,7 @@
 //! Immutable, lifetime-free RTF document facade.
 
 use crate::document::Tree;
-use crate::{OpenOptions, RtfResult, SourceLimits};
+use crate::{OpenOptions, SourceLimits};
 use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
@@ -90,7 +90,7 @@ impl Package {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn parse(input: &str) -> RtfResult<Self> {
+    pub fn parse(input: &str) -> crate::Result<Self> {
         Self::parse_with_options(input, OpenOptions::default())
     }
 
@@ -105,7 +105,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn parse_with_options(input: &str, options: OpenOptions) -> RtfResult<Self> {
+    pub fn parse_with_options(input: &str, options: OpenOptions) -> crate::Result<Self> {
         Tree::parse(input, options).map(|model| Self::from_model(model, options))
     }
 
@@ -117,7 +117,7 @@ impl Package {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_bytes(input: &[u8]) -> RtfResult<Self> {
+    pub fn from_bytes(input: &[u8]) -> crate::Result<Self> {
         Self::from_bytes_with_options(input, OpenOptions::default())
     }
 
@@ -127,7 +127,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn from_bytes_with_options(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
+    pub fn from_bytes_with_options(input: &[u8], options: OpenOptions) -> crate::Result<Self> {
         Tree::parse_bytes(input, options).map(|model| Self::from_model(model, options))
     }
 
@@ -140,7 +140,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is
     /// exceeded.
-    pub fn from_owned_bytes(input: Vec<u8>) -> RtfResult<Self> {
+    pub fn from_owned_bytes(input: Vec<u8>) -> crate::Result<Self> {
         Self::from_owned_bytes_with_options(input, OpenOptions::default())
     }
 
@@ -150,7 +150,10 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn from_owned_bytes_with_options(input: Vec<u8>, options: OpenOptions) -> RtfResult<Self> {
+    pub fn from_owned_bytes_with_options(
+        input: Vec<u8>,
+        options: OpenOptions,
+    ) -> crate::Result<Self> {
         Tree::from_owned_bytes(input, options).map(|model| Self::from_model(model, options))
     }
 
@@ -158,7 +161,7 @@ impl Package {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn open(path: impl AsRef<Path>) -> RtfResult<Self> {
+    pub fn open(path: impl AsRef<Path>) -> crate::Result<Self> {
         Self::open_with_options(path, OpenOptions::default())
     }
 
@@ -167,7 +170,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> RtfResult<Self> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> crate::Result<Self> {
         Tree::open(path, options).map(|model| Self::from_model(model, options))
     }
 

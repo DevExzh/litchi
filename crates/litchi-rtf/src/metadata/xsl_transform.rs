@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use crate::{RtfError, RtfResult};
-
 /// Maximum encoded UTF-8 size accepted for a custom XSL transform location.
 pub const MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES: usize = 65_536;
 
@@ -36,7 +34,7 @@ impl<'a> DocumentXslTransform<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(location: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(location: Cow<'a, str>) -> crate::Result<Self> {
         let transform = Self { location };
         transform.validate()?;
         Ok(transform)
@@ -44,14 +42,14 @@ impl<'a> DocumentXslTransform<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.location.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF XSL transform location must not be empty".to_string(),
             ));
         }
         if self.location.len() > MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF XSL transform location exceeds the resource limit".to_string(),
             ));
         }
@@ -60,7 +58,7 @@ impl<'a> DocumentXslTransform<'a> {
             .chars()
             .any(|character| matches!(character, '\0' | '\r' | '\n'))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF XSL transform location contains a forbidden character".to_string(),
             ));
         }

@@ -15,7 +15,6 @@ pub(crate) use crate::{
     annotation, bookmark, border, document_variable, field, form_field, info, list,
     navigation_entry, object, picture, section, shape, stylesheet, table, types, user_property,
 };
-// The writer's parent-relative imports still use this crate-private name. The
-// public metadata path is `metadata::Timestamp`; this alias never leaves the
-// private codec module.
-pub(crate) use crate::metadata::info::RtfTimestamp;
+// The writer's parent-relative imports reach the timestamp through the codec;
+// its public path is `metadata::Timestamp`.
+pub(crate) use crate::metadata::info::Timestamp;

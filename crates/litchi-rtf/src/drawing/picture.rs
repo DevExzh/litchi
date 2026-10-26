@@ -9,7 +9,6 @@
 //! - DIB (Device Independent Bitmap)
 //! - BMP
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_PICTURE_WRITE_BYTES: usize = 64 * 1_048_576;
@@ -38,9 +37,9 @@ impl PictureShapeProperties<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.properties.is_empty() || self.properties.len() > MAX_PICTURE_SHAPE_PROPERTIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picprop must contain a bounded nonempty property list".to_string(),
             ));
         }
@@ -59,12 +58,12 @@ impl PictureShapeProperties<'_> {
                     )
                 })
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF picture shape-property size overflow".to_string(),
                     )
                 })?;
             if bytes > MAX_PICTURE_SHAPE_PROPERTY_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF picture shape properties exceed the text safety limit".to_string(),
                 ));
             }
@@ -111,9 +110,9 @@ impl PictureIdentity<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.units_per_inch == Some(0) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF blipupi must be positive".to_string(),
             ));
         }
@@ -122,7 +121,7 @@ impl PictureIdentity<'_> {
             .as_ref()
             .is_some_and(|uid| !uid.is_empty() && uid.len() != 16)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF blipuid must contain exactly 16 bytes or be empty".to_string(),
             ));
         }
@@ -195,7 +194,7 @@ pub struct PictureBitmapMetadata {
 }
 
 impl PictureBitmapMetadata {
-    fn validate(&self, image_type: ImageType) -> RtfResult<()> {
+    fn validate(&self, image_type: ImageType) -> crate::Result<()> {
         let present = self.windows_bitmap
             || self.bitmap_source
             || self.bits_per_pixel.is_some()
@@ -203,7 +202,7 @@ impl PictureBitmapMetadata {
             || self.planes.is_some()
             || self.width_bytes.is_some();
         if present && image_type != ImageType::Dib {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF bitmap header controls require a DIB or Windows bitmap picture".to_string(),
             ));
         }
@@ -213,13 +212,13 @@ impl PictureBitmapMetadata {
             ("wbmplanes", self.planes),
         ] {
             if value == Some(0) {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} must be positive"
                 )));
             }
         }
         if self.width_bytes == Some(0) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF wbmwidthbytes must be positive".to_string(),
             ));
         }
@@ -227,7 +226,7 @@ impl PictureBitmapMetadata {
             .width_bytes
             .is_some_and(|value| value > i32::MAX as u32)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF wbmwidthbytes exceeds the signed control-word range".to_string(),
             ));
         }
@@ -298,9 +297,9 @@ impl<'a> Picture<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.data.is_empty() || self.data.len() > MAX_PICTURE_WRITE_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture payload is empty or exceeds the writing limit".to_string(),
             ));
         }

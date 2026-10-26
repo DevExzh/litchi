@@ -9449,7 +9449,7 @@
       ],
       "required_signatures": [
         {
-          "method": "litchi_xlsb::host::VbaProject::project",
+          "method": "litchi_xlsb::package::vba_project::VbaProject::project",
           "inputs": ["self", "package", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_vba::Limits"
@@ -26142,7 +26142,7 @@
         },
         {
           "name": "slide",
-          "scope": "litchi_keynote::Show",
+          "scope": "litchi_keynote::show::Show",
           "replacement": "use Show::slides().get or Show::select_slide (record 155)",
           "recursive": false
         },
@@ -27732,7 +27732,7 @@
         },
         {
           "name": "slide",
-          "scope": "litchi_keynote::Show",
+          "scope": "litchi_keynote::show::Show",
           "replacement": "use Show::slides().get or Show::select_slide (record 155)",
           "recursive": false
         },

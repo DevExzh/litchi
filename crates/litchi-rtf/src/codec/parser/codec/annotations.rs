@@ -1,27 +1,27 @@
 use super::{
     ControlWord, Cow, HashMap, MAX_ANNOTATION_TEXT_BYTES, MAX_ANNOTATIONS, MAX_BOOKMARK_NAME_BYTES,
-    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, Token, control_symbol_text,
-    parser_classification_error, require_parameterless,
+    ParsedBodyStoryEvent, Parser, Token, control_symbol_text, parser_classification_error,
+    require_parameterless,
 };
 
 impl Parser<'_> {
-    pub(super) fn parse_annotation_range_marker(&mut self, is_start: bool) -> RtfResult<()> {
+    pub(super) fn parse_annotation_range_marker(&mut self, is_start: bool) -> crate::Result<()> {
         let value = self.parse_ignorable_text_destination()?;
         let reference = value.trim().parse::<i32>().map_err(|_err| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF annotation range reference must be a signed integer".to_string(),
             )
         })?;
         if !self.annotation_ranges.contains_key(&reference)
             && self.annotation_ranges.len() >= MAX_ANNOTATIONS
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation range count exceeds the safety limit".to_string(),
             ));
         }
         if is_start {
             if self.annotation_ranges.contains_key(&reference) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF annotation range start".to_string(),
                 ));
             }
@@ -31,12 +31,12 @@ impl Parser<'_> {
                 .push(ParsedBodyStoryEvent::AnnotationStart(reference));
         } else {
             let range = self.annotation_ranges.get_mut(&reference).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF annotation range end has no matching start".to_string(),
                 )
             })?;
             if range.1.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF annotation range end".to_string(),
                 ));
             }
@@ -47,14 +47,14 @@ impl Parser<'_> {
         Ok(())
     }
 
-    pub(super) fn parse_annotation_destination(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_annotation_destination(&mut self) -> crate::Result<()> {
         if self.annotations.len() >= MAX_ANNOTATIONS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation count exceeds the safety limit".to_string(),
             ));
         }
         if !self.pending_annotation_mark {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation destination requires a preceding chatn marker".to_string(),
             ));
         }
@@ -92,7 +92,7 @@ impl Parser<'_> {
                             &mut drawing_order,
                         )?;
                         let added = drawing_order.get(order_start..).ok_or_else(|| {
-                            RtfError::ParserError(
+                            crate::Error::ParserError(
                                 "RTF annotation drawing order shrank during parsing".to_string(),
                             )
                         })?;
@@ -110,20 +110,20 @@ impl Parser<'_> {
                     match nested {
                         Some(ControlWord::AnnotationReference) => {
                             if reference.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF annotation reference".to_string(),
                                 ));
                             }
                             let value = self.parse_nested_annotation_value()?;
                             reference = Some(value.trim().parse::<i32>().map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF annotation reference must be a signed integer".to_string(),
                                 )
                             })?);
                         },
                         Some(ControlWord::AnnotationDate) => {
                             if date.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF annotation date".to_string(),
                                 ));
                             }
@@ -131,7 +131,7 @@ impl Parser<'_> {
                         },
                         Some(ControlWord::AnnotationParent) => {
                             if parent_id.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF annotation parent".to_string(),
                                 ));
                             }
@@ -139,7 +139,7 @@ impl Parser<'_> {
                         },
                         Some(ControlWord::AnnotationIcon) => {
                             if icon.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF annotation icon".to_string(),
                                 ));
                             }
@@ -147,14 +147,14 @@ impl Parser<'_> {
                         },
                         Some(ControlWord::AnnotationTime) => {
                             if time.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF annotation time".to_string(),
                                 ));
                             }
                             time = Some(self.parse_nested_annotation_value()?);
                         },
                         Some(control) if Self::forbidden_annotation_control(&control) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF annotation body cannot contain active data".to_string(),
                             ));
                         },
@@ -183,31 +183,33 @@ impl Parser<'_> {
                         .map(char::len_utf8)
                         .try_fold(0usize, |total, length| total.checked_add(length))
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF annotation text size overflow".to_string(),
                             )
                         })?;
                     let mut remainder = String::new();
                     remainder
                         .try_reserve_exact(remainder_bytes)
-                        .map_err(|_error| RtfError::AllocationFailed {
+                        .map_err(|_error| crate::Error::AllocationFailed {
                             resource: "RTF annotation text",
                             requested: remainder_bytes,
                         })?;
                     remainder.extend(tail);
                     let decoded = self.decode_transport_text(&remainder)?;
                     let observed = text.len().checked_add(decoded.len()).ok_or_else(|| {
-                        RtfError::MalformedDocument("RTF annotation text size overflow".to_string())
+                        crate::Error::MalformedDocument(
+                            "RTF annotation text size overflow".to_string(),
+                        )
                     })?;
                     if observed > MAX_ANNOTATION_TEXT_BYTES {
-                        return Err(RtfError::LimitExceeded {
+                        return Err(crate::Error::LimitExceeded {
                             resource: "RTF annotation text",
                             observed,
                             limit: MAX_ANNOTATION_TEXT_BYTES,
                         });
                     }
                     text.try_reserve_exact(decoded.len()).map_err(|_error| {
-                        RtfError::AllocationFailed {
+                        crate::Error::AllocationFailed {
                             resource: "RTF annotation text",
                             requested: observed,
                         }
@@ -238,7 +240,7 @@ impl Parser<'_> {
                     text.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(Token::Control(control)) if Self::forbidden_annotation_control(control) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF annotation body cannot contain active data".to_string(),
                     ));
                 },
@@ -251,7 +253,7 @@ impl Parser<'_> {
                     | ControlWord::AssociatedBaselineUp(_)
                     | ControlWord::AssociatedBaselineDown(_),
                 )) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF annotation character baseline formatting cannot be represented losslessly"
                             .to_string(),
                     ));
@@ -260,7 +262,7 @@ impl Parser<'_> {
                     self.mark_unknown_syntax()?;
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF annotation body cannot contain binary data".to_string(),
                     ));
                 },
@@ -268,13 +270,13 @@ impl Parser<'_> {
             }
             self.pos += 1;
             if text.len() > MAX_ANNOTATION_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF annotation text exceeds the safety limit".to_string(),
                 ));
             }
         }
         if depth != 0 {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         if text.len() != observed_len {
             super::provenance::extend(&mut text_tokens, origin, self.pos);
@@ -290,19 +292,19 @@ impl Parser<'_> {
                 .iter()
                 .any(|annotation| annotation.has_reference && annotation.id == id)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "duplicate RTF annotation reference".to_string(),
             ));
         }
         let (position, range_end) = match self.annotation_ranges.remove(&id) {
             Some((start, Some(end))) if start <= end => (start, end),
             Some((_start, None)) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF annotation range has no matching end".to_string(),
                 ));
             },
             Some(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF annotation range end precedes its start".to_string(),
                 ));
             },
@@ -343,14 +345,14 @@ impl Parser<'_> {
         Ok(())
     }
 
-    pub(super) fn parse_nested_annotation_value(&mut self) -> RtfResult<String> {
+    pub(super) fn parse_nested_annotation_value(&mut self) -> crate::Result<String> {
         self.pos += 3; // opening brace, ignorable marker, destination
         let mut value = String::new();
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF annotation metadata cannot contain nested groups".to_string(),
                     ));
                 },
@@ -367,7 +369,7 @@ impl Parser<'_> {
                     value.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF annotation metadata contains active or invalid controls".to_string(),
                     ));
                 },
@@ -375,13 +377,13 @@ impl Parser<'_> {
             }
             self.pos += 1;
             if value.len() > MAX_BOOKMARK_NAME_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF annotation metadata exceeds the safety limit".to_string(),
                 ));
             }
         }
         if depth != 0 {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         Ok(value.trim_end_matches(['\r', '\n']).to_string())
     }
@@ -405,9 +407,9 @@ impl Parser<'_> {
         )
     }
 
-    pub(super) fn finalize_annotations(&self) -> RtfResult<()> {
+    pub(super) fn finalize_annotations(&self) -> crate::Result<()> {
         if !self.annotation_ranges.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document contains an orphan annotation range".to_string(),
             ));
         }
@@ -415,14 +417,16 @@ impl Parser<'_> {
             || self.pending_annotation_initials_seen
             || self.pending_annotation_mark
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document contains orphan annotation metadata".to_string(),
             ));
         }
         Ok(())
     }
 
-    pub(super) fn finalize_body_story_events(&mut self) -> RtfResult<Vec<crate::BodyStoryEvent>> {
+    pub(super) fn finalize_body_story_events(
+        &mut self,
+    ) -> crate::Result<Vec<crate::BodyStoryEvent>> {
         let annotation_indices: HashMap<i32, usize> = self
             .annotations
             .iter()
@@ -437,7 +441,7 @@ impl Parser<'_> {
                 ParsedBodyStoryEvent::AnnotationStart(reference) => {
                     crate::BodyStoryEvent::AnnotationStart(
                         *annotation_indices.get(&reference).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF annotation start has no resolved comment".to_string(),
                             )
                         })?,
@@ -446,7 +450,7 @@ impl Parser<'_> {
                 ParsedBodyStoryEvent::AnnotationEnd(reference) => {
                     crate::BodyStoryEvent::AnnotationEnd(
                         *annotation_indices.get(&reference).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF annotation end has no resolved comment".to_string(),
                             )
                         })?,
@@ -458,7 +462,7 @@ impl Parser<'_> {
                         .copied()
                         .flatten()
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF revision event has no tracked text".to_string(),
                             )
                         })?,
@@ -469,7 +473,7 @@ impl Parser<'_> {
                         .copied()
                         .flatten()
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF revision event has no tracked text".to_string(),
                             )
                         })?,
@@ -481,7 +485,7 @@ impl Parser<'_> {
                             .copied()
                             .flatten()
                             .ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF deletion event has no tracked text".to_string(),
                                 )
                             })?,

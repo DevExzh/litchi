@@ -1,6 +1,5 @@
 //! Inert, positional legacy RTF form-field metadata.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_FORM_FIELDS: usize = 65_536;
@@ -17,12 +16,12 @@ pub enum FormFieldType {
 }
 
 impl FormFieldType {
-    pub(crate) fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub(crate) fn from_rtf(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::Text),
             1 => Ok(Self::CheckBox),
             2 => Ok(Self::DropDown),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF form-field type must be 0, 1, or 2".to_string(),
             )),
         }
@@ -48,7 +47,7 @@ pub enum FormTextType {
 }
 
 impl FormTextType {
-    pub(crate) fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub(crate) fn from_rtf(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::Regular),
             1 => Ok(Self::Number),
@@ -56,7 +55,7 @@ impl FormTextType {
             3 => Ok(Self::CurrentDate),
             4 => Ok(Self::CurrentTime),
             5 => Ok(Self::Calculation),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF form text type must be in 0..=5".to_string(),
             )),
         }
@@ -157,21 +156,21 @@ impl FormField<'_> {
         Some(total)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.range_end < self.position {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field range is reversed".to_string(),
             ));
         }
         if self.range_end - self.position != self.result_text.len() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF form-field result range length {} does not match its {} text bytes",
                 self.range_end - self.position,
                 self.result_text.len()
             )));
         }
         if self.data.len() > MAX_FORM_FIELD_DATA_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF datafield exceeds the safety limit".to_string(),
             ));
         }
@@ -190,13 +189,13 @@ impl FormField<'_> {
         .chain(self.list_entries.iter().map(Cow::as_ref))
         {
             if value.len() > MAX_FORM_FIELD_STRING_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF form-field string exceeds the safety limit".to_string(),
                 ));
             }
         }
         if self.list_entries.len() > MAX_FORM_FIELD_LIST_ENTRIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field list exceeds 25 entries".to_string(),
             ));
         }
@@ -204,14 +203,14 @@ impl FormField<'_> {
             .half_point_size
             .is_some_and(|value| !(1..=32767).contains(&value))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field half-point size is outside 1..=32767".to_string(),
             ));
         }
         if self.own_help != self.help_text.is_some()
             || self.own_status != self.status_text.is_some()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF form-field own-help/status flags conflict with their text destinations"
                     .to_string(),
             ));
@@ -231,7 +230,7 @@ impl FormField<'_> {
                     || self.default_result.is_some()
                     || self.result.is_some()
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF text form field contains checkbox/list-only controls".to_string(),
                     ));
                 }
@@ -252,7 +251,7 @@ impl FormField<'_> {
                         .result
                         .is_some_and(|value| value != 25 && !(0..=1).contains(&value))
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF checkbox form-field controls conflict or are out of range".to_string(),
                     ));
                 }
@@ -270,7 +269,7 @@ impl FormField<'_> {
                     || self.default_result.is_some_and(|value| !valid_index(value))
                     || self.result.is_some_and(|value| !valid_index(value))
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF dropdown form-field controls conflict or select an invalid entry"
                             .to_string(),
                     ));

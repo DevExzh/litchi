@@ -1,6 +1,5 @@
 //! Inert RTF document-theme payloads.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_THEME_DATA_BYTES: usize = 16 * 1_048_576;
@@ -19,7 +18,7 @@ impl<'a> DocumentTheme<'a> {
     pub fn new(
         data: Cow<'a, [u8]>,
         color_scheme_mapping: Option<Cow<'a, [u8]>>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let theme = Self {
             data,
             color_scheme_mapping,
@@ -28,14 +27,14 @@ impl<'a> DocumentTheme<'a> {
         Ok(theme)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.data.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF theme data cannot be empty".to_string(),
             ));
         }
         if self.data.len() > MAX_THEME_DATA_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF theme data exceeds the safety limit".to_string(),
             ));
         }
@@ -44,7 +43,7 @@ impl<'a> DocumentTheme<'a> {
             .as_ref()
             .is_some_and(|mapping| mapping.is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF color-scheme mapping cannot be empty".to_string(),
             ));
         }
@@ -53,7 +52,7 @@ impl<'a> DocumentTheme<'a> {
             .as_ref()
             .is_some_and(|mapping| mapping.len() > MAX_COLOR_SCHEME_MAPPING_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF color-scheme mapping exceeds the safety limit".to_string(),
             ));
         }

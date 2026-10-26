@@ -4,7 +4,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use crate::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 use std::ops::Range;
 
@@ -50,14 +50,14 @@ impl<'a> PasswordHash<'a> {
     /// # Errors
     /// Returns an error when the record is truncated, inconsistent, or larger
     /// than [`MAX_PASSWORD_HASH_BYTES`].
-    pub fn from_bytes(bytes: Cow<'a, [u8]>) -> RtfResult<Self> {
+    pub fn from_bytes(bytes: Cow<'a, [u8]>) -> crate::Result<Self> {
         if bytes.len() > MAX_PASSWORD_HASH_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash payload exceeds the safety limit".to_string(),
             ));
         }
         if bytes.len() < PASSWORD_HASH_HEADER_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash payload is shorter than its header".to_string(),
             ));
         }
@@ -69,54 +69,56 @@ impl<'a> PasswordHash<'a> {
                 .map(u32::from_le_bytes)
         };
         let version = read(0).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash version is truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash version is truncated".to_string())
         })?;
         let total_size = read(4).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash size is truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash size is truncated".to_string())
         })?;
         let expected_size = usize::try_from(total_size).map_err(|_err| {
-            RtfError::MalformedDocument("RTF passwordhash size is not representable".to_string())
+            crate::Error::MalformedDocument(
+                "RTF passwordhash size is not representable".to_string(),
+            )
         })?;
         if expected_size != bytes.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash size does not match its payload".to_string(),
             ));
         }
         let flags = read(8).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash flags are truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash flags are truncated".to_string())
         })?;
         let algorithm_id = read(12).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash algorithm is truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash algorithm is truncated".to_string())
         })?;
         let spin_count = read(16).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash spin count is truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash spin count is truncated".to_string())
         })?;
         let hash_size = read(20).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash hash size is truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash hash size is truncated".to_string())
         })?;
         let salt_size = read(24).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash salt size is truncated".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash salt size is truncated".to_string())
         })?;
         let salt_size_usize = usize::try_from(salt_size).map_err(|_err| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF passwordhash salt size is not representable".to_string(),
             )
         })?;
         let hash_size_usize = usize::try_from(hash_size).map_err(|_err| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF passwordhash hash size is not representable".to_string(),
             )
         })?;
         let salt_end = PASSWORD_HASH_HEADER_BYTES
             .checked_add(salt_size_usize)
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF passwordhash salt size overflows".to_string())
+                crate::Error::MalformedDocument("RTF passwordhash salt size overflows".to_string())
             })?;
         let hash_end = salt_end.checked_add(hash_size_usize).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF passwordhash hash size overflows".to_string())
+            crate::Error::MalformedDocument("RTF passwordhash hash size overflows".to_string())
         })?;
         if hash_end > bytes.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash salt and hash exceed the payload".to_string(),
             ));
         }
@@ -137,7 +139,7 @@ impl<'a> PasswordHash<'a> {
     }
 
     /// Parse a borrowed inert binary password-hash record without copying it.
-    pub fn from_slice(bytes: &'a [u8]) -> RtfResult<Self> {
+    pub fn from_slice(bytes: &'a [u8]) -> crate::Result<Self> {
         Self::from_bytes(Cow::Borrowed(bytes))
     }
 
@@ -147,7 +149,7 @@ impl<'a> PasswordHash<'a> {
     /// This convenience constructor does not claim that the resulting record
     /// is a Word-compatible verifier. Use [`Self::from_parts`] when a source
     /// or producer supplies a different layout or trailing extension.
-    pub fn new(salt: Cow<'a, [u8]>, hash: Cow<'a, [u8]>) -> RtfResult<Self> {
+    pub fn new(salt: Cow<'a, [u8]>, hash: Cow<'a, [u8]>) -> crate::Result<Self> {
         Self::from_parts(1, 1, 0x8004, 50_000, salt, hash, Cow::Borrowed(&[]))
     }
 
@@ -162,27 +164,27 @@ impl<'a> PasswordHash<'a> {
         salt: Cow<'a, [u8]>,
         hash: Cow<'a, [u8]>,
         trailing: Cow<'a, [u8]>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let total_size = PASSWORD_HASH_HEADER_BYTES
             .checked_add(salt.len())
             .and_then(|size| size.checked_add(hash.len()))
             .and_then(|size| size.checked_add(trailing.len()))
             .ok_or_else(|| {
-                RtfError::InvalidStructure("RTF passwordhash size overflow".to_string())
+                crate::Error::InvalidStructure("RTF passwordhash size overflow".to_string())
             })?;
         let total_size_u32 = u32::try_from(total_size).map_err(|_err| {
-            RtfError::InvalidStructure("RTF passwordhash size exceeds u32".to_string())
+            crate::Error::InvalidStructure("RTF passwordhash size exceeds u32".to_string())
         })?;
         if total_size > MAX_PASSWORD_HASH_BYTES {
-            return Err(RtfError::InvalidStructure(
+            return Err(crate::Error::InvalidStructure(
                 "RTF passwordhash payload exceeds the safety limit".to_string(),
             ));
         }
         let hash_size = u32::try_from(hash.len()).map_err(|_err| {
-            RtfError::InvalidStructure("RTF passwordhash hash is too large".to_string())
+            crate::Error::InvalidStructure("RTF passwordhash hash is too large".to_string())
         })?;
         let salt_size = u32::try_from(salt.len()).map_err(|_err| {
-            RtfError::InvalidStructure("RTF passwordhash salt is too large".to_string())
+            crate::Error::InvalidStructure("RTF passwordhash salt is too large".to_string())
         })?;
         let mut bytes = Vec::new();
         crate::error::try_reserve_additional(
@@ -266,7 +268,7 @@ impl<'a> PasswordHash<'a> {
     }
 
     /// Validate the record and its configured resource bounds.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         let encoded_size = self.raw.len();
         if encoded_size > MAX_PASSWORD_HASH_BYTES
             || self.total_size as usize != encoded_size
@@ -275,7 +277,7 @@ impl<'a> PasswordHash<'a> {
             || self.raw.get(self.salt_range.clone()).is_none()
             || self.raw.get(self.hash_range.clone()).is_none()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash record has inconsistent sizes".to_string(),
             ));
         }
@@ -303,14 +305,16 @@ fn parse_legacy_timestamp_triplet(
     value: &str,
     separator: char,
     invalid_component: &'static str,
-) -> RtfResult<[i32; 3]> {
+) -> crate::Result<[i32; 3]> {
     let mut parts = value.split(separator);
     let parse = |part: Option<&str>| {
         part.ok_or_else(|| {
-            RtfError::MalformedDocument("RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string())
+            crate::Error::MalformedDocument(
+                "RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string(),
+            )
         })?
         .parse()
-        .map_err(|_err| RtfError::MalformedDocument(invalid_component.to_string()))
+        .map_err(|_err| crate::Error::MalformedDocument(invalid_component.to_string()))
     };
     let components = [
         parse(parts.next())?,
@@ -318,7 +322,7 @@ fn parse_legacy_timestamp_triplet(
         parse(parts.next())?,
     ];
     if parts.next().is_some() {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string(),
         ));
     }
@@ -327,7 +331,7 @@ fn parse_legacy_timestamp_triplet(
 
 /// A possibly partial timestamp from an RTF information destination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct RtfTimestamp {
+pub struct Timestamp {
     /// Raw values are signed because legacy producers use invalid values such
     /// as zero as sentinels. Use [`Self::validate`] or [`Self::is_valid`]
     /// before interpreting a parsed value as a calendar timestamp.
@@ -339,7 +343,7 @@ pub struct RtfTimestamp {
     pub second: Option<i32>,
 }
 
-impl RtfTimestamp {
+impl Timestamp {
     #[must_use]
     pub fn is_valid(&self) -> bool {
         self.validate().is_ok()
@@ -347,7 +351,7 @@ impl RtfTimestamp {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.year.is_some_and(|value| value > 9999)
             || self.month.is_some_and(|value| !(1..=12).contains(&value))
             || self.day.is_some_and(|value| !(1..=31).contains(&value))
@@ -355,7 +359,7 @@ impl RtfTimestamp {
             || self.minute.is_some_and(|value| value > 59)
             || self.second.is_some_and(|value| value > 59)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF info timestamp component is outside its valid range".to_string(),
             ));
         }
@@ -368,7 +372,7 @@ impl RtfTimestamp {
                 _ => 31,
             };
             if day > max_day {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF info timestamp contains an invalid calendar date".to_string(),
                 ));
             }
@@ -378,9 +382,9 @@ impl RtfTimestamp {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_legacy(value: &str) -> RtfResult<Self> {
+    pub fn from_legacy(value: &str) -> crate::Result<Self> {
         let (date, time) = value.split_once('T').ok_or_else(|| {
-            RtfError::MalformedDocument("RTF info time must contain T".to_string())
+            crate::Error::MalformedDocument("RTF info time must contain T".to_string())
         })?;
         let [year, month, day] =
             parse_legacy_timestamp_triplet(date, '-', "invalid RTF info date")?;
@@ -430,16 +434,16 @@ pub struct DocumentInfo<'a> {
     pub revision: Option<u32>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub creation_time: Option<Cow<'a, str>>,
-    pub creation_timestamp: Option<RtfTimestamp>,
+    pub creation_timestamp: Option<Timestamp>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub revision_time: Option<Cow<'a, str>>,
-    pub revision_timestamp: Option<RtfTimestamp>,
+    pub revision_timestamp: Option<Timestamp>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub print_time: Option<Cow<'a, str>>,
-    pub print_timestamp: Option<RtfTimestamp>,
+    pub print_timestamp: Option<Timestamp>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub backup_time: Option<Cow<'a, str>>,
-    pub backup_timestamp: Option<RtfTimestamp>,
+    pub backup_timestamp: Option<Timestamp>,
     pub editing_time: Option<u32>,
     pub pages: Option<u32>,
     pub words: Option<u32>,
@@ -480,7 +484,7 @@ impl<'a> DocumentInfo<'a> {
         self
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         for value in [
             self.title.as_deref(),
             self.subject.as_deref(),
@@ -498,7 +502,7 @@ impl<'a> DocumentInfo<'a> {
         .flatten()
         {
             if value.len() > MAX_INFO_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF info text exceeds the metadata safety limit".to_string(),
                 ));
             }
@@ -517,7 +521,7 @@ impl<'a> DocumentInfo<'a> {
         .flatten()
         {
             if value > i32::MAX as u32 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF info numeric value exceeds the signed control-word range".to_string(),
                 ));
             }
@@ -532,7 +536,7 @@ impl<'a> DocumentInfo<'a> {
                 if let Some(legacy_text) = legacy
                     && legacy_text != timestamp.legacy_string()
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "conflicting typed and legacy RTF info timestamps".to_string(),
                     ));
                 } else if legacy.is_none() {
@@ -541,7 +545,7 @@ impl<'a> DocumentInfo<'a> {
                     timestamp.validate()?;
                 }
             } else if let Some(legacy_text) = legacy {
-                RtfTimestamp::from_legacy(legacy_text)?;
+                Timestamp::from_legacy(legacy_text)?;
             }
         }
         self.protection.validate()?;
@@ -571,13 +575,13 @@ pub enum ProtectionLevel {
 }
 
 impl ProtectionLevel {
-    pub(crate) fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub(crate) fn from_rtf(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::Level0),
             1 => Ok(Self::Level1),
             2 => Ok(Self::Level2),
             3 => Ok(Self::Level3),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF protection level must be in 0..=3".to_string(),
             )),
         }
@@ -652,12 +656,12 @@ impl DocumentProtection<'_> {
         self.enforced != Some(false) && self.protection_type() != ProtectionType::None
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if let Some(hash) = &self.password_hash
             && (hash.len() != PROTECTION_PASSWORD_HASH_BYTES
                 || !hash.as_bytes().iter().all(u8::is_ascii_hexdigit))
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection password hash must contain exactly eight hexadecimal digits"
                     .to_string(),
             ));

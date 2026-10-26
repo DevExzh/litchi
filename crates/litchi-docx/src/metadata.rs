@@ -768,8 +768,10 @@ mod tests {
 
         let mut edit = package.edit_metadata();
         edit.set(Metadata::default());
-        let mut app = app::Props::default();
-        app.company = Some("Acme".to_owned());
+        let app = app::Props {
+            company: Some("Acme".to_owned()),
+            ..Default::default()
+        };
         edit.set_app_props(Some(app));
         let mut custom = CustomProps::new();
         custom

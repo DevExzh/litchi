@@ -5,7 +5,7 @@
 )]
 use super::{
     ControlWord, Cow, Destination, MAX_GROUP_NESTING_DEPTH, MAX_PICTURE_DATA_BYTES,
-    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, Token, control_symbol_text,
+    ParsedBodyStoryEvent, Parser, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
@@ -14,21 +14,21 @@ impl<'a> Parser<'a> {
         &mut self,
         kind: crate::PictureCompatibilityKind,
         starred: bool,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if self.current_state()?.destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility wrapper must occur in document body text".to_string(),
             ));
         }
         if self.picture_compatibility_records.len() >= crate::MAX_PICTURE_COMPATIBILITY_RECORDS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility record count exceeds the safety limit".to_string(),
             ));
         }
         self.pos += if starred { 2 } else { 1 };
         while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
             if !text.chars().all(char::is_whitespace) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF picture-compatibility wrapper contains text outside pict".to_string(),
                 ));
             }
@@ -38,7 +38,7 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos..self.pos + 2),
             Some([Token::OpenBrace, Token::Control(ControlWord::Picture)])
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility wrapper must contain exactly one pict destination"
                     .to_string(),
             ));
@@ -47,26 +47,26 @@ impl<'a> Parser<'a> {
         let picture_index = self.pictures.len();
         self.parse_picture()?;
         if self.pictures.len() != picture_index + 1 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility payload cannot be empty".to_string(),
             ));
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility pict destination is not closed".to_string(),
             ));
         }
         self.pos += 1;
         while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
             if !text.chars().all(char::is_whitespace) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF picture-compatibility wrapper contains trailing text".to_string(),
                 ));
             }
             self.pos += 1;
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility wrapper must contain exactly one pict destination"
                     .to_string(),
             ));
@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
                     || (record.position == self.body_text_len && record.kind == kind)
             })
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture-compatibility wrappers are duplicated or out of body order"
                     .to_string(),
             ));
@@ -106,9 +106,9 @@ impl<'a> Parser<'a> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_picture(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_picture(&mut self) -> crate::Result<()> {
         if self.pictures.len() >= crate::picture::MAX_PICTURES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture count exceeds the safety limit".to_string(),
             ));
         }
@@ -172,7 +172,7 @@ impl<'a> Parser<'a> {
                         ControlWord::PictureScaleY(s) => scale_y = Some(*s),
                         ControlWord::PictureScaled(parameter) => {
                             if data_started || scaled || parameter.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF picscaled is duplicated, parameterized, or late"
                                         .to_string(),
                                 ));
@@ -181,7 +181,7 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::PictureBitmap(parameter) => {
                             if data_started || bitmap.bitmap_source || parameter.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF picbmp is duplicated, parameterized, or late".to_string(),
                                 ));
                             }
@@ -189,7 +189,7 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::PictureBitsPerPixel(value) => {
                             if data_started || bitmap.bits_per_pixel.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF picbpp is duplicated or late".to_string(),
                                 ));
                             }
@@ -198,7 +198,7 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::WindowsBitmapBitsPerPixel(value) => {
                             if data_started || bitmap.windows_bits_per_pixel.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF wbmbitspixel is duplicated or late".to_string(),
                                 ));
                             }
@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::WindowsBitmapPlanes(value) => {
                             if data_started || bitmap.planes.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF wbmplanes is duplicated or late".to_string(),
                                 ));
                             }
@@ -215,12 +215,12 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::WindowsBitmapWidthBytes(value) => {
                             if data_started || bitmap.width_bytes.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF wbmwidthbytes is duplicated or late".to_string(),
                                 ));
                             }
                             let value = value.ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF wbmwidthbytes requires a parameter".to_string(),
                                 )
                             })?;
@@ -229,7 +229,7 @@ impl<'a> Parser<'a> {
                                     .ok()
                                     .filter(|value| *value != 0)
                                     .ok_or_else(|| {
-                                        RtfError::MalformedDocument(
+                                        crate::Error::MalformedDocument(
                                             "RTF wbmwidthbytes must be positive".to_string(),
                                         )
                                     })?,
@@ -263,7 +263,7 @@ impl<'a> Parser<'a> {
                         )?,
                         ControlWord::BlipTag(value) => {
                             if data_started || blip_tag.is_some() || identity_stage > 1 {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF bliptag is duplicated, late, or out of order".to_string(),
                                 ));
                             }
@@ -272,17 +272,17 @@ impl<'a> Parser<'a> {
                         },
                         ControlWord::BlipUnitsPerInch(value) => {
                             if data_started || blip_upi.is_some() || identity_stage > 2 {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF blipupi is duplicated, late, or out of order".to_string(),
                                 ));
                             }
                             let value = u16::try_from(*value).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF blipupi is outside 1..=65535".to_string(),
                                 )
                             })?;
                             if value == 0 {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF blipupi must be positive".to_string(),
                                 ));
                             }
@@ -290,7 +290,7 @@ impl<'a> Parser<'a> {
                             identity_stage = 2;
                         },
                         ControlWord::BlipUid => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF blipuid destination must be starred and grouped".to_string(),
                             ));
                         },
@@ -307,7 +307,7 @@ impl<'a> Parser<'a> {
                     Self::reserve_picture_payload(&mut data, decoded_bytes)?;
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF picture contains a non-hexadecimal character".to_string(),
                             )
                         })?;
@@ -322,7 +322,7 @@ impl<'a> Parser<'a> {
                 Token::Binary(bytes) => {
                     data_started = true;
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF picture binary payload splits a hexadecimal byte".to_string(),
                         ));
                     }
@@ -340,7 +340,7 @@ impl<'a> Parser<'a> {
                         ])
                     ) {
                         if data_started || blip_uid.is_some() {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF blipuid is duplicated or occurs after picture data"
                                     .to_string(),
                             ));
@@ -351,7 +351,7 @@ impl<'a> Parser<'a> {
                         self.tokens.get(self.pos..self.pos + 2),
                         Some([Token::OpenBrace, Token::Control(ControlWord::BlipUid)])
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF blipuid destination must be starred".to_string(),
                         ));
                     } else {
@@ -363,7 +363,7 @@ impl<'a> Parser<'a> {
         }
 
         if high_nibble.is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture contains an odd number of hexadecimal digits".to_string(),
             ));
         }
@@ -409,7 +409,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn reserve_picture_payload(data: &mut Vec<u8>, additional: usize) -> RtfResult<()> {
+    fn reserve_picture_payload(data: &mut Vec<u8>, additional: usize) -> crate::Result<()> {
         Self::reserve_picture_payload_with_limit(
             data,
             additional,
@@ -425,25 +425,25 @@ impl<'a> Parser<'a> {
         limit: usize,
         resource: &'static str,
         message: &'static str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let remaining = limit.saturating_sub(data.len());
         if additional > remaining {
-            return Err(RtfError::MalformedDocument(message.to_string()));
+            return Err(crate::Error::MalformedDocument(message.to_string()));
         }
         data.try_reserve_exact(additional)
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource,
                 requested: data.len().saturating_add(additional),
             })?;
         Ok(())
     }
 
-    pub(super) fn positive_picture_u16(value: Option<i32>, name: &str) -> RtfResult<u16> {
+    pub(super) fn positive_picture_u16(value: Option<i32>, name: &str) -> crate::Result<u16> {
         value
             .and_then(|value| u16::try_from(value).ok())
             .filter(|value| *value != 0)
             .ok_or_else(|| {
-                RtfError::MalformedDocument(format!(
+                crate::Error::MalformedDocument(format!(
                     "RTF {name} must have a positive 16-bit parameter"
                 ))
             })
@@ -454,21 +454,21 @@ impl<'a> Parser<'a> {
         value: Option<i32>,
         data_started: bool,
         name: &str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if data_started || slot.is_some() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {name} is duplicated or occurs after picture data"
             )));
         }
         *slot = Some(value.ok_or_else(|| {
-            RtfError::MalformedDocument(format!("RTF {name} requires a parameter"))
+            crate::Error::MalformedDocument(format!("RTF {name} requires a parameter"))
         })?);
         Ok(())
     }
 
     pub(super) fn scan_picture_shape_properties(
         &mut self,
-    ) -> RtfResult<Option<crate::PictureShapeProperties<'a>>> {
+    ) -> crate::Result<Option<crate::PictureShapeProperties<'a>>> {
         let original_pos = self.pos;
         let result = self.scan_picture_shape_properties_inner();
         self.pos = original_pos;
@@ -477,7 +477,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn scan_picture_shape_properties_inner(
         &mut self,
-    ) -> RtfResult<Option<crate::PictureShapeProperties<'a>>> {
+    ) -> crate::Result<Option<crate::PictureShapeProperties<'a>>> {
         let mut index = self.pos + 1;
         let mut depth = 0usize;
         let mut properties = None;
@@ -495,17 +495,17 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::PictureProperties(_)))
                     ) {
                         if !starred {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF picprop destination must be starred".to_string(),
                             ));
                         }
                         if properties.is_some() {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF picture contains multiple picprop destinations".to_string(),
                             ));
                         }
                         if saw_picture_content {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF picprop must precede picture payload data".to_string(),
                             ));
                         }
@@ -519,7 +519,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::OpenBrace) => {
                     if depth >= MAX_GROUP_NESTING_DEPTH {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF picture nesting depth exceeds the safety limit".to_string(),
                         ));
                     }
@@ -532,7 +532,7 @@ impl<'a> Parser<'a> {
                     index += 1;
                 },
                 Some(Token::Control(ControlWord::PictureProperties(_))) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF picprop destination must be a direct child group of pict".to_string(),
                     ));
                 },
@@ -550,7 +550,7 @@ impl<'a> Parser<'a> {
                 Some(_) => {
                     index += 1;
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
         Ok(properties)
@@ -558,26 +558,26 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_picture_shape_properties(
         &mut self,
-    ) -> RtfResult<crate::PictureShapeProperties<'a>> {
+    ) -> crate::Result<crate::PictureShapeProperties<'a>> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
             || !matches!(
                 self.tokens.get(self.pos + 1),
                 Some(Token::Control(ControlWord::IgnorableDestination))
             )
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF picprop destination".to_string(),
             ));
         }
         match self.tokens.get(self.pos + 2) {
             Some(Token::Control(ControlWord::PictureProperties(None))) => self.pos += 3,
             Some(Token::Control(ControlWord::PictureProperties(Some(_)))) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF picprop destination must not have a parameter".to_string(),
                 ));
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF picprop destination".to_string(),
                 ));
             },
@@ -593,7 +593,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::PictureShapeId(Some(value)))) => {
                     if result.shape_id.replace(*value).is_some() || !result.properties.is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shplid must occur at most once before picture properties"
                                 .to_string(),
                         ));
@@ -601,7 +601,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::PictureShapeId(None))) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shplid requires a parameter".to_string(),
                     ));
                 },
@@ -612,7 +612,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if result.properties.len() >= crate::MAX_PICTURE_SHAPE_PROPERTIES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF picture shape-property count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -624,17 +624,19 @@ impl<'a> Parser<'a> {
                     return Ok(result);
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid content or ordering in RTF picprop destination".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn parse_picture_shape_property(&mut self) -> RtfResult<crate::ShapeProperty<'a>> {
+    pub(super) fn parse_picture_shape_property(
+        &mut self,
+    ) -> crate::Result<crate::ShapeProperty<'a>> {
         self.pos += 2; // opening brace and \sp
         self.skip_picture_property_whitespace();
         let name = self.parse_picture_property_text(ControlWord::ShapePropertyName, "sn")?;
@@ -656,7 +658,7 @@ impl<'a> Parser<'a> {
             None
         };
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture sp must contain one sn, one sv, and at most one trailing hsv"
                     .to_string(),
             ));
@@ -671,14 +673,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub(super) fn parse_picture_property_value(&mut self) -> RtfResult<(String, Option<Vec<u8>>)> {
+    pub(super) fn parse_picture_property_value(
+        &mut self,
+    ) -> crate::Result<(String, Option<Vec<u8>>)> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
             || !matches!(
                 self.tokens.get(self.pos + 1),
                 Some(Token::Control(ControlWord::ShapePropertyValue))
             )
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF picture sp requires an unstarred sv destination".to_string(),
             ));
         }
@@ -690,7 +694,7 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if binary_value.is_some() && !text.trim().is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF picture property cannot mix scalar and binary values".to_string(),
                         ));
                     }
@@ -706,14 +710,14 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if binary_value.is_some() || !text.trim().is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF svb must be the only picture property value".to_string(),
                         ));
                     }
                     binary_value = Some(self.parse_shape_binary_value()?);
                 },
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "nested groups are not allowed in RTF picture sv".to_string(),
                     ));
                 },
@@ -731,11 +735,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "active controls are not allowed in RTF picture sv".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -747,7 +751,7 @@ impl<'a> Parser<'a> {
     /// groups may appear in any order (RTF "Hyperlink Property for Shapes").
     pub(super) fn parse_shape_hyperlink_destination(
         &mut self,
-    ) -> RtfResult<crate::ShapeHyperlink<'a>> {
+    ) -> crate::Result<crate::ShapeHyperlink<'a>> {
         self.pos += 2; // opening brace and hl control
         let mut hyperlink = crate::ShapeHyperlink::default();
         loop {
@@ -768,14 +772,14 @@ impl<'a> Parser<'a> {
                             &mut hyperlink.friendly_name
                         },
                         _ => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF hl may contain only hlloc, hlsrc, and hlfr destinations"
                                     .to_string(),
                             ));
                         },
                     };
                     if slot.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "duplicate RTF shape-hyperlink string destination".to_string(),
                         ));
                     }
@@ -785,7 +789,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF hl contains ungrouped, binary, or active data".to_string(),
                     ));
                 },
@@ -797,7 +801,7 @@ impl<'a> Parser<'a> {
 
     /// Parse one `\hlloc`/`\hlsrc`/`\hlfr` string destination group;
     /// `self.pos` is at its opening brace.
-    pub(super) fn parse_shape_hyperlink_string(&mut self) -> RtfResult<Cow<'a, str>> {
+    pub(super) fn parse_shape_hyperlink_string(&mut self) -> crate::Result<Cow<'a, str>> {
         self.pos += 2; // opening brace and destination control
         let mut value = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
@@ -808,7 +812,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
                 _ => {
                     if !self.consume_destination_text_token(
                         &mut value,
@@ -816,13 +820,13 @@ impl<'a> Parser<'a> {
                         &mut fallback_skip,
                         "shape-hyperlink string",
                     )? {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-hyperlink string destination contains grouped, binary, or active data"
                                 .to_string(),
                         ));
                     }
                     if value.len() > crate::shape::MAX_SHAPE_HYPERLINK_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-hyperlink string exceeds the safety limit".to_string(),
                         ));
                     }
@@ -845,11 +849,11 @@ impl<'a> Parser<'a> {
         &mut self,
         expected: ControlWord<'_>,
         name: &str,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
             || self.tokens.get(self.pos + 1) != Some(&Token::Control(expected))
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF picture sp requires an unstarred {name} destination"
             )));
         }
@@ -862,7 +866,7 @@ impl<'a> Parser<'a> {
                     return Ok(text.trim().to_string());
                 },
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "nested groups are not allowed in RTF picture {name}"
                     )));
                 },
@@ -878,16 +882,16 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "active controls are not allowed in RTF picture {name}"
                     )));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
 
-    pub(super) fn parse_picture_uid(&mut self) -> RtfResult<Vec<u8>> {
+    pub(super) fn parse_picture_uid(&mut self) -> crate::Result<Vec<u8>> {
         self.pos += 3; // opening brace, ignorable marker, and blipuid
         let mut bytes = Vec::with_capacity(16);
         let mut high_nibble = None;
@@ -896,12 +900,12 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF blipuid contains an odd number of hexadecimal digits".to_string(),
                         ));
                     }
                     if !bytes.is_empty() && bytes.len() != 16 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF blipuid must contain exactly 16 bytes or be empty".to_string(),
                         ));
                     }
@@ -910,14 +914,14 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) => {
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF blipuid contains a non-hexadecimal character".to_string(),
                             )
                         })?;
                         if let Some(high) = high_nibble.take() {
                             bytes.push((high << 4) | nibble);
                             if bytes.len() > 16 {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF blipuid exceeds 16 bytes".to_string(),
                                 ));
                             }
@@ -928,11 +932,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Control(_) | Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF blipuid contains active, nested, or binary content".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }

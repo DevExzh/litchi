@@ -106,9 +106,9 @@ impl CharacterBorder {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.width > 75 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF character-border width must be in 0..=75 twips".to_string(),
             ));
         }
@@ -134,9 +134,9 @@ impl CharacterShading {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.amount.is_some_and(|amount| amount > 10_000) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF character shading must be in 0..=10000".to_string(),
             ));
         }
@@ -288,14 +288,14 @@ impl Border {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate_table(&self) -> crate::RtfResult<()> {
+    pub fn validate_table(&self) -> crate::Result<()> {
         if !(0..=75).contains(&self.width) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-border width must be in 0..=75 twips".to_string(),
             ));
         }
         if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&self.space) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-border spacing is out of range".to_string(),
             ));
         }
@@ -490,9 +490,9 @@ impl Shading {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.amount.is_some_and(|amount| amount > 10_000) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph shading must be in 0..=10000".to_string(),
             ));
         }
@@ -503,9 +503,9 @@ impl Shading {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_amount(&mut self, amount: Option<u16>) -> crate::RtfResult<()> {
+    pub fn set_amount(&mut self, amount: Option<u16>) -> crate::Result<()> {
         if amount.is_some_and(|value| value > 10_000) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF paragraph shading must be in 0..=10000".to_string(),
             ));
         }

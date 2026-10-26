@@ -221,7 +221,11 @@ fn table_formula_object(index: usize, column: bool) -> u64 {
 }
 
 fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -232,7 +236,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }], Default::default())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -706,7 +714,8 @@ fn synthetic_package_with_metadata(
     }
 
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -771,22 +780,26 @@ fn metadata_archive(document: &Archive) -> TestResult<Vec<u8>> {
             &[],
         )?],
     };
-    Ok(SnappyStream::compress(&archive.to_bytes()?, Default::default())?)
+    Ok(SnappyStream::compress(
+        &archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
         SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
-     Default::default(),)?)
+        Default::default(),
+    )?)
 }
 
 fn preview_count(package: &[u8]) -> usize {
-    Catalog::from_bytes(package)
+    Catalog::from_bytes(package, Default::default())
         .unwrap_or_else(|error| panic!("package preview catalog is valid: {error}"))
         .iter()
         .filter(|entry| PREVIEWS.contains(&entry.name()))
@@ -797,14 +810,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(), Default::default())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -812,12 +829,15 @@ fn rewrite_document_archive(
 }
 
 fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(), Default::default())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     Ok(archive
         .object(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?
@@ -833,12 +853,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(), Default::default())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -850,7 +873,8 @@ fn rewrite_metadata(
     let mut metadata = tsp::PackageMetadata::decode(message.data.as_slice())?;
     mutate(&mut metadata)?;
     message.data = metadata.encode_to_vec();
-    let component = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
         Limits::default(),
@@ -922,7 +946,7 @@ fn metadata_uuid_collision(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn remove_metadata_member(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let members = catalog
         .iter()
         .filter(|entry| entry.name() != METADATA_MEMBER)
@@ -936,18 +960,21 @@ fn remove_metadata_member(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn metadata_physical_id_collision(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
-        archive.insert_object(object(
-            METADATA_OBJECT_IDENTIFIER,
-            FILTER_SET_MESSAGE_TYPE,
-            filter_set_payload(),
-            &[],
-        )?)?;
+        archive.insert_object(
+            object(
+                METADATA_OBJECT_IDENTIFIER,
+                FILTER_SET_MESSAGE_TYPE,
+                filter_set_payload(),
+                &[],
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let metadata = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
@@ -1067,10 +1094,13 @@ fn append_duplicate_model_message(package: &[u8], index: usize) -> TestResult<Ve
             .ok_or("missing table-model message")?
             .data
             .clone();
-        model.push_message(RawMessage {
-            type_: TABLE_MODEL_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        model.push_message(
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -1087,10 +1117,13 @@ fn append_duplicate_info_message(package: &[u8], index: usize) -> TestResult<Vec
             .ok_or("missing table-info message")?
             .data
             .clone();
-        info.push_message(RawMessage {
-            type_: TABLE_INFO_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        info.push_message(
+            RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -1112,7 +1145,7 @@ fn append_duplicate_formula_owner(package: &[u8], index: usize) -> TestResult<Ve
             .clone();
         let mut duplicate = owner;
         duplicate.archive_info.identifier = Some(table_formula_owner(index) + 10_000);
-        archive.insert_object(duplicate)?;
+        archive.insert_object(duplicate, Default::default())?;
         Ok(())
     })
 }
@@ -1387,7 +1420,11 @@ fn wrong_model_map_metadata_path(package: &[u8], index: usize) -> TestResult<Vec
             .iter_mut()
             .find(|field| field.path.as_slice() == [TABLE_MODEL_UID_MAP_FIELD])
             .ok_or("missing model UID-map field metadata")?;
-        field.path = litchi_iwa_core::FieldPath::new(vec![TABLE_MODEL_UID_MAP_FIELD + 1], litchi_iwa_core::Limits::default()).unwrap();
+        field.path = litchi_iwa_core::FieldPath::new(
+            vec![TABLE_MODEL_UID_MAP_FIELD + 1],
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         Ok(())
     })
 }
@@ -1640,6 +1677,7 @@ fn aggregate_ownerless_fixture(cross_component: bool) -> TestResult<Vec<u8>> {
             type_: FORMULA_OWNER_MESSAGE_TYPE,
             data: payload.encode_to_vec(),
         },
+        Default::default(),
     )?;
     owner.archive_info.message_infos[0].field_infos.clear();
     let engine = object(
@@ -1696,14 +1734,16 @@ fn aggregate_ownerless_fixture(cross_component: bool) -> TestResult<Vec<u8>> {
             &Archive {
                 objects: vec![engine, owner],
             }
-            .to_bytes()?,
-         Default::default(),)?)
+            .to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     } else {
         archive.objects.push(engine);
         None
     };
-    let document = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let document =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut members = catalog
         .iter()
         .map(|entry| {
@@ -2566,8 +2606,10 @@ fn assert_member_locality(
     selected_index: usize,
     owner_created: bool,
 ) {
-    let source_catalog = Catalog::from_bytes(source).expect("source catalog is valid");
-    let target_catalog = Catalog::from_bytes(target).expect("target catalog is valid");
+    let source_catalog =
+        Catalog::from_bytes(source, Default::default()).expect("source catalog is valid");
+    let target_catalog =
+        Catalog::from_bytes(target, Default::default()).expect("target catalog is valid");
 
     for source_entry in source_catalog.iter() {
         let name = source_entry.name();

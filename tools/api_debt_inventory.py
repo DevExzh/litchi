@@ -26,6 +26,10 @@ A wave is done for a category when its crate has no rows left in it. A
 `Commit` that aliases `litchi_core::edit::Commit` has the triad accessors
 (record 0356 P4), and a type under a `builder` module is an authoring draft,
 whose `&mut self` methods are allowed (0351 §2.1 rule 7; record 0356b).
+Two more shapes are not debt (record 0366): a `raw::Reader`, the mutable
+codec model 0351 §2.1 rule 6 names, and a type that rustdoc places in a
+build-script output file (the generated IWA wire schema keeps the file
+format's message names, such as `tswp::UndoTransaction`).
 """
 from __future__ import annotations
 
@@ -210,6 +214,19 @@ def auditable_commit_nominals(document, crate: str, delegated_globs=frozenset())
     return frozenset(covered)
 
 
+def is_generated(item) -> bool:
+    """Whether rustdoc places ``item`` in a build-script output file.
+
+    Generated wire schemas (``litchi-iwa-protos`` includes prost/buffa code
+    from ``OUT_DIR``) keep the message names of the file format, such as
+    ``tswp::UndoTransaction``; those names are not Litchi staging types.
+    """
+    span = item.get("span") if isinstance(item, dict) else None
+    filename = span.get("filename", "") if isinstance(span, dict) else ""
+    parts = Path(filename).parts
+    return any(parts[i] == "build" and parts[i + 2] == "out" for i in range(len(parts) - 2))
+
+
 def target_family(method: str) -> str:
     """The Edit family a package mutator moves to (a naming heuristic)."""
     if method.startswith(OUTPUT_PREFIXES):
@@ -299,7 +316,8 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                     target = target_family(name)
                 yield "mut_owner", text, receiver, target
             elif receiver == "&mut self" and crate != "litchi_iwa" and not draft and (
-                    owner.startswith(("Mutable", "Flat")) or owner in DRAFT_NAMES):
+                    owner.startswith(("Mutable", "Flat")) or owner in DRAFT_NAMES) and not (
+                    owner == "Reader" and "raw" in path[:-2]):
                 yield "mut_draft", text, receiver, "Builder draft or Edit verb; no Mutable* type"
             if name == "with_limits" or name.endswith("_with_limits"):
                 yield "with_limits", text, receiver, "OpenOptions / EditOptions, or required limits (raw)"
@@ -328,6 +346,7 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                           else "return contract unverified")
                 yield "replay_return", "::".join(replay_path), detail, "register and satisfy Result<family::Commit> in result_methods"
         elif kind in ("struct", "enum", "type_alias"):
+            generated = is_generated(item)
             if (kind == "enum" and name == "Error"
                     and not {"non_exhaustive", "#[non_exhaustive]"}.intersection(item.get("attrs", []))):
                 yield "exhaustive_error", text, kind, "add #[non_exhaustive]; migrate exhaustive consumers"
@@ -369,7 +388,7 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                         "add " + ",".join(missing) if missing else "",
                         "delete " + ",".join(extra) if extra else "")))
                     yield "commit_type", text, detail, target
-            if name.endswith(("Edit", "Transaction")):
+            if name.endswith(("Edit", "Transaction")) and not generated:
                 bad = sorted(members & {"rollback", "is_changed", "snapshot"})
                 renamed = name.endswith("Transaction") or name != "Edit"
                 if bad or renamed:
@@ -377,7 +396,7 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                         "rename to the focused module's Edit" if renamed else "",
                         "delete " + ",".join(bad) if bad else "")))
                     yield "edit_type", text, ",".join(bad), target
-            if name.endswith("Transaction"):
+            if name.endswith("Transaction") and not generated:
                 yield "transaction_type", text, kind, "rename Edit (focused module)"
         elif kind == "variant" and name == "UnsafeEdit":
             yield "unsafe_edit", text, "variant", "Refused(litchi_core::edit::Refusal)"

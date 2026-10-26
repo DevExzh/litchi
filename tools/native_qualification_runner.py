@@ -2738,6 +2738,9 @@ class SafeRunner:
         # starting a build.
         env.pop("CARGO_HOME", None)
         env.pop("CARGO_CONFIG", None)
+        # An inherited target directory (session env.sh, coordinator gate) is
+        # not a manifest override; the runner sets its own below.
+        env.pop("CARGO_TARGET_DIR", None)
         # These session switches are never part of a qualification input.
         # A caller that needs one must record it in the reviewed manifest
         # rather than inheriting a process-wide blessing/cap override.

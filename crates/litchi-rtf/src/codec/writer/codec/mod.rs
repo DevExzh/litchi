@@ -53,7 +53,7 @@ use super::super::{
     ParagraphGroupPropertyTable, ParagraphWrapping, Picture, PictureCompatibilityKind,
     PictureCompatibilityRecord, PictureShapeProperties, PresentNoteKinds, ProtectionRange,
     ProtectionUserTable, Revision, RevisionAuthor, RevisionMetadata, RevisionSaveMetadata,
-    RevisionType, Row, RtfTimestamp, Section, SectionBreakType, SectionFootnotePlacement,
+    RevisionType, Row, Section, SectionBreakType, SectionFootnotePlacement,
     SectionLineNumberRestart, SectionNoteOptions, SectionRendering, Shading, ShadingPattern, Shape,
     ShapeGroup, ShapeGroupChild, ShapeGroupInfo, ShapeProperty, ShapeResult, ShapeThemeColor,
     ShapeType, SmartTag, SoftBreak, SoftBreakKind, StoryDrawing, StoryEvent, StoryField, Style,
@@ -63,8 +63,8 @@ use super::super::{
     TableHorizontalReference, TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit,
     TableRowAlignment, TableRowBandIndex, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
     TableRowHeight, TableShading, TableVerticalPosition, TableVerticalReference, TextDirection,
-    UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation, document_variable,
-    field, form_field, navigation_entry, section, user_property,
+    Timestamp, UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation,
+    document_variable, field, form_field, navigation_entry, section, user_property,
 };
 use crate::model::document::Tree;
 use litchi_codepage::Mbcs;
@@ -94,7 +94,7 @@ pub enum DefaultTabWidthPolicy {
 
 /// RTF writer options
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WriterOptions {
+pub struct Options {
     /// Checked legacy character set declared by the document header.
     pub charset: Charset,
     /// Indent RTF output for readability
@@ -131,7 +131,7 @@ impl Charset {
     }
 }
 
-impl Default for WriterOptions {
+impl Default for Options {
     fn default() -> Self {
         Self {
             charset: Charset::WINDOWS_1252,
@@ -146,11 +146,11 @@ impl Default for WriterOptions {
 ///
 /// Provides functionality to serialize RTF documents to a writer.
 /// All fields are used internally during the writing process.
-pub struct RtfWriter<W: Write> {
+pub struct Writer<W: Write> {
     /// Output writer
     writer: W,
     /// Writer options
-    options: WriterOptions,
+    options: Options,
     /// Font table
     font_table: FontTable<'static>,
     /// Color table
@@ -228,14 +228,14 @@ fn take_story_item<'a, T>(items: &'a [T], seen: &mut [bool], index: usize) -> io
     Ok(item)
 }
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Create a new RTF writer
     pub fn new(writer: W) -> Self {
-        Self::with_options(writer, WriterOptions::default())
+        Self::with_options(writer, Options::default())
     }
 
     /// Create a new RTF writer with options
-    pub fn with_options(writer: W, options: WriterOptions) -> Self {
+    pub fn with_options(writer: W, options: Options) -> Self {
         Self {
             writer,
             options,
@@ -250,7 +250,7 @@ impl<W: Write> RtfWriter<W> {
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
     pub fn write(&mut self, document: &crate::Package) -> io::Result<()> {
-        if self.options == WriterOptions::default()
+        if self.options == Options::default()
             && let Some(source) = document.model().preserved_source()
         {
             return self.writer.write_all(source);

@@ -1,5 +1,3 @@
-use crate::{RtfError, RtfResult};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentOrigin {
     PlainTextEmail,
@@ -15,11 +13,11 @@ impl HtmlEmailVersion {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_rtf_value(value: i32) -> RtfResult<Self> {
+    pub fn from_rtf_value(value: i32) -> crate::Result<Self> {
         if value == 1 {
             Ok(Self::Version1)
         } else {
-            Err(RtfError::MalformedDocument(
+            Err(crate::Error::MalformedDocument(
                 "RTF fromhtml version must be 1".to_string(),
             ))
         }
@@ -42,12 +40,12 @@ impl DocumentAutoFormatType {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_rtf_value(value: i32) -> RtfResult<Self> {
+    pub fn from_rtf_value(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::General),
             1 => Ok(Self::Letter),
             2 => Ok(Self::Email),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF document type must be in the range 0 through 2".to_string(),
             )),
         }

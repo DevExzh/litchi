@@ -49,7 +49,7 @@ impl SectionColumn {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(width: i32, space_after: Option<i32>) -> crate::RtfResult<Self> {
+    pub fn new(width: i32, space_after: Option<i32>) -> crate::Result<Self> {
         let column = Self { width, space_after };
         column.validate()?;
         Ok(column)
@@ -58,9 +58,9 @@ impl SectionColumn {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if !(1..=MAX_SECTION_COLUMN_TWIPS).contains(&self.width) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF section-column width must be in 1..=31680 twips".to_string(),
             ));
         }
@@ -68,7 +68,7 @@ impl SectionColumn {
             .space_after
             .is_some_and(|value| !(0..=MAX_SECTION_COLUMN_TWIPS).contains(&value))
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF section-column spacing must be in 0..=31680 twips".to_string(),
             ));
         }
@@ -97,7 +97,7 @@ impl SectionColumns {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn equal(count: u16, spacing: i32, separator: bool) -> crate::RtfResult<Self> {
+    pub fn equal(count: u16, spacing: i32, separator: bool) -> crate::Result<Self> {
         let columns = Self {
             count,
             default_spacing: spacing,
@@ -116,9 +116,9 @@ impl SectionColumns {
         columns: Vec<SectionColumn>,
         default_spacing: i32,
         separator: bool,
-    ) -> crate::RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let count = u16::try_from(columns.len()).map_err(|_err| {
-            crate::RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF section-column count exceeds the safety limit".to_string(),
             )
         })?;
@@ -142,19 +142,19 @@ impl SectionColumns {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if !(1..=MAX_SECTION_COLUMNS).contains(&self.count) {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF section-column count must be in 1..={MAX_SECTION_COLUMNS}"
             )));
         }
         if !(0..=MAX_SECTION_COLUMN_TWIPS).contains(&self.default_spacing) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF section-column default spacing must be in 0..=31680 twips".to_string(),
             ));
         }
         if !self.explicit.is_empty() && self.explicit.len() != usize::from(self.count) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF explicit section-column count does not match cols".to_string(),
             ));
         }
@@ -386,7 +386,7 @@ impl SectionLineNumbering {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(increment: u16) -> crate::RtfResult<Self> {
+    pub fn new(increment: u16) -> crate::Result<Self> {
         let value = Self {
             increment: Some(increment),
             ..Self::default()
@@ -411,9 +411,9 @@ impl SectionLineNumbering {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.increment == Some(0) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF line-number increment must be in 1..=65535".to_string(),
             ));
         }
@@ -421,7 +421,7 @@ impl SectionLineNumbering {
             .distance
             .is_some_and(|value| !(0..=MAX_SECTION_LINE_DISTANCE).contains(&value))
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF line-number distance must be in 0..=31680 twips".to_string(),
             ));
         }
@@ -429,7 +429,7 @@ impl SectionLineNumbering {
             .start
             .is_some_and(|value| !(1..=MAX_SECTION_LINE_START).contains(&value))
         {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF starting line number must be in 1..={MAX_SECTION_LINE_START}"
             )));
         }
@@ -471,11 +471,11 @@ impl SectionNoteOptions {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.footnote_start.is_some_and(|value| value <= 0)
             || self.endnote_start.is_some_and(|value| value <= 0)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF section note starting numbers must be positive".to_string(),
             ));
         }
@@ -542,12 +542,12 @@ impl SectionPageNumberHeading {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .level
             .is_some_and(|value| i32::from(value) > MAX_PAGE_NUMBER_HEADING_LEVEL)
         {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF page-number heading level must be in 0..={MAX_PAGE_NUMBER_HEADING_LEVEL}"
             )));
         }
@@ -608,12 +608,12 @@ impl SectionDocumentGrid {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .line_grid
             .is_some_and(|value| !(0..=MAX_SECTION_LINE_GRID_TWIPS).contains(&value))
         {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF section line-grid pitch must be in 0..={MAX_SECTION_LINE_GRID_TWIPS} twips"
             )));
         }
@@ -860,7 +860,7 @@ impl<'a> HeaderFooter<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::Result<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape);
         let mut order = self.drawing_order.clone();
@@ -886,7 +886,7 @@ impl<'a> HeaderFooter<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::Result<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group);
         let mut order = self.drawing_order.clone();
@@ -927,7 +927,7 @@ impl<'a> HeaderFooter<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         let text = self.text();
         crate::field::push_story_page_break(
             &mut self.story_events,
@@ -1072,9 +1072,9 @@ impl<'a> Note<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.content.len() > MAX_NOTE_BODY_BYTES || self.reference.len() > 65_536 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note text exceeds the safety limit".to_string(),
             ));
         }
@@ -1096,7 +1096,7 @@ impl<'a> Note<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::Result<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape);
         let mut order = self.drawing_order.clone();
@@ -1121,7 +1121,7 @@ impl<'a> Note<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::Result<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group);
         let mut order = self.drawing_order.clone();
@@ -1161,7 +1161,7 @@ impl<'a> Note<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         crate::field::push_story_page_break(
             &mut self.story_events,
             self.content.as_ref(),

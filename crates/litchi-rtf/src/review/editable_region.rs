@@ -10,7 +10,6 @@
 //! The markers are parsed and stored as passive metadata only; no editing
 //! restriction is ever evaluated or enforced.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_EDITABLE_REGIONS: usize = 65_536;
@@ -34,15 +33,15 @@ impl<'a> EditableRegion<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(position: usize, content: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(position: usize, content: Cow<'a, str>) -> crate::Result<Self> {
         let region = Self { position, content };
         region.validate()?;
         Ok(region)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.content.contains('\0') {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF editable-region content contains a forbidden control character".to_string(),
             ));
         }

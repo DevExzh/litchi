@@ -19,10 +19,10 @@ use super::super::{
     DocumentThemeLanguages, DocumentThumbnailPreference, DocumentView, DocumentWindowCaption,
     DocumentWord2003Compatibility, DocumentWriteReservations, DocumentXmlPolicies,
     DocumentXslTransform, DocumentXslTransformUsage, HtmlEmailVersion, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-    RtfWriter, TextDirection, Tree, Write, io,
+    TextDirection, Tree, Write, Writer, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write document header
     ///
     /// # Errors
