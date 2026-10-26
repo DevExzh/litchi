@@ -10,6 +10,9 @@ use core::mem::size_of;
 
 use crate::formula_dependencies;
 
+/// Formula authoring and removal for the Keynote and Pages table owners
+/// (record 0376a).
+pub mod author;
 /// The dependent-cache refresh of value writes for the Keynote and Pages
 /// table owners (record 0376).
 pub mod refresh;
@@ -430,10 +433,11 @@ pub enum Unsupported {
     TextScalar,
     CacheType,
     HeaderNameManager,
-    /// The edited table's formula list is segmented (record 0376).
-    SegmentedFormulaList,
     /// A tile or cell shape outside the shared cell writer (record 0376).
     Storage,
+    /// A dependency-graph shape the shared rewrite does not regenerate, such
+    /// as the selected table's mirrored range records (record 0376a).
+    Graph,
 }
 
 /// A cache cell rewrite.  The owner is retained to make raw list rewrites
