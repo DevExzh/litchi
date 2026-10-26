@@ -6139,3 +6139,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   bytecode files; frozen C has only its approved ignored lock. Full gate,
   census, all 25 qualification rows and final control cleanup remain open.
   Only memo 22 is deferred; nothing is pushed.
+
+  Protocol admission review returns retired DOC HEAD checks, replaceable
+  fidelity expectations and then recursive bind delegation (165a). DOC/Ink
+  v5 passes independent source review with original oracles and positive
+  bind/CLI tests. W8 v4 passes after path/hash repairs; its accidentally
+  overwritten initial packet is restored exactly from retained tool-call
+  patches and all original seals are independently verified. Neither packet
+  is native acceptance. The isolated ODF raw-codec leaf commits at 48d68bcc29
+  with seven Python checks and rustfmt passing; independent review and Rust
+  builds remain open. The same full65 gate continues its Ops integration
+  chunks. All 25 qualification rows remain required; nothing is pushed.
