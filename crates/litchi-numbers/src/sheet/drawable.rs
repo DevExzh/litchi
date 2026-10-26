@@ -49,6 +49,16 @@ pub mod properties {
     };
 }
 
+/// Exact-source text-language transactions for the storage a sheet text
+/// box or shape owns: [`crate::Package::edit_sheet_drawable_text_languages`].
+pub mod language {
+    pub use crate::package::sheet_drawable_language::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::language::{TextLanguage, TextLanguageRun};
+}
+
 /// Exact-source plain-text transactions for the storage a sheet text box or
 /// shape owns: [`crate::Package::edit_sheet_drawable_plain_text`].
 pub mod plain_text {
