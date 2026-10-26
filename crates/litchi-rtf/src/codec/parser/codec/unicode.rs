@@ -1,6 +1,5 @@
 use super::{
-    ControlWord, Cow, Destination, Parser, RtfError, RtfResult, SmallVec, StyleBlock, Token,
-    append_transport_bytes,
+    ControlWord, Cow, Destination, Parser, SmallVec, StyleBlock, Token, append_transport_bytes,
 };
 
 /// `\uN` code units with the token each was read from.
@@ -72,7 +71,7 @@ impl Parser<'_> {
         skip: usize,
         run: &mut UnicodeRun,
         bounded: bool,
-    ) -> RtfResult<usize> {
+    ) -> crate::Result<usize> {
         let mut awaiting_fallback = 0usize;
         let mut code = first_code;
         loop {
@@ -165,7 +164,7 @@ impl Parser<'_> {
         clippy::cast_sign_loss,
         reason = "RTF \\uN parameters are signed 16-bit; the wrapping conversions implement the specified negative-value and fallback-skip behavior"
     )]
-    pub(super) fn parse_unicode_sequence(&mut self, first_code: i32) -> RtfResult<()> {
+    pub(super) fn parse_unicode_sequence(&mut self, first_code: i32) -> crate::Result<()> {
         let skip_count = self.current_state()?.unicode_skip as usize;
 
         // Collect consecutive Unicode values, joining surrogate pairs.
@@ -236,7 +235,7 @@ impl Parser<'_> {
                     self.body_text_len
                         .checked_add(allocated.len())
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument("RTF body text length overflow".into())
+                            crate::Error::MalformedDocument("RTF body text length overflow".into())
                         })?;
                 self.prepare_body_block_push()?;
                 self.blocks.push(block);

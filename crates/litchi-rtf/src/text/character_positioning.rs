@@ -1,7 +1,5 @@
 //! Typed character baseline, expansion, scaling, and kerning state.
 
-use crate::{RtfError, RtfResult};
-
 pub const MAX_CHARACTER_BASELINE_HALF_POINTS: i32 = 31_680;
 pub const MAX_CHARACTER_EXPANSION: i32 = 31_680;
 pub const MAX_CHARACTER_SCALE_PERCENT: i32 = 600;
@@ -33,7 +31,7 @@ pub enum CharacterExpansion {
 /// quarter-point alias.
 pub(crate) fn normalize_character_expansion(
     expansion: CharacterExpansion,
-) -> RtfResult<CharacterExpansion> {
+) -> crate::Result<CharacterExpansion> {
     match expansion {
         CharacterExpansion::None => Ok(CharacterExpansion::None),
         CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value) => {
@@ -41,7 +39,7 @@ pub(crate) fn normalize_character_expansion(
                 return Ok(CharacterExpansion::None);
             }
             if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&i32::from(value)) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF character expansion is out of range".to_string(),
                 ));
             }
@@ -50,18 +48,18 @@ pub(crate) fn normalize_character_expansion(
     }
 }
 
-pub(crate) fn validate_character_scale(value: u16) -> RtfResult<()> {
+pub(crate) fn validate_character_scale(value: u16) -> crate::Result<()> {
     if !(1..=MAX_CHARACTER_SCALE_PERCENT as u16).contains(&value) {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF character scale is out of range".to_string(),
         ));
     }
     Ok(())
 }
 
-pub(crate) fn validate_character_kerning(value: u16) -> RtfResult<()> {
+pub(crate) fn validate_character_kerning(value: u16) -> crate::Result<()> {
     if i32::from(value) > MAX_CHARACTER_KERNING_HALF_POINTS {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF character kerning is out of range".to_string(),
         ));
     }
@@ -72,7 +70,7 @@ pub(crate) fn validate_character_kerning(value: u16) -> RtfResult<()> {
 pub(crate) fn effective_character_expansion(
     typed: CharacterExpansion,
     legacy_quarter_points: i32,
-) -> RtfResult<CharacterExpansion> {
+) -> crate::Result<CharacterExpansion> {
     let typed = normalize_character_expansion(typed)?;
     if typed != CharacterExpansion::None {
         return Ok(typed);
@@ -81,18 +79,18 @@ pub(crate) fn effective_character_expansion(
         return Ok(CharacterExpansion::None);
     }
     if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&legacy_quarter_points) {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF legacy character spacing is out of range".to_string(),
         ));
     }
     let value = i16::try_from(legacy_quarter_points).map_err(|_error| {
-        RtfError::MalformedDocument("RTF legacy character spacing is out of range".to_string())
+        crate::Error::MalformedDocument("RTF legacy character spacing is out of range".to_string())
     })?;
     normalize_character_expansion(CharacterExpansion::QuarterPoints(value))
 }
 
 /// Resolve typed and legacy horizontal scale fields to one canonical value.
-pub(crate) fn effective_character_scale(typed: u16, legacy: i32) -> RtfResult<u16> {
+pub(crate) fn effective_character_scale(typed: u16, legacy: i32) -> crate::Result<u16> {
     validate_character_scale(typed)?;
     if typed != 100 {
         return Ok(typed);
@@ -101,14 +99,14 @@ pub(crate) fn effective_character_scale(typed: u16, legacy: i32) -> RtfResult<u1
         return Ok(100);
     }
     let value = u16::try_from(legacy).map_err(|_error| {
-        RtfError::MalformedDocument("RTF legacy character scale is out of range".to_string())
+        crate::Error::MalformedDocument("RTF legacy character scale is out of range".to_string())
     })?;
     validate_character_scale(value)?;
     Ok(value)
 }
 
 /// Resolve typed and legacy kerning fields to one canonical value.
-pub(crate) fn effective_character_kerning(typed: u16, legacy: i32) -> RtfResult<u16> {
+pub(crate) fn effective_character_kerning(typed: u16, legacy: i32) -> crate::Result<u16> {
     validate_character_kerning(typed)?;
     if typed != 0 {
         return Ok(typed);
@@ -117,7 +115,7 @@ pub(crate) fn effective_character_kerning(typed: u16, legacy: i32) -> RtfResult<
         return Ok(0);
     }
     let value = u16::try_from(legacy).map_err(|_error| {
-        RtfError::MalformedDocument("RTF legacy character kerning is out of range".to_string())
+        crate::Error::MalformedDocument("RTF legacy character kerning is out of range".to_string())
     })?;
     validate_character_kerning(value)?;
     Ok(value)
@@ -148,9 +146,9 @@ impl CharacterPositioning {
         clippy::cast_sign_loss,
         reason = "adjacent range checks bound each narrowing conversion to the target type's range"
     )]
-    fn bounded_nonnegative(value: i32, maximum: i32, name: &str) -> RtfResult<u16> {
+    fn bounded_nonnegative(value: i32, maximum: i32, name: &str) -> crate::Result<u16> {
         if !(0..=maximum).contains(&value) {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {name} parameter is out of range"
             )));
         }
@@ -177,7 +175,7 @@ impl CharacterPositioning {
         self.baseline = CharacterBaseline::Normal;
     }
 
-    pub(crate) fn set_raised(&mut self, value: i32) -> RtfResult<()> {
+    pub(crate) fn set_raised(&mut self, value: i32) -> crate::Result<()> {
         let bounded = Self::bounded_nonnegative(value, MAX_CHARACTER_BASELINE_HALF_POINTS, "up")?;
         self.baseline = if bounded == 0 {
             CharacterBaseline::Normal
@@ -187,7 +185,7 @@ impl CharacterPositioning {
         Ok(())
     }
 
-    pub(crate) fn set_lowered(&mut self, value: i32) -> RtfResult<()> {
+    pub(crate) fn set_lowered(&mut self, value: i32) -> crate::Result<()> {
         let bounded = Self::bounded_nonnegative(value, MAX_CHARACTER_BASELINE_HALF_POINTS, "dn")?;
         self.baseline = if bounded == 0 {
             CharacterBaseline::Normal
@@ -201,9 +199,9 @@ impl CharacterPositioning {
         clippy::cast_possible_truncation,
         reason = "adjacent range checks bound each narrowing conversion to the target type's range"
     )]
-    pub(crate) fn set_quarter_point_expansion(&mut self, value: i32) -> RtfResult<()> {
+    pub(crate) fn set_quarter_point_expansion(&mut self, value: i32) -> crate::Result<()> {
         if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&value) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF expnd parameter is out of range".to_string(),
             ));
         }
@@ -219,9 +217,9 @@ impl CharacterPositioning {
         clippy::cast_possible_truncation,
         reason = "adjacent range checks bound each narrowing conversion to the target type's range"
     )]
-    pub(crate) fn set_twip_expansion(&mut self, value: i32) -> RtfResult<()> {
+    pub(crate) fn set_twip_expansion(&mut self, value: i32) -> crate::Result<()> {
         if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&value) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF expndtw parameter is out of range".to_string(),
             ));
         }
@@ -238,9 +236,9 @@ impl CharacterPositioning {
         clippy::cast_sign_loss,
         reason = "adjacent range checks bound each narrowing conversion to the target type's range"
     )]
-    pub(crate) fn set_scale(&mut self, value: i32) -> RtfResult<()> {
+    pub(crate) fn set_scale(&mut self, value: i32) -> crate::Result<()> {
         if !(1..=MAX_CHARACTER_SCALE_PERCENT).contains(&value) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF charscalex parameter is out of range".to_string(),
             ));
         }
@@ -248,7 +246,7 @@ impl CharacterPositioning {
         Ok(())
     }
 
-    pub(crate) fn set_kerning(&mut self, value: i32) -> RtfResult<()> {
+    pub(crate) fn set_kerning(&mut self, value: i32) -> crate::Result<()> {
         self.kerning_half_points =
             Self::bounded_nonnegative(value, MAX_CHARACTER_KERNING_HALF_POINTS, "kerning")?;
         Ok(())
@@ -260,13 +258,13 @@ impl CharacterPositioning {
         clippy::cast_possible_truncation,
         reason = "the crate scale constant is defined within the u16 range"
     )]
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         match self.baseline {
             CharacterBaseline::RaisedHalfPoints(value)
             | CharacterBaseline::LoweredHalfPoints(value)
                 if value == 0 || i32::from(value) > MAX_CHARACTER_BASELINE_HALF_POINTS =>
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF character baseline is out of range".to_string(),
                 ));
             },
@@ -281,7 +279,7 @@ impl CharacterPositioning {
                 if value == 0
                     || i32::from(value).unsigned_abs() > MAX_CHARACTER_EXPANSION as u32 =>
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF character expansion is out of range".to_string(),
                 ));
             },
@@ -290,12 +288,12 @@ impl CharacterPositioning {
             | CharacterExpansion::Twips(_) => {},
         }
         if !(1..=MAX_CHARACTER_SCALE_PERCENT as u16).contains(&self.horizontal_scale_percent) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF character scale is out of range".to_string(),
             ));
         }
         if i32::from(self.kerning_half_points) > MAX_CHARACTER_KERNING_HALF_POINTS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF character kerning is out of range".to_string(),
             ));
         }

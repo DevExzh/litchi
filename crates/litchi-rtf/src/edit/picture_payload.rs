@@ -1,8 +1,8 @@
 //! Exact-source updates for conservative standalone hexadecimal picture payloads.
 
 use super::{Commit, Edit, Error, Operation, Package};
+use crate::ImageType;
 use crate::lexer::{ControlWord, Lexer, Token};
-use crate::{ImageType, RtfError};
 use bumpalo::Bump;
 use serde_json::{Map, Value};
 use std::borrow::Cow;
@@ -1384,7 +1384,7 @@ const fn hex_digit(nibble: u8, uppercase: bool) -> u8 {
 }
 
 fn allocation_error(resource: &'static str, requested: usize) -> Error {
-    Error::Rtf(RtfError::AllocationFailed {
+    Error::Rtf(crate::Error::AllocationFailed {
         resource,
         requested,
     })

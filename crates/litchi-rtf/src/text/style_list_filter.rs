@@ -1,5 +1,3 @@
-use crate::{RtfError, RtfResult};
-
 /// Passive suggested sorting for a host application's document-style list.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum DocumentStyleSortMethod {
@@ -15,14 +13,14 @@ impl DocumentStyleSortMethod {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_rtf_value(value: i32) -> RtfResult<Self> {
+    pub fn from_rtf_value(value: i32) -> crate::Result<Self> {
         match value {
             0 => Ok(Self::Name),
             1 => Ok(Self::HostDefault),
             2 => Ok(Self::Font),
             3 => Ok(Self::BasedOnStyle),
             4 => Ok(Self::StyleType),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF style-sort method must be in the range 0 through 4".to_string(),
             )),
         }
@@ -67,9 +65,9 @@ impl DocumentStyleListFilter {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_bits(bits: u16) -> RtfResult<Self> {
+    pub fn from_bits(bits: u16) -> crate::Result<Self> {
         if bits & Self::RESERVED_BITS != 0 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF style-list filter uses the reserved 0010 bit".to_string(),
             ));
         }
@@ -99,11 +97,11 @@ impl DocumentStyleListFilter {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(self) -> RtfResult<()> {
+    pub fn validate(self) -> crate::Result<()> {
         Self::from_bits(self.0).map(|_| ())
     }
 
-    pub(crate) fn validate_for_write(self) -> RtfResult<()> {
+    pub(crate) fn validate_for_write(self) -> crate::Result<()> {
         if self.1 { Ok(()) } else { self.validate() }
     }
 }

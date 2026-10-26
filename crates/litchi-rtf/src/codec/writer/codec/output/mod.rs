@@ -1,7 +1,7 @@
 //! Deterministic RTF output owners.
 //!
 //! Each child module contributes an implementation slice to the same
-//! [`RtfWriter`](super::RtfWriter) facade. Keeping the slices as inherent
+//! [`Writer`](super::Writer) facade. Keeping the slices as inherent
 //! implementations preserves the existing API while making the output order
 //! and ownership boundaries explicit.
 

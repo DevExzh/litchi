@@ -15,7 +15,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use crate::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -27,8 +27,8 @@ pub(crate) const MAX_MATH_PROPERTY_VALUE_BYTES: usize = 1_024;
 pub(crate) const MAX_MATH_RUN_TEXT_BYTES: usize = 65_536;
 pub(crate) const MAX_MATH_TOTAL_TEXT_BYTES: usize = 16 * 1_048_576;
 
-fn malformed(message: impl Into<String>) -> RtfError {
-    RtfError::MalformedDocument(message.into())
+fn malformed(message: impl Into<String>) -> crate::Error {
+    crate::Error::MalformedDocument(message.into())
 }
 
 #[allow(
@@ -243,13 +243,13 @@ impl<'a> MathProperty<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(name: MathPropertyName, value: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(name: MathPropertyName, value: Cow<'a, str>) -> crate::Result<Self> {
         let property = Self { name, value };
         property.validate()?;
         Ok(property)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.value.len() > MAX_MATH_PROPERTY_VALUE_BYTES {
             return Err(malformed(
                 "RTF math property value exceeds the safety limit",
@@ -306,7 +306,7 @@ pub struct MathMatrixColumn<'a> {
 }
 
 impl MathMatrixColumn<'_> {
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if let Some(properties) = &self.properties {
             if properties.kind != MathPropertiesKind::MatrixColumn {
                 return Err(malformed(
@@ -348,7 +348,7 @@ impl<'a> MathProperties<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(kind: MathPropertiesKind, properties: Vec<MathProperty<'a>>) -> RtfResult<Self> {
+    pub fn new(kind: MathPropertiesKind, properties: Vec<MathProperty<'a>>) -> crate::Result<Self> {
         let destination = Self {
             kind,
             properties,
@@ -359,7 +359,7 @@ impl<'a> MathProperties<'a> {
         Ok(destination)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.properties.len() > MAX_MATH_PROPERTIES_PER_DESTINATION {
             return Err(malformed(
                 "RTF math property count exceeds the safety limit",
@@ -594,7 +594,7 @@ impl MathStructureKind {
     }
 }
 
-fn validate_objects(objects: &[MathObject<'_>], depth: usize) -> RtfResult<()> {
+fn validate_objects(objects: &[MathObject<'_>], depth: usize) -> crate::Result<()> {
     if depth > MAX_MATH_DEPTH {
         return Err(malformed("RTF math nesting depth exceeds the safety limit"));
     }
@@ -622,7 +622,7 @@ fn validate_objects(objects: &[MathObject<'_>], depth: usize) -> RtfResult<()> {
     Ok(())
 }
 
-pub(crate) fn validate_element(element: &MathElement<'_>, depth: usize) -> RtfResult<()> {
+pub(crate) fn validate_element(element: &MathElement<'_>, depth: usize) -> crate::Result<()> {
     if let Some(properties) = &element.argument_properties {
         if properties.kind != MathPropertiesKind::Argument {
             return Err(malformed(
@@ -643,7 +643,7 @@ impl<'a> MathStructure<'a> {
         kind: MathStructureKind,
         properties: Option<MathProperties<'a>>,
         children: Vec<MathStructureChild<'a>>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let structure = Self {
             kind,
             properties,
@@ -653,7 +653,7 @@ impl<'a> MathStructure<'a> {
         Ok(structure)
     }
 
-    pub(crate) fn validate_at(&self, depth: usize) -> RtfResult<()> {
+    pub(crate) fn validate_at(&self, depth: usize) -> crate::Result<()> {
         if let Some(properties) = &self.properties {
             if properties.kind != self.kind.properties_kind() {
                 return Err(malformed(
@@ -817,7 +817,7 @@ impl<'a> MathZone<'a> {
         paragraph_properties: Option<MathProperties<'a>>,
         content: Vec<MathObject<'a>>,
         position: usize,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let zone = Self {
             kind,
             paragraph_properties,
@@ -828,7 +828,7 @@ impl<'a> MathZone<'a> {
         Ok(zone)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         match (&self.kind, &self.paragraph_properties) {
             (MathZoneKind::Inline, Some(_)) => {
                 return Err(malformed(

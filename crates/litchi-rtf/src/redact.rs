@@ -6,8 +6,8 @@
 //! shapes, opaque syntax, signatures, or protection metadata.  Those surfaces
 //! remain explicit diagnostics and make strict planning fail closed.
 
+use crate::Package;
 use crate::edit::Error;
-use crate::{Package, RtfError};
 use litchi_core::patch::{BlobBundle, BlobId, ForwardOnly, Patch, PatchLimits, PatchOperation};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -184,7 +184,7 @@ impl Snapshot {
         let count = usize::from(references.next_file.is_some())
             .saturating_add(usize::from(references.template.is_some()));
         if count > MAX_REFERENCES {
-            return Err(Error::Rtf(RtfError::LimitExceeded {
+            return Err(Error::Rtf(crate::Error::LimitExceeded {
                 resource: "RTF external-reference inventory entries",
                 observed: count,
                 limit: MAX_REFERENCES,
@@ -508,7 +508,7 @@ fn push_unique(
         return Ok(());
     }
     if unsupported.len() >= MAX_DIAGNOSTICS {
-        return Err(Error::Rtf(RtfError::LimitExceeded {
+        return Err(Error::Rtf(crate::Error::LimitExceeded {
             resource: "external-reference diagnostics",
             observed: unsupported.len().saturating_add(1),
             limit: MAX_DIAGNOSTICS,
@@ -801,7 +801,7 @@ pub(crate) fn apply_forward(source: &Package, patch: &Patch<ForwardOnly>) -> Res
         ));
     }
     if patch.operations().len() > MAX_REFERENCES {
-        return Err(Error::Rtf(RtfError::LimitExceeded {
+        return Err(Error::Rtf(crate::Error::LimitExceeded {
             resource: "external-reference patch operations",
             observed: patch.operations().len(),
             limit: MAX_REFERENCES,
@@ -938,7 +938,7 @@ pub(crate) fn apply_forward(source: &Package, patch: &Patch<ForwardOnly>) -> Res
 }
 
 fn allocation(resource: &'static str, requested: usize) -> Error {
-    Error::Rtf(RtfError::AllocationFailed {
+    Error::Rtf(crate::Error::AllocationFailed {
         resource,
         requested,
     })

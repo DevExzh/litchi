@@ -1,14 +1,14 @@
 use super::super::control_word::{ControlWord, match_control_word};
 use super::super::lexer::Lexer;
 use super::super::model::Token;
-use crate::codec::error::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 
 impl<'a> Lexer<'a> {
     /// Get the next token.
-    pub(in crate::codec::lexer) fn next_token(&mut self) -> RtfResult<Token<'a>> {
+    pub(in crate::codec::lexer) fn next_token(&mut self) -> crate::Result<Token<'a>> {
         if self.pos >= self.input.len() {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
 
         let ch = self.current_char()?;
@@ -27,11 +27,11 @@ impl<'a> Lexer<'a> {
     }
 
     /// Parse a control word or control symbol.
-    fn parse_control_word(&mut self) -> RtfResult<Token<'a>> {
+    fn parse_control_word(&mut self) -> crate::Result<Token<'a>> {
         self.advance()?; // Skip '\'
 
         if self.pos >= self.input.len() {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
 
         let ch = self.current_char()?;
@@ -119,7 +119,7 @@ impl<'a> Lexer<'a> {
     /// opaque control exactly like an unknown control word; only the
     /// undefined symbols are recorded as repairs. Control symbols take no
     /// delimiter, so a following space stays text.
-    fn parse_unhandled_control_symbol(&mut self, start: usize) -> RtfResult<Token<'a>> {
+    fn parse_unhandled_control_symbol(&mut self, start: usize) -> crate::Result<Token<'a>> {
         self.advance()?;
         let symbol = self.source_range(start, self.pos)?;
         if !matches!(symbol, "|" | ":") {
@@ -132,7 +132,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Parse numeric parameter after control word.
-    fn parse_numeric_parameter(&mut self) -> RtfResult<Option<i32>> {
+    fn parse_numeric_parameter(&mut self) -> crate::Result<Option<i32>> {
         if self.pos >= self.input.len() {
             return Ok(None);
         }

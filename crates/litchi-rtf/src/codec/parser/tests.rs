@@ -1,4 +1,3 @@
-use super::super::error::RtfError;
 use super::codec::parser_classification_error;
 use crate::model::document::Tree;
 
@@ -6,7 +5,7 @@ use crate::model::document::Tree;
 fn parser_classification_failures_use_the_typed_error_channel() {
     assert!(matches!(
         parser_classification_error(),
-        RtfError::ParserError(message)
+        crate::Error::ParserError(message)
             if message == "RTF parser control classification invariant failed"
     ));
 }
@@ -63,7 +62,7 @@ fn ignores_visible_trailing_data_and_rejects_non_rtf_roots() {
         assert!(
             matches!(
                 Tree::parse(source, crate::read::OpenOptions::default()).err(),
-                Some(RtfError::MalformedDocument(message)) if message == MISSING_VERSION_ERROR
+                Some(crate::Error::MalformedDocument(message)) if message == MISSING_VERSION_ERROR
             ),
             "accepted bare \\rtf root {source:?}"
         );
@@ -74,7 +73,7 @@ fn ignores_visible_trailing_data_and_rejects_non_rtf_roots() {
         assert!(
             matches!(
                 Tree::parse(source, crate::read::OpenOptions::default()).err(),
-                Some(RtfError::MalformedDocument(message)) if message == ROOT_ERROR
+                Some(crate::Error::MalformedDocument(message)) if message == ROOT_ERROR
             ),
             "accepted invalid RTF root {source:?}"
         );

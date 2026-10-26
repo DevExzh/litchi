@@ -3,7 +3,6 @@
 //! This module provides support for comments, revisions, and other annotations
 //! in RTF documents.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_ANNOTATIONS: usize = 65_536;
@@ -131,19 +130,19 @@ impl<'a> Annotation<'a> {
     }
 
     /// Validate this inert annotation without resolving any reference.
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.annotation_type != AnnotationType::Comment {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "only comment annotations use the RTF annotation destination".to_string(),
             ));
         }
         if self.range_end < self.position {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation range end precedes its start".to_string(),
             ));
         }
         if self.text.len() > MAX_ANNOTATION_BODY_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF annotation body exceeds the safety limit".to_string(),
             ));
         }
@@ -164,7 +163,7 @@ impl<'a> Annotation<'a> {
             ("time", self.time.as_deref()),
         ] {
             if value.is_some_and(|text| text.len() > MAX_ANNOTATION_METADATA_BYTES) {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF annotation {kind} exceeds the safety limit"
                 )));
             }
@@ -176,7 +175,7 @@ impl<'a> Annotation<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::Result<()> {
         let mut shapes = self.shapes.clone();
         shapes.push(shape);
         let mut order = self.drawing_order.clone();
@@ -201,7 +200,7 @@ impl<'a> Annotation<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::Result<()> {
         let mut groups = self.shape_groups.clone();
         groups.push(group);
         let mut order = self.drawing_order.clone();
@@ -240,7 +239,7 @@ impl<'a> Annotation<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         crate::field::push_story_page_break(
             &mut self.story_events,
             self.text.as_ref(),
@@ -344,19 +343,19 @@ impl<'a> Revision<'a> {
         Self::new(RevisionType::Deletion, author, content)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.id < 0 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author index cannot be negative".to_string(),
             ));
         }
         if self.content.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision content cannot be empty".to_string(),
             ));
         }
         if self.content.len() > MAX_REVISION_TEXT_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision content exceeds the safety limit".to_string(),
             ));
         }
@@ -365,24 +364,24 @@ impl<'a> Revision<'a> {
             .as_deref()
             .is_some_and(|date| date.parse::<i32>().is_err())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision date must contain a packed signed DTTM value".to_string(),
             ));
         }
         match self.revision_type {
             RevisionType::Insertion if self.range_end <= self.position => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF insertion revision must cover a non-empty body range".to_string(),
                 ));
             },
             RevisionType::Deletion if self.range_end != self.position => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF deletion revision must be positioned between visible body characters"
                         .to_string(),
                 ));
             },
             RevisionType::FormatChange | RevisionType::MovedFrom | RevisionType::MovedTo => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
             },
@@ -415,15 +414,15 @@ impl<'a> RevisionAuthor<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(name: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
+    pub fn new(name: impl Into<Cow<'a, str>>) -> crate::Result<Self> {
         let author = Self { name: name.into() };
         author.validate()?;
         Ok(author)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.name.len() > MAX_REVISION_AUTHOR_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author exceeds the safety limit".to_string(),
             ));
         }

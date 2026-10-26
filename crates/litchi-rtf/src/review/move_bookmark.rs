@@ -7,7 +7,6 @@
 //! cross-location pair object or apply the specification's deleted/inserted
 //! fallback when one location is absent; it never executes a move operation.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_MOVE_BOOKMARKS: usize = 65_536;
@@ -71,7 +70,7 @@ impl<'a> MoveBookmark<'a> {
         date: u32,
         position: usize,
         content: Cow<'a, str>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let bookmark = Self {
             kind,
             tag,
@@ -84,19 +83,19 @@ impl<'a> MoveBookmark<'a> {
         Ok(bookmark)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.tag.is_empty() || self.tag.len() > MAX_MOVE_BOOKMARK_TAG_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF move-bookmark tag must contain 1..=20 bytes".to_string(),
             ));
         }
         if !self.tag.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF move-bookmark tag must be alphanumeric".to_string(),
             ));
         }
         if self.content.len() > MAX_MOVE_BOOKMARK_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF move-bookmark content exceeds the safety limit".to_string(),
             ));
         }

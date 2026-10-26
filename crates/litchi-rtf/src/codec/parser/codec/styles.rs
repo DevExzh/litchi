@@ -6,14 +6,14 @@ use super::{
     ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment, ParagraphFrame,
     ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
     ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
-    ParagraphWrapping, Parser, RtfError, RtfResult, SmallVec, State, TextDirection, Token,
-    UnderlineStyle, animated_text, append_transport_bytes, apply_associated_character_control,
-    associated_font_ref, character_grid, character_style_reference, character_type_selector,
-    complex_script_selector, control_symbol_text, emphasis_mark, fit_text, font_size,
-    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
-    require_parameterless, required_list_spacing, required_paragraph_bool,
-    required_paragraph_indent, required_table_value, section_style_reference,
-    strict_paragraph_selector, strict_paragraph_toggle, table_style_reference,
+    ParagraphWrapping, Parser, SmallVec, State, TextDirection, Token, UnderlineStyle,
+    animated_text, append_transport_bytes, apply_associated_character_control, associated_font_ref,
+    character_grid, character_style_reference, character_type_selector, complex_script_selector,
+    control_symbol_text, emphasis_mark, fit_text, font_size, nonnegative_author_index,
+    paragraph_style_reference, parser_classification_error, require_parameterless,
+    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
+    required_table_value, section_style_reference, strict_paragraph_selector,
+    strict_paragraph_toggle, table_style_reference,
 };
 use std::mem::size_of;
 
@@ -24,35 +24,39 @@ fn style_paragraph_frame(state: &mut State) -> &mut ParagraphFrame {
         .get_or_insert_with(ParagraphFrame::default)
 }
 
-fn style_frame_nonnegative(value: Option<i32>, name: &str) -> RtfResult<u32> {
+fn style_frame_nonnegative(value: Option<i32>, name: &str) -> crate::Result<u32> {
     let value = value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     let value = u32::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument(format!("RTF {name} parameter cannot be negative"))
+        crate::Error::MalformedDocument(format!("RTF {name} parameter cannot be negative"))
     })?;
     (value <= crate::MAX_PARAGRAPH_FRAME_TWIPS as u32)
         .then_some(value)
-        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} exceeds the safety limit")))
+        .ok_or_else(|| {
+            crate::Error::MalformedDocument(format!("RTF {name} exceeds the safety limit"))
+        })
 }
 
-fn style_frame_offset(value: Option<i32>, name: &str) -> RtfResult<i32> {
+fn style_frame_offset(value: Option<i32>, name: &str) -> crate::Result<i32> {
     let value = value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     (value.unsigned_abs() <= crate::MAX_PARAGRAPH_FRAME_TWIPS as u32)
         .then_some(value)
-        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} exceeds the safety limit")))
+        .ok_or_else(|| {
+            crate::Error::MalformedDocument(format!("RTF {name} exceeds the safety limit"))
+        })
 }
 
-fn style_frame_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
+fn style_frame_toggle(value: Option<i32>, name: &str) -> crate::Result<bool> {
     match value {
         Some(1) => Ok(true),
         Some(0) => Ok(false),
-        None => Err(RtfError::MalformedDocument(format!(
+        None => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} requires a numeric parameter of 0 or 1"
         ))),
-        Some(_) => Err(RtfError::MalformedDocument(format!(
+        Some(_) => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} parameter must be 0 or 1"
         ))),
     }
@@ -63,13 +67,13 @@ impl<'a> Parser<'a> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_latent_styles(&mut self) -> RtfResult<crate::LatentStyles<'a>> {
+    pub(super) fn parse_latent_styles(&mut self) -> crate::Result<crate::LatentStyles<'a>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::LatentStyles))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF latentstyles destination".to_string(),
             ));
         }
@@ -87,7 +91,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let styles = crate::LatentStyles {
                         max_style_index: max_style_index.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF latentstyles is missing lsdstimax".to_string(),
                             )
                         })?,
@@ -108,7 +112,7 @@ impl<'a> Parser<'a> {
                             Some(Token::Control(ControlWord::LatentStyleExceptions))
                         )
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF latentstyles contains a duplicate or active nested destination"
                                 .to_string(),
                         ));
@@ -119,7 +123,7 @@ impl<'a> Parser<'a> {
                     macro_rules! set_once {
                         ($slot:expr, $value:expr, $name:literal) => {{
                             if $slot.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     concat!("duplicate RTF latent-style ", $name).to_string(),
                                 ));
                             }
@@ -129,12 +133,12 @@ impl<'a> Parser<'a> {
                     match control {
                         ControlWord::LatentStyleMax(value) => {
                             let max_index = u32::try_from(*value).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF lsdstimax cannot be negative".to_string(),
                                 )
                             })?;
                             if max_index > crate::latent_style::MAX_LATENT_STYLE_INDEX {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF lsdstimax exceeds 65535".to_string(),
                                 ));
                             }
@@ -166,7 +170,7 @@ impl<'a> Parser<'a> {
                             "lsdprioritydef"
                         ),
                         _ => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF latentstyles contains an unsupported control".to_string(),
                             ));
                         },
@@ -177,11 +181,11 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_) | Token::Text(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF latentstyles contains orphan text or binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -192,13 +196,13 @@ impl<'a> Parser<'a> {
     )]
     pub(super) fn parse_latent_style_exceptions(
         &mut self,
-    ) -> RtfResult<Vec<crate::LatentStyleException<'a>>> {
+    ) -> crate::Result<Vec<crate::LatentStyleException<'a>>> {
         self.expect_token(&Token::OpenBrace)?;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::LatentStyleExceptions))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF lsdlockedexcept destination".to_string(),
             ));
         }
@@ -219,7 +223,7 @@ impl<'a> Parser<'a> {
                         || builder.quick_format.is_some()
                         || builder.priority.is_some()
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF latent-style exception is missing its terminating semicolon"
                                 .to_string(),
                         ));
@@ -236,14 +240,14 @@ impl<'a> Parser<'a> {
                             | ControlWord::LatentStylePriority(_)
                     ) && !name.trim().is_empty()
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF latent-style properties must precede the style name".to_string(),
                         ));
                     }
                     macro_rules! set_once {
                         ($slot:expr, $value:expr, $name:literal) => {{
                             if $slot.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     concat!("duplicate RTF latent-style exception ", $name)
                                         .to_string(),
                                 ));
@@ -286,7 +290,7 @@ impl<'a> Parser<'a> {
                                 &mut text_bytes,
                             )?;
                             if name.len() > crate::latent_style::MAX_LATENT_STYLE_NAME_BYTES {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF latent-style exception name exceeds the safety limit"
                                         .to_string(),
                                 ));
@@ -304,7 +308,7 @@ impl<'a> Parser<'a> {
                             continue;
                         },
                         _ => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF latent-style exception contains an unsupported control"
                                     .to_string(),
                             ));
@@ -323,15 +327,15 @@ impl<'a> Parser<'a> {
                     )?;
                 },
                 Some(Token::OpenBrace | Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF latent-style exceptions cannot contain nesting or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if name.len() > crate::latent_style::MAX_LATENT_STYLE_NAME_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF latent-style exception name exceeds the safety limit".to_string(),
                 ));
             }
@@ -344,17 +348,17 @@ impl<'a> Parser<'a> {
         builder: &mut LatentStyleExceptionBuilder,
         entries: &mut Vec<crate::LatentStyleException<'a>>,
         text_bytes: &mut usize,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let Some(last_separator) = name.rfind(';') else {
             return Ok(());
         };
         let completed = name.get(..=last_separator).ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF latent-style parser found an invalid text boundary".to_string(),
             )
         })?;
         let completed_body = completed.strip_suffix(';').ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF latent-style parser lost an exception delimiter".to_string(),
             )
         })?;
@@ -370,17 +374,17 @@ impl<'a> Parser<'a> {
             };
             candidate.validate()?;
             if entries.len() >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF latent-style exception count exceeds the safety limit".to_string(),
                 ));
             }
             let next_text_bytes = text_bytes.checked_add(entry_name.len()).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF latent-style aggregate text size overflow".to_string(),
                 )
             })?;
             if next_text_bytes > crate::latent_style::MAX_LATENT_STYLE_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF latent-style text exceeds the safety limit".to_string(),
                 ));
             }
@@ -399,22 +403,22 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_latent_style_bool(value: i32) -> RtfResult<bool> {
+    pub(super) fn parse_latent_style_bool(value: i32) -> crate::Result<bool> {
         match value {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF latent-style Boolean values must be 0 or 1".to_string(),
             )),
         }
     }
 
-    pub(super) fn parse_latent_style_priority(value: i32) -> RtfResult<u8> {
+    pub(super) fn parse_latent_style_priority(value: i32) -> crate::Result<u8> {
         u8::try_from(value)
             .ok()
             .filter(|priority| *priority <= 99)
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF latent-style priority must be in 0..=99".to_string(),
                 )
             })
@@ -424,7 +428,7 @@ impl<'a> Parser<'a> {
         &mut self,
         expected: ControlWord<'a>,
         limit: usize,
-    ) -> RtfResult<Vec<u8>> {
+    ) -> crate::Result<Vec<u8>> {
         self.pos += 1; // ignorable-destination marker
         let matches_expected = matches!(
             (&expected, self.tokens.get(self.pos)),
@@ -437,7 +441,7 @@ impl<'a> Parser<'a> {
             )
         );
         if !matches_expected {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF theme destination".to_string(),
             ));
         }
@@ -449,12 +453,12 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if high.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF theme payload has an odd hexadecimal digit count".to_string(),
                         ));
                     }
                     if data.is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF theme payload cannot be empty".to_string(),
                         ));
                     }
@@ -470,7 +474,7 @@ impl<'a> Parser<'a> {
                             b'a'..=b'f' => byte - b'a' + 10,
                             b'A'..=b'F' => byte - b'A' + 10,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF theme payload contains a non-hexadecimal character"
                                         .to_string(),
                                 ));
@@ -485,24 +489,24 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF theme payload cannot contain controls, nesting, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if data.len() > limit {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF theme payload exceeds the safety limit".to_string(),
                 ));
             }
         }
     }
 
-    pub(super) fn parse_xml_namespace_table(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_xml_namespace_table(&mut self) -> crate::Result<()> {
         if self.saw_xml_namespace_table {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple XML namespace tables".to_string(),
             ));
         }
@@ -519,12 +523,12 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_) | Token::Control(_) | Token::Text(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF XML namespace table contains ungrouped, active, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -532,12 +536,12 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_window_caption_destination(
         &mut self,
         starred: bool,
-    ) -> RtfResult<crate::DocumentWindowCaption<'a>> {
+    ) -> crate::Result<crate::DocumentWindowCaption<'a>> {
         if starred {
             self.pos += 1;
         }
         if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::WindowCaption)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF window caption destination".to_string(),
             ));
         }
@@ -571,14 +575,14 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF window caption contains active, nested, or binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if value.len() > crate::MAX_WINDOW_CAPTION_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF window caption exceeds the resource limit".to_string(),
                 ));
             }
@@ -587,10 +591,10 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_xsl_transform_destination(
         &mut self,
-    ) -> RtfResult<crate::DocumentXslTransform<'a>> {
+    ) -> crate::Result<crate::DocumentXslTransform<'a>> {
         self.pos += 1;
         if self.tokens.get(self.pos) != Some(&Token::Control(ControlWord::XslTransform)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF XSL transform destination".to_string(),
             ));
         }
@@ -624,14 +628,14 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF XSL transform contains active, nested, or binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if location.len() > crate::MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF XSL transform location exceeds the resource limit".to_string(),
                 ));
             }
@@ -641,18 +645,18 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_style_list_filter_destination(
         &mut self,
         parameter: Option<i32>,
-    ) -> RtfResult<crate::DocumentStyleListFilter> {
+    ) -> crate::Result<crate::DocumentStyleListFilter> {
         self.pos += 1;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::StyleListFilter(_)))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF style-list filter destination".to_string(),
             ));
         }
         if parameter.is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF style-list filter must be a delimited four-digit hexadecimal string"
                     .to_string(),
             ));
@@ -664,13 +668,13 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if value.len() != 4 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF style-list filter must contain exactly four hexadecimal digits"
                                 .to_string(),
                         ));
                     }
                     let bits = u16::from_str_radix(&value, 16).map_err(|_err| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "invalid RTF style-list filter hexadecimal value".to_string(),
                         )
                     })?;
@@ -685,14 +689,14 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF style-list filter contains active, nested, or binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if value.len() > 4 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style-list filter exceeds its four-digit resource bound".to_string(),
                 ));
             }
@@ -701,17 +705,17 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_legacy_write_reservation_destination(
         &mut self,
-    ) -> RtfResult<crate::LegacyWriteReservation<'a>> {
+    ) -> crate::Result<crate::LegacyWriteReservation<'a>> {
         self.pos += 1;
         match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::WriteReservation(None))) => {},
             Some(Token::Control(ControlWord::WriteReservation(Some(_)))) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF writereservation must not have a numeric parameter".to_string(),
                 ));
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF legacy write-reservation destination".to_string(),
                 ));
             },
@@ -746,15 +750,15 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy write reservation contains active, nested, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if data.len() > crate::MAX_WRITE_RESERVATION_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF legacy write-reservation payload exceeds the resource limit".to_string(),
                 ));
             }
@@ -763,17 +767,17 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_write_reservation_hash_destination(
         &mut self,
-    ) -> RtfResult<crate::WriteReservationHash<'a>> {
+    ) -> crate::Result<crate::WriteReservationHash<'a>> {
         self.pos += 1;
         match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::WriteReservationHash(None))) => {},
             Some(Token::Control(ControlWord::WriteReservationHash(Some(_)))) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF writereservhash must not have a numeric parameter".to_string(),
                 ));
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF write-reservation hash destination".to_string(),
                 ));
             },
@@ -788,7 +792,7 @@ impl<'a> Parser<'a> {
                         || !encoded.len().is_multiple_of(2)
                         || !encoded.bytes().all(|byte| byte.is_ascii_hexdigit())
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF write-reservation hash must contain an even number of hexadecimal digits"
                                 .to_string(),
                         ));
@@ -796,12 +800,12 @@ impl<'a> Parser<'a> {
                     let mut data = Vec::with_capacity(encoded.len() / 2);
                     for pair in encoded.as_bytes().as_chunks::<2>().0.iter() {
                         let pair_text = std::str::from_utf8(pair).map_err(|_err| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "invalid RTF write-reservation hash encoding".to_string(),
                             )
                         })?;
                         data.push(u8::from_str_radix(pair_text, 16).map_err(|_err| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "invalid RTF write-reservation hash encoding".to_string(),
                             )
                         })?);
@@ -817,15 +821,15 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF write-reservation hash contains active, nested, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if encoded.len() > crate::MAX_WRITE_RESERVATION_BYTES * 2 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF write-reservation hash exceeds the resource limit".to_string(),
                 ));
             }
@@ -835,10 +839,10 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_external_reference_destination(
         &mut self,
         expected: ControlWord<'a>,
-    ) -> RtfResult<Cow<'a, str>> {
+    ) -> crate::Result<Cow<'a, str>> {
         self.pos += 1;
         if self.tokens.get(self.pos) != Some(&Token::Control(expected)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF external document reference destination".to_string(),
             ));
         }
@@ -851,7 +855,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let stored = self.arena.alloc_str(value.trim());
                     if stored.is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF external document reference name cannot be empty".to_string(),
                         ));
                     }
@@ -877,12 +881,12 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF external document reference contains active, nested, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -891,9 +895,9 @@ impl<'a> Parser<'a> {
         &self,
         value: &mut String,
         text: &str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF external document reference transport",
                 observed: text.len(),
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -902,7 +906,7 @@ impl<'a> Parser<'a> {
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(text.len())
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF external document reference transport",
                 requested: text.len(),
             })?;
@@ -914,22 +918,24 @@ impl<'a> Parser<'a> {
         Self::append_external_reference_text(value, decoded.as_ref())
     }
 
-    fn append_external_reference_text(value: &mut String, decoded: &str) -> RtfResult<()> {
+    fn append_external_reference_text(value: &mut String, decoded: &str) -> crate::Result<()> {
         let additional = decoded
             .chars()
             .filter(|character| !matches!(character, '\r' | '\n'))
             .map(char::len_utf8)
             .try_fold(0usize, |total, length| total.checked_add(length))
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF external document reference size overflow".to_string(),
                 )
             })?;
         let observed = value.len().checked_add(additional).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF external document reference size overflow".to_string())
+            crate::Error::MalformedDocument(
+                "RTF external document reference size overflow".to_string(),
+            )
         })?;
         if observed > crate::MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF external document reference",
                 observed,
                 limit: crate::MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
@@ -937,7 +943,7 @@ impl<'a> Parser<'a> {
         }
         value
             .try_reserve_exact(additional)
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF external document reference",
                 requested: observed,
             })?;
@@ -953,10 +959,10 @@ impl<'a> Parser<'a> {
     pub(super) fn push_bounded_unicode_code(
         utf16: &mut SmallVec<[u16; 4]>,
         code: i32,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let observed = utf16.len().saturating_add(1).saturating_mul(4);
         if observed > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF Unicode fallback",
                 observed,
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -964,7 +970,7 @@ impl<'a> Parser<'a> {
         }
         utf16
             .try_reserve(1)
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF Unicode fallback",
                 requested: observed.saturating_mul(size_of::<u16>()),
             })?;
@@ -983,10 +989,10 @@ impl<'a> Parser<'a> {
         &mut self,
         utf16: &super::unicode::UnicodeRun,
         resource: &'static str,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         let worst_case = utf16.len().saturating_mul(4);
         if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource,
                 observed: worst_case,
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -995,7 +1001,7 @@ impl<'a> Parser<'a> {
         let mut decoded = String::new();
         decoded
             .try_reserve_exact(worst_case)
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource,
                 requested: worst_case,
             })?;
@@ -1003,9 +1009,9 @@ impl<'a> Parser<'a> {
         Ok(decoded)
     }
 
-    pub(super) fn parse_protection_user_table(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_protection_user_table(&mut self) -> crate::Result<()> {
         if self.saw_protection_user_table {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF contains multiple protection-user tables".to_string(),
             ));
         }
@@ -1016,7 +1022,7 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if self.protection_users.is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF protection-user table cannot be empty".to_string(),
                         ));
                     }
@@ -1027,19 +1033,19 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_) | Token::Control(_) | Token::Text(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF protection-user table contains ungrouped, active, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
 
-    pub(super) fn parse_protection_user_entry(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_protection_user_entry(&mut self) -> crate::Result<()> {
         if self.protection_users.len() >= crate::MAX_PROTECTION_USERS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-user count exceeds the safety limit".to_string(),
             ));
         }
@@ -1057,12 +1063,12 @@ impl<'a> Parser<'a> {
                         .protection_user_text_bytes
                         .checked_add(user.name.len())
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF protection-user aggregate size overflow".to_string(),
                             )
                         })?;
                     if self.protection_user_text_bytes > crate::MAX_PROTECTION_USER_TOTAL_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF protection-user aggregate text exceeds the safety limit"
                                 .to_string(),
                         ));
@@ -1090,24 +1096,24 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF protection-user entry contains active, nested, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if name.len() > crate::MAX_PROTECTION_USER_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF protection username exceeds the safety limit".to_string(),
                 ));
             }
         }
     }
 
-    pub(super) fn parse_xml_namespace_entry(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_xml_namespace_entry(&mut self) -> crate::Result<()> {
         if self.xml_namespaces.len() >= crate::xml_namespace::MAX_XML_NAMESPACES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF XML namespace count exceeds the safety limit".to_string(),
             ));
         }
@@ -1115,25 +1121,25 @@ impl<'a> Parser<'a> {
         let id = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::XmlNamespace(value))) => {
                 let namespace_id = u32::try_from(*value).map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF XML namespace ID must be a positive signed integer".to_string(),
                     )
                 })?;
                 if namespace_id == 0 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF XML namespace ID must be a positive signed integer".to_string(),
                     ));
                 }
                 namespace_id
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF XML namespace entry is missing xmlnsN".to_string(),
                 ));
             },
         };
         if self.xml_namespaces.iter().any(|entry| entry.id == id) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF XML namespace IDs must be unique".to_string(),
             ));
         }
@@ -1153,14 +1159,14 @@ impl<'a> Parser<'a> {
                         .xml_namespace_text_bytes
                         .checked_add(entry.namespace.len())
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF XML namespace aggregate size overflow".to_string(),
                             )
                         })?;
                     if self.xml_namespace_text_bytes
                         > crate::xml_namespace::MAX_XML_NAMESPACE_TOTAL_BYTES
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF XML namespace aggregate text exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1187,15 +1193,15 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF XML namespace entry contains active, nested, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if namespace.len() > crate::xml_namespace::MAX_XML_NAMESPACE_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF XML namespace identifier exceeds the safety limit".to_string(),
                 ));
             }
@@ -1204,13 +1210,13 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_generator_destination(
         &mut self,
-    ) -> RtfResult<crate::DocumentGenerator<'a>> {
+    ) -> crate::Result<crate::DocumentGenerator<'a>> {
         self.pos += 1; // ignorable-destination marker
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::Generator))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF generator destination".to_string(),
             ));
         }
@@ -1242,22 +1248,22 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF generator destination contains active, nested, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if value.len() > crate::generator::MAX_GENERATOR_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF generator value exceeds the safety limit".to_string(),
                 ));
             }
         }
     }
 
-    pub(super) fn parse_revision_author_group(&mut self) -> RtfResult<String> {
+    pub(super) fn parse_revision_author_group(&mut self) -> crate::Result<String> {
         self.pos += 1; // opening brace
         let mut author = String::new();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
@@ -1273,7 +1279,7 @@ impl<'a> Parser<'a> {
                         .to_string());
                 },
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revision author contains a nested destination".to_string(),
                     ));
                 },
@@ -1290,7 +1296,7 @@ impl<'a> Parser<'a> {
                     author.push_str(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(Token::Control(_) | Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revision author contains a non-text control or binary data"
                             .to_string(),
                     ));
@@ -1299,25 +1305,25 @@ impl<'a> Parser<'a> {
             }
             self.pos += 1;
             if author.len() > MAX_REVISION_AUTHOR_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF revision author exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn push_direct_revision_authors(&mut self, text: &mut String) -> RtfResult<()> {
+    pub(super) fn push_direct_revision_authors(&mut self, text: &mut String) -> crate::Result<()> {
         let Some(last_separator) = text.rfind(';') else {
             return Ok(());
         };
         let completed = text.get(..=last_separator).ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF revision-author parser found an invalid text boundary".to_string(),
             )
         })?;
         let completed_body = completed.strip_suffix(';').ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF revision-author parser lost an author delimiter".to_string(),
             )
         })?;
@@ -1328,9 +1334,9 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn push_revision_author(&mut self, author: &str) -> RtfResult<()> {
+    pub(super) fn push_revision_author(&mut self, author: &str) -> crate::Result<()> {
         if self.revision_authors.len() >= MAX_REVISION_AUTHORS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author count exceeds the safety limit".to_string(),
             ));
         }
@@ -1338,14 +1344,14 @@ impl<'a> Parser<'a> {
             .revision_author_text_bytes
             .checked_add(author.len())
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF aggregate revision-author size overflow".to_string(),
                 )
             })?;
         if revision_author_text_bytes
             > super::super::super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF aggregate revision-author text exceeds the safety limit".to_string(),
             ));
         }
@@ -1359,9 +1365,9 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_list_table(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_list_table(&mut self) -> crate::Result<()> {
         if self.saw_list_table {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple list tables".to_string(),
             ));
         }
@@ -1371,7 +1377,7 @@ impl<'a> Parser<'a> {
                 .iter()
                 .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list table must occur in the root header".to_string(),
             ));
         }
@@ -1398,7 +1404,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if self.list_table.picture_bullet_count != 0 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF list table contains multiple listpicture destinations".to_string(),
                         ));
                     }
@@ -1416,7 +1422,7 @@ impl<'a> Parser<'a> {
                         ])
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF listpicture does not accept a parameter".to_string(),
                     ));
                 },
@@ -1426,7 +1432,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ListPicture(_)))
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF listpicture destination must be starred".to_string(),
                     ));
                 },
@@ -1440,7 +1446,7 @@ impl<'a> Parser<'a> {
                         ])
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shppict must be nested in listpicture".to_string(),
                     ));
                 },
@@ -1457,10 +1463,10 @@ impl<'a> Parser<'a> {
                 None => break,
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn parse_list_picture_destination(&mut self) -> RtfResult<Vec<Option<usize>>> {
+    pub(super) fn parse_list_picture_destination(&mut self) -> crate::Result<Vec<Option<usize>>> {
         self.pos += 3; // opening brace, \*, and \listpicture
         let mut indices = Vec::new();
         loop {
@@ -1477,7 +1483,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if indices.len() >= 65_536 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF list-picture record count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1493,7 +1499,7 @@ impl<'a> Parser<'a> {
                         ])
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shppict does not accept a parameter".to_string(),
                     ));
                 },
@@ -1505,20 +1511,20 @@ impl<'a> Parser<'a> {
                     return Ok(indices);
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF listpicture contains content outside a shppict record".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
 
-    pub(super) fn parse_list_shape_picture_destination(&mut self) -> RtfResult<usize> {
+    pub(super) fn parse_list_shape_picture_destination(&mut self) -> crate::Result<usize> {
         self.pos += 3; // opening brace, \*, and \shppict
         while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
             if !text.chars().all(char::is_whitespace) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shppict contains text outside pict".to_string(),
                 ));
             }
@@ -1528,7 +1534,7 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos..self.pos + 2),
             Some([Token::OpenBrace, Token::Control(ControlWord::Picture)])
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list shppict must contain exactly one pict destination".to_string(),
             ));
         }
@@ -1536,26 +1542,26 @@ impl<'a> Parser<'a> {
         let index = self.pictures.len();
         self.parse_picture()?;
         if self.pictures.len() != index + 1 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list picture payload cannot be empty".to_string(),
             ));
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list pict destination is not closed".to_string(),
             ));
         }
         self.pos += 1;
         while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
             if !text.chars().all(char::is_whitespace) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shppict contains trailing text".to_string(),
                 ));
             }
             self.pos += 1;
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list shppict must contain exactly one pict destination".to_string(),
             ));
         }
@@ -1571,7 +1577,7 @@ impl<'a> Parser<'a> {
         clippy::cast_possible_truncation,
         reason = "the nine-level check above bounds the level count to the u8 range"
     )]
-    pub(super) fn parse_list_definition(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_list_definition(&mut self) -> crate::Result<()> {
         self.pos += 2; // opening brace and `list`
         let mut list = super::super::super::list::List::new(0);
         list.simple = false;
@@ -1587,7 +1593,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if list.levels.len() >= MAX_LIST_LEVELS {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF list exceeds the nine-level specification limit".to_string(),
                         ));
                     }
@@ -1644,15 +1650,15 @@ impl<'a> Parser<'a> {
                     _ => {},
                 },
                 Some(_) => {},
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
         if !closed {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         if list.simple && (list.hybrid || list.levels.len() > 1) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid simple RTF list definition".to_string(),
             ));
         }
@@ -1661,7 +1667,7 @@ impl<'a> Parser<'a> {
         }
         if has_id {
             if self.list_table.lists().len() >= MAX_LISTS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF list count exceeds the safety limit".to_string(),
                 ));
             }
@@ -1677,7 +1683,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_list_level(
         &mut self,
         level_index: u8,
-    ) -> RtfResult<super::super::super::list::ListLevel<'a>> {
+    ) -> crate::Result<super::super::super::list::ListLevel<'a>> {
         self.pos += 2; // opening brace and `listlevel`
         let mut level = super::super::super::list::ListLevel::new(level_index);
         let mut explicit_indent = false;
@@ -1739,7 +1745,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::FontNumber(value) => {
                         level.font_ref = u16::try_from(*value).map_err(|_err| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF list font reference is outside the supported range"
                                     .to_string(),
                             )
@@ -1754,13 +1760,13 @@ impl<'a> Parser<'a> {
                     ControlWord::FirstLineIndent(value) => level.first_line_indent = Some(*value),
                     ControlWord::TabPosition(value) => {
                         let tab_position = value.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF list-level tx control requires a numeric parameter"
                                     .to_string(),
                             )
                         })?;
                         if level.tabs.len() >= MAX_LIST_TABS {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF list level has too many tabs".to_string(),
                             ));
                         }
@@ -1777,7 +1783,7 @@ impl<'a> Parser<'a> {
                     ControlWord::ListLevelTemplateId(value) => level.template_id = Some(*value),
                     ControlWord::ListLevelPicture(value) => {
                         level.picture_index = Some(u32::try_from(*value).map_err(|_err| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF list picture index cannot be negative".to_string(),
                             )
                         })?);
@@ -1789,14 +1795,14 @@ impl<'a> Parser<'a> {
             }
             self.pos += 1;
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     pub(super) fn parse_list_text_group(
         &mut self,
         is_name: bool,
         strip_length: bool,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         self.pos += if matches!(
             self.tokens.get(self.pos + 1),
             Some(Token::Control(ControlWord::IgnorableDestination))
@@ -1836,7 +1842,7 @@ impl<'a> Parser<'a> {
                     let decoded = self.parse_style_unicode(*first, unicode_skip)?;
                     value.push_str(&decoded);
                     if value.len() > MAX_LIST_TEXT_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF list text exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1853,12 +1859,12 @@ impl<'a> Parser<'a> {
             }
             self.pos += 1;
             if value.len() > MAX_LIST_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF list text exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     pub(super) fn list_level_type(value: i32) -> super::super::super::list::ListLevelType {
@@ -1877,9 +1883,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(super) fn parse_list_override_table(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_list_override_table(&mut self) -> crate::Result<()> {
         if self.saw_list_override_table {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple list override tables".to_string(),
             ));
         }
@@ -1890,7 +1896,7 @@ impl<'a> Parser<'a> {
                 .iter()
                 .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF list override table must follow listtable in the root header".to_string(),
             ));
         }
@@ -1916,10 +1922,10 @@ impl<'a> Parser<'a> {
                 None => break,
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn parse_list_override(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_list_override(&mut self) -> crate::Result<()> {
         self.pos += 2; // opening brace and `listoverride`
         let mut list_id = None;
         let mut index = None;
@@ -1940,7 +1946,7 @@ impl<'a> Parser<'a> {
                     let mut has_format_override = false;
                     let mut level_start_at = None;
                     let override_index = u8::try_from(override_levels.len()).map_err(|_err| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF list override has too many levels".to_string(),
                         )
                     })?;
@@ -1967,7 +1973,7 @@ impl<'a> Parser<'a> {
                                 continue;
                             },
                             Some(_) => {},
-                            None => return Err(RtfError::UnexpectedEof),
+                            None => return Err(crate::Error::UnexpectedEof),
                         }
                         self.pos += 1;
                     }
@@ -1996,22 +2002,22 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::ListOverrideIndex(value))) => index = Some(*value),
                 Some(Token::Control(ControlWord::ListOverrideCount(value))) => {
                     level_count = Some(u8::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF list override count is outside the supported range".to_string(),
                         )
                     })?);
                 },
                 Some(_) => {},
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
         if !closed {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         if let (Some(list_index), Some(override_list_id)) = (index, list_id) {
             if self.list_override_table.overrides().len() >= MAX_LISTS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF list override count exceeds the safety limit".to_string(),
                 ));
             }
@@ -2212,7 +2218,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_default_formatting_destination(
         &mut self,
         kind: crate::DefaultFormattingDestination,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if self.states.len() != 3
             || self.section_note_options_closed
             || self
@@ -2220,7 +2226,7 @@ impl<'a> Parser<'a> {
                 .get(1)
                 .is_none_or(|state| state.destination != Destination::DocumentBody)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF default-formatting destination must occur once in the root document header"
                     .to_string(),
             ));
@@ -2233,7 +2239,7 @@ impl<'a> Parser<'a> {
                 self.default_formatting.paragraph().is_some()
             },
         } {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "duplicate RTF default-formatting destination".to_string(),
             ));
         }
@@ -2262,7 +2268,7 @@ impl<'a> Parser<'a> {
                 },
             )?,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF default-formatting destination".to_string(),
                 ));
             },
@@ -2282,12 +2288,12 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     if script.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF defchp script selector lacks its af value".to_string(),
                         ));
                     }
                     if state.pending_tab_alignment.is_some() || state.pending_tab_leader.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF defpap has an incomplete tab definition".to_string(),
                         ));
                     }
@@ -2314,13 +2320,13 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {},
                 Some(Token::OpenBrace) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF default-formatting destination cannot contain nested content"
                             .to_string(),
                     ));
                 },
                 Some(Token::Binary(_) | Token::Text(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF default-formatting destination contains active content".to_string(),
                     ));
                 },
@@ -2333,7 +2339,7 @@ impl<'a> Parser<'a> {
                                 | ControlWord::DoubleByteCharacter(_)
                         ) {
                             if script.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF defchp script selector lacks its af value".to_string(),
                                 ));
                             }
@@ -2345,7 +2351,7 @@ impl<'a> Parser<'a> {
                             };
                             require_parameterless(*parameter, key)?;
                             if !seen.insert(key) {
-                                return Err(RtfError::MalformedDocument(format!(
+                                return Err(crate::Error::MalformedDocument(format!(
                                     "duplicate RTF {key} selector in defchp"
                                 )));
                             }
@@ -2355,7 +2361,7 @@ impl<'a> Parser<'a> {
                         {
                             let value = associated_font_ref(*parameter)?;
                             match script.take().ok_or_else(|| {
-                                RtfError::ParserError(
+                                crate::Error::ParserError(
                                     "RTF defchp script selector state was lost".to_string(),
                                 )
                             })? {
@@ -2366,14 +2372,14 @@ impl<'a> Parser<'a> {
                         } else if Self::apply_character_decoration_control(&mut state, control)? {
                         } else if let Some(key) = Self::default_character_property_key(control) {
                             if !seen.insert(key) {
-                                return Err(RtfError::MalformedDocument(format!(
+                                return Err(crate::Error::MalformedDocument(format!(
                                     "duplicate RTF {key} property in defchp"
                                 )));
                             }
                             match control {
                                 ControlWord::FontNumber(value) => {
                                     u16::try_from(*value).map_err(|_err| {
-                                        RtfError::MalformedDocument(
+                                        crate::Error::MalformedDocument(
                                             "RTF defchp font value must be in 0..=65535"
                                                 .to_string(),
                                         )
@@ -2382,14 +2388,14 @@ impl<'a> Parser<'a> {
                                 ControlWord::FontSize(value)
                                     if !(1..=i32::from(u16::MAX)).contains(value) =>
                                 {
-                                    return Err(RtfError::MalformedDocument(
+                                    return Err(crate::Error::MalformedDocument(
                                         "RTF defchp fs value must be in 1..=65535".to_string(),
                                     ));
                                 },
                                 ControlWord::ColorForeground(value)
                                 | ControlWord::Highlight(value) => {
                                     u16::try_from(*value).map_err(|_err| {
-                                        RtfError::MalformedDocument(
+                                        crate::Error::MalformedDocument(
                                             "RTF defchp color value must be in 0..=65535"
                                                 .to_string(),
                                         )
@@ -2408,7 +2414,7 @@ impl<'a> Parser<'a> {
                             }
                             Self::apply_style_property(&mut state, control)?;
                         } else {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "unsupported control in RTF defchp destination".to_string(),
                             ));
                         }
@@ -2417,35 +2423,35 @@ impl<'a> Parser<'a> {
                         if Self::apply_paragraph_tab_control(&mut state, control)? {
                         } else if let ControlWord::TableNestingLevel(parameter) = control {
                             if !seen.insert("itap") {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF itap property in defpap".to_string(),
                                 ));
                             }
                             let value = parameter.ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF defpap itap requires a numeric parameter".to_string(),
                                 )
                             })?;
                             let nesting_depth = u8::try_from(value).map_err(|_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF defpap itap value must be in 0..=32".to_string(),
                                 )
                             })?;
                             if nesting_depth > 32 {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF defpap itap value must be in 0..=32".to_string(),
                                 ));
                             }
                             itap = Some(nesting_depth);
                         } else if let Some(key) = Self::default_paragraph_property_key(control) {
                             if !seen.insert(key) {
-                                return Err(RtfError::MalformedDocument(format!(
+                                return Err(crate::Error::MalformedDocument(format!(
                                     "duplicate RTF {key} property in defpap"
                                 )));
                             }
                             if matches!(control,ControlWord::LeftIndent(value)|ControlWord::RightIndent(value)|ControlWord::FirstLineIndent(value)|ControlWord::SpaceBefore(value)|ControlWord::SpaceAfter(value)|ControlWord::SpaceBetween(value) if value.unsigned_abs()>10_000_000)
                             {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF defpap layout value exceeds the safety limit".to_string(),
                                 ));
                             }
@@ -2457,21 +2463,21 @@ impl<'a> Parser<'a> {
                                 _ => Self::apply_style_property(&mut state, control)?,
                             }
                         } else {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "unsupported control in RTF defpap destination".to_string(),
                             ));
                         }
                     },
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
         }
     }
 
-    pub(super) fn parse_stylesheet(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_stylesheet(&mut self) -> crate::Result<()> {
         if self.saw_stylesheet {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document contains multiple stylesheet destinations".to_string(),
             ));
         }
@@ -2481,7 +2487,7 @@ impl<'a> Parser<'a> {
                 .iter()
                 .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF stylesheet must occur in the root document header".to_string(),
             ));
         }
@@ -2499,14 +2505,14 @@ impl<'a> Parser<'a> {
                 None => break,
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     #[allow(
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_style_entry(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_style_entry(&mut self) -> crate::Result<()> {
         let entry_start = self.pos;
         self.pos += 1; // opening brace
         let starred = matches!(
@@ -2546,7 +2552,7 @@ impl<'a> Parser<'a> {
         macro_rules! set_style_once {
             ($key:literal, $target:expr, $value:expr) => {{
                 if !seen_metadata.insert($key) {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "duplicate RTF style metadata control: {}",
                         $key
                     )));
@@ -2562,7 +2568,7 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Some(Token::Control(ControlWord::Page(_))) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF page is not permitted in a stylesheet".to_string(),
                     ));
                 },
@@ -2586,7 +2592,7 @@ impl<'a> Parser<'a> {
                     let decoded = self.parse_style_unicode(*first, state.unicode_skip)?;
                     Self::append_style_name(&mut name, &decoded, &mut name_complete);
                     if name.len() > MAX_STYLE_NAME_BYTES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF style name exceeds the safety limit".to_string(),
                         ));
                     }
@@ -2609,7 +2615,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::ParagraphStyle(value) => {
                         if style_type.is_some() || saw_content_before_selector {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF style selector is duplicated or out of order".to_string(),
                             ));
                         }
@@ -2618,7 +2624,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::CharacterStyle(value) if style_type.is_none() => {
                         if saw_content_before_selector {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF style selector is duplicated or out of order".to_string(),
                             ));
                         }
@@ -2630,7 +2636,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::SectionStyle(value) => {
                         if style_type.is_some() || saw_content_before_selector {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF style selector is duplicated or out of order".to_string(),
                             ));
                         }
@@ -2639,7 +2645,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::TableStyle(value) => {
                         if style_type.is_some() || saw_content_before_selector {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF style selector is duplicated or out of order".to_string(),
                             ));
                         }
@@ -2658,7 +2664,7 @@ impl<'a> Parser<'a> {
                     | ControlWord::TableStyleBandSizeHorizontal(_)
                     | ControlWord::TableStyleBandSizeVertical(_)) => {
                         if style_type != Some(super::super::super::stylesheet::StyleType::Table) {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF table-style conditional controls may occur only in table style definitions"
                                     .to_string(),
                             ));
@@ -2747,7 +2753,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::StyleBasedOn(value) => {
                         if !seen_metadata.insert("sbasedon") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF sbasedon".to_string(),
                             ));
                         }
@@ -2755,7 +2761,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::StyleNext(value) => {
                         if !seen_metadata.insert("snext") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF snext".to_string(),
                             ));
                         }
@@ -2763,7 +2769,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::StyleLink(value) => {
                         if !seen_metadata.insert("slink") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF slink".to_string(),
                             ));
                         }
@@ -2791,7 +2797,7 @@ impl<'a> Parser<'a> {
                     },
                     ControlWord::StyleRevisionId(value) => {
                         if !seen_metadata.insert("styrsid") {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "duplicate RTF styrsid".to_string(),
                             ));
                         }
@@ -2815,7 +2821,7 @@ impl<'a> Parser<'a> {
             }
             self.pos += 1;
             if name.len() > MAX_STYLE_NAME_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style name exceeds the safety limit".to_string(),
                 ));
             }
@@ -2830,17 +2836,17 @@ impl<'a> Parser<'a> {
             return Ok(());
         };
         if !name_complete {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF style name must end with a semicolon".to_string(),
             ));
         }
         if resolved_type != super::super::super::stylesheet::StyleType::Paragraph && !starred {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF non-paragraph style entries must be starred".to_string(),
             ));
         }
         if self.stylesheet.styles().len() >= MAX_STYLES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF style count exceeds the safety limit".to_string(),
             ));
         }
@@ -2894,9 +2900,11 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn style_id(value: i32, field: &str) -> RtfResult<u16> {
+    pub(super) fn style_id(value: i32, field: &str) -> crate::Result<u16> {
         u16::try_from(value).map_err(|_err| {
-            RtfError::MalformedDocument(format!("RTF {field} ID is outside the supported range"))
+            crate::Error::MalformedDocument(format!(
+                "RTF {field} ID is outside the supported range"
+            ))
         })
     }
 
@@ -2918,7 +2926,7 @@ impl<'a> Parser<'a> {
         &mut self,
         first_code: i32,
         unicode_skip: i32,
-    ) -> RtfResult<(String, String)> {
+    ) -> crate::Result<(String, String)> {
         let skip = unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = super::unicode::UnicodeRun::default();
         let awaiting_fallback = self.collect_unicode_run(first_code, skip, &mut utf16, true)?;
@@ -2938,25 +2946,25 @@ impl<'a> Parser<'a> {
                             .map(char::len_utf8)
                             .try_fold(0usize, |total, length| total.checked_add(length))
                             .ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF Unicode fallback size overflow".to_string(),
                                 )
                             })?;
                         let observed =
                             remainder.len().checked_add(additional).ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF Unicode fallback size overflow".to_string(),
                                 )
                             })?;
                         if observed > MAX_TEXT_INTERMEDIATE_BYTES {
-                            return Err(RtfError::LimitExceeded {
+                            return Err(crate::Error::LimitExceeded {
                                 resource: "RTF Unicode fallback text",
                                 observed,
                                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
                             });
                         }
                         remainder.try_reserve_exact(additional).map_err(|_error| {
-                            RtfError::AllocationFailed {
+                            crate::Error::AllocationFailed {
                                 resource: "RTF Unicode fallback text",
                                 requested: remainder.len().saturating_add(additional),
                             }
@@ -2990,15 +2998,15 @@ impl<'a> Parser<'a> {
         &mut self,
         first_code: i32,
         unicode_skip: i32,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         let (mut decoded, remainder) =
             self.parse_unicode_with_remainder(first_code, unicode_skip)?;
         let fallback = self.decode_transport_text(&remainder)?;
         let observed = decoded.len().checked_add(fallback.len()).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF Unicode fallback size overflow".to_string())
+            crate::Error::MalformedDocument("RTF Unicode fallback size overflow".to_string())
         })?;
         if observed > MAX_TEXT_INTERMEDIATE_BYTES {
-            return Err(RtfError::LimitExceeded {
+            return Err(crate::Error::LimitExceeded {
                 resource: "RTF Unicode fallback text",
                 observed,
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
@@ -3006,7 +3014,7 @@ impl<'a> Parser<'a> {
         }
         decoded
             .try_reserve_exact(fallback.len())
-            .map_err(|_error| RtfError::AllocationFailed {
+            .map_err(|_error| crate::Error::AllocationFailed {
                 resource: "RTF Unicode fallback text",
                 requested: observed,
             })?;
@@ -3019,7 +3027,7 @@ impl<'a> Parser<'a> {
         target: &mut DeferredText,
         first_code: i32,
         unicode_skip: i32,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let (decoded, remainder) = self.parse_unicode_with_remainder(first_code, unicode_skip)?;
         target.push_unicode(&decoded);
         target.push_transport(&remainder)
@@ -3029,15 +3037,15 @@ impl<'a> Parser<'a> {
         value: Option<i32>,
         control: &str,
         maximum: u16,
-    ) -> RtfResult<u16> {
+    ) -> crate::Result<u16> {
         let parameter = value.ok_or_else(|| {
-            RtfError::MalformedDocument(format!("RTF {control} requires a numeric parameter"))
+            crate::Error::MalformedDocument(format!("RTF {control} requires a numeric parameter"))
         })?;
         let parsed = u16::try_from(parameter).map_err(|_err| {
-            RtfError::MalformedDocument(format!("RTF {control} value must be in 0..={maximum}"))
+            crate::Error::MalformedDocument(format!("RTF {control} value must be in 0..={maximum}"))
         })?;
         if parsed > maximum {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {control} value must be in 0..={maximum}"
             )));
         }
@@ -3093,7 +3101,7 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_table_decoration_control(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         const STYLE: u8 = 1;
         const WIDTH: u8 = 2;
         const COLOR: u8 = 4;
@@ -3162,7 +3170,7 @@ impl<'a> Parser<'a> {
                 _ => return Err(parser_classification_error()),
             };
             if *seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF table shading component".to_string(),
                 ));
             }
@@ -3224,12 +3232,12 @@ impl<'a> Parser<'a> {
             }
         };
         if state.active_table_border_seen & component != 0 {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "duplicate RTF table-border {name}"
             )));
         }
         if component != STYLE && state.active_table_border_seen & STYLE == 0 {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF table-border {name} precedes its style"
             )));
         }
@@ -3245,7 +3253,7 @@ impl<'a> Parser<'a> {
         }
         .as_mut()
         .ok_or_else(|| {
-            RtfError::ParserError("RTF active table-border state is missing".to_string())
+            crate::Error::ParserError("RTF active table-border state is missing".to_string())
         })?;
         if let Some(style) = Self::table_border_style(control) {
             border.style = style;
@@ -3319,7 +3327,7 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_character_decoration_control(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         const STYLE: u8 = 1;
         const WIDTH: u8 = 2;
         const COLOR: u8 = 4;
@@ -3330,7 +3338,7 @@ impl<'a> Parser<'a> {
         match control {
             ControlWord::CharacterBorder(parameter) => {
                 if parameter.is_some() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF chbrdr must not have a numeric parameter".to_string(),
                     ));
                 }
@@ -3397,13 +3405,13 @@ impl<'a> Parser<'a> {
             }
         };
         if state.character_border_seen & component != 0 {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "duplicate RTF character-border {duplicate_name}"
             )));
         }
         state.character_border_seen |= component;
         let border = state.formatting.character_border.as_mut().ok_or_else(|| {
-            RtfError::ParserError("RTF active character-border state is missing".to_string())
+            crate::Error::ParserError("RTF active character-border state is missing".to_string())
         })?;
         if let Some(style) = Self::character_border_style(control) {
             border.style = style;
@@ -3429,8 +3437,8 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_paragraph_border_side(
         state: &mut State,
         side: ParagraphBorderSide,
-        apply: impl Fn(&mut crate::Border) -> RtfResult<()>,
-    ) -> RtfResult<()> {
+        apply: impl Fn(&mut crate::Border) -> crate::Result<()>,
+    ) -> crate::Result<()> {
         let borders = &mut state.paragraph.borders;
         match side {
             ParagraphBorderSide::Top => apply(&mut borders.top),
@@ -3462,7 +3470,7 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_paragraph_border_control(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         let segment = match control {
             ControlWord::BorderTop => Some(ParagraphBorderSide::Top),
             ControlWord::BorderBottom => Some(ParagraphBorderSide::Bottom),
@@ -3476,7 +3484,7 @@ impl<'a> Parser<'a> {
         if let Some(border_segment) = segment {
             let bit = border_segment.bit();
             if state.paragraph_border_seen & bit != 0 {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "duplicate RTF paragraph border segment".to_string(),
                 ));
             }
@@ -3488,11 +3496,13 @@ impl<'a> Parser<'a> {
         let side = state.paragraph_border_side;
         if let Some(style) = Self::table_border_style(control) {
             let border_side = side.ok_or_else(|| {
-                RtfError::MalformedDocument("RTF paragraph border style has no segment".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF paragraph border style has no segment".to_string(),
+                )
             })?;
             Self::apply_paragraph_border_side(state, border_side, |border| {
                 if border.style != crate::BorderStyle::None && style != crate::BorderStyle::None {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "duplicate RTF paragraph border style".to_string(),
                     ));
                 }
@@ -3503,7 +3513,7 @@ impl<'a> Parser<'a> {
         }
         let require_side = |border_state: &State| {
             border_state.paragraph_border_side.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF paragraph border component has no segment".to_string(),
                 )
             })
@@ -3511,7 +3521,7 @@ impl<'a> Parser<'a> {
         match control {
             ControlWord::BorderWidth(value) => {
                 let width = value.ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF brdrw requires a numeric parameter".to_string(),
                     )
                 })?;
@@ -3567,7 +3577,7 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_paragraph_shading_control(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         match control {
             ControlWord::Shading(value) => {
                 state
@@ -3620,7 +3630,7 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_style_property(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if Self::apply_paragraph_tab_control(state, control)? {
             return Ok(());
         }
@@ -3703,7 +3713,7 @@ impl<'a> Parser<'a> {
             },
             ControlWord::UnderlineColor(value) => {
                 state.formatting.underline_color = Some(u16::try_from(*value).map_err(|_err| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF underline color is outside the supported range".to_string(),
                     )
                 })?);
@@ -3850,7 +3860,7 @@ impl<'a> Parser<'a> {
                     .ok()
                     .filter(|level| *level <= 9)
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF outline level must be between 0 and 9".to_string(),
                         )
                     })?;
@@ -4031,7 +4041,7 @@ impl<'a> Parser<'a> {
                     ParagraphFrameHorizontalPosition::Offset(
                         i32::try_from(style_frame_nonnegative(*value, "posx")?).map_err(
                             |_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF posx exceeds the safety limit".to_string(),
                                 )
                             },
@@ -4089,7 +4099,7 @@ impl<'a> Parser<'a> {
                     ParagraphFrameVerticalPosition::Offset(
                         i32::try_from(style_frame_nonnegative(*value, "posy")?).map_err(
                             |_err| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF posy exceeds the safety limit".to_string(),
                                 )
                             },
@@ -4222,21 +4232,21 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_drop_cap_control(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         match control {
             ControlWord::DropCapLines(value) => {
                 let raw_lines = value.ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF dropcapli requires a numeric parameter".to_string(),
                     )
                 })?;
                 let lines = u16::try_from(raw_lines).map_err(|_err| {
-                    RtfError::MalformedDocument(format!(
+                    crate::Error::MalformedDocument(format!(
                         "RTF dropcapli must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
                     ))
                 })?;
                 if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&lines) {
-                    return Err(RtfError::MalformedDocument(format!(
+                    return Err(crate::Error::MalformedDocument(format!(
                         "RTF dropcapli must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
                     )));
                 }
@@ -4247,12 +4257,12 @@ impl<'a> Parser<'a> {
                     Some(1) => ParagraphDropCapKind::InText,
                     Some(2) => ParagraphDropCapKind::Margin,
                     Some(_) => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF dropcapt accepts only 1 or 2".to_string(),
                         ));
                     },
                     None => {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF dropcapt requires a numeric parameter".to_string(),
                         ));
                     },
@@ -4266,9 +4276,9 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
-    pub(super) fn validate_drop_cap_state(state: &State, context: &str) -> RtfResult<()> {
+    pub(super) fn validate_drop_cap_state(state: &State, context: &str) -> crate::Result<()> {
         if state.drop_cap_kind.is_some() != state.drop_cap_lines.is_some() {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {context} has incomplete drop-cap properties"
             )));
         }
@@ -4285,12 +4295,12 @@ impl<'a> Parser<'a> {
     pub(super) fn apply_paragraph_tab_control(
         state: &mut State,
         control: &ControlWord<'_>,
-    ) -> RtfResult<bool> {
+    ) -> crate::Result<bool> {
         use super::super::super::border::{TabAlignment, TabLeader, TabStop};
 
-        fn require_flag(parameter: Option<i32>, name: &str) -> RtfResult<()> {
+        fn require_flag(parameter: Option<i32>, name: &str) -> crate::Result<()> {
             if parameter.is_some() {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF {name} tab selector does not accept a numeric parameter"
                 )));
             }
@@ -4302,10 +4312,10 @@ impl<'a> Parser<'a> {
             parameter: Option<i32>,
             name: &str,
             alignment: TabAlignment,
-        ) -> RtfResult<()> {
+        ) -> crate::Result<()> {
             require_flag(parameter, name)?;
             if state.pending_tab_alignment.is_some() || state.pending_tab_leader.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF tab alignment must occur once and before its leader".to_string(),
                 ));
             }
@@ -4318,10 +4328,10 @@ impl<'a> Parser<'a> {
             parameter: Option<i32>,
             name: &str,
             leader: TabLeader,
-        ) -> RtfResult<()> {
+        ) -> crate::Result<()> {
             require_flag(parameter, name)?;
             if state.pending_tab_leader.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF tab definition contains multiple leader selectors".to_string(),
                 ));
             }
@@ -4333,15 +4343,15 @@ impl<'a> Parser<'a> {
             clippy::wildcard_enum_match_arm,
             reason = "remaining variants share the same fallback by design"
         )]
-        fn append(state: &mut State, position: Option<i32>, bar: bool) -> RtfResult<()> {
+        fn append(state: &mut State, position: Option<i32>, bar: bool) -> crate::Result<()> {
             let tab_position = position.ok_or_else(|| {
-                RtfError::MalformedDocument(format!(
+                crate::Error::MalformedDocument(format!(
                     "RTF {} control requires a numeric parameter",
                     if bar { "tb" } else { "tx" }
                 ))
             })?;
             if bar && state.pending_tab_alignment.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF bar tab cannot have a tab-alignment selector".to_string(),
                 ));
             }
@@ -4355,7 +4365,7 @@ impl<'a> Parser<'a> {
                 leader: state.pending_tab_leader.unwrap_or(TabLeader::None),
             };
             state.paragraph.tab_stops.push(tab).map_err(|_err| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF paragraph exceeds the 64-tab safety limit".to_string(),
                 )
             })?;

@@ -14,7 +14,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use crate::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -26,19 +26,19 @@ pub(crate) const MAX_CUSTOM_XML_ATTRIBUTE_NAME_BYTES: usize = 1_024;
 pub(crate) const MAX_CUSTOM_XML_ATTRIBUTE_VALUE_BYTES: usize = 65_536;
 pub(crate) const MAX_CUSTOM_XML_TOTAL_BYTES: usize = 16 * 1_048_576;
 
-fn validate_name(kind: &str, name: &str, max_bytes: usize) -> RtfResult<()> {
+fn validate_name(kind: &str, name: &str, max_bytes: usize) -> crate::Result<()> {
     if name.trim().is_empty() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF custom XML {kind} cannot be empty"
         )));
     }
     if name.len() > max_bytes {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF custom XML {kind} exceeds the safety limit"
         )));
     }
     if name.contains(['\0', '\r', '\n']) {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF custom XML {kind} contains a forbidden control character"
         )));
     }
@@ -59,25 +59,25 @@ impl<'a> CustomXmlAttribute<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(name: Cow<'a, str>, value: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(name: Cow<'a, str>, value: Cow<'a, str>) -> crate::Result<Self> {
         let attribute = Self { name, value };
         attribute.validate()?;
         Ok(attribute)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         validate_name(
             "attribute name",
             self.name.as_ref(),
             MAX_CUSTOM_XML_ATTRIBUTE_NAME_BYTES,
         )?;
         if self.value.len() > MAX_CUSTOM_XML_ATTRIBUTE_VALUE_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF custom XML attribute value exceeds the safety limit".to_string(),
             ));
         }
         if self.value.contains(['\0', '\r', '\n']) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF custom XML attribute value contains a forbidden control character".to_string(),
             ));
         }
@@ -124,7 +124,7 @@ impl<'a> CustomXmlTag<'a> {
         attributes: Vec<CustomXmlAttribute<'a>>,
         position: usize,
         content: Cow<'a, str>,
-    ) -> RtfResult<Self> {
+    ) -> crate::Result<Self> {
         let tag = Self {
             name,
             namespace,
@@ -136,17 +136,17 @@ impl<'a> CustomXmlTag<'a> {
         Ok(tag)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         validate_name("tag name", self.name.as_ref(), MAX_CUSTOM_XML_NAME_BYTES)?;
         if let Some(id) = self.namespace
             && (id == 0 || id > i32::MAX as u32)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF custom XML namespace references must be in 1..=2147483647".to_string(),
             ));
         }
         if self.attributes.len() > MAX_CUSTOM_XML_ATTRIBUTES_PER_TAG {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF custom XML attribute count exceeds the safety limit".to_string(),
             ));
         }
@@ -159,7 +159,7 @@ impl<'a> CustomXmlTag<'a> {
         for attribute in &self.attributes {
             attribute.validate()?;
             if !names.insert(attribute.name.as_ref()) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF custom XML attribute names must be unique within a tag".to_string(),
                 ));
             }

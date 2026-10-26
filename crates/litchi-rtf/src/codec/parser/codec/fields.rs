@@ -4,7 +4,7 @@
 )]
 use super::{
     ControlWord, Cow, Destination, DrawingStoryCapture, FormFieldBuilder, MAX_GROUP_NESTING_DEPTH,
-    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, SmallVec, Token, control_symbol_text,
+    ParsedBodyStoryEvent, Parser, SmallVec, Token, control_symbol_text,
     parser_classification_error, require_parameterless,
 };
 
@@ -17,9 +17,9 @@ impl Parser<'_> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_field(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_field(&mut self) -> crate::Result<()> {
         if self.field_nesting_depth >= MAX_GROUP_NESTING_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF nested field depth exceeds the safety limit".to_string(),
             ));
         }
@@ -105,17 +105,17 @@ impl Parser<'_> {
 
                     if let Some((name, parameter, bit)) = status_control {
                         if saw_field_destination {
-                            return Err(RtfError::MalformedDocument(format!(
+                            return Err(crate::Error::MalformedDocument(format!(
                                 "RTF field state control \\{name} must precede field destinations"
                             )));
                         }
                         if parameter.is_some() {
-                            return Err(RtfError::MalformedDocument(format!(
+                            return Err(crate::Error::MalformedDocument(format!(
                                 "RTF field state control \\{name} does not accept a parameter"
                             )));
                         }
                         if field_status_seen & bit != 0 {
-                            return Err(RtfError::MalformedDocument(format!(
+                            return Err(crate::Error::MalformedDocument(format!(
                                 "duplicate RTF field state control \\{name}"
                             )));
                         }
@@ -149,7 +149,7 @@ impl Parser<'_> {
                             Some(Token::Control(ControlWord::IgnorableDestination))
                         ) && is_status_control(self.tokens.get(self.pos + 2)));
                     if grouped_status {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF field state controls must occur directly in the field group"
                                 .to_string(),
                         ));
@@ -268,7 +268,7 @@ impl Parser<'_> {
                                     self.pos += 1;
                                 },
                                 Token::OpenBrace if self.is_custom_xml_markup_group() => {
-                                    return Err(RtfError::MalformedDocument(
+                                    return Err(crate::Error::MalformedDocument(
                                         "RTF custom XML markup destinations are supported only in the main body story"
                                             .to_string(),
                                     ));
@@ -293,7 +293,7 @@ impl Parser<'_> {
                                     match destination {
                                         Some(ControlWord::FormField) => {
                                             if form_field.is_some() {
-                                                return Err(RtfError::MalformedDocument(
+                                                return Err(crate::Error::MalformedDocument(
                                                     "RTF field contains multiple formfield destinations"
                                                         .to_string(),
                                                 ));
@@ -302,7 +302,7 @@ impl Parser<'_> {
                                         },
                                         Some(ControlWord::DataField) => {
                                             if data_field.is_some() {
-                                                return Err(RtfError::MalformedDocument(
+                                                return Err(crate::Error::MalformedDocument(
                                                     "RTF field contains multiple datafield destinations"
                                                         .to_string(),
                                                 ));
@@ -325,7 +325,7 @@ impl Parser<'_> {
                                         _ => {
                                             nested_depth =
                                                 nested_depth.checked_add(1).ok_or_else(|| {
-                                                    RtfError::MalformedDocument(
+                                                    crate::Error::MalformedDocument(
                                                         "field instruction nesting depth overflow"
                                                             .to_string(),
                                                     )
@@ -349,7 +349,7 @@ impl Parser<'_> {
                                 Token::OpenBrace => {
                                     nested_depth =
                                         nested_depth.checked_add(1).ok_or_else(|| {
-                                            RtfError::MalformedDocument(
+                                            crate::Error::MalformedDocument(
                                                 "field instruction nesting depth overflow"
                                                     .to_string(),
                                             )
@@ -365,7 +365,7 @@ impl Parser<'_> {
                                 || result.len()
                                     > super::super::super::form_field::MAX_FORM_FIELD_STRING_BYTES
                             {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF field instruction or result exceeds the safety limit"
                                         .to_string(),
                                 ));
@@ -380,10 +380,10 @@ impl Parser<'_> {
         }
 
         let result_text = std::str::from_utf8(&result).map_err(|_err| {
-            RtfError::MalformedDocument("RTF field result is not valid UTF-8".to_string())
+            crate::Error::MalformedDocument("RTF field result is not valid UTF-8".to_string())
         })?;
         let field_drawings = self.field_drawing_captures.pop().ok_or_else(|| {
-            RtfError::MalformedDocument("RTF field drawing capture stack underflow".to_string())
+            crate::Error::MalformedDocument("RTF field drawing capture stack underflow".to_string())
         })?;
 
         // Create the generic field record if we have an instruction.
@@ -420,7 +420,7 @@ impl Parser<'_> {
             let field_safety = crate::validation::classify_field(&field);
 
             if self.fields.len() >= crate::field::MAX_GENERIC_FIELDS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF generic field count exceeds the safety limit".to_string(),
                 ));
             }
@@ -452,7 +452,7 @@ impl Parser<'_> {
                     .field_drawing_captures
                     .last_mut()
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF nested field lacks a parent result story".to_string(),
                         )
                     })?
@@ -471,12 +471,12 @@ impl Parser<'_> {
 
         if let Some(builder) = form_field {
             if self.form_fields.len() >= super::super::super::form_field::MAX_FORM_FIELDS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF form-field count exceeds the safety limit".to_string(),
                 ));
             }
             let field_type = builder.field_type.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF formfield destination is missing fftype".to_string(),
                 )
             })?;
@@ -526,20 +526,22 @@ impl Parser<'_> {
             };
             form_field.validate()?;
             let added = form_field.text_bytes().ok_or_else(|| {
-                RtfError::MalformedDocument("RTF form-field aggregate size overflow".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF form-field aggregate size overflow".to_string(),
+                )
             })?;
             self.form_field_text_bytes =
                 self.form_field_text_bytes
                     .checked_add(added)
                     .ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF form-field aggregate size overflow".to_string(),
                         )
                     })?;
             if self.form_field_text_bytes
                 > super::super::super::form_field::MAX_FORM_FIELD_TOTAL_BYTES
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF form-field aggregate text exceeds the safety limit".to_string(),
                 ));
             }
@@ -564,13 +566,13 @@ impl Parser<'_> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_form_field_destination(&mut self) -> RtfResult<FormFieldBuilder> {
+    pub(super) fn parse_form_field_destination(&mut self) -> crate::Result<FormFieldBuilder> {
         self.expect_token(&Token::OpenBrace)?;
         if !matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF formfield destination must be starred".to_string(),
             ));
         }
@@ -579,7 +581,7 @@ impl Parser<'_> {
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::FormField))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF formfield destination".to_string(),
             ));
         }
@@ -624,7 +626,7 @@ impl Parser<'_> {
                             )
                         )
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF formfield text destinations must be starred".to_string(),
                         ));
                     }
@@ -640,7 +642,7 @@ impl Parser<'_> {
                             if builder.list_entries.len()
                                 >= super::super::super::form_field::MAX_FORM_FIELD_LIST_ENTRIES
                             {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF form-field list exceeds 25 entries".to_string(),
                                 ));
                             }
@@ -665,14 +667,14 @@ impl Parser<'_> {
                         ) => {
                             self.pos += 1;
                             depth = depth.checked_add(1).ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF formfield nesting depth overflow".to_string(),
                                 )
                             })?;
                             continue;
                         },
                         Some(_) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF formfield contains an active or unknown nested destination"
                                     .to_string(),
                             ));
@@ -680,7 +682,7 @@ impl Parser<'_> {
                         None => {
                             self.pos += 1;
                             depth = depth.checked_add(1).ok_or_else(|| {
-                                RtfError::MalformedDocument(
+                                crate::Error::MalformedDocument(
                                     "RTF formfield nesting depth overflow".to_string(),
                                 )
                             })?;
@@ -688,7 +690,7 @@ impl Parser<'_> {
                         },
                     };
                     if target.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF formfield contains a duplicate text destination".to_string(),
                         ));
                     }
@@ -698,7 +700,7 @@ impl Parser<'_> {
                     macro_rules! set_once {
                         ($slot:expr, $value:expr, $name:literal) => {{
                             if $slot.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     concat!("duplicate RTF formfield ", $name).to_string(),
                                 ));
                             }
@@ -718,9 +720,11 @@ impl Parser<'_> {
                         ),
                         ControlWord::FormFieldMaxLength(value) => set_once!(
                             builder.max_length,
-                            u16::try_from(*value).map_err(|_err| RtfError::MalformedDocument(
-                                "RTF ffmaxlen is outside 0..=65535".to_string()
-                            ))?,
+                            u16::try_from(*value).map_err(|_err| {
+                                crate::Error::MalformedDocument(
+                                    "RTF ffmaxlen is outside 0..=65535".to_string(),
+                                )
+                            })?,
                             "ffmaxlen"
                         ),
                         ControlWord::FormFieldProtected(value) => {
@@ -751,7 +755,7 @@ impl Parser<'_> {
                             set_once!(builder.has_list_box, *value, "ffhaslistbox");
                         },
                         _ => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF formfield contains an unsupported control".to_string(),
                             ));
                         },
@@ -760,24 +764,24 @@ impl Parser<'_> {
                 },
                 Some(Token::Text(text)) => {
                     if !self.decode_transport_text(text)?.trim().is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF formfield contains orphan text".to_string(),
                         ));
                     }
                     self.pos += 1;
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF formfield cannot contain binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn parse_form_field_text_destination(&mut self) -> RtfResult<String> {
+    pub(super) fn parse_form_field_text_destination(&mut self) -> crate::Result<String> {
         self.expect_token(&Token::OpenBrace)?;
         if matches!(
             self.tokens.get(self.pos),
@@ -810,21 +814,21 @@ impl Parser<'_> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF form-field text contains active, nested, or binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if text.len() > super::super::super::form_field::MAX_FORM_FIELD_STRING_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF form-field string exceeds the safety limit".to_string(),
                 ));
             }
         }
     }
 
-    pub(super) fn parse_data_field_destination(&mut self) -> RtfResult<Vec<u8>> {
+    pub(super) fn parse_data_field_destination(&mut self) -> crate::Result<Vec<u8>> {
         self.expect_token(&Token::OpenBrace)?;
         if matches!(
             self.tokens.get(self.pos),
@@ -836,7 +840,7 @@ impl Parser<'_> {
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::DataField))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF datafield destination".to_string(),
             ));
         }
@@ -848,7 +852,7 @@ impl Parser<'_> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if high.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF datafield has an odd hexadecimal digit count".to_string(),
                         ));
                     }
@@ -864,7 +868,7 @@ impl Parser<'_> {
                             b'a'..=b'f' => byte - b'a' + 10,
                             b'A'..=b'F' => byte - b'A' + 10,
                             _ => {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF datafield contains a non-hexadecimal character"
                                         .to_string(),
                                 ));
@@ -879,15 +883,15 @@ impl Parser<'_> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Binary(_) | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF datafield cannot contain controls, nesting, or binary data"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if data.len() > super::super::super::form_field::MAX_FORM_FIELD_DATA_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF datafield exceeds the safety limit".to_string(),
                 ));
             }

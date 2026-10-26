@@ -5,7 +5,7 @@
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
 use super::border::{Borders, CharacterBorder, CharacterShading, Shading};
-use crate::{RtfError, RtfResult};
+
 use litchi_codepage::Mbcs;
 use std::borrow::Cow;
 use std::num::NonZeroU16;
@@ -403,13 +403,13 @@ impl EmbeddedFont<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .file_name
             .as_ref()
             .is_some_and(|name| name.is_empty() || name.len() > Self::MAX_FILE_NAME_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or oversized RTF embedded font file name".to_string(),
             ));
         }
@@ -418,7 +418,7 @@ impl EmbeddedFont<'_> {
             .as_ref()
             .is_some_and(|data| data.is_empty() || data.len() > Self::MAX_DATA_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or oversized RTF embedded font data".to_string(),
             ));
         }
@@ -538,7 +538,7 @@ impl<'a> Font<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         const MAX_FONT_NAME_BYTES: usize = 4_096;
         if self.name.is_empty()
             || self.name.len() > MAX_FONT_NAME_BYTES
@@ -551,7 +551,7 @@ impl<'a> Font<'a> {
                 .as_ref()
                 .is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid or oversized RTF font name".to_string(),
             ));
         }
@@ -608,17 +608,17 @@ impl<'a> FontTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn insert(&mut self, index: FontRef, font: Font<'a>) -> RtfResult<Option<Font<'a>>> {
+    pub fn insert(&mut self, index: FontRef, font: Font<'a>) -> crate::Result<Option<Font<'a>>> {
         font.validate()?;
         if self.fonts.len() != self.defined.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF font-table size".to_string(),
             ));
         }
 
         let slot = usize::from(index);
         let required_len = slot.checked_add(1).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF font-table index overflow".to_string())
+            crate::Error::MalformedDocument("RTF font-table index overflow".to_string())
         })?;
         if required_len > self.fonts.len() {
             let additional = required_len - self.fonts.len();
@@ -639,10 +639,10 @@ impl<'a> FontTable<'a> {
 
         let (fonts, defined) = (&mut self.fonts, &mut self.defined);
         let font_slot = fonts.get_mut(slot).ok_or_else(|| {
-            RtfError::MalformedDocument("invalid RTF font-table index".to_string())
+            crate::Error::MalformedDocument("invalid RTF font-table index".to_string())
         })?;
         let defined_slot = defined.get_mut(slot).ok_or_else(|| {
-            RtfError::MalformedDocument("invalid RTF font-table index".to_string())
+            crate::Error::MalformedDocument("invalid RTF font-table index".to_string())
         })?;
         let was_defined = *defined_slot;
         let previous = std::mem::replace(font_slot, font);
@@ -678,10 +678,10 @@ impl<'a> FontTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         const MAX_AGGREGATE_EMBEDDED_BYTES: usize = 256 * 1_048_576;
         if self.fonts.len() > 65_536 || self.defined.len() != self.fonts.len() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid RTF font-table size".to_string(),
             ));
         }
@@ -701,7 +701,7 @@ impl<'a> FontTable<'a> {
                     total.checked_add(font.non_tagged_name.as_ref().map_or(0, |name| name.len()))
                 })
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF font-table text size overflow".to_string())
+                    crate::Error::MalformedDocument("RTF font-table text size overflow".to_string())
                 })?;
             embedded_aggregate = embedded_aggregate
                 .checked_add(
@@ -710,16 +710,18 @@ impl<'a> FontTable<'a> {
                         .map_or(0, |embedded| embedded.data.as_ref().map_or(0, Vec::len)),
                 )
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF font-table embedded size overflow".to_string())
+                    crate::Error::MalformedDocument(
+                        "RTF font-table embedded size overflow".to_string(),
+                    )
                 })?;
         }
         if aggregate > 16 * 1_048_576 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF font-table text exceeds the safety limit".to_string(),
             ));
         }
         if embedded_aggregate > MAX_AGGREGATE_EMBEDDED_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF font-table embedded fonts exceed the safety limit".to_string(),
             ));
         }
@@ -902,9 +904,9 @@ impl ParagraphDropCap {
         clippy::cast_possible_truncation,
         reason = "the range check above bounds the line count to the u8 range"
     )]
-    pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> RtfResult<Self> {
+    pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> crate::Result<Self> {
         if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&line_count) {
-            return Err(RtfError::InvalidStructure(format!(
+            return Err(crate::Error::InvalidStructure(format!(
                 "RTF drop-cap line count must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
             )));
         }
@@ -930,9 +932,9 @@ impl ParagraphDropCap {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(self) -> RtfResult<()> {
+    pub fn validate(self) -> crate::Result<()> {
         if self.line_count == 0 {
-            return Err(RtfError::InvalidStructure(
+            return Err(crate::Error::InvalidStructure(
                 "RTF drop-cap line count must be nonzero".to_string(),
             ));
         }
@@ -1083,7 +1085,7 @@ pub struct ParagraphFrame {
 
 impl ParagraphFrame {
     /// Validate all bounded frame values before serialization.
-    pub fn validate(self) -> RtfResult<()> {
+    pub fn validate(self) -> crate::Result<()> {
         if self
             .width_twips
             .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
@@ -1100,7 +1102,7 @@ impl ParagraphFrame {
                 .vertical_text_offset_twips
                 .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
         {
-            return Err(RtfError::InvalidStructure(
+            return Err(crate::Error::InvalidStructure(
                 "RTF paragraph frame distance exceeds the safety limit".to_string(),
             ));
         }
@@ -1123,7 +1125,7 @@ impl ParagraphFrame {
             self.vertical_position,
             ParagraphFrameVerticalPosition::NegativeOffset(value) if !check_signed_offset(value)
         ) {
-            return Err(RtfError::InvalidStructure(
+            return Err(crate::Error::InvalidStructure(
                 "RTF paragraph frame position is outside the safety limit".to_string(),
             ));
         }
@@ -1152,9 +1154,9 @@ impl RevisionMetadata {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.author.is_some_and(|author| author < 0) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision author index cannot be negative".to_string(),
             ));
         }
@@ -1239,7 +1241,7 @@ impl Paragraph {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_shading(&mut self, shading: Shading) -> RtfResult<()> {
+    pub fn set_shading(&mut self, shading: Shading) -> crate::Result<()> {
         shading.validate()?;
         self.shading = shading;
         Ok(())
@@ -1530,7 +1532,10 @@ impl AssociatedCharacterFormatting {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_baseline(&mut self, value: Option<AssociatedCharacterBaseline>) -> RtfResult<()> {
+    pub fn set_baseline(
+        &mut self,
+        value: Option<AssociatedCharacterBaseline>,
+    ) -> crate::Result<()> {
         if matches!(
             value,
             Some(
@@ -1538,7 +1543,7 @@ impl AssociatedCharacterFormatting {
                     | AssociatedCharacterBaseline::LoweredHalfPoints(points)
             ) if points == 0 || i32::from(points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF associated character baseline is out of range".to_string(),
             ));
         }
@@ -1554,7 +1559,7 @@ impl AssociatedCharacterFormatting {
         clippy::cast_possible_truncation,
         reason = "adjacent range checks bound each narrowing conversion to the target type's range"
     )]
-    pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> RtfResult<()> {
+    pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> crate::Result<()> {
         self.expansion_quarter_points = match value {
             None => None,
             Some(points)
@@ -1564,7 +1569,7 @@ impl AssociatedCharacterFormatting {
                 Some(points as i16)
             },
             Some(_) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF associated character expansion is out of range".to_string(),
                 ));
             },
@@ -1576,14 +1581,14 @@ impl AssociatedCharacterFormatting {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if let Some(baseline) = self.baseline {
             let value = match baseline {
                 AssociatedCharacterBaseline::RaisedHalfPoints(value)
                 | AssociatedCharacterBaseline::LoweredHalfPoints(value) => value,
             };
             if value == 0 || i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF associated character baseline is out of range".to_string(),
                 ));
             }
@@ -1591,7 +1596,7 @@ impl AssociatedCharacterFormatting {
         if self.expansion_quarter_points.is_some_and(|value| {
             i32::from(value).unsigned_abs() > crate::MAX_CHARACTER_EXPANSION as u32
         }) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF associated character expansion is out of range".to_string(),
             ));
         }

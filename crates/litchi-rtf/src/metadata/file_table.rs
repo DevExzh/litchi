@@ -1,6 +1,5 @@
 //! Inert RTF file-table metadata.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -54,19 +53,19 @@ impl<'a> FileTableEntry<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.id > i32::MAX as u32 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file identifier exceeds the signed parameter range".to_string(),
             ));
         }
         if self.name.is_empty() || self.name.len() > MAX_FILE_NAME_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file-table name is empty or exceeds the safety limit".to_string(),
             ));
         }
         if self.name.contains('\0') {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file-table name contains a NUL character".to_string(),
             ));
         }
@@ -109,10 +108,10 @@ impl<'a> FileTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add(&mut self, entry: FileTableEntry<'a>) -> RtfResult<()> {
+    pub fn add(&mut self, entry: FileTableEntry<'a>) -> crate::Result<()> {
         entry.validate()?;
         if self.entries.len() >= MAX_FILE_TABLE_ENTRIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file table exceeds the entry limit".to_string(),
             ));
         }
@@ -121,7 +120,7 @@ impl<'a> FileTable<'a> {
             .last()
             .is_some_and(|previous| previous.id >= entry.id)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file-table IDs are duplicated or out of order".to_string(),
             ));
         }
@@ -132,9 +131,9 @@ impl<'a> FileTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.entries.is_empty() || self.entries.len() > MAX_FILE_TABLE_ENTRIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file table has an invalid entry count".to_string(),
             ));
         }
@@ -144,17 +143,17 @@ impl<'a> FileTable<'a> {
         for entry in &self.entries {
             entry.validate()?;
             if !ids.insert(entry.id) || previous.is_some_and(|id| id >= entry.id) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF file-table IDs are duplicated or out of order".to_string(),
                 ));
             }
             previous = Some(entry.id);
             text_bytes = text_bytes.checked_add(entry.name.len()).ok_or_else(|| {
-                RtfError::MalformedDocument("RTF file-table text size overflow".to_string())
+                crate::Error::MalformedDocument("RTF file-table text size overflow".to_string())
             })?;
         }
         if text_bytes > MAX_FILE_TABLE_TEXT_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF file-table text exceeds the safety limit".to_string(),
             ));
         }

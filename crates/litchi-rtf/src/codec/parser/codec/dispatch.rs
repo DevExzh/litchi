@@ -1,7 +1,6 @@
 use super::{
     ControlWord, Destination, MAX_OBJECTS, MAX_SHAPE_GROUPS, MAX_SHAPES, ParsedBodyStoryEvent,
-    Parser, RootDrawingOwner, RtfError, RtfResult, Token, parser_classification_error,
-    require_parameterless,
+    Parser, RootDrawingOwner, Token, parser_classification_error, require_parameterless,
 };
 
 impl Parser<'_> {
@@ -59,13 +58,13 @@ impl Parser<'_> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn dispatch_group_destination(&mut self) -> RtfResult<bool> {
+    pub(super) fn dispatch_group_destination(&mut self) -> crate::Result<bool> {
         if let Some(token) = self.tokens.get(self.pos) {
             match token {
                 Token::Control(
                     ControlWord::FileTable | ControlWord::FileEntry | ControlWord::BlipUid,
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF file-table destinations are misplaced or not starred".to_string(),
                     ));
                 },
@@ -85,7 +84,7 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::LegacyDrawingObject) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy drawing-object destination must be starred".to_string(),
                     ));
                 },
@@ -93,7 +92,7 @@ impl Parser<'_> {
                     ControlWord::DefaultCharacterProperties(_)
                     | ControlWord::DefaultParagraphProperties(_),
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF defchp and defpap destinations must be starred".to_string(),
                     ));
                 },
@@ -112,7 +111,7 @@ impl Parser<'_> {
                             .iter()
                             .any(|block| !block.text.trim().is_empty())
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF font table must occur exactly once at document scope before body text".to_string(),
                         ));
                     }
@@ -137,12 +136,12 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::UserProperties) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF userprops destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::DocumentVariable) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF docvar destination must be starred".to_string(),
                     ));
                 },
@@ -168,7 +167,7 @@ impl Parser<'_> {
                     | ControlWord::XmlAttributeValue
                     | ControlWord::FactoidName,
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF SmartTag/XML attribute destinations must be grouped and starred"
                             .to_string(),
                     ));
@@ -179,24 +178,24 @@ impl Parser<'_> {
                     | ControlWord::MoveToStart
                     | ControlWord::MoveToEnd,
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF move-bookmark destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(
                     ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd,
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF protection-range destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::KinsokuFollowing | ControlWord::KinsokuLeading) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF kinsoku destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::HtmlTag(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF htmltag destination must be starred".to_string(),
                     ));
                 },
@@ -211,7 +210,7 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(control) if Self::is_math_scoped_control(control) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF math destinations and properties may occur only inside a math zone"
                             .to_string(),
                     ));
@@ -230,7 +229,7 @@ impl Parser<'_> {
                                 .current_state()
                                 .is_ok_and(|state| state.in_table || state.table_nesting_level != 0)
                         {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF passwordhash destination must occur in the root header"
                                     .to_string(),
                             ));
@@ -292,7 +291,7 @@ impl Parser<'_> {
                             | ControlWord::XmlAttributeNamespace(_)
                             | ControlWord::FactoidName,
                         )) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF SmartTag metadata is only valid inside a starred xmlopen"
                                     .to_string(),
                             ));
@@ -305,13 +304,13 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::XmlOpen | ControlWord::XmlClose)) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF custom XML tag destinations must not be starred".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::FileTable)) => {
                             if self.file_table.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple filetbl destinations".to_string(),
                                 ));
                             }
@@ -334,53 +333,53 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::BlipUid)) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF blipuid destination may occur only inside pict".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::PictureProperties(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF picprop destination may occur only inside pict".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::ShapeBinaryValue(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF svb destination may occur only inside sv".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::ShapeThemeValue(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF hsv destination may occur only after sv inside sp".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::ShapeResult(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF shprslt destination may occur only inside a root shape"
                                     .to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::ShapeText(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF shptxt destination may occur only inside a shape".to_string(),
                             ));
                         },
                         Some(Token::Control(
                             ControlWord::Object | ControlWord::InvalidObjectDestinationParameter,
                         )) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF object destination must not be starred".to_string(),
                             ));
                         },
                         Some(Token::Control(
                             ControlWord::GeneratedListText | ControlWord::LegacyGeneratedListText,
                         )) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF generated list-marker destinations must not be starred"
                                     .to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::LegacyParagraphNumbering(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF pn destination must not be starred".to_string(),
                             ));
                         },
@@ -390,14 +389,14 @@ impl Parser<'_> {
                             | ControlWord::DocumentType(_)
                             | ControlWord::DefaultTabWidth(_),
                         )) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF numeric document property must not be starred".to_string(),
                             ));
                         },
                         Some(Token::Control(control))
                             if Self::is_legacy_drawing_control(control) =>
                         {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF legacy drawing controls must occur inside a starred do destination"
                                     .to_string(),
                             ));
@@ -413,7 +412,7 @@ impl Parser<'_> {
                             | ControlWord::FootnoteNumbering(_)
                             | ControlWord::EndnoteNumbering(_),
                         )) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF note options must be unstarred root document-format controls"
                                     .to_string(),
                             ));
@@ -577,7 +576,7 @@ impl Parser<'_> {
                             | ControlWord::DoNotSplitRowsAroundFloatingTables(_)
                             | ControlWord::UseAnsiKerningPairs(_),
                         )) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF document-property flag must not be starred".to_string(),
                             ));
                         },
@@ -592,7 +591,7 @@ impl Parser<'_> {
                             if !in_unicode_alternate
                                 && (self.states.len() != 3 || self.section_note_options_closed)
                             {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF kinsoku destinations must precede visible text at document root"
                                         .to_string(),
                                 ));
@@ -604,7 +603,7 @@ impl Parser<'_> {
                                 self.kinsoku.leading.is_some()
                             };
                             if duplicate {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF kinsoku destination".to_string(),
                                 ));
                             }
@@ -619,13 +618,13 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::WindowCaption)) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF window caption must precede visible text at document root"
                                         .to_string(),
                                 ));
                             }
                             if self.window_caption.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF window caption destination".to_string(),
                                 ));
                             }
@@ -636,13 +635,13 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::XslTransform)) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF XSL transform must precede visible text at document root"
                                         .to_string(),
                                 ));
                             }
                             if self.xsl_transform.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF XSL transform destination".to_string(),
                                 ));
                             }
@@ -652,13 +651,13 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::StyleListFilter(parameter))) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF style-list filter must precede visible text at document root"
                                         .to_string(),
                                 ));
                             }
                             if self.style_list_filter.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF style-list filter destination".to_string(),
                                 ));
                             }
@@ -672,7 +671,7 @@ impl Parser<'_> {
                             | ControlWord::WriteReservationHash(_)),
                         )) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF write reservation must precede visible text at document root"
                                         .to_string(),
                                 ));
@@ -680,7 +679,7 @@ impl Parser<'_> {
                             match control {
                                 ControlWord::WriteReservation(_) => {
                                     if self.write_reservations.legacy.is_some() {
-                                        return Err(RtfError::MalformedDocument(
+                                        return Err(crate::Error::MalformedDocument(
                                             "duplicate RTF legacy write-reservation destination"
                                                 .to_string(),
                                         ));
@@ -690,7 +689,7 @@ impl Parser<'_> {
                                 },
                                 ControlWord::WriteReservationHash(_) => {
                                     if self.write_reservations.hash.is_some() {
-                                        return Err(RtfError::MalformedDocument(
+                                        return Err(crate::Error::MalformedDocument(
                                             "duplicate RTF write-reservation hash destination"
                                                 .to_string(),
                                         ));
@@ -704,7 +703,7 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::UnicodeAlternateDestination)) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF ud destination must be the Unicode branch of upr".to_string(),
                             ));
                         },
@@ -727,13 +726,13 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::FormField | ControlWord::DataField)) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "orphan RTF formfield/datafield destination".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::Generator)) => {
                             if self.generator.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple generator destinations".to_string(),
                                 ));
                             }
@@ -763,7 +762,7 @@ impl Parser<'_> {
                             control @ (ControlWord::NextFile | ControlWord::DocumentTemplate),
                         )) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF external document references must precede visible text at document root"
                                         .to_string(),
                                 ));
@@ -778,7 +777,7 @@ impl Parser<'_> {
                                 _ => return Err(parser_classification_error()),
                             };
                             if duplicate {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate RTF external document reference destination"
                                         .to_string(),
                                 ));
@@ -834,7 +833,7 @@ impl Parser<'_> {
                             | ControlWord::DocumentViewNoPageBoundaries(_)),
                         )) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF document-view controls must precede visible text at document root"
                                         .to_string(),
                                 ));
@@ -842,7 +841,7 @@ impl Parser<'_> {
                             let view_control = *control;
                             self.pos += 2;
                             if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "starred RTF document-view group must contain exactly one control"
                                         .to_string(),
                                 ));
@@ -854,7 +853,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::ThemeData)) => {
                             if self.saw_theme_data {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple theme-data destinations".to_string(),
                                 ));
                             }
@@ -868,7 +867,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::ColorSchemeMapping)) => {
                             if self.saw_color_scheme_mapping {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple color-scheme mappings".to_string(),
                                 ));
                             }
@@ -882,7 +881,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::LatentStyles)) => {
                             if self.latent_styles.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple latentstyles destinations".to_string(),
                                 ));
                             }
@@ -897,7 +896,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::ParagraphGroupTable)) => {
                             if self.paragraph_group_table.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple pgptbl destinations".to_string(),
                                 ));
                             }
@@ -907,7 +906,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::DataStore)) => {
                             if self.saw_data_store {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple datastore destinations".to_string(),
                                 ));
                             }
@@ -918,7 +917,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::MailMerge)) => {
                             if self.mail_merge.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple mailmerge destinations".to_string(),
                                 ));
                             }
@@ -928,7 +927,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::MathProperties)) => {
                             if self.math_properties.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple math-properties destinations"
                                         .to_string(),
                                 ));
@@ -949,7 +948,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::AnnotationAuthor)) => {
                             if self.pending_annotation_author_seen {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate pending RTF annotation author".to_string(),
                                 ));
                             }
@@ -961,7 +960,7 @@ impl Parser<'_> {
                         },
                         Some(Token::Control(ControlWord::AnnotationInitials)) => {
                             if self.pending_annotation_initials_seen {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "duplicate pending RTF annotation initials".to_string(),
                                 ));
                             }
@@ -987,17 +986,17 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::Shape(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF shp destination must not be starred".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::ShapeGroup(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF shpgrp destination must not be starred".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::ListPicture(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF listpicture is misplaced".to_string(),
                             ));
                         },
@@ -1011,24 +1010,24 @@ impl Parser<'_> {
                             return Ok(true);
                         },
                         Some(Token::Control(ControlWord::NonShapePicture(_))) => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF nonshppict destination must not be starred".to_string(),
                             ));
                         },
                         Some(Token::Control(ControlWord::BackgroundDestination(parameter))) => {
                             require_parameterless(*parameter, "background")?;
                             if self.states.len() != 3 || self.section_note_options_closed {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF background destination must precede visible text at document root".to_string(),
                                 ));
                             }
                             if self.background_shape_index.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF contains multiple background destinations".to_string(),
                                 ));
                             }
                             if self.shapes.len() >= MAX_SHAPES {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF shape count exceeds the safety limit".to_string(),
                                 ));
                             }
@@ -1073,24 +1072,24 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::FormField | ControlWord::DataField) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "orphan RTF formfield/datafield destination".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Generator) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF generator destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::WindowCaption) => {
                     if self.states.len() != 3 || self.section_note_options_closed {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF window caption must precede visible text at document root"
                                 .to_string(),
                         ));
                     }
                     if self.window_caption.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "duplicate RTF window caption destination".to_string(),
                         ));
                     }
@@ -1099,75 +1098,75 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::XslTransform) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF XSL transform destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::StyleListFilter(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF style-list filter destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(
                     ControlWord::WriteReservation(_) | ControlWord::WriteReservationHash(_),
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF write-reservation destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::RevisionSaveTable) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF revision-save table must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::XmlNamespaceTable) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF XML namespace table must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ProtectionUserTable) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF protection-user table must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::NextFile | ControlWord::DocumentTemplate) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF external document reference destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ThemeData | ControlWord::ColorSchemeMapping) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF theme destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::LatentStyles | ControlWord::LatentStyleExceptions) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF latent-style destinations are misplaced or not starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::LegacySectionNumberingLevel(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF pnseclvl destination is misplaced or not starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ParagraphGroupTable | ControlWord::ParagraphGroup) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF paragraph-group destination is misplaced or not starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::DataStore) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF datastore destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::MailMerge) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF mailmerge destination must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::MathProperties) => {
                     if self.math_properties.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF contains multiple math-properties destinations".to_string(),
                         ));
                     }
@@ -1231,7 +1230,7 @@ impl Parser<'_> {
                         RootDrawingOwner::Body => self.shapes.len(),
                     };
                     if count >= MAX_SHAPES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1316,7 +1315,7 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::ShapePicture(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shppict destination must be starred".to_string(),
                     ));
                 },
@@ -1367,7 +1366,7 @@ impl Parser<'_> {
                         RootDrawingOwner::Body => self.shape_groups.len(),
                     };
                     if count >= MAX_SHAPE_GROUPS {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape group count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1474,33 +1473,33 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::PictureProperties(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF picprop destination may occur only inside pict".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeBinaryValue(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF svb destination may occur only inside sv".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeThemeValue(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF hsv destination may occur only after sv inside sp".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeResult(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shprslt destination may occur only inside a root shape".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeText(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shptxt destination may occur only inside a shape".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::Object) => {
                     if self.objects.len() >= MAX_OBJECTS {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF embedded object count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1514,7 +1513,7 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::InvalidObjectDestinationParameter) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object destination must not have a parameter".to_string(),
                     ));
                 },
@@ -1529,7 +1528,7 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::InvalidObjectResultDestinationParameter) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF object result destination must not have a parameter".to_string(),
                     ));
                 },
@@ -1645,7 +1644,7 @@ impl Parser<'_> {
                     | ControlWord::EndnoteContinuationSeparator
                     | ControlWord::EndnoteContinuationNotice,
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF note-separator destinations must be starred".to_string(),
                     ));
                 },

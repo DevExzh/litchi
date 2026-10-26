@@ -3,7 +3,7 @@
 //! This module provides support for RTF stylesheets and style definitions.
 
 use super::types::{Formatting, Paragraph};
-use crate::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -290,13 +290,17 @@ impl<'a> StyleSheet<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn inheritance_chain(&self, style_type: StyleType, id: u16) -> RtfResult<Vec<&Style<'a>>> {
+    pub fn inheritance_chain(
+        &self,
+        style_type: StyleType,
+        id: u16,
+    ) -> crate::Result<Vec<&Style<'a>>> {
         let mut chain = Vec::new();
         let mut seen = HashSet::new();
         let mut current = self.get_typed(style_type, id);
         while let Some(style) = current {
             if !seen.insert((style.style_type, style.id)) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF stylesheet contains a based-on cycle".to_string(),
                 ));
             }
@@ -309,16 +313,16 @@ impl<'a> StyleSheet<'a> {
         Ok(chain)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.styles.len() > MAX_STYLES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF stylesheet exceeds the supported style count".to_string(),
             ));
         }
         let mut ids = HashSet::with_capacity(self.styles.len());
         for style in &self.styles {
             if !ids.insert((style.style_type, style.id)) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF stylesheet contains a duplicate typed style ID".to_string(),
                 ));
             }
@@ -326,7 +330,7 @@ impl<'a> StyleSheet<'a> {
                 || style.name.len() > MAX_STYLE_NAME_BYTES
                 || style.name.contains(';')
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style name is empty, too long, or contains a semicolon".to_string(),
                 ));
             }
@@ -334,12 +338,12 @@ impl<'a> StyleSheet<'a> {
                 .priority
                 .is_some_and(|value| !(0..=99).contains(&value))
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style priority must be in 0..=99".to_string(),
                 ));
             }
             if style.revision_id.is_some_and(|value| value < 0) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF style revision ID cannot be negative".to_string(),
                 ));
             }

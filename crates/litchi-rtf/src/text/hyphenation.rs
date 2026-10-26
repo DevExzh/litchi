@@ -1,7 +1,5 @@
 //! Passive document-level RTF hyphenation settings.
 
-use crate::{RtfError, RtfResult};
-
 /// Maximum retained value for `hyphconsec`.
 pub const MAX_HYPHENATION_CONSECUTIVE_LINES: u32 = i32::MAX as u32;
 /// Maximum retained `hyphhotz` measurement in twips.
@@ -27,12 +25,12 @@ impl DocumentHyphenation {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .consecutive_line_limit
             .is_some_and(|value| value > MAX_HYPHENATION_CONSECUTIVE_LINES)
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF hyphenation consecutive-line limit exceeds {MAX_HYPHENATION_CONSECUTIVE_LINES}"
             )));
         }
@@ -40,7 +38,7 @@ impl DocumentHyphenation {
             .hot_zone_twips
             .is_some_and(|value| value > MAX_HYPHENATION_HOT_ZONE_TWIPS)
         {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF hyphenation hot zone exceeds {MAX_HYPHENATION_HOT_ZONE_TWIPS} twips"
             )));
         }

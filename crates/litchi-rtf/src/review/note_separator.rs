@@ -1,6 +1,5 @@
 //! Inert footnote and endnote separator destinations.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_NOTE_SEPARATOR_TEXT_BYTES: usize = 65_536;
@@ -38,9 +37,9 @@ impl<'a> NoteSeparator<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.elements.len() > MAX_NOTE_SEPARATOR_ELEMENTS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note separator contains too many elements".to_string(),
             ));
         }
@@ -58,10 +57,10 @@ impl<'a> NoteSeparator<'a> {
                 })
             })
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF note-separator size overflow".to_string())
+                crate::Error::MalformedDocument("RTF note-separator size overflow".to_string())
             })?;
         if text_bytes > MAX_NOTE_SEPARATOR_TEXT_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note-separator text exceeds the safety limit".to_string(),
             ));
         }
@@ -111,7 +110,7 @@ impl<'a> NoteSeparator<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::Result<()> {
         self.elements
             .push(NoteSeparatorElement::Drawing(crate::StoryDrawing::Shape(
                 self.shapes.len(),
@@ -127,7 +126,7 @@ impl<'a> NoteSeparator<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::Result<()> {
         self.elements.push(NoteSeparatorElement::Drawing(
             crate::StoryDrawing::ShapeGroup(self.shape_groups.len()),
         ));
@@ -198,7 +197,7 @@ impl<'a> NoteSeparatorTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add(&mut self, separator: NoteSeparator<'a>) -> RtfResult<()> {
+    pub fn add(&mut self, separator: NoteSeparator<'a>) -> crate::Result<()> {
         separator.validate()?;
         if self.entries.len() >= 6
             || self
@@ -206,7 +205,7 @@ impl<'a> NoteSeparatorTable<'a> {
                 .last()
                 .is_some_and(|entry| entry.kind >= separator.kind)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note-separator destinations are duplicated or out of order".to_string(),
             ));
         }
@@ -216,12 +215,12 @@ impl<'a> NoteSeparatorTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         let mut previous = None;
         for entry in &self.entries {
             entry.validate()?;
             if previous.is_some_and(|kind| kind >= entry.kind) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF note-separator destinations are duplicated or out of order".to_string(),
                 ));
             }

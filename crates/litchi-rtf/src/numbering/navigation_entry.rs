@@ -1,6 +1,5 @@
 //! Inert source marks used to generate indexes and tables of contents.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_NAVIGATION_ENTRIES: usize = 65_536;
@@ -39,7 +38,7 @@ impl<'a> IndexEntry<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(position: usize, text: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
+    pub fn new(position: usize, text: impl Into<Cow<'a, str>>) -> crate::Result<Self> {
         let entry = Self {
             position,
             text: text.into(),
@@ -53,13 +52,13 @@ impl<'a> IndexEntry<'a> {
         Ok(entry)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         validate_text("index-entry", &self.text, false)?;
         if self
             .index_id
             .is_some_and(|value| !value.is_ascii_uppercase())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF index identifier must be ASCII A through Z".to_string(),
             ));
         }
@@ -128,7 +127,7 @@ impl<'a> TableOfContentsEntry<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(position: usize, text: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
+    pub fn new(position: usize, text: impl Into<Cow<'a, str>>) -> crate::Result<Self> {
         let entry = Self {
             position,
             text: text.into(),
@@ -140,15 +139,15 @@ impl<'a> TableOfContentsEntry<'a> {
         Ok(entry)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         validate_text("table-of-contents entry", &self.text, false)?;
         if !self.table_id.is_ascii_uppercase() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-of-contents identifier must be ASCII A through Z".to_string(),
             ));
         }
         if !(1..=9).contains(&self.level) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-of-contents level must be between 1 and 9".to_string(),
             ));
         }
@@ -183,7 +182,7 @@ impl NavigationEntry<'_> {
         }
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         match self {
             Self::Index(entry) => entry.validate(),
             Self::TableOfContents(entry) => entry.validate(),
@@ -206,14 +205,14 @@ impl NavigationEntry<'_> {
     }
 }
 
-fn validate_text(kind: &str, text: &str, allow_empty: bool) -> RtfResult<()> {
+fn validate_text(kind: &str, text: &str, allow_empty: bool) -> crate::Result<()> {
     if !allow_empty && text.is_empty() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {kind} text cannot be empty"
         )));
     }
     if text.len() > MAX_NAVIGATION_ENTRY_TEXT_BYTES {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {kind} text exceeds {MAX_NAVIGATION_ENTRY_TEXT_BYTES} bytes"
         )));
     }

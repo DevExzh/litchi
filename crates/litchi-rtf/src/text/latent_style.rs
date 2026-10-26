@@ -1,6 +1,5 @@
 //! Inert RTF latent-style defaults and exceptions.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -31,25 +30,25 @@ pub struct LatentStyles<'a> {
 }
 
 impl LatentStyleException<'_> {
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.name.trim().is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style exception name cannot be empty".to_string(),
             ));
         }
         if self.name.len() > MAX_LATENT_STYLE_NAME_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style exception name exceeds the safety limit".to_string(),
             ));
         }
         if self.name.contains(['\0', '\r', '\n', ';']) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style exception name contains a forbidden delimiter/control"
                     .to_string(),
             ));
         }
         if self.priority.is_some_and(|priority| priority > 99) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style priority must be in 0..=99".to_string(),
             ));
         }
@@ -58,19 +57,19 @@ impl LatentStyleException<'_> {
 }
 
 impl LatentStyles<'_> {
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.max_style_index > MAX_LATENT_STYLE_INDEX {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style maximum index exceeds 65535".to_string(),
             ));
         }
         if self.priority_default.is_some_and(|priority| priority > 99) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style default priority must be in 0..=99".to_string(),
             ));
         }
         if self.exceptions.len() > MAX_LATENT_STYLE_EXCEPTIONS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF latent-style exception count exceeds the safety limit".to_string(),
             ));
         }
@@ -84,17 +83,17 @@ impl LatentStyles<'_> {
         for exception in &self.exceptions {
             exception.validate()?;
             if !names.insert(exception.name.as_ref()) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF latent-style exception names must be unique".to_string(),
                 ));
             }
             total = total.checked_add(exception.name.len()).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF latent-style aggregate text size overflow".to_string(),
                 )
             })?;
             if total > MAX_LATENT_STYLE_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF latent-style aggregate text exceeds the safety limit".to_string(),
                 ));
             }

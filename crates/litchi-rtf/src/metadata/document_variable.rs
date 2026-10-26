@@ -1,6 +1,5 @@
 //! Inert RTF document-variable metadata.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_DOCUMENT_VARIABLES: usize = 65_536;
@@ -22,7 +21,10 @@ impl<'a> DocumentVariable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(name: impl Into<Cow<'a, str>>, value: impl Into<Cow<'a, str>>) -> RtfResult<Self> {
+    pub fn new(
+        name: impl Into<Cow<'a, str>>,
+        value: impl Into<Cow<'a, str>>,
+    ) -> crate::Result<Self> {
         let variable = Self {
             name: name.into(),
             value: value.into(),
@@ -31,19 +33,19 @@ impl<'a> DocumentVariable<'a> {
         Ok(variable)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.name.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF document-variable name cannot be empty".to_string(),
             ));
         }
         if self.name.len() > MAX_DOCUMENT_VARIABLE_NAME_BYTES {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF document-variable name exceeds {MAX_DOCUMENT_VARIABLE_NAME_BYTES} bytes"
             )));
         }
         if self.value.len() > MAX_DOCUMENT_VARIABLE_VALUE_BYTES {
-            return Err(RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF document-variable value exceeds {MAX_DOCUMENT_VARIABLE_VALUE_BYTES} bytes"
             )));
         }

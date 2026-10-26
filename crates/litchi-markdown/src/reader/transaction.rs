@@ -605,7 +605,7 @@ impl Patch {
 
     /// Whether the before- and after-images are byte-identical.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -676,7 +676,7 @@ impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Patch")
-            .field("changed", &!self.is_empty())
+            .field("changed", &!self.is_noop())
             .field("dialect", &self.dialect)
             .finish_non_exhaustive()
     }
@@ -761,7 +761,7 @@ impl History {
         }
         let current_policy = self.current.limits();
         validate_patch_policy(commit.patch(), current_policy)?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             // The current snapshot already validates the unchanged source under
             // the recipient's policy. Keep this path allocation-free even when
             // the producer used a different policy envelope.
@@ -1067,7 +1067,7 @@ pub(crate) fn apply(source: &Snapshot, patch: &Patch) -> Result<Commit, Error> {
         return Err(Error::PatchConflict);
     }
     validate_patch_policy(patch, source.limits())?;
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(Commit::new(
             source.clone(),
             patch.clone(),
