@@ -5,6 +5,7 @@
 //! non-style layer owns that graph; this module only validates and losslessly
 //! patches the generated wedge-explosion scalar.
 
+use litchi_iwa_common::chart::pie::{WedgeExplosion, WedgeIndex};
 use prost::Message;
 
 use crate::charts::series_non_style::{
@@ -20,51 +21,54 @@ use crate::{Error, HostPackage, Result};
 const PIE_WEDGE_EXPLOSION_FIELD: u32 = 63;
 const MINIMUM_WEDGE_EXPLOSION_PERCENT: f32 = 0.0;
 const MAXIMUM_WEDGE_EXPLOSION_PERCENT: f32 = 100.0;
-const MAXIMUM_WEDGE_EXPLOSION_FRACTION: f32 = 1.0;
-const PERCENT_SCALE: f32 = 100.0;
 
 /// Distance of one pie or donut wedge from the chart center.
 ///
 /// Values use the percentage displayed by the Wedges inspector and must be
-/// finite in the inclusive range `0%..=100%`.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ChartPieWedgeExplosion(f32);
+/// finite in the inclusive range `0%..=100%`. The value is the shared
+/// `litchi_iwa_common::chart::pie::WedgeExplosion` (record 0375).
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ChartPieWedgeExplosion(WedgeExplosion);
+
+impl std::fmt::Debug for ChartPieWedgeExplosion {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartPieWedgeExplosion")
+            .field(&self.0.native_fraction())
+            .finish()
+    }
+}
 
 impl ChartPieWedgeExplosion {
     /// Wedge at its native, unseparated position.
-    pub const ZERO: Self = Self(MINIMUM_WEDGE_EXPLOSION_PERCENT);
+    pub const ZERO: Self = Self(WedgeExplosion::ZERO);
     /// Wedge at the inspector's maximum distance from the center.
-    pub const MAXIMUM: Self = Self(MAXIMUM_WEDGE_EXPLOSION_FRACTION);
+    pub const MAXIMUM: Self = Self(WedgeExplosion::MAXIMUM);
 
     /// Construct a wedge position from an inspector percentage.
     pub fn from_percent(percent: f32) -> Result<Self> {
-        if !percent.is_finite()
-            || !(MINIMUM_WEDGE_EXPLOSION_PERCENT..=MAXIMUM_WEDGE_EXPLOSION_PERCENT)
-                .contains(&percent)
-        {
-            return Err(Error::InvalidFormat(format!(
+        WedgeExplosion::from_percent(percent).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart pie wedge explosion must be finite and within {MINIMUM_WEDGE_EXPLOSION_PERCENT}%..={MAXIMUM_WEDGE_EXPLOSION_PERCENT}%"
-            )));
-        }
-        Ok(Self(percent / PERCENT_SCALE))
+            ))
+        })
     }
 
     /// Return the percentage displayed by iWork.
     pub fn percent(self) -> f32 {
-        self.0 * PERCENT_SCALE
+        self.0.percent()
     }
 
     fn from_native(fraction: f32) -> Result<Self> {
-        if !fraction.is_finite() || !(0.0..=1.0).contains(&fraction) {
-            return Err(Error::InvalidFormat(format!(
+        WedgeExplosion::from_native(fraction).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "native chart pie wedge explosion {fraction} must be finite and within 0.0..=1.0"
-            )));
-        }
-        Ok(Self(fraction))
+            ))
+        })
     }
 
     const fn native_fraction(self) -> f32 {
-        self.0
+        self.0.native_fraction()
     }
 }
 
@@ -82,19 +86,29 @@ impl TryFrom<f32> for ChartPieWedgeExplosion {
     }
 }
 
-/// Zero-based index of one pie or donut wedge in chart series order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ChartPieWedgeIndex(usize);
+/// Zero-based index of one pie or donut wedge in chart series order (the
+/// shared `litchi_iwa_common::chart::pie::WedgeIndex`).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ChartPieWedgeIndex(WedgeIndex);
+
+impl std::fmt::Debug for ChartPieWedgeIndex {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("ChartPieWedgeIndex")
+            .field(&self.0.zero_based())
+            .finish()
+    }
+}
 
 impl ChartPieWedgeIndex {
     /// Construct a zero-based wedge index.
     pub const fn from_zero_based(index: usize) -> Self {
-        Self(index)
+        Self(WedgeIndex::from_zero_based(index))
     }
 
     /// Return the zero-based wedge index.
     pub const fn zero_based(self) -> usize {
-        self.0
+        self.0.zero_based()
     }
 }
 

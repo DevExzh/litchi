@@ -5,6 +5,7 @@
 //! `TSCH.Chart3DVectorArchive`. X, Y, W, and unrelated protobuf fields are
 //! retained byte-for-byte when an existing vector is updated.
 
+use litchi_iwa_common::chart3d::{Depth, Scale};
 use prost::Message;
 
 use crate::charts::Kind;
@@ -27,7 +28,6 @@ const VECTOR_Z_FIELD: u32 = 3;
 
 const MINIMUM_DEPTH_PERCENT: f32 = 0.0;
 const MAXIMUM_DEPTH_PERCENT: f32 = 100.0;
-const DEFAULT_DEPTH_PERCENT: f32 = 11.020_468;
 const BAR_MINIMUM_DEPTH_RATIO: f32 = 1.0 / 6.0;
 const BAR_MAXIMUM_DEPTH_RATIO: f32 = 4.0;
 const COLUMN_MINIMUM_DEPTH_RATIO: f32 = 1.0 / 6.0;
@@ -36,7 +36,6 @@ const LINEAR_MINIMUM_DEPTH_RATIO: f32 = 1.0 / 3.0;
 const LINEAR_MAXIMUM_DEPTH_RATIO: f32 = 3.0;
 const PIE_MINIMUM_DEPTH_RATIO: f32 = 0.25;
 const PIE_MAXIMUM_DEPTH_RATIO: f32 = 4.0;
-const DEPTH_PERCENT_EQUALITY_EPSILON: f32 = 0.001;
 
 // A complete scale is required when a chart has not yet been opened in an
 // iWork application. These are the native default scene dimensions; later
@@ -45,44 +44,40 @@ const DEFAULT_SCALE_X: f32 = 1.5;
 const DEFAULT_SCALE_Y: f32 = 2.2;
 const DEFAULT_SCALE_W: f32 = f32::from_bits(0x3f22_b0c9);
 
-/// Depth of a native 3D chart, in Chart-inspector percent.
-#[derive(Debug, Clone, Copy)]
-pub struct Chart3dDepth {
-    percent: f32,
-}
+/// Depth of a native 3D chart, in Chart-inspector percent (the shared
+/// `litchi_iwa_common::chart3d::Depth`, record 0375).
+#[derive(Clone, Copy, PartialEq)]
+pub struct Chart3dDepth(Depth);
 
-impl PartialEq for Chart3dDepth {
-    fn eq(&self, other: &Self) -> bool {
-        (self.percent - other.percent).abs() <= DEPTH_PERCENT_EQUALITY_EPSILON
+impl std::fmt::Debug for Chart3dDepth {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Chart3dDepth")
+            .field("percent", &self.0.percent())
+            .finish()
     }
 }
 
 impl Chart3dDepth {
     /// Native depth used when no chart-specific scale is stored.
-    pub const DEFAULT: Self = Self {
-        percent: DEFAULT_DEPTH_PERCENT,
-    };
+    pub const DEFAULT: Self = Self(Depth::DEFAULT);
 
     /// Construct a chart depth in the inspector's inclusive `0%..=100%` range.
     pub fn from_percent(percent: f32) -> Result<Self> {
-        if !percent.is_finite()
-            || !(MINIMUM_DEPTH_PERCENT..=MAXIMUM_DEPTH_PERCENT).contains(&percent)
-        {
-            return Err(Error::InvalidFormat(format!(
+        Depth::from_percent(percent).map(Self).map_err(|_| {
+            Error::InvalidFormat(format!(
                 "chart 3D depth must be finite and within {MINIMUM_DEPTH_PERCENT}%..={MAXIMUM_DEPTH_PERCENT}%"
-            )));
-        }
-        Ok(Self { percent })
+            ))
+        })
     }
 
     /// Return the Chart-inspector percentage.
     pub const fn percent(self) -> f32 {
-        self.percent
+        self.0.percent()
     }
 
     const fn depth_ratio(self, field: ScaleField) -> f32 {
-        let (minimum, maximum) = field.depth_ratio_bounds();
-        minimum + (maximum - minimum) * (self.percent / MAXIMUM_DEPTH_PERCENT)
+        self.0.native_ratio(field.scale())
     }
 
     fn from_depth_ratio(field: ScaleField, depth_ratio: f32) -> Result<Self> {
@@ -121,6 +116,16 @@ impl ScaleField {
             Kind::Line3d => Some(Self::Line),
             Kind::Pie3d | Kind::Donut3d => Some(Self::Pie),
             _ => None,
+        }
+    }
+
+    const fn scale(self) -> Scale {
+        match self {
+            Self::Area => Scale::Area,
+            Self::Bar => Scale::Bar,
+            Self::Column => Scale::Column,
+            Self::Line => Scale::Line,
+            Self::Pie => Scale::Pie,
         }
     }
 
@@ -340,7 +345,7 @@ mod tests {
     #[test]
     fn depth_is_bounded_and_has_the_native_default() {
         assert_eq!(Chart3dDepth::default(), Chart3dDepth::DEFAULT);
-        assert_eq!(Chart3dDepth::DEFAULT.percent(), DEFAULT_DEPTH_PERCENT);
+        assert_eq!(Chart3dDepth::DEFAULT.percent(), 11.020_468);
         assert!(Chart3dDepth::from_percent(f32::NAN).is_err());
         assert!(Chart3dDepth::from_percent(f32::INFINITY).is_err());
         assert!(Chart3dDepth::from_percent(-0.001).is_err());
