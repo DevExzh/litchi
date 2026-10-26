@@ -73,6 +73,7 @@ pub(crate) mod table_cell_pop_up_menu;
 pub(crate) mod table_cell_pop_up_menu_metadata;
 pub(crate) mod table_cell_pop_up_menu_native;
 pub(crate) mod table_cell_scientific_format;
+pub(crate) mod table_cell_text;
 pub(crate) mod table_cell_text_format;
 pub(crate) mod table_cell_text_style;
 pub(crate) mod table_cells;
