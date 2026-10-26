@@ -465,7 +465,8 @@ fn host_series_graph_route(
 
 /// ABBA cost probe of the graph-engine writes with source and candidate
 /// admission (record 0375a §5): a styled allocation, an unstyled
-/// allocation (new object container) and a container release per format;
+/// allocation (new object container), a container release, data symbols
+/// (override and series style) and a trendline per format;
 /// toggle `*series_graph_cases::host_series_graph_route*` or
 /// `*series_graph_cases::leaf_series_graph_route*`.
 #[test]
@@ -479,6 +480,8 @@ fn series_graph_write_cost_abba() -> TestResult {
                 Some(Values::Wedges(vec![25.0, 0.0, 10.0])),
                 Values::Wedges(vec![0.0, 0.0, 0.0]),
             ),
+            (None, symbols(Kind::Line2d, &DIAMONDS)),
+            (None, Values::Trendlines(vec![Trend::NamedLinear])),
         ];
         for (before, values) in runs {
             let mut input = input(format, values.kind())?;
