@@ -2731,22 +2731,121 @@ pub(super) fn set_encoded_cell_value(
 ) -> Result<()> {
     table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
-    let cell_count = update_tile(
-        package,
-        &location.tile_archive,
-        location.tile_id,
-        location.tile_row,
-        column,
-        location.descriptor.model.number_of_columns as usize,
-        value,
-    )?;
-    update_row_header(
+    update_tile_and_headers(
         package,
         &location.object_locations,
         &location.descriptor.model,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
         row,
-        cell_count,
+        column,
+        value,
     )
+}
+
+/// Write one cell into its tile and keep the row- and column-header cell
+/// counts in step (see [`adjust_column_header`]).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn update_tile_and_headers(
+    package: &mut HostPackage,
+    locations: &HashMap<u64, String>,
+    model: &TableModelArchive,
+    tile_archive: &str,
+    tile_id: u64,
+    tile_row: u32,
+    row: usize,
+    column: usize,
+    value: EncodedValue,
+) -> Result<()> {
+    let present_before =
+        read_tile_cell(package, tile_archive, tile_id, tile_row, column)?.is_some();
+    let cell_count = update_tile(
+        package,
+        tile_archive,
+        tile_id,
+        tile_row,
+        column,
+        model.number_of_columns as usize,
+        value,
+    )?;
+    let present_after = read_tile_cell(package, tile_archive, tile_id, tile_row, column)?.is_some();
+    update_row_header(package, locations, model, row, cell_count)?;
+    adjust_column_header(
+        package,
+        locations,
+        model,
+        column,
+        i64::from(present_after) - i64::from(present_before),
+    )
+}
+
+/// Keep the column-header cell count in step with a cell write.
+///
+/// Host defect fixed with record 0371: the host kept only the row-header
+/// count, while native Numbers and Pages saves count the cells of every
+/// column too (`body-table-cells-native.pages`: column counts 5, 5, 3, 3
+/// beside row counts 4, 4, 4, 2, 2). The adjustment is the shared leaf
+/// writer's (`litchi_numbers_wire::table_write::header_adjust`).
+fn adjust_column_header(
+    package: &mut HostPackage,
+    locations: &HashMap<u64, String>,
+    model: &TableModelArchive,
+    column: usize,
+    delta: i64,
+) -> Result<()> {
+    if delta == 0 {
+        return Ok(());
+    }
+    let bucket_id = model.base_data_store.column_headers.identifier;
+    let Some(archive_name) = locations.get(&bucket_id) else {
+        return Ok(());
+    };
+    let column = u32::try_from(column)
+        .map_err(|_| Error::ParseError("Numbers column exceeds u32".to_owned()))?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(bucket_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers column-header bucket object {bucket_id} is missing"
+            ))
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| tst::HeaderStorageBucket::decode(message.data.as_slice()).is_ok())
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Object {bucket_id} has no column-header bucket payload"
+                ))
+            })?;
+        let raw = &object.messages[message_index];
+        let message_type = raw.type_;
+        let data = match litchi_numbers_wire::table_write::header_adjust(
+            &raw.data,
+            column,
+            delta,
+            &litchi_numbers_wire::Limits::DEFAULT,
+        ) {
+            Ok(data) => data,
+            // A source that never counted this column (no entry, or a count
+            // below the removed cell) keeps its bucket as the host always did.
+            Err(_) if delta < 0 => return Ok(()),
+            Err(error) => {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers column-header count: {error}"
+                )));
+            },
+        };
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+            Default::default(),
+        )?;
+        Ok(())
+    })
 }
 
 pub(super) fn verify_formula_link(
@@ -3877,12 +3976,10 @@ pub(super) fn update_tile(
             tile.row_infos.push(row_info);
             tile.row_infos.sort_by_key(|info| info.tile_row_index);
         }
-        tile.numrows = tile
-            .row_infos
-            .iter()
-            .map(|info| info.tile_row_index + 1)
-            .max()
-            .unwrap_or(0);
+        // Host defect fixed with record 0371 (as record 0370 did for the
+        // topology edits): native saves count the stored row records, so a
+        // tile whose source `numrows` counts its records keeps counting them.
+        tile.numrows = super::topology_tile_numrows(&previous, &tile.row_infos);
 
         // Some Numbers 3-era files retain complete BNC-v5 buffers alongside
         // their legacy rows but leave the tile-level selector on pre-BNC.
