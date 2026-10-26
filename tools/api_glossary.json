@@ -28698,6 +28698,18 @@
           "inputs": ["chart_drawable", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::line",
+          "inputs": ["shape_info", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::rewrite_line",
+          "inputs": ["shape_info", "replacement", "width", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
         }
       ]
     },
