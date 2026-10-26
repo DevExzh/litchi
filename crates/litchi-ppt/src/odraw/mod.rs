@@ -13,8 +13,9 @@ mod package;
 mod tests;
 
 pub use codec::{anchor, parse, parse_drawing, text_from_drawing, text_from_textbox};
+pub use litchi_odraw::image::LimitKind as ImageLimitKind;
 pub use litchi_odraw::shape::{Bounds, Flags, Kind, Native, Shape};
-pub use litchi_odraw::{Container, Limits, Record, RecordKind};
+pub use litchi_odraw::{Container, Error, LimitKind, Limits, Record, RecordKind};
 pub(crate) use model::ShapeLimitsExt;
 pub use model::{Anchor, Drawing, FrameKind, Placeholder, ShapeExt};
 

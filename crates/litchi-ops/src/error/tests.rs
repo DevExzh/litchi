@@ -2240,6 +2240,51 @@ fn ppt_source_limit_configuration_preserves_dimension_and_values() {
 
 #[cfg(feature = "ppt")]
 #[test]
+fn ppt_officeart_limits_are_not_reported_as_corrupt_files() {
+    use litchi_ppt::odraw::{Error as OfficeArtError, ImageLimitKind, LimitKind};
+
+    for (officeart, expected) in [
+        (
+            OfficeArtError::LimitExceeded {
+                limit: LimitKind::Records,
+                observed: 9,
+                maximum: 8,
+            },
+            Code::LimitExceeded,
+        ),
+        (
+            OfficeArtError::ImageLimitExceeded {
+                limit: ImageLimitKind::Files,
+                observed: 9,
+                maximum: 8,
+            },
+            Code::LimitExceeded,
+        ),
+        (
+            OfficeArtError::InvalidLimit {
+                limit: LimitKind::Depth,
+                value: 65,
+                maximum: 64,
+            },
+            Code::InvalidArgument,
+        ),
+        (
+            OfficeArtError::MalformedShape {
+                reason: "shape invariant",
+            },
+            Code::CorruptFile,
+        ),
+    ] {
+        let error = assert_code(litchi_ppt::Error::OfficeArt(officeart), expected);
+        assert!(matches!(
+            error.leaf(),
+            Source::Ppt(litchi_ppt::Error::OfficeArt(_))
+        ));
+    }
+}
+
+#[cfg(feature = "ppt")]
+#[test]
 fn ppt_authoring_errors_preserve_their_typed_cause() {
     let error = assert_code(
         litchi_ppt::Error::Authoring(litchi_ppt::WriteError::InvalidData(
