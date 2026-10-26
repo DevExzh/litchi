@@ -413,14 +413,20 @@ mod probe {
             .read_to_end(&mut archive_comment)
             .expect("ZIP archive comment");
         let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        #[cfg(feature = "raw-codec-current")]
         let index = PreservationIndex::new(
             &archive,
             &mut scratch,
             soapberry_zip::office::ArchiveLimits::default(),
         )
         .expect("ZIP preservation index");
+        #[cfg(all(feature = "raw-codec-original", not(feature = "raw-codec-current")))]
+        let index = PreservationIndex::new(&archive, &mut scratch).expect("ZIP preservation index");
+        #[cfg(feature = "raw-codec-current")]
         let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
             .expect("ZIP archive reader");
+        #[cfg(all(feature = "raw-codec-original", not(feature = "raw-codec-current")))]
+        let reader = ArchiveReader::new(bytes).expect("ZIP archive reader");
         let mut names = Vec::with_capacity(index.entries().len());
         let mut members = Vec::with_capacity(index.entries().len());
         for entry in index.entries() {

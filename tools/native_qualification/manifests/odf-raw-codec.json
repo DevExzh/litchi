@@ -37,7 +37,7 @@
     },
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128,
-    "sha256": "59c959379d47a7be9c745a811b3322ad87f3bb8b491901b2fc3ada16fc8f77ba"
+    "sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
   },
   "build": {
     "profile": "release",
