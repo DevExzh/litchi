@@ -246,8 +246,28 @@ pub enum CandidateEntryKind {
 }
 
 /// A borrowed, allocation-free descriptor for one ZIP record.
+///
+/// The descriptor is bound to the source bytes of the plan that produced it:
+/// it cannot outlive them, and [`CandidateIngressPlan::admit_entry`] refuses a
+/// descriptor from another source, or one whose recorded facts no longer
+/// match its central record, before any charge is made.
+///
+/// ```compile_fail,E0515
+/// use litchi_iwa_archive::Limits;
+/// use litchi_iwa_archive::unstable::{CandidateEntry, CandidateIngressPlan};
+/// fn stale<'a>() -> CandidateEntry<'a> {
+///     let bytes = Vec::new();
+///     let plan = CandidateIngressPlan::from_bytes(&bytes, Limits::default()).unwrap();
+///     let entry = plan.entries().next().unwrap().unwrap();
+///     entry
+/// }
+/// ```
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct CandidateEntry {
+pub struct CandidateEntry<'data> {
+    source_lifetime: std::marker::PhantomData<&'data [u8]>,
+    central_offset: u64,
+    source_ptr: usize,
+    source_len: usize,
     ordinal: usize,
     wayfinder: soapberry_zip::ZipArchiveEntryWayfinder,
     kind: CandidateEntryKind,
@@ -258,7 +278,7 @@ pub struct CandidateEntry {
     materialized_bytes: usize,
 }
 
-impl std::fmt::Debug for CandidateEntry {
+impl std::fmt::Debug for CandidateEntry<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("CandidateEntry")
@@ -273,7 +293,7 @@ impl std::fmt::Debug for CandidateEntry {
     }
 }
 
-impl CandidateEntry {
+impl CandidateEntry<'_> {
     /// Stable ordinal within this candidate's central-directory order.
     #[must_use]
     pub const fn ordinal(self) -> usize {
@@ -332,7 +352,7 @@ impl CandidateEntry {
 /// One ZIP target whose output capacity has been admitted.
 pub struct AdmittedCandidateEntry<'plan, 'data> {
     plan: &'plan CandidateIngressPlan<'data>,
-    entry: CandidateEntry,
+    entry: CandidateEntry<'data>,
 }
 
 impl std::fmt::Debug for AdmittedCandidateEntry<'_, '_> {
@@ -347,7 +367,7 @@ impl std::fmt::Debug for AdmittedCandidateEntry<'_, '_> {
 impl<'plan, 'data> AdmittedCandidateEntry<'plan, 'data> {
     /// Borrow the neutral descriptor after its output charge was admitted.
     #[must_use]
-    pub const fn entry(&self) -> CandidateEntry {
+    pub const fn entry(&self) -> CandidateEntry<'data> {
         self.entry
     }
 
@@ -555,7 +575,7 @@ impl<'data> CandidateIngressPlan<'data> {
     }
 
     /// Return descriptors in central-directory order without allocating names.
-    pub fn entries(&self) -> impl Iterator<Item = Result<CandidateEntry>> + '_ {
+    pub fn entries(&self) -> impl Iterator<Item = Result<CandidateEntry<'data>>> + '_ {
         self.archive
             .entries()
             .enumerate()
@@ -584,23 +604,58 @@ impl<'data> CandidateIngressPlan<'data> {
     /// Admit one member's ZIP-decoded output before materializing it.
     pub fn admit_entry<V>(
         &self,
-        entry: CandidateEntry,
+        entry: CandidateEntry<'data>,
         visitor: &mut V,
     ) -> std::result::Result<AdmittedCandidateEntry<'_, 'data>, CandidateIngressError<V::Error>>
     where
         V: CandidateIngressVisitor,
     {
+        if !self.owns_entry(entry) {
+            return Err(CandidateIngressError::Physical(invalid(
+                "candidate ZIP entry does not belong to this source plan",
+            )));
+        }
         if entry.is_directory() {
             return Err(CandidateIngressError::Physical(invalid(
                 "cannot admit a directory as a ZIP payload",
             )));
         }
+        // A Deflate read also owns the decoder's input buffer and state, and
+        // revalidating the recorded central member traverses its metadata.
+        let (retained_bytes, allocations) = match entry.compression {
+            CandidateCompression::Deflated => (
+                entry
+                    .materialized_bytes
+                    .checked_add(soapberry_zip::office::DEFLATE_READ_SCRATCH_UPPER_BOUND_BYTES)
+                    .ok_or_else(|| {
+                        CandidateIngressError::Physical(invalid(
+                            "candidate ZIP Deflate storage overflows usize",
+                        ))
+                    })?,
+                1usize
+                    .checked_add(soapberry_zip::office::DEFLATE_READ_SCRATCH_ALLOCATIONS)
+                    .ok_or_else(|| {
+                        CandidateIngressError::Physical(invalid(
+                            "candidate ZIP Deflate allocation count overflows usize",
+                        ))
+                    })?,
+            ),
+            _ => (entry.materialized_bytes, 1),
+        };
+        let traversal_bytes = entry
+            .compressed_bytes
+            .checked_add(entry.metadata_bytes)
+            .ok_or_else(|| {
+                CandidateIngressError::Physical(invalid(
+                    "candidate ZIP entry validation work overflows usize",
+                ))
+            })?;
         visitor
             .admit(CandidateIngressCharge::new(
                 CandidateIngressPhase::ZipEntryStorage,
-                entry.materialized_bytes,
-                entry.compressed_bytes,
-                1,
+                retained_bytes,
+                traversal_bytes,
+                allocations,
             ))
             .map_err(CandidateIngressError::Admission)?;
         Ok(AdmittedCandidateEntry { plan: self, entry })
@@ -693,7 +748,11 @@ impl<'data> CandidateIngressPlan<'data> {
             })
     }
 
-    fn entry_from_record(&self, ordinal: usize, entry: ZipFileHeaderRecord<'_>) -> CandidateEntry {
+    fn entry_from_record(
+        &self,
+        ordinal: usize,
+        entry: ZipFileHeaderRecord<'_>,
+    ) -> CandidateEntry<'data> {
         let raw_path = entry.file_path();
         let raw_name = raw_path.as_ref();
         let kind = classify_entry(raw_name, entry.is_dir());
@@ -707,7 +766,12 @@ impl<'data> CandidateIngressPlan<'data> {
             CompressionMethod::Deflate => declared_bytes.saturating_add(1),
             _ => 0,
         };
+        let source = self.archive.as_bytes();
         CandidateEntry {
+            source_lifetime: std::marker::PhantomData,
+            central_offset: entry.central_directory_offset(),
+            source_ptr: source.as_ptr() as usize,
+            source_len: source.len(),
             ordinal,
             wayfinder: entry.wayfinder(),
             kind,
@@ -722,7 +786,21 @@ impl<'data> CandidateIngressPlan<'data> {
         }
     }
 
-    fn read_entry(&self, entry: CandidateEntry) -> Result<Vec<u8>> {
+    /// Whether a descriptor came from this plan's source and still matches
+    /// its recorded central record. The record is looked up directly at its
+    /// offset, without rescanning preceding records.
+    fn owns_entry(&self, candidate: CandidateEntry<'_>) -> bool {
+        let source = self.archive.as_bytes();
+        if candidate.source_ptr != source.as_ptr() as usize || candidate.source_len != source.len()
+        {
+            return false;
+        }
+        self.archive
+            .central_record_at(candidate.central_offset)
+            .is_ok_and(|entry| self.entry_from_record(candidate.ordinal, entry) == candidate)
+    }
+
+    fn read_entry(&self, entry: CandidateEntry<'_>) -> Result<Vec<u8>> {
         let source = self.archive.get_entry_borrowed(entry.wayfinder)?;
         match entry.compression {
             CandidateCompression::Stored => {
@@ -901,8 +979,8 @@ impl SourceCatalog {
 #[cfg(test)]
 mod tests {
     use super::{
-        CandidateCompression, CandidateEntryKind, CandidateIngressCharge, CandidateIngressPhase,
-        CandidateIngressPlan,
+        CandidateCompression, CandidateEntryKind, CandidateIngressCharge, CandidateIngressError,
+        CandidateIngressPhase, CandidateIngressPlan,
     };
     use crate::package::{EntryEdit, EntryInsertion};
     use crate::{Limits, SourceCatalog};
@@ -927,6 +1005,96 @@ mod tests {
         writer.write_stored("Index/Document.iwa", &stream)?;
         writer.write_deflated("Metadata/Properties.plist", b"properties")?;
         writer.finish_to_bytes().map_err(crate::Error::from)
+    }
+
+    #[test]
+    fn candidate_entry_is_source_bound_before_any_charge() -> crate::Result<()> {
+        let first = package()?;
+        let second = first.clone();
+        let plan_a = CandidateIngressPlan::from_bytes(&first, Limits::default())?;
+        let plan_b = CandidateIngressPlan::from_bytes(&second, Limits::default())?;
+        let entry = plan_a
+            .entries()
+            .next()
+            .transpose()?
+            .ok_or_else(|| crate::Error::InvalidBundle("test entry is missing".to_owned()))?;
+
+        let mut charges = 0usize;
+        let result = plan_b.admit_entry(entry, &mut |_charge| {
+            charges = charges.saturating_add(1);
+            Ok::<(), crate::Error>(())
+        });
+        assert!(matches!(
+            result,
+            Err(CandidateIngressError::Physical(crate::Error::InvalidBundle(message)))
+                if message.contains("does not belong to this source plan")
+        ));
+        assert_eq!(charges, 0);
+
+        let mut forged = plan_b
+            .entries()
+            .next()
+            .transpose()?
+            .ok_or_else(|| crate::Error::InvalidBundle("test entry is missing".to_owned()))?;
+        forged.materialized_bytes = forged.materialized_bytes.saturating_add(1);
+        let result = plan_b.admit_entry(forged, &mut |_charge| {
+            charges = charges.saturating_add(1);
+            Ok::<(), crate::Error>(())
+        });
+        assert!(matches!(
+            result,
+            Err(CandidateIngressError::Physical(crate::Error::InvalidBundle(message)))
+                if message.contains("does not belong to this source plan")
+        ));
+        assert_eq!(charges, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn deflated_entry_charge_includes_decoder_workspace() -> crate::Result<()> {
+        let bytes = package()?;
+        let plan = CandidateIngressPlan::from_bytes(&bytes, Limits::default())?;
+        let entry = plan
+            .entries()
+            .find(|result| {
+                result
+                    .as_ref()
+                    .is_ok_and(|entry| entry.compression() == CandidateCompression::Deflated)
+            })
+            .transpose()?
+            .ok_or_else(|| {
+                crate::Error::InvalidBundle("deflated test entry is missing".to_owned())
+            })?;
+        let mut admitted = None;
+        plan.admit_entry(entry, &mut |charge: CandidateIngressCharge| {
+            admitted = Some(charge);
+            Ok::<(), crate::Error>(())
+        })
+        .map_err(|error| match error {
+            CandidateIngressError::Physical(error) | CandidateIngressError::Admission(error) => {
+                error
+            },
+            CandidateIngressError::CloneArithmetic { resource } => {
+                crate::Error::InvalidBundle(resource.to_owned())
+            },
+        })?;
+        let charge = admitted.ok_or_else(|| {
+            crate::Error::InvalidBundle("deflated admission did not charge".to_owned())
+        })?;
+        assert_eq!(
+            charge.retained_bytes(),
+            entry.materialized_bytes()
+                + soapberry_zip::office::DEFLATE_READ_SCRATCH_UPPER_BOUND_BYTES
+        );
+        assert_eq!(
+            charge.allocations(),
+            1 + soapberry_zip::office::DEFLATE_READ_SCRATCH_ALLOCATIONS
+        );
+        assert_eq!(
+            charge.traversal_bytes(),
+            entry.compressed_bytes() + entry.metadata_bytes()
+        );
+        Ok(())
     }
 
     #[test]
@@ -1059,7 +1227,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(super::CandidateIngressError::Admission("ledger full"))
+            Err(CandidateIngressError::Admission("ledger full"))
         ));
         Ok(())
     }
