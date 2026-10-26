@@ -949,3 +949,103 @@ fn keynote_slide_shape_preset_parity() -> TestResult {
         },
     )
 }
+
+/// `basic.key` with one host-added straight line on slide 0.
+fn line_fixture() -> TestResult<crate::harness::Fixture> {
+    let base = fixture(TEXT_BOX)?;
+    let mut editor = keynote::Draft::from_bytes(&base.bytes)?;
+    editor.add_slide_line(
+        SLIDE,
+        DrawablePoint { x: 100.0, y: 120.0 },
+        DrawablePoint { x: 260.0, y: 200.0 },
+    )?;
+    Ok(crate::harness::Fixture {
+        path: "iwork/keynote/basic.key + host add_slide_line",
+        bytes: editor.to_bytes()?,
+    })
+}
+
+#[test]
+fn keynote_slide_line_segment_parity() -> TestResult {
+    use litchi_keynote::slide::drawable::Segment;
+    let input = line_fixture()?;
+    let (start, end) = (
+        litchi_iwa_common::shape::geometry::Point { x: 40.0, y: 300.0 },
+        litchi_iwa_common::shape::geometry::Point { x: 10.0, y: 90.0 },
+    );
+    run_on(
+        "keynote_slide_line_segment_parity",
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::Line)?)?;
+            editor.set_slide_line_segment(
+                SLIDE,
+                id,
+                DrawablePoint {
+                    x: start.x,
+                    y: start.y,
+                },
+                DrawablePoint { x: end.x, y: end.y },
+            )?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::Line)?;
+            leaf_run(source, |edit| {
+                edit.set_line_segment(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                    Segment::new(start, end)?,
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
+
+fn line_segments_agree(bytes: &[u8]) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let package = Package::from_bytes(bytes)?;
+    let position = leaf_position(bytes, Kind::Line)?;
+    let host = editor.slide_line_segment(SLIDE, host_id(&editor, bytes, position)?)?;
+    let leaf = package.slide_line_segment(
+        SlideSelector::index(SLIDE),
+        DrawableSelector::index(position),
+    )?;
+    let render =
+        |start: (f32, f32), end: (f32, f32), length: f32| format!("{start:?} {end:?} {length:.3}");
+    let host_text = render(
+        (host.start().x, host.start().y),
+        (host.end().x, host.end().y),
+        host.length(),
+    );
+    assert_eq!(
+        host_text,
+        render(
+            (leaf.start().x, leaf.start().y),
+            (leaf.end().x, leaf.end().y),
+            leaf.length()
+        )
+    );
+    Ok(host_text)
+}
+
+#[test]
+fn keynote_slide_line_segment_read_parity() -> TestResult {
+    let input = line_fixture()?;
+    Case::new(
+        "keynote_slide_line_segment_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host and leaf line segments agree", line_segments_agree)
+    .run()?;
+    Ok(())
+}
