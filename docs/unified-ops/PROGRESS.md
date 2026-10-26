@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0362ul165uh | [Post-diagnostic build prerequisites](0362ul165uh-post-diagnostic-build-prerequisites.md) | DOCX sparse vendor closure repaired and release builds active; fuzz cache fetch/offline validation and canonical API tests source-ready and queued; two more obsolete worktrees retired |
 | 0362ul165ue | [Terminal diagnostic and leaf cleanup](0362ul165ue-diagnostic-returns-and-leaf-cleanup.md) | Twenty checks complete: thirteen pass, seven preserved failures, all five runtime supplements pass; two reviewed leaves merged and retired; final qualification pending |
 | 0362ul165uf | [Tooling import and adapter identities](0362ul165uf-tooling-identity-repair.md) | Merged leaf `ed12bd5528`: consistent PPT protocol exception imports and reviewed current ODF consumer manifest pin; focused Python checks pass; launch PATH repair and final gate pending |
 | 0362ul165ug | [Gate dependency and evidence registrations](0362ul165ug-gate-registry-repair.md) | Merged leaf `d9979bf2ff`: explicit shared ZIP dev edge and optional operations VBA edge; five validation-only evidence dispositions; focused policy and matrix checks pass; native/final gate pending |
@@ -6488,3 +6489,24 @@ See [0063](0063-source-pptx-modern-comments.md).
   for Rust validation. Fresh fuzz lock preparation and the four DOCX release
   compiler checks can now use the serial heavy slot. All native and final
   candidate acceptance remains required. Nothing is pushed.
+
+  Post-diagnostic compilation exposes two preparation gaps (165uh): the DOCX
+  baseline lacks a vendored manifest, and offline fuzz metadata needs five
+  locked registry archives. Both failures are preserved. Exact DOCX source
+  materialization passes independent review and the v3 release builds are
+  running with explicit toolchain PATH. Fuzz v4 separates reviewed locked
+  cache hydration from fresh offline validation; canonical API validation v2
+  uses the current bounded runner/helper and is queued. Three-way previews
+  preserve current ODF work; DOCX will update its coupled DrawingML manifest
+  pin in the integration commit. Two superseded fuzz worktrees are retired,
+  reaching 288 worktrees/448 refs removed. A newly created concurrent IWA plan
+  leaf is retained for review. All 70 excluded office refs remain unchanged;
+  final native/source/gate acceptance is still pending. Nothing is pushed.
+
+
+## Coordinator handover (2026-10-26): Claude resumes sole coordination
+- The owner paused the Codex coordinator and returned the program to Claude. Owner decisions (2026-10-26): (1) defer the ODT/ODP performance improvements; fix the IWA constructor regressions now, with refactored APIs; (2) Codex's behaviour changes are judged against the 0351 contract; (3) remove obsolete build directories while keeping the work; merge Codex's progress, or discard it where it violates the contract or regresses badly.
+- Cleanup: 366 Cargo target directories under `.coord/` and four orphaned worktree targets removed (disk 75% used, 1.0 TB free); two orphaned source worktrees archived under `.coord/salvage/`; 1,454 litchi scratch entries removed from `/tmp` (96 → 18 GB).
+- Record [0363](0363-iwa-monolith-exit-plan.md): plan to dissolve `litchi-iwa` into the leaf crates per ADR 0028 (owner instruction 2026-10-26). Of 2,228 host `pub fn`s, 123 are at leaf parity, 415 partial, 120 on unmerged Codex branches, 1,570 host-only (crosswalk in `results/0363`). The 66 Codex iWork branches (4,090 commits behind trunk, pre-0351 API) are donors to port, not merge. Waves W0 (substrate, codecs, parity harness) → W1 (Numbers, Pages, Keynote, shared text, shared charts/shapes/media) → W2 (drawables, text boxes, tests/examples) → W3 (delete the host). Coordinator adopts recommendations D2–D7; D1 (native verification without macOS) goes to the owner.
+- API-debt finish: records 0364 (glossary row 46), 0365 (gate runner and rows 41/48–51), 0366 (final API inventory and OfficeCLI corpus) in progress; then one paired ABBA run and the 53 rows on one trunk commit.
+- Owner decision D1 (2026-10-26): the Tier-B differential (known-field equality with the host plus untouched-byte preservation) is accepted as the parity proof for routes whose host version already has native evidence. Native macOS open/save/reopen runs for the remaining routes (no host native evidence, or output that differs from the host) are queued in `docs/unified-ops/0363-mac-queue.md` and must pass before W3 deletes the host.
