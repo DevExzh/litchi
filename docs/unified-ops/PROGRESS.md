@@ -6304,3 +6304,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   The unused ODF design worktree/ref is removed, bringing cumulative cleanup
   to 278 worktrees/440 refs. C/P stay frozen; final qualification remains open.
   Nothing is pushed.
+
+  The remaining-29 diagnostic passes ODS Clippy, the full ODS suite and
+  workspace Clippy, but finds two stale DOCX metadata assertions (165l).
+  An isolated leaf corrects them and strengthens serialized empty-core and
+  independent replay coverage; focused Rust validation remains pending.
+  Final-source admission review also finds that ODF preparation cannot admit
+  the probe and lock now committed on trunk. Its preparer, runner, manifest
+  and tests migrate together on a new leaf; review returns incomplete P trust,
+  adapter and report/input-drift checks. Protocol previews
+  separate P1/P2, with successive guards returned for actual producer and
+  provenance defects; v9 repair continues. W6's real source preparation passes,
+  but remaining path/child-invocation defects require v6, now under review. The
+  exact 70d ODF baseline is prepared for later lock resolution/compilation.
+  Root removes 8.35 GB of obsolete gate caches and preserves inputs before
+  retiring failed W6 source copies. All final qualification remains required;
+  C/P stay frozen and nothing is pushed.
