@@ -618,7 +618,13 @@ stylesheet_without_variation}` take a required `WireLimits` and are pinned
 as `required_signatures`. An engine owns payloads only; a set/reset run of
 one host property is one `paragraph_style::Change::{Set(Property),
 Reset(PropertyKind)}`, and its `Plan` (`Rewrite`, `Derive`, `Collapse`) is
-published by the format package's own family.
+published by the format package's own family. Named paragraph styles
+(`paragraph_style::named`: `catalog`, `applied`, `plan_apply`,
+`named_copy`, `renamed`, `redefine` and the stylesheet and theme
+rewrites) and highlights and text comments (`annotation`: `annotations`,
+`annotation`, `graph` and the highlight and comment-storage codecs) follow
+the same rule; a refused catalog request is
+`paragraph_style::Error::Refused(Refusal)`.
 
 `families` lists fully qualified public module paths that have completed the
 shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,
