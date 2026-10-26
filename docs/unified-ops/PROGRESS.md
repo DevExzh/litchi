@@ -6200,3 +6200,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   complete public prefix-to-policy flow, failed builds, binary drift and
   terminal status checks. Nineteen of 25 rows now have reviewed source
   preparations; every actual native qualification remains pending.
+
+  A coverage audit restores three omitted qualification groups (165f): common
+  flat ODF parts, the original ODT set/flat-open performance residuals, and
+  four W6 ODS source-backed routes. The corrected inventory has 28 required
+  rows; ODP tail append is already represented. Sheet v6 migrates its runner
+  and tracked test together and passes independent source review, bringing
+  source-ready preparations to 23. Root composes the reviewed legacy, sheet
+  and ODF reuse patches into a 26-file external preview; actual bindings and
+  integrated tests remain pending. ODG/ODP v3 is committed on the active leaf
+  and under review. The same full65 gate continues facade tests with 33 checks
+  verified. Root reclaims 3.86 GB of retired crypto debug caches, preserves
+  their evidence, and confirms 75 heads/62 worktrees with no further unused
+  unified leaf. All 28 actual qualifications remain open; nothing is pushed.
