@@ -6334,5 +6334,6 @@ See [0063](0063-source-pptx-modern-comments.md).
   all four failed W6 source copies (about 111.66 GB apparent), preserving
   logs and recovery inputs. After 157 passing chunks, the workspace suite
   reproduces the same two DOCX assertions and proceeds to isolated wsdoc.
-  Focused DOCX validation passes source preflight and awaits the Cargo slot;
-  W6 repair and all final qualification remain required. Nothing is pushed.
+  Focused DOCX validation passes source preflight and is queued to take the
+  Cargo slot only after the complete diagnostic becomes terminal. W6 repair
+  and all final qualification remain required. Nothing is pushed.

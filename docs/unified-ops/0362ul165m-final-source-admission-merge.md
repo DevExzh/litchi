@@ -56,6 +56,14 @@ Its bounded driver passes source preflight; the absent ignored root lock is
 copied from Q and verified against the approved digest. No Cargo command has
 run on that repair yet.
 
+The focused command is queued as
+`litchi-docx-metadata-after-rest29-v1.service`. Its waiting process starts no
+Cargo work. It requires the diagnostic's terminal service state and complete
+29-row result, then invokes the pinned driver with its source, lock and
+unrelated-builder checks. A stopped diagnostic refuses the handoff. The
+focused DOCX run reserves the next Cargo slot; other builds must wait for
+both services to become terminal.
+
 The branch census confirms 78 heads and 66 worktrees before this merge.
 All 70 excluded heads are unchanged. Five retained unified controls were
 already merged; this merge accepts the ODF admission leaf. The DOCX leaf
@@ -97,6 +105,7 @@ Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
 | `branch-worktree-165m-20261026/receipt.json` | `651a9000ba489e219fd88485b558f065b42c78072c8b2158e658752b439aeb45` |
 | `rest29-workspace-docx-failure-20261026/receipt.json` | `9374323f4b6b7d4b7e589f92ce84d23a41322c3d8b8c962f6440bd6f637a73e1` |
 | `docx-metadata-focused-prep-20261026/receipt.json` | `6fb49529b6055f686cdfdec710ceba7d118bd587615d1e89a057544b8df04f18` |
+| `docx-metadata-focused-queue-20261026/launch.json` | `77b90d07507303a70fd5ccbaf7114d22bb1e1e24f558ff9dbe2754ff294aab09` |
 | `w6-failed-source-retirement-20261026-v5/retirement.json` | `6ec639a10ef571ffd2ef8945e6b5a86c303b786ffddbc14f8c880ff28aee51f0` |
 | `w6-failed-source-retirement-20261026-v6/retirement.json` | `b3722713fc75e7cf8be9d8e3836c1768977d9bb3f013cd88ce7afc4a1b0de74e` |
 | `odf-final-source-admission-retirement-20261026/receipt.json` | `81020430f12519a91e9f9864f76c9d0988bbcdd930cb2167e3c5ff90cb69570c` |
