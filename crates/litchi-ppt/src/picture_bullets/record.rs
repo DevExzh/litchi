@@ -196,7 +196,7 @@ impl PictureBullet {
             picture_type,
             &officeart_record,
             limits.max_officeart_record_bytes,
-            limits.records,
+            limits.image_limits(),
         )?;
         Ok(Self::from_admitted(
             index,
@@ -297,7 +297,7 @@ impl PictureBullet {
             self.picture_type,
             &self.officeart_record,
             limits.max_officeart_record_bytes,
-            limits.records,
+            limits.image_limits(),
         )?;
         let payload_len =
             self.officeart_record.len().checked_add(2).ok_or_else(|| {
@@ -567,7 +567,7 @@ fn parse_picture_bullet_with_limits(
         picture_type,
         officeart_record,
         limits.max_officeart_record_bytes,
-        limits.records,
+        limits.image_limits(),
     )?;
 
     let mut owned_officeart = Vec::new();
@@ -598,7 +598,7 @@ fn validate_officeart_record(
     picture_type: PictureBulletType,
     officeart_record: &[u8],
     maximum: usize,
-    source_limits: SourceLimits,
+    image_limits: litchi_odraw::image::Limits,
 ) -> Result<()> {
     if officeart_record.len() < 8 || officeart_record.len() > maximum {
         return Err(if officeart_record.len() > maximum {
@@ -607,20 +607,17 @@ fn validate_officeart_record(
             Error::Corrupted("picture-bullet OfficeArt record is truncated".into())
         });
     }
-    let (image_record, consumed) = litchi_odraw::Record::parse(
-        officeart_record,
-        0,
-        crate::odraw::limits_for_source(source_limits),
-    )?;
+    let (image_record, consumed) =
+        litchi_odraw::Record::parse(officeart_record, 0, image_limits.records)?;
     if consumed != officeart_record.len() {
         return Err(Error::Corrupted(
             "Picture-bullet OfficeArt record has an invalid size".to_string(),
         ));
     }
     let kind = if image_record.kind() == litchi_odraw::RecordKind::Bse {
-        litchi_odraw::image::Entry::parse(image_record, Default::default())?.kind()?
+        litchi_odraw::image::Entry::parse(image_record, image_limits)?.kind()?
     } else {
-        litchi_odraw::image::Blip::from_record(image_record, Default::default())?.kind()
+        litchi_odraw::image::Blip::from_record(image_record, image_limits)?.kind()
     };
     if !picture_type_matches(picture_type, kind) {
         return Err(Error::Corrupted(
