@@ -969,6 +969,40 @@ fn first_reference(payload: &[u8], number: u32, wire: WireLimits) -> Result<Opti
         .map_err(lift)
 }
 
+/// The tile, tile-local row and table column count of the cell
+/// `row`/`column` of the table whose drawable is `info`.
+fn table_cell_tile(
+    workspace: &Workspace<'_>,
+    info: u64,
+    row: u32,
+    column: u32,
+) -> Result<(u64, u32, u32), Error> {
+    let wire = workspace.wire;
+    let (_, _, info_payload) = payload_of(workspace, info, &[TABLE_INFO])?;
+    let model = first_reference(info_payload, 2, wire)?.ok_or(Error::InvalidSource)?;
+    let (_, _, model_payload) = payload_of(workspace, model, &[TABLE_MODEL])?;
+    let rows = first_varint(model_payload, 6, wire)?.ok_or(Error::InvalidSource)?;
+    let columns = first_varint(model_payload, 7, wire)?.ok_or(Error::InvalidSource)?;
+    if u64::from(row) >= rows || u64::from(column) >= columns {
+        return Err(Error::Refused(crate::slide::drawable::Refusal::InvalidSpan));
+    }
+    let columns = u32::try_from(columns).map_err(|_| Error::InvalidSource)?;
+    let store = first_message(model_payload, 4, wire)?.ok_or(Error::InvalidSource)?;
+    let tiles = first_message(&store, 3, wire)?.ok_or(Error::InvalidSource)?;
+    let size = first_varint(&tiles, 2, wire)?.unwrap_or(256).max(1);
+    let key = u64::from(row) / size;
+    let mut tile = None;
+    for entry in Fields::parse(&tiles, wire).map_err(lift)?.all(1) {
+        let entry = entry.message().map_err(lift)?;
+        if first_varint(entry, 1, wire)? == Some(key) {
+            tile = first_reference(entry, 2, wire)?;
+        }
+    }
+    let tile = tile.ok_or_else(table_storage)?;
+    let local = u32::try_from(u64::from(row) % size).map_err(|_| Error::InvalidSource)?;
+    Ok((tile, local, columns))
+}
+
 fn first_varint(payload: &[u8], number: u32, wire: WireLimits) -> Result<Option<u64>, Error> {
     let fields = Fields::parse(payload, wire).map_err(lift)?;
     fields
@@ -1017,91 +1051,328 @@ pub(super) fn set_table_cell(
     column: u32,
     value: &super::TableCellValue,
 ) -> Result<(), Error> {
+    write_table_cell(workspace, info, row, column, value, None)
+}
+
+/// Set the formula of one cell of the table whose drawable is `info`, with
+/// `cached` as its displayed result (record 0376a).
+pub(super) fn set_table_formula(
+    workspace: &mut Workspace<'_>,
+    info: u64,
+    row: u32,
+    column: u32,
+    expression: &crate::slide::table::formula::FormulaExpression,
+    cached: &super::TableCellValue,
+) -> Result<(), Error> {
+    write_table_cell(workspace, info, row, column, cached, Some(expression))
+}
+
+/// The engine and formula-owner objects of the (staged) package.
+fn formula_graph<'w>(
+    workspace: &'w Workspace<'_>,
+) -> Result<
+    Option<(
+        litchi_numbers_wire::formula_cache::author::Object<'w>,
+        Vec<litchi_numbers_wire::formula_cache::author::Object<'w>>,
+    )>,
+    Error,
+> {
+    use litchi_numbers_wire::formula_cache::author::Object;
+    let mut engine = None;
+    let mut owners = Vec::new();
+    for component in workspace.package().state.source.components().iter() {
+        for object in &component.archive().objects {
+            let Some(message) = object.messages.first() else {
+                continue;
+            };
+            if message.type_ != FORMULA_OWNER && message.type_ != CALCULATION_ENGINE {
+                continue;
+            }
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+            let staged = staged_object(workspace, identifier).ok_or(Error::InvalidSource)?;
+            if message.type_ == FORMULA_OWNER {
+                owners.push(staged);
+            } else if engine.replace(staged).is_some() {
+                return Err(Error::InvalidSource);
+            }
+        }
+    }
+    Ok(engine
+        .filter(|_| !owners.is_empty())
+        .map(|engine: Object<'w>| (engine, owners)))
+}
+
+/// One staged object's first message and its object references.
+fn staged_object<'w>(
+    workspace: &'w Workspace<'_>,
+    identifier: u64,
+) -> Option<litchi_numbers_wire::formula_cache::author::Object<'w>> {
+    let object = workspace.object(identifier)?;
+    let message = object.messages.first()?;
+    Some(litchi_numbers_wire::formula_cache::author::Object {
+        identifier,
+        payload: &message.data,
+        references: object
+            .archive_info
+            .message_infos
+            .first()
+            .map_or(&[][..], |info| info.object_references.as_slice()),
+    })
+}
+
+/// Replace the first message of each object with its planned payload.
+fn replace_first(
+    workspace: &mut Workspace<'_>,
+    payloads: Vec<(u64, Vec<u8>)>,
+) -> Result<(), Error> {
+    for (identifier, payload) in payloads {
+        let message_type = workspace
+            .require(identifier)
+            .map_err(lift)?
+            .messages
+            .first()
+            .ok_or(Error::InvalidSource)?
+            .type_;
+        replace_payload(workspace, identifier, 0, message_type, payload).map_err(lift)?;
+    }
+    Ok(())
+}
+
+/// Publish the formula side of one cell change into the workspace: the
+/// changed payloads, and the cell-record tile the engine created or emptied
+/// (record 0376a).
+fn apply_formula_edit(
+    workspace: &mut Workspace<'_>,
+    edit: litchi_numbers_wire::formula_cache::author::Edit,
+) -> Result<(), Error> {
+    use litchi_iwa_core::{ArchiveObject, RawMessage};
+    const CELL_RECORD_TILE: u32 = 4_009;
+    let member = workspace
+        .component_of(edit.owner)
+        .ok_or(Error::InvalidSource)?;
+    let mut payloads = edit.payloads;
+    if let Some(tile) = edit.created_tile {
+        let position = payloads
+            .iter()
+            .position(|(identifier, _)| *identifier == tile)
+            .ok_or(Error::InvalidSource)?;
+        let (_, payload) = payloads.remove(position);
+        if workspace.allocate().map_err(lift)? != tile {
+            return Err(Error::InvalidSource);
+        }
+        let object = ArchiveObject::new(
+            tile,
+            vec![RawMessage {
+                type_: CELL_RECORD_TILE,
+                data: payload,
+            }],
+            workspace.archive_limits(),
+        )
+        .map_err(|error| lift(error.into()))?;
+        workspace.insert(&member, object).map_err(lift)?;
+        let uuid = workspace.clone_uuid(None, tile).map_err(lift)?;
+        let component = workspace
+            .registry
+            .component_for_member(&member)
+            .ok_or(Error::InvalidSource)?
+            .identifier;
+        workspace
+            .registry
+            .component_mut(component)
+            .ok_or(Error::InvalidSource)?
+            .add_object_uuid(tile, uuid);
+        let owner = workspace.object_mut(edit.owner).map_err(lift)?;
+        let info = owner
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or(Error::InvalidSource)?;
+        if !info.object_references.contains(&tile) {
+            info.object_references.push(tile);
+        }
+    }
+    replace_first(workspace, payloads)?;
+    if let Some(tile) = edit.removed_tile {
+        workspace.remove_object(tile).map_err(lift)?;
+        let component = workspace
+            .registry
+            .component_for_member(&member)
+            .ok_or(Error::InvalidSource)?
+            .identifier;
+        workspace
+            .registry
+            .component_mut(component)
+            .ok_or(Error::InvalidSource)?
+            .remove_object_uuids(&[tile]);
+        let owner = workspace.object_mut(edit.owner).map_err(lift)?;
+        let info = owner
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or(Error::InvalidSource)?;
+        info.object_references
+            .retain(|reference| *reference != tile);
+    }
+    Ok(())
+}
+
+fn write_table_cell(
+    workspace: &mut Workspace<'_>,
+    info: u64,
+    row: u32,
+    column: u32,
+    value: &super::TableCellValue,
+    formula: Option<&crate::slide::table::formula::FormulaExpression>,
+) -> Result<(), Error> {
     use litchi_numbers_wire::{
-        formula_cache::{self, DependencyPayload, refresh},
+        formula_cache::{self, DependencyPayload, author, refresh},
         table_write::{self, CellInput},
     };
     let wire = workspace.wire;
-    let package = workspace.package();
-    let limits = package.numbers_wire_limits().map_err(|_| table_storage())?;
+    let limits = workspace
+        .package()
+        .numbers_wire_limits()
+        .map_err(|_| table_storage())?;
     let input = match value {
         super::TableCellValue::Text(text) => CellInput::Text(text),
         super::TableCellValue::Number(number) => CellInput::Number(*number),
         super::TableCellValue::Boolean(flag) => CellInput::Boolean(*flag),
         super::TableCellValue::Empty => CellInput::Empty,
     };
+    let refused = |error: formula_cache::Error| match error {
+        formula_cache::Error::UnsupportedDependency(_) => table_formulas(),
+        _ => table_storage(),
+    };
+    // The formula side (record 0376a): remove the formula a value write
+    // replaces, or author the new one, through the shared engine.
+    let (tile, local, columns) = table_cell_tile(workspace, info, row, column)?;
+    let (tile_index, tile_type, tile_payload) = payload_of(workspace, tile, &[TILE])?;
+    let previous = table_write::tile_cell(tile_payload, local, column, &limits)
+        .map_err(|_| table_storage())?;
+    let holds_formula = previous
+        .as_deref()
+        .map(|cell| litchi_numbers_wire::BncCellView::parse(cell, &limits))
+        .transpose()
+        .map_err(|_| table_storage())?
+        .is_some_and(|cell| {
+            matches!(
+                cell.stored_value(),
+                litchi_numbers_wire::StoredValue::Formula(_)
+            )
+        });
+    let mut formula_key = None;
+    if holds_formula || formula.is_some() {
+        let (engine, owners) = formula_graph(workspace)?.ok_or_else(table_formulas)?;
+        let source = author::Source {
+            engine,
+            owners: &owners,
+            table: info,
+        };
+        let object = |identifier: u64| staged_object(workspace, identifier);
+        let encoded = match formula {
+            Some(expression) => {
+                let (owner, rows, table_columns) = author::table_owner(source, &object, &limits)
+                    .map_err(refused)?
+                    .ok_or_else(table_formulas)?;
+                Some(
+                    author::encode(expression, owner, row, column, rows, table_columns, &limits)
+                        .map_err(refused)?,
+                )
+            },
+            None => None,
+        };
+        let change = match &encoded {
+            Some(encoded) => author::Change::Author(encoded),
+            None => author::Change::Remove,
+        };
+        let next = workspace.next_identifier();
+        let edit =
+            author::plan(source, row, column, change, next, &object, &limits).map_err(refused)?;
+        formula_key = edit.key;
+        let stripped = previous
+            .as_deref()
+            .filter(|_| holds_formula)
+            .map(|cell| table_write::formula_free(cell, &limits))
+            .transpose()
+            .map_err(|_| table_formulas())?;
+        apply_formula_edit(workspace, edit)?;
+        if let Some(stripped) = stripped {
+            let (_, _, tile_payload) = payload_of(workspace, tile, &[TILE])?;
+            let written = table_write::tile_set_cell(
+                tile_payload,
+                local,
+                column,
+                columns,
+                Some(&stripped),
+                &limits,
+            )
+            .map_err(|_| table_storage())?;
+            replace_payload(workspace, tile, tile_index, tile_type, written.tile).map_err(lift)?;
+        }
+    }
     // The calculation graph: plan the refresh of the formula caches that
-    // read the cell (record 0376) before any payload changes.
-    let mut engine = None;
-    let mut owners = Vec::new();
-    for component in package.state.source.components().iter() {
-        for object in &component.archive().objects {
-            for message in &object.messages {
-                if message.type_ == FORMULA_OWNER {
-                    owners.push(DependencyPayload {
-                        identifier: object.archive_info.identifier.ok_or(Error::InvalidSource)?,
-                        bytes: &message.data,
-                    });
-                } else if message.type_ == CALCULATION_ENGINE
-                    && engine.replace(message.data.as_slice()).is_some()
-                {
-                    return Err(Error::InvalidSource);
+    // read the cell (record 0376) before the value changes. An authored
+    // formula keeps its supplied cache and refreshes nothing, as the host.
+    let refresh = if formula.is_some() {
+        refresh::Plan::default()
+    } else {
+        let package = workspace.package();
+        let mut engine = None;
+        let mut owners = Vec::new();
+        for component in package.state.source.components().iter() {
+            for object in &component.archive().objects {
+                for message in &object.messages {
+                    if message.type_ == FORMULA_OWNER || message.type_ == CALCULATION_ENGINE {
+                        let identifier =
+                            object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+                        let staged = workspace
+                            .object(identifier)
+                            .and_then(|object| object.messages.first())
+                            .ok_or(Error::InvalidSource)?;
+                        if message.type_ == FORMULA_OWNER {
+                            owners.push(DependencyPayload {
+                                identifier,
+                                bytes: &staged.data,
+                            });
+                        } else if engine.replace(staged.data.as_slice()).is_some() {
+                            return Err(Error::InvalidSource);
+                        }
+                    }
                 }
             }
         }
-    }
-    // The staged state: an earlier write of the same edit is a baseline
-    // value of this one.
-    let staged = &*workspace;
-    let object = |identifier: u64| -> Option<&[u8]> {
-        staged
-            .object(identifier)
-            .and_then(|object| object.messages.first())
-            .map(|message| message.data.as_slice())
-    };
-    let refresh = match engine {
-        Some(engine) if !owners.is_empty() => refresh::plan(
-            refresh::Source {
-                engine,
-                owners: &owners,
-                table: info,
-            },
-            &[refresh::Write {
-                row,
-                column,
-                value: &input,
-            }],
-            &object,
-            &limits,
-        )
-        .map_err(|error| match error {
-            formula_cache::Error::UnsupportedDependency(_) => table_formulas(),
-            _ => table_storage(),
-        })?,
-        _ => refresh::Plan::default(),
+        // The staged state: an earlier write of the same edit is a
+        // baseline value of this one.
+        let staged = &*workspace;
+        let object = |identifier: u64| -> Option<&[u8]> {
+            staged
+                .object(identifier)
+                .and_then(|object| object.messages.first())
+                .map(|message| message.data.as_slice())
+        };
+        match engine {
+            Some(engine) if !owners.is_empty() => refresh::plan(
+                refresh::Source {
+                    engine,
+                    owners: &owners,
+                    table: info,
+                },
+                &[refresh::Write {
+                    row,
+                    column,
+                    value: &input,
+                }],
+                &object,
+                &limits,
+            )
+            .map_err(refused)?,
+            _ => refresh::Plan::default(),
+        }
     };
     let (_, _, info_payload) = payload_of(workspace, info, &[TABLE_INFO])?;
     let model = first_reference(info_payload, 2, wire)?.ok_or(Error::InvalidSource)?;
     let (_, _, model_payload) = payload_of(workspace, model, &[TABLE_MODEL])?;
-    let rows = first_varint(model_payload, 6, wire)?.ok_or(Error::InvalidSource)?;
-    let columns = first_varint(model_payload, 7, wire)?.ok_or(Error::InvalidSource)?;
-    if u64::from(row) >= rows || u64::from(column) >= columns {
-        return Err(Error::Refused(crate::slide::drawable::Refusal::InvalidSpan));
-    }
-    let columns = u32::try_from(columns).map_err(|_| Error::InvalidSource)?;
     let store = first_message(model_payload, 4, wire)?.ok_or(Error::InvalidSource)?;
-    let tiles = first_message(&store, 3, wire)?.ok_or(Error::InvalidSource)?;
-    let size = first_varint(&tiles, 2, wire)?.unwrap_or(256).max(1);
-    let key = u64::from(row) / size;
-    let mut tile = None;
-    for entry in Fields::parse(&tiles, wire).map_err(lift)?.all(1) {
-        let entry = entry.message().map_err(lift)?;
-        if first_varint(entry, 1, wire)? == Some(key) {
-            tile = first_reference(entry, 2, wire)?;
-        }
-    }
-    let tile = tile.ok_or_else(table_storage)?;
-    let local = u32::try_from(u64::from(row) % size).map_err(|_| Error::InvalidSource)?;
     let strings = first_reference(&store, 4, wire)?.ok_or(Error::InvalidSource)?;
     let (tile_index, tile_type, tile_payload) = payload_of(workspace, tile, &[TILE])?;
     let previous = table_write::tile_cell(tile_payload, local, column, &limits)
@@ -1118,6 +1389,13 @@ pub(super) fn set_table_cell(
     let (cell, released) =
         table_write::cell_bytes(previous.as_deref(), &input, string_key, &limits)
             .map_err(|_| table_storage())?;
+    let cell = match formula_key {
+        Some(key) => Some(
+            table_write::with_formula(cell.as_deref().ok_or_else(table_formulas)?, key, &limits)
+                .map_err(|_| table_storage())?,
+        ),
+        None => cell,
+    };
     if let Some(released) = released {
         list = table_write::list_release(&list, released, &limits).map_err(|_| table_storage())?;
     }

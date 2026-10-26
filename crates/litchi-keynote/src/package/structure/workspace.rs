@@ -115,6 +115,11 @@ impl<'p> Workspace<'p> {
         self.package
     }
 
+    /// The identifier the next [`Self::allocate`] returns.
+    pub(in crate::package) const fn next_identifier(&self) -> u64 {
+        self.next_identifier
+    }
+
     /// Allocate a fresh package-wide object identifier.
     pub(in crate::package) fn allocate(&mut self) -> Result<u64, StructureError> {
         let identifier = self.next_identifier;
