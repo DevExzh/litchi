@@ -3267,7 +3267,7 @@ record-limit signatures are not applicable because the parser is crate-private.
 |---|---|
 | `litchi_markdown::{OpenOptions, reader::OpenOptions}` | adopted (0362ul70; `dialect`/`read_limits` consuming setters and `*_value()` getters) |
 | `litchi_markdown::reader::Snapshot::{read, read_bytes, read_with_options, read_bytes_with_options}` | adopted (0362ul70; default finite owner ingress plus canonical retained options) |
-| `litchi_markdown::reader::{Edit, Patch, Commit, Diagnostics}` | adopted (0362ul70; reader family registered with the shared `Commit` alias and owner replay result) |
+| `litchi_markdown::reader::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362ul70/165ud; reader family exposes typed limit dimensions, exact `Patch::is_noop`, the shared `Commit` alias, and owner replay result) |
 
 Structured keywords (owner decision 0350, memo item 20):
 
