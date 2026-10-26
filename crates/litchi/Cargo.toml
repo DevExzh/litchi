@@ -95,7 +95,7 @@ litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML fo
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
-parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
+parking_lot = { version = "0.13", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
 phf = { version = "0.14", features = ["macros"] } # Perfect hash functions for compile-time static maps
 rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
 rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
