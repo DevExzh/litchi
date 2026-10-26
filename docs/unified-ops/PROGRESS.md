@@ -6320,3 +6320,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   Root removes 8.35 GB of obsolete gate caches and preserves inputs before
   retiring failed W6 source copies. All final qualification remains required;
   C/P stay frozen and nothing is pushed.
+
+  ODF final-source admission is merged at leaf 172c803ebd (165m). It verifies
+  committed candidate inputs without writes and checks the actual C → P1 → P2
+  identity chain. Independent review findings are repaired; root verifies the
+  final seal-equality correction and all 16 affected tests pass. Protocol
+  composition v10 passes source review and 20 controls; v11 corrects only a
+  stale test count and dependent receipt hashes. Actual P installation and
+  rebinding remain pending. The branch census confirms 78 heads/66 worktrees
+  and 70 unchanged excluded heads; DOCX is the remaining unmerged repair.
+  Cleanup removes two failed W6 source copies (55.83 GB apparent) and continues
+  on the other two after a bounded size-scan failure. The same diagnostic
+  continues workspace tests; focused DOCX validation, W6 repair and all final
+  qualification remain required. Nothing is pushed.

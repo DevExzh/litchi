@@ -1,25 +1,43 @@
 #!/usr/bin/env python3
-"""Source-only tests for ODF raw-codec baseline preparation."""
+"""Source-only tests for integrated-final-C ODF raw-codec admission."""
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-import json
 
-from tools.native_qualification import prepare_odf_raw_codec_inputs as prep
 from tools.native_qualification import odf_raw_codec_paired_runner as runner
+from tools.native_qualification import prepare_odf_raw_codec_inputs as prep
+
+SOURCE_ROOT = Path(__file__).resolve().parents[1]
 
 
 def git(root: Path, *args: str) -> str:
-    result = subprocess.run(["git", "-C", str(root), *args], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
     return result.stdout.strip()
 
 
-def repository(root: Path, *, probe: bytes | None, lock: bytes | None, consumer: bool) -> str:
+def repository(
+    root: Path,
+    *,
+    consumer: bool,
+    consumer_manifest: bytes | None = None,
+    probe: bytes | None = None,
+    lock: bytes | None = None,
+    production_marker: str = "candidate",
+    baseline: bool = False,
+) -> str:
     root.mkdir(parents=True)
     git(root, "init", "-q", "--initial-branch=main")
     git(root, "config", "user.email", "odf-raw-prep@example.invalid")
@@ -28,371 +46,284 @@ def repository(root: Path, *, probe: bytes | None, lock: bytes | None, consumer:
     production = root / "crates/litchi-ops/Cargo.toml"
     production.parent.mkdir(parents=True, exist_ok=True)
     production.write_text(
-        "[package]\nname = \"litchi-ops\"\nversion = \"0.0.0\"\n",
+        "[package]\nname = \"litchi-ops\"\nversion = \"0.0.0\"\n"
+        f"description = \"{production_marker}\"\n",
         encoding="utf-8",
     )
-    if consumer:
-        consumer_manifest = root / prep.CONSUMER_MANIFEST
-        consumer_manifest.parent.mkdir(parents=True, exist_ok=True)
-        consumer_manifest.write_text(
-            "[package]\nname = \"litchi-perf-baseline\"\n"
-            + ("# reviewed adapter\n" if probe is not None else "# candidate placeholder\n"),
-            encoding="utf-8",
-        )
-    if probe is not None:
-        path = root / prep.PROBE_PATH
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(probe)
-    if lock is not None:
-        path = root / prep.LOCK_PATH
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(lock)
+    perf = root / prep.CONSUMER_MANIFEST
+    perf.parent.mkdir(parents=True, exist_ok=True)
+    examples = root / prep.PROBE_PATH.parent
+    examples.mkdir(parents=True, exist_ok=True)
+    if baseline:
+        perf.write_text('[package]\nname = "litchi-perf-baseline"\nversion = "0.0.1"\n', encoding="utf-8")
+        (root / prep.LOCK_PATH).write_bytes(b"baseline old lock\n")
+        (examples / ".keep").write_text("\n", encoding="utf-8")
+    elif consumer:
+        if consumer_manifest is None:
+            consumer_manifest = (SOURCE_ROOT / prep.CONSUMER_MANIFEST).read_bytes()
+        if probe is None:
+            probe = (SOURCE_ROOT / prep.PROBE_PATH).read_bytes()
+        if lock is None:
+            lock = (SOURCE_ROOT / prep.LOCK_PATH).read_bytes()
+        perf.write_bytes(consumer_manifest)
+        (root / prep.LOCK_PATH).write_bytes(lock)
+        (root / prep.PROBE_PATH).write_bytes(probe)
     git(root, "add", ".")
     git(root, "commit", "-qm", "fixture")
     return git(root, "rev-parse", "HEAD")
 
 
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def candidate_identity(candidate: Path, *, p1_commit: str, p1_tree: str, pin_sha256: str) -> dict:
+    candidate_object = {
+        "mode": prep.CANDIDATE_MODE,
+        "commit": git(candidate, "rev-parse", "HEAD"),
+        "tree": git(candidate, "rev-parse", "HEAD^{tree}"),
+        "production_source_tree_sha256": prep._production_source_tree(candidate),
+        "consumer_manifest": {
+            "path": str(prep.CONSUMER_MANIFEST),
+            "sha256": sha(candidate / prep.CONSUMER_MANIFEST),
+            "bytes": (candidate / prep.CONSUMER_MANIFEST).stat().st_size,
+        },
+        "probe": {
+            "path": str(prep.PROBE_PATH),
+            "sha256": sha(candidate / prep.PROBE_PATH),
+            "bytes": (candidate / prep.PROBE_PATH).stat().st_size,
+        },
+        "perf_lock": {
+            "path": str(prep.LOCK_PATH),
+            "sha256": sha(candidate / prep.LOCK_PATH),
+            "bytes": (candidate / prep.LOCK_PATH).stat().st_size,
+        },
+    }
+    return {
+        "schema": prep.IDENTITY_SCHEMA,
+        "sealed_by": {
+            "role": "protocol-P1",
+            "commit": p1_commit,
+            "tree": p1_tree,
+            "p1_pin_sha256": pin_sha256,
+            "candidate_sha256": prep._candidate_identity_digest(candidate_object),
+        },
+        "candidate": candidate_object,
+    }
+
+
 class OdfRawPreparationTests(unittest.TestCase):
-    def test_overlay_is_limited_to_adapter_and_lock(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="odf-raw-prep-") as directory:
+    def setUp(self) -> None:
+        self._old_baseline = prep.BASELINE_COMMIT
+
+    def tearDown(self) -> None:
+        prep.BASELINE_COMMIT = self._old_baseline
+
+    def fixture(self, root: Path) -> tuple[Path, Path, Path, Path, Path, Path, Path, dict]:
+        baseline = root / "baseline"
+        candidate = root / "candidate"
+        protocol_p = root / "protocol-p"
+        adapter = root / "adapter"
+        candidate_ref = repository(candidate, consumer=True, production_marker="integrated-final-c")
+        # P1 is derived from frozen C; P2 is the later binding endpoint.
+        subprocess.run(["git", "clone", "-q", str(candidate), str(protocol_p)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        git(protocol_p, "config", "user.email", "odf-raw-prep@example.invalid")
+        git(protocol_p, "config", "user.name", "ODF raw preparation test")
+        (protocol_p / "p1-source-seal.txt").write_text("P1 source seal\n", encoding="utf-8")
+        git(protocol_p, "add", "p1-source-seal.txt")
+        git(protocol_p, "commit", "-qm", "seal P1 from frozen C")
+        p1_ref = git(protocol_p, "rev-parse", "HEAD")
+        p1_tree = git(protocol_p, "rev-parse", "HEAD^{tree}")
+        (protocol_p / "p2-binding-install.txt").write_text("P2 binding\n", encoding="utf-8")
+        git(protocol_p, "add", "p2-binding-install.txt")
+        git(protocol_p, "commit", "-qm", "install P2 binding")
+        self.assertNotEqual(p1_ref, git(protocol_p, "rev-parse", "HEAD"))
+        baseline_ref = repository(baseline, consumer=False, baseline=True, production_marker="baseline")
+        repository(adapter, consumer=True, production_marker="adapter-3401")
+        external_lock = root / "baseline.lock"
+        external_lock.write_bytes(b"baseline lock\n")
+        pin = {
+            "schema": prep.PROTOCOL_P_PIN_SCHEMA,
+            "root": str(protocol_p.resolve()),
+            "source_candidate": {"commit": candidate_ref, "tree": git(candidate, "rev-parse", "HEAD^{tree}")},
+            "p1": {"commit": p1_ref, "tree": p1_tree},
+        }
+        pin_path = root / "protocol-p1-pin.json"
+        pin_path.write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
+        identity = candidate_identity(candidate, p1_commit=p1_ref, p1_tree=p1_tree, pin_sha256=sha(pin_path))
+        identity_path = root / "candidate-identity.json"
+        identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+        prep.BASELINE_COMMIT = baseline_ref
+        return baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity
+
+    def run_prepare(self, root: Path) -> tuple[dict, Path, Path, Path, Path, Path, Path, Path]:
+        baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, _ = self.fixture(root)
+        output = root / "preparation.json"
+        value = prep.prepare(
+            baseline_root=baseline,
+            candidate_root=candidate,
+            adapter_root=adapter,
+            protocol_p_root=protocol_p,
+            protocol_p_pin_path=pin_path,
+            candidate_identity_path=identity_path,
+            baseline_lock=external_lock,
+            output=output,
+        )
+        return value, baseline, candidate, adapter, protocol_p, pin_path, identity_path, output
+
+    def test_integrated_candidate_is_clean_and_candidate_is_never_written(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-raw-integrated-") as directory:
             root = Path(directory)
-            baseline = root / "baseline"
-            candidate = root / "candidate"
-            adapter = root / "adapter"
-            baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
-            candidate_ref = repository(candidate, probe=None, lock=b"candidate old lock\n", consumer=True)
-            repository(adapter, probe=b"reviewed raw adapter\n", lock=b"candidate lock\n", consumer=True)
-            external_lock = root / "baseline.lock"
-            external_lock.write_bytes(b"baseline lock\n")
-            output = root / "preparation.json"
-            old = prep.BASELINE_COMMIT
-            old_candidate = prep.CANDIDATE_COMMIT
-            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
-            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
-            prep.BASELINE_COMMIT = baseline_ref
-            prep.CANDIDATE_COMMIT = candidate_ref
-            prep.CANDIDATE_LOCK_BEFORE_SHA256 = hashlib.sha256(b"candidate old lock\n").hexdigest()
-            prep.CANDIDATE_LOCK_BEFORE_BYTES = len(b"candidate old lock\n")
-            try:
-                value = prep.prepare(
-                    baseline_root=baseline,
-                    candidate_root=candidate,
-                    adapter_root=adapter,
-                    candidate_ref=candidate_ref,
-                    candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
-                    baseline_lock=external_lock,
-                    output=output,
-                )
-            finally:
-                prep.BASELINE_COMMIT = old
-                prep.CANDIDATE_COMMIT = old_candidate
-                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
-                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
-            self.assertEqual(value["lane"], prep.LANE)
-            self.assertEqual(
-                sorted(prep._status_paths(value["baseline"]["after_overlay"]["status"])),
-                sorted([str(prep.CONSUMER_MANIFEST), str(prep.LOCK_PATH), str(prep.PROBE_PATH)]),
-            )
-            self.assertEqual((baseline / prep.PROBE_PATH).read_bytes(), b"reviewed raw adapter\n")
-            self.assertEqual((baseline / prep.LOCK_PATH).read_bytes(), b"baseline lock\n")
-            self.assertEqual((candidate / prep.LOCK_PATH).read_bytes(), b"candidate lock\n")
-            self.assertEqual(
-                sorted(prep._status_paths(value["candidate"]["after_overlay"]["status"])),
-                sorted([str(prep.CONSUMER_MANIFEST), str(prep.LOCK_PATH), str(prep.PROBE_PATH)]),
-            )
-            self.assertEqual(
-                value["candidate"]["lock_before_overlay"]["sha256"],
-                hashlib.sha256(b"candidate old lock\n").hexdigest(),
-            )
-            self.assertEqual(
-                value["candidate"]["lock"]["source_path"],
-                str(adapter / prep.LOCK_PATH),
-            )
-            self.assertEqual(
-                value["candidate"]["production_source_tree_before_sha256"],
-                value["candidate"]["production_source_tree_sha256"],
-            )
-            self.assertIn("no build", value["claim_scope"])
-            manifest = json.loads(
-                (Path(__file__).resolve().parents[1] / "tools/native_qualification/manifests/odf-raw-codec.json").read_text(encoding="utf-8")
-            )
-            manifest["baseline_commit"] = baseline_ref
-            manifest["candidate_commit"] = candidate_ref
+            value, baseline, candidate, adapter, protocol_p, pin_path, identity_path, output = self.run_prepare(root)
+            self.assertEqual(value["candidate"]["mode"], prep.CANDIDATE_MODE)
+            self.assertEqual(value["candidate"]["overlay_paths"], [])
+            self.assertEqual(value["candidate"]["before"], value["candidate"]["after"])
+            self.assertEqual(value["candidate_identity"]["path"], str(identity_path.resolve()))
+            self.assertEqual(value["protocol_p_pin"]["path"], str(pin_path.resolve()))
+            self.assertEqual(value["protocol_p_anchor"]["source_candidate_commit"], git(candidate, "rev-parse", "HEAD"))
+            self.assertEqual(value["protocol_p_anchor"]["current_commit"], git(protocol_p, "rev-parse", "HEAD"))
+            self.assertNotEqual(value["protocol_p_anchor"]["p1_commit"], value["protocol_p_anchor"]["current_commit"])
+            self.assertEqual(value["adapter"]["consumer_provenance_scope"], "three consumer files only; production closure is not equated to final C")
+            self.assertNotEqual(prep._production_source_tree(candidate), prep._production_source_tree(adapter))
+            self.assertEqual((candidate / prep.PROBE_PATH).read_bytes(), (adapter / prep.PROBE_PATH).read_bytes())
+            self.assertEqual(sorted(prep._status_paths(value["baseline"]["after_overlay"]["status"])), sorted([str(prep.CONSUMER_MANIFEST), str(prep.LOCK_PATH), str(prep.PROBE_PATH)]))
+            self.assertTrue(output.is_file())
+
+    def test_six_admission_refusals(self) -> None:
+        cases = ("old-lock", "missing-probe", "stale-c", "unexpected", "symlink", "proof-drift")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory(prefix=f"odf-raw-{case}-") as directory:
+                root = Path(directory)
+                baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+                mutated = copy.deepcopy(identity)
+                if case == "old-lock":
+                    old = b"old pre-final-C lock\n"
+                    (adapter / prep.LOCK_PATH).write_bytes(old)
+                    git(adapter, "add", str(prep.LOCK_PATH))
+                    git(adapter, "commit", "-qm", "old lock")
+                    mutated["candidate"]["perf_lock"] = {"path": str(prep.LOCK_PATH), "sha256": sha(adapter / prep.LOCK_PATH), "bytes": len(old)}
+                    mutated["sealed_by"]["candidate_sha256"] = prep._candidate_identity_digest(mutated["candidate"])
+                elif case == "missing-probe":
+                    (candidate / prep.PROBE_PATH).unlink()
+                elif case == "stale-c":
+                    mutated["candidate"]["commit"] = "c" * 40
+                    mutated["sealed_by"]["candidate_sha256"] = prep._candidate_identity_digest(mutated["candidate"])
+                elif case == "unexpected":
+                    (candidate / "unexpected.txt").write_text("dirty\n", encoding="utf-8")
+                elif case == "symlink":
+                    probe = adapter / prep.PROBE_PATH
+                    probe.unlink()
+                    probe.symlink_to(adapter / prep.LOCK_PATH)
+                elif case == "proof-drift":
+                    mutated["sealed_by"]["candidate_sha256"] = "0" * 64
+                identity_path.write_text(json.dumps(mutated, indent=2) + "\n", encoding="utf-8")
+                with self.assertRaises(prep.PreparationError):
+                    prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / f"{case}.json")
+                self.assertFalse((baseline / prep.PROBE_PATH).exists(), "refusal must precede baseline writes")
+
+    def test_rejects_mismatched_p1_envelope_root_tree_and_ancestry(self) -> None:
+        for field in ("root", "p1", "source_candidate", "ancestry"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory(prefix=f"odf-raw-p1-{field}-") as directory:
+                root = Path(directory)
+                baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+                pin = json.loads(pin_path.read_text(encoding="utf-8"))
+                if field == "root":
+                    pin["root"] = str(root / "other-p")
+                elif field == "p1":
+                    pin["p1"]["tree"] = "b" * 40
+                elif field == "source_candidate":
+                    pin["source_candidate"]["commit"] = "a" * 40
+                else:
+                    unrelated = git(baseline, "rev-parse", "HEAD")
+                    git(protocol_p, "fetch", "-q", str(baseline), "main")
+                    pin["p1"] = {"commit": unrelated, "tree": git(baseline, "rev-parse", "HEAD^{tree}")}
+                    identity["sealed_by"]["commit"] = unrelated
+                    identity["sealed_by"]["tree"] = pin["p1"]["tree"]
+                pin_path.write_text(json.dumps(pin, indent=2) + "\n", encoding="utf-8")
+                if field == "ancestry":
+                    identity["sealed_by"]["p1_pin_sha256"] = sha(pin_path)
+                    identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+                with self.assertRaises(prep.PreparationError):
+                    prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / f"{field}.json")
+
+    def test_rejects_assume_unchanged_production_edit_at_prepare(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-raw-assume-unchanged-") as directory:
+            root = Path(directory)
+            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, _ = self.fixture(root)
+            production = candidate / "crates/litchi-ops/Cargo.toml"
+            production.write_text(production.read_text(encoding="utf-8") + "# hidden edit\n", encoding="utf-8")
+            git(candidate, "update-index", "--assume-unchanged", str(production.relative_to(candidate)))
+            with self.assertRaises(prep.PreparationError):
+                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "assume-unchanged.json")
+
+    def test_rejects_p1_seal_fields_that_do_not_equal_the_pin(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-raw-p1-seal-") as directory:
+            root = Path(directory)
+            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+            identity["sealed_by"]["commit"] = "f" * 40
+            identity["sealed_by"]["tree"] = "e" * 40
+            identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+            with self.assertRaises(prep.PreparationError):
+                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "bad-seal.json")
+
+    def test_public_prepare_to_runner_positive_and_identity_rejection(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-raw-cli-composition-") as directory:
+            root = Path(directory)
+            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+            preparation_path = root / "preparation.json"
+            self.assertEqual(prep.main(["--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--baseline-lock", str(external_lock), "--output", str(preparation_path)]), 0)
+            value = json.loads(preparation_path.read_text(encoding="utf-8"))
+            manifest = json.loads((SOURCE_ROOT / "tools/native_qualification/manifests/odf-raw-codec.json").read_text(encoding="utf-8"))
+            manifest["baseline_commit"] = git(baseline, "rev-parse", "HEAD")
             manifest["source"]["candidate_consumer_manifest_sha256"] = value["candidate"]["consumer_manifest"]["sha256"]
-            manifest["source"]["candidate_lock_before_sha256"] = value["candidate"]["lock_before_overlay"]["sha256"]
-            manifest["source"]["candidate_lock_before_bytes"] = value["candidate"]["lock_before_overlay"]["bytes"]
+            manifest["source"]["candidate_consumer_manifest_bytes"] = value["candidate"]["consumer_manifest"]["bytes"]
             manifest["source"]["candidate_lock_sha256"] = value["candidate"]["lock"]["sha256"]
             manifest["source"]["candidate_lock_bytes"] = value["candidate"]["lock"]["bytes"]
             manifest["probe"]["sha256"] = value["candidate"]["probe"]["sha256"]
-            old_runner_candidate = runner.CANDIDATE_COMMIT
-            old_runner_lock_sha = runner.CANDIDATE_LOCK_SHA256
-            old_runner_lock_bytes = runner.CANDIDATE_LOCK_BYTES
-            old_runner_lock_before_sha = runner.CANDIDATE_LOCK_BEFORE_SHA256
-            old_runner_lock_before_bytes = runner.CANDIDATE_LOCK_BEFORE_BYTES
-            runner.CANDIDATE_COMMIT = candidate_ref
-            runner.CANDIDATE_LOCK_SHA256 = value["candidate"]["lock"]["sha256"]
-            runner.CANDIDATE_LOCK_BYTES = value["candidate"]["lock"]["bytes"]
-            runner.CANDIDATE_LOCK_BEFORE_SHA256 = value["candidate"]["lock_before_overlay"]["sha256"]
-            runner.CANDIDATE_LOCK_BEFORE_BYTES = value["candidate"]["lock_before_overlay"]["bytes"]
-            try:
-                manifest = runner.validate_manifest(manifest)
-            finally:
-                runner.CANDIDATE_COMMIT = old_runner_candidate
-                runner.CANDIDATE_LOCK_SHA256 = old_runner_lock_sha
-                runner.CANDIDATE_LOCK_BYTES = old_runner_lock_bytes
-                runner.CANDIDATE_LOCK_BEFORE_SHA256 = old_runner_lock_before_sha
-                runner.CANDIDATE_LOCK_BEFORE_BYTES = old_runner_lock_before_bytes
-            checked = runner._validate_preparation(
-                value,
-                hashlib.sha256(output.read_bytes()).hexdigest(),
-                manifest=manifest,
-                baseline_root=baseline.resolve(),
-                candidate_root=candidate.resolve(),
-                adapter_root=adapter.resolve(),
-                candidate_commit=candidate_ref,
-                candidate_lock_sha256=value["candidate"]["lock"]["sha256"],
-            )
-            self.assertEqual(checked["adapter"]["root"], str(adapter.resolve()))
-            mutated = json.loads(json.dumps(value))
-            mutated["candidate"]["probe"]["sha256"] = "0" * 64
-            with self.assertRaises(runner.RunnerError):
-                runner._validate_preparation(
-                    mutated,
-                    hashlib.sha256(json.dumps(mutated, sort_keys=True).encode()).hexdigest(),
-                    manifest=manifest,
-                    baseline_root=baseline.resolve(),
-                    candidate_root=candidate.resolve(),
-                    adapter_root=adapter.resolve(),
-                    candidate_commit=candidate_ref,
-                    candidate_lock_sha256=value["candidate"]["lock"]["sha256"],
-                )
-            mutated = json.loads(json.dumps(value))
-            mutated["candidate"]["lock_before_overlay"]["sha256"] = "0" * 64
-            with self.assertRaises(runner.RunnerError):
-                runner._validate_preparation(
-                    mutated,
-                    hashlib.sha256(json.dumps(mutated, sort_keys=True).encode()).hexdigest(),
-                    manifest=manifest,
-                    baseline_root=baseline.resolve(),
-                    candidate_root=candidate.resolve(),
-                    adapter_root=adapter.resolve(),
-                    candidate_commit=candidate_ref,
-                    candidate_lock_sha256=value["candidate"]["lock"]["sha256"],
-                )
-
-    def test_rejects_historical_candidate_and_dirty_baseline(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="odf-raw-prep-guard-") as directory:
-            root = Path(directory)
-            baseline = root / "baseline"
-            candidate = root / "candidate"
-            adapter = root / "adapter"
-            baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
-            candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
-            repository(adapter, probe=b"adapter\n", lock=b"candidate overlay\n", consumer=True)
-            external_lock = root / "baseline.lock"
-            external_lock.write_bytes(b"baseline\n")
-            old = prep.BASELINE_COMMIT
-            old_candidate = prep.CANDIDATE_COMMIT
-            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
-            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
-            prep.BASELINE_COMMIT = baseline_ref
-            prep.CANDIDATE_COMMIT = candidate_ref
-            prep.CANDIDATE_LOCK_BEFORE_SHA256 = hashlib.sha256(b"candidate\n").hexdigest()
-            prep.CANDIDATE_LOCK_BEFORE_BYTES = len(b"candidate\n")
-            try:
-                (baseline / "dirty.txt").write_text("dirty", encoding="utf-8")
-                with self.assertRaisesRegex(prep.PreparationError, "clean"):
-                    prep.prepare(
-                        baseline_root=baseline,
-                        candidate_root=candidate,
-                        adapter_root=adapter,
-                        candidate_ref=candidate_ref,
-                        candidate_lock_sha256=hashlib.sha256(b"candidate\n").hexdigest(),
-                        baseline_lock=external_lock,
-                        output=root / "dirty.json",
-                    )
-                (baseline / "dirty.txt").unlink()
-                with self.assertRaisesRegex(prep.PreparationError, "historical"):
-                    prep.prepare(
-                        baseline_root=baseline,
-                        candidate_root=candidate,
-                        adapter_root=adapter,
-                        candidate_ref=prep.HISTORICAL_CANDIDATE,
-                        candidate_lock_sha256=hashlib.sha256(b"candidate\n").hexdigest(),
-                        baseline_lock=external_lock,
-                        output=root / "historical.json",
-                    )
-            finally:
-                prep.BASELINE_COMMIT = old
-                prep.CANDIDATE_COMMIT = old_candidate
-                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
-                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
-
-    def test_output_path_is_rejected_before_any_overlay(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="odf-raw-prep-output-guard-") as directory:
-            root = Path(directory)
-            baseline = root / "baseline"
-            candidate = root / "candidate"
-            adapter = root / "adapter"
-            baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
-            candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
-            repository(adapter, probe=b"adapter\n", lock=b"candidate\n", consumer=True)
-            external_lock = root / "baseline.lock"
-            external_lock.write_bytes(b"baseline\n")
-            before_candidate = {
-                path: path.read_bytes() for path in (candidate / prep.CONSUMER_MANIFEST, candidate / prep.LOCK_PATH)
-            }
-            old = prep.BASELINE_COMMIT
-            old_candidate = prep.CANDIDATE_COMMIT
-            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
-            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
-            prep.BASELINE_COMMIT = baseline_ref
-            prep.CANDIDATE_COMMIT = candidate_ref
-            prep.CANDIDATE_LOCK_BEFORE_SHA256 = hashlib.sha256(b"candidate\n").hexdigest()
-            prep.CANDIDATE_LOCK_BEFORE_BYTES = len(b"candidate\n")
-            try:
-                with self.assertRaisesRegex(prep.PreparationError, "outside source roots"):
-                    prep.prepare(
-                        baseline_root=baseline,
-                        candidate_root=candidate,
-                        adapter_root=adapter,
-                        candidate_ref=candidate_ref,
-                        candidate_lock_sha256=hashlib.sha256(b"candidate\n").hexdigest(),
-                        baseline_lock=external_lock,
-                        output=candidate / "preparation.json",
-                    )
-            finally:
-                prep.BASELINE_COMMIT = old
-                prep.CANDIDATE_COMMIT = old_candidate
-                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
-                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
-            self.assertEqual(before_candidate, {path: path.read_bytes() for path in before_candidate})
-            self.assertFalse((baseline / prep.PROBE_PATH).exists())
-
-    def test_public_prepare_main_to_real_runner_admission(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="odf-raw-cli-composition-") as directory:
-            root = Path(directory)
-            baseline = root / "baseline"
-            candidate = root / "candidate"
-            adapter = root / "adapter"
-            baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
-            candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
-            repository(adapter, probe=b"adapter\n", lock=b"candidate overlay\n", consumer=True)
-            external_lock = root / "baseline.lock"
-            external_lock.write_bytes(b"baseline\n")
-            manifest = json.loads(
-                (Path(__file__).resolve().parents[1] / "tools/native_qualification/manifests/odf-raw-codec.json").read_text(encoding="utf-8")
-            )
-            manifest["baseline_commit"] = baseline_ref
-            manifest["candidate_commit"] = candidate_ref
-            manifest["source"]["candidate_consumer_manifest_sha256"] = hashlib.sha256(
-                (adapter / prep.CONSUMER_MANIFEST).read_bytes()
-            ).hexdigest()
-            manifest["source"]["candidate_lock_before_sha256"] = hashlib.sha256(b"candidate\n").hexdigest()
-            manifest["source"]["candidate_lock_before_bytes"] = len(b"candidate\n")
-            manifest["source"]["candidate_lock_sha256"] = hashlib.sha256(b"candidate overlay\n").hexdigest()
-            manifest["source"]["candidate_lock_bytes"] = len(b"candidate overlay\n")
-            manifest["probe"]["sha256"] = hashlib.sha256(
-                (adapter / prep.PROBE_PATH).read_bytes()
-            ).hexdigest()
+            manifest["probe"]["bytes"] = value["candidate"]["probe"]["bytes"]
             manifest_path = root / "manifest.json"
             manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-            preparation_path = root / "preparation.json"
-            old_baseline = prep.BASELINE_COMMIT
-            old_candidate = prep.CANDIDATE_COMMIT
-            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
-            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
-            old_runner_candidate = runner.CANDIDATE_COMMIT
-            old_runner_lock_sha = runner.CANDIDATE_LOCK_SHA256
-            old_runner_lock_bytes = runner.CANDIDATE_LOCK_BYTES
-            old_runner_lock_before_sha = runner.CANDIDATE_LOCK_BEFORE_SHA256
-            old_runner_lock_before_bytes = runner.CANDIDATE_LOCK_BEFORE_BYTES
             old_build = runner.PairedRunner.build
-            prep.BASELINE_COMMIT = baseline_ref
-            prep.CANDIDATE_COMMIT = candidate_ref
-            prep.CANDIDATE_LOCK_BEFORE_SHA256 = manifest["source"]["candidate_lock_before_sha256"]
-            prep.CANDIDATE_LOCK_BEFORE_BYTES = manifest["source"]["candidate_lock_before_bytes"]
-            runner.CANDIDATE_COMMIT = candidate_ref
-            runner.CANDIDATE_LOCK_SHA256 = manifest["source"]["candidate_lock_sha256"]
-            runner.CANDIDATE_LOCK_BYTES = manifest["source"]["candidate_lock_bytes"]
-            runner.CANDIDATE_LOCK_BEFORE_SHA256 = manifest["source"]["candidate_lock_before_sha256"]
-            runner.CANDIDATE_LOCK_BEFORE_BYTES = manifest["source"]["candidate_lock_before_bytes"]
+            instances: list[runner.PairedRunner] = []
 
             def admit_endpoints(instance: runner.PairedRunner) -> None:
+                instances.append(instance)
                 instance._endpoint("baseline", full=True)
                 instance._endpoint("candidate", full=True)
 
             runner.PairedRunner.build = admit_endpoints  # type: ignore[method-assign]
             try:
-                self.assertEqual(
-                    prep.main(
-                        [
-                            "--baseline-root", str(baseline),
-                            "--candidate-root", str(candidate),
-                            "--adapter-root", str(adapter),
-                            "--candidate-ref", candidate_ref,
-                            "--candidate-lock-sha256", manifest["source"]["candidate_lock_sha256"],
-                            "--baseline-lock", str(external_lock),
-                            "--output", str(preparation_path),
-                        ]
-                    ),
-                    0,
-                )
-                candidate_lock = manifest["source"]["candidate_lock_sha256"]
-                self.assertEqual(
-                    runner.main(
-                        [
-                            "--manifest", str(manifest_path),
-                            "--preparation", str(preparation_path),
-                            "--baseline-root", str(baseline),
-                            "--candidate-root", str(candidate),
-                            "--adapter-root", str(adapter),
-                            "--candidate-commit", candidate_ref,
-                            "--candidate-lock-sha256", candidate_lock,
-                            "--output", str(root / "runner-output"),
-                            "--target-root", str(root / "target"),
-                            "--tmp-root", str(root / "tmp"),
-                            "--cpu", "0",
-                            "--phase", "build",
-                        ]
-                    ),
-                    0,
-                )
-                bad_manifest = dict(manifest)
-                bad_manifest["source"] = dict(manifest["source"])
-                bad_manifest["source"]["candidate_lock_sha256"] = "0" * 64
-                bad_manifest_path = root / "bad-manifest.json"
-                bad_manifest_path.write_text(json.dumps(bad_manifest, indent=2) + "\n", encoding="utf-8")
-                self.assertEqual(
-                    runner.main(
-                        [
-                            "--manifest", str(bad_manifest_path),
-                            "--preparation", str(preparation_path),
-                            "--baseline-root", str(baseline),
-                            "--candidate-root", str(candidate),
-                            "--adapter-root", str(adapter),
-                            "--candidate-commit", candidate_ref,
-                            "--candidate-lock-sha256", candidate_lock,
-                            "--output", str(root / "bad-output"),
-                            "--target-root", str(root / "bad-target"),
-                            "--tmp-root", str(root / "bad-tmp"),
-                            "--cpu", "0",
-                            "--phase", "build",
-                        ]
-                    ),
-                    2,
-                )
+                args = ["--manifest", str(manifest_path), "--preparation", str(preparation_path), "--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--output", str(root / "runner-output"), "--target-root", str(root / "target"), "--tmp-root", str(root / "tmp"), "--cpu", "0", "--phase", "build"]
+                self.assertEqual(runner.main(args), 0)
+                self.assertEqual(len(instances), 1)
+                bad_seal = copy.deepcopy(identity)
+                bad_seal["sealed_by"]["commit"] = "f" * 40
+                bad_seal["sealed_by"]["tree"] = "e" * 40
+                bad_seal_path = root / "bad-seal-identity.json"
+                bad_seal_path.write_text(json.dumps(bad_seal, indent=2) + "\n", encoding="utf-8")
+                bad_seal_args = list(args)
+                bad_seal_args[bad_seal_args.index(str(identity_path))] = str(bad_seal_path)
+                bad_seal_args[bad_seal_args.index(str(root / "runner-output"))] = str(root / "bad-seal-output")
+                bad_seal_args[bad_seal_args.index(str(root / "target"))] = str(root / "bad-seal-target")
+                bad_seal_args[bad_seal_args.index(str(root / "tmp"))] = str(root / "bad-seal-tmp")
+                self.assertEqual(runner.main(bad_seal_args), 2)
+                drifted = json.loads(identity_path.read_text(encoding="utf-8"))
+                identity_path.write_text(json.dumps(drifted, separators=(",", ":")) + "\n", encoding="utf-8")
+                with self.assertRaises(runner.RunnerError):
+                    instances[0]._endpoint("candidate", full=True)
+                broken = json.loads(identity_path.read_text(encoding="utf-8"))
+                broken["candidate"]["tree"] = "d" * 40
+                broken["sealed_by"]["candidate_sha256"] = prep._candidate_identity_digest(broken["candidate"])
+                broken_path = root / "broken-identity.json"
+                broken_path.write_text(json.dumps(broken, indent=2) + "\n", encoding="utf-8")
+                bad_args = list(args)
+                bad_args[bad_args.index(str(identity_path))] = str(broken_path)
+                bad_args[bad_args.index(str(root / "runner-output"))] = str(root / "bad-output")
+                bad_args[bad_args.index(str(root / "target"))] = str(root / "bad-target")
+                bad_args[bad_args.index(str(root / "tmp"))] = str(root / "bad-tmp")
+                self.assertEqual(runner.main(bad_args), 2)
             finally:
                 runner.PairedRunner.build = old_build
-                runner.CANDIDATE_COMMIT = old_runner_candidate
-                runner.CANDIDATE_LOCK_SHA256 = old_runner_lock_sha
-                runner.CANDIDATE_LOCK_BYTES = old_runner_lock_bytes
-                runner.CANDIDATE_LOCK_BEFORE_SHA256 = old_runner_lock_before_sha
-                runner.CANDIDATE_LOCK_BEFORE_BYTES = old_runner_lock_before_bytes
-                prep.BASELINE_COMMIT = old_baseline
-                prep.CANDIDATE_COMMIT = old_candidate
-                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
-                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
 
 
 if __name__ == "__main__":

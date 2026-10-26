@@ -1,27 +1,31 @@
 {
-  "schema": "litchi.odf.raw-codec-qualification.manifest.v1",
+  "schema": "litchi.odf.raw-codec-qualification.manifest.v2",
   "lane": "odf-raw-codec",
   "baseline_commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
-  "candidate_commit": "33a0a63d3553712c1276da592f7846a0c7dcabd6",
   "source": {
     "consumer_manifest": "tools/perf-baseline/Cargo.toml",
     "production_manifest": "crates/litchi-ops/Cargo.toml",
     "lock_path": "tools/perf-baseline/Cargo.lock",
+    "candidate_mode": "integrated_final_c",
+    "candidate_identity_schema": "litchi.odf.raw-codec-qualification.candidate-identity.v2",
+    "protocol_p_pin_schema": "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1",
     "candidate_consumer_manifest_sha256": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
-    "candidate_lock_before_sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
-    "candidate_lock_before_bytes": 56941,
+    "candidate_consumer_manifest_bytes": 8181,
     "candidate_lock_sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",
     "candidate_lock_bytes": 57961,
+    "candidate_probe_bytes": 65903,
     "baseline_overlay": [
       "tools/perf-baseline/Cargo.toml",
       "tools/perf-baseline/Cargo.lock",
       "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
     ],
-    "candidate_overlay": [
+    "candidate_overlay": [],
+    "candidate_integrated_files": [
       "tools/perf-baseline/Cargo.toml",
       "tools/perf-baseline/Cargo.lock",
       "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
-    ]
+    ],
+    "adapter_provenance_scope": "three consumer files only; production closure is not equated to final C"
   },
   "probe": {
     "path": "tools/perf-baseline/examples/odf_raw_codec_qualification.rs",
@@ -37,6 +41,7 @@
     },
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128,
+    "bytes": 65903,
     "sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
   },
   "build": {
