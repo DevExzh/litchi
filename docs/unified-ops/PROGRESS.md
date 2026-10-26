@@ -6420,3 +6420,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   and ref are retired, reaching cumulative cleanup of 284 worktrees and
   446 refs. The census is again 76 heads/65 worktrees; the DOCX native leaf
   is the only active unmerged unified branch. Nothing is pushed.
+
+  All 31 feature-matrix profiles pass in the current-7c diagnostic (165u).
+  Root verifies source, four locks, logs, target trace and resource/process
+  guards; the run continues to Clippy. The DOCX native leaf adds its missing
+  regression module to the existing tooling-unit row, preserving 53 gate
+  rows. Root verifies the registration and a conflict-free prospective merge;
+  compiler validation remains queued. Protocol v13 is returned because it
+  records identities without producing the composed P1/P2 artifacts, and
+  incorrectly orders DOCX after candidate selection. A concrete v14 repair
+  is required before actual final-source binding. All 29 native groups and
+  final all-65 remain pending. Nothing is pushed.
