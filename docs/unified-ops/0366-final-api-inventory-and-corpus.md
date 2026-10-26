@@ -1,7 +1,7 @@
 # 0366 — final API inventory and OfficeCLI corpus
 
 Date: 2026-10-26. Branch `uo2/fin-census`, cut from trunk `55b5616c7d` and
-merged with trunk `df7cabe23f` (a documentation-only change). This record
+merged with trunk `df7cabe23f` and then `67315868f5` (both documentation-only). This record
 gives the final public-API debt inventory over every workspace library and
 re-records the OfficeCLI example corpus. It claims no performance result.
 
