@@ -75,6 +75,18 @@ ROOT_TYPES: dict[int, str] = {
     3047: ".TSD.GuideStorageArchive",
     3056: ".TSD.CommentStorageArchive",
     3097: ".TSD.StandinCaptionArchive",
+    5020: ".TSCH.ChartStylePreset",
+    5021: ".TSCH.ChartDrawableArchive",
+    5022: ".TSCH.ChartStyleArchive",
+    5023: ".TSCH.ChartNonStyleArchive",
+    5024: ".TSCH.LegendStyleArchive",
+    5025: ".TSCH.LegendNonStyleArchive",
+    5026: ".TSCH.ChartAxisStyleArchive",
+    5027: ".TSCH.ChartAxisNonStyleArchive",
+    5028: ".TSCH.ChartSeriesStyleArchive",
+    5029: ".TSCH.ChartSeriesNonStyleArchive",
+    5030: ".TSCH.ReferenceLineStyleArchive",
+    5031: ".TSCH.ReferenceLineNonStyleArchive",
     10024: ".TSWP.TextStylePresetArchive",
 }
 
