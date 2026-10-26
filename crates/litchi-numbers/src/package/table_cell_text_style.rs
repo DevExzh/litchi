@@ -809,7 +809,7 @@ pub(super) fn materialize_cell(
     let encoded = crate::cell::wire::encode(cell, &limits).map_err(|_| Error::InvalidSource)?;
     let (tile_index, tile_data) =
         topology::message(working, *tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
-    let written = litchi_numbers_wire::table_write::tile_set_cell(
+    let written = litchi_numbers_wire::table_write::tile_set_cell_in_field_order(
         tile_data,
         local,
         position.column(),
