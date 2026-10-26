@@ -425,7 +425,7 @@ mod tests {
     fn package_without_parts(names: &[&str]) -> Result<Package> {
         let package = Package::new()?;
         let mut opc = package.opc_package().clone();
-        for name in names {
+        for &name in names {
             let part = PackURI::new(name).expect("static property URI");
             let relationship_ids: Vec<_> = opc
                 .rels()
