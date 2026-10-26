@@ -182,6 +182,31 @@ def commit_shape_fixture(crate: str, modules: tuple[str, ...], methods: tuple[st
     return {"root": 0, "includes_private": False, "index": index, "paths": paths}
 
 
+def single_type_fixture(module: str, name: str, *, span_file: str = "src/lib.rs") -> dict:
+    """``fixture::<module>::<name>`` with one ``&mut self`` method ``apply_change``."""
+    def item(name, kind, inner, **extra):
+        return {"name": name, "crate_id": 0, "visibility": "public",
+                "inner": {kind: inner}, **extra}
+
+    method = {"sig": {"inputs": [["self", {"borrowed_ref": {"is_mutable": True}}]],
+                      "output": {"primitive": "unit"}},
+              "generics": {"params": []}}
+    index = {
+        "0": item("fixture", "module", {"items": [1], "is_crate": True}),
+        "1": item(module, "module", {"items": [2], "is_crate": False}),
+        "2": item(name, "struct", {"fields": [], "impls": [3]},
+                  span={"filename": span_file, "begin": [1, 1], "end": [2, 1]}),
+        "3": item(name, "impl", {"items": [4]}, span={}),
+        "4": item("apply_change", "function", method),
+    }
+    paths = {
+        "0": {"path": ["fixture"], "kind": "module", "crate_id": 0},
+        "1": {"path": ["fixture", module], "kind": "module", "crate_id": 0},
+        "2": {"path": ["fixture", module, name], "kind": "struct", "crate_id": 0},
+    }
+    return {"root": 0, "includes_private": False, "index": index, "paths": paths}
+
+
 class InventoryOwnerCoverageTests(unittest.TestCase):
     def test_nominal_coverage_requires_the_local_definition_identity(self):
         methods = ("package", "into_package", "patch", "diagnostics", "into_parts")
@@ -410,6 +435,32 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
             "rename to the focused module's Edit",
         )
         self.assertEqual(findings, [expected])
+
+    def _rows(self, document):
+        return list(inventory.rows(document, "fixture", result_rules=[],
+                                   immutable_owners=set(), delegated_globs=set()))
+
+    def test_raw_reader_is_the_permitted_mutable_codec_model(self):
+        self.assertEqual(self._rows(single_type_fixture("raw", "Reader")), [])
+        self.assertEqual(
+            [row[:2] for row in self._rows(single_type_fixture("model", "Reader"))],
+            [("mut_draft", "fixture::model::Reader::apply_change")],
+        )
+
+    def test_generated_wire_schema_names_are_not_staging_types(self):
+        generated = ("/w/target/debug/build/litchi-iwa-protos-0123/out/tswp.rs")
+        self.assertEqual(self._rows(single_type_fixture(
+            "tswp", "UndoTransaction", span_file=generated)), [])
+        self.assertEqual(
+            sorted(row[0] for row in self._rows(single_type_fixture("tswp", "UndoTransaction"))),
+            ["edit_type", "transaction_type"],
+        )
+        self.assertEqual(
+            [row[0] for row in self._rows(single_type_fixture(
+                "builder_out", "HeaderSizeEdit", span_file="src/build/x/out.rs"))],
+            ["edit_type"],
+            "only a build-script out directory counts as generated",
+        )
 
     def test_missing_policy_owner_fails_closed(self):
         surface = inventory.Inventory(owner_fixture(), "fixture")
