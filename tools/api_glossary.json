@@ -20377,6 +20377,54 @@
           ],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::number_attachment::anchors",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::number_attachment::anchor",
+          "inputs": [
+            "storage",
+            "position",
+            "object",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::number_attachment::settings",
+          "inputs": [
+            "payload",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::number_attachment::encode",
+          "inputs": [
+            "settings",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::number_attachment::with_settings",
+          "inputs": [
+            "payload",
+            "settings",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
         }
       ]
     },
