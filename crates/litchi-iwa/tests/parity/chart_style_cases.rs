@@ -298,6 +298,24 @@ impl Components {
         Ok(Self { catalog, archives })
     }
 
+    /// Every IWA object of every component.
+    pub(crate) fn objects(
+        &self,
+    ) -> impl Iterator<Item = &litchi_iwa_archive::iwa::ArchiveObject> + Clone {
+        self.archives
+            .iter()
+            .flat_map(|(_, archive)| archive.objects.iter())
+    }
+
+    /// The length of a package member, if present.
+    pub(crate) fn member_size(&self, name: &str) -> Option<u64> {
+        self.catalog
+            .package()
+            .iter()
+            .find(|entry| entry.name() == name)
+            .map(|entry| entry.data().len() as u64)
+    }
+
     /// `(component index, message index)` of the unique `message_type`
     /// message of object `identifier`.
     pub(crate) fn locate(&self, identifier: u64, message_type: u32) -> TestResult<(usize, usize)> {
