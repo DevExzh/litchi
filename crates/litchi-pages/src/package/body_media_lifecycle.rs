@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_common::media::embedded::{AssetId, Embedded};
 use litchi_iwa_common::wire::remove_repeated_length_delimited_field_where;
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_text::TextPosition;
@@ -128,6 +129,27 @@ pub enum Refusal {
     /// family does not prove.
     #[error("the selected Pages body media has a shared or split graph")]
     SharedGraph,
+    /// Replacement data is empty.
+    #[error("replacement media data is empty")]
+    EmptyData,
+    /// Only a movie has a poster image.
+    #[error("a Pages body {kind} has no poster image")]
+    NoPoster {
+        /// The selected kind.
+        kind: &'static str,
+    },
+    /// The replacement's signature names another media type than the asset.
+    #[error("the replacement media type does not match the asset")]
+    MismatchedType,
+    /// The asset is not materialized in the package.
+    #[error("the media asset is not materialized in this package")]
+    NotMaterialized,
+    /// The selector resolves no section.
+    #[error("the Pages document has no such section")]
+    SectionNotFound,
+    /// No embedded asset reachable from the document has the identifier.
+    #[error("no reachable Pages media asset has the identifier")]
+    AssetNotFound,
     /// No operation was staged.
     #[error("no body-media operation is staged")]
     NoStagedOperation,
@@ -145,8 +167,12 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::NotFound { .. } => RefusalKind::NotFound,
-            Self::NotMedia { .. } => RefusalKind::UnsupportedTarget,
+            Self::NotFound { .. } | Self::AssetNotFound | Self::SectionNotFound => {
+                RefusalKind::NotFound
+            },
+            Self::NotMedia { .. } | Self::NoPoster { .. } => RefusalKind::UnsupportedTarget,
+            Self::EmptyData | Self::MismatchedType => RefusalKind::InvalidValue,
+            Self::NotMaterialized => RefusalKind::UnsupportedContent,
             Self::Commented | Self::SharedGraph | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
@@ -204,10 +230,21 @@ impl From<caption::Error> for Error {
 }
 
 /// The staged operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
     Remove(DrawableSelector),
     Duplicate(DrawableSelector, TextPosition),
+    Replace(DrawableSelector, Asset, Arc<[u8]>),
+    ReplaceAsset(AssetId, Arc<[u8]>),
+}
+
+/// Which embedded asset of a drawable a replacement targets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Asset {
+    /// The image, movie or audio data.
+    Data,
+    /// A movie's poster image.
+    Poster,
 }
 
 /// One body-media lifecycle operation staged against an immutable package.
@@ -256,6 +293,62 @@ impl Edit<'_> {
         self.stage(Operation::Duplicate(selector, anchor))
     }
 
+    /// Stage new bytes for the media data of one body image, movie or audio
+    /// clip. The data asset keeps its identifier, so every drawable sharing
+    /// it (a duplicate) shows the replacement.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a shape, empty data and a second operation.
+    pub fn replace_data(
+        &mut self,
+        selector: impl Into<DrawableSelector>,
+        data: &[u8],
+    ) -> Result<&mut Self, Error> {
+        let selector = selector.into();
+        media_kind(selector)?;
+        if data.is_empty() {
+            return Err(Refusal::EmptyData.into());
+        }
+        self.stage(Operation::Replace(selector, Asset::Data, Arc::from(data)))
+    }
+
+    /// Stage new bytes for the poster image of one body movie.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a non-movie, empty data and a second operation.
+    pub fn replace_poster(
+        &mut self,
+        selector: impl Into<DrawableSelector>,
+        data: &[u8],
+    ) -> Result<&mut Self, Error> {
+        let selector = selector.into();
+        if !matches!(selector, DrawableSelector::Movie(_)) {
+            return Err(Refusal::NoPoster {
+                kind: kind_name(selector),
+            }
+            .into());
+        }
+        if data.is_empty() {
+            return Err(Refusal::EmptyData.into());
+        }
+        self.stage(Operation::Replace(selector, Asset::Poster, Arc::from(data)))
+    }
+
+    /// Stage new bytes for one embedded asset reachable from the document,
+    /// keeping its identifier.
+    ///
+    /// # Errors
+    ///
+    /// Refuses empty data and a second operation.
+    pub fn replace_asset(&mut self, asset: AssetId, data: &[u8]) -> Result<&mut Self, Error> {
+        if data.is_empty() {
+            return Err(Refusal::EmptyData.into());
+        }
+        self.stage(Operation::ReplaceAsset(asset, Arc::from(data)))
+    }
+
     fn stage(&mut self, operation: Operation) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
             return Err(Refusal::OperationAlreadyStaged.into());
@@ -266,13 +359,26 @@ impl Edit<'_> {
 
     /// Validate and publish the staged operation.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Refusal::NoStagedOperation)?;
+        let operation = self.operation.clone().ok_or(Refusal::NoStagedOperation)?;
         if !self.source.state.source.source_is_exact() {
             return Err(Refusal::UnsupportedSource.into());
         }
         let (package, diagnostics) = match operation {
             Operation::Remove(selector) => remove(self.source, selector)?,
             Operation::Duplicate(selector, anchor) => duplicate(self.source, selector, anchor)?,
+            Operation::Replace(selector, asset, data) => {
+                let identifier = asset_identifier(self.source, selector, asset)?;
+                replace(self.source, identifier, &data)?
+            },
+            Operation::ReplaceAsset(asset, data) => {
+                if !media_assets(self.source, graph::ROOT_OBJECT_IDENTIFIER)?
+                    .iter()
+                    .any(|embedded| embedded.data() == asset)
+                {
+                    return Err(Refusal::AssetNotFound.into());
+                }
+                replace(self.source, asset.get(), &data)?
+            },
         };
         let target = package.state.source.shared_source();
         Ok(Commit {
@@ -390,6 +496,59 @@ impl Commit {
 }
 
 impl Package {
+    /// The embedded media assets reachable from the document's object graph
+    /// (the host's `media_assets`), ordered by identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidSource`] for invalid package metadata.
+    pub fn media_assets(&self) -> Result<Vec<Embedded>, Error> {
+        media_assets(self, graph::ROOT_OBJECT_IDENTIFIER)
+    }
+
+    /// The embedded media assets reachable from one section's object graph
+    /// (the host's `section_media_assets`).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SectionNotFound`] when the selector resolves no section.
+    pub fn section_media_assets<'selector>(
+        &self,
+        section: impl Into<crate::SectionSelector<'selector>>,
+    ) -> Result<Vec<Embedded>, Error> {
+        let position = self
+            .select_section(section.into())
+            .map_err(|_| Refusal::SectionNotFound)?
+            .ok_or(Refusal::SectionNotFound)?
+            .index();
+        let identifier = super::section_text::native_body(self)
+            .map_err(|_| Error::InvalidSource)?
+            .section_identifier(position)
+            .ok_or(Error::InvalidSource)?;
+        media_assets(self, identifier)
+    }
+
+    /// The bytes of one embedded asset reachable from the document.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::AssetNotFound`] for an unreachable asset,
+    /// [`Refusal::NotMaterialized`] for one without a `Data/` member.
+    pub fn extract_media(&self, asset: AssetId) -> Result<Vec<u8>, Error> {
+        let embedded = media_assets(self, graph::ROOT_OBJECT_IDENTIFIER)?
+            .into_iter()
+            .find(|embedded| embedded.data() == asset)
+            .ok_or(Refusal::AssetNotFound)?;
+        let path = embedded.package_path().ok_or(Refusal::NotMaterialized)?;
+        self.state
+            .source
+            .package()
+            .iter()
+            .find(|entry| entry.name() == path)
+            .map(|entry| entry.data().to_vec())
+            .ok_or_else(|| Refusal::NotMaterialized.into())
+    }
+
     /// Begin a lifecycle operation on the body's images, movies and audio
     /// clips.
     #[must_use]
@@ -814,7 +973,7 @@ fn remove(source: &Package, selector: DrawableSelector) -> Result<(Package, Diag
         }
     }
     let deletions = deletions.iter().map(String::as_str).collect::<Vec<_>>();
-    let candidate = graph::publish_changes(source, archives, &[], &deletions)?;
+    let candidate = graph::publish_changes(source, archives, &[], &[], &deletions)?;
     verify_removed(&candidate, selector, &media)?;
     Ok((
         candidate,
@@ -1442,4 +1601,252 @@ fn resolve_drawable(
         .anchors
         .iter()
         .any(|anchor| anchor.drawable == drawable))
+}
+
+const IMAGE_DATA_FIELD: u32 = 11;
+const MOVIE_DATA_FIELD: u32 = 14;
+const MOVIE_POSTER_FIELD: u32 = 15;
+const DATA_INFO_DIGEST_FIELD: u32 = 2;
+const DATA_INFO_LENGTH_FIELD: u32 = 18;
+const METADATA_DATAS_FIELD: u32 = 4;
+
+/// The data identifier `asset` of the selected drawable references.
+fn asset_identifier(
+    package: &Package,
+    selector: DrawableSelector,
+    asset: Asset,
+) -> Result<u64, Error> {
+    let mut budget = Budget::new(package)?;
+    let index = ObjectIndex::new(package, &mut budget)?;
+    let body = graph::resolve_body(&index, &mut budget)?;
+    let selected =
+        graph::select_drawable(&index, &body, selector, &mut budget)?.ok_or(Refusal::NotFound {
+            kind: kind_name(selector),
+            position: selector.position(),
+        })?;
+    let field = match (selector, asset) {
+        (DrawableSelector::Image(_), _) => IMAGE_DATA_FIELD,
+        (_, Asset::Data) => MOVIE_DATA_FIELD,
+        (_, Asset::Poster) => MOVIE_POSTER_FIELD,
+    };
+    let view = budget.parse(selected.payload, 1)?;
+    let reference = graph::unique_field(&view, field, 2)?.ok_or(Error::InvalidSource)?;
+    let reference = budget.parse(reference.payload(), 2)?;
+    let identifier = graph::unique_field(&reference, 1, 0)?.ok_or(Error::InvalidSource)?;
+    Ok(graph::canonical_varint(identifier.payload())?)
+}
+
+/// The `DataInfo` with a new digest and materialized length (the host's
+/// `patch_data_info`: existing fields rewritten in place, missing ones
+/// appended).
+fn patched_data_info(info: &[u8], digest: &[u8], length: u64) -> Result<Vec<u8>, Error> {
+    let view =
+        litchi_iwa_common::wire::WireView::parse(info, litchi_iwa_common::WireLimits::default())
+            .map_err(graph::map_wire_error)?;
+    let mut output = Vec::with_capacity(info.len() + digest.len());
+    let (mut digests, mut lengths) = (0usize, 0usize);
+    for field in view.fields() {
+        match field.number() {
+            DATA_INFO_DIGEST_FIELD => {
+                digests += 1;
+                litchi_iwa_common::wire::append_length_delimited_field(
+                    &mut output,
+                    DATA_INFO_DIGEST_FIELD,
+                    digest,
+                    litchi_iwa_common::WireLimits::default(),
+                )
+                .map_err(graph::map_wire_error)?;
+            },
+            DATA_INFO_LENGTH_FIELD => {
+                lengths += 1;
+                litchi_iwa_common::wire::append_varint_field(
+                    &mut output,
+                    DATA_INFO_LENGTH_FIELD,
+                    length,
+                )
+                .map_err(graph::map_wire_error)?;
+            },
+            _ => output.extend_from_slice(field.raw()),
+        }
+    }
+    if digests > 1 || lengths > 1 {
+        return Err(Error::InvalidSource);
+    }
+    if digests == 0 {
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut output,
+            DATA_INFO_DIGEST_FIELD,
+            digest,
+            litchi_iwa_common::WireLimits::default(),
+        )
+        .map_err(graph::map_wire_error)?;
+    }
+    if lengths == 0 {
+        litchi_iwa_common::wire::append_varint_field(&mut output, DATA_INFO_LENGTH_FIELD, length)
+            .map_err(graph::map_wire_error)?;
+    }
+    Ok(output)
+}
+
+fn replace(
+    source: &Package,
+    identifier: u64,
+    data: &[u8],
+) -> Result<(Package, Diagnostics), Error> {
+    use sha1::Digest as _;
+    let metadata = objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let member =
+        objects::data_member(&metadata.payload, identifier)?.ok_or(Refusal::NotMaterialized)?;
+    let current = source
+        .state
+        .source
+        .package()
+        .iter()
+        .find(|entry| entry.name() == member)
+        .ok_or(Refusal::NotMaterialized)?;
+    let declared = litchi_iwa_common::media::Type::from_extension(
+        std::path::Path::new(&member)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or(""),
+    );
+    let detected = litchi_iwa_common::media::Type::from_bytes(data);
+    if declared != litchi_iwa_common::media::Type::Unknown
+        && detected != litchi_iwa_common::media::Type::Unknown
+        && declared != detected
+    {
+        return Err(Refusal::MismatchedType.into());
+    }
+    let _ = current;
+    let digest = sha1::Sha1::digest(data);
+    let length = data.len() as u64;
+    let mut patched = 0usize;
+    let payload = litchi_iwa_common::wire::transform_length_delimited_fields_at_path(
+        &metadata.payload,
+        &[METADATA_DATAS_FIELD],
+        |info| {
+            let view = litchi_iwa_common::wire::WireView::parse(
+                info,
+                litchi_iwa_common::WireLimits::default(),
+            )?;
+            let id = view
+                .fields()
+                .find(|field| field.number() == 1)
+                .and_then(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+                .map(|(value, _)| value);
+            if id != Some(identifier) {
+                return Ok(info.to_vec());
+            }
+            patched += 1;
+            patched_data_info(info, &digest, length)
+                .map_err(|_| litchi_iwa_common::Error::InvalidFormat("DataInfo".to_owned()))
+        },
+    )
+    .map_err(graph::map_wire_error)?;
+    if patched != 1 {
+        return Err(Error::InvalidSource);
+    }
+    let archive_limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(graph::map_archive_error)?;
+    let mut archives: Vec<(Arc<str>, Archive)> = Vec::new();
+    let archive = editable(source, &mut archives, &metadata.component)?;
+    archive
+        .object_mut(metadata.object)
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
+            metadata.message_index,
+            RawMessage {
+                type_: METADATA_MESSAGE_TYPE,
+                data: payload,
+            },
+            archive_limits,
+        )
+        .map_err(graph::map_core_error)?;
+    let candidate = graph::publish_changes(source, archives, &[], &[(member.as_str(), data)], &[])?;
+    let written = candidate
+        .state
+        .source
+        .package()
+        .iter()
+        .find(|entry| entry.name() == member)
+        .ok_or(Error::Verification)?;
+    if written.data() != data {
+        return Err(Error::Verification);
+    }
+    Ok((
+        candidate,
+        Diagnostics {
+            changed: true,
+            ..Diagnostics::default()
+        },
+    ))
+}
+
+/// The assets reachable from the document root (object 1) through object
+/// references, through a message data reference or a component
+/// data-reference owner of a reachable object.
+fn media_assets(package: &Package, root: u64) -> Result<Vec<Embedded>, Error> {
+    let Some(metadata) = objects::metadata(package)? else {
+        return Ok(Vec::new());
+    };
+    let all = package
+        .state
+        .source
+        .components()
+        .iter()
+        .flat_map(|component| component.archive().objects.iter())
+        .collect::<Vec<_>>();
+    let objects_iter = || all.iter().copied();
+    let assets = crate::media_native::embedded_assets(&metadata.payload, objects_iter(), |path| {
+        package
+            .state
+            .source
+            .package()
+            .iter()
+            .find(|entry| entry.name() == path)
+            .map(|entry| entry.data().len() as u64)
+    })
+    .map_err(|_| Error::InvalidSource)?;
+    let mut outgoing = std::collections::HashMap::<u64, Vec<u64>>::new();
+    let mut message_data = std::collections::HashMap::<u64, Vec<u64>>::new();
+    for object in objects_iter() {
+        let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+        let references = outgoing.entry(identifier).or_default();
+        for info in &object.archive_info.message_infos {
+            references.extend(info.object_references.iter().copied());
+            message_data
+                .entry(identifier)
+                .or_default()
+                .extend(info.data_references.iter().copied());
+        }
+    }
+    let mut reachable = HashSet::new();
+    let mut queue = std::collections::VecDeque::from([root]);
+    while let Some(identifier) = queue.pop_front() {
+        if !reachable.insert(identifier) {
+            continue;
+        }
+        if let Some(references) = outgoing.get(&identifier) {
+            queue.extend(references.iter().copied());
+        }
+    }
+    let mut live = HashSet::new();
+    for identifier in &reachable {
+        if let Some(data) = message_data.get(identifier) {
+            live.extend(data.iter().copied());
+        }
+    }
+    for (data, object) in objects::data_owners(&metadata.payload)? {
+        if reachable.contains(&object) {
+            live.insert(data);
+        }
+    }
+    Ok(assets
+        .into_iter()
+        .filter(|asset| live.contains(&asset.data().get()))
+        .collect())
 }

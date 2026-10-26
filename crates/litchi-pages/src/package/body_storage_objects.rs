@@ -893,3 +893,34 @@ pub(crate) fn data_metadata_entries(payload: &[u8]) -> GraphResult<Vec<u64>> {
     }
     Ok(data)
 }
+
+/// Every `(data, object)` component data-reference owner (current and
+/// versioned components) of a metadata payload.
+pub(crate) fn data_owners(payload: &[u8]) -> GraphResult<Vec<(u64, u64)>> {
+    let mut owners = Vec::new();
+    for field in [
+        METADATA_COMPONENTS_FIELD,
+        METADATA_VERSIONED_COMPONENTS_FIELD,
+    ] {
+        for info in repeated_length_delimited_payloads(payload, field).map_err(map_wire_error)? {
+            for reference in
+                repeated_length_delimited_payloads(info, COMPONENT_DATA_REFERENCES_FIELD)
+                    .map_err(map_wire_error)?
+            {
+                let data = view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)
+                    .map_err(map_wire_error)?
+                    .ok_or(GraphError::InvalidSource)?;
+                for owner in
+                    repeated_length_delimited_payloads(reference, DATA_REFERENCE_OWNERS_FIELD)
+                        .map_err(map_wire_error)?
+                {
+                    let object = view_varint(owner, OWNER_OBJECT_FIELD)
+                        .map_err(map_wire_error)?
+                        .ok_or(GraphError::InvalidSource)?;
+                    owners.push((data, object));
+                }
+            }
+        }
+    }
+    Ok(owners)
+}
