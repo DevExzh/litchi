@@ -11,14 +11,16 @@
 
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::package_metadata_codec::{
-    Batch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor, ComponentRemovalBatch,
-    ComponentSelector, DataReferenceOwnerDescriptor, ExternalReferenceAddition,
-    ExternalReferenceDescriptor, ExternalReferenceRemoval, ObjectUuidAddition,
-    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor, RemovalBatch,
-    RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions, SaveTokenBatch, UuidBits,
-    inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    AdditionSaveTokenBatch, Batch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor,
+    ComponentRemovalBatch, ComponentSelector, DataReferenceOwnerDescriptor,
+    ExternalReferenceAddition, ExternalReferenceDescriptor, ExternalReferenceRemoval,
+    ObjectUuidAddition, ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor,
+    RemovalBatch, RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions,
+    SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    rewrite_package_metadata_additions_and_save_tokens,
     rewrite_package_metadata_combined_additions_and_removals_and_save_tokens,
     rewrite_package_metadata_component_removals, rewrite_package_metadata_removals_and_save_tokens,
+    rewrite_package_metadata_save_tokens,
 };
 
 use super::super::metadata::{ENTRY_NAME, MESSAGE_TYPE, normalized_locator};
@@ -284,6 +286,10 @@ pub(in crate::package) struct Transition {
     /// Removed objects whose identifiers may lower the watermark when they
     /// are its suffix (the host editor's `release_package_identifier_suffix`).
     pub(in crate::package) released: Vec<u64>,
+    /// Components whose save token advances although their registry
+    /// records do not change (the host's `advance_save_tokens_for_entries`
+    /// over the components a route rewrites).
+    pub(in crate::package) stamps: Vec<u64>,
 }
 
 impl Transition {
@@ -321,8 +327,18 @@ impl Transition {
         Ok(())
     }
 
+    /// Advance the save token of `component` (record 0370d).
+    pub(in crate::package) fn stamp(&mut self, component: u64) -> FaultResult<()> {
+        if !self.stamps.contains(&component) {
+            reserve(&mut self.stamps, 1)?;
+            self.stamps.push(component);
+        }
+        Ok(())
+    }
+
     fn is_empty(&self) -> bool {
-        self.uuid_additions.is_empty()
+        self.stamps.is_empty()
+            && self.uuid_additions.is_empty()
             && self.uuid_removals.is_empty()
             && self.external_removals.is_empty()
             && self.external_additions.is_empty()
@@ -518,7 +534,8 @@ pub(super) fn apply(
                     .iter()
                     .chain(&transition.external_additions)
                     .flat_map(|external| [external.source, external.target]),
-            );
+            )
+            .chain(transition.stamps.iter().copied());
         for identifier in touched {
             let selector = selector(identifier)?;
             if !tokens.contains(&selector) {
@@ -545,12 +562,33 @@ pub(super) fn apply(
         } else {
             last
         };
-        let output = if removes && !adds && last <= current {
+        let stamped = !transition.stamps.is_empty();
+        let output = if !removes && !adds && last == current {
+            rewrite_package_metadata_save_tokens(source, SaveTokenBatch::new(&tokens), options)
+        } else if !removes && !adds && last > current {
+            rewrite_package_metadata_additions_and_save_tokens(
+                source,
+                AdditionSaveTokenBatch::new(
+                    Batch::new(current, last, &[], &[]),
+                    SaveTokenBatch::new(&tokens),
+                ),
+                options,
+            )
+        } else if !adds && last <= current {
             rewrite_package_metadata_removals_and_save_tokens(
                 source,
                 RemovalSaveTokenBatch::new(
                     RemovalBatch::new(current, &uuid_removals, &external_removals, &[])
                         .with_new_last_object_identifier(last),
+                    SaveTokenBatch::new(&tokens),
+                ),
+                options,
+            )
+        } else if adds && !removes && stamped {
+            rewrite_package_metadata_additions_and_save_tokens(
+                source,
+                AdditionSaveTokenBatch::new(
+                    Batch::new(current, last, &uuid_additions, &external_additions),
                     SaveTokenBatch::new(&tokens),
                 ),
                 options,

@@ -635,24 +635,22 @@ fn update_cell(
     identifier: Option<u32>,
     applied_rule: Option<u32>,
 ) -> Result<()> {
-    let cell_count = update_tile(
+    // Host defect fixed with record 0370d: a cell stored for its rules (an
+    // empty cell) was counted in its row header but not in its column
+    // header; the column header now follows, as for every cell write.
+    update_tile_and_headers(
         package,
+        &location.object_locations,
+        &location.descriptor.model,
         &location.tile_archive,
         location.tile_id,
         location.tile_row,
+        row,
         column,
-        location.descriptor.model.number_of_columns as usize,
         EncodedValue::ConditionalStyle {
             identifier,
             applied_rule,
         },
-    )?;
-    update_row_header(
-        package,
-        &location.object_locations,
-        &location.descriptor.model,
-        row,
-        cell_count,
     )
 }
 

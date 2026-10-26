@@ -23265,6 +23265,7 @@
       "families": [
         "litchi_numbers::cell::comment",
         "litchi_numbers::cell::comment::transaction",
+        "litchi_numbers::cell::conditional_highlight",
         "litchi_numbers::cell::data_format::control::transaction",
         "litchi_numbers::cell::data_format::currency::transaction",
         "litchi_numbers::cell::data_format::custom::transaction",
@@ -23383,6 +23384,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_conditional_highlights",
+          "ok": "litchi_numbers::cell::conditional_highlight::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_lists",
@@ -24076,6 +24081,7 @@
       "families": [
         "litchi_numbers::cell::comment",
         "litchi_numbers::cell::comment::transaction",
+        "litchi_numbers::cell::conditional_highlight",
         "litchi_numbers::cell::data_format::control::transaction",
         "litchi_numbers::cell::data_format::currency::transaction",
         "litchi_numbers::cell::data_format::custom::transaction",
@@ -24194,6 +24200,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_conditional_highlights",
+          "ok": "litchi_numbers::cell::conditional_highlight::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_lists",
