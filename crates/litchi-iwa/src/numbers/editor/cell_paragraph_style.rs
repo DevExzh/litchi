@@ -1127,12 +1127,16 @@ fn reset_property(
                     parent_id,
                     style_id,
                 )?;
+                // Host defect fixed with record 0370: the style list kept an
+                // external reference to the parent even when the cell fell
+                // back to its section's base style and no entry names the
+                // parent any more.
                 unregister_private_style(
                     &mut staged,
                     &resolved.table_archive,
                     &style.archive_name,
                     style_id,
-                    Some(parent_id),
+                    (parent_id != base_id).then_some(parent_id),
                 )?;
                 release_package_identifier_suffix(&mut staged, &[style_id])?;
             }
