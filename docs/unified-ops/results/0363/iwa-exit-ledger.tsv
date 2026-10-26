@@ -58,11 +58,11 @@ document.rs	extract_media_to_file	1	shared	media.asset	host-only	litchi-iwa-arch
 document.rs	extract_media_to_writer	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 document.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 document.rs	media_stats	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-document.rs	message_type_summary	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-document.rs	most_common_message_type	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
+document.rs	message_type_summary	1	shared	other	migrated	litchi_iwa_archive::unstable::message_type_summary	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
+document.rs	most_common_message_type	1	shared	other	migrated	litchi_iwa_archive::unstable::most_common_message_type	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
 document.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 document.rs	snapshot	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-document.rs	stats	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
+document.rs	stats	1	shared	other	migrated	litchi_iwa_archive::unstable::count_message_types	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
 document.rs	text	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 document.rs	validate	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 keynote/creation.rs	build	1	keynote	builder	host-only	litchi-keynote	-	-	-	-
@@ -1346,18 +1346,18 @@ numbers/editor/text_box_create.rs	add_sheet_text_box	1	numbers	drawable.text_box
 numbers/editor/text_box_duplicate.rs	duplicate_sheet_text_box	1	numbers	drawable.text_box_lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/topology_oracle.rs	__edit_table_topology_unverified	1	numbers	other	host-only	litchi-numbers	-	-	-	-
 package.rs	apply	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-package.rs	archive	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-package.rs	archive	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
+package.rs	archive	1	shared	other	migrated	litchi_iwa_archive::unstable::cached_component	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
+package.rs	archive	2	shared	other	migrated	litchi_iwa_archive::unstable::cached_component	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
 package.rs	calculation_engine_entry_name	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	calculation_engine_entry_name	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	commit	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	contains_entry	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	contains_entry	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	edit	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-package.rs	entry	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-package.rs	entry	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-package.rs	entry_names	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-package.rs	entry_names	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
+package.rs	entry	1	shared	other	migrated	litchi_iwa_archive::unstable::entry	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
+package.rs	entry	2	shared	other	migrated	litchi_iwa_archive::unstable::entry	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
+package.rs	entry_names	1	shared	other	migrated	litchi_iwa_archive::unstable::entry_names	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
+package.rs	entry_names	2	shared	other	migrated	litchi_iwa_archive::unstable::entry_names	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
 package.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	from_read_at	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	from_shared_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
@@ -1366,8 +1366,8 @@ package.rs	insert_archive_before	1	shared	other	host-only	litchi-iwa-archive / l
 package.rs	insert_entry	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	is_empty	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	is_empty	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-package.rs	iwa_entry_names	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-package.rs	iwa_entry_names	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
+package.rs	iwa_entry_names	1	shared	other	migrated	litchi_iwa_archive::unstable::iwa_entry_names	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
+package.rs	iwa_entry_names	2	shared	other	migrated	litchi_iwa_archive::unstable::iwa_entry_names	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
 package.rs	len	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	len	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-

@@ -32,4 +32,5 @@ mod pages_cases;
 mod pages_cost_probes;
 mod pages_drawable_cases;
 mod pages_text_cases;
+mod physical_cases;
 mod self_test;
