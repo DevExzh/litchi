@@ -1,10 +1,10 @@
 //! Selector-first, source-preserving frame, property and playback edits of
-//! body-anchored images, movies and audio clips.
+//! body-anchored images, movies, audio clips and shapes.
 //!
 //! The drawable is found by kind and text-flow position in the rooted body
 //! storage; the shared [`super::body_drawable_graph`] proof establishes its
 //! ownership. Each staged change is a field-level rewrite of the selected
-//! media message (and, when a movie or audio clip moves, of its body
+//! drawable message (and, when a movie or audio clip moves, of its body
 //! attachment's offsets): unknown fields, field order and every other object
 //! stay byte-identical.
 
@@ -26,10 +26,16 @@ use super::body_drawable_graph::{
 };
 use super::movie_playback::{__decode_movie_playback_payload, __rewrite_movie_playback_payload};
 use crate::drawable::{Geometry, GeometryFlags, Properties};
-use crate::selector::MediaSelector;
+use crate::selector::DrawableSelector;
 
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const SHAPE_INFO_SHAPE_FIELD: u32 = 1;
+const SHAPE_INFO_DEPRECATED_STORAGE_FIELD: u32 = 2;
+const SHAPE_INFO_OWNED_STORAGE_FIELD: u32 = 4;
+const SHAPE_INFO_IS_TEXT_BOX_FIELD: u32 = 6;
+const DRAWABLE_PENCIL_ANNOTATIONS_FIELD: u32 = 9;
 const MEDIA_DRAWABLE_FIELD: u32 = 1;
 const DRAWABLE_PARENT_FIELD: u32 = 2;
 const IMAGE_ORIGINAL_SIZE_FIELD: u32 = 4;
@@ -45,7 +51,7 @@ const ATTACHMENT_V_OFFSET_FIELD: u32 = 5;
 const H_OFFSET_BODY_MARGIN: u64 = 0;
 const V_OFFSET_PAGE: u64 = 1;
 
-/// A finite resource charged by one body-media property operation.
+/// A finite resource charged by one body-drawable property operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
@@ -73,7 +79,7 @@ impl fmt::Display for LimitKind {
     }
 }
 
-/// Failure from a body-media property read or transaction.
+/// Failure from a body-drawable property read or transaction.
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
@@ -81,12 +87,12 @@ pub enum Error {
     /// it (record 0351 §2.4).
     #[error(transparent)]
     Refused(Refusal),
-    /// The rooted media graph or the selected payload is malformed.
-    #[error("the selected Pages body-media source is invalid")]
+    /// The rooted drawable graph or the selected payload is malformed.
+    #[error("the selected Pages body-drawable source is invalid")]
     InvalidSource,
     /// A finite operation resource ceiling was exceeded.
     #[error(
-        "Pages body-media properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
+        "Pages body-drawable properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
     Limit {
         /// Resource category.
@@ -97,16 +103,16 @@ pub enum Error {
         maximum: u64,
     },
     /// A bounded temporary allocation failed.
-    #[error("could not allocate {amount} units for Pages body-media properties")]
+    #[error("could not allocate {amount} units for Pages body-drawable properties")]
     Allocation {
         /// Requested units.
         amount: usize,
     },
     /// Reopening the candidate did not reproduce the requested state.
-    #[error("the edited Pages body-media properties failed semantic verification")]
+    #[error("the edited Pages body-drawable properties failed semantic verification")]
     Verification,
     /// The patch was produced from another exact package artifact.
-    #[error("the Pages body-media properties patch does not match the exact source package")]
+    #[error("the Pages body-drawable properties patch does not match the exact source package")]
     PatchConflict,
 }
 
@@ -133,7 +139,7 @@ pub enum Refusal {
     },
     /// The value cannot be stored (non-finite or negative frame parts, an
     /// invalid playback value, a movie frame without a position).
-    #[error("invalid Pages body-media value: {reason}")]
+    #[error("invalid Pages body-drawable value: {reason}")]
     InvalidValue {
         /// Why the value was refused.
         reason: &'static str,
@@ -152,7 +158,7 @@ pub enum Refusal {
     #[error("the Pages body media attachment uses unsupported offset bases")]
     UnsupportedAnchor,
     /// The source does not keep an exact artifact for a changed publication.
-    #[error("this Pages source does not support exact body-media edits")]
+    #[error("this Pages source does not support exact body-drawable edits")]
     UnsupportedSource,
 }
 
@@ -207,10 +213,10 @@ impl From<litchi_iwa_common::Error> for Error {
     }
 }
 
-/// The stored frame, properties and playback of one body media drawable.
+/// The stored frame, properties and playback of one body drawable.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
-    selector: MediaSelector,
+    selector: DrawableSelector,
     geometry: Option<Geometry>,
     properties: Properties,
     playback: Option<MediaPlaybackSettings>,
@@ -221,7 +227,7 @@ pub struct Snapshot {
 impl Snapshot {
     /// The selector this snapshot was read through.
     #[must_use]
-    pub const fn selector(&self) -> MediaSelector {
+    pub const fn selector(&self) -> DrawableSelector {
         self.selector
     }
 
@@ -303,7 +309,7 @@ impl Edit<'_> {
         })
     }
 
-    /// Replace the frame of an image or movie.
+    /// Replace the frame of an image, movie or shape.
     ///
     /// A movie frame must have a position: Pages keeps a movie's body
     /// attachment offsets in step with it, and this edit moves them too.
@@ -313,7 +319,7 @@ impl Edit<'_> {
     /// Refuses audio (use [`Self::set_position`]), a drawable without a
     /// frame, and non-finite or negative parts.
     pub fn set_geometry(&mut self, geometry: Geometry) -> Result<&mut Self, Error> {
-        if matches!(self.target.selector, MediaSelector::Audio(_)) {
+        if matches!(self.target.selector, DrawableSelector::Audio(_)) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "set_geometry",
                 kind: "audio",
@@ -327,7 +333,7 @@ impl Edit<'_> {
             }
             .into());
         }
-        if matches!(self.target.selector, MediaSelector::Movie(_)) {
+        if matches!(self.target.selector, DrawableSelector::Movie(_)) {
             if geometry.position.is_none() {
                 return Err(Refusal::InvalidValue {
                     reason: "a movie frame needs a position",
@@ -354,7 +360,10 @@ impl Edit<'_> {
             }
             .into());
         }
-        if !matches!(self.target.selector, MediaSelector::Image(_)) {
+        if matches!(
+            self.target.selector,
+            DrawableSelector::Movie(_) | DrawableSelector::Audio(_)
+        ) {
             self.move_attachment = true;
         }
         self.after.geometry = Some(Geometry {
@@ -364,13 +373,13 @@ impl Edit<'_> {
         Ok(self)
     }
 
-    /// Apply one native Arrange Flip command to an image or movie.
+    /// Apply one native Arrange Flip command to an image, movie or shape.
     ///
     /// # Errors
     ///
     /// Refuses audio and a frame without layout flags.
     pub fn flip(&mut self, axis: FlipAxis) -> Result<&mut Self, Error> {
-        if matches!(self.target.selector, MediaSelector::Audio(_)) {
+        if matches!(self.target.selector, DrawableSelector::Audio(_)) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "flip",
                 kind: "audio",
@@ -392,12 +401,15 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// Refuses audio and a drawable without a positive original size.
+    /// Refuses audio, shapes and a drawable without a positive original size.
     pub fn restore_original_size(&mut self) -> Result<&mut Self, Error> {
-        if matches!(self.target.selector, MediaSelector::Audio(_)) {
+        if matches!(
+            self.target.selector,
+            DrawableSelector::Audio(_) | DrawableSelector::Shape(_)
+        ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "restore_original_size",
-                kind: "audio",
+                kind: self.kind_name(),
             }
             .into());
         }
@@ -432,12 +444,15 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// Refuses an image and an invalid playback value.
+    /// Refuses an image or shape and an invalid playback value.
     pub fn set_playback(&mut self, settings: MediaPlaybackSettings) -> Result<&mut Self, Error> {
-        if matches!(self.target.selector, MediaSelector::Image(_)) {
+        if matches!(
+            self.target.selector,
+            DrawableSelector::Image(_) | DrawableSelector::Shape(_)
+        ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "set_playback",
-                kind: "image",
+                kind: self.kind_name(),
             }
             .into());
         }
@@ -454,11 +469,11 @@ impl Edit<'_> {
     }
 }
 
-/// Exact-source reversible body-media properties patch.
+/// Exact-source reversible body-drawable properties patch.
 #[derive(Clone, PartialEq)]
 pub struct Patch {
     artifacts: ExactArtifacts,
-    selector: MediaSelector,
+    selector: DrawableSelector,
     before: Snapshot,
     after: Snapshot,
     touched_components: usize,
@@ -478,7 +493,7 @@ impl fmt::Debug for Patch {
 impl Patch {
     /// The selected drawable.
     #[must_use]
-    pub const fn selector(&self) -> MediaSelector {
+    pub const fn selector(&self) -> DrawableSelector {
         self.selector
     }
 
@@ -519,7 +534,7 @@ impl Patch {
     }
 }
 
-/// Content-free diagnostics of one body-media properties publication.
+/// Content-free diagnostics of one body-drawable properties publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Diagnostics {
     changed: bool,
@@ -540,8 +555,8 @@ impl Diagnostics {
     }
 }
 
-/// The validated immutable result of one body-media properties transaction.
-#[must_use = "a body-media properties commit contains the validated package snapshot"]
+/// The validated immutable result of one body-drawable properties transaction.
+#[must_use = "a body-drawable properties commit contains the validated package snapshot"]
 #[derive(Debug)]
 pub struct Commit {
     package: Package,
@@ -583,7 +598,7 @@ impl Commit {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Target {
-    selector: MediaSelector,
+    selector: DrawableSelector,
     attachment: NonZeroU64,
     attachment_message: usize,
     attachment_component: Arc<str>,
@@ -600,9 +615,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`Error`] when no drawable matches or the graph is invalid.
-    pub fn body_media_properties(
+    pub fn body_drawable_properties(
         &self,
-        selector: impl Into<MediaSelector>,
+        selector: impl Into<DrawableSelector>,
     ) -> Result<Snapshot, Error> {
         Ok(resolve(self, selector.into())?.1)
     }
@@ -613,9 +628,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`Error`] when no drawable matches or the graph is invalid.
-    pub fn edit_body_media_properties(
+    pub fn edit_body_drawable_properties(
         &self,
-        selector: impl Into<MediaSelector>,
+        selector: impl Into<DrawableSelector>,
     ) -> Result<Edit<'_>, Error> {
         let (target, before) = resolve(self, selector.into())?;
         Ok(Edit {
@@ -627,13 +642,13 @@ impl Package {
         })
     }
 
-    /// Replay an exact-source body-media properties patch.
+    /// Replay an exact-source body-drawable properties patch.
     ///
     /// # Errors
     ///
     /// Returns [`Error::PatchConflict`] when the patch was made against
     /// another artifact or the drawable no longer matches its `before` state.
-    pub fn apply_body_media_properties(&self, patch: &Patch) -> Result<Commit, Error> {
+    pub fn apply_body_drawable_properties(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = self.state.source.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
             return Err(Error::PatchConflict);
@@ -668,15 +683,24 @@ impl Package {
     }
 }
 
-const fn kind_name(selector: MediaSelector) -> &'static str {
+const fn kind_name(selector: DrawableSelector) -> &'static str {
     match selector {
-        MediaSelector::Image(_) => "image",
-        MediaSelector::Movie(_) => "movie",
-        MediaSelector::Audio(_) => "audio",
+        DrawableSelector::Image(_) => "image",
+        DrawableSelector::Movie(_) => "movie",
+        DrawableSelector::Audio(_) => "audio",
+        DrawableSelector::Shape(_) => "shape",
     }
 }
 
-fn resolve(package: &Package, selector: MediaSelector) -> Result<(Target, Snapshot), Error> {
+const fn message_type(selector: DrawableSelector) -> u32 {
+    match selector {
+        DrawableSelector::Image(_) => IMAGE_MESSAGE_TYPE,
+        DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => MOVIE_MESSAGE_TYPE,
+        DrawableSelector::Shape(_) => SHAPE_INFO_MESSAGE_TYPE,
+    }
+}
+
+fn resolve(package: &Package, selector: DrawableSelector) -> Result<(Target, Snapshot), Error> {
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
     let body = graph::resolve_body(&index, &mut budget)?;
@@ -684,10 +708,7 @@ fn resolve(package: &Package, selector: MediaSelector) -> Result<(Target, Snapsh
     let mut seen = 0usize;
     for anchor in &body.anchors {
         let drawable = index.get(anchor.drawable)?;
-        let message_type = match selector {
-            MediaSelector::Image(_) => IMAGE_MESSAGE_TYPE,
-            MediaSelector::Movie(_) | MediaSelector::Audio(_) => MOVIE_MESSAGE_TYPE,
-        };
+        let message_type = message_type(selector);
         let Some((message_index, message)) =
             graph::unique_optional_message(drawable.object, message_type)?
         else {
@@ -704,16 +725,19 @@ fn resolve(package: &Package, selector: MediaSelector) -> Result<(Target, Snapsh
                 continue;
             }
             let audio = flags.audio_only() == Some(true);
-            if audio != matches!(selector, MediaSelector::Audio(_)) {
+            if audio != matches!(selector, DrawableSelector::Audio(_)) {
                 continue;
             }
+        }
+        if message_type == SHAPE_INFO_MESSAGE_TYPE && !is_ordinary_shape(payload, &mut budget)? {
+            continue;
         }
         if seen != requested {
             seen += 1;
             continue;
         }
         graph::validate_message_metadata(drawable.object, message_index)?;
-        let drawable_payload = media_drawable_payload(payload, &mut budget)?;
+        let drawable_payload = drawable_payload(selector, payload, &mut budget)?;
         let parent = drawable_parent(drawable_payload, &mut budget)?;
         if parent != Some(body.root.body) {
             return Err(Error::InvalidSource);
@@ -739,11 +763,54 @@ fn resolve(package: &Package, selector: MediaSelector) -> Result<(Target, Snapsh
     .into())
 }
 
-fn media_drawable_payload<'a>(payload: &'a [u8], budget: &mut Budget) -> Result<&'a [u8], Error> {
+/// The `TSD.DrawableArchive` of the selected message: field 1 of an
+/// `ImageArchive`/`MovieArchive`, field 1 of field 1 of a `ShapeInfoArchive`.
+fn drawable_payload<'a>(
+    selector: DrawableSelector,
+    payload: &'a [u8],
+    budget: &mut Budget,
+) -> Result<&'a [u8], Error> {
     let view = budget.parse(payload, 1)?;
-    Ok(graph::unique_field(&view, MEDIA_DRAWABLE_FIELD, 2)?
+    let outer = graph::unique_field(&view, MEDIA_DRAWABLE_FIELD, 2)?
         .ok_or(Error::InvalidSource)?
-        .payload())
+        .payload();
+    if !matches!(selector, DrawableSelector::Shape(_)) {
+        return Ok(outer);
+    }
+    let shape = budget.parse(outer, 2)?;
+    let drawable = graph::unique_field(&shape, MEDIA_DRAWABLE_FIELD, 2)?
+        .ok_or(Error::InvalidSource)?
+        .payload();
+    let view = budget.parse(drawable, 3)?;
+    if view
+        .fields()
+        .any(|field| field.number() == DRAWABLE_PENCIL_ANNOTATIONS_FIELD)
+    {
+        return Err(Error::InvalidSource);
+    }
+    Ok(drawable)
+}
+
+/// Whether a `ShapeInfoArchive` is an ordinary body shape: an explicit
+/// non-text-box flag and one owned storage recorded in both storage slots.
+fn is_ordinary_shape(payload: &[u8], budget: &mut Budget) -> Result<bool, Error> {
+    let view = budget.parse(payload, 1)?;
+    let text_box = graph::unique_field(&view, SHAPE_INFO_IS_TEXT_BOX_FIELD, 0)?
+        .map(|field| graph::canonical_varint(field.payload()))
+        .transpose()?;
+    if text_box != Some(0) {
+        return Ok(false);
+    }
+    let owned = graph::unique_field(&view, SHAPE_INFO_OWNED_STORAGE_FIELD, 2)?
+        .ok_or(Error::InvalidSource)?;
+    let deprecated = graph::unique_field(&view, SHAPE_INFO_DEPRECATED_STORAGE_FIELD, 2)?
+        .ok_or(Error::InvalidSource)?;
+    if graph::parse_reference(owned.payload(), budget)?
+        != graph::parse_reference(deprecated.payload(), budget)?
+    {
+        return Err(Error::InvalidSource);
+    }
+    Ok(true)
 }
 
 fn drawable_parent(payload: &[u8], budget: &mut Budget) -> Result<Option<NonZeroU64>, Error> {
@@ -800,7 +867,7 @@ fn map_codec_error(error: &codec::DecodeError) -> Error {
 }
 
 fn read_snapshot(
-    selector: MediaSelector,
+    selector: DrawableSelector,
     payload: &[u8],
     drawable_payload: &[u8],
     budget: &Budget,
@@ -830,18 +897,26 @@ fn read_snapshot(
         aspect_ratio_locked: stored.aspect_ratio_locked(),
         accessibility_description: stored.accessibility_description().map(str::to_owned),
     };
-    let (original_field, natural_field) = match selector {
-        MediaSelector::Image(_) => (IMAGE_ORIGINAL_SIZE_FIELD, IMAGE_NATURAL_SIZE_FIELD),
-        MediaSelector::Movie(_) | MediaSelector::Audio(_) => {
-            (MOVIE_ORIGINAL_SIZE_FIELD, MOVIE_NATURAL_SIZE_FIELD)
+    let sizes = match selector {
+        DrawableSelector::Image(_) => Some((IMAGE_ORIGINAL_SIZE_FIELD, IMAGE_NATURAL_SIZE_FIELD)),
+        DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => {
+            Some((MOVIE_ORIGINAL_SIZE_FIELD, MOVIE_NATURAL_SIZE_FIELD))
         },
+        DrawableSelector::Shape(_) => None,
     };
-    let view = litchi_iwa_common::wire::WireView::parse(payload, budget.wire_limits())?;
-    let original_size = stored_size(&view, original_field, budget)?;
-    let natural_size = stored_size(&view, natural_field, budget)?;
+    let (original_size, natural_size) = match sizes {
+        Some((original_field, natural_field)) => {
+            let view = litchi_iwa_common::wire::WireView::parse(payload, budget.wire_limits())?;
+            (
+                stored_size(&view, original_field, budget)?,
+                stored_size(&view, natural_field, budget)?,
+            )
+        },
+        None => (None, None),
+    };
     let playback = match selector {
-        MediaSelector::Image(_) => None,
-        MediaSelector::Movie(_) | MediaSelector::Audio(_) => Some(
+        DrawableSelector::Image(_) | DrawableSelector::Shape(_) => None,
+        DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => Some(
             __decode_movie_playback_payload(payload, budget.wire_limits())
                 .map_err(|_| Error::InvalidSource)?,
         ),
@@ -925,19 +1000,22 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .data
         .clone();
     if geometry_changed || properties_changed {
-        payload = transform_length_delimited_field(&payload, MEDIA_DRAWABLE_FIELD, |drawable| {
-            rewrite_drawable(drawable, &edit.before, &edit.after, &budget)
-        })?;
+        let rewrite =
+            |drawable: &[u8]| rewrite_drawable(drawable, &edit.before, &edit.after, &budget);
+        payload = if matches!(current.selector, DrawableSelector::Shape(_)) {
+            transform_length_delimited_field(&payload, MEDIA_DRAWABLE_FIELD, |shape| {
+                transform_length_delimited_field(shape, SHAPE_INFO_SHAPE_FIELD, rewrite)
+            })?
+        } else {
+            transform_length_delimited_field(&payload, MEDIA_DRAWABLE_FIELD, rewrite)?
+        };
     }
     if playback_changed {
         let settings = edit.after.playback.ok_or(Error::InvalidSource)?;
         payload = __rewrite_movie_playback_payload(&payload, settings, budget.wire_limits())
             .map_err(|_| Error::InvalidSource)?;
     }
-    let message_type = match current.selector {
-        MediaSelector::Image(_) => IMAGE_MESSAGE_TYPE,
-        MediaSelector::Movie(_) | MediaSelector::Audio(_) => MOVIE_MESSAGE_TYPE,
-    };
+    let message_type = message_type(current.selector);
     let mut rewrites = vec![MessageRewrite {
         component: Arc::clone(&current.drawable_component),
         object: current.drawable,

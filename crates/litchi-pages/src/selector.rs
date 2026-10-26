@@ -318,29 +318,32 @@ impl ImageSelector {
     }
 }
 
-/// Selects one body-anchored image, movie or audio clip by its kind and its
-/// zero-based source order among drawables of that kind.
+/// Selects one body-anchored image, movie, audio clip or shape by its kind
+/// and its zero-based text-flow position among drawables of that kind.
 ///
 /// Images are the ordinary `ImageArchive` attachments of the rooted body
 /// storage; movies and audio are its file-backed movie attachments, split by
-/// their audio-only flag (live video is neither). Native identifiers are not
-/// representable here.
+/// their audio-only flag (live video is neither); shapes are its text-bearing
+/// shapes that are not text boxes. Native identifiers are not representable
+/// here.
 #[allow(
     clippy::module_name_repetitions,
-    reason = "The selector name identifies the Pages body-media domain."
+    reason = "The selector name identifies the Pages body-drawable domain."
 )]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MediaSelector {
+pub enum DrawableSelector {
     /// The image at this zero-based position among body images.
     Image(Position),
     /// The movie at this zero-based position among body movies.
     Movie(Position),
     /// The audio clip at this zero-based position among body audio clips.
     Audio(Position),
+    /// The shape at this zero-based position among body shapes.
+    Shape(Position),
 }
 
-impl MediaSelector {
+impl DrawableSelector {
     /// Select a body image by zero-based index.
     #[must_use]
     pub const fn image(index: usize) -> Self {
@@ -359,16 +362,25 @@ impl MediaSelector {
         Self::Audio(Position::new(index))
     }
 
+    /// Select a body shape by zero-based index.
+    #[must_use]
+    pub const fn shape(index: usize) -> Self {
+        Self::Shape(Position::new(index))
+    }
+
     /// The selected position within its kind.
     #[must_use]
     pub const fn position(self) -> Position {
         match self {
-            Self::Image(position) | Self::Movie(position) | Self::Audio(position) => position,
+            Self::Image(position)
+            | Self::Movie(position)
+            | Self::Audio(position)
+            | Self::Shape(position) => position,
         }
     }
 }
 
-impl From<ImageSelector> for MediaSelector {
+impl From<ImageSelector> for DrawableSelector {
     fn from(selector: ImageSelector) -> Self {
         Self::Image(selector.as_position())
     }

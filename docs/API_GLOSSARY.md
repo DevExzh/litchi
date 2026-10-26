@@ -2835,9 +2835,9 @@ text-flow position, never a native identifier.
 
 | Name | Meaning | Status |
 |---|---|---|
-| `litchi_pages::MediaSelector::{Image, Movie, Audio}` (`image`, `movie`, `audio`, `position`) | One body image, movie or audio clip by kind and zero-based text-flow position among that kind (audio = audio-only movie; live video is neither) | ✅ 0371 |
-| `litchi_pages::drawable::{Geometry, GeometryFlags, Properties, Point, Size, FlipAxis}` | Archive-free drawable frame (optional position, size, layout flags, angle; `Geometry::flipped`), the reflection-bearing flag set, and the four shared drawable properties (hyperlink, locked, aspect-ratio locked, accessibility description) | ✅ 0371 |
-| `litchi_pages::media::properties::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Snapshot}` | Registered family in `pages`; `Package::{body_media_properties, edit_body_media_properties, apply_body_media_properties}`; `Edit::{set_geometry, set_position, flip, restore_original_size, set_properties, set_playback}` replace the host's 20 image/movie/audio geometry, flip, Original Size, property, position and playback methods | ✅ 0371 |
+| `litchi_pages::DrawableSelector::{Image, Movie, Audio, Shape}` (`image`, `movie`, `audio`, `shape`, `position`; also `litchi_pages::drawable::DrawableSelector`) | One body image, movie, audio clip or ordinary shape by kind and zero-based text-flow position among that kind (audio = audio-only movie; live video is neither; text boxes are not shapes) — the 0363 §3.2 Pages drawable selector | ✅ 0371 |
+| `litchi_pages::drawable::{Geometry, GeometryFlags, Properties, Point, Size, FlipAxis, MediaPlaybackSettings, MediaLoopMode, MediaVolume}` | Archive-free drawable frame (optional position, size, layout flags, angle; `Geometry::flipped`), the reflection-bearing flag set, the four shared drawable properties (hyperlink, locked, aspect-ratio locked, accessibility description) and the shared playback values | ✅ 0371 |
+| `litchi_pages::drawable::properties::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Snapshot}` | Registered family in `pages`; `Package::{body_drawable_properties, edit_body_drawable_properties, apply_body_drawable_properties}`; `Edit::{set_geometry, set_position, flip, restore_original_size, set_properties, set_playback}` replace the host's 25 image/movie/audio/shape geometry, flip, Original Size, property, position and playback methods; a verb that does not apply to the kind is `Refusal::UnsupportedOperation` | ✅ 0371 |
 
 ## iWork facade retirement and iWork open options (record 0306)
 

@@ -1,12 +1,12 @@
 //! Body-media frame, property and playback transactions
-//! (`litchi_pages::media::properties`, record 0371).
+//! (`litchi_pages::drawable::properties`, record 0371).
 
 use std::time::Duration;
 
+use litchi_pages::drawable::properties::{Error, Refusal};
 use litchi_pages::drawable::{FlipAxis, Geometry, Point, Properties, Size};
-use litchi_pages::media::properties::{Error, Refusal};
-use litchi_pages::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
-use litchi_pages::{MediaSelector, Package};
+use litchi_pages::drawable::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use litchi_pages::{DrawableSelector, Package};
 
 const IMAGES: &[u8] =
     include_bytes!("../../../test-data/iwork/pages/image-adjustments-native.pages");
@@ -22,7 +22,7 @@ fn bytes(package: &Package) -> Vec<u8> {
 fn image_frame_edit_round_trips_and_inverts_exactly() {
     let package = Package::from_bytes(IMAGES).unwrap();
     let before = package
-        .body_media_properties(MediaSelector::image(0))
+        .body_drawable_properties(DrawableSelector::image(0))
         .unwrap();
     let frame = before.geometry().unwrap();
     assert!(before.playback().is_none());
@@ -36,7 +36,7 @@ fn image_frame_edit_round_trips_and_inverts_exactly() {
         ..frame
     };
     let mut edit = package
-        .edit_body_media_properties(MediaSelector::image(0))
+        .edit_body_drawable_properties(DrawableSelector::image(0))
         .unwrap();
     edit.set_geometry(moved).unwrap();
     edit.flip(FlipAxis::Horizontal).unwrap();
@@ -51,7 +51,7 @@ fn image_frame_edit_round_trips_and_inverts_exactly() {
 
     let after = commit
         .package()
-        .body_media_properties(MediaSelector::image(0))
+        .body_drawable_properties(DrawableSelector::image(0))
         .unwrap();
     let geometry = after.geometry().unwrap();
     assert_eq!(geometry.position, moved.position);
@@ -65,18 +65,20 @@ fn image_frame_edit_round_trips_and_inverts_exactly() {
 
     let restored = commit
         .package()
-        .apply_body_media_properties(&commit.patch().inverse())
+        .apply_body_drawable_properties(&commit.patch().inverse())
         .unwrap();
     assert_eq!(bytes(restored.package()), IMAGES);
 
     // Replaying the forward patch on the source reproduces the commit.
-    let replayed = package.apply_body_media_properties(commit.patch()).unwrap();
+    let replayed = package
+        .apply_body_drawable_properties(commit.patch())
+        .unwrap();
     assert_eq!(bytes(replayed.package()), bytes(commit.package()));
     // A patch for another artifact conflicts.
     assert_eq!(
         commit
             .package()
-            .apply_body_media_properties(commit.patch())
+            .apply_body_drawable_properties(commit.patch())
             .unwrap_err(),
         Error::PatchConflict
     );
@@ -86,10 +88,10 @@ fn image_frame_edit_round_trips_and_inverts_exactly() {
 fn unchanged_edit_is_an_exact_no_op() {
     let package = Package::from_bytes(IMAGES).unwrap();
     let before = package
-        .body_media_properties(MediaSelector::image(0))
+        .body_drawable_properties(DrawableSelector::image(0))
         .unwrap();
     let mut edit = package
-        .edit_body_media_properties(MediaSelector::image(0))
+        .edit_body_drawable_properties(DrawableSelector::image(0))
         .unwrap();
     edit.set_geometry(before.geometry().unwrap()).unwrap();
     edit.set_properties(before.properties().clone());
@@ -103,7 +105,7 @@ fn unchanged_edit_is_an_exact_no_op() {
 fn audio_playback_edit_changes_only_playback() {
     let package = Package::from_bytes(AUDIO).unwrap();
     let before = package
-        .body_media_properties(MediaSelector::audio(0))
+        .body_drawable_properties(DrawableSelector::audio(0))
         .unwrap();
     let settings = MediaPlaybackSettings {
         start_time: None,
@@ -113,13 +115,13 @@ fn audio_playback_edit_changes_only_playback() {
         volume: Some(MediaVolume::new(0.5).unwrap()),
     };
     let mut edit = package
-        .edit_body_media_properties(MediaSelector::audio(0))
+        .edit_body_drawable_properties(DrawableSelector::audio(0))
         .unwrap();
     edit.set_playback(settings).unwrap();
     let commit = edit.commit().unwrap();
     let after = commit
         .package()
-        .body_media_properties(MediaSelector::audio(0))
+        .body_drawable_properties(DrawableSelector::audio(0))
         .unwrap();
     assert_eq!(after.playback(), Some(settings.canonicalize().unwrap()));
     assert_eq!(after.geometry(), before.geometry());
@@ -130,7 +132,7 @@ fn audio_playback_edit_changes_only_playback() {
 fn verbs_that_do_not_apply_to_the_kind_are_refused() {
     let audio = Package::from_bytes(AUDIO).unwrap();
     let mut edit = audio
-        .edit_body_media_properties(MediaSelector::audio(0))
+        .edit_body_drawable_properties(DrawableSelector::audio(0))
         .unwrap();
     for error in [
         edit.set_geometry(Geometry::default()).unwrap_err(),
@@ -144,7 +146,7 @@ fn verbs_that_do_not_apply_to_the_kind_are_refused() {
     }
     let images = Package::from_bytes(IMAGES).unwrap();
     let mut edit = images
-        .edit_body_media_properties(MediaSelector::image(0))
+        .edit_body_drawable_properties(DrawableSelector::image(0))
         .unwrap();
     let error = edit
         .set_playback(MediaPlaybackSettings::new(Duration::from_secs(1)))
@@ -172,11 +174,11 @@ fn verbs_that_do_not_apply_to_the_kind_are_refused() {
 fn missing_drawables_are_not_found() {
     let images = Package::from_bytes(IMAGES).unwrap();
     for selector in [
-        MediaSelector::image(99),
-        MediaSelector::movie(0),
-        MediaSelector::audio(0),
+        DrawableSelector::image(99),
+        DrawableSelector::movie(0),
+        DrawableSelector::audio(0),
     ] {
-        let error = images.body_media_properties(selector).unwrap_err();
+        let error = images.body_drawable_properties(selector).unwrap_err();
         assert!(
             matches!(error, Error::Refused(Refusal::NotFound { .. })),
             "{selector:?}: {error:?}"

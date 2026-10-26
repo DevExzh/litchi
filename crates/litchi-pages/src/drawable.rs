@@ -1,9 +1,41 @@
-//! Drawables anchored in the Pages body: their layer order and the
-//! archive-free geometry and property values shared by images, movies, audio
-//! and shapes.
+//! Drawables anchored in the Pages body: their layer order, their frame,
+//! property and playback transactions, and the archive-free geometry and
+//! property values shared by images, movies, audio and shapes.
+
+//!
+//! [`DrawableSelector`] picks one image, movie, audio clip or shape by kind
+//! and text-flow position; [`crate::Package::edit_body_drawable_properties`]
+//! stages frame, property and playback changes through [`properties::Edit`].
+//!
+//! ```no_run
+//! use litchi_pages::drawable::FlipAxis;
+//! use litchi_pages::{DrawableSelector, Package};
+//!
+//! # fn edit(source: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::from_bytes(source)?;
+//! let mut edit = package.edit_body_drawable_properties(DrawableSelector::image(0))?;
+//! edit.flip(FlipAxis::Horizontal)?;
+//! let commit = edit.commit()?;
+//! let restored = commit
+//!     .package()
+//!     .apply_body_drawable_properties(&commit.patch().inverse())?;
+//! # let _ = restored;
+//! # Ok(())
+//! # }
+//! ```
 
 pub use crate::drawable_order::{BodyDrawableHandle, BodyDrawableSelector, DrawableLayerMove};
+pub use crate::selector::DrawableSelector;
+pub use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 pub use litchi_iwa_common::shape::geometry::{FlipAxis, Point, Size};
+
+/// Exact-source frame, property and playback transactions for body
+/// images, movies, audio clips and shapes.
+pub mod properties {
+    pub use crate::package::body_drawable_properties::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
+    };
+}
 
 /// Exact-source transactions for the body drawables' layer order.
 pub mod order {

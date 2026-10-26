@@ -1,6 +1,6 @@
 //! Pages body media parity cases (wave W1-B, record 0371): the frame,
 //! property and playback edits of body images, movies and audio clips
-//! (`litchi_pages::media::properties`).
+//! (`litchi_pages::drawable::properties`).
 
 use std::time::Duration;
 
@@ -11,7 +11,7 @@ use litchi_iwa::shapes::{
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 use litchi_pages::drawable::{FlipAxis, Geometry, GeometryFlags, Point, Properties, Size};
-use litchi_pages::{MediaSelector, Package};
+use litchi_pages::{DrawableSelector, Package};
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
 use crate::leaf_bytes;
@@ -61,6 +61,25 @@ fn movie_fixture() -> TestResult<Fixture> {
     editor.add_body_movie(anchor, "movie.mov", MOVIE, "poster.png", POSTER, options)?;
     Ok(Fixture {
         path: "source-built: Draft::create_with_text + add_body_movie",
+        bytes: editor.to_bytes()?,
+    })
+}
+
+/// A source-built document with one body rectangle (`add_body_rectangle`).
+fn shape_fixture() -> TestResult<Fixture> {
+    let mut editor = pages::Draft::create_with_text("Quarterly report")?;
+    let anchor = "Quarterly report".encode_utf16().count();
+    editor.add_body_rectangle(
+        anchor,
+        "Shape text",
+        DrawablePoint { x: 72.0, y: 96.0 },
+        DrawableSize {
+            width: 144.0,
+            height: 72.0,
+        },
+    )?;
+    Ok(Fixture {
+        path: "source-built: Draft::create_with_text + add_body_rectangle",
         bytes: editor.to_bytes()?,
     })
 }
@@ -126,10 +145,10 @@ enum Op {
     Playback(MediaPlaybackSettings),
 }
 
-fn host_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Vec<u8>> {
+fn host_route(source: &[u8], selector: DrawableSelector, op: &Op) -> TestResult<Vec<u8>> {
     let mut editor = pages::Draft::from_bytes(source)?;
     match selector {
-        MediaSelector::Image(position) => {
+        DrawableSelector::Image(position) => {
             let image = editor
                 .body_images()?
                 .get(position.get())
@@ -148,7 +167,7 @@ fn host_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Vec
                 Op::Position(_) | Op::Playback(_) => return Err("no host image route".into()),
             }
         },
-        MediaSelector::Movie(position) => {
+        DrawableSelector::Movie(position) => {
             let id = editor
                 .body_movies()?
                 .get(position.get())
@@ -167,7 +186,7 @@ fn host_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Vec
                 Op::Position(_) => return Err("no host movie position route".into()),
             }
         },
-        MediaSelector::Audio(position) => {
+        DrawableSelector::Audio(position) => {
             let id = editor
                 .body_audio()?
                 .get(position.get())
@@ -190,14 +209,33 @@ fn host_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Vec
                 },
             }
         },
+        DrawableSelector::Shape(position) => {
+            let id = editor
+                .body_shapes()?
+                .get(position.get())
+                .ok_or("host shape missing")?
+                .drawable_object_id;
+            match op {
+                Op::Geometry(geometry) => {
+                    editor.set_body_shape_geometry(id, host_geometry(*geometry))?
+                },
+                Op::Flip(axis) => drop(editor.flip_body_shape(id, host_axis(*axis))?),
+                Op::Properties(properties) => {
+                    editor.set_body_shape_properties(id, host_properties(properties))?;
+                },
+                Op::Position(_) | Op::OriginalSize | Op::Playback(_) => {
+                    return Err("no host shape route".into());
+                },
+            }
+        },
         _ => return Err("unknown selector".into()),
     }
     Ok(editor.to_bytes()?)
 }
 
-fn leaf_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<LeafRun> {
+fn leaf_route(source: &[u8], selector: DrawableSelector, op: &Op) -> TestResult<LeafRun> {
     let package = Package::from_bytes(source)?;
-    let mut edit = package.edit_body_media_properties(selector)?;
+    let mut edit = package.edit_body_drawable_properties(selector)?;
     match op {
         Op::Geometry(geometry) => drop(edit.set_geometry(*geometry)?),
         Op::Position(point) => drop(edit.set_position(*point)?),
@@ -212,7 +250,7 @@ fn leaf_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Lea
     }
     let restored = commit
         .package()
-        .apply_body_media_properties(&commit.patch().inverse())?;
+        .apply_body_drawable_properties(&commit.patch().inverse())?;
     Ok(LeafRun::with_inverse(
         leaf_bytes!(commit.package()),
         leaf_bytes!(restored.package()),
@@ -222,16 +260,20 @@ fn leaf_route(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Lea
 fn host_media(bytes: &[u8]) -> TestResult<String> {
     let editor = pages::Draft::from_bytes(bytes)?;
     Ok(format!(
-        "{:#?}\n{:#?}\n{:#?}",
+        "{:#?}\n{:#?}\n{:#?}\n{:#?}",
         editor.body_images()?,
         editor.body_movies()?,
-        editor.body_audio()?
+        editor.body_audio()?,
+        editor.body_shapes()?
     ))
 }
 
-fn leaf_media(bytes: &[u8], selector: MediaSelector) -> TestResult<String> {
+fn leaf_media(bytes: &[u8], selector: DrawableSelector) -> TestResult<String> {
     let package = Package::from_bytes(bytes)?;
-    Ok(format!("{:#?}", package.body_media_properties(selector)?))
+    Ok(format!(
+        "{:#?}",
+        package.body_drawable_properties(selector)?
+    ))
 }
 
 fn media_case(
@@ -239,7 +281,7 @@ fn media_case(
     tier: Tier,
     evidence: Evidence,
     input: &Fixture,
-    selector: MediaSelector,
+    selector: DrawableSelector,
     op: Op,
 ) -> TestResult {
     let op = &op;
@@ -247,7 +289,7 @@ fn media_case(
         .host(|source| host_route(source, selector, op))
         .leaf(|source| leaf_route(source, selector, op))
         .read("host body media", host_media)
-        .read("leaf body_media_properties", move |bytes| {
+        .read("leaf body_drawable_properties", move |bytes| {
             leaf_media(bytes, selector)
         })
         .run()?;
@@ -256,7 +298,7 @@ fn media_case(
 
 fn first_image_geometry(input: &Fixture) -> TestResult<Geometry> {
     Ok(Package::from_bytes(&input.bytes)?
-        .body_media_properties(MediaSelector::image(0))?
+        .body_drawable_properties(DrawableSelector::image(0))?
         .geometry()
         .ok_or("image has no frame")?)
 }
@@ -278,7 +320,7 @@ fn pages_body_image_geometry_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::image(0),
+        DrawableSelector::image(0),
         Op::Geometry(geometry),
     )
 }
@@ -291,7 +333,7 @@ fn pages_body_image_flip_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::image(0),
+        DrawableSelector::image(0),
         Op::Flip(FlipAxis::Vertical),
     )
 }
@@ -308,7 +350,7 @@ fn pages_body_image_original_size_parity() -> TestResult {
         }),
         ..first_image_geometry(&input)?
     };
-    let mut resize = edit.edit_body_media_properties(MediaSelector::image(0))?;
+    let mut resize = edit.edit_body_drawable_properties(DrawableSelector::image(0))?;
     resize.set_geometry(geometry)?;
     edit = resize.commit()?.into_package();
     let resized = Fixture {
@@ -320,7 +362,7 @@ fn pages_body_image_original_size_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &resized,
-        MediaSelector::image(0),
+        DrawableSelector::image(0),
         Op::OriginalSize,
     )
 }
@@ -333,7 +375,7 @@ fn pages_body_image_properties_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::image(0),
+        DrawableSelector::image(0),
         Op::Properties(properties()),
     )
 }
@@ -355,7 +397,7 @@ fn pages_body_movie_geometry_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::movie(0),
+        DrawableSelector::movie(0),
         Op::Geometry(geometry),
     )
 }
@@ -368,7 +410,7 @@ fn pages_body_movie_flip_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::movie(0),
+        DrawableSelector::movie(0),
         Op::Flip(FlipAxis::Horizontal),
     )
 }
@@ -381,7 +423,7 @@ fn pages_body_movie_original_size_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::movie(0),
+        DrawableSelector::movie(0),
         Op::OriginalSize,
     )
 }
@@ -394,7 +436,7 @@ fn pages_body_movie_properties_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::movie(0),
+        DrawableSelector::movie(0),
         Op::Properties(properties()),
     )
 }
@@ -407,7 +449,7 @@ fn pages_body_movie_playback_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::movie(0),
+        DrawableSelector::movie(0),
         Op::Playback(playback()?),
     )
 }
@@ -420,7 +462,7 @@ fn pages_body_audio_position_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::audio(0),
+        DrawableSelector::audio(0),
         Op::Position(Point { x: 210.0, y: 330.0 }),
     )
 }
@@ -433,7 +475,7 @@ fn pages_body_audio_properties_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
         &input,
-        MediaSelector::audio(0),
+        DrawableSelector::audio(0),
         Op::Properties(properties()),
     )
 }
@@ -446,25 +488,74 @@ fn pages_body_audio_playback_parity() -> TestResult {
         Tier::A,
         Evidence::Native("test-data/iwork/pages/audio-playback-native-resaved.pages"),
         &input,
-        MediaSelector::audio(0),
+        DrawableSelector::audio(0),
         Op::Playback(playback()?),
+    )
+}
+
+#[test]
+fn pages_body_shape_geometry_parity() -> TestResult {
+    let input = shape_fixture()?;
+    let geometry = Geometry {
+        position: Some(Point { x: 30.0, y: 40.0 }),
+        size: Some(Size {
+            width: 50.0,
+            height: 60.0,
+        }),
+        flags: Some(GeometryFlags::from_bits(3)),
+        angle: Some(15.0),
+    };
+    media_case(
+        "pages_body_shape_geometry_parity",
+        Tier::A,
+        Evidence::Queued,
+        &input,
+        DrawableSelector::shape(0),
+        Op::Geometry(geometry),
+    )
+}
+
+#[test]
+fn pages_body_shape_flip_parity() -> TestResult {
+    let input = shape_fixture()?;
+    media_case(
+        "pages_body_shape_flip_parity",
+        Tier::A,
+        Evidence::Queued,
+        &input,
+        DrawableSelector::shape(0),
+        Op::Flip(FlipAxis::Vertical),
+    )
+}
+
+#[test]
+fn pages_body_shape_properties_parity() -> TestResult {
+    let input = shape_fixture()?;
+    media_case(
+        "pages_body_shape_properties_parity",
+        Tier::A,
+        Evidence::Queued,
+        &input,
+        DrawableSelector::shape(0),
+        Op::Properties(properties()),
     )
 }
 
 /// The read routes: every body image, movie and audio clip reads the same
 /// frame, properties and playback through both routes.
 #[test]
-fn pages_body_media_read_parity() -> TestResult {
+fn pages_body_drawable_read_parity() -> TestResult {
     for (path, input) in [
         (IMAGES, fixture(IMAGES)?),
         (AUDIO, fixture(AUDIO)?),
         ("audio", audio_fixture()?),
         ("movie", movie_fixture()?),
+        ("shape", shape_fixture()?),
     ] {
         let host = pages::Draft::from_bytes(&input.bytes)?;
         let package = Package::from_bytes(&input.bytes)?;
         for (index, image) in host.body_images()?.iter().enumerate() {
-            let leaf = package.body_media_properties(MediaSelector::image(index))?;
+            let leaf = package.body_drawable_properties(DrawableSelector::image(index))?;
             assert_eq!(
                 leaf.geometry().map(host_geometry),
                 Some(image.geometry),
@@ -481,7 +572,7 @@ fn pages_body_media_read_parity() -> TestResult {
             );
         }
         for (index, movie) in host.body_movies()?.iter().enumerate() {
-            let leaf = package.body_media_properties(MediaSelector::movie(index))?;
+            let leaf = package.body_drawable_properties(DrawableSelector::movie(index))?;
             assert_eq!(
                 leaf.geometry().map(host_geometry),
                 Some(movie.geometry),
@@ -491,7 +582,7 @@ fn pages_body_media_read_parity() -> TestResult {
             assert_eq!(leaf.playback(), Some(movie.playback));
         }
         for (index, audio) in host.body_audio()?.iter().enumerate() {
-            let leaf = package.body_media_properties(MediaSelector::audio(index))?;
+            let leaf = package.body_drawable_properties(DrawableSelector::audio(index))?;
             assert_eq!(
                 leaf.geometry()
                     .and_then(|geometry| geometry.position)
@@ -501,19 +592,28 @@ fn pages_body_media_read_parity() -> TestResult {
             assert_eq!(host_properties(leaf.properties()), audio.properties);
             assert_eq!(leaf.playback(), Some(audio.playback));
         }
+        for (index, shape) in host.body_shapes()?.iter().enumerate() {
+            let leaf = package.body_drawable_properties(DrawableSelector::shape(index))?;
+            assert_eq!(
+                leaf.geometry().map(host_geometry),
+                Some(shape.geometry),
+                "{path}"
+            );
+            assert_eq!(host_properties(leaf.properties()), shape.properties);
+        }
         let images = host.body_images()?.len();
         assert!(matches!(
-            package.body_media_properties(MediaSelector::image(images)),
-            Err(litchi_pages::media::properties::Error::Refused(_))
+            package.body_drawable_properties(DrawableSelector::image(images)),
+            Err(litchi_pages::drawable::properties::Error::Refused(_))
         ));
     }
     Ok(())
 }
 
 /// The leaf route alone (open, edit, commit, write), for the cost probes.
-fn leaf_output(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Vec<u8>> {
+fn leaf_output(source: &[u8], selector: DrawableSelector, op: &Op) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
-    let mut edit = package.edit_body_media_properties(selector)?;
+    let mut edit = package.edit_body_drawable_properties(selector)?;
     match op {
         Op::Geometry(geometry) => drop(edit.set_geometry(*geometry)?),
         Op::Position(point) => drop(edit.set_position(*point)?),
@@ -526,7 +626,7 @@ fn leaf_output(source: &[u8], selector: MediaSelector, op: &Op) -> TestResult<Ve
     Ok(leaf_bytes!(commit.package()))
 }
 
-fn media_cost(input: &Fixture, selector: MediaSelector, op: &Op) -> TestResult {
+fn media_cost(input: &Fixture, selector: DrawableSelector, op: &Op) -> TestResult {
     crate::pages_cost_probes::abba(
         input,
         |source| host_route(source, selector, op),
@@ -539,7 +639,7 @@ fn media_cost(input: &Fixture, selector: MediaSelector, op: &Op) -> TestResult {
 fn media_image_flip_cost_abba() -> TestResult {
     media_cost(
         &fixture(IMAGES)?,
-        MediaSelector::image(0),
+        DrawableSelector::image(0),
         &Op::Flip(FlipAxis::Vertical),
     )
 }
@@ -549,7 +649,7 @@ fn media_image_flip_cost_abba() -> TestResult {
 fn media_image_properties_cost_abba() -> TestResult {
     media_cost(
         &fixture(IMAGES)?,
-        MediaSelector::image(0),
+        DrawableSelector::image(0),
         &Op::Properties(properties()),
     )
 }
@@ -568,7 +668,7 @@ fn media_movie_geometry_cost_abba() -> TestResult {
     };
     media_cost(
         &movie_fixture()?,
-        MediaSelector::movie(0),
+        DrawableSelector::movie(0),
         &Op::Geometry(geometry),
     )
 }
@@ -578,7 +678,7 @@ fn media_movie_geometry_cost_abba() -> TestResult {
 fn media_audio_playback_cost_abba() -> TestResult {
     media_cost(
         &fixture(AUDIO)?,
-        MediaSelector::audio(0),
+        DrawableSelector::audio(0),
         &Op::Playback(playback()?),
     )
 }
