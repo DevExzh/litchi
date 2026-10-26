@@ -22055,6 +22055,18 @@
           "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
         },
         {
+          "method": "litchi_numbers_wire::formula_cache::refresh::plan",
+          "inputs": ["source", "writes", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::refresh::TileCaches::apply",
+          "inputs": ["self", "tile", "columns", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::formula_dependencies::prepare_graph",
           "inputs": ["graph", "limits"],
           "limits_argument": "limits",

@@ -9,6 +9,10 @@
 use core::mem::size_of;
 
 use crate::formula_dependencies;
+
+/// The dependent-cache refresh of value writes for the Keynote and Pages
+/// table owners (record 0376).
+pub mod refresh;
 use litchi_iwa_common::formula::{FiniteF64, FormulaCachedValue};
 use litchi_iwa_common::{varint, wire::WireView};
 use litchi_iwa_protos::{
@@ -426,6 +430,10 @@ pub enum Unsupported {
     TextScalar,
     CacheType,
     HeaderNameManager,
+    /// The edited table's formula list is segmented (record 0376).
+    SegmentedFormulaList,
+    /// A tile or cell shape outside the shared cell writer (record 0376).
+    Storage,
 }
 
 /// A cache cell rewrite.  The owner is retained to make raw list rewrites
