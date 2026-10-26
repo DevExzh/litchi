@@ -912,9 +912,7 @@ fn run_add_controls_preserve_atomic_and_best_effort_failure_boundaries() {
         assert_eq!(error.item(), Some(1));
         let commit = file.batch([add, invalid], BatchMode::BestEffort).unwrap();
         assert!(matches!(commit.value()[0], ItemResult::Applied(_)));
-        assert!(
-            matches!(&commit.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
-        );
+        assert!(matches!(&commit.value()[1], ItemResult::Failed(error) if error.item() == Some(1)));
         assert_eq!(
             commit
                 .file()
@@ -1182,9 +1180,7 @@ fn command_run_literal_text_obeys_selector_and_failure_boundaries() {
         assert_eq!(error.item(), Some(1));
         let commit = file.batch(&commands, BatchMode::BestEffort).unwrap();
         assert_eq!(text(commit.file()), "literal\r\nline\tend");
-        assert!(
-            matches!(&commit.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
-        );
+        assert!(matches!(&commit.value()[1], ItemResult::Failed(error) if error.item() == Some(1)));
         assert_eq!(
             commit
                 .patch()
@@ -1720,12 +1716,7 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
         }
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch(&input, mode).unwrap();
-            assert!(
-                commit
-                    .value()
-                    .iter()
-                    .all(|result| applied(result).changed)
-            );
+            assert!(commit.value().iter().all(|result| applied(result).changed));
             assert_eq!(
                 commit.file().to_bytes().unwrap(),
                 oracle.to_bytes().unwrap()

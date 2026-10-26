@@ -372,9 +372,7 @@ fn batches_keep_atomic_and_best_effort_semantics() {
         );
         assert_eq!(text(&source, FIRST), "first");
         let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-        assert!(
-            matches!(&result.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
-        );
+        assert!(matches!(&result.value()[1], ItemResult::Failed(error) if error.item() == Some(1)));
         assert_eq!(text(result.file(), FIRST), "changed");
         assert_eq!(text(result.file(), "/slide[2]/shape[1]"), "later");
         assert_eq!(text(&source, FIRST), "first");

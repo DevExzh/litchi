@@ -6101,3 +6101,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   Rawv12a passes independent source review and 18 tests. Corrected C2 freeze,
   full65/isolated rustdoc, final census and native performance remain open.
   The remaining unified refs are merged controls. Nothing is pushed.
+
+  The fresh C2 full65 run stops at its first formatting row (162): two
+  BatchCommit consumer tests need assertion reflow. No build or test runs.
+  Root preserves and verifies the terminal failure, applies the formatting
+  correction and passes the same check across all 588 changed Rust files.
+  Native and census recipes wait at their source-identity boundary. A fresh
+  committed successor and gate state are required; no final acceptance or push.
