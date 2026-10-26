@@ -20691,6 +20691,231 @@
           ],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::stylesheet",
+          "inputs": [
+            "styles",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::theme_presets",
+          "inputs": [
+            "theme",
+            "stylesheet",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::catalog",
+          "inputs": [
+            "styles",
+            "stylesheet",
+            "sheet",
+            "presets",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::applied",
+          "inputs": [
+            "styles",
+            "catalog",
+            "first",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::plan_apply",
+          "inputs": [
+            "styles",
+            "catalog",
+            "first",
+            "target",
+            "exclusive",
+            "unreferenced",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::named_copy",
+          "inputs": [
+            "source",
+            "name",
+            "style_identifier",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::renamed",
+          "inputs": [
+            "payload",
+            "name",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::stylesheet_with_named",
+          "inputs": [
+            "sheet",
+            "style",
+            "style_identifier",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::stylesheet_without_named",
+          "inputs": [
+            "sheet",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::theme_with_preset",
+          "inputs": [
+            "theme",
+            "stylesheet",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::theme_without_preset",
+          "inputs": [
+            "theme",
+            "stylesheet",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::named::redefine",
+          "inputs": [
+            "styles",
+            "catalog",
+            "first",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::highlight",
+          "inputs": [
+            "payload",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::encode_highlight",
+          "inputs": [
+            "comment_storage",
+            "uuid",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::comment_storage",
+          "inputs": [
+            "payload",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::encode_comment_storage",
+          "inputs": [
+            "body",
+            "creation_date",
+            "author",
+            "storage_uuid",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::comment_storage_with_body",
+          "inputs": [
+            "payload",
+            "body",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::comment_storage_with_reply",
+          "inputs": [
+            "payload",
+            "change",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::graph",
+          "inputs": [
+            "objects",
+            "object",
+            "range",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::annotations",
+          "inputs": [
+            "storage",
+            "objects",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::annotation::annotation",
+          "inputs": [
+            "storage",
+            "objects",
+            "object",
+            "highlight",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
         }
       ]
     },
@@ -26837,6 +27062,7 @@
         "litchi_keynote::slide::table::physical_sort::transaction",
         "litchi_keynote::slide::creation",
         "litchi_keynote::slide::build",
+        "litchi_keynote::chart::lifecycle",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -26914,6 +27140,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_builds",
           "ok": "litchi_keynote::slide::build::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_lifecycle",
+          "ok": "litchi_keynote::chart::lifecycle::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_deletion",
@@ -28432,6 +28662,7 @@
         "litchi_keynote::slide::table::physical_sort::transaction",
         "litchi_keynote::slide::creation",
         "litchi_keynote::slide::build",
+        "litchi_keynote::chart::lifecycle",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -28509,6 +28740,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_builds",
           "ok": "litchi_keynote::slide::build::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_lifecycle",
+          "ok": "litchi_keynote::chart::lifecycle::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_deletion",
