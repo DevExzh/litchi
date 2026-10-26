@@ -16,6 +16,40 @@ from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Record 0368 (decision D4 of record 0363): the archive-free cell data-format
+# values moved from `litchi-numbers` to `litchi-iwa-common::table`, and each
+# `litchi-numbers` module now re-exports them beside its transactions. The
+# focused Numbers audits below read a data-format module as its semantic
+# owner; reading it as the module plus its moved value definitions keeps those
+# audits checking the same declarations at their canonical home.
+_NUMBERS_DATA_FORMAT_SOURCE = ("crates", "litchi-numbers", "src", "cell")
+_COMMON_DATA_FORMAT_SOURCE = ("crates", "litchi-iwa-common", "src", "table", "cell")
+_PATH_READ_TEXT = Path.read_text
+
+
+def _moved_data_format_counterpart(path: Path) -> Path | None:
+    parts = path.parts
+    for index in range(len(parts) - len(_NUMBERS_DATA_FORMAT_SOURCE)):
+        window = parts[index : index + len(_NUMBERS_DATA_FORMAT_SOURCE)]
+        if window != _NUMBERS_DATA_FORMAT_SOURCE:
+            continue
+        rest = parts[index + len(_NUMBERS_DATA_FORMAT_SOURCE) :]
+        if not rest or rest[0] not in {"data_format", "data_format.rs"}:
+            return None
+        return Path(*parts[:index], *_COMMON_DATA_FORMAT_SOURCE, *rest)
+    return None
+
+
+def _read_text_with_moved_data_formats(self: Path, *args, **kwargs) -> str:
+    text = _PATH_READ_TEXT(self, *args, **kwargs)
+    counterpart = _moved_data_format_counterpart(self)
+    if counterpart is not None and counterpart.is_file():
+        text = f"{text}\n{_PATH_READ_TEXT(counterpart, *args, **kwargs)}"
+    return text
+
+
+Path.read_text = _read_text_with_moved_data_formats  # type: ignore[method-assign]
 DEFAULT_POLICY = Path(__file__).with_name("crate_boundaries.json")
 
 OOXML_FORMATS = frozenset(
@@ -31469,6 +31503,9 @@ def _numbers_table_cell_date_time_format_public_leak(
 ) -> str | None:
     """Classify archive, wire, generated, or identifier vocabulary."""
 
+    if identifier == "litchi_iwa_common":
+        # The neutral table vocabulary owner (record 0368, decision D4).
+        return None
     if identifier in NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS:
         return "raw identifier or archive type"
     return _iwork_public_leak(identifier)
@@ -31850,6 +31887,9 @@ def _numbers_table_cell_duration_format_public_leak(
 ) -> str | None:
     """Classify native, archive, wire, generated, or host vocabulary."""
 
+    if identifier == "litchi_iwa_common":
+        # The neutral table vocabulary owner (record 0368, decision D4).
+        return None
     if identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_RAW_MARKERS:
         return "raw identifier or archive type"
     if identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_PROTO_ORIGINS:
@@ -37978,6 +38018,9 @@ def audit_iwa_numbers_table_cell_text_format_source_topology(
 def _numbers_table_cell_control_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden in the generic control facade."""
 
+    if identifier == "litchi_iwa_common":
+        # The neutral table vocabulary owner (record 0368, decision D4).
+        return None
     if identifier in NUMBERS_TABLE_CELL_CONTROL_PROTO_ORIGINS:
         return "protobuf type"
     if identifier in NUMBERS_TABLE_CELL_CONTROL_PHYSICAL_TYPES:

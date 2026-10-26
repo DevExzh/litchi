@@ -206,6 +206,10 @@ const fn is_known_extension(field_number: u32) -> bool {
 }
 
 #[cfg(test)]
+#[path = "theme/exit_parity.rs"]
+mod exit_parity;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::protobuf::tsp;

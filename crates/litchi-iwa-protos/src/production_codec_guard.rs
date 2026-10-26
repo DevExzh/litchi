@@ -771,6 +771,10 @@ mod tests {
             include_str!("keynote_slide_number_codec.rs"),
         ),
         (
+            "number_attachment",
+            include_str!("number_attachment_codec.rs"),
+        ),
+        (
             "keynote_soundtrack_settings",
             include_str!("keynote_soundtrack_settings_codec.rs"),
         ),

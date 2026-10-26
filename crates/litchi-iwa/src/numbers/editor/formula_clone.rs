@@ -1,6 +1,8 @@
 //! CalculationEngine graph cloning for independently duplicated Numbers tables.
 
 mod dependency_wire;
+#[cfg(test)]
+mod exit_parity;
 mod formula_storage;
 mod removal;
 

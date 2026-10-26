@@ -4,8 +4,11 @@
 //! decimal settings beside the plain Number and Percentage formats.  The
 //! nominal types are re-exported from the compatibility decimal module while
 //! this module owns the focused Currency transaction entry point.
+//!
+//! The values are the neutral `litchi_iwa_common::table::cell::data_format::currency`
+//! vocabulary (record 0368), re-exported here at their established path.
 
-pub use super::number::{
+pub use litchi_iwa_common::table::cell::data_format::currency::{
     Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, NegativeStyle, ThousandsSeparator,
 };
 
@@ -15,23 +18,4 @@ pub mod transaction {
     pub use crate::package::table_cell_currency_format::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Currency, CurrencyCode, CurrencyStyle, DecimalPlaces};
-
-    #[test]
-    fn currency_namespace_keeps_a_nominal_format_family() {
-        let currency = Currency::new(
-            CurrencyCode::EUR,
-            DecimalPlaces::Automatic,
-            super::NegativeStyle::MinusSign,
-            super::ThousandsSeparator::Hidden,
-            CurrencyStyle::Accounting,
-        );
-
-        assert_eq!(currency.code(), CurrencyCode::EUR);
-        assert_eq!(currency.style(), CurrencyStyle::Accounting);
-    }
 }
