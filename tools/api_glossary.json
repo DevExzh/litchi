@@ -20175,7 +20175,73 @@
           "match": "suffix"
         }
       ],
-      "families": []
+      "families": [],
+      "required_signatures": [
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::uniform_style",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::repoint",
+          "inputs": [
+            "storage",
+            "from",
+            "to",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::stylesheet_with_variation",
+          "inputs": [
+            "stylesheet",
+            "parent",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::stylesheet_without_variation",
+          "inputs": [
+            "stylesheet",
+            "parent",
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::effective",
+          "inputs": [
+            "styles",
+            "style",
+            "kind",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::paragraph_style::plan",
+          "inputs": [
+            "styles",
+            "target",
+            "change",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        }
+      ]
     },
     {
       "id": "iwa-core",
