@@ -621,6 +621,14 @@ enum Operation {
         message_type: u32,
         properties: crate::slide::media::MediaProperties,
     },
+    Preset {
+        slide: u64,
+        drawable: u64,
+        message_index: usize,
+        message_type: u32,
+        preset: Preset,
+        geometry: Geometry,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1012,6 +1020,7 @@ impl<'a> Edit<'a> {
             | Operation::NotesStyle { .. }
             | Operation::Flip { .. }
             | Operation::Properties { .. }
+            | Operation::Preset { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
@@ -1168,6 +1177,46 @@ impl<'a> Edit<'a> {
             message_index: item.message_index,
             message_type: item.message_type,
             properties,
+        });
+        Ok(self)
+    }
+
+    /// Stage a new preset path for one shape at its current frame size,
+    /// keeping its text, style and every other path-source field (host
+    /// `set_slide_shape_preset`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors, [`Refusal::Unsupported`] for other
+    /// kinds and [`Refusal::InvalidGeometry`] for a corner radius beyond
+    /// half the shorter side.
+    pub fn set_preset<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        preset: Preset,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        let geometry = item
+            .geometry
+            .filter(|_| item.kind == Kind::Shape)
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))?;
+        if let Preset::RoundedRectangle { radius } = preset
+            && (!radius.is_finite()
+                || radius < 0.0
+                || radius > geometry.width.min(geometry.height) / 2.0)
+        {
+            return Err(Error::Refused(Refusal::InvalidGeometry));
+        }
+        self.operations.push(Operation::Preset {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            message_index: item.message_index,
+            message_type: item.message_type,
+            preset,
+            geometry,
         });
         Ok(self)
     }
@@ -2577,6 +2626,24 @@ fn commit_operations(
                 {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Preset {
+                slide,
+                drawable,
+                message_index,
+                message_type,
+                preset,
+                geometry,
+            } => {
+                arrange::set_preset(
+                    &mut workspace,
+                    *drawable,
+                    *message_index,
+                    *message_type,
+                    *preset,
+                    *geometry,
+                )?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::AddImage {

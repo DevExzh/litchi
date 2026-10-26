@@ -344,3 +344,75 @@ mod tests {
         assert_eq!(vertical_flip_angle(Some(270.0)), 90.0);
     }
 }
+
+/// `TSWP.ShapeInfoArchive.super` (`TSD.ShapeArchive`) and its path source.
+const SHAPE_ARCHIVE: u32 = 1;
+const SHAPE_PATH_SOURCE: u32 = 3;
+/// The path-family fields of `TSD.PathSourceArchive` (point, scalar,
+/// Bézier, callout, connection line, editable Bézier).
+const PATH_FAMILIES: std::ops::RangeInclusive<u32> = 3..=8;
+
+/// Replace a shape's path family with `preset`'s at the frame size, keeping
+/// every other path-source field (host `set_shape_preset`).
+pub(super) fn set_preset(
+    workspace: &mut Workspace<'_>,
+    drawable: u64,
+    message_index: usize,
+    message_type: u32,
+    preset: super::Preset,
+    geometry: Geometry,
+) -> Result<(), Error> {
+    use litchi_iwa_common::wire::parse_wire_fields;
+    let wire = workspace.wire;
+    let replacement = super::author::path_source(preset, geometry.width, geometry.height)?.finish();
+    let replacement_fields =
+        parse_wire_fields(&replacement, wire).map_err(|_| Error::InvalidSource)?;
+    let family = replacement_fields
+        .iter()
+        .find(|field| PATH_FAMILIES.contains(&field.number()))
+        .ok_or(Error::InvalidSource)?
+        .raw(&replacement)
+        .map_err(|_| Error::InvalidSource)?
+        .to_vec();
+    let source = payload(workspace, drawable, message_index)?;
+    let data = edit_nested(&source, &[SHAPE_ARCHIVE], wire, &mut |shape| {
+        let original = shape
+            .unique(SHAPE_PATH_SOURCE)?
+            .ok_or(StructureError::Unexpected("path source"))?
+            .message()?
+            .to_vec();
+        let fields = parse_wire_fields(&original, wire)
+            .map_err(|_| StructureError::Unexpected("path source"))?;
+        if fields
+            .iter()
+            .filter(|field| PATH_FAMILIES.contains(&field.number()))
+            .count()
+            > 1
+        {
+            return Err(StructureError::Unexpected("path families"));
+        }
+        let mut output = Vec::with_capacity(original.len() + family.len());
+        let mut inserted = false;
+        for field in &fields {
+            if PATH_FAMILIES.contains(&field.number()) {
+                if !inserted {
+                    output.extend_from_slice(&family);
+                    inserted = true;
+                }
+                continue;
+            }
+            output.extend_from_slice(
+                field
+                    .raw(&original)
+                    .map_err(|_| StructureError::Unexpected("path source"))?,
+            );
+        }
+        if !inserted {
+            output.extend_from_slice(&family);
+        }
+        shape.set_message(SHAPE_PATH_SOURCE, &output);
+        Ok(())
+    })
+    .map_err(lift)?;
+    replace_payload(workspace, drawable, message_index, message_type, data).map_err(lift)
+}
