@@ -292,3 +292,60 @@ fn table_cell_value_batch_cost_abba() -> TestResult {
         },
     )
 }
+
+/// `clear_table_cell` against the values family's `Value::Empty` on a cell
+/// the host filled first. Not at parity: clearing the row's only (unstyled)
+/// cell, the host drops the empty tile row and its row header, while the
+/// shared leaf writer (`litchi_numbers_wire::table_write`) keeps an empty
+/// row record and a zero-count header. The route stays host-only and the
+/// divergence goes to W1-A, which owns the writer (record 0371).
+#[test]
+fn pages_body_table_cell_clear_divergence_is_reported() -> TestResult {
+    let Err(error) = clear_case() else {
+        return Err("table-cell clear is now at parity; migrate the route".into());
+    };
+    let report = error.to_string();
+    assert!(report.contains("host     row_infos: []"), "{report}");
+    Ok(())
+}
+
+fn clear_case() -> TestResult {
+    let source = fixture(CATALOG)?;
+    let mut editor = pages::Draft::from_bytes(&source.bytes)?;
+    let model = host_model(&editor)?;
+    editor.set_table_cell(model, 1, 3, CellValue::Text("Zürich".to_owned()))?;
+    let input = crate::harness::Fixture {
+        path: "iwork/pages/body-table-catalog-native.pages + host D2 \"Zürich\"",
+        bytes: editor.to_bytes()?,
+    };
+    Case::new(
+        "pages_body_table_cell_clear_divergence_is_reported",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = pages::Draft::from_bytes(source)?;
+        let model = host_model(&editor)?;
+        editor.clear_table_cell(model, 1, 3)?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        let package = Package::from_bytes(source)?;
+        let mut edit = package.edit_body_table_values(TABLE)?;
+        edit.set(1, 3, Value::Empty)?;
+        let commit = edit.commit()?;
+        let restored = commit
+            .package()
+            .apply_body_table_values(&commit.patch().inverse())?;
+        Ok(LeafRun::with_inverse(
+            leaf_bytes!(commit.package()),
+            leaf_bytes!(restored.package()),
+        ))
+    })
+    .read("host table cells", host_cells)
+    .read("leaf body_table_cells", leaf_cells)
+    .run()?;
+    Ok(())
+}
