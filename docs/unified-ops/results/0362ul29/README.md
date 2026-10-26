@@ -21,7 +21,10 @@ that calls `setsid`) before moving any reported output. Successful
 test/example ELF executables in exactly `target/debug/deps` or
 `target/debug/examples` (including stale hashed variants from earlier feature
 builds) and only their exact `.d`/`.rmeta` sidecars are atomically moved beside
-the target into a per-chunk quarantine;
+the target into a per-invocation, per-chunk quarantine namespace.  The
+namespace is derived from the resolved log directory and gate attempt, so
+different suites may safely reuse chunk indices; a repeated direct invocation
+reuses an existing artifact only after verifying identical bytes and mode.
 their bytes, mode, SHA-256, original relative path, command and chunk index
 are recorded in `manifest.jsonl`. Caches, rlibs, build outputs, shared
 libraries, non-ELF files, `target/debug/build`, and release artifacts remain
