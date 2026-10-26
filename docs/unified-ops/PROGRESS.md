@@ -6117,3 +6117,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   capture or native measurement is claimed. C and pending P stay frozen;
   coordinator documentation continues on trunk. Full qualification, protocol
   installation and remaining control cleanup remain required. Nothing is pushed.
+
+  Root verifies 29 passing rows of the same live C2a gate (164). A completion
+  checklist finds no additional source defect but preserves all outstanding
+  census, native, fidelity and performance requirements; residuals are not
+  accepted exceptions. The execution checklist corrects current-native to
+  176 total ABBA legs across its two lanes. The refreshed 74-head census finds
+  all four unified control refs already merged and still in qualification
+  use; 61 worktrees remain, with no additional unused unified leaf. C and P
+  stay frozen. Full65 and the final proofs remain open; nothing is pushed.
