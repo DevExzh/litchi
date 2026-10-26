@@ -20985,6 +20985,26 @@
           "replacement": "use shape::fill::ImageData; no host prefix (record 0375)"
         },
         {
+          "name": "ChartLegendCoordinate",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Coordinate; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendExtent",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Extent; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendRect",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Rect; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendFrame",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Frame; no host prefix (record 0375)"
+        },
+        {
           "name": "LineSegment",
           "scope": "litchi_iwa_common",
           "replacement": "use shape::line::Segment (record 0375)"
