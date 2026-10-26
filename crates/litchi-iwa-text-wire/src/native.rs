@@ -564,7 +564,12 @@ pub(crate) struct Color {
 }
 
 impl Color {
-    fn merge(&mut self, data: &[u8], depth: usize, budget: &mut Budget) -> NativeResult<()> {
+    pub(crate) fn merge(
+        &mut self,
+        data: &[u8],
+        depth: usize,
+        budget: &mut Budget,
+    ) -> NativeResult<()> {
         fields(data, depth, budget, |field, _| {
             match field.number {
                 1 => self.model = field.int32()?,
