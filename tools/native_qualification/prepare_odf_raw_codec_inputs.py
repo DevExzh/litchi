@@ -10,6 +10,11 @@ and three consumer files are supplied by a separate protocol-P1-sealed
 identity.  P1 is independently pinned and may have a later clean P2 binding
 installed on the protocol worktree; the preparer never writes to either
 source endpoint.
+
+The baseline lock is admitted only with the independently generated offline
+metadata provenance for the dedicated 70d manifest.  Its fixed registry
+flate2/zlib-rs identities and historical seed bind the lock graph; an external
+copy of the candidate lock is rejected before any overlay write.
 """
 
 from __future__ import annotations
@@ -59,6 +64,56 @@ CONSUMER_MANIFEST_POLICIES = {
 ROOT_PATCH_POLICIES = {
     "baseline": {},
     "candidate": {"flate2": "vendor/flate2", "zlib-rs": "vendor/zlib-rs"},
+}
+BASELINE_LOCK_IDENTITY = {
+    "schema": "litchi.odf.raw-codec.baseline-lock-provenance.v1",
+    "sha256": "5ad5000eef2a0a9038f77e16e3347ba757be932e830fe07855c267fcd695cc2a",
+    "bytes": 43921,
+    "seed": {
+        "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "bytes": 57158,
+        "registry_entries": 204,
+    },
+    "source": {
+        "commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+        "tree": "4d716d79263612541988f2e30198f7f8e59e520c",
+        "manifest_sha256": BASELINE_CONSUMER_MANIFEST_SHA256,
+        "manifest_bytes": BASELINE_CONSUMER_MANIFEST_BYTES,
+        "probe_sha256": "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002",
+        "probe_bytes": 65903,
+    },
+    "policy": {
+        "root_patch_resolution": "historical_registry",
+        "patches": {},
+        "required_registry": {
+            "flate2": {
+                "version": "1.1.10",
+                "source": "registry+https://github.com/rust-lang/crates.io-index",
+                "checksum": "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb",
+            },
+            "zlib-rs": {
+                "version": "0.6.7",
+                "source": "registry+https://github.com/rust-lang/crates.io-index",
+                "checksum": "34b31d188d9d685a4f9c7b46d6e36631b07058d2cfe190267adce54dc230bf12",
+            },
+        },
+    },
+    "resolution": {
+        "registry_entries": 170,
+        "registry_added": 0,
+        "registry_removed": 34,
+        "registry_changed": 5,
+        "local_packages_added": [
+            "litchi-odb",
+            "litchi-odc",
+            "litchi-odf-formula",
+            "litchi-odf-raw-codec-consumer",
+            "litchi-odg",
+            "litchi-odi",
+            "litchi-odm",
+            "litchi-oth",
+        ],
+    },
 }
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
@@ -313,6 +368,135 @@ def _validate_root_patch_resolution(root: Path, role: str) -> dict[str, str]:
     return observed
 
 
+def _lock_registry_rows(lock: Path) -> tuple[dict[tuple[str, str], Mapping[str, Any]], dict[str, Mapping[str, Any]]]:
+    try:
+        document = tomllib.loads(lock.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise PreparationError(f"cannot parse baseline Cargo.lock: {error}") from error
+    packages = document.get("package")
+    if document.get("version") != 4 or not isinstance(packages, list):
+        raise PreparationError("baseline Cargo.lock schema differs")
+    registry: dict[tuple[str, str], Mapping[str, Any]] = {}
+    all_packages: dict[str, Mapping[str, Any]] = {}
+    for package in packages:
+        if not isinstance(package, Mapping) or not isinstance(package.get("name"), str) or not isinstance(package.get("version"), str):
+            raise PreparationError("baseline Cargo.lock package row is malformed")
+        key = (package["name"], package["version"])
+        all_packages[f"{package['name']}@{package['version']}"] = package
+        source = package.get("source")
+        if isinstance(source, str) and source.startswith("registry+"):
+            registry[key] = package
+    return registry, all_packages
+
+
+def _load_baseline_lock_provenance(
+    provenance_path: Path,
+    *,
+    baseline_lock: Path,
+    baseline_manifest: Path,
+    baseline_root: Path,
+    roots: tuple[Path, ...],
+) -> tuple[dict[str, Any], str, int, Path]:
+    provenance_path = _resolve(provenance_path)
+    if any(_under(provenance_path, root) or provenance_path == root for root in roots):
+        raise PreparationError("baseline lock provenance must be outside every source endpoint")
+    if provenance_path.is_symlink() or not provenance_path.is_file():
+        raise PreparationError("baseline lock provenance must be a regular file")
+    try:
+        raw = provenance_path.read_bytes()
+        value = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as error:
+        raise PreparationError(f"cannot read baseline lock provenance: {error}") from error
+    if not isinstance(value, Mapping) or value.get("schema") != BASELINE_LOCK_IDENTITY["schema"] or value.get("status") != "generated_offline_metadata":
+        raise PreparationError("baseline lock provenance schema/status differs")
+    source = value.get("source")
+    seed = value.get("seed")
+    lock_record = value.get("lock")
+    resolution = value.get("resolution")
+    command = value.get("command")
+    outputs = value.get("outputs")
+    if not all(isinstance(item, Mapping) for item in (source, seed, lock_record, resolution, command, outputs)):
+        raise PreparationError("baseline lock provenance is incomplete")
+    if source.get("commit") != BASELINE_LOCK_IDENTITY["source"]["commit"] or source.get("tree") != BASELINE_LOCK_IDENTITY["source"]["tree"]:
+        raise PreparationError("baseline lock provenance source commit/tree differs")
+    source_root = _resolve(str(source.get("root")))
+    if any(source_root == root or _under(source_root, root) or _under(root, source_root) for root in roots):
+        raise PreparationError("baseline lock provenance source overlaps a selected endpoint")
+    try:
+        if _git(source_root, "rev-parse", "HEAD").strip() != BASELINE_LOCK_IDENTITY["source"]["commit"] or _git(source_root, "rev-parse", "HEAD^{tree}").strip() != BASELINE_LOCK_IDENTITY["source"]["tree"]:
+            raise PreparationError("baseline lock provenance source endpoint moved")
+    except PreparationError:
+        raise
+    # Cargo.lock is ignored in the historical source endpoint; the generated
+    # lock is still bound separately by its fixed hash and lock record.
+    expected_status = sorted((str(CONSUMER_MANIFEST), str(PROBE_PATH)))
+    if sorted(source.get("status_paths", [])) != expected_status:
+        raise PreparationError("baseline lock provenance source status is outside the three consumer files")
+    source_manifest = source.get("consumer_manifest")
+    source_probe = source.get("probe")
+    if not isinstance(source_manifest, Mapping) or not isinstance(source_probe, Mapping):
+        raise PreparationError("baseline lock provenance source identities are missing")
+    for record, expected_path, expected_sha, expected_bytes, label in (
+        (source_manifest, str(CONSUMER_MANIFEST), BASELINE_CONSUMER_MANIFEST_SHA256, BASELINE_CONSUMER_MANIFEST_BYTES, "source manifest"),
+        (source_probe, str(PROBE_PATH), BASELINE_LOCK_IDENTITY["source"]["probe_sha256"], BASELINE_LOCK_IDENTITY["source"]["probe_bytes"], "source probe"),
+    ):
+        if record.get("path") != expected_path or record.get("sha256") != expected_sha or record.get("bytes") != expected_bytes:
+            raise PreparationError(f"baseline lock provenance {label} identity differs")
+        path = _resolve(expected_path, base=source_root)
+        observed_sha, observed_bytes = _sha256(path)
+        if (observed_sha, observed_bytes) != (expected_sha, expected_bytes):
+            raise PreparationError(f"baseline lock provenance {label} bytes differ")
+    if source.get("root_patch_resolution") != {"root_patch_resolution": "historical_registry", "patches": {}}:
+        raise PreparationError("baseline lock provenance root patch policy differs")
+    if seed.get("sha256") != BASELINE_LOCK_IDENTITY["seed"]["sha256"] or seed.get("bytes") != BASELINE_LOCK_IDENTITY["seed"]["bytes"] or seed.get("registry_entries") != BASELINE_LOCK_IDENTITY["seed"]["registry_entries"]:
+        raise PreparationError("baseline lock provenance historical seed identity differs")
+    seed_path = _resolve(str(seed.get("path")))
+    if any(seed_path == root or _under(seed_path, root) for root in roots):
+        raise PreparationError("baseline lock provenance seed must be external to every source endpoint")
+    seed_sha, seed_bytes = _sha256(seed_path)
+    if (seed_sha, seed_bytes) != (BASELINE_LOCK_IDENTITY["seed"]["sha256"], BASELINE_LOCK_IDENTITY["seed"]["bytes"]):
+        raise PreparationError("baseline lock provenance historical seed bytes differ")
+    lock_path = _resolve(baseline_lock)
+    if lock_record.get("path") != str(lock_path) or lock_record.get("sha256") != BASELINE_LOCK_IDENTITY["sha256"] or lock_record.get("bytes") != BASELINE_LOCK_IDENTITY["bytes"]:
+        raise PreparationError("baseline lock provenance does not name the selected lock")
+    lock_sha, lock_bytes = _sha256(lock_path)
+    if (lock_sha, lock_bytes) != (BASELINE_LOCK_IDENTITY["sha256"], BASELINE_LOCK_IDENTITY["bytes"]):
+        raise PreparationError("baseline lock bytes are not the generated 70d dedicated lock")
+    manifest_sha, manifest_bytes = _sha256(baseline_manifest)
+    if (manifest_sha, manifest_bytes) != (BASELINE_LOCK_IDENTITY["source"]["manifest_sha256"], BASELINE_LOCK_IDENTITY["source"]["manifest_bytes"]):
+        raise PreparationError("selected baseline manifest is not the generated lock manifest")
+    if command.get("exit_code") != 0 or command.get("cwd") != str(source_root):
+        raise PreparationError("baseline lock provenance command identity differs")
+    argv = command.get("argv")
+    if not isinstance(argv, list) or argv[1:] != ["metadata", "--offline", "--format-version", "1", "--manifest-path", str(CONSUMER_MANIFEST)]:
+        raise PreparationError("baseline lock provenance was not generated by offline metadata")
+    local_added = resolution.get("local_packages_added", [])
+    local_added_names = sorted(row[0] for row in local_added if isinstance(row, list) and len(row) == 2 and isinstance(row[0], str))
+    if resolution.get("registry_entries") != BASELINE_LOCK_IDENTITY["resolution"]["registry_entries"] or len(resolution.get("registry_added", [])) != BASELINE_LOCK_IDENTITY["resolution"]["registry_added"] or len(resolution.get("registry_removed", [])) != BASELINE_LOCK_IDENTITY["resolution"]["registry_removed"] or len(resolution.get("registry_changed", [])) != BASELINE_LOCK_IDENTITY["resolution"]["registry_changed"] or local_added_names != BASELINE_LOCK_IDENTITY["resolution"]["local_packages_added"] or len(local_added_names) != len(local_added):
+        raise PreparationError("baseline lock provenance resolution summary differs")
+    if resolution.get("required_registry") != BASELINE_LOCK_IDENTITY["policy"]["required_registry"]:
+        raise PreparationError("baseline lock provenance registry policy differs")
+    stdout = outputs.get("metadata_stdout")
+    stderr = outputs.get("metadata_stderr")
+    for output, label in ((stdout, "metadata stdout"), (stderr, "metadata stderr")):
+        if not isinstance(output, Mapping):
+            raise PreparationError(f"baseline lock provenance {label} identity is missing")
+        output_path = _resolve(str(output.get("path")))
+        if any(output_path == root or _under(output_path, root) for root in roots):
+            raise PreparationError(f"baseline lock provenance {label} must be external to every source endpoint")
+        observed_sha, observed_bytes = _sha256(output_path)
+        if (observed_sha, observed_bytes) != (output.get("sha256"), output.get("bytes")):
+            raise PreparationError(f"baseline lock provenance {label} bytes differ")
+    registry, _ = _lock_registry_rows(lock_path)
+    if len(registry) != BASELINE_LOCK_IDENTITY["resolution"]["registry_entries"]:
+        raise PreparationError("baseline dedicated lock registry entry count differs")
+    for package_name, expected in BASELINE_LOCK_IDENTITY["policy"]["required_registry"].items():
+        rows = [row for (name, _), row in registry.items() if name == package_name]
+        if len(rows) != 1 or {key: rows[0].get(key) for key in ("version", "source", "checksum")} != expected:
+            raise PreparationError(f"baseline dedicated lock does not preserve registry {package_name}")
+    return dict(value), hashlib.sha256(raw).hexdigest(), len(raw), provenance_path
+
+
 def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the small identity envelope sealed by protocol P1.
 
@@ -496,6 +680,7 @@ def prepare(
     candidate_root: Path,
     adapter_root: Path,
     baseline_consumer_manifest: Path,
+    baseline_lock_provenance: Path,
     protocol_p_root: Path,
     protocol_p_pin_path: Path,
     candidate_identity_path: Path,
@@ -506,6 +691,7 @@ def prepare(
     candidate_root = _resolve(candidate_root)
     adapter_root = _resolve(adapter_root)
     baseline_consumer_manifest = _resolve(baseline_consumer_manifest)
+    baseline_lock_provenance = _resolve(baseline_lock_provenance)
     protocol_p_root = _resolve(protocol_p_root)
     protocol_p_pin, protocol_p_pin_sha256, protocol_p_pin_bytes, protocol_p_pin_path = _load_protocol_p_pin(
         protocol_p_pin_path,
@@ -553,6 +739,14 @@ def prepare(
     if baseline_consumer_manifest.is_symlink() or not baseline_consumer_manifest.is_file():
         raise PreparationError("baseline consumer manifest must be a regular external file")
     _validate_consumer_manifest_file(baseline_consumer_manifest, "baseline")
+    external_lock = _resolve(baseline_lock)
+    baseline_lock_provenance_value, baseline_lock_provenance_sha256, baseline_lock_provenance_bytes, baseline_lock_provenance_path = _load_baseline_lock_provenance(
+        baseline_lock_provenance,
+        baseline_lock=external_lock,
+        baseline_manifest=baseline_consumer_manifest,
+        baseline_root=baseline_root,
+        roots=(baseline_root, candidate_root, adapter_root, protocol_p_root),
+    )
     if any(protocol_p_root == root or _under(protocol_p_root, root) or _under(root, protocol_p_root) for root in (baseline_root, candidate_root, adapter_root)):
         raise PreparationError("protocol-P anchor endpoint must be disjoint from source endpoints")
     candidate_production_source_tree = _production_source_tree(candidate_root)
@@ -570,7 +764,6 @@ def prepare(
     baseline_probe = _resolve(PROBE_PATH, base=baseline_root)
     baseline_consumer = _resolve(CONSUMER_MANIFEST, base=baseline_root)
     baseline_lock_destination = _resolve(LOCK_PATH, base=baseline_root)
-    external_lock = _resolve(baseline_lock)
     if _under(external_lock, baseline_root) or _under(external_lock, candidate_root) or _under(external_lock, adapter_root):
         raise PreparationError("baseline lock source must be external to every source endpoint")
     adapter_probe_sha, adapter_probe_bytes = _sha256(adapter_probe)
@@ -655,7 +848,7 @@ def prepare(
             "probe": {"source_path": str(adapter_probe), "destination_path": str(baseline_probe), "sha256": prepared_probe_sha, "bytes": prepared_probe_bytes},
             "consumer_manifest": {"source_path": str(baseline_consumer_manifest), "destination_path": str(baseline_consumer), "sha256": prepared_consumer_sha, "bytes": prepared_consumer_bytes},
             "consumer_manifest_policy": CONSUMER_MANIFEST_POLICIES["baseline"],
-            "lock": {"source_path": str(external_lock), "destination_path": str(baseline_lock_destination), "sha256": prepared_lock_sha, "bytes": prepared_lock_size},
+            "lock": {"source_path": str(external_lock), "destination_path": str(baseline_lock_destination), "sha256": prepared_lock_sha, "bytes": prepared_lock_size, "provenance_path": str(baseline_lock_provenance_path), "provenance_sha256": baseline_lock_provenance_sha256, "provenance_bytes": baseline_lock_provenance_bytes, "provenance": baseline_lock_provenance_value},
         },
         "candidate": {
             "root": str(candidate_root),
@@ -708,6 +901,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--adapter-root", type=Path, required=True)
     parser.add_argument("--baseline-consumer-manifest", type=Path, required=True)
+    parser.add_argument("--baseline-lock-provenance", type=Path, required=True)
     parser.add_argument("--protocol-p-root", type=Path, required=True)
     parser.add_argument("--protocol-p-pin", type=Path, required=True)
     parser.add_argument("--candidate-identity", type=Path, required=True)
@@ -720,6 +914,7 @@ def main(argv: list[str] | None = None) -> int:
             candidate_root=args.candidate_root,
             adapter_root=args.adapter_root,
             baseline_consumer_manifest=args.baseline_consumer_manifest,
+            baseline_lock_provenance=args.baseline_lock_provenance,
             protocol_p_root=args.protocol_p_root,
             protocol_p_pin_path=args.protocol_p_pin,
             candidate_identity_path=args.candidate_identity,

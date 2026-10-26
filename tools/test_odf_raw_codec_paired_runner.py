@@ -35,6 +35,7 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["source"]["candidate_mode"], runner.CANDIDATE_MODE)
         self.assertEqual(value["source"]["consumer_package"], runner.CONSUMER_PACKAGE)
         self.assertEqual(value["source"]["consumer_manifest_identities"], runner.CONSUMER_MANIFEST_IDENTITIES)
+        self.assertEqual(value["source"]["baseline_lock_identity"], runner.BASELINE_LOCK_IDENTITY)
         self.assertEqual(value["source"]["candidate_integrated_files"], [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)])
         self.assertEqual(value["source"]["protocol_p_pin_schema"], runner.PROTOCOL_P_PIN_SCHEMA)
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
@@ -50,6 +51,8 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["source"]["consumer_manifest_identities"]["candidate"]["bytes"], (ROOT / runner.CONSUMER_MANIFEST).stat().st_size)
         self.assertEqual(value["source"]["consumer_manifest_identities"]["baseline"]["sha256"], runner.BASELINE_CONSUMER_MANIFEST_SHA256)
         self.assertEqual(value["source"]["consumer_manifest_identities"]["baseline"]["bytes"], runner.BASELINE_CONSUMER_MANIFEST_BYTES)
+        self.assertEqual(value["source"]["baseline_lock_identity"]["sha256"], runner.BASELINE_LOCK_IDENTITY["sha256"])
+        self.assertEqual(value["source"]["baseline_lock_identity"]["bytes"], runner.BASELINE_LOCK_IDENTITY["bytes"])
         lock_path = ROOT / runner.LOCK_PATH
         self.assertEqual(value["source"]["consumer_lock_status"], runner.CONSUMER_LOCK_STATUS_READY)
         self.assertEqual(value["source"]["candidate_consumer_lock_sha256"], digest(str(runner.LOCK_PATH)))
@@ -117,6 +120,10 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             runner.validate_manifest(value)
         value = manifest()
         value["source"]["consumer_manifest_identities"]["baseline"]["sha256"] = "a" * 64
+        with self.assertRaises(runner.RunnerError):
+            runner.validate_manifest(value)
+        value = manifest()
+        value["source"]["baseline_lock_identity"]["seed"]["sha256"] = "a" * 64
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
         value = manifest()

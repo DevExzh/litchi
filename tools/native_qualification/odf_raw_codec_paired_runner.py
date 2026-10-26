@@ -11,7 +11,9 @@ baseline, candidate, candidate, baseline order.  Receipts are protocol
 evidence only and make no acceptance claim.  Final-C identity is admitted
 from a separate protocol-P1-sealed identity envelope and an independently
 supplied P1 pin; this runner never takes a free-standing candidate commit or
-lock argument.
+lock argument.  The baseline lock handoff additionally requires the
+independently generated 70d metadata provenance and its historical registry
+graph; candidate lock bytes cannot be substituted as an external baseline.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ if str(TOOLS_ROOT) not in sys.path:
 
 import native_qualification_runner as generic  # noqa: E402
 from native_qualification import odf_shared_triad_paired_runner as reviewed  # noqa: E402
+from native_qualification import prepare_odf_raw_codec_inputs as preparation_contract  # noqa: E402
 
 
 SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v4"
@@ -97,6 +100,7 @@ ROOT_PATCH_POLICIES = {
     "baseline": {},
     "candidate": {"flate2": "vendor/flate2", "zlib-rs": "vendor/zlib-rs"},
 }
+BASELINE_LOCK_IDENTITY = preparation_contract.BASELINE_LOCK_IDENTITY
 BUILD_PROFILE = "release"
 BUILD_FLAG = "--release"
 BUILD_BINARY_DIRECTORY = "release"
@@ -649,6 +653,26 @@ def _validate_root_patch_resolution(root: Path, role: str) -> dict[str, str]:
     return observed
 
 
+def _load_baseline_lock_provenance(
+    provenance_path: Path,
+    *,
+    baseline_lock: Path,
+    baseline_manifest: Path,
+    baseline_root: Path,
+    roots: tuple[Path, ...],
+) -> tuple[dict[str, Any], str, int, Path]:
+    try:
+        return preparation_contract._load_baseline_lock_provenance(
+            provenance_path,
+            baseline_lock=baseline_lock,
+            baseline_manifest=baseline_manifest,
+            baseline_root=baseline_root,
+            roots=roots,
+        )
+    except preparation_contract.PreparationError as error:
+        raise RunnerError(str(error)) from error
+
+
 def _validate_route_descriptors(routes: Any) -> list[dict[str, Any]]:
     if routes != list(EXPECTED_ROUTES):
         raise RunnerError("manifest route protocol differs from the reviewed ODF raw-codec contract")
@@ -706,6 +730,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
             raise RunnerError(f"manifest source.{key} differs from the canonical path")
     if source.get("consumer_manifest_identities") != CONSUMER_MANIFEST_IDENTITIES:
         raise RunnerError("source consumer manifest identities or patch policies differ")
+    if source.get("baseline_lock_identity") != BASELINE_LOCK_IDENTITY:
+        raise RunnerError("source baseline lock identity or historical resolution policy differs")
     consumer_sha = CONSUMER_MANIFEST_IDENTITIES["candidate"]["sha256"]
     consumer_bytes = CONSUMER_MANIFEST_IDENTITIES["candidate"]["bytes"]
     lock_status = source.get("consumer_lock_status")
@@ -791,6 +817,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     normalized["candidate_consumer_lock_sha256"] = lock_sha
     normalized["candidate_consumer_lock_bytes"] = lock_bytes
     normalized["consumer_manifest_identities"] = CONSUMER_MANIFEST_IDENTITIES
+    normalized["baseline_lock_identity"] = BASELINE_LOCK_IDENTITY
     normalized["probe_sha256"] = probe_sha
     normalized["probe_bytes"] = probe_bytes
     return normalized
@@ -805,6 +832,7 @@ def _validate_preparation(
     candidate_root: Path,
     adapter_root: Path,
     baseline_consumer_manifest: Path,
+    baseline_lock_provenance: Path,
     protocol_p_root: Path,
     protocol_p_pin: Mapping[str, Any],
     protocol_p_pin_path: Path,
@@ -981,6 +1009,15 @@ def _validate_preparation(
     source_lock_sha, source_lock_bytes = _sha256_file(baseline_lock_source)
     if (source_lock_sha, source_lock_bytes) != (baseline_lock["sha256"], baseline_lock["bytes"]):
         raise RunnerError("preparation baseline lock source bytes differ")
+    provenance_value, provenance_sha256, provenance_bytes, provenance_path = _load_baseline_lock_provenance(
+        baseline_lock_provenance,
+        baseline_lock=baseline_lock_source,
+        baseline_manifest=baseline_manifest_path,
+        baseline_root=baseline_root,
+        roots=(baseline_root, candidate_root, adapter_root, protocol_p_root),
+    )
+    if baseline_lock.get("provenance_path") != str(provenance_path) or baseline_lock.get("provenance_sha256") != provenance_sha256 or baseline_lock.get("provenance_bytes") != provenance_bytes or baseline_lock.get("provenance") != provenance_value:
+        raise RunnerError("preparation baseline lock provenance handoff differs")
     claim = data.get("claim_scope")
     if not isinstance(claim, str) or NON_ACCEPTANCE not in claim:
         raise RunnerError("preparation is not explicitly non-acceptance")
@@ -1079,7 +1116,7 @@ def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
 
 
 class PairedRunner:
-    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, baseline_consumer_manifest: Path, protocol_p_root: Path, protocol_p_pin_path: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
+    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, baseline_consumer_manifest: Path, baseline_lock_provenance: Path, protocol_p_root: Path, protocol_p_pin_path: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
         if phase not in {"build", "abba"}:
             raise RunnerError("phase must be build or abba")
         if not isinstance(cpu, int) or cpu < 0 or cpu >= (os.cpu_count() or 1):
@@ -1091,6 +1128,7 @@ class PairedRunner:
         self.candidate_root = _resolve(candidate_root)
         self.adapter_root = _resolve(adapter_root)
         self.baseline_consumer_manifest = _resolve(baseline_consumer_manifest)
+        self.baseline_lock_provenance = _resolve(baseline_lock_provenance)
         self.protocol_p_root = _resolve(protocol_p_root)
         self.protocol_p_pin_path = _resolve(protocol_p_pin_path)
         self.candidate_identity_path = _resolve(candidate_identity_path)
@@ -1098,7 +1136,7 @@ class PairedRunner:
         self.target_root = _resolve(target_root)
         self.tmp_root = _resolve(tmp_root)
         self.cpu = cpu
-        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "baseline_consumer_manifest": self.baseline_consumer_manifest, "protocol_p": self.protocol_p_root, "protocol_p_pin": self.protocol_p_pin_path, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
+        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "baseline_consumer_manifest": self.baseline_consumer_manifest, "baseline_lock_provenance": self.baseline_lock_provenance, "protocol_p": self.protocol_p_root, "protocol_p_pin": self.protocol_p_pin_path, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
         if self.manifest["source"]["consumer_lock_status"] != CONSUMER_LOCK_STATUS_READY:
@@ -1122,7 +1160,7 @@ class PairedRunner:
         self.protocol_p_anchor = _verify_protocol_p_pin(self.protocol_p_root, self.protocol_p_pin, self.candidate_identity["candidate"])
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
         self.preparation_sha256 = prep_sha
-        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, baseline_consumer_manifest=self.baseline_consumer_manifest, protocol_p_root=self.protocol_p_root, protocol_p_pin=self.protocol_p_pin, protocol_p_pin_path=self.protocol_p_pin_path, protocol_p_pin_sha256=self.protocol_p_pin_sha256, protocol_p_pin_bytes=self.protocol_p_pin_bytes, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
+        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, baseline_consumer_manifest=self.baseline_consumer_manifest, baseline_lock_provenance=self.baseline_lock_provenance, protocol_p_root=self.protocol_p_root, protocol_p_pin=self.protocol_p_pin, protocol_p_pin_path=self.protocol_p_pin_path, protocol_p_pin_sha256=self.protocol_p_pin_sha256, protocol_p_pin_bytes=self.protocol_p_pin_bytes, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
         self.runner_sha256, _ = _sha256_file(Path(__file__).resolve())
         self.guard = generic.ProcessGuard()
         self.endpoint_cache: dict[str, dict[str, Any]] = {}
@@ -1210,6 +1248,7 @@ class PairedRunner:
             candidate_root=self.candidate_root,
             adapter_root=self.adapter_root,
             baseline_consumer_manifest=self.baseline_consumer_manifest,
+            baseline_lock_provenance=self.baseline_lock_provenance,
             protocol_p_root=self.protocol_p_root,
             protocol_p_pin=self.protocol_p_pin,
             protocol_p_pin_path=self.protocol_p_pin_path,
@@ -1228,6 +1267,7 @@ class PairedRunner:
             (self.manifest_path, self.manifest_sha256, "manifest"),
             (self.preparation_path, self.preparation_sha256, "preparation"),
             (self.baseline_consumer_manifest, self.manifest["source"]["consumer_manifest_identities"]["baseline"]["sha256"], "baseline consumer manifest"),
+            (self.baseline_lock_provenance, self.preparation["baseline"]["lock"]["provenance_sha256"], "baseline lock provenance"),
             (self.protocol_p_pin_path, self.protocol_p_pin_sha256, "protocol-P1 pin"),
             (self.candidate_identity_path, self.candidate_identity_sha256, "candidate identity"),
         ):
@@ -1611,7 +1651,7 @@ class PairedRunner:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "baseline-consumer-manifest", "protocol-p-root", "protocol-p-pin", "candidate-identity", "output", "target-root", "tmp-root"):
+    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "baseline-consumer-manifest", "baseline-lock-provenance", "protocol-p-root", "protocol-p-pin", "candidate-identity", "output", "target-root", "tmp-root"):
         parser.add_argument(f"--{name}", required=True, type=Path if name.endswith(("manifest", "preparation", "root", "output")) else str)
     parser.add_argument("--cpu", required=True, type=int)
     parser.add_argument("--phase", required=True, choices=("build", "abba"))
@@ -1621,7 +1661,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, baseline_consumer_manifest=args.baseline_consumer_manifest, protocol_p_root=args.protocol_p_root, protocol_p_pin_path=args.protocol_p_pin, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
+        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, baseline_consumer_manifest=args.baseline_consumer_manifest, baseline_lock_provenance=args.baseline_lock_provenance, protocol_p_root=args.protocol_p_root, protocol_p_pin_path=args.protocol_p_pin, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
         if args.phase == "build":
             runner.build()
         else:
