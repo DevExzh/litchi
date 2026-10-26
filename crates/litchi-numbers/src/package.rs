@@ -52,6 +52,7 @@ mod sheet;
 pub(crate) mod sheet_drawable;
 mod sheet_drawable_graph;
 pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_order;
 mod structure;

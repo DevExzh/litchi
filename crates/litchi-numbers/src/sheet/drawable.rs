@@ -49,6 +49,15 @@ pub mod properties {
     };
 }
 
+/// Exact-source character and paragraph property transactions for the text
+/// a sheet text box or shape owns: [`crate::Package::edit_sheet_text_box_text`].
+pub mod text {
+    pub use crate::package::sheet_drawable_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+
 /// What a sheet drawable is.
 ///
 /// ```

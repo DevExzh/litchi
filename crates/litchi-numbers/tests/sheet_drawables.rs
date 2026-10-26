@@ -122,11 +122,15 @@ fn verbs_that_do_not_apply_are_typed_refusals() -> TestResult {
     assert_eq!(refusal.kind(), RefusalKind::UnsupportedOperation);
     assert!(matches!(
         package.sheet_drawable_properties(0, DrawableSelector::image(5)),
-        Err(properties::Error::Refused(properties::Refusal::DrawableNotFound { .. }))
+        Err(properties::Error::Refused(
+            properties::Refusal::DrawableNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.sheet_drawable_properties("No such sheet", 0),
-        Err(properties::Error::Refused(properties::Refusal::SheetNotFound))
+        Err(properties::Error::Refused(
+            properties::Refusal::SheetNotFound
+        ))
     ));
     Ok(())
 }
@@ -158,14 +162,17 @@ fn z_order_moves_reorder_the_list_and_tables_are_not_removed() -> TestResult {
         ))
     ));
     assert!(matches!(
-        edit.move_to(DrawableSelector::index(0), Position::new(list.len())).map(drop),
+        edit.move_to(DrawableSelector::index(0), Position::new(list.len()))
+            .map(drop),
         Err(drawable::Error::Refused(
             drawable::Refusal::ZPositionOutOfRange { .. }
         ))
     ));
     assert!(matches!(
         package.edit_sheet_drawables(0)?.commit(),
-        Err(drawable::Error::Refused(drawable::Refusal::NoStagedOperation))
+        Err(drawable::Error::Refused(
+            drawable::Refusal::NoStagedOperation
+        ))
     ));
     Ok(())
 }
