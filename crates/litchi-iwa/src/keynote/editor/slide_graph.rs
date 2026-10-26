@@ -318,6 +318,45 @@ pub(super) fn patch_slide_drawable_references(
                 )?;
             }
         }
+        if let Some(identifier) = remove {
+            // Host defect fixed in wave W1-C (record 0372): the template tag
+            // (`sage_tag_to_info_map`) and instructional-text entries that
+            // name the removed drawable go with it; the host used to leave
+            // them pointing at the deleted object while dropping the
+            // reference from the header.
+            if slide
+                .sage_tag_to_info_map
+                .iter()
+                .any(|entry| entry.info.identifier == identifier)
+            {
+                data = remove_repeated_length_delimited_field_where(&data, 28, |entry| {
+                    Ok(kn::slide_archive::SageTagMapEntry::decode(entry)?
+                        .info
+                        .identifier
+                        == identifier)
+                })?;
+            }
+            if slide.instructional_text_map.as_ref().is_some_and(|map| {
+                map.instructional_text_for_infos.iter().any(|entry| {
+                    entry
+                        .info
+                        .as_ref()
+                        .is_some_and(|info| info.identifier == identifier)
+                })
+            }) {
+                data = transform_length_delimited_field(&data, 45, |map| {
+                    remove_repeated_length_delimited_field_where(map, 1, |entry| {
+                        Ok(
+                            kn::slide_archive::instructional_text_map::InstructionalTextMapEntry::decode(
+                                entry,
+                            )?
+                            .info
+                            .is_some_and(|info| info.identifier == identifier),
+                        )
+                    })
+                })?;
+            }
+        }
         let verified = kn::SlideArchive::decode(data.as_slice())?;
         for references in [&verified.owned_drawables, &verified.drawables_z_order] {
             if let Some(identifier) = remove

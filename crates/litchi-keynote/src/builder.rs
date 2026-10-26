@@ -56,13 +56,23 @@ pub enum Error {
     /// The slide size could not be written.
     #[error(transparent)]
     ShowSettings(#[from] show::Error),
+    /// The document language is not a valid language tag.
+    #[error("invalid Keynote document language: {0}")]
+    InvalidLanguage(#[source] litchi_iwa_text::language::Error),
+    /// The document locale is empty or contains a NUL character.
+    #[error("a Keynote document locale must be non-empty text without NUL")]
+    InvalidLocale,
+    /// The language or locale could not be written.
+    #[error("could not write the Keynote document language or locale: {0}")]
+    Locale(#[source] ReadError),
 }
 
 /// Builder for a fresh one-slide Keynote presentation.
 ///
 /// Unset values keep the blank presentation's defaults: title
-/// "Presentation Title", subtitle "Presentation Subtitle", no speaker notes
-/// and a 1920×1080-point slide. The [`Identity`] has no default.
+/// "Presentation Title", subtitle "Presentation Subtitle", no speaker notes,
+/// a 1920×1080-point slide, language `en` and locale `en_US`. The
+/// [`Identity`] has no default.
 #[derive(Debug, Clone, Default, PartialEq)]
 #[must_use = "a Keynote builder does nothing until `build` is called"]
 pub struct Builder {
@@ -71,6 +81,8 @@ pub struct Builder {
     subtitle: Option<String>,
     notes: Option<String>,
     slide_size: Option<Size>,
+    language: Option<String>,
+    locale: Option<String>,
 }
 
 impl Builder {
@@ -111,6 +123,22 @@ impl Builder {
         self
     }
 
+    /// Set the document language (a BCP 47 tag such as `"fr"`), written to
+    /// the document and to every text storage's language, as Keynote does.
+    /// Unset, the blank presentation's `"en"` stays.
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    /// Set the document locale (for example `"fr_FR"`), written to the
+    /// document's current and creation locale and the calculation engine.
+    /// Unset, the blank presentation's `"en_US"` stays.
+    pub fn locale(mut self, locale: impl Into<String>) -> Self {
+        self.locale = Some(locale.into());
+        self
+    }
+
     /// Build the presentation.
     ///
     /// # Costs
@@ -125,9 +153,24 @@ impl Builder {
     /// the typed error of the transaction that failed.
     pub fn build(self) -> Result<Package, Error> {
         let identity = self.identity.ok_or(Error::MissingIdentity)?;
+        if let Some(language) = self.language.as_deref() {
+            litchi_iwa_text::TextLanguageTag::new(language).map_err(Error::InvalidLanguage)?;
+        }
+        if self
+            .locale
+            .as_deref()
+            .is_some_and(|locale| locale.trim().is_empty() || locale.contains('\0'))
+        {
+            return Err(Error::InvalidLocale);
+        }
         let mut package = Package::new()
             .with_identity(&identity)
             .map_err(Error::Identity)?;
+        if self.language.is_some() || self.locale.is_some() {
+            package = package
+                .with_language_and_locale(self.language.as_deref(), self.locale.as_deref())
+                .map_err(Error::Locale)?;
+        }
         let first = SlideSelector::index(0);
         if let Some(title) = self.title.as_deref() {
             let mut edit = package.edit_slide_title(first)?;

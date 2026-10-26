@@ -12,7 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
-use litchi_iwa_protos::{kn, tn, tp, tsce, tsp, tss, tst, tswp};
+use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsd, tsp, tss, tst, tswp};
 use prost::Message;
 
 use crate::harness::Format;
@@ -105,7 +105,39 @@ impl KnownFields {
                 .with(1, "KN.DocumentArchive", decode_as::<kn::DocumentArchive>)
                 .with(2, "KN.ShowArchive", decode_as::<kn::ShowArchive>)
                 .with(4, "KN.SlideNodeArchive", decode_as::<kn::SlideNodeArchive>)
-                .with(5, "KN.SlideArchive", decode_as::<kn::SlideArchive>),
+                .with(5, "KN.SlideArchive", decode_as::<kn::SlideArchive>)
+                // Slide drawables (wave W1-C, record 0372); the type numbers
+                // are those of `tools/gen_keynote_reference_schema.py`.
+                .with(
+                    7,
+                    "KN.PlaceholderArchive",
+                    decode_as::<kn::PlaceholderArchive>,
+                )
+                .with(8, "KN.BuildArchive", decode_as::<kn::BuildArchive>)
+                .with(15, "KN.NoteArchive", decode_as::<kn::NoteArchive>)
+                .with(
+                    633,
+                    "TSA.CaptionInfoArchive",
+                    decode_as::<tsa::CaptionInfoArchive>,
+                )
+                .with(
+                    2_011,
+                    "TSWP.ShapeInfoArchive",
+                    decode_as::<tswp::ShapeInfoArchive>,
+                )
+                .with(3_005, "TSD.ImageArchive", decode_as::<tsd::ImageArchive>)
+                .with(3_006, "TSD.MaskArchive", decode_as::<tsd::MaskArchive>)
+                .with(3_007, "TSD.MovieArchive", decode_as::<tsd::MovieArchive>)
+                .with(
+                    3_056,
+                    "TSD.CommentStorageArchive",
+                    decode_as::<tsd::CommentStorageArchive>,
+                )
+                .with(
+                    3_097,
+                    "TSD.StandinCaptionArchive",
+                    decode_as::<tsd::StandinCaptionArchive>,
+                ),
         }
     }
 
@@ -131,15 +163,21 @@ impl KnownFields {
 
 /// Decode `data` as `M` and canonicalise it.
 pub fn decode_as<M: Message + Default + Debug>(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
-    let message = M::decode(data)?;
+    Ok(decoded(M::decode(data)?, data))
+}
+
+/// Canonicalise an already decoded (and possibly normalised) `message`
+/// whose source payload was `data`. Cases that accept a documented
+/// divergence register a decoder that normalises the message first.
+pub fn decoded<M: Message + Debug>(message: M, data: &[u8]) -> Decoded {
     let canonical = message.encode_to_vec();
     let known = top_level_fields(&canonical);
     let unknown_fields = top_level_fields(data).difference(&known).copied().collect();
-    Ok(Decoded {
+    Decoded {
         canonical,
         debug: format!("{message:#?}"),
         unknown_fields,
-    })
+    }
 }
 
 /// Top-level field numbers of a protobuf payload (best effort: scanning
