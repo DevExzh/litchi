@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0362ul165ug | [Gate dependency and evidence registrations](0362ul165ug-gate-registry-repair.md) | Merged leaf `d9979bf2ff`: explicit shared ZIP dev edge and optional operations VBA edge; five validation-only evidence dispositions; focused policy and matrix checks pass; native/final gate pending |
 | 0349 | [Workspace gate hygiene and canonical durable JSON](0349-workspace-gate-hygiene.md) | Merged (R19 `uo2/ws-hygiene`, `55517a5d02`): feature-unification determinism fix, workspace clippy/test/doc clean |
 | 0348 | [PPTX batch budget](0348-pptx-batch-budget.md) | Merged (R19 `uo2/pptx-batch`, `b70dd3e182`): every PPTX batch within 2× with batch equivalence; bench TSV split |
 | 0347 | [Numbers swap, Python Commit.patch, XLSX picture single read](0347-numbers-swap-python-patch-xlsx-picture.md) | Merged (R18 `uo2/cross-small`, `0a2c9d0314`): Numbers sheet/table swap (no whole-format verb refusal left), Python `Commit.patch`, XLSX picture `set src` 1.27 → 1.07 |
@@ -6452,3 +6453,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   blobs must be hydrated before its metadata commands can run. The DOCX
   release builds remain queued, and all native/final qualification remains
   required. Nothing is pushed.
+
+  The current-7c diagnostic completes rows 46–52 with API and tooling findings.
+  The iWork leaf API and corpus-disposition checks pass. The API glossary
+  reports 711 RTF canonical-definition findings and 36 other rows; isolated
+  RTF and Markdown/checker repairs are committed and awaiting Rust validation.
+  Tooling exposes an import-identity mismatch, a stale DrawingML manifest pin,
+  missing dependency/evidence registrations, and a systemd PATH that omits
+  rustc. Root merges the reviewed registry repair (165ug): two real dependency
+  edges and precise dispositions for five validation-only records, with
+  focused Python tests passing. Original failed rows remain preserved, and
+  runtime supplements continue on immutable 7c. Final source selection and
+  qualification remain pending. Nothing is pushed.
