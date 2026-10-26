@@ -94,19 +94,6 @@ impl<T> OptionalAction<T> {
 }
 
 impl SheetActions {
-    /// Whether this worksheet staged a typed style request (font, alignment,
-    /// fill, border, protection, quote prefix or number format), the only
-    /// actions commit-time style lowering rewrites.
-    pub(super) fn has_typed_style_requests(&self) -> bool {
-        !(self.fonts.is_empty()
-            && self.alignments.is_empty()
-            && self.fills.is_empty()
-            && self.borders.is_empty()
-            && self.protections.is_empty()
-            && self.quote_prefixes.is_empty()
-            && self.number_formats.is_empty())
-    }
-
     pub(super) fn len(&self) -> usize {
         usize::from(self.rename.is_some())
             .saturating_add(usize::from(self.visibility.is_some()))

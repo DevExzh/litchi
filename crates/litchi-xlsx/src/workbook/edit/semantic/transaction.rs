@@ -3459,7 +3459,16 @@ impl Edit {
             }
         }
 
-        let previous_capture_budget = self.capture_budget.take();
+        // A join rebuilds the ledger from the normalized actions, because the
+        // joined edit keeps staging against it. Commit (`retain_undo` false)
+        // reads only the ledger's maximum afterwards (`check_patch` measures
+        // the published patch itself), so it keeps the incremental ledger
+        // instead of rebuilding an exact one it never consults (record 0377).
+        let previous_capture_budget = if retain_undo {
+            self.capture_budget.take()
+        } else {
+            None
+        };
         let mut undo_capture_budget = None;
         if let Some(previous) = previous_capture_budget {
             match CaptureBudget::rebuilt(&previous, &self.base, &self.sheets, &self.added) {
@@ -3970,7 +3979,7 @@ impl Edit {
             svg_projected_owners: _,
             svg_staged_payload_bytes: _,
             svg_base_part_bytes,
-            mut capture_budget,
+            capture_budget,
         } = self;
         let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
@@ -3991,26 +4000,12 @@ impl Edit {
         let mut drawing_graph = Vec::new();
         let mut svg_parts = Vec::new();
         let mut content_types = None;
-        let lowering_changed_sheets = sheets.values().any(SheetActions::has_typed_style_requests);
         let (styles_part_changed, projected_style_count) =
             lower_style_requests(&base, &mut sheets, &mut parts)?;
 
-        // Style lowering canonicalizes property-level requests into their
-        // final cell actions. Rebuild the bounded ledger from that published
-        // shape so an equal typed style, a canceled request, or a merged
-        // replacement does not retain a stale pre-lowering charge. This is
-        // only paid by bounded edits and is still metadata-only for deferred
-        // worksheet parts.
-        //
-        // `commit` normalized the edit (and rebuilt the ledger from the same
-        // `base`, `sheets` and `added`) just before lowering. Lowering only
-        // changes `sheets` when some worksheet staged a typed style request;
-        // without one, the rebuild here would reproduce the ledger it
-        // already holds, so it is skipped (record 0377).
-        if lowering_changed_sheets && let Some(previous) = capture_budget.take() {
-            capture_budget = Some(CaptureBudget::rebuilt(&previous, &base, &sheets, &added)?);
-        }
-
+        // Commit reads only the ledger's maximum from here on (`check_patch`
+        // measures the published patch), so the style lowering above needs no
+        // ledger rebuild (record 0377).
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
             let data = base
