@@ -378,3 +378,535 @@ fn pages_body_table_formula_refresh_cross_table_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+/// `C3 = B3 + 1` cached as `cached`.
+fn authored_expression() -> litchi_iwa_common::formula::FormulaExpression {
+    use litchi_iwa_common::formula::{
+        FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
+    };
+    FormulaExpression::binary(
+        FormulaBinaryOperator::Add,
+        FormulaExpression::Cell(FormulaCellReference::relative(2, 1)),
+        FormulaExpression::Number(1.0),
+    )
+}
+
+fn keynote_first_table(editor: &keynote::Draft) -> TestResult<(usize, u64)> {
+    for slide in 0..editor.slides()?.len() {
+        if let Some(table) = editor.slide_tables(slide)?.first() {
+            return Ok((slide, table.model_object_id));
+        }
+    }
+    Err("no slide table".into())
+}
+
+fn host_keynote_author(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let (slide, model) = keynote_first_table(&editor)?;
+    editor.set_slide_table_formula(
+        slide,
+        model,
+        2,
+        2,
+        authored_expression(),
+        litchi_iwa_common::formula::FormulaCachedValue::number(8.0)?,
+    )?;
+    Ok(editor.to_bytes()?)
+}
+
+/// The leaf route on the first slide table: `stage` stages the operation.
+fn leaf_keynote(
+    source: &[u8],
+    stage: &dyn Fn(
+        &mut litchi_keynote::slide::drawable::Edit<'_>,
+        usize,
+        litchi_keynote::DrawableSelector,
+    ) -> Result<(), litchi_keynote::slide::drawable::Error>,
+) -> TestResult<Vec<u8>> {
+    let package = litchi_keynote::Package::from_bytes(source)?;
+    let host = keynote::Draft::from_bytes(source)?;
+    let (slide, _) = keynote_first_table(&host)?;
+    let mut last = None;
+    for drawable in 0..64 {
+        let mut edit = package.edit_slide_drawables();
+        let selector = litchi_keynote::DrawableSelector::index(drawable);
+        if let Err(error) = stage(&mut edit, slide, selector) {
+            last = Some(error.to_string());
+            continue;
+        }
+        return Ok(leaf_bytes!(edit.commit()?.package()));
+    }
+    Err(last
+        .unwrap_or_else(|| "no table drawable".to_owned())
+        .into())
+}
+
+fn leaf_keynote_author(source: &[u8]) -> TestResult<Vec<u8>> {
+    leaf_keynote(source, &|edit, slide, selector| {
+        edit.set_table_formula_cached(
+            slide,
+            selector,
+            2,
+            2,
+            authored_expression(),
+            litchi_iwa_common::formula::FormulaCachedValue::number(8.0).expect("finite"),
+        )
+        .map(|_| ())
+    })
+}
+
+fn keynote_formula(bytes: &[u8]) -> TestResult<Option<String>> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let (slide, model) = keynote_first_table(&editor)?;
+    Ok(editor.slide_table_formula(slide, model, 2, 2)?)
+}
+
+fn keynote_author_case(
+    name: &'static str,
+    path: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
+    let input = fixture(path)?;
+    Case::new(name, Format::Keynote, tier, evidence, &input)
+        .host(host_keynote_author)
+        .leaf(|source| Ok(LeafRun::output(leaf_keynote_author(source)?)))
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .read("host slide_table_formula C3", keynote_formula)
+        .read("cached result of C3", |bytes| formula_caches(bytes, 2, 2))
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn keynote_slide_table_formula_author_parity() -> TestResult {
+    keynote_author_case(
+        "keynote_slide_table_formula_author_parity",
+        "iwork/keynote/table-discovery.key",
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn keynote_slide_table_formula_author_graph_parity() -> TestResult {
+    keynote_author_case(
+        "keynote_slide_table_formula_author_graph_parity",
+        KEYNOTE,
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+/// Clear a host-authored formula: the host's `clear_slide_table_formula`
+/// against the leaf's `set_table_cell(.., Empty)`.
+#[test]
+fn keynote_slide_table_formula_clear_parity() -> TestResult {
+    let authored = host_keynote_author(&fixture("iwork/keynote/table-discovery.key")?.bytes)?;
+    let input = crate::harness::Fixture {
+        path: "iwork/keynote/table-discovery.key",
+        bytes: authored,
+    };
+    Case::new(
+        "keynote_slide_table_formula_clear_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        let (slide, model) = keynote_first_table(&editor)?;
+        editor.clear_slide_table_formula(slide, model, 2, 2)?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        Ok(LeafRun::output(leaf_keynote(
+            source,
+            &|edit, slide, selector| {
+                edit.set_table_cell(
+                    slide,
+                    selector,
+                    2,
+                    2,
+                    litchi_keynote::slide::drawable::TableCellValue::Empty,
+                )
+                .map(|_| ())
+            },
+        )?))
+    })
+    .leaf_invalidates_root_previews()
+    .leaf_structural_metadata()
+    .read("host slide_table_formula C3", keynote_formula)
+    .run()?;
+    Ok(())
+}
+
+fn host_authored_keynote() -> TestResult<crate::harness::Fixture> {
+    Ok(crate::harness::Fixture {
+        path: "iwork/keynote/table-discovery.key",
+        bytes: host_keynote_author(&fixture("iwork/keynote/table-discovery.key")?.bytes)?,
+    })
+}
+
+/// Replace a host-authored formula with a number: the host's
+/// `set_slide_table_cell` against the leaf's `set_table_cell`.
+#[test]
+fn keynote_slide_table_formula_replace_parity() -> TestResult {
+    let input = host_authored_keynote()?;
+    Case::new(
+        "keynote_slide_table_formula_replace_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        let (slide, model) = keynote_first_table(&editor)?;
+        editor.set_slide_table_cell(slide, model, 2, 2, Value::Number(FiniteF64::new(5.0)?))?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        Ok(LeafRun::output(leaf_keynote(
+            source,
+            &|edit, slide, selector| {
+                edit.set_table_cell(
+                    slide,
+                    selector,
+                    2,
+                    2,
+                    litchi_keynote::slide::drawable::TableCellValue::Number(5.0),
+                )
+                .map(|_| ())
+            },
+        )?))
+    })
+    .leaf_invalidates_root_previews()
+    .leaf_structural_metadata()
+    .read("host slide_table_formula C3", keynote_formula)
+    .read("host cell C3", |bytes| {
+        let editor = keynote::Draft::from_bytes(bytes)?;
+        let (slide, model) = keynote_first_table(&editor)?;
+        Ok(format!(
+            "{:?}",
+            editor.slide_table(slide, model)?.get_cell(2, 2)
+        ))
+    })
+    .run()?;
+    Ok(())
+}
+
+/// The leaf reads a formula cell as its rendered source, as the host's
+/// `slide_table_formula` does: the native D2 (receipted) and a
+/// host-authored formula.
+#[test]
+fn keynote_slide_table_formula_read_parity() -> TestResult {
+    let evidence = Evidence::Native("test-data/iwork/keynote/slide-table-read-native-receipt.json");
+    for (input, row, column) in [(fixture(KEYNOTE)?, 1, 3), (host_authored_keynote()?, 2, 2)] {
+        let host = {
+            let editor = keynote::Draft::from_bytes(&input.bytes)?;
+            let (slide, model) = keynote_first_table(&editor)?;
+            editor
+                .slide_table_formula(slide, model, row, column)?
+                .ok_or("host reads no formula")?
+        };
+        Case::new(
+            "keynote_slide_table_formula_read_parity",
+            Format::Keynote,
+            Tier::A,
+            evidence,
+            &input,
+        )
+        .read_only()
+        .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| {
+            let package = litchi_keynote::Package::from_bytes(source)?;
+            let host_editor = keynote::Draft::from_bytes(source)?;
+            let (slide, _) = keynote_first_table(&host_editor)?;
+            let read = package.slide_table_cells(slide, 0_usize)?;
+            let cell = read
+                .table()
+                .get(litchi_iwa_common::table::coordinate::At::new(
+                    u32::try_from(row)?,
+                    u32::try_from(column)?,
+                ));
+            if cell
+                != Some(&litchi_iwa_common::table::cell::value::Value::Formula(
+                    host.clone(),
+                ))
+            {
+                return Err(format!("leaf reads {cell:?}, host {host:?}").into());
+            }
+            Ok(LeafRun::output(leaf_bytes!(package)))
+        })
+        .run()?;
+    }
+    Ok(())
+}
+
+/// The native D2 formula of `slide-table-read-native.key` carries a cell
+/// comment: the host refuses to clear it ("expected to remove one protobuf
+/// field 11") and the leaf refuses typed, because the shared cell writer
+/// does not rewrite a commented cell (record 0376a).
+#[test]
+fn keynote_native_commented_formula_clear_is_refused() -> TestResult {
+    let input = fixture(KEYNOTE)?;
+    let host = (|| -> TestResult<Vec<u8>> {
+        let mut editor = keynote::Draft::from_bytes(&input.bytes)?;
+        let (slide, model) = keynote_first_table(&editor)?;
+        editor.clear_slide_table_formula(slide, model, 1, 3)?;
+        Ok(editor.to_bytes()?)
+    })();
+    assert!(host.is_err(), "the host now clears the native formula");
+    let leaf = leaf_keynote(&input.bytes, &|edit, slide, selector| {
+        edit.set_table_cell(
+            slide,
+            selector,
+            1,
+            3,
+            litchi_keynote::slide::drawable::TableCellValue::Empty,
+        )
+        .map(|_| ())
+    });
+    let error = leaf.expect_err("a commented formula cell is refused");
+    assert!(error.to_string().contains("cell storage"), "{error}");
+    Ok(())
+}
+
+fn host_pages_author(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = pages::Draft::from_bytes(source)?;
+    let model = pages_model(&editor)?;
+    editor.set_table_formula(
+        model,
+        2,
+        2,
+        authored_expression(),
+        litchi_iwa_common::formula::FormulaCachedValue::number(8.0)?,
+    )?;
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_pages(
+    source: &[u8],
+    stage: &dyn Fn(
+        &mut litchi_pages::table::values::Edit<'_>,
+    ) -> Result<(), litchi_pages::table::values::Error>,
+) -> TestResult<Vec<u8>> {
+    let package = litchi_pages::Package::from_bytes(source)?;
+    let mut edit = package.edit_body_table_values(0usize)?;
+    stage(&mut edit)?;
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+fn leaf_pages_author(source: &[u8]) -> TestResult<Vec<u8>> {
+    leaf_pages(source, &|edit| {
+        edit.set_formula_cached(
+            2,
+            2,
+            authored_expression(),
+            litchi_iwa_common::formula::FormulaCachedValue::number(8.0).expect("finite"),
+        )
+        .map(|_| ())
+    })
+}
+
+fn pages_formula(bytes: &[u8]) -> TestResult<Option<String>> {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    Ok(editor.table_formula(pages_model(&editor)?, 2, 2)?)
+}
+
+fn pages_author_case(
+    name: &'static str,
+    path: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
+    let input = fixture(path)?;
+    Case::new(name, Format::Pages, tier, evidence, &input)
+        .host(host_pages_author)
+        .leaf(|source| Ok(LeafRun::output(leaf_pages_author(source)?)))
+        .leaf_structural_metadata()
+        .read("host table_formula C3", pages_formula)
+        .read("cached result of C3", |bytes| formula_caches(bytes, 2, 2))
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_table_formula_author_parity() -> TestResult {
+    pages_author_case(
+        "pages_body_table_formula_author_parity",
+        "iwork/pages/body-table-catalog-native.pages",
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+/// Divergence pinned (record 0376a): on `body-table-cells-native.pages`
+/// the table's `SUM(B2:B3)` range is mirrored inline and in a range tile,
+/// which the shared dependency rewrite does not regenerate. The host
+/// authors C3; the leaf refuses typed.
+#[test]
+fn pages_body_table_formula_author_mirrored_range_divergence_is_reported() -> TestResult {
+    let input = fixture(PAGES)?;
+    assert!(host_pages_author(&input.bytes).is_ok());
+    let error = leaf_pages_author(&input.bytes).expect_err("the leaf refuses");
+    assert!(error.to_string().contains("formula graph"), "{error}");
+    Ok(())
+}
+
+fn host_authored_pages() -> TestResult<crate::harness::Fixture> {
+    Ok(crate::harness::Fixture {
+        path: "iwork/pages/body-table-catalog-native.pages",
+        bytes: host_pages_author(&fixture("iwork/pages/body-table-catalog-native.pages")?.bytes)?,
+    })
+}
+
+/// Clear a host-authored formula: the host's `clear_table_formula` against
+/// the leaf's `set(.., Empty)`.
+#[test]
+fn pages_body_table_formula_clear_parity() -> TestResult {
+    let input = host_authored_pages()?;
+    Case::new(
+        "pages_body_table_formula_clear_parity",
+        Format::Pages,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = pages::Draft::from_bytes(source)?;
+        let model = pages_model(&editor)?;
+        editor.clear_table_formula(model, 2, 2)?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        Ok(LeafRun::output(leaf_pages(source, &|edit| {
+            edit.set(2, 2, litchi_pages::table::values::Value::Empty)
+                .map(|_| ())
+        })?))
+    })
+    .leaf_structural_metadata()
+    .read("host table_formula C3", pages_formula)
+    .run()?;
+    Ok(())
+}
+
+/// Replace a host-authored formula with a number.
+#[test]
+fn pages_body_table_formula_replace_parity() -> TestResult {
+    let input = host_authored_pages()?;
+    Case::new(
+        "pages_body_table_formula_replace_parity",
+        Format::Pages,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = pages::Draft::from_bytes(source)?;
+        let model = pages_model(&editor)?;
+        editor.set_table_cell(model, 2, 2, Value::Number(FiniteF64::new(5.0)?))?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        Ok(LeafRun::output(leaf_pages(source, &|edit| {
+            edit.set(2, 2, litchi_pages::table::values::Value::Number(5.0))
+                .map(|_| ())
+        })?))
+    })
+    .leaf_structural_metadata()
+    .read("host table_formula C3", pages_formula)
+    .read("host cell C3", |bytes| pages_cell(bytes, 2, 2))
+    .run()?;
+    Ok(())
+}
+
+/// The leaf reads a formula cell as its rendered source, as the host's
+/// `table_formula` does: the native B4 (receipted) and a host-authored
+/// formula.
+#[test]
+fn pages_body_table_formula_read_parity() -> TestResult {
+    let evidence = Evidence::Native("test-data/iwork/pages/body-table-cells-native-receipt.json");
+    for (input, row, column) in [(fixture(PAGES)?, 3, 1), (host_authored_pages()?, 2, 2)] {
+        let host = {
+            let editor = pages::Draft::from_bytes(&input.bytes)?;
+            editor
+                .table_formula(pages_model(&editor)?, row, column)?
+                .ok_or("host reads no formula")?
+        };
+        Case::new(
+            "pages_body_table_formula_read_parity",
+            Format::Pages,
+            Tier::A,
+            evidence,
+            &input,
+        )
+        .read_only()
+        .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| {
+            let package = litchi_pages::Package::from_bytes(source)?;
+            let read = package.body_table_cells(litchi_pages::BodyTableSelector::index(0))?;
+            let cell = read
+                .table()
+                .get(litchi_iwa_common::table::coordinate::At::new(
+                    u32::try_from(row)?,
+                    u32::try_from(column)?,
+                ));
+            if cell
+                != Some(&litchi_iwa_common::table::cell::value::Value::Formula(
+                    host.clone(),
+                ))
+            {
+                return Err(format!("leaf reads {cell:?}, host {host:?}").into());
+            }
+            Ok(LeafRun::output(leaf_bytes!(package)))
+        })
+        .run()?;
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn host_author_keynote(source: &[u8]) -> TestResult<Vec<u8>> {
+    host_keynote_author(source)
+}
+
+#[inline(never)]
+fn leaf_author_keynote(source: &[u8]) -> TestResult<Vec<u8>> {
+    leaf_keynote_author(source)
+}
+
+#[inline(never)]
+fn host_author_pages(source: &[u8]) -> TestResult<Vec<u8>> {
+    host_pages_author(source)
+}
+
+#[inline(never)]
+fn leaf_author_pages(source: &[u8]) -> TestResult<Vec<u8>> {
+    leaf_pages_author(source)
+}
+
+/// Callgrind ABBA probe of formula authoring (record 0376a §5): C3 = B3 + 1
+/// on `table-discovery.key` and `body-table-catalog-native.pages`, open,
+/// edit, commit and serialize; toggle `*formula_refresh_cases::host_author_*`
+/// or `*formula_refresh_cases::leaf_author_*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn formula_author_cost_abba() -> TestResult {
+    use std::hint::black_box;
+    let keynote_input = fixture("iwork/keynote/table-discovery.key")?;
+    let pages_input = fixture("iwork/pages/body-table-catalog-native.pages")?;
+    for leg in [false, true, true, false] {
+        if leg {
+            black_box(leaf_author_keynote(&keynote_input.bytes)?);
+            black_box(leaf_author_pages(&pages_input.bytes)?);
+        } else {
+            black_box(host_author_keynote(&keynote_input.bytes)?);
+            black_box(host_author_pages(&pages_input.bytes)?);
+        }
+    }
+    Ok(())
+}

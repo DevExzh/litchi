@@ -74,6 +74,28 @@ impl KnownFields {
                 11_006,
                 "TSP.PackageMetadata",
                 decode_as::<tsp::PackageMetadata>,
+            )
+            // The calculation engine is shared by the three applications
+            // (record 0376a: Keynote and Pages formula writes).
+            .with(
+                4_000,
+                "TSCE.CalculationEngineArchive",
+                decode_as::<tsce::CalculationEngineArchive>,
+            )
+            .with(
+                4_008,
+                "TSCE.FormulaOwnerDependenciesArchive",
+                decode_as::<tsce::FormulaOwnerDependenciesArchive>,
+            )
+            .with(
+                4_009,
+                "TSCE.CellRecordTileArchive",
+                decode_as::<tsce::CellRecordTileArchive>,
+            )
+            .with(
+                4_010,
+                "TSCE.RangePrecedentsTileArchive",
+                decode_as::<tsce::RangePrecedentsTileArchive>,
             );
         match format {
             Format::Numbers => known

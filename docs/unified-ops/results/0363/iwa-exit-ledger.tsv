@@ -694,9 +694,9 @@ keynote/editor/slide_tables/conditional_highlight.rs	clear_slide_table_cell_cond
 keynote/editor/slide_tables/conditional_highlight.rs	set_slide_table_cell_conditional_highlighting	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/conditional_highlight.rs	slide_table_cell_conditional_highlight_rules	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/conditional_highlight.rs	slide_table_cell_conditional_highlighting	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/formula.rs	clear_slide_table_formula	1	keynote	table.formula	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/formula.rs	set_slide_table_formula	1	keynote	table.formula	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/formula.rs	slide_table_formula	1	keynote	table.formula	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables/formula.rs	clear_slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_clear_parity	B	-	-
+keynote/editor/slide_tables/formula.rs	set_slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::slide::drawable::Edit::set_table_formula_cached	keynote_slide_table_formula_author_parity	B	-	-
+keynote/editor/slide_tables/formula.rs	slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::Package::slide_table_cells	keynote_slide_table_formula_read_parity	A	test-data/iwork/keynote/slide-table-read-native-receipt.json	-
 keynote/editor/slide_tables/hidden_axes.rs	set_slide_table_hidden_axes	1	keynote	table.hidden_axes	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/hidden_axes.rs	slide_table_hidden_axes	1	keynote	table.hidden_axes	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/topology.rs	insert_slide_table_column	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
@@ -1885,9 +1885,9 @@ pages/editor/tables/conditional_highlight.rs	clear_table_cell_conditional_highli
 pages/editor/tables/conditional_highlight.rs	set_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	table_cell_conditional_highlight_rules	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/formula.rs	clear_table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/formula.rs	set_table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/formula.rs	clear_table_formula	1	pages	table.formula	migrated	litchi_pages::table::values::Edit::set	pages_body_table_formula_clear_parity	B	-	-
+pages/editor/tables/formula.rs	set_table_formula	1	pages	table.formula	migrated	litchi_pages::table::values::Edit::set_formula_cached	pages_body_table_formula_author_parity	B	-	-
+pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	migrated	litchi_pages::Package::body_table_cells	pages_body_table_formula_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_clear_parity	A	-	-
