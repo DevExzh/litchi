@@ -18,9 +18,12 @@
 #![forbid(unsafe_code)]
 
 mod char_style;
+pub mod language;
 mod native;
 pub mod paragraph_style;
+pub mod ranged;
 mod rewrite;
+pub mod smart_field;
 mod values;
 
 pub use char_style::{
