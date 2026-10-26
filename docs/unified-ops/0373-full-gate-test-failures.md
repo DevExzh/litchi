@@ -23,6 +23,16 @@ failing test (scripts kept outside the repository in
 | 7 | `litchi-iwa-core` `framing::retained_unknown_header_obeys_stricter_field_limits`: all four results `false` | **code regression** | bisect: first bad commit 846a0fea0b ("perf(iwa): cache retained header admissions"). The cached `HeaderAdmission` refuses with the whole-header total (`observed: 3`). Parse refuses with the streaming preflight's first failure (`observed: 2`), so publication and parse disagreed | `admit_retained_header` still accepts from the cached totals with no rewalk. On a refusal it re-runs the streaming preflight, so it reports the same diagnostic as parse (falling back to the cached error if the preflight admits). Only the refusal path changes |
 | 8 | `litchi-odf-formula` `fifth_wave::deterministic_merge_transfer_and_history_properties_reopen_and_reverse`: `History::apply` on a stale origin was not `PackageError::PatchConflict` | **code regression** (never passed) | 8be62f1859 ("close public family error boundaries") moved `History` to the family error and changed the test to expect `litchi_odf_common::Error::PatchConflict`. `History::apply` still used `?` on the core `Error::PatchConflict`, which `From<litchi_core::Error>` wraps as `Error::Core` | `History::apply` checks each link with `is_applicable_to` and returns `Error::patch_conflict("odf_formula.history.apply", …)`, the same way `push` and `Package::apply` do |
 
+## Tooling rows 48 and 51
+
+The completed gate also failed two tooling rows.
+
+- **Row 51 (`bench-matrix`), and the `tools.test_unified_bench_matrix` failure in row 48.** At c594870566, `docs/unified-ops/results/0289/bench-matrix.md` was stale: records landed after it was last regenerated. This is a real generated-output check, not a pin. The file is regenerated on this branch with `python3 tools/unified_bench_matrix.py`, and `--check` passes. It has to be regenerated again whenever a later record merges.
+- **Row 48 (`tooling-unit`): `tools.test_prepare_raw_api_census` raised `CensusError: tools/api_glossary.json differs from source commit f17dda6e6f…; rebind the matrix`.**
+  - **Cause.** `tools/prepare_raw_api_census.py` (records 0362ul79e, 0362ul131a, 0362ul145a) binds the checked-in `tools/raw_api_census_matrix.json` to one source commit's blob hashes for the glossary, the workspace manifest, every crate manifest and `raw_api_coverage.json`. Any glossary or manifest change breaks it.
+  - **Decision (coordinator, 2026-10-26).** This belongs to Codex's frozen-candidate qualification process, which `ctx-final` says is not an owner requirement. The tool, its test and the pinned matrix are deleted, and the module is removed from `TOOL_MODULES` in `tools/gate/run_gate.sh`. Nothing else on trunk imports the tool or reads the matrix. The records that cite it stay as history. The archived `docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py` still names the module, but it is evidence and the gate does not run it. The coordinator's own `.coord/gate.sh` also lists the module and must drop it as well.
+  - **Sweep for other pins.** Every `TOOL_MODULES` test, plus `iwa_exit_ledger.py --check`, was run in a throwaway worktree after a commit that changed `tools/api_glossary.json` and appended a line to the workspace `Cargo.toml` and to every `crates/*/Cargo.toml` and `crates/*/src/lib.rs`. Only the census test and the stale bench matrix failed. Both also failed without the churn, and no other tooling test breaks on source changes. The other tests that mention commits or SHA-256 values check synthetic fixtures or immutable archived evidence, not the live tree.
+
 ## Verification
 
 Each failing command was rerun and passes:
@@ -59,6 +69,8 @@ Only refusal or slow paths changed:
 No hot path was re-measured.
 
 ## Commits
+
+- (this commit): tooling, retire the pinned raw-API census and regenerate the bench matrix (rows 48, 51)
 
 - 25f045c746: OPC replacement relationships (2)
 - ecde66248b: OPC limit test (3)
