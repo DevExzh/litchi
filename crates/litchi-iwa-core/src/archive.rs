@@ -546,7 +546,29 @@ impl FieldPath {
     /// zero-valued components are valid wire values.
     #[inline]
     pub fn new(path: Vec<u32>, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        if limits.is_default_profile() {
+            if path.len() < DEFAULT_FIELD_PATH_COMPONENTS {
+                return Ok(Self { path });
+            }
+            // Rebuild the default profile inside the cold path so a caller
+            // with a constant profile does not materialize it per call.
+            return Self::new_checked_default(path);
+        }
+        Self::new_checked(path, limits)
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn new_checked_default(path: Vec<u32>) -> Result<Self> {
+        Self::new_checked(path, Limits::default())
+    }
+
+    /// Exact admission for every input outside the constant-time default
+    /// certificate. Kept out of line so the common constructor stays a
+    /// single comparison at its call site.
+    #[cold]
+    #[inline(never)]
+    fn new_checked(path: Vec<u32>, limits: Limits) -> Result<Self> {
         let value = Self { path };
         check_field_path_constructor(&value, limits)?;
         Ok(value)
@@ -906,12 +928,36 @@ impl FieldInfo {
     /// absent.
     #[inline]
     pub fn new(path: FieldPath, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        if limits.is_default_profile() {
+            if path.path.len() < DEFAULT_FIELD_PATH_COMPONENTS {
+                return Ok(Self::minimal(path));
+            }
+            return Self::new_checked_default(path);
+        }
+        Self::new_checked(path, limits)
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn new_checked_default(path: FieldPath) -> Result<Self> {
+        Self::new_checked(path, Limits::default())
+    }
+
+    /// Exact admission for every input outside the constant-time default
+    /// certificate, kept out of line like [`FieldPath::new`]'s.
+    #[cold]
+    #[inline(never)]
+    fn new_checked(path: FieldPath, limits: Limits) -> Result<Self> {
         check_minimal_field_info_constructor(&path, limits)?;
-        Ok(Self {
+        Ok(Self::minimal(path))
+    }
+
+    #[inline(always)]
+    fn minimal(path: FieldPath) -> Self {
+        Self {
             path,
             ..Self::default()
-        })
+        }
     }
 
     /// Resolve the schema default without changing encoded presence.
@@ -959,14 +1005,12 @@ impl ArchiveInfo {
     /// Because protobuf messages are not self-delimiting, callers must pass a
     /// reader bounded to exactly one header when additional bytes follow it.
     pub fn parse<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
         let data = read_bounded(reader, limits.max_header_bytes(), "ArchiveInfo")?;
         Self::decode(&data, limits)
     }
 
     /// Decode one `TSP.ArchiveInfo` header under explicit limits.
     pub fn decode(data: &[u8], limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
         let preflight = preflight_header(data, HeaderKind::ArchiveInfo, limits)?;
         Self::decode_with_preflight(data, limits, preflight)
@@ -1013,13 +1057,47 @@ impl ArchiveInfo {
         message_infos: impl Into<MessageInfoCollection>,
         limits: Limits,
     ) -> Result<Self> {
-        let default_limits = limits.is_default_profile();
-        let limits = if default_limits {
-            limits
-        } else {
-            limits.validate()?
-        };
         let message_infos = message_infos.into();
+        if !limits.is_default_profile() {
+            return Self::from_collection(identifier, message_infos, limits);
+        }
+        if match (&message_infos.admission, message_infos.limits) {
+            // Every record entered through a minimal default-profile
+            // push: its payload length was checked and the message count
+            // stayed within the per-object ceiling, so the compile-time
+            // bounds of `DEFAULT_SHAPE_MESSAGE_ENTRY_BYTES` cover the
+            // whole header.
+            (Some(admission), CollectionProfile::Default) => admission.is_minimal_only(),
+            // An uncertified collection (an ordinary `Vec`) is checked
+            // record by record.
+            (None, _) => default_archive_info_bounds_are_safe(&message_infos.message_infos),
+            (Some(_), _) => false,
+        } {
+            return Ok(Self {
+                identifier: Some(identifier),
+                message_infos: message_infos.message_infos,
+                should_merge: None,
+            });
+        }
+        // Rebuild the default profile inside the out-of-line path so a
+        // caller with a constant profile does not materialize it per call.
+        Self::from_collection_default(identifier, message_infos)
+    }
+
+    #[inline(never)]
+    fn from_collection_default(
+        identifier: u64,
+        message_infos: MessageInfoCollection,
+    ) -> Result<Self> {
+        Self::from_collection(identifier, message_infos, Limits::default())
+    }
+
+    #[inline(never)]
+    fn from_collection(
+        identifier: u64,
+        message_infos: MessageInfoCollection,
+        limits: Limits,
+    ) -> Result<Self> {
         let (message_infos, collection_admission, collection_limits) = message_infos.into_parts();
         let value = Self {
             identifier: Some(identifier),
@@ -1028,21 +1106,15 @@ impl ArchiveInfo {
         };
         if let (Some(collection_admission), Some(collection_limits)) =
             (collection_admission, collection_limits)
-            && collection_limits == limits
+            && same_profile(collection_limits, limits)
         {
             let admission = collection_admission.archive_info(identifier)?;
             admission.check(limits)?;
             return Ok(value);
         }
-        // A default-profile minimal record has fixed metadata cardinalities:
-        // its message count, four fields per message, three version values,
-        // and fixed neutral allocations are all below the hard ceilings. The
-        // only caller-controlled resource dimension left is each payload
-        // length, which is checked before this certificate is used. Strict or
-        // non-minimal profiles retain the exact admission path below.
-        if default_limits && default_archive_info_bounds_are_safe(&value.message_infos) {
-            return Ok(value);
-        }
+        // `new` already answered a default-profile uncertified collection
+        // whose records all have the certified shape. Strict profiles and
+        // other shapes retain the exact admission path.
         check_archive_info_constructor(&value, limits)?;
         Ok(value)
     }
@@ -1052,30 +1124,70 @@ impl ArchiveInfo {
     }
 }
 
+/// Whether two limit profiles are equal, answering the common default case
+/// with one bit test per side: an unmarked profile equals `Limits::default()`.
+#[inline(always)]
+fn same_profile(left: Limits, right: Limits) -> bool {
+    (left.is_default_profile() && right.is_default_profile()) || left == right
+}
+
+/// Upper bound of one encoded `ArchiveInfo.message_infos` entry whose only
+/// populated fields are `type`, at most three inline `versions` values and
+/// `length`: entry tag and length prefix (2), type (1 + 5), packed versions
+/// (1 + 1 + 3 * 5) and length (1 + 5).
+const DEFAULT_SHAPE_MESSAGE_ENTRY_BYTES: usize = 2 + 6 + 17 + 6;
+
+// The default-profile certificate below is sound only while these products
+// stay inside the default ceilings. Changing a ceiling, the default profile
+// or the record layout must keep them true (they are checked at compile time).
+const _: () = {
+    let messages = Limits::MAX_MESSAGES_PER_OBJECT;
+    // Identifier field (11 bytes) plus every message entry.
+    assert!(11 + messages * DEFAULT_SHAPE_MESSAGE_ENTRY_BYTES <= Limits::MAX_HEADER_BYTES);
+    // Identifier plus one entry, type, packed versions and length per message.
+    assert!(messages * 4 < Limits::MAX_HEADER_FIELDS);
+    // One message record plus three version values per message.
+    assert!(messages * 4 <= Limits::MAX_METADATA_ITEMS);
+    // Inline versions own no heap memory.
+    assert!(
+        size_of::<ArchiveInfo>() + messages * size_of::<MessageInfo>()
+            <= Limits::DEFAULT_HEADER_MEMORY_BYTES
+    );
+    // ArchiveInfo -> MessageInfo.
+    assert!(1 <= Limits::DEFAULT_HEADER_NESTING);
+};
+
+/// Constant-work-per-record admission certificate for the default profile.
+///
+/// A record qualifies when every repeated or optional field other than
+/// `type`, `versions` and `length` is empty, `versions` is stored inline
+/// (at most three values, no heap allocation) and `length` is within the
+/// message-byte ceiling. The admitted resources of such a record do not
+/// depend on its version or type values, and the compile-time assertions
+/// above prove that any number of qualifying records up to the per-object
+/// ceiling fits every default budget. The check reads each public field
+/// once and combines them without a branch per field. Any record outside
+/// this shape, and every non-default profile, takes the exact admission
+/// path with its original error precedence.
 #[inline]
 fn default_archive_info_bounds_are_safe(message_infos: &[MessageInfo]) -> bool {
     if message_infos.len() > Limits::MAX_MESSAGES_PER_OBJECT {
         return false;
     }
+    let mut outside = 0usize;
     for message_info in message_infos {
-        if message_info.versions.spilled()
-            || message_info.versions.as_slice() != DEFAULT_MESSAGE_VERSIONS
-        {
-            return false;
-        }
-        let shape = message_info.field_infos.len()
+        outside |= message_info.field_infos.len()
             | message_info.object_references.len()
             | message_info.data_references.len()
             | usize::from(message_info.base_message_index.is_some())
             | message_info.diff_merge_version.len()
             | usize::from(message_info.diff_field_path.is_some())
             | message_info.fields_to_remove.len()
-            | message_info.diff_read_version.len();
-        if shape != 0 || u64::from(message_info.length) > Limits::MAX_MESSAGE_BYTES as u64 {
-            return false;
-        }
+            | message_info.diff_read_version.len()
+            | usize::from(message_info.versions.spilled())
+            | usize::from(u64::from(message_info.length) > Limits::MAX_MESSAGE_BYTES as u64);
     }
-    true
+    outside == 0
 }
 
 /// Metadata for one payload in an archive object.
@@ -1106,11 +1218,6 @@ impl MessageInfo {
     #[inline]
     pub fn new(type_: u32, length: usize, limits: Limits) -> Result<Self> {
         let default_limits = limits.is_default_profile();
-        let limits = if default_limits {
-            limits
-        } else {
-            limits.validate()?
-        };
         check_message_length(length, limits)?;
         let length = u32::try_from(length)
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
@@ -1133,15 +1240,19 @@ impl MessageInfo {
         })
     }
 
-    fn try_new(type_: u32, length: u32) -> Result<Self> {
+    /// Build the conventional record after its admission has been decided.
+    ///
+    /// Infallible and always inlined, so collection and object constructors
+    /// write the record directly into its destination slot.
+    #[inline(always)]
+    fn conventional(type_: u32, length: u32) -> Self {
         #[cfg(test)]
         MESSAGE_INFO_CONSTRUCTIONS.with(|count| {
             count.set(count.get().saturating_add(1));
         });
-        let versions = SmallVec::from_buf(DEFAULT_MESSAGE_VERSIONS);
-        Ok(Self {
+        Self {
             type_,
-            versions,
+            versions: SmallVec::from_buf(DEFAULT_MESSAGE_VERSIONS),
             length,
             field_infos: Vec::new(),
             object_references: Vec::new(),
@@ -1151,12 +1262,11 @@ impl MessageInfo {
             diff_field_path: None,
             fields_to_remove: Vec::new(),
             diff_read_version: Vec::new(),
-        })
+        }
     }
 
     /// Decode one `TSP.MessageInfo` protobuf under explicit limits.
     pub fn decode(data: &[u8], limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
         let preflight = preflight_header(data, HeaderKind::MessageInfo, limits)?;
         let decoded =
@@ -1179,7 +1289,6 @@ impl MessageInfo {
     /// reader bounded to exactly one metadata message when additional bytes
     /// follow it.
     pub fn parse<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
         let data = read_bounded(reader, limits.max_header_bytes(), "MessageInfo")?;
         Self::decode(&data, limits)
     }
@@ -1248,7 +1357,40 @@ impl MessageInfo {
 pub struct MessageInfoCollection {
     message_infos: Vec<MessageInfo>,
     admission: Option<MessageInfoCollectionAdmission>,
-    limits: Option<Limits>,
+    limits: CollectionProfile,
+}
+
+/// The admission profile a collection was started with.
+///
+/// The default profile is stored as a unit variant: per-record admission
+/// then reads constant ceilings instead of loading a stored `Limits` value,
+/// and starting a collection does not copy the profile.
+#[derive(Debug, Clone, Copy)]
+enum CollectionProfile {
+    /// An ordinary `Vec<MessageInfo>` converted without a profile.
+    Unbounded,
+    Default,
+    Custom(Limits),
+}
+
+impl CollectionProfile {
+    #[inline(always)]
+    fn new(limits: Limits) -> Self {
+        if limits.is_default_profile() {
+            Self::Default
+        } else {
+            Self::Custom(limits)
+        }
+    }
+
+    #[inline(always)]
+    fn limits(self) -> Option<Limits> {
+        match self {
+            Self::Unbounded => None,
+            Self::Default => Some(Limits::default()),
+            Self::Custom(limits) => Some(limits),
+        }
+    }
 }
 
 impl From<Vec<MessageInfo>> for MessageInfoCollection {
@@ -1256,7 +1398,7 @@ impl From<Vec<MessageInfo>> for MessageInfoCollection {
         Self {
             message_infos,
             admission: None,
-            limits: None,
+            limits: CollectionProfile::Unbounded,
         }
     }
 }
@@ -1269,7 +1411,6 @@ impl MessageInfoCollection {
 
     /// Start a bounded message collection with reserved element capacity.
     pub fn with_capacity(capacity: usize, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
         if capacity > limits.max_messages_per_object() {
             return Err(limit(
                 LimitKind::MessagesPerObject,
@@ -1284,7 +1425,7 @@ impl MessageInfoCollection {
         Ok(Self {
             message_infos,
             admission: Some(MessageInfoCollectionAdmission::empty()),
-            limits: Some(limits),
+            limits: CollectionProfile::new(limits),
         })
     }
 
@@ -1292,6 +1433,7 @@ impl MessageInfoCollection {
     pub fn push(&mut self, message_info: MessageInfo) -> Result<()> {
         let limits = self
             .limits
+            .limits()
             .ok_or_else(|| Error::invalid_archive(0, "message collection has no limits"))?;
         let message_count = self
             .message_infos
@@ -1350,6 +1492,7 @@ impl MessageInfoCollection {
     pub fn push_new(&mut self, type_: u32, length: usize) -> Result<()> {
         let limits = self
             .limits
+            .limits()
             .ok_or_else(|| Error::invalid_archive(0, "message collection has no limits"))?;
         let message_count = self
             .message_infos
@@ -1366,16 +1509,16 @@ impl MessageInfoCollection {
         check_message_length(length, limits)?;
         let length = u32::try_from(length)
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
-        let message_info = MessageInfo::try_new(type_, length)?;
         if let Some(collection_admission) = self.admission.as_mut() {
-            let version_memory = message_versions_memory(&message_info.versions)?;
+            // Conventional versions are inline and own no heap memory.
             if limits.is_default_profile() {
-                collection_admission.push_minimal_default(type_, length, version_memory, limits)?;
+                collection_admission.push_minimal_default(type_, length, 0, limits)?;
             } else {
-                collection_admission.push_minimal(type_, length, version_memory, limits)?;
+                collection_admission.push_minimal(type_, length, 0, limits)?;
             }
         }
-        self.message_infos.push(message_info);
+        self.message_infos
+            .push(MessageInfo::conventional(type_, length));
         Ok(())
     }
 
@@ -1413,7 +1556,10 @@ impl MessageInfoCollection {
     /// original bounded profile is still available.
     pub fn clear(&mut self) {
         self.message_infos.clear();
-        self.admission = self.limits.map(|_| MessageInfoCollectionAdmission::empty());
+        self.admission = self
+            .limits
+            .limits()
+            .map(|_| MessageInfoCollectionAdmission::empty());
     }
 
     /// Return the number of messages currently held.
@@ -1440,7 +1586,7 @@ impl MessageInfoCollection {
         Option<MessageInfoCollectionAdmission>,
         Option<Limits>,
     ) {
-        (self.message_infos, self.admission, self.limits)
+        (self.message_infos, self.admission, self.limits.limits())
     }
 }
 
@@ -1495,14 +1641,33 @@ fn check_constructor_header(
     Ok(())
 }
 
-#[inline]
+/// Constant-time admission certificate for the default profile.
+///
+/// Under the default profile, a path with fewer than this many components
+/// (one metadata item is reserved for an enclosing minimal `FieldInfo`)
+/// satisfies every derived budget, as the compile-time assertions below
+/// prove: its packed components, length prefix and wrapper fit the header
+/// byte budget, its neutral memory fits the memory budget, and it adds one
+/// field and at most one nesting level. Every other input, and every
+/// non-default profile, takes the exact constructor admission with its
+/// original error precedence.
+const DEFAULT_FIELD_PATH_COMPONENTS: usize = Limits::MAX_METADATA_ITEMS;
+
+const _: () = {
+    let components = DEFAULT_FIELD_PATH_COMPONENTS;
+    // Five varint bytes per u32 component, a ten-byte length prefix and a
+    // one-byte tag, wrapped once more in a FieldInfo entry.
+    assert!(components * 5 + 11 + 11 <= Limits::MAX_HEADER_BYTES);
+    assert!(size_of::<FieldInfo>() + components * 4 <= Limits::DEFAULT_HEADER_MEMORY_BYTES);
+    assert!(2 <= Limits::MAX_HEADER_FIELDS);
+    assert!(1 <= Limits::DEFAULT_HEADER_NESTING);
+};
+
 fn check_field_path_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
     let metadata_items = path.path.len();
     if limits.is_default_profile() && metadata_items <= Limits::MAX_METADATA_ITEMS {
-        // Under the default hard ceilings, this metadata bound also proves
-        // the derived path header, neutral memory, field and nesting bounds:
-        // one million u32 components occupy at most five million packed
-        // bytes, below the 16 MiB header and 64 MiB memory budgets.
+        // See `DEFAULT_FIELD_PATH_COMPONENTS`; the bound also holds at
+        // exactly the metadata ceiling for a standalone path.
         return Ok(());
     }
     let header_length = admitted_path_header_length(path, false, limits)?;
@@ -1551,7 +1716,6 @@ fn admitted_path_header_length(path: &FieldPath, nested: bool, limits: Limits) -
     }
 }
 
-#[inline]
 fn check_minimal_field_info_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
     let metadata_items = path
         .path
@@ -1630,7 +1794,7 @@ fn preflight_archive_object_constructor(
 
         // MessageInfo::validate runs before ArchiveInfo's aggregate checks.
         // Preserve that error precedence while avoiding repeated version
-        // storage work performed by MessageInfo::try_new.
+        // storage work performed by MessageInfo::conventional.
         if DEFAULT_MESSAGE_VERSIONS.len() > limits.max_metadata_items() {
             return Err(limit(
                 LimitKind::MetadataItems,
@@ -2406,7 +2570,6 @@ impl PartialEq for ArchiveObject {
 impl ArchiveObject {
     /// Construct an object under explicit resource limits.
     pub fn new(identifier: u64, messages: Vec<RawMessage>, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
         let header_length = preflight_archive_object_constructor(identifier, &messages, limits)?;
         let mut message_infos = Vec::new();
         message_infos
@@ -2415,7 +2578,7 @@ impl ArchiveObject {
         for message in &messages {
             let length = u32::try_from(message.data.len())
                 .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
-            message_infos.push(MessageInfo::try_new(message.type_, length)?);
+            message_infos.push(MessageInfo::conventional(message.type_, length));
         }
         let archive_info = ArchiveInfo {
             identifier: Some(identifier),
@@ -2468,7 +2631,6 @@ impl ArchiveObject {
         replacement_messages: &[RawMessage],
         limits: Limits,
     ) -> Result<Self> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let source_identifier = self
             .archive_info
@@ -2585,7 +2747,6 @@ impl ArchiveObject {
 
     /// Validate this object under explicit resource limits.
     pub fn validate(&self, limits: Limits) -> Result<()> {
-        let limits = limits.validate()?;
         if self.archive_info.identifier.is_none() {
             return Err(Error::invalid_archive(
                 0,
@@ -2803,7 +2964,6 @@ impl ArchiveObject {
         policy: ArchiveReferencePolicy,
         limits: Limits,
     ) -> Result<usize> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let canonical = encode_archive_info(&self.archive_info, limits)?;
         let source_header = match self.source_headers() {
@@ -2903,7 +3063,6 @@ impl ArchiveObject {
         message: RawMessage,
         limits: Limits,
     ) -> Result<RawMessage> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let message_info = self
             .archive_info
@@ -2948,7 +3107,6 @@ impl ArchiveObject {
         message: RawMessage,
         limits: Limits,
     ) -> Result<RawMessage> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let current_info = self
             .archive_info
@@ -3079,7 +3237,6 @@ impl ArchiveObject {
             return self.replace_message_preserving_header(index, message, limits);
         }
 
-        let limits = limits.validate()?;
         let data_identifier_count = match data_references {
             DataReferencePruning::Selected(identifiers) => identifiers.len(),
             DataReferencePruning::None | DataReferencePruning::All => 0,
@@ -3231,7 +3388,6 @@ impl ArchiveObject {
         reordered_selected_identifiers: &[u64],
         limits: Limits,
     ) -> Result<RawMessage> {
-        let limits = limits.validate()?;
         if reordered_selected_identifiers.len() > limits.max_metadata_items() {
             return Err(limit(
                 LimitKind::MetadataItems,
@@ -3419,7 +3575,6 @@ impl ArchiveObject {
         reordered_data_references: &[u64],
         limits: Limits,
     ) -> Result<RawMessage> {
-        let limits = limits.validate()?;
         if reordered_data_references.len() > limits.max_metadata_items() {
             return Err(limit(
                 LimitKind::MetadataItems,
@@ -3575,7 +3730,6 @@ impl ArchiveObject {
         canonical_fields: Option<CanonicalObjectReferenceFields<'_>>,
         limits: Limits,
     ) -> Result<RawMessage> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let current_info = self
             .archive_info
@@ -3715,7 +3869,6 @@ impl ArchiveObject {
         canonical_field: Option<CanonicalFieldDataReferenceTransition<'_>>,
         limits: Limits,
     ) -> Result<RawMessage> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let current_info = self
             .archive_info
@@ -3877,7 +4030,6 @@ impl ArchiveObject {
 
     /// Append one payload under explicit resource limits.
     pub fn push_message(&mut self, message: RawMessage, limits: Limits) -> Result<()> {
-        let limits = limits.validate()?;
         self.validate(limits)?;
         let next_count = self
             .messages
@@ -3894,7 +4046,7 @@ impl ArchiveObject {
         check_message_length(message.data.len(), limits)?;
         let length = u32::try_from(message.data.len())
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
-        let message_info = MessageInfo::try_new(message.type_, length)?;
+        let message_info = MessageInfo::conventional(message.type_, length);
         self.archive_info
             .message_infos
             .try_reserve(1)
@@ -3968,7 +4120,6 @@ impl Archive {
         limits: Limits,
         selected_identifier: Option<u64>,
     ) -> Result<Self> {
-        let limits = limits.validate()?;
         if data.len() > limits.max_archive_bytes() {
             return Err(limit(
                 LimitKind::ArchiveBytes,
@@ -4163,7 +4314,6 @@ impl Archive {
         decompressed_source: &[u8],
         limits: Limits,
     ) -> Result<()> {
-        let limits = limits.validate()?;
         if decompressed_source.len() > limits.max_archive_bytes() {
             return Err(limit(
                 LimitKind::ArchiveBytes,
@@ -4320,7 +4470,6 @@ impl Archive {
 
     /// Serialize this archive under explicit resource limits.
     pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>> {
-        let limits = limits.validate()?;
         let expected_length = self.encoded_len(limits)?;
         validate_object_set(self.objects.iter(), limits)?;
         let mut output = Vec::new();
@@ -4398,13 +4547,11 @@ impl Archive {
 
     /// Validate all objects under explicit resource limits.
     pub fn validate(&self, limits: Limits) -> Result<()> {
-        let limits = limits.validate()?;
         validate_object_set(self.objects.iter(), limits)
     }
 
     /// Insert an object under explicit resource limits.
     pub fn insert_object(&mut self, object: ArchiveObject, limits: Limits) -> Result<()> {
-        let limits = limits.validate()?;
         let identifier = object
             .archive_info
             .identifier
@@ -4431,7 +4578,6 @@ impl Archive {
         if objects.is_empty() {
             return Ok(());
         }
-        let limits = limits.validate()?;
         if objects
             .iter()
             .any(|object| object.archive_info.identifier == Some(0))
@@ -4472,7 +4618,6 @@ impl Archive {
         object: ArchiveObject,
         limits: Limits,
     ) -> Result<Option<ArchiveObject>> {
-        let limits = limits.validate()?;
         let identifier = object
             .archive_info
             .identifier
@@ -4520,7 +4665,6 @@ impl Archive {
         identifier: u64,
         limits: Limits,
     ) -> Result<ArchiveObject> {
-        let limits = limits.validate()?;
         if identifier == 0 {
             return Err(Error::invalid_archive(0, "object identifier is zero"));
         }
@@ -9059,7 +9203,6 @@ impl<'a> CanonicalHeaderProbe<'a> {
 }
 
 fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> Result<usize> {
-    let limits = limits.validate()?;
     let mut archive_length = 0usize;
     let mut total_messages = 0usize;
 
@@ -9173,7 +9316,14 @@ fn admit_retained_header(
 ) -> Result<()> {
     check_header_length(original.len(), limits)?;
     if let Some(admission) = admission {
-        return admission.check(original.len(), limits);
+        if admission.check(original.len(), limits).is_ok() {
+            return Ok(());
+        }
+        // The cached totals prove a refusal but not its observation: fresh
+        // ingress stops at the first charge that exceeds a budget and reports
+        // that count. Replay the same bounded preflight (cold path) so a
+        // retained header refuses with exactly the error its parse would.
+        return refuse_retained_header(original, admission, limits);
     }
     // This private buffer was parsed or rewritten through the header codec.
     // Every field needs at least a tag and a value/length byte, and the known
@@ -9212,6 +9362,19 @@ fn admit_retained_header(
     }
     preflight_header(original, HeaderKind::ArchiveInfo, limits)?;
     Ok(())
+}
+
+#[cold]
+#[inline(never)]
+fn refuse_retained_header(
+    original: &[u8],
+    admission: HeaderAdmission,
+    limits: Limits,
+) -> Result<()> {
+    preflight_header_with_admission(original, HeaderKind::ArchiveInfo, limits)?;
+    // Unreachable for a consistent cache; keep the cached refusal as the
+    // fail-closed answer rather than admitting the header.
+    admission.check(original.len(), limits)
 }
 
 fn emit_canonical_archive_info(
@@ -9899,7 +10062,6 @@ fn validate_object_set<'a, I>(objects: I, limits: Limits) -> Result<()>
 where
     I: IntoIterator<Item = &'a ArchiveObject>,
 {
-    let limits = limits.validate()?;
     let objects = objects.into_iter();
     let mut identifiers = HashSet::new();
     let initial_capacity = objects.size_hint().0.min(limits.max_objects());
@@ -10434,12 +10596,169 @@ mod tests {
     }
 
     #[test]
+    fn default_path_certificates_match_exact_admission_at_the_metadata_ceiling() -> Result<()> {
+        let limits = Limits::default();
+        let ceiling = Limits::MAX_METADATA_ITEMS;
+        // Fast certificate, its first excluded length (exact path, admitted)
+        // and the first refused length for a standalone path.
+        for components in [ceiling - 1, ceiling] {
+            let path = FieldPath::new(vec![u32::MAX; components], limits)?;
+            assert_eq!(path.path.len(), components);
+            super::check_field_path_constructor(&path, limits)?;
+        }
+        let refused = FieldPath::new(vec![0; ceiling + 1], limits)
+            .expect_err("one component over the metadata ceiling");
+        assert!(matches!(
+            refused,
+            Error::Limit { kind: LimitKind::MetadataItems, observed, maximum }
+                if observed == ceiling + 1 && maximum == ceiling
+        ));
+
+        // A minimal FieldInfo reserves one metadata item for itself.
+        let admitted = FieldPath {
+            path: vec![u32::MAX; ceiling - 1],
+        };
+        super::check_minimal_field_info_constructor(&admitted, limits)?;
+        let info = FieldInfo::new(admitted, limits)?;
+        assert_eq!(info.path.path.len(), ceiling - 1);
+        let refused = FieldInfo::new(
+            FieldPath {
+                path: vec![0; ceiling],
+            },
+            limits,
+        )
+        .expect_err("FieldInfo at the path ceiling exceeds the metadata budget");
+        assert!(matches!(
+            refused,
+            Error::Limit { kind: LimitKind::MetadataItems, observed, maximum }
+                if observed == ceiling + 1 && maximum == ceiling
+        ));
+
+        // A stricter profile never takes the default certificate.
+        let strict = limits.with_metadata_items(2)?;
+        assert!(FieldPath::new(vec![1, 2], strict).is_ok());
+        assert!(matches!(
+            FieldPath::new(vec![1, 2, 3], strict),
+            Err(Error::Limit {
+                kind: LimitKind::MetadataItems,
+                observed: 3,
+                maximum: 2
+            })
+        ));
+        assert!(matches!(
+            FieldInfo::new(FieldPath { path: vec![1, 2] }, strict),
+            Err(Error::Limit {
+                kind: LimitKind::MetadataItems,
+                observed: 3,
+                maximum: 2
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn default_archive_info_certificate_agrees_with_exact_admission() -> Result<()> {
+        let limits = Limits::default();
+        let mut records = Vec::new();
+        for versions in [
+            &[][..],
+            &[0][..],
+            &[u32::MAX, u32::MAX][..],
+            &[u32::MAX; 3][..],
+        ] {
+            let mut message = MessageInfo::new(u32::MAX, Limits::MAX_MESSAGE_BYTES, limits)?;
+            message.versions = smallvec::SmallVec::from_slice(versions);
+            assert!(!message.versions.spilled());
+            records.push(message);
+        }
+        assert!(default_archive_info_bounds_are_safe(&records));
+        let exact = ArchiveInfo {
+            identifier: Some(u64::MAX),
+            message_infos: records.clone(),
+            should_merge: None,
+        };
+        check_archive_info_constructor(&exact, limits)?;
+        let info = ArchiveInfo::new(u64::MAX, records.clone(), limits)?;
+        assert_eq!(info.message_infos, records);
+
+        // Each field outside the certified shape takes the exact path.
+        let base = records[0].clone();
+        let mut outside = Vec::new();
+        let mut message = base.clone();
+        message.length = u32::try_from(Limits::MAX_MESSAGE_BYTES + 1).expect("fits u32");
+        outside.push(message);
+        let mut message = base.clone();
+        message.versions = smallvec::SmallVec::from_slice(&[1, 2, 3, 4]);
+        outside.push(message);
+        let mut message = base.clone();
+        message.field_infos.push(FieldInfo::default());
+        outside.push(message);
+        let mut message = base.clone();
+        message.object_references.push(1);
+        outside.push(message);
+        let mut message = base.clone();
+        message.data_references.push(1);
+        outside.push(message);
+        let mut message = base.clone();
+        message.base_message_index = Some(0);
+        outside.push(message);
+        let mut message = base.clone();
+        message.diff_merge_version.push(1);
+        outside.push(message);
+        let mut message = base.clone();
+        message.diff_field_path = Some(FieldPath::default());
+        outside.push(message);
+        let mut message = base.clone();
+        message.fields_to_remove.push(FieldPath::default());
+        outside.push(message);
+        let mut message = base;
+        message.diff_read_version.push(1);
+        outside.push(message);
+        for message in outside {
+            assert!(!default_archive_info_bounds_are_safe(std::slice::from_ref(
+                &message
+            )));
+        }
+        assert!(matches!(
+            ArchiveInfo::new(
+                1,
+                vec![{
+                    let mut message = records[0].clone();
+                    message.length =
+                        u32::try_from(Limits::MAX_MESSAGE_BYTES + 1).expect("fits u32");
+                    message
+                }],
+                limits,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::MessageBytes,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn default_archive_info_admission_checks_public_message_version_mutations() -> Result<()> {
         let limits = Limits::default();
         let mut message = MessageInfo::new(7, 1, limits)?;
         message.versions[0] = u32::MAX;
-        assert!(!default_archive_info_bounds_are_safe(std::slice::from_ref(
+        // Inline version values do not change the admitted resources, so the
+        // value-independent certificate and the exact path must agree.
+        assert!(default_archive_info_bounds_are_safe(std::slice::from_ref(
             &message
+        )));
+        let exact = ArchiveInfo {
+            identifier: Some(0),
+            message_infos: vec![message.clone()],
+            should_merge: None,
+        };
+        check_archive_info_constructor(&exact, limits)?;
+        let mut grown = message.clone();
+        grown.versions.push(9);
+        assert!(grown.versions.spilled());
+        assert!(!default_archive_info_bounds_are_safe(std::slice::from_ref(
+            &grown
         )));
 
         let info = ArchiveInfo::new(0, vec![message], limits)?;
@@ -10990,7 +11309,7 @@ mod tests {
             assert_eq!(
                 constructions(),
                 before,
-                "MessageInfo::try_new must not run for a rejected aggregate header"
+                "MessageInfo::conventional must not run for a rejected aggregate header"
             );
         };
 
