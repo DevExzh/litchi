@@ -744,17 +744,17 @@ fn pages_body_table_formula_author_parity() -> TestResult {
     )
 }
 
-/// Divergence pinned (record 0376a): on `body-table-cells-native.pages`
-/// the table's `SUM(B2:B3)` range is mirrored inline and in a range tile,
-/// which the shared dependency rewrite does not regenerate. The host
-/// authors C3; the leaf refuses typed.
+/// `body-table-cells-native.pages`: the table's `SUM(B2:B3)` range is
+/// mirrored inline and in a range-precedents tile, which the shared rewrite
+/// regenerates together (record 0376a).
 #[test]
-fn pages_body_table_formula_author_mirrored_range_divergence_is_reported() -> TestResult {
-    let input = fixture(PAGES)?;
-    assert!(host_pages_author(&input.bytes).is_ok());
-    let error = leaf_pages_author(&input.bytes).expect_err("the leaf refuses");
-    assert!(error.to_string().contains("formula graph"), "{error}");
-    Ok(())
+fn pages_body_table_formula_author_graph_parity() -> TestResult {
+    pages_author_case(
+        "pages_body_table_formula_author_graph_parity",
+        PAGES,
+        Tier::B,
+        Evidence::Queued,
+    )
 }
 
 fn host_authored_pages() -> TestResult<crate::harness::Fixture> {
