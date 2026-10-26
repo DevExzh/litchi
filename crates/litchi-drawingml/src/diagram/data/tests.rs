@@ -468,7 +468,7 @@ fn raw_policy_reports_invalid_and_output_limits_before_allocation() {
         defaults.node_depth_value(),
         defaults.node_text_bytes_value(),
     );
-    assert!(matches!(parse(TRANSITIONAL), Ok(_)));
+    assert!(parse(TRANSITIONAL).is_ok());
     assert!(matches!(
         DiagramDataModel::parse(TRANSITIONAL, &invalid),
         Err(crate::Error::InvalidLimit { .. })

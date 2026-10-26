@@ -1964,28 +1964,28 @@ mod tests {
             "</dgm:dataModel>"
         );
         assert!(matches!(
-            SmartArt::parse_data_xml(&xml, &limits_with(2, 100, 100, 100, 100)),
+            SmartArt::parse_data_xml(xml, &limits_with(2, 100, 100, 100, 100)),
             Err(Error::Limit {
                 kind: LimitKind::DiagramPoints,
                 ..
             })
         ));
         assert!(matches!(
-            SmartArt::parse_data_xml(&xml, &limits_with(100, 1, 100, 100, 100)),
+            SmartArt::parse_data_xml(xml, &limits_with(100, 1, 100, 100, 100)),
             Err(Error::Limit {
                 kind: LimitKind::DiagramConnections,
                 ..
             })
         ));
         assert!(matches!(
-            SmartArt::parse_data_xml(&xml, &limits_with(100, 100, 3, 100, 100)),
+            SmartArt::parse_data_xml(xml, &limits_with(100, 100, 3, 100, 100)),
             Err(Error::Limit {
                 kind: LimitKind::DiagramDataModelTextBytes,
                 ..
             })
         ));
         assert!(matches!(
-            SmartArt::parse_data_xml(&xml, &limits_with(100, 100, 100, 100, 1)),
+            SmartArt::parse_data_xml(xml, &limits_with(100, 100, 100, 100, 1)),
             Err(Error::Limit {
                 kind: LimitKind::DiagramNodeDepth,
                 ..
@@ -2010,7 +2010,7 @@ mod tests {
             "</dgm:cxnLst>",
             "</dgm:dataModel>"
         );
-        let nodes = SmartArt::parse_data_xml(&xml, &Limits::default()).unwrap();
+        let nodes = SmartArt::parse_data_xml(xml, &Limits::default()).unwrap();
         assert_eq!(nodes.len(), 1);
         assert_eq!(nodes[0].text, "");
         assert_eq!(
@@ -2040,7 +2040,7 @@ mod tests {
             "</dgm:cxnLst>",
             "</dgm:dataModel>"
         );
-        let nodes = SmartArt::parse_data_xml(&xml, &Limits::default()).unwrap();
+        let nodes = SmartArt::parse_data_xml(xml, &Limits::default()).unwrap();
         assert_eq!(
             nodes
                 .iter()
