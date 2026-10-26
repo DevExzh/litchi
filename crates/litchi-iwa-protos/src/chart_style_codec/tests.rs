@@ -756,3 +756,58 @@ fn depth_writes_scale_the_stored_denominator() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn property_rules_clear_defaults_and_pick_archives() -> TestResult {
+    use super::property;
+    let base = base_non_style();
+    for write in [
+        property::pie_start_angle(0.0),
+        property::donut_inner_radius(property::DEFAULT_DONUT_INNER_RADIUS),
+        property::radar_start_angle(0.0),
+        property::series_gap_3d(property::DEFAULT_SERIES_GAP_3D),
+        property::rotation_3d(
+            property::DEFAULT_ROTATION_3D.0,
+            property::DEFAULT_ROTATION_3D.1,
+        ),
+        property::depth_3d(property::Scale3d::Pie, 1.0, None),
+    ] {
+        assert_eq!(write.archive(), Archive::ChartNonStyle);
+        let output = rewrite(
+            &base,
+            write.archive(),
+            write.writes(),
+            write.empty(),
+            Limits::DEFAULT,
+        )?;
+        assert!(!output.changed(), "{write:?}");
+    }
+    let angle = property::pie_start_angle(90.0);
+    let output = rewrite(
+        &base,
+        angle.archive(),
+        angle.writes(),
+        angle.empty(),
+        Limits::DEFAULT,
+    )?;
+    let properties = decode(output.as_bytes(), Archive::ChartNonStyle, Limits::DEFAULT)?;
+    assert_eq!(
+        properties.float(chart_non_style::PIE_START_ANGLE)?,
+        Some(90.0)
+    );
+
+    let corners = property::rounded_corners(0.0, false);
+    assert_eq!(
+        (corners.archive(), corners.writes().len()),
+        (Archive::ChartStyle, 2)
+    );
+    let distance = property::pie_label_distance(property::DEFAULT_PIE_LABEL_DISTANCE);
+    assert_eq!(distance.archive(), Archive::SeriesNonStyle);
+    assert_eq!(distance.empty(), EmptyExtension::Remove);
+    assert_eq!(property::pie_wedge_explosion(0.5).writes().len(), 1);
+    assert_eq!(
+        property::Scale3d::Bar.field(),
+        chart_non_style::BAR_SCALE_3D
+    );
+    Ok(())
+}
