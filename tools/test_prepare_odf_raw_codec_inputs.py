@@ -55,7 +55,7 @@ def repository(
     examples = root / prep.PROBE_PATH.parent
     examples.mkdir(parents=True, exist_ok=True)
     if baseline:
-        perf.write_text('[package]\nname = "litchi-perf-baseline"\nversion = "0.0.1"\n', encoding="utf-8")
+        perf.write_text('[package]\nname = "litchi-odf-raw-codec-consumer"\nversion = "0.0.1"\n', encoding="utf-8")
         (root / prep.LOCK_PATH).write_bytes(b"baseline old lock\n")
         (examples / ".keep").write_text("\n", encoding="utf-8")
     elif consumer:
@@ -64,7 +64,8 @@ def repository(
         if probe is None:
             probe = (SOURCE_ROOT / prep.PROBE_PATH).read_bytes()
         if lock is None:
-            lock = (SOURCE_ROOT / prep.LOCK_PATH).read_bytes()
+            lock_path = SOURCE_ROOT / prep.LOCK_PATH
+            lock = lock_path.read_bytes() if lock_path.is_file() else b"candidate consumer lock\n"
         perf.write_bytes(consumer_manifest)
         (root / prep.LOCK_PATH).write_bytes(lock)
         (root / prep.PROBE_PATH).write_bytes(probe)
@@ -93,7 +94,7 @@ def candidate_identity(candidate: Path, *, p1_commit: str, p1_tree: str, pin_sha
             "sha256": sha(candidate / prep.PROBE_PATH),
             "bytes": (candidate / prep.PROBE_PATH).stat().st_size,
         },
-        "perf_lock": {
+        "consumer_lock": {
             "path": str(prep.LOCK_PATH),
             "sha256": sha(candidate / prep.LOCK_PATH),
             "bytes": (candidate / prep.LOCK_PATH).stat().st_size,
@@ -201,7 +202,7 @@ class OdfRawPreparationTests(unittest.TestCase):
                     (adapter / prep.LOCK_PATH).write_bytes(old)
                     git(adapter, "add", str(prep.LOCK_PATH))
                     git(adapter, "commit", "-qm", "old lock")
-                    mutated["candidate"]["perf_lock"] = {"path": str(prep.LOCK_PATH), "sha256": sha(adapter / prep.LOCK_PATH), "bytes": len(old)}
+                    mutated["candidate"]["consumer_lock"] = {"path": str(prep.LOCK_PATH), "sha256": sha(adapter / prep.LOCK_PATH), "bytes": len(old)}
                     mutated["sealed_by"]["candidate_sha256"] = prep._candidate_identity_digest(mutated["candidate"])
                 elif case == "missing-probe":
                     (candidate / prep.PROBE_PATH).unlink()
@@ -277,8 +278,9 @@ class OdfRawPreparationTests(unittest.TestCase):
             manifest["baseline_commit"] = git(baseline, "rev-parse", "HEAD")
             manifest["source"]["candidate_consumer_manifest_sha256"] = value["candidate"]["consumer_manifest"]["sha256"]
             manifest["source"]["candidate_consumer_manifest_bytes"] = value["candidate"]["consumer_manifest"]["bytes"]
-            manifest["source"]["candidate_lock_sha256"] = value["candidate"]["lock"]["sha256"]
-            manifest["source"]["candidate_lock_bytes"] = value["candidate"]["lock"]["bytes"]
+            manifest["source"]["consumer_lock_status"] = "ready"
+            manifest["source"]["candidate_consumer_lock_sha256"] = value["candidate"]["lock"]["sha256"]
+            manifest["source"]["candidate_consumer_lock_bytes"] = value["candidate"]["lock"]["bytes"]
             manifest["probe"]["sha256"] = value["candidate"]["probe"]["sha256"]
             manifest["probe"]["bytes"] = value["candidate"]["probe"]["bytes"]
             manifest_path = root / "manifest.json"

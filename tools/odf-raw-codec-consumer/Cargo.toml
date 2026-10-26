@@ -1,0 +1,60 @@
+[package]
+name = "litchi-odf-raw-codec-consumer"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# This package is intentionally isolated from tools/perf-baseline.  The ODF
+# raw-codec lane needs only the ten ODF operations and must not inherit the
+# broad performance package's facade, OOXML, legacy, or iWork consumers.
+[features]
+default = []
+raw-codec-odf = [
+    "litchi-ops/odt",
+    "litchi-ops/ods",
+    "litchi-ops/odp",
+    "litchi-ops/odg",
+    "litchi-ops/odc",
+    "litchi-ops/odi",
+    "litchi-ops/odb",
+    "litchi-ops/odf-formula",
+    "litchi-ops/oth",
+    "litchi-ops/odm",
+]
+raw-codec-original = ["raw-codec-odf"]
+raw-codec-current = ["raw-codec-odf"]
+raw-codec-allocator = []
+
+[[example]]
+name = "odf_raw_codec_qualification"
+# Keep one canonical reviewed probe.  This relative target path deliberately
+# points at tools/perf-baseline; duplicating the 65,903-byte probe would create
+# a second source identity and let the two consumer packages drift.
+path = "../perf-baseline/examples/odf_raw_codec_qualification.rs"
+required-features = ["raw-codec-odf"]
+
+[dependencies]
+litchi-core = { path = "../../crates/litchi-core" }
+litchi-odf-common = { path = "../../crates/litchi-odf-common" }
+litchi-ops = { path = "../../crates/litchi-ops", default-features = false }
+quick-xml = "0.41"
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../crates/soapberry-zip" }
+
+# Match the production workspace's optimized native profile.  The allocator
+# variant is selected by raw-codec-allocator and the canonical probe owns the
+# counting global allocator under that feature.
+[profile.release]
+lto = true
+panic = "abort"
+
+# Preserve the production workspace's Rust-only Deflate implementation when
+# this package is built as its own workspace.  The root workspace supplies
+# these patches for its members; this isolated consumer must repeat the exact
+# closure rather than silently resolving registry copies or C zlib.
+[patch.crates-io]
+flate2 = { path = "../../vendor/flate2" }
+zlib-rs = { path = "../../vendor/zlib-rs" }
+
+[workspace]

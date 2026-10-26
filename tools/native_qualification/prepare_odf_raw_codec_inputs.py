@@ -25,16 +25,19 @@ import tempfile
 from typing import Any, Mapping
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v4"
-IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v2"
+SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v5"
+IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v3"
 PROTOCOL_P_PIN_SCHEMA = "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1"
 CANDIDATE_MODE = "integrated_final_c"
 LANE = "odf-raw-codec"
 BASELINE_COMMIT = "70d64634c9d1d4328447d8724d3b076114a91fd0"
 HISTORICAL_CANDIDATE = "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee"
+# The probe remains one canonical reviewed source under perf-baseline.  Only
+# the manifest and lock move into the isolated ODF consumer package.
 PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
-CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
-LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
+CONSUMER_MANIFEST = Path("tools/odf-raw-codec-consumer/Cargo.toml")
+LOCK_PATH = Path("tools/odf-raw-codec-consumer/Cargo.lock")
+CONSUMER_LOCK_KEY = "consumer_lock"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 UPSTREAM_COMPONENT = "3rd" + "party"
@@ -262,7 +265,7 @@ def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
         "production_source_tree_sha256",
         "consumer_manifest",
         "probe",
-        "perf_lock",
+        CONSUMER_LOCK_KEY,
     }:
         raise PreparationError("candidate identity fields are incomplete")
     if candidate.get("mode") != CANDIDATE_MODE:
@@ -274,7 +277,7 @@ def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
     _require_hash(candidate.get("production_source_tree_sha256"), "candidate identity production source closure")
     _file_identity(candidate.get("consumer_manifest"), "candidate consumer manifest", CONSUMER_MANIFEST)
     _file_identity(candidate.get("probe"), "candidate probe", PROBE_PATH)
-    _file_identity(candidate.get("perf_lock"), "candidate performance lock", LOCK_PATH)
+    _file_identity(candidate.get(CONSUMER_LOCK_KEY), "candidate consumer lock", LOCK_PATH)
     if sealed_digest != _candidate_identity_digest(candidate):
         raise PreparationError("candidate identity seal digest does not match the candidate object")
     return {
@@ -287,7 +290,7 @@ def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
             "production_source_tree_sha256": str(candidate["production_source_tree_sha256"]),
             "consumer_manifest": dict(candidate["consumer_manifest"]),
             "probe": dict(candidate["probe"]),
-            "perf_lock": dict(candidate["perf_lock"]),
+            CONSUMER_LOCK_KEY: dict(candidate[CONSUMER_LOCK_KEY]),
         },
     }
 
@@ -486,14 +489,14 @@ def prepare(
     for label, observed, expected in (
         ("consumer manifest", (adapter_consumer_sha, adapter_consumer_bytes), candidate_identity["consumer_manifest"]),
         ("probe", (adapter_probe_sha, adapter_probe_bytes), candidate_identity["probe"]),
-        ("performance lock", (adapter_lock_sha, adapter_lock_bytes), candidate_identity["perf_lock"]),
+        ("consumer lock", (adapter_lock_sha, adapter_lock_bytes), candidate_identity[CONSUMER_LOCK_KEY]),
     ):
         if observed != (expected["sha256"], expected["bytes"]):
             raise PreparationError(f"adapter {label} does not match the P-sealed final-C consumer identity")
     for path, label, expected in (
         (candidate_consumer, "candidate consumer manifest", candidate_identity["consumer_manifest"]),
         (candidate_probe, "candidate probe", candidate_identity["probe"]),
-        (candidate_lock, "candidate performance lock", candidate_identity["perf_lock"]),
+        (candidate_lock, "candidate consumer lock", candidate_identity[CONSUMER_LOCK_KEY]),
     ):
         observed = _sha256(path)
         if observed != (expected["sha256"], expected["bytes"]):
@@ -575,7 +578,7 @@ def prepare(
             "overlay_paths": [],
             "consumer_manifest": {"source_path": str(candidate_consumer), "path": str(candidate_consumer), "sha256": candidate_identity["consumer_manifest"]["sha256"], "bytes": candidate_identity["consumer_manifest"]["bytes"]},
             "probe": {"source_path": str(candidate_probe), "path": str(candidate_probe), "sha256": candidate_identity["probe"]["sha256"], "bytes": candidate_identity["probe"]["bytes"]},
-            "lock": {"source_path": str(candidate_lock), "path": str(candidate_lock), "sha256": candidate_identity["perf_lock"]["sha256"], "bytes": candidate_identity["perf_lock"]["bytes"]},
+            "lock": {"source_path": str(candidate_lock), "path": str(candidate_lock), "sha256": candidate_identity[CONSUMER_LOCK_KEY]["sha256"], "bytes": candidate_identity[CONSUMER_LOCK_KEY]["bytes"]},
         },
         "adapter": {
             "root": str(adapter_root),

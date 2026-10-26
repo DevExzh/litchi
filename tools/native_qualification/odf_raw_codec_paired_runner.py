@@ -41,9 +41,9 @@ import native_qualification_runner as generic  # noqa: E402
 from native_qualification import odf_shared_triad_paired_runner as reviewed  # noqa: E402
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v2"
-PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v4"
-IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v2"
+SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v3"
+PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v5"
+IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v3"
 PROTOCOL_P_PIN_SCHEMA = "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1"
 CANDIDATE_MODE = "integrated_final_c"
 ROLES = ("baseline", "candidate")
@@ -58,22 +58,28 @@ TARGET_HARD_LIMIT_BYTES = 20_000_000_000
 MEMORY_HARD_LIMIT_BYTES = 20_000_000_000
 PROBE_MAX_BYTES = 1_048_576
 PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
-CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
+CONSUMER_MANIFEST = Path("tools/odf-raw-codec-consumer/Cargo.toml")
 PRODUCTION_MANIFEST = Path("crates/litchi-ops/Cargo.toml")
-LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
-CANDIDATE_CONSUMER_MANIFEST_SHA256 = "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a"
-CANDIDATE_CONSUMER_MANIFEST_BYTES = 8181
+LOCK_PATH = Path("tools/odf-raw-codec-consumer/Cargo.lock")
+CONSUMER_PACKAGE = "litchi-odf-raw-codec-consumer"
+CANDIDATE_CONSUMER_MANIFEST_SHA256 = "2139bdfc2e0b66e40b0180d40d764688fac58fc30ea3675d5381afe05132a51d"
+CANDIDATE_CONSUMER_MANIFEST_BYTES = 2056
 CANDIDATE_PROBE_SHA256 = "34fda74cc0bfba691c3b1c8856ae48f9213e165a5b09635eb42081a5611b8002"
 CANDIDATE_PROBE_BYTES = 65903
-CANDIDATE_LOCK_SHA256 = "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4"
-CANDIDATE_LOCK_BYTES = 57961
+CONSUMER_LOCK_KEY = "consumer_lock"
+CONSUMER_LOCK_STATUS_PENDING = "pending_metadata"
+CONSUMER_LOCK_STATUS_READY = "ready"
 BUILD_PROFILE = "release"
 BUILD_FLAG = "--release"
 BUILD_BINARY_DIRECTORY = "release"
 EXPECTED_BUILD = {
+    "package": CONSUMER_PACKAGE,
     "profile": BUILD_PROFILE,
     "cargo_flag": BUILD_FLAG,
     "binary_directory": BUILD_BINARY_DIRECTORY,
+    "lto": "fat",
+    "panic": "abort",
+    "allocator_feature": "raw-codec-allocator",
     "variants": {
         "normal": {"allocator_feature": None},
         "allocator": {"allocator_feature": "raw-codec-allocator"},
@@ -306,7 +312,7 @@ def _validate_candidate_identity(data: Mapping[str, Any], manifest: Mapping[str,
     _require_sha(sealed_by.get("p1_pin_sha256"), "candidate identity P1 pin digest", 64)
     seal = _require_sha(sealed_by.get("candidate_sha256"), "candidate identity seal digest", 64)
     candidate = data.get("candidate")
-    required = {"mode", "commit", "tree", "production_source_tree_sha256", "consumer_manifest", "probe", "perf_lock"}
+    required = {"mode", "commit", "tree", "production_source_tree_sha256", "consumer_manifest", "probe", CONSUMER_LOCK_KEY}
     if not isinstance(candidate, Mapping) or set(candidate) != required:
         raise RunnerError("candidate identity fields are incomplete")
     if candidate.get("mode") != CANDIDATE_MODE:
@@ -317,7 +323,7 @@ def _validate_candidate_identity(data: Mapping[str, Any], manifest: Mapping[str,
     files = (
         ("consumer_manifest", CONSUMER_MANIFEST),
         ("probe", PROBE_PATH),
-        ("perf_lock", LOCK_PATH),
+        (CONSUMER_LOCK_KEY, LOCK_PATH),
     )
     for key, expected_path in files:
         value = candidate.get(key)
@@ -333,8 +339,8 @@ def _validate_candidate_identity(data: Mapping[str, Any], manifest: Mapping[str,
         raise RunnerError("candidate consumer manifest does not match the reviewed manifest")
     if candidate["probe"]["sha256"] != manifest["probe"]["sha256"] or candidate["probe"]["bytes"] != manifest["probe"]["bytes"]:
         raise RunnerError("candidate probe does not match the reviewed manifest")
-    if candidate["perf_lock"]["sha256"] != manifest["source"]["candidate_lock_sha256"] or candidate["perf_lock"]["bytes"] != manifest["source"]["candidate_lock_bytes"]:
-        raise RunnerError("candidate performance lock does not match the reviewed manifest")
+    if candidate[CONSUMER_LOCK_KEY]["sha256"] != manifest["source"]["candidate_consumer_lock_sha256"] or candidate[CONSUMER_LOCK_KEY]["bytes"] != manifest["source"]["candidate_consumer_lock_bytes"]:
+        raise RunnerError("candidate consumer lock does not match the reviewed manifest")
     if seal != _candidate_identity_digest(candidate):
         raise RunnerError("candidate identity seal digest does not match the candidate object")
     return {"schema": IDENTITY_SCHEMA, "sealed_by": dict(sealed_by), "candidate": {key: (dict(value) if isinstance(value, Mapping) else value) for key, value in candidate.items()}}
@@ -580,7 +586,7 @@ EXPECTED_OUTPUT_PROOF = [
 
 
 def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
-    if data.get("schema") != "litchi.odf.raw-codec-qualification.manifest.v2":
+    if data.get("schema") != "litchi.odf.raw-codec-qualification.manifest.v3":
         raise RunnerError("manifest schema is not the ODF raw-codec schema")
     if data.get("lane") != "odf-raw-codec":
         raise RunnerError("manifest lane is not odf-raw-codec")
@@ -592,6 +598,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         raise RunnerError("manifest source identity is missing")
     expected_source = {
         "consumer_manifest": str(CONSUMER_MANIFEST),
+        "consumer_package": CONSUMER_PACKAGE,
         "production_manifest": str(PRODUCTION_MANIFEST),
         "lock_path": str(LOCK_PATH),
         "baseline_overlay": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
@@ -609,14 +616,23 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     consumer_bytes = source.get("candidate_consumer_manifest_bytes")
     if isinstance(consumer_bytes, bool) or not isinstance(consumer_bytes, int) or consumer_bytes <= 0:
         raise RunnerError("source.candidate_consumer_manifest_bytes must be a positive integer")
-    lock_sha = _require_sha(source.get("candidate_lock_sha256"), "source.candidate_lock_sha256", 64)
-    lock_bytes = source.get("candidate_lock_bytes")
-    if isinstance(lock_bytes, bool) or not isinstance(lock_bytes, int) or lock_bytes <= 0:
-        raise RunnerError("source.candidate_lock_bytes must be a positive integer")
+    lock_status = source.get("consumer_lock_status")
+    if lock_status == CONSUMER_LOCK_STATUS_PENDING:
+        if source.get("candidate_consumer_lock_sha256") is not None or source.get("candidate_consumer_lock_bytes") is not None:
+            raise RunnerError("pending consumer lock must not carry a stale identity")
+        lock_sha = None
+        lock_bytes = None
+    elif lock_status == CONSUMER_LOCK_STATUS_READY:
+        lock_sha = _require_sha(source.get("candidate_consumer_lock_sha256"), "source.candidate_consumer_lock_sha256", 64)
+        lock_bytes = source.get("candidate_consumer_lock_bytes")
+        if isinstance(lock_bytes, bool) or not isinstance(lock_bytes, int) or lock_bytes <= 0:
+            raise RunnerError("source.candidate_consumer_lock_bytes must be a positive integer")
+    else:
+        raise RunnerError("source.consumer_lock_status must be pending_metadata or ready")
     if consumer_sha != CANDIDATE_CONSUMER_MANIFEST_SHA256 or consumer_bytes != CANDIDATE_CONSUMER_MANIFEST_BYTES:
         raise RunnerError("manifest candidate consumer identity is not the reviewed consumer file")
-    if lock_sha != CANDIDATE_LOCK_SHA256 or lock_bytes != CANDIDATE_LOCK_BYTES:
-        raise RunnerError("manifest candidate lock identity is not the reviewed final-C lock")
+    if lock_status == CONSUMER_LOCK_STATUS_READY and (lock_sha is None or lock_bytes is None):
+        raise RunnerError("ready consumer lock identity is incomplete")
     probe = data.get("probe")
     if not isinstance(probe, Mapping) or probe.get("path") != str(PROBE_PATH):
         raise RunnerError("manifest probe path differs")
@@ -681,8 +697,9 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     normalized = dict(data)
     normalized["routes"] = routes
     normalized["candidate_mode"] = CANDIDATE_MODE
-    normalized["candidate_lock_sha256"] = lock_sha
-    normalized["candidate_lock_bytes"] = lock_bytes
+    normalized["consumer_lock_status"] = lock_status
+    normalized["candidate_consumer_lock_sha256"] = lock_sha
+    normalized["candidate_consumer_lock_bytes"] = lock_bytes
     normalized["candidate_consumer_manifest_sha256"] = consumer_sha
     normalized["candidate_consumer_manifest_bytes"] = consumer_bytes
     normalized["probe_sha256"] = probe_sha
@@ -805,14 +822,14 @@ def _validate_preparation(
     expected_files = {
         "consumer_manifest": (candidate_consumer, expected_candidate["consumer_manifest"], adapter_consumer, manifest["candidate_consumer_manifest_sha256"], manifest["candidate_consumer_manifest_bytes"]),
         "probe": (candidate_probe, expected_candidate["probe"], adapter_probe, manifest["probe_sha256"], manifest["probe_bytes"]),
-        "perf_lock": (candidate_lock, expected_candidate["perf_lock"], adapter_lock, manifest["candidate_lock_sha256"], manifest["candidate_lock_bytes"]),
+        CONSUMER_LOCK_KEY: (candidate_lock, expected_candidate[CONSUMER_LOCK_KEY], adapter_lock, manifest["candidate_consumer_lock_sha256"], manifest["candidate_consumer_lock_bytes"]),
     }
     for label, (candidate_value, expected, adapter_value, manifest_sha, manifest_bytes) in expected_files.items():
         if candidate_value["sha256"] != expected["sha256"] or candidate_value["bytes"] != expected["bytes"] or candidate_value["sha256"] != manifest_sha or candidate_value["bytes"] != manifest_bytes:
             raise RunnerError(f"preparation candidate {label} does not match the P-sealed manifest identity")
         if adapter_value["sha256"] != manifest_sha or adapter_value["bytes"] != manifest_bytes:
             raise RunnerError(f"preparation adapter {label} does not match the manifest identity")
-        relative = {"consumer_manifest": CONSUMER_MANIFEST, "probe": PROBE_PATH, "perf_lock": LOCK_PATH}[label]
+        relative = {"consumer_manifest": CONSUMER_MANIFEST, "probe": PROBE_PATH, CONSUMER_LOCK_KEY: LOCK_PATH}[label]
         adapter_path = _require_tracked_regular(adapter_root, relative, f"adapter {label}")
         if _resolve(str(adapter_value["path"])) != adapter_path:
             raise RunnerError(f"preparation adapter {label} path is not inside the selected adapter endpoint")
@@ -862,7 +879,7 @@ def _validate_preparation(
 def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation: Mapping[str, Any], candidate_identity: Mapping[str, Any]) -> dict[str, Any]:
     state = _source_state(root)
     package = _package_identity(root, PRODUCTION_MANIFEST, "litchi-ops")
-    consumer = _package_identity(root, CONSUMER_MANIFEST, "litchi-perf-baseline")
+    consumer = _package_identity(root, CONSUMER_MANIFEST, CONSUMER_PACKAGE)
     probe = _file_identity(root, PROBE_PATH, "probe")
     lock = _file_identity(root, LOCK_PATH, "Cargo.lock")
     if role == "baseline":
@@ -880,7 +897,7 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
             raise RunnerError("candidate source is stale or has an unexpected write")
         if state.get("production_tree_sha256") != preparation["candidate"]["production_tree_sha256"] or _production_source_tree(root) != expected["production_source_tree_sha256"]:
             raise RunnerError("candidate production source identity differs")
-        if consumer["sha256"] != expected["consumer_manifest"]["sha256"] or consumer["bytes"] != expected["consumer_manifest"]["bytes"] or probe["sha256"] != expected["probe"]["sha256"] or probe["bytes"] != expected["probe"]["bytes"] or lock["sha256"] != expected["perf_lock"]["sha256"] or lock["bytes"] != expected["perf_lock"]["bytes"]:
+        if consumer["sha256"] != expected["consumer_manifest"]["sha256"] or consumer["bytes"] != expected["consumer_manifest"]["bytes"] or probe["sha256"] != expected["probe"]["sha256"] or probe["bytes"] != expected["probe"]["bytes"] or lock["sha256"] != expected[CONSUMER_LOCK_KEY]["sha256"] or lock["bytes"] != expected[CONSUMER_LOCK_KEY]["bytes"]:
             raise RunnerError("candidate probe/lock identity differs")
     else:
         raise RunnerError(f"unknown endpoint role {role!r}")
@@ -970,6 +987,8 @@ class PairedRunner:
         _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "protocol_p": self.protocol_p_root, "protocol_p_pin": self.protocol_p_pin_path, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
+        if self.manifest["source"]["consumer_lock_status"] != CONSUMER_LOCK_STATUS_READY:
+            raise RunnerError("consumer lock metadata is pending; build and ABBA are not admissible")
         self.protocol_p_pin, self.protocol_p_pin_sha256, self.protocol_p_pin_bytes, self.protocol_p_pin_path = _load_protocol_p_pin(
             self.protocol_p_pin_path,
             protocol_p_root=self.protocol_p_root,
@@ -1240,7 +1259,7 @@ class PairedRunner:
         features = [adapter]
         if variant == "allocator":
             features.append("raw-codec-allocator")
-        return ["cargo", "build", BUILD_FLAG, "--offline", "--locked", "--jobs", "1", "--manifest-path", str(CONSUMER_MANIFEST), "-p", "litchi-perf-baseline", "--example", PROBE_NAME, "--no-default-features", "--features", ",".join(features)]
+        return ["cargo", "build", BUILD_FLAG, "--offline", "--locked", "--jobs", "1", "--manifest-path", str(CONSUMER_MANIFEST), "-p", CONSUMER_PACKAGE, "--example", PROBE_NAME, "--no-default-features", "--features", ",".join(features)]
 
     def _binary(self, role: str, variant: str) -> Path:
         return self._target(role, variant) / BUILD_BINARY_DIRECTORY / "examples" / PROBE_NAME

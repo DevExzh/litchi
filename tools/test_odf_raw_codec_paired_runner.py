@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import tempfile
+import tomllib
 import unittest
 
 from tools.native_qualification import odf_raw_codec_paired_runner as runner
@@ -32,6 +33,7 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["paired"]["probe_iterations"], runner.PROBE_ITERATIONS)
         self.assertEqual(value["source"]["candidate_overlay"], [])
         self.assertEqual(value["source"]["candidate_mode"], runner.CANDIDATE_MODE)
+        self.assertEqual(value["source"]["consumer_package"], runner.CONSUMER_PACKAGE)
         self.assertEqual(value["source"]["candidate_integrated_files"], [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)])
         self.assertEqual(value["source"]["protocol_p_pin_schema"], runner.PROTOCOL_P_PIN_SCHEMA)
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
@@ -48,10 +50,37 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             digest(str(runner.CONSUMER_MANIFEST)),
         )
         self.assertEqual(value["source"]["candidate_consumer_manifest_bytes"], (ROOT / runner.CONSUMER_MANIFEST).stat().st_size)
-        self.assertEqual(value["source"]["candidate_lock_sha256"], digest(str(runner.LOCK_PATH)))
-        self.assertEqual(value["source"]["candidate_lock_bytes"], (ROOT / runner.LOCK_PATH).stat().st_size)
+        lock_path = ROOT / runner.LOCK_PATH
+        self.assertEqual(value["source"]["consumer_lock_status"], runner.CONSUMER_LOCK_STATUS_READY)
+        self.assertEqual(value["source"]["candidate_consumer_lock_sha256"], digest(str(runner.LOCK_PATH)))
+        self.assertEqual(value["source"]["candidate_consumer_lock_bytes"], lock_path.stat().st_size)
+        self.assertTrue(lock_path.is_file(), "the dedicated lock must be generated before admission")
         self.assertEqual(value["probe"]["bytes"], (ROOT / runner.PROBE_PATH).stat().st_size)
         self.assertEqual(value["build"], runner.EXPECTED_BUILD)
+
+    def test_dedicated_manifest_uses_canonical_probe_and_odf_only_closure(self) -> None:
+        cargo = tomllib.loads((ROOT / runner.CONSUMER_MANIFEST).read_text(encoding="utf-8"))
+        self.assertEqual(cargo["package"]["name"], runner.CONSUMER_PACKAGE)
+        self.assertEqual(cargo["workspace"], {})
+        self.assertEqual(cargo["example"][0]["path"], "../perf-baseline/examples/odf_raw_codec_qualification.rs")
+        self.assertEqual(cargo["profile"]["release"], {"lto": True, "panic": "abort"})
+        self.assertEqual(cargo["features"]["raw-codec-odf"], [
+            "litchi-ops/odt",
+            "litchi-ops/ods",
+            "litchi-ops/odp",
+            "litchi-ops/odg",
+            "litchi-ops/odc",
+            "litchi-ops/odi",
+            "litchi-ops/odb",
+            "litchi-ops/odf-formula",
+            "litchi-ops/oth",
+            "litchi-ops/odm",
+        ])
+        self.assertFalse(cargo["dependencies"]["litchi-ops"].get("default-features", True))
+        self.assertEqual(
+            set(cargo["dependencies"]),
+            {"litchi-core", "litchi-odf-common", "litchi-ops", "quick-xml", "serde_json", "sha2", "soapberry-zip"},
+        )
 
     def test_rust_route_descriptors_match_manifest(self) -> None:
         source = (ROOT / "tools/perf-baseline/examples/odf_raw_codec_qualification.rs").read_text(encoding="utf-8")
@@ -79,11 +108,11 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
 
     def test_manifest_rejects_stale_hashes_and_route_mutation(self) -> None:
         value = manifest()
-        value["source"]["candidate_lock_sha256"] = None
+        value["source"]["consumer_lock_status"] = runner.CONSUMER_LOCK_STATUS_PENDING
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
         value = manifest()
-        value["source"]["candidate_lock_bytes"] += 1
+        value["source"]["candidate_consumer_lock_sha256"] = None
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
         value = manifest()
@@ -138,6 +167,8 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertIn("--release", normal)
         self.assertIn("--release", allocator)
         self.assertNotIn("--debug", normal)
+        self.assertEqual(normal[normal.index("-p") + 1], runner.CONSUMER_PACKAGE)
+        self.assertEqual(normal[normal.index("--manifest-path") + 1], str(runner.CONSUMER_MANIFEST))
         self.assertEqual(
             instance._binary("baseline", "normal"),
             instance._target("baseline", "normal") / "release" / "examples" / runner.PROBE_NAME,
