@@ -6126,3 +6126,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   all four unified control refs already merged and still in qualification
   use; 61 worktrees remain, with no additional unused unified leaf. C and P
   stay frozen. Full65 and the final proofs remain open; nothing is pushed.
+
+  Native scope reconciliation restores 25 required execution rows (165):
+  17 historical groups become 18 rows after splitting OLE/XLS properties,
+  then seven later rows are added. The recent three-policy shorthand did
+  not close the earlier lanes; no final-C2a native receipt exists. W8 File's
+  109-route C2a preparation exposes a stale six-edge dependency policy;
+  its exact twelve-edge successor is being prepared. DOC/Ink preparation
+  retains a returned historical-path test, and ODF raw codec still needs
+  its paired protocol. The gate's 1,022 Ops library tests pass while its
+  integration chunks continue. Root preserves and removes six generated
+  bytecode files; frozen C has only its approved ignored lock. Full gate,
+  census, all 25 qualification rows and final control cleanup remain open.
+  Only memo 22 is deferred; nothing is pushed.
