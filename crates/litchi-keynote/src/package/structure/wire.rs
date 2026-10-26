@@ -11,6 +11,7 @@ use super::StructureError;
 pub(in crate::package) const VARINT: u8 = 0;
 pub(in crate::package) const LENGTH_DELIMITED: u8 = 2;
 pub(in crate::package) const FIXED32: u8 = 5;
+pub(in crate::package) const FIXED64: u8 = 1;
 
 /// One parsed field: number, wire type, raw encoding and payload span.
 #[derive(Debug, Clone)]
@@ -143,6 +144,11 @@ impl Fields {
         self.set_single(number, FIXED32, &value.to_le_bytes());
     }
 
+    /// Set a singular `double` field, in place when present.
+    pub(in crate::package) fn set_double(&mut self, number: u32, value: f64) {
+        self.set_single(number, FIXED64, &value.to_le_bytes());
+    }
+
     /// Set a singular message field, in place when present.
     pub(in crate::package) fn set_message(&mut self, number: u32, payload: &[u8]) {
         self.set_single(number, LENGTH_DELIMITED, payload);
@@ -204,6 +210,12 @@ impl Writer {
 
     pub(in crate::package) fn float(mut self, number: u32, value: f32) -> Self {
         self.key(number, FIXED32);
+        self.bytes.extend_from_slice(&value.to_le_bytes());
+        self
+    }
+
+    pub(in crate::package) fn double(mut self, number: u32, value: f64) -> Self {
+        self.key(number, FIXED64);
         self.bytes.extend_from_slice(&value.to_le_bytes());
         self
     }

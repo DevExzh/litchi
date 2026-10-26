@@ -41,6 +41,7 @@ const ROUTES: &[(&str, &str)] = &[
     ("slide_duplicate", TEXT_BOX),
     ("slide_add", TEXT_BOX),
     ("slide_layout", TEXT_BOX),
+    ("build_add", TEXT_BOX),
 ];
 
 #[inline(never)]
@@ -95,6 +96,9 @@ fn w1c_host_route(route: &str, source: &[u8], png: &[u8], id: u64) -> TestResult
             let layout = editor.default_slide_layout()?;
             editor.add_slide(layout)?;
         },
+        "build_add" => {
+            editor.add_slide_build(0, id, litchi_iwa::keynote::BuildSettings::appear_in())?;
+        },
         "slide_layout" => {
             let layout = editor
                 .slide_layouts()?
@@ -126,6 +130,17 @@ fn w1c_leaf_route(route: &str, source: &[u8], png: &[u8], position: usize) -> Te
                 let count = package.slides()?.len();
                 edit.add_slide(LayoutSelector::Name(&name), Position::new(count))?;
             }
+            edit.commit()?.into_package()
+        },
+        "build_add" => {
+            let mut edit = package.edit_slide_builds();
+            edit.add(
+                slide,
+                DrawableSelector::index(position),
+                litchi_keynote::slide::build::Settings::appear(
+                    litchi_keynote::slide::build::Stage::In,
+                ),
+            )?;
             edit.commit()?.into_package()
         },
         _ => {
