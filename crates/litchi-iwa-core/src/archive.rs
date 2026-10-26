@@ -9173,7 +9173,15 @@ fn admit_retained_header(
 ) -> Result<()> {
     check_header_length(original.len(), limits)?;
     if let Some(admission) = admission {
-        return admission.check(original.len(), limits);
+        // The cached totals settle the admitted case without a second walk.
+        // A refusal is rare, so it re-runs the streaming preflight: parse and
+        // publication then report the same first-failure `observed` count
+        // instead of the cached whole-header total.
+        let Err(cached) = admission.check(original.len(), limits) else {
+            return Ok(());
+        };
+        preflight_header(original, HeaderKind::ArchiveInfo, limits)?;
+        return Err(cached);
     }
     // This private buffer was parsed or rewritten through the header codec.
     // Every field needs at least a tag and a value/length byte, and the known
