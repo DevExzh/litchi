@@ -27,6 +27,7 @@ mod chart_style_cases;
 mod cost_probes;
 mod harness;
 mod known_fields;
+mod media_cases;
 
 mod keynote_builder_cases;
 mod keynote_cases;
