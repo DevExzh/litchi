@@ -520,6 +520,12 @@ fn preflight_metadata(entries: &[(&PhysicalEntry, &[u8])]) -> Result<()> {
                 String::from_utf8_lossy(authority)
             )));
         }
+        if local.flags != central.flags {
+            return Err(Error::InvalidBundle(format!(
+                "semantic metadata authority {} has mismatched local and central flags",
+                String::from_utf8_lossy(authority)
+            )));
+        }
         if !matches!(central.compression_method, 0 | 8) {
             return Err(Error::InvalidBundle(format!(
                 "semantic metadata authority {} uses unsupported ZIP compression",
@@ -639,6 +645,42 @@ mod tests {
         // signatures; their compression fields begin at offsets 8 and 10.
         bytes[positions[0] - 22..positions[0] - 20].copy_from_slice(&99u16.to_le_bytes());
         bytes[positions[1] - 36..positions[1] - 34].copy_from_slice(&99u16.to_le_bytes());
+    }
+
+    fn make_flags_mismatch(bytes: &mut [u8], name: &[u8]) {
+        let positions = bytes
+            .windows(name.len())
+            .enumerate()
+            .filter_map(|(index, candidate)| (candidate == name).then_some(index))
+            .collect::<Vec<_>>();
+        assert_eq!(positions.len(), 2);
+        // Local and central filename fields begin 30 and 46 bytes after their
+        // signatures; their general-purpose flags begin at offsets 6 and 8.
+        bytes[positions[0] - 24..positions[0] - 22].copy_from_slice(&0x0008_u16.to_le_bytes());
+        bytes[positions[1] - 38..positions[1] - 36].copy_from_slice(&0_u16.to_le_bytes());
+    }
+
+    #[test]
+    fn flat_metadata_flag_mismatch_is_refused_before_reads() -> Result<()> {
+        let document = iwa(1)?;
+        let mut bytes = zip(&[
+            ("Index/Document.iwa", &document),
+            ("Metadata/Properties.plist", b"sidecar"),
+        ])?;
+        make_flags_mismatch(&mut bytes, b"Metadata/Properties.plist");
+
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            SemanticProjection::from_bytes(
+                &bytes,
+                Limits::default(),
+                SemanticProfile::Metadata,
+            ),
+            Err(Error::InvalidBundle(message))
+                if message.contains("semantic metadata authority Metadata/Properties.plist has mismatched local and central flags")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
+        Ok(())
     }
 
     fn replace_raw_name(bytes: &mut [u8], old: &[u8], new: &[u8]) {

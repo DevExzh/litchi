@@ -1484,6 +1484,43 @@ pub fn parse_wire_fields(data: &[u8], limits: WireLimits) -> Result<Vec<WireFiel
     Ok(items)
 }
 
+/// Visit protobuf wire fields in order without retaining a field list.
+///
+/// This applies exactly the framing, input-byte and field-count rules of
+/// [`parse_wire_fields`], in the same order and with the same errors, but
+/// hands each field to `visit` instead of collecting it. Callers that only
+/// look up a few field numbers avoid an input-sized allocation. A field is
+/// visited only after it parsed and passed the field-count ceiling; an error
+/// returned by `visit` stops the scan.
+pub fn visit_wire_fields<F>(data: &[u8], limits: WireLimits, mut visit: F) -> Result<()>
+where
+    F: FnMut(WireField) -> Result<()>,
+{
+    if data.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: data.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut fields = 0usize;
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let field = parse_wire_field(data, offset)?;
+        offset = field.end;
+        if fields >= limits.max_fields() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: fields + 1,
+                limit: limits.max_fields(),
+            });
+        }
+        fields += 1;
+        visit(field)?;
+    }
+    Ok(())
+}
+
 fn parse_wire_field(data: &[u8], start: usize) -> Result<WireField> {
     let (key, key_length) = crate::varint::decode_varint_from_bytes(&data[start..])
         .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
@@ -1712,10 +1749,35 @@ where
 /// singular schema fields.
 pub fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u8>> {
     let limits = WireLimits::default();
+    // Parsing both source messages and emitting the merged message are part of
+    // one bounded rewrite. Reject an over-budget source pair before the field
+    // vectors (and their backing allocations) are materialized.
+    if base.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: base.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    if overlay.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: overlay.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let input_work = base
+        .len()
+        .checked_add(overlay.len())
+        .ok_or_else(|| Error::InvalidFormat("protobuf overlay work overflow".to_owned()))?;
+    ensure_rewrite_work(input_work, limits)?;
     let base_fields = parse_wire_fields(base, limits)?;
     let overlay_fields = parse_wire_fields(overlay, limits)?;
-    ensure_rewrite_work(overlay_fields.len(), limits)?;
     if overlay_fields.is_empty() {
+        let work = input_work
+            .checked_add(base.len())
+            .ok_or_else(|| Error::InvalidFormat("protobuf overlay work overflow".to_owned()))?;
+        ensure_rewrite_work(work, limits)?;
         return clone_output(base, limits);
     }
 
@@ -1801,6 +1863,11 @@ pub fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u
                 .ok_or_else(|| Error::InvalidFormat("protobuf output size overflow".to_owned()))?;
         }
     }
+
+    let work = input_work
+        .checked_add(output_size)
+        .ok_or_else(|| Error::InvalidFormat("protobuf overlay work overflow".to_owned()))?;
+    ensure_rewrite_work(work, limits)?;
 
     let mut output = output_with_capacity(output_size, limits)?;
     for field in &base_fields {
@@ -1899,7 +1966,11 @@ pub fn patch_nested_fields_batched(
         });
     }
 
-    let trie = build_batch_edit_trie(edits, limits)?;
+    let (trie, trie_work) = build_batch_edit_trie(edits, limits)?;
+    let minimum_work = trie_work
+        .checked_add(data.len())
+        .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
+    ensure_rewrite_work(minimum_work, limits)?;
     let mut context = BatchPlanContext::new(limits);
     let root_plan = plan_batch_message(data, 0, data.len(), 0, 0, &trie, edits, &mut context)?;
     let root = context
@@ -1913,9 +1984,9 @@ pub fn patch_nested_fields_batched(
         .ok_or_else(|| Error::InvalidFormat("protobuf field-count overflow".to_owned()))?;
     ensure_field_count(output_fields, limits)?;
     let output_size = root.output_len;
-    let work = data
-        .len()
-        .checked_add(output_size)
+    let work = trie_work
+        .checked_add(data.len())
+        .and_then(|work| work.checked_add(output_size))
         .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
     ensure_rewrite_work(work, limits)?;
 
@@ -1928,7 +1999,7 @@ pub fn patch_nested_fields_batched(
 fn build_batch_edit_trie(
     edits: &[NestedFieldEdit<'_>],
     limits: WireLimits,
-) -> Result<Vec<BatchTrieNode>> {
+) -> Result<(Vec<BatchTrieNode>, usize)> {
     ensure_field_count(edits.len(), limits)?;
     let mut trie = Vec::new();
     trie.try_reserve(1)
@@ -1937,6 +2008,7 @@ fn build_batch_edit_trie(
             amount: 1,
         })?;
     trie.push(BatchTrieNode::new());
+    let mut work = 0usize;
 
     for (edit_index, edit) in edits.iter().enumerate() {
         if edit.path.is_empty() {
@@ -1947,6 +2019,10 @@ fn build_batch_edit_trie(
         ensure_nesting(edit.path.len() - 1, limits)?;
         let mut node_index = 0usize;
         for &field_number in edit.path {
+            work = work
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("protobuf rewrite-work overflow".to_owned()))?;
+            ensure_rewrite_work(work, limits)?;
             validate_field_number(field_number)?;
             if trie[node_index].edit.is_some() {
                 return Err(Error::InvalidFormat(
@@ -1975,6 +2051,12 @@ fn build_batch_edit_trie(
                     .children
                     .binary_search_by_key(&field_number, |&(number, _)| number)
                     .unwrap_or_else(|position| position);
+                work = work
+                    .checked_add(trie[node_index].children.len() - position)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("protobuf rewrite-work overflow".to_owned())
+                    })?;
+                ensure_rewrite_work(work, limits)?;
                 trie[node_index]
                     .children
                     .try_reserve(1)
@@ -2000,7 +2082,7 @@ fn build_batch_edit_trie(
         }
         trie[node_index].edit = Some(edit_index);
     }
-    Ok(trie)
+    Ok((trie, work))
 }
 
 #[allow(
@@ -4017,6 +4099,80 @@ mod tests {
     }
 
     #[test]
+    fn visiting_wire_fields_matches_the_collected_parse() {
+        let mut source = varint_field(1, 7);
+        source.extend(length_delimited_field(2, b"payload"));
+        source.extend(varint_field(1, 9));
+        let collected = parse_wire_fields(&source, WireLimits::DEFAULT).unwrap();
+        let mut visited = Vec::new();
+        visit_wire_fields(&source, WireLimits::DEFAULT, |field| {
+            visited.push(field);
+            Ok(())
+        })
+        .unwrap();
+        let shape = |fields: &[WireField]| {
+            fields
+                .iter()
+                .map(|field| {
+                    (
+                        field.number(),
+                        field.wire_type(),
+                        field.start(),
+                        field.key_end(),
+                        field.payload_start(),
+                        field.end(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(shape(&visited), shape(&collected));
+
+        // The same field ceiling and framing errors, in the same order.
+        let tight = WireLimits::default().with_fields(2).unwrap();
+        assert_eq!(
+            visit_wire_fields(&source, tight, |_| Ok(()))
+                .unwrap_err()
+                .to_string(),
+            parse_wire_fields(&source, tight).unwrap_err().to_string()
+        );
+        let mut truncated = source.clone();
+        truncated.extend([0x12, 0x05, b'x']);
+        assert_eq!(
+            visit_wire_fields(&truncated, WireLimits::DEFAULT, |_| Ok(()))
+                .unwrap_err()
+                .to_string(),
+            parse_wire_fields(&truncated, WireLimits::DEFAULT)
+                .unwrap_err()
+                .to_string()
+        );
+        let mut visits = 0;
+        assert!(
+            visit_wire_fields(&source, WireLimits::DEFAULT, |_| {
+                visits += 1;
+                Err(Error::InvalidFormat("stop".to_owned()))
+            })
+            .is_err()
+        );
+        assert_eq!(visits, 1);
+    }
+
+    #[test]
+    fn singular_wire_overlay_charges_source_and_output_bytes() {
+        let payload = vec![b'x'; 8_000_000];
+        let base = length_delimited_field(1, &payload);
+        assert!(base.len() * 2 > WireLimits::MAX_REWRITE_WORK);
+
+        assert!(matches!(
+            overlay_singular_wire_fields(&base, &[]),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed,
+                limit,
+            }) if observed == base.len() * 2 && limit == WireLimits::MAX_REWRITE_WORK
+        ));
+    }
+
+    #[test]
     fn scalar_patches_preserve_unknown_fields_and_restore_exact_bytes() {
         let mut original = varint_field(99, 9001);
         original.extend([0xaa, 0x01, 0x03, b'a', b'b', b'c']);
@@ -4346,7 +4502,8 @@ mod tests {
             NestedFieldReplacement::Varint(Some(300)),
         )];
         let expected = varint_field(1, 300);
-        let work = source.len() + expected.len();
+        let trie_work = replace.iter().map(|edit| edit.path().len()).sum::<usize>();
+        let work = trie_work + source.len() + expected.len();
         let exact = WireLimits::default()
             .with_input_bytes(source.len())
             .unwrap()
@@ -4417,6 +4574,28 @@ mod tests {
                 observed: 2,
                 limit: 1,
             })
+        ));
+    }
+
+    #[test]
+    fn batched_nested_rejects_quadratic_edit_trie_shifts_before_completion() {
+        const EDIT_COUNT: usize = 6_000;
+        let paths: Vec<[u32; 1]> = (1..=EDIT_COUNT as u32)
+            .rev()
+            .map(|number| [number])
+            .collect();
+        let edits: Vec<_> = paths
+            .iter()
+            .map(|path| NestedFieldEdit::new(path, false, NestedFieldReplacement::Varint(Some(1))))
+            .collect();
+
+        assert!(matches!(
+            patch_nested_fields_batched(&[], &edits, WireLimits::DEFAULT),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed,
+                limit,
+            }) if observed > limit && limit == WireLimits::MAX_REWRITE_WORK
         ));
     }
 

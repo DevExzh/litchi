@@ -2091,6 +2091,17 @@ pub const VERIFIED_ENTRY_READER_BUFFER_SIZE: usize = 16 * 1024;
 const FLATE2_DEFLATE_INPUT_BUFFER_SIZE: usize = 32 * 1024;
 const ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES: usize = 64 * 1024;
 
+/// Heap scratch envelope for the configured flate2 read decoder, excluding
+/// the caller's output buffer. Includes its input buffer and zlib-rs state.
+#[doc(hidden)]
+pub const DEFLATE_READ_SCRATCH_UPPER_BOUND_BYTES: usize =
+    FLATE2_DEFLATE_INPUT_BUFFER_SIZE + ZLIB_RS_INFLATE_STATE_UPPER_BOUND_BYTES;
+
+/// Allocation requests for the configured read decoder's input buffer and
+/// single zlib-rs state/window block, excluding the caller's output buffer.
+#[doc(hidden)]
+pub const DEFLATE_READ_SCRATCH_ALLOCATIONS: usize = 2;
+
 // Precompressed transfer captures are source reads rather than callback
 // decoder buffers. Keep their requests bounded to one 64 KiB range so a
 // short-read ReaderAt does not turn a large member into thousands of 16 KiB

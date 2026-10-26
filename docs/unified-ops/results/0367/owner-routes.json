@@ -1,0 +1,187 @@
+{
+ "schema": "litchi.0367.owner-routes.v1",
+ "trunk": "1e78bb87b6fb09c1643986804ac406db6eef3320",
+ "candidate": "f2e5e7898520fd6d0096ad27f99aaee9060a8d66",
+ "probe": {
+  "path": "docs/unified-ops/results/0361fd/owner_probe.rs",
+  "sha256": "caabaf3dd4590d95cfda0c1dec8373088a7087c423f79878ec1826cd0262d96d"
+ },
+ "build": "docs/unified-ops/results/0367/owner-build.sh",
+ "binaries": {
+  "trunk": "eba062bc3cf7e1d832b1f7275f33e77d822833458a56405fac227a0c1ed460aa",
+  "candidate": "efab113ed2a0fdd089377aa9e9c777d876c78b22e7bc4dbb339a2617bb2eb7aa"
+ },
+ "method": "callgrind and dhat at N=1 and N=5, per-op = (N5-N1)/4; peak = dhat bytes at t-gmax at N=1; binaries run as t/owner-probe and c/owner-probe (equal-length argv[0])",
+ "routes": {
+  "numbers_headers": {
+   "t": {
+    "ir_per_op": 18394551.25,
+    "bytes_per_op": 3381115.0,
+    "blocks_per_op": 19539.0,
+    "peak_bytes": 2292727,
+    "peak_bytes_n5": 2292727,
+    "output_bytes": 79384,
+    "output_digest": "b5ec27ca45761520"
+   },
+   "c": {
+    "ir_per_op": 18282280.25,
+    "bytes_per_op": 3378555.0,
+    "blocks_per_op": 19529.0,
+    "peak_bytes": 2292727,
+    "peak_bytes_n5": 2292727,
+    "output_bytes": 79384,
+    "output_digest": "b5ec27ca45761520"
+   },
+   "ir_ratio": 0.9938965078041793
+  },
+  "keynote_media": {
+   "t": {
+    "ir_per_op": 80458623.0,
+    "bytes_per_op": 6544004.0,
+    "blocks_per_op": 27202.0,
+    "peak_bytes": 5826644,
+    "peak_bytes_n5": 5826644,
+    "output_bytes": 692034,
+    "output_digest": "c05db7c7eae28b25"
+   },
+   "c": {
+    "ir_per_op": 80299327.0,
+    "bytes_per_op": 6541444.0,
+    "blocks_per_op": 27194.0,
+    "peak_bytes": 5826644,
+    "peak_bytes_n5": 5826644,
+    "output_bytes": 692034,
+    "output_digest": "c05db7c7eae28b25"
+   },
+   "ir_ratio": 0.9980201500589937
+  },
+  "pages_footnote_insert": {
+   "t": {
+    "ir_per_op": 1475286.75,
+    "bytes_per_op": 142869.0,
+    "blocks_per_op": 1654.0,
+    "peak_bytes": 31187,
+    "peak_bytes_n5": 31187,
+    "output_bytes": 1350,
+    "output_digest": "157d2a4a9d772ce0"
+   },
+   "c": {
+    "ir_per_op": 1457324.0,
+    "bytes_per_op": 142869.0,
+    "blocks_per_op": 1654.0,
+    "peak_bytes": 31187,
+    "peak_bytes_n5": 31187,
+    "output_bytes": 1350,
+    "output_digest": "157d2a4a9d772ce0"
+   },
+   "ir_ratio": 0.9878242314587317
+  },
+  "pages_section_name": {
+   "t": {
+    "ir_per_op": 18084948.25,
+    "bytes_per_op": 3359928.0,
+    "blocks_per_op": 19370.0,
+    "peak_bytes": 2192626,
+    "peak_bytes_n5": 2192626,
+    "output_bytes": 96472,
+    "output_digest": "d57c39300ed58fec"
+   },
+   "c": {
+    "ir_per_op": 17930929.25,
+    "bytes_per_op": 3360792.0,
+    "blocks_per_op": 19371.0,
+    "peak_bytes": 2192626,
+    "peak_bytes_n5": 2192626,
+    "output_bytes": 96472,
+    "output_digest": "d57c39300ed58fec"
+   },
+   "ir_ratio": 0.9914835808280513
+  }
+ },
+ "tolerant_abba": [
+  {
+   "route": "numbers_headers",
+   "count": 398,
+   "ratios": [
+    0.9933,
+    1.0017,
+    0.9908,
+    0.9979,
+    0.993
+   ],
+   "median": 0.9933,
+   "clean_blocks": 0,
+   "load_1min": [
+    "15.43",
+    "15.43",
+    "15.95",
+    "15.95",
+    "15.96"
+   ]
+  },
+  {
+   "route": "keynote_media",
+   "count": 124,
+   "ratios": [
+    1.0096,
+    1.0009,
+    1.0227,
+    1.0233,
+    1.0231
+   ],
+   "median": 1.0227,
+   "clean_blocks": 0,
+   "load_1min": [
+    "15.80",
+    "15.80",
+    "15.26",
+    "15.26",
+    "14.83"
+   ]
+  },
+  {
+   "route": "pages_footnote_insert",
+   "count": 5599,
+   "ratios": [
+    0.99,
+    0.995,
+    0.9928,
+    0.9802,
+    0.9918
+   ],
+   "median": 0.9918,
+   "clean_blocks": 0,
+   "load_1min": [
+    "15.09",
+    "15.56",
+    "15.56",
+    "15.84",
+    "15.84"
+   ]
+  },
+  {
+   "route": "pages_section_name",
+   "count": 433,
+   "ratios": [
+    0.9935,
+    0.9951,
+    0.9972,
+    0.9978,
+    0.9987
+   ],
+   "median": 0.9972,
+   "clean_blocks": 0,
+   "load_1min": [
+    "15.77",
+    "15.71",
+    "15.71",
+    "15.71",
+    "15.73"
+   ]
+  }
+ ],
+ "peak_attribution": {
+  "record": "0361fda",
+  "finding": "The 5-byte peak increases of 0361fd (keynote_media 5,909,141 -> 5,909,146; pages_footnote_insert 32,684 -> 32,689) are the probe argv[0] string held live in owner_probe::main: build-candidate/owner-probe is 27 bytes, build-base/owner-probe 22. The only differing t-gmax site in both routes is owner_probe::main (+5 B). Rerunning the same protected 0361fd binaries (851a090f..., 47579bd2...) as b/owner-probe and c/owner-probe gives equal peaks: 32,675 and 32,675; 5,909,132 and 5,909,132."
+ }
+}

@@ -2,9 +2,12 @@ use crate::error::{Error, LimitKind, Result};
 
 /// Hard and caller-selectable bounds for one decompressed IWA archive.
 ///
-/// The type is intentionally copyable and contains no allocation. Every
-/// parser entry point validates it before it reads a header or reserves a
-/// metadata collection.
+/// The type is intentionally copyable and contains no allocation. A value is
+/// valid by construction: its fields are private, and the only ways to obtain
+/// one are [`Default`] and the `with_*` methods, each of which returns the
+/// result of [`Limits::validate`]. Parser, constructor and serializer entry
+/// points therefore rely on that invariant instead of validating the profile
+/// again on every call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(
     clippy::struct_field_names,
@@ -49,6 +52,10 @@ impl Limits {
     pub const MAX_HEADER_MEMORY_BYTES: usize = 512 * 1024 * 1024;
     /// Hard ceiling for repeated metadata items in one object header.
     pub const MAX_METADATA_ITEMS: usize = 1_000_000;
+    /// Default nested-message depth budget for one header wire tree.
+    pub(crate) const DEFAULT_HEADER_NESTING: usize = 16;
+    /// Default decoded allocation budget for one header wire tree.
+    pub(crate) const DEFAULT_HEADER_MEMORY_BYTES: usize = 64 * 1024 * 1024;
 
     /// Tighten the aggregate archive-byte budget.
     ///
@@ -374,8 +381,8 @@ impl Default for Limits {
             max_message_bytes: Self::MAX_MESSAGE_BYTES,
             max_header_bytes: Self::MAX_HEADER_BYTES,
             max_header_fields: Self::MAX_HEADER_FIELDS,
-            max_header_nesting: 16,
-            max_header_memory_bytes: 64 * 1024 * 1024,
+            max_header_nesting: Self::DEFAULT_HEADER_NESTING,
+            max_header_memory_bytes: Self::DEFAULT_HEADER_MEMORY_BYTES,
             max_metadata_items: Self::MAX_METADATA_ITEMS,
         }
     }
