@@ -1200,8 +1200,22 @@ pub fn decode_drawable_archive_with_report(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(DrawableSnapshot<'_>, DecodeReport), DecodeError> {
-    let scan = scan_drawable(source, options)?;
-    Ok((scan.snapshot, scan.report(source.len())))
+    validate_input(source, options)?;
+    let mut budget = Budget::new();
+    let snapshot = stream_drawable(source, options, &mut budget)?;
+    let accounting = budget.accounting();
+    Ok((
+        snapshot,
+        DecodeReport {
+            input_bytes: source.len(),
+            fields: accounting.fields,
+            work_bytes: accounting.work_bytes,
+            max_depth: accounting.max_depth,
+            allocations: accounting.allocations,
+            retained_bytes: source.len(),
+            scratch_bytes: accounting.scratch_bytes,
+        },
+    ))
 }
 
 /// Prepare a source-preserving direct drawable rewrite.
@@ -1597,6 +1611,181 @@ fn scan_drawable<'source>(
     })
 }
 
+/// Record the single occurrence of a known field.
+fn once(
+    slot: &mut Option<ParsedField>,
+    field: ParsedField,
+    name: &'static str,
+) -> Result<(), DecodeError> {
+    if slot.replace(field).is_some() {
+        return Err(DecodeError::plain(name));
+    }
+    Ok(())
+}
+
+/// Allocation-free strict decode of a drawable (record 0368a).
+///
+/// Applies the same framing, canonical-encoding, duplicate, finiteness and
+/// UTF-8 rules as the rewrite scan, in one pass over the source and its
+/// selected nested messages, without retaining field tables or running the
+/// generated cross-check view the rewrite path uses.
+fn stream_drawable<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<DrawableSnapshot<'source>, DecodeError> {
+    let mut geometry_field = None;
+    let mut hyperlink_field = None;
+    let mut locked_field = None;
+    let mut aspect_field = None;
+    let mut accessibility_field = None;
+    stream_message(source, options, budget, 1, |field| match field.number {
+        GEOMETRY_FIELD => once(&mut geometry_field, field, "DrawableArchive.geometry"),
+        HYPERLINK_FIELD => once(&mut hyperlink_field, field, "DrawableArchive.hyperlink_url"),
+        LOCKED_FIELD => once(&mut locked_field, field, "DrawableArchive.locked"),
+        ASPECT_RATIO_LOCKED_FIELD => once(
+            &mut aspect_field,
+            field,
+            "DrawableArchive.aspect_ratio_locked",
+        ),
+        ACCESSIBILITY_DESCRIPTION_FIELD => once(
+            &mut accessibility_field,
+            field,
+            "DrawableArchive.accessibility_description",
+        ),
+        _ => Ok(()),
+    })?;
+    let geometry = geometry_field
+        .map(|field| {
+            require_wire(field, 2, "DrawableArchive.geometry")?;
+            stream_geometry(payload(source, field)?, options, budget, 2)
+        })
+        .transpose()?;
+    let flag = |field: Option<ParsedField>, name: &'static str| {
+        field
+            .map(|field| {
+                require_wire(field, 0, name)?;
+                canonical_bool(field)
+            })
+            .transpose()
+    };
+    let hyperlink_url = hyperlink_field
+        .map(|field| {
+            require_wire(field, 2, "DrawableArchive.hyperlink_url")?;
+            str::from_utf8(payload(source, field)?)
+                .map_err(|_| DecodeError::invalid_utf8("hyperlink_url"))
+        })
+        .transpose()?;
+    let locked = flag(locked_field, "DrawableArchive.locked")?;
+    let aspect_ratio_locked = flag(aspect_field, "DrawableArchive.aspect_ratio_locked")?;
+    let accessibility_description = accessibility_field
+        .map(|field| {
+            require_wire(field, 2, "DrawableArchive.accessibility_description")?;
+            str::from_utf8(payload(source, field)?)
+                .map_err(|_| DecodeError::invalid_utf8("accessibility_description"))
+        })
+        .transpose()?;
+    Ok(DrawableSnapshot {
+        geometry,
+        properties: DrawablePropertiesSnapshot {
+            hyperlink_url,
+            locked,
+            aspect_ratio_locked,
+            accessibility_description,
+        },
+    })
+}
+
+fn stream_geometry(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<GeometrySnapshot, DecodeError> {
+    let mut position_field = None;
+    let mut size_field = None;
+    let mut flags_field = None;
+    let mut angle_field = None;
+    stream_message(source, options, budget, depth, |field| match field.number {
+        POSITION_FIELD => once(&mut position_field, field, "Geometry.position"),
+        SIZE_FIELD => once(&mut size_field, field, "Geometry.size"),
+        FLAGS_FIELD => once(&mut flags_field, field, "Geometry.flags"),
+        ANGLE_FIELD => once(&mut angle_field, field, "Geometry.angle"),
+        _ => Ok(()),
+    })?;
+    let mut pair = |field: Option<ParsedField>, name: &'static str, point: bool| {
+        field
+            .map(|field| {
+                require_wire(field, 2, name)?;
+                stream_fixed_pair(payload(source, field)?, options, budget, depth + 1, point)
+            })
+            .transpose()
+    };
+    let position = pair(position_field, "Geometry.position", true)?;
+    let size = pair(size_field, "Geometry.size", false)?;
+    let flags = flags_field
+        .map(|field| {
+            require_wire(field, 0, "Geometry.flags")?;
+            canonical_u32(field, "Geometry.flags")
+        })
+        .transpose()?;
+    let angle = angle_field
+        .map(|field| {
+            require_wire(field, 5, "Geometry.angle")?;
+            let value = fixed32(source, field, "Geometry.angle")?;
+            if !value.is_finite() {
+                return Err(DecodeError::plain("Geometry.angle must be finite"));
+            }
+            Ok(value)
+        })
+        .transpose()?;
+    Ok(GeometrySnapshot {
+        position: position.map(|(x, y)| Point::new(x, y)),
+        size: size.map(|(width, height)| Size::new(width, height)),
+        flags,
+        angle,
+    })
+}
+
+fn stream_fixed_pair(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: u32,
+    point: bool,
+) -> Result<(f32, f32), DecodeError> {
+    let (first_name, second_name, name) = if point {
+        ("Point.x", "Point.y", "Point")
+    } else {
+        ("Size.width", "Size.height", "Size")
+    };
+    let mut first = None;
+    let mut second = None;
+    stream_message(source, options, budget, depth, |field| match field.number {
+        // POINT_X_FIELD == SIZE_WIDTH_FIELD, POINT_Y_FIELD == SIZE_HEIGHT_FIELD
+        POINT_X_FIELD => once(&mut first, field, first_name),
+        POINT_Y_FIELD => once(&mut second, field, second_name),
+        _ => Ok(()),
+    })?;
+    let first = first.ok_or_else(|| DecodeError::plain(first_name))?;
+    let second = second.ok_or_else(|| DecodeError::plain(second_name))?;
+    require_wire(first, 5, name)?;
+    require_wire(second, 5, name)?;
+    let first = fixed32(source, first, name)?;
+    let second = fixed32(source, second, name)?;
+    if !first.is_finite() || !second.is_finite() {
+        return Err(DecodeError::plain(if point {
+            "Point coordinates must be finite"
+        } else {
+            "Size dimensions must be finite"
+        }));
+    }
+    if !point && (first < 0.0 || second < 0.0) {
+        return Err(DecodeError::plain("Size dimensions must be non-negative"));
+    }
+    Ok((first, second))
+}
+
 fn parse_geometry(
     source: &[u8],
     options: DecodeOptions,
@@ -1908,10 +2097,31 @@ fn parse_message(
     budget: &mut Budget,
     depth: u32,
 ) -> Result<Vec<ParsedField>, DecodeError> {
-    budget.depth(depth, options)?;
-    budget.message(source.len(), options)?;
     let capacity = source.len().min(options.max_fields);
     let mut fields = budget.reserve_fields(capacity, options)?;
+    stream_message(source, options, budget, depth, |field| {
+        fields.push(field);
+        Ok(())
+    })?;
+    Ok(fields)
+}
+
+/// Strictly scan one message's fields in wire order without retaining them.
+///
+/// Every field is framed, bounds-checked and charged to `budget` exactly as
+/// [`parse_message`] does; `visit` sees each top-level field once.
+fn stream_message<F>(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: u32,
+    mut visit: F,
+) -> Result<(), DecodeError>
+where
+    F: FnMut(ParsedField) -> Result<(), DecodeError>,
+{
+    budget.depth(depth, options)?;
+    budget.message(source.len(), options)?;
     let mut cursor = 0usize;
     while cursor < source.len() {
         let start = cursor;
@@ -1980,7 +2190,7 @@ fn parse_message(
         };
         cursor = value_end;
         budget.field(cursor.saturating_sub(start), options)?;
-        fields.push(ParsedField {
+        visit(ParsedField {
             number,
             wire,
             key_canonical,
@@ -1991,9 +2201,9 @@ fn parse_message(
             varint,
             varint_canonical,
             length_canonical,
-        });
+        })?;
     }
-    Ok(fields)
+    Ok(())
 }
 
 fn skip_group(
@@ -2060,7 +2270,14 @@ fn skip_group(
     }
 }
 
+#[inline]
 fn read_varint(source: &[u8], start: usize) -> Result<(u64, usize, bool), DecodeError> {
+    // One-byte varints (most keys, lengths and flags) are always canonical.
+    if let Some(&byte) = source.get(start)
+        && byte < 0x80
+    {
+        return Ok((u64::from(byte), start + 1, true));
+    }
     let mut value = 0u64;
     let mut shift = 0u32;
     let mut cursor = start;
@@ -3163,8 +3380,10 @@ mod tests {
         );
         assert_eq!(report.input_bytes(), source.len());
         assert!(report.fields() >= 12);
-        assert!(report.allocations() >= BUFFA_LOGICAL_ALLOCATIONS_PER_TRAVERSAL * 2);
-        assert!(report.scratch_bytes() > 0);
+        // The read path is allocation-free (record 0368a); the rewrite path
+        // keeps its field tables and generated cross-check.
+        assert_eq!(report.allocations(), 0);
+        assert_eq!(report.scratch_bytes(), 0);
         assert!(report.work_bytes() > source.len());
     }
 
@@ -3364,8 +3583,16 @@ mod tests {
     fn buffa_traversal_limits_are_charged_before_projection() {
         let source = drawable_fixture();
         let constrained = options(&source).with_max_allocations(8);
-        let error = decode_drawable_archive(&source, constrained)
-            .expect_err("the final Buffa traversal should be precharged");
+        // The read path allocates nothing (record 0368a); the rewrite scan
+        // still precharges its generated cross-check traversals.
+        decode_drawable_archive(&source, constrained).expect("allocation-free read");
+        let error = prepare_drawable_archive_rewrite(
+            &source,
+            GeometryWrite::preserve(),
+            DrawablePropertiesWrite::preserve(),
+            constrained,
+        )
+        .expect_err("the final Buffa traversal should be precharged");
         assert!(matches!(
             error.resource_limit(),
             Some(DecodeLimit::Allocations { .. })

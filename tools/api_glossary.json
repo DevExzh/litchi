@@ -21434,6 +21434,12 @@
       "banned_names": [],
       "required_signatures": [
         {
+          "method": "litchi_numbers_wire::formula_graph::next_owner_id",
+          "inputs": ["engine", "owners", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_graph::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::formula_graph::remap_owner",
           "inputs": ["source", "remap", "limits"],
           "limits_argument": "limits",
@@ -28376,6 +28382,16 @@
       "default_features": true,
       "features": [],
       "banned_names": [
+        {
+          "name": "encode_checked",
+          "scope": "litchi_iwa_protos::theme_codec",
+          "replacement": "ThemeReferenceSnapshot::encode returns Result; the panicking twin is deleted (record 0368a)"
+        },
+        {
+          "name": "encode_checked",
+          "scope": "litchi_iwa_protos::keynote_theme_codec",
+          "replacement": "ThemeReferenceSnapshot::encode returns Result; the panicking twin is deleted (record 0368a)"
+        },
         {
           "name": "decode_shape_properties",
           "scope": "litchi_iwa_protos::shape_properties_codec",

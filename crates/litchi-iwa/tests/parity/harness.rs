@@ -205,6 +205,7 @@ impl<'a> Case<'a> {
     /// deleted all three root previews; Keynote regenerated them on
     /// resave"); every other member and object is still compared.
     #[must_use]
+    #[allow(dead_code, reason = "used by the W1 cases that are landing next")]
     pub fn leaf_invalidates_root_previews(mut self) -> Self {
         self.leaf_drops = &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
         self
@@ -216,6 +217,7 @@ impl<'a> Case<'a> {
     /// Both are checked for their documented shape and then compared as
     /// equal; see [`MetadataPolicy`].
     #[must_use]
+    #[allow(dead_code, reason = "used by the W1 cases that are landing next")]
     pub fn leaf_structural_metadata(mut self) -> Self {
         self.metadata = MetadataPolicy {
             save_token: true,

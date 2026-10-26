@@ -589,14 +589,12 @@ impl ThemeReferenceSnapshot {
     }
 
     /// Encode this reference as canonical nested protobuf bytes.
-    #[must_use]
-    pub fn encode(self) -> Vec<u8> {
-        self.encode_checked()
-            .expect("ThemeReferenceSnapshot::encode requires a non-zero identifier")
-    }
-
-    /// Fallibly encode this reference after validating native identity.
-    pub fn encode_checked(self) -> Result<Vec<u8>, DecodeError> {
+    ///
+    /// # Errors
+    ///
+    /// A typed invalid-source [`DecodeError`] when the identifier is zero
+    /// (record 0368a: no panicking twin).
+    pub fn encode(self) -> Result<Vec<u8>, DecodeError> {
         if self.identifier == 0 {
             return Err(DecodeError::invalid(
                 "TSP.Reference.identifier must be non-zero",
@@ -3725,5 +3723,11 @@ mod tests {
             Some(16)
         );
         Ok(())
+    }
+
+    #[test]
+    fn zero_reference_identifier_is_a_typed_error() {
+        assert!(ThemeReferenceSnapshot::new(0).encode().is_err());
+        assert!(!ThemeReferenceSnapshot::new(7).encode().unwrap().is_empty());
     }
 }
