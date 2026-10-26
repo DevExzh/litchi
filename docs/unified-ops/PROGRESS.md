@@ -6232,3 +6232,9 @@ See [0063](0063-source-pptx-modern-comments.md).
   Root corrects the new receipt verifier's rejection of valid zero-periodic-
   sample rows while preserving initial-size and error checks. All prior
   packets and review receipts remain preserved; qualification stays open.
+
+  The corrected receipt verifier passes independent review. The facade suite
+  then finishes all 79 chunks: root verifies every chunk log and 34 completed
+  top-level gate checks. Facade logs report 209 passing tests, including 19
+  library tests and 20 doctests. The same gate proceeds to core tests; no
+  full65 or native acceptance is claimed.

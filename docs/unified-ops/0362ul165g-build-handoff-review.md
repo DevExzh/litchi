@@ -58,6 +58,14 @@ the live service; terminal mode refuses incomplete coverage without creating
 output. The narrow correction passes review and leaves source/plan/state
 unchanged. No terminal gate acceptance is inferred.
 
+The facade suite subsequently finishes. Root runs the reviewed successor
+against the new row snapshot and verifies 34 completed top-level checks.
+All 79 facade chunk logs are rehashed against their producing records; their
+command sequence, successful exits and resource checks pass. The logs report
+209 passing tests in total, including 19 library tests and 20 doctests. The
+same gate continues to core tests; the remaining checks, including isolated
+workspace rustdoc, have no terminal acceptance yet.
+
 Run the verifier with a fresh external output directory; omit
 `--allow-partial` for terminal verification. Its fixed inputs are the exact
 C2a gate artifacts, not a generic or rebindable acceptance policy. The v2
@@ -100,6 +108,8 @@ Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
 | `final-gate-C2a-root-verifier-20261026-v2/verify.py` | 9,037 | `29a6831801de026e994fe7b56156dc326a4004a3f8b23e66be122f1b605ab0a7` |
 | `final-gate-C2a-root-verifier-20261026-v2/guard-controls.json` | 2,039 | `851d7b6365b7b846f71f1ee2086d99b2ab81a74897d1055763c158b035c08801` |
 | `final-gate-C2a-root-verifier-20261026-v2-independent-review-20261026/review-receipt.json` | 4,762 | `a9c2c2b988597ef7db946e2cadb24c5e87a4caeefff58ad124854918c3906d0c` |
+| `final-gate-C2a-root-verifier-20261026-v2/partial-2-facade-complete/verification.json` | 25,908 | `ae9d25c5c431c46d00cb4b522b5f3ac8e057a558d440d3b96af7ccfc6e1d4b00` |
+| `final-gate-C2a-root-verifier-20261026-v2/facade-79-chunks-verified.json` | 56,814 | `18e28b1e1842f665e4f00eb3046665876ac153752ed836e943bdfed416eb31c7` |
 | `odf-flat-parts-C2a-prep-20261026-v1-independent-review-20261026/review-receipt.json` | 8,482 | `20c6888e7546ed7c95c89887b2344103280290ef8493c9bf864f47e53b2bbaad` |
 | `w6-odt-ods-C2a-prep-20261026-v1-independent-review-20261026/review-receipt.json` | 11,542 | `76747562bb685631e432fd03fd7d2f9344b51bd57568710e23afcb57f83cd704` |
 
