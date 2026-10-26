@@ -21,7 +21,7 @@ use litchi_iwa_protos::chart_style_codec::{
     self as codec, Archive, Limits, Write,
     property::{self, PropertyWrite},
 };
-use litchi_keynote::drawing_native as plumbing;
+use litchi_iwa_style::drawing as plumbing;
 
 use crate::chart_style_cases::{Components, Target, input, publish};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};

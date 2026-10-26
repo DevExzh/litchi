@@ -8797,10 +8797,10 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertEqual(
             len(all_policy_edges), len(registered_edges) + len(registered_debt)
         )
-        self.assertEqual(len(self.policy.migration_debt), 11)
+        self.assertEqual(len(self.policy.migration_debt), 12)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
-            [1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17],
+            [1, 2, 4, 8, 10, 11, 12, 13, 14, 15, 16, 17],
         )
         self.assertNotIn(host_edge, all_policy_edges)
         self.assertIn(archive_edge, self.policy.canonical_edges)
