@@ -268,3 +268,6 @@ and the artifact SHA-256.
 | W2-A | Numbers | `litchi_numbers::Package::sheet_text_box_list_level` | see `sheet_text_box_list` | as above | pending | - |
 | W2-A | Numbers | `litchi_numbers::Package::sheet_text_box_list_numbering` | see `sheet_text_box_list` | as above | pending | - |
 | W2-A | Numbers | `litchi_numbers::Package::sheet_text_box_list_property` | see `sheet_text_box_list` | as above | pending | - |
+| W2-A | Numbers | `litchi_numbers::sheet::drawable::drop_cap::Edit::set` | no host native evidence; tier B (numbers_sheet_text_box_drop_cap_set_parity): a derived Drop Cap variation gets a deterministic UUID; the in-place rewrite is byte-identical | `chart-grid-authored-native.numbers` + host two-paragraph text box: Drop Caps on both paragraphs, then a second value | pending | - |
+| W2-A | Numbers | `litchi_numbers::sheet::drawable::drop_cap::Edit::remove` | no host native evidence; tier B (numbers_sheet_text_box_drop_cap_remove_parity) | as above after a host set on the first paragraph | pending | - |
+| W2-A | Numbers | `litchi_numbers::Package::sheet_drawable_drop_caps` | no host native evidence; tier A (numbers_sheet_text_box_drop_cap_read_parity) | as above | pending | - |

@@ -466,3 +466,199 @@ fn numbers_sheet_text_box_language_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- Drop Caps -------------------------------------------------------------
+
+use litchi_numbers::sheet::drawable::drop_cap::{
+    CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+};
+
+/// `chart-grid-authored-native.numbers` (its theme has a Drop Cap base) with
+/// one host text box of two paragraphs.
+fn drop_cap_fixture() -> TestResult<Fixture> {
+    let mut editor = numbers::Draft::from_bytes(
+        &crate::harness::fixture("iwork/numbers/chart-grid-authored-native.numbers")?.bytes,
+    )?;
+    let sheet = editor.sheets()?.first().ok_or("no sheet")?.id();
+    editor.add_sheet_text_box(
+        sheet,
+        "First paragraph\nSecond paragraph",
+        litchi_iwa::shapes::DrawablePoint { x: 300.0, y: 200.0 },
+        litchi_iwa::shapes::DrawableSize {
+            width: 220.0,
+            height: 90.0,
+        },
+    )?;
+    Ok(Fixture {
+        path: "chart-grid-authored-native.numbers + add_sheet_text_box",
+        bytes: editor.to_bytes()?,
+    })
+}
+
+fn drop_cap_samples() -> TestResult<[DropCap; 2]> {
+    Ok([
+        DropCap::new(LineCount::new(3)?, CharacterCount::new(1)?),
+        DropCap::new(LineCount::new(4)?, CharacterCount::new(2)?)
+            .with_raised_lines(RaisedLines::new(1)?)
+            .with_wrap(Wrap::Contour)
+            .with_padding(Padding::from_points(6.0)?)
+            .with_outdent(Outdent::from_ratio(0.25)?),
+    ])
+}
+
+fn host_drop_caps(bytes: &[u8]) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    Ok(format!(
+        "{:?}",
+        e.sheet_text_box_paragraph_drop_caps(s, d)?
+            .into_iter()
+            .map(|placement| (placement.paragraph, placement.drop_cap))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_drop_caps(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:?}",
+        Package::from_bytes(bytes)?.sheet_drawable_drop_caps(0, DrawableSelector::text_box(0))?
+    ))
+}
+
+fn host_drop_cap(
+    source: &[u8],
+    paragraph: TextPosition,
+    value: Option<DropCap>,
+) -> TestResult<Vec<u8>> {
+    let mut e = numbers::Draft::from_bytes(source)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    match value {
+        Some(value) => e.set_sheet_text_box_paragraph_drop_cap(s, d, paragraph, value)?,
+        None => drop(e.remove_sheet_text_box_paragraph_drop_cap(s, d, paragraph)?),
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn drop_cap_case(
+    name: &'static str,
+    tier: Tier,
+    input: &Fixture,
+    paragraph: TextPosition,
+    value: Option<DropCap>,
+) -> TestResult {
+    let mut case = Case::new(name, Format::Numbers, tier, Evidence::Queued, input)
+        .host(|source| host_drop_cap(source, paragraph, value))
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_drop_caps(0, DrawableSelector::text_box(0))?;
+            match value {
+                Some(value) => {
+                    edit.set(paragraph, value)?;
+                },
+                None => {
+                    edit.remove(paragraph)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_drop_caps(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host drop caps", host_drop_caps)
+        .read("leaf drop caps", leaf_drop_caps)
+        .known_fields(|known| {
+            known.with(
+                10_024,
+                "TSWP.DropCapStyleArchive",
+                decode_as::<tswp::DropCapStyleArchive>,
+            )
+        });
+    if tier == Tier::B {
+        case = case.leaf_structural_metadata();
+    }
+    case.run()?;
+    Ok(())
+}
+
+fn second_paragraph() -> TestResult<TextPosition> {
+    Ok(TextPosition::from_utf16_index(
+        "First paragraph\n".encode_utf16().count(),
+    )?)
+}
+
+#[test]
+fn numbers_sheet_text_box_drop_cap_set_parity() -> TestResult {
+    let input = drop_cap_fixture()?;
+    let [first, second] = drop_cap_samples()?;
+    for paragraph in [TextPosition::ZERO, second_paragraph()?] {
+        drop_cap_case(
+            "numbers_sheet_text_box_drop_cap_set_parity",
+            Tier::B,
+            &input,
+            paragraph,
+            Some(first),
+        )?;
+    }
+    // A second value on the paragraph's own variation rewrites it in place.
+    let set = Fixture {
+        path: input.path,
+        bytes: host_drop_cap(&input.bytes, TextPosition::ZERO, Some(first))?,
+    };
+    drop_cap_case(
+        "numbers_sheet_text_box_drop_cap_set_parity",
+        Tier::B,
+        &set,
+        TextPosition::ZERO,
+        Some(second),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_drop_cap_remove_parity() -> TestResult {
+    let input = drop_cap_fixture()?;
+    let [first, _] = drop_cap_samples()?;
+    let set = Fixture {
+        path: input.path,
+        bytes: host_drop_cap(&input.bytes, TextPosition::ZERO, Some(first))?,
+    };
+    drop_cap_case(
+        "numbers_sheet_text_box_drop_cap_remove_parity",
+        Tier::B,
+        &set,
+        TextPosition::ZERO,
+        None,
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_drop_cap_read_parity() -> TestResult {
+    let input = drop_cap_fixture()?;
+    let [first, _] = drop_cap_samples()?;
+    let set = host_drop_cap(&input.bytes, second_paragraph()?, Some(first))?;
+    for bytes in [input.bytes.clone(), set] {
+        assert_eq!(host_drop_caps(&bytes)?, leaf_drop_caps(&bytes)?);
+        let e = numbers::Draft::from_bytes(&bytes)?;
+        let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+        let leaf = Package::from_bytes(&bytes)?
+            .sheet_drawable_drop_caps(0, DrawableSelector::text_box(0))?;
+        for paragraph in [TextPosition::ZERO, second_paragraph()?] {
+            assert_eq!(
+                e.sheet_text_box_paragraph_drop_cap(s, d, paragraph)?,
+                leaf.iter()
+                    .find(|(at, _)| *at == paragraph)
+                    .map(|(_, cap)| *cap)
+            );
+        }
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

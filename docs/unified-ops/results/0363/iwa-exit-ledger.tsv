@@ -912,7 +912,7 @@ numbers/editor/semantic/text_box.rs	remove_sheet_text_box_comment	1	numbers	text
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_comment_reply	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_highlight	1	numbers	text.highlight	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_hyperlink	1	numbers	text.hyperlink	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/text_box.rs	remove_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	remove_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	migrated	litchi_numbers::sheet::drawable::drop_cap::Edit::remove	numbers_sheet_text_box_drop_cap_remove_parity	B	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_text_language_boundary	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::remove_boundary	numbers_sheet_text_box_language_remove_parity	A	-	-
 numbers/editor/semantic/text_box.rs	replace_sheet_text_box_text	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::replace	numbers_sheet_text_box_text_replace_parity	A	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_columns	1	numbers	drawable.text_box_properties	host-only	litchi-numbers	-	-	-	-
@@ -957,7 +957,7 @@ numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_background	1	nu
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_borders	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_decimal_tab_character	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_default_tab_interval	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
-numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	migrated	litchi_numbers::sheet::drawable::drop_cap::Edit::set	numbers_sheet_text_box_drop_cap_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_flow	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_indents	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_line_spacing	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
@@ -1001,8 +1001,8 @@ numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_background	1	number
 numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_borders	1	numbers	text.paragraph	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_decimal_tab_character	1	numbers	text.paragraph	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_default_tab_interval	1	numbers	text.paragraph	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
-numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_drop_caps	1	numbers	text.drop_cap	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	migrated	litchi_numbers::Package::sheet_drawable_drop_caps	numbers_sheet_text_box_drop_cap_read_parity	A	-	-
+numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_drop_caps	1	numbers	text.drop_cap	migrated	litchi_numbers::Package::sheet_drawable_drop_caps	numbers_sheet_text_box_drop_cap_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_flow	1	numbers	text.paragraph	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_indents	1	numbers	text.paragraph	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_paragraph_line_spacing	1	numbers	text.paragraph	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
