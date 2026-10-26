@@ -6390,3 +6390,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   worktrees/443 refs. The historical 28 preparation groups are source-ready;
   the newly required DOCX metadata group is under review. All 29 groups,
   final rebinding and final all-65 remain required. Nothing is pushed.
+
+  The remaining twenty checks are prepared at current 7c and launched as a
+  fresh diagnostic (165s). Review catches an executing-runner mismatch before
+  launch; v3 fixes it, passes independent review and starts under the serial
+  20 GiB/no-swap guard. No older rows are reused. DOCX native review confirms
+  the existing ADR0015 core-canonicalization contract and returns evidence
+  integrity defects. The bdb634 successor also fixes completed-output
+  validator mutation, passes independent review and 59 source tests. Four
+  historical and candidate probe builds are source-ready and queued after
+  the diagnostic. Python bindings build successfully and pass 300/301 tests;
+  an empty signed-file edit expectation is under contract review. The
+  diagnostic continues to the feature matrix.
+  Root retires the completed Q472a worktree/ref after preserving its lock,
+  reaching cumulative cleanup of 283 worktrees/445 refs. There are 76 heads
+  and 65 worktrees; all 70 excluded refs remain unchanged. The DOCX native
+  leaf is the only active unmerged unified branch. All 29 native groups,
+  actual final-candidate rebinding and final all-65 remain required.
+  Nothing is pushed.
