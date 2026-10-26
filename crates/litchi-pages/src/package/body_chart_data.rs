@@ -537,11 +537,11 @@ impl Package {
             .candidate_reopen(target_len)
             .map_err(map_arrangement_error)?;
         let target_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-        let catalog = litchi_iwa_archive::SourceCatalog::from_shared_bytes(
-            target_bytes,
-            self.state.source.limits(),
-        )
-        .map_err(|_| Error::Verification)?;
+        let catalog = self
+            .state
+            .source
+            .reopen(target_bytes)
+            .map_err(|_| Error::Verification)?;
         let candidate = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
         let verified = body_chart_arrangement::resolve_target(
             &candidate,

@@ -188,7 +188,8 @@ pub(super) fn rewrite(
     )?;
     budget.charge_transaction_work(target_reopen.work)?;
     budget.charge_references(target_reopen.references)?;
-    let candidate = Package::from_shared_profile(output.into(), source.state.options)
+    let candidate = source
+        .reopen_candidate(output.into())
         .map_err(map_candidate_read_error)?;
     let candidate_target = resolve_native_target(&candidate, budget)?;
     if candidate_target.prepared() != target.prepared()

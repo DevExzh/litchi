@@ -618,7 +618,13 @@ stylesheet_without_variation}` take a required `WireLimits` and are pinned
 as `required_signatures`. An engine owns payloads only; a set/reset run of
 one host property is one `paragraph_style::Change::{Set(Property),
 Reset(PropertyKind)}`, and its `Plan` (`Rewrite`, `Derive`, `Collapse`) is
-published by the format package's own family.
+published by the format package's own family. Named paragraph styles
+(`paragraph_style::named`: `catalog`, `applied`, `plan_apply`,
+`named_copy`, `renamed`, `redefine` and the stylesheet and theme
+rewrites) and highlights and text comments (`annotation`: `annotations`,
+`annotation`, `graph` and the highlight and comment-storage codecs) follow
+the same rule; a refused catalog request is
+`paragraph_style::Error::Refused(Refusal)`.
 
 `families` lists fully qualified public module paths that have completed the
 shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,
@@ -2790,6 +2796,7 @@ Both profiles now register 30 families.
 | --- | --- | --- |
 | `litchi_iwa_text_wire::{CharacterProperties, CharStyleRun, CharStyleError, char_style_runs, styles_in_span, restyle_span, character_style_variation, character_style_properties, character_style_parent, stylesheet_with_style}` | Shared TSWP `table_char_style` runs and the character-style variation records a span restyle writes | ✅ 0309 |
 | `litchi_numbers::cell::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, CharacterProperties}` | Registered family (32nd) in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text_style, apply_table_cell_text_style, table_cell_text_style}`; `Edit::set(At, CharacterProperties)` on stored cells | ✅ 0309 |
+| `litchi_numbers::cell::text::{Edit, Patch, Commit, Diagnostics, Error, Refusal, LimitKind, Property, PropertyKind}` | Registered family in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text, apply_table_cell_text, table_cell_text}`; `Edit::set(At, Property)` and `Edit::reset(At, PropertyKind)`: one property verb over the shared paragraph-style engine (`litchi_iwa_text_wire::paragraph_style`) replacing the host's per-property `set_table_cell_*`/`reset_table_cell_*`/`table_cell_*` methods | ✅ 0370 |
 | `litchi_numbers_wire::{Limits, LimitKind}` and `litchi_numbers_wire::{BncCell, BncCellView, cell_value::decode_cell_value, pre_bnc::PreBncCellView}` | Every raw parse, projection and owned encode takes the caller-selected `&Limits`; unknown wire fields and opaque tails remain source-authoritative | ✅ 0362ul66 |
 | `litchi_numbers_wire::table_write::{tile_cell, tile_set_cell, header_adjust, list_intern, list_release, cell_bytes, cell_formula_state, table_formula_state, CellInput, FormulaState, TileCellWrite, WriteError}` | Shared TST cell writer for Pages and Keynote tables; each variable-size reader/writer takes `&Limits`, preflights input/output/items, and uses fallible staging | ✅ 0309, 0362ul66 |
 | `litchi_pages::table::values::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Value}` | Registered family in `pages`; `Package::{edit_body_table_values, apply_body_table_values}`; `Edit::set(row, column, Value)` | ✅ 0309 |
@@ -2833,6 +2840,23 @@ not an alias (no second name exists).
 | `litchi_iwa_protos::{theme_codec, keynote_theme_codec, theme_presets_codec, shape_properties_codec, keynote_shape_creation_codec, number_attachment_codec}` | Bounded Buffa codecs ported from the donors; each entry point takes its `DecodeOptions`/`EncodeOptions`; no limit-less twin | ✅ 0368 |
 | `shape_properties_codec::{decode_shape_properties, rewrite_shape_properties}` | banned donor aliases: use `decode_drawable_archive`, `rewrite_drawable_archive` (never ported) | ✅ 0368 |
 | `{theme_codec, keynote_theme_codec}::ThemeReferenceSnapshot::encode -> Result<Vec<u8>, DecodeError>` | a zero identifier is a typed error; the panicking `encode`/`encode_checked` pair is replaced, `encode_checked` banned | ✅ 0368a |
+
+## Pages body media, shapes and text out of the host (record 0371)
+
+Wave W1-B of record 0363 moves the host's Pages body editors into
+`litchi-pages` families. Host runs of `x()`/`set_x()`/`flip_x()`/`restore_x()`
+collapse into one family with property verbs; selectors carry kind and
+text-flow position, never a native identifier.
+
+| Name | Meaning | Status |
+|---|---|---|
+| `litchi_pages::DrawableSelector::{Image, Movie, Audio, Shape}` (`image`, `movie`, `audio`, `shape`, `position`; also `litchi_pages::drawable::DrawableSelector`) | One body image, movie, audio clip or ordinary shape by kind and zero-based text-flow position among that kind (audio = audio-only movie; live video is neither; text boxes are not shapes) — the 0363 §3.2 Pages drawable selector | ✅ 0371 |
+| `litchi_pages::drawable::{Geometry, GeometryFlags, Properties, Point, Size, FlipAxis, MediaPlaybackSettings, MediaLoopMode, MediaVolume}` | Archive-free drawable frame (optional position, size, layout flags, angle; `Geometry::flipped`), the reflection-bearing flag set, the four shared drawable properties (hyperlink, locked, aspect-ratio locked, accessibility description) and the shared playback values | ✅ 0371 |
+| `litchi_pages::drawable::properties::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Snapshot}` | Registered family in `pages`; `Package::{body_drawable_properties, edit_body_drawable_properties, apply_body_drawable_properties}`; `Edit::{set_geometry, set_position, flip, restore_original_size, set_properties, set_playback}` replace the host's 25 image/movie/audio/shape geometry, flip, Original Size, property, position and playback methods; a verb that does not apply to the kind is `Refusal::UnsupportedOperation` | ✅ 0371 |
+| `litchi_pages::drawable::text::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered family in `pages`; `Package::{body_drawable_text, edit_body_drawable_text, apply_body_drawable_text}` over a `DrawableSelector` (ordinary shapes; other kinds `Refusal::NoText`); `Edit::{replace, insert, delete, set, clear}`, one splice per edit; a splice removing a referenced object is `Refusal::DependentContent` | ✅ 0371 |
+| `litchi_pages::bookmark::{Bookmark, Selector, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextRange, Name, Settings, Visibility}` | Registered family in `pages`; `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add(TextRange, Settings), update(selector, TextRange, Settings), remove(selector)}`, one operation per edit; `Selector::{Position, Name}`; `Bookmark::{range, settings}` carries no native identifier | ✅ 0371 |
+| `litchi_pages::date_time::{Field, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextRange, DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan}` | Registered family in `pages`; `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add(TextRange, Settings), insert(TextPosition, DisplayText, Settings), update(position, TextRange, Settings), remove(position)}`, one operation per edit; `Field::{range, settings}` | ✅ 0371 |
+| `litchi_pages::number_attachment::{Attachment, Target, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextNumberAttachmentSettings, TextNumberAttachmentKind, TextNumberAttachmentFormat, TextNumberAttachmentText}` | Registered family in `pages`; `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert(TextPosition, settings), update(position, settings), remove(position)}`; `Attachment::{position, settings}` carries no native identifier (the host's `TextNumberAttachmentId` stays out) | ✅ 0371 |
 
 ## iWork facade retirement and iWork open options (record 0306)
 

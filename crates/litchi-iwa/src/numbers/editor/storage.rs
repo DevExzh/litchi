@@ -4073,7 +4073,19 @@ pub(super) fn update_row_header(
             .iter()
             .position(|header| header.index == row_u32)
         {
-            Some(position) if cell_count == 0 => {
+            // Host defect fixed with record 0370: a row header left counting
+            // no cell went even when it held the row's height, hiding state
+            // or styles. Only a bare header goes now, as the shared leaf
+            // writer's `header_adjust` drops it.
+            Some(position)
+                if cell_count == 0 && {
+                    let header = &bucket.headers[position];
+                    header.size == 0.0
+                        && header.hiding_state == 0
+                        && header.cell_style.is_none()
+                        && header.text_style.is_none()
+                } =>
+            {
                 bucket.headers.remove(position);
             },
             Some(position) => bucket.headers[position].number_of_cells = cell_count,

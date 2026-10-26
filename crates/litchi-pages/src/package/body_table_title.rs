@@ -8,7 +8,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits,
     wire::{NestedFieldEdit, NestedFieldReplacement, patch_nested_fields_batched},
@@ -737,9 +737,11 @@ fn rewrite_title(
     budget
         .charge_payload_work(output.len())
         .map_err(map_lock_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = source
+        .state
+        .source
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&candidate_source)
         .map_err(map_lock_error)?;
@@ -899,7 +901,10 @@ fn require_style_object(
 }
 
 fn reopen_target(source: &Package, target: Arc<[u8]>) -> Result<Package, Error> {
-    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
         .map_err(map_archive_error)?;
     Package::from_source_catalog(catalog).map_err(map_package_error)
 }

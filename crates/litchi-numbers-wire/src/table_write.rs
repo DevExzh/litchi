@@ -592,6 +592,11 @@ pub fn tile_set_cell(
         };
         cells[column] = cell;
         let count = cells.iter().filter(|cell| cell.is_some()).count() as u64;
+        if count == 0 {
+            // A row left without cells goes, as the host writer drops it
+            // (record 0370; native tiles store no empty rows).
+            return Ok(None);
+        }
         let (storage, offsets) = encode(&cells, unit, limits)?;
         Ok(Some(rebuild(row, limits, |field| match field.number {
             2 => {
@@ -641,6 +646,7 @@ pub fn tile_set_cell(
     let exists = rows.contains(&u64::from(local_row));
     let mut row_index = 0_usize;
     let mut inserted = false;
+    let mut removed = false;
     let mut output = Vec::new();
     reserve(&mut output, tile.len().min(limits.max_output_bytes()))?;
     for field in fields(tile, limits)? {
@@ -656,8 +662,10 @@ pub fn tile_set_cell(
             }
             if single_varint(field.payload, 1, limits)? == Some(u64::from(local_row)) {
                 found = true;
-                let row = rewritten_row(field.payload)?.ok_or(WriteError::Invalid)?;
-                bytes_field(&mut output, 5, &row, limits)?;
+                match rewritten_row(field.payload)? {
+                    Some(row) => bytes_field(&mut output, 5, &row, limits)?,
+                    None => removed = true,
+                }
                 continue;
             }
         }
@@ -671,15 +679,24 @@ pub fn tile_set_cell(
         }
     }
     let _ = found;
-    if inserted {
+    if inserted || removed {
         let new_numrows = if counts_rows {
-            numrows.checked_add(1).ok_or(WriteError::Invalid)?
-        } else {
+            if inserted {
+                numrows.checked_add(1).ok_or(WriteError::Invalid)?
+            } else {
+                numrows.checked_sub(1).ok_or(WriteError::Invalid)?
+            }
+        } else if inserted {
             numrows.max(
                 u64::from(local_row)
                     .checked_add(1)
                     .ok_or(WriteError::Invalid)?,
             )
+        } else {
+            rows.iter()
+                .filter(|row| **row != u64::from(local_row))
+                .max()
+                .map_or(0, |row| row + 1)
         };
         output = rebuild(&output, limits, |field| {
             if field.number != 4 {
@@ -696,8 +713,31 @@ pub fn tile_set_cell(
     })
 }
 
+/// Whether a `TST.HeaderStorageBucket.Header` holds only its index, a zero
+/// size, a visible hiding state and its cell count.
+fn header_is_bare(header: &[u8], limits: &Limits) -> Result<bool> {
+    for field in fields(header, limits)? {
+        match field.number {
+            1 | 4 => {},
+            2 => {
+                if field.payload.iter().any(|byte| *byte != 0) {
+                    return Ok(false);
+                }
+            },
+            3 => {
+                if single_varint(header, 3, limits)? != Some(0) {
+                    return Ok(false);
+                }
+            },
+            _ => return Ok(false),
+        }
+    }
+    Ok(true)
+}
+
 /// Add `delta` to the cell count of header `index` in a header bucket,
-/// creating the header (size 0, visible) when it has none.
+/// creating the header (size 0, visible) when it has none; a bare header
+/// left counting no cell goes.
 ///
 /// # Errors
 ///
@@ -727,6 +767,11 @@ pub fn header_adjust(bucket: &[u8], index: u32, delta: i64, limits: &Limits) -> 
             .and_then(|cells| cells.checked_add(delta))
             .filter(|after| *after >= 0)
             .ok_or(WriteError::Unsupported)?;
+        if after == 0 && header_is_bare(field.payload, limits)? {
+            // A header left counting no cell and carrying nothing else goes,
+            // as the host writer drops it (record 0370).
+            return Ok(Some(Vec::new()));
+        }
         let header = rebuild(field.payload, limits, |inner| {
             if inner.number != 4 {
                 return Ok(None);

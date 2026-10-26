@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
-use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
+use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind};
 use litchi_iwa_common::chart::arrangement::ChartArrangement;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
@@ -1053,7 +1053,10 @@ impl Package {
         // the transaction has crossed its last checked boundary.
         budget.candidate_reopen(target_len)?;
         let target_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-        let catalog = SourceCatalog::from_shared_bytes(target_bytes, self.state.source.limits())
+        let catalog = self
+            .state
+            .source
+            .reopen(target_bytes)
             .map_err(map_archive_error)?;
         let candidate = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
         let verified = resolve_target(
@@ -2010,7 +2013,10 @@ pub(super) fn rewrite_chart_payload(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     let package = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
     let target_previews = match preview_mode {

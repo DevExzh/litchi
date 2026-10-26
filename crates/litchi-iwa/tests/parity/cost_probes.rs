@@ -134,3 +134,66 @@ fn numbers_text_style_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+#[inline(never)]
+fn host_cell_text(source: &[u8], reset: bool) -> TestResult<Vec<u8>> {
+    use litchi_iwa::text::Alignment;
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = editor
+        .package()
+        .iwa_entry_names()
+        .find_map(|name| {
+            editor
+                .package()
+                .archive(name)
+                .ok()?
+                .objects
+                .into_iter()
+                .find_map(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .any(|message| message.type_ == 6_001)
+                        .then_some(object.archive_info.identifier)
+                        .flatten()
+                })
+        })
+        .ok_or("no table model")?;
+    if reset {
+        editor.reset_table_cell_text_alignment(id, 1, 1)?;
+    } else {
+        editor.set_table_cell_text_alignment(id, 1, 1, Alignment::Justified)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_cell_text(source: &[u8], reset: bool) -> TestResult<Vec<u8>> {
+    use litchi_iwa::text::Alignment;
+    use litchi_numbers::cell::text::{Property, PropertyKind};
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let at = litchi_numbers::table::At::new(1, 1);
+    let edit = package.edit_table_cell_text(0usize, 0usize)?;
+    let edit = if reset {
+        edit.reset(at, PropertyKind::Alignment)?
+    } else {
+        edit.set(at, Property::Alignment(Alignment::Justified))?
+    };
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Cell paragraph alignment on `basic.numbers` B2: set, then reset on the
+/// host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_cell_text_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let set = host_cell_text(&input.bytes, false)?;
+    for (bytes, reset) in [(&input.bytes, false), (&set, true)] {
+        black_box(host_cell_text(bytes, reset)?);
+        black_box(leaf_cell_text(bytes, reset)?);
+        black_box(leaf_cell_text(bytes, reset)?);
+        black_box(host_cell_text(bytes, reset)?);
+    }
+    Ok(())
+}

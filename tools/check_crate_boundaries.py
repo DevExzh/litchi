@@ -21598,6 +21598,11 @@ def _iwa_example_and_test_paths(root: Path) -> tuple[Path, ...]:
         absolute_root = root / relative_root
         if absolute_root.is_dir():
             paths.update(absolute_root.rglob("*.rs"))
+    # The record 0369 exit-parity harness calls the host routes on purpose:
+    # each case runs a host route as the oracle of its leaf family until W3
+    # deletes the host with the harness.
+    parity = root / "crates/litchi-iwa/tests/parity"
+    paths = {path for path in paths if parity not in path.parents}
     return tuple(sorted(paths))
 
 

@@ -805,8 +805,8 @@ numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
@@ -816,21 +816,21 @@ numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_level	1	numbers
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_alignment	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_background	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_baseline_shift	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_capitalization	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_character_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_color	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_decorations	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_font	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_ligatures	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_outline	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_script	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_shadow	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_alignment	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_background	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_baseline_shift	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_capitalization	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_character_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_color	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_decorations	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_font	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_ligatures	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_outline	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	host-only	litchi-numbers	-	-	-	-
@@ -839,8 +839,8 @@ numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell
 numbers/editor/semantic/table.rs	set_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_list	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
@@ -852,20 +852,20 @@ numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_scale	1	nu
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_numbering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_lists	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_alignment	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_background	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_baseline_shift	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_capitalization	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_character_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_color	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_decorations	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_font	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_ligatures	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_outline	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_script	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_text_shadow	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_alignment	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_background	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_baseline_shift	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_capitalization	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_character_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_color	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_decorations	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_font	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_ligatures	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_outline	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text_style	numbers_cell_text_style_parity	B	-	-
 numbers/editor/semantic/table.rs	table_cell_borders	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_data_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
@@ -873,8 +873,8 @@ numbers/editor/semantic/table.rs	table_cell_fill	1	numbers	table.cell_appearance
 numbers/editor/semantic/table.rs	table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_merges	1	numbers	table.merge	migrated	litchi_numbers::Package::table_merges	numbers_table_merges_read_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	-
 numbers/editor/semantic/table.rs	table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_indents	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_list	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
@@ -886,20 +886,20 @@ numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_scale	1	number
 numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_list_numbering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_lists	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_alignment	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_background	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_baseline_shift	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_capitalization	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_character_spacing	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_color	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_decorations	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_font	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_ligatures	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_outline	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_script	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_text_shadow	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_alignment	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_background	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_baseline_shift	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_capitalization	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_character_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_color	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_decorations	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_font	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_ligatures	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_outline	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text_style	numbers_cell_text_style_read_parity	A	-	-
 numbers/editor/semantic/table.rs	unmerge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_unmerge_parity	A	-	-
 numbers/editor/semantic/text_box.rs	add_sheet_text_box_comment	1	numbers	text.comment	host-only	litchi-numbers	-	-	-	-
@@ -1572,15 +1572,15 @@ pages/editor.rs	update_text_box_highlight	1	pages	text.highlight	host-only	litch
 pages/editor.rs	update_text_box_hyperlink	1	pages	text.hyperlink	host-only	litchi-pages	-	-	-	-
 pages/editor/audio.rs	add_body_audio	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
 pages/editor/audio.rs	body_audio	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
-pages/editor/audio.rs	body_audio_playback_settings	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
-pages/editor/audio.rs	body_audio_position	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
-pages/editor/audio.rs	body_audio_properties	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
+pages/editor/audio.rs	body_audio_playback_settings	1	pages	drawable.audio	migrated	litchi_pages::Package::body_drawable_properties	pages_body_audio_playback_parity	A	test-data/iwork/pages/audio-playback-native-resaved.pages	-
+pages/editor/audio.rs	body_audio_position	1	pages	drawable.audio	migrated	litchi_pages::Package::body_drawable_properties	pages_body_audio_position_parity	A	-	-
+pages/editor/audio.rs	body_audio_properties	1	pages	drawable.audio	migrated	litchi_pages::Package::body_drawable_properties	pages_body_audio_properties_parity	A	-	-
 pages/editor/audio.rs	duplicate_body_audio	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
 pages/editor/audio.rs	remove_body_audio	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
 pages/editor/audio.rs	replace_body_audio_data	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
-pages/editor/audio.rs	set_body_audio_playback_settings	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
-pages/editor/audio.rs	set_body_audio_position	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
-pages/editor/audio.rs	set_body_audio_properties	1	pages	drawable.audio	host-only	litchi-pages	-	-	-	-
+pages/editor/audio.rs	set_body_audio_playback_settings	1	pages	drawable.audio	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_audio_playback_parity	A	test-data/iwork/pages/audio-playback-native-resaved.pages	-
+pages/editor/audio.rs	set_body_audio_position	1	pages	drawable.audio	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_audio_position_parity	A	-	-
+pages/editor/audio.rs	set_body_audio_properties	1	pages	drawable.audio	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_audio_properties_parity	A	-	-
 pages/editor/body_shapes.rs	add_body_line	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	add_body_line_with_endpoints	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	add_body_line_with_style	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
@@ -1591,18 +1591,18 @@ pages/editor/body_shapes.rs	body_line_endpoints	1	pages	drawable.shape	host-only
 pages/editor/body_shapes.rs	body_line_segment	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_shape_effects	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_shape_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	body_shape_geometry	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	body_shape_geometry	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_properties	pages_body_shape_geometry_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_preset	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	body_shape_properties	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	body_shape_properties	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_properties	pages_body_shape_properties_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_shadow	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_shape_stroke	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_shape_text_layout	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_shapes	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	clear_body_shape_text	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	clear_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_clear_parity	A	-	-
 pages/editor/body_shapes.rs	duplicate_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	flip_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	flip_body_shape	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_flip_parity	A	-	-
 pages/editor/body_shapes.rs	remove_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	replace_body_shape_text	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	replace_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_replace_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_line_endpoints	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	reset_body_shape_effects	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	reset_body_shape_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
@@ -1613,13 +1613,13 @@ pages/editor/body_shapes.rs	set_body_line_endpoints	1	pages	drawable.shape	host-
 pages/editor/body_shapes.rs	set_body_line_segment	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	set_body_shape_effects	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	set_body_shape_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	set_body_shape_geometry	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	set_body_shape_geometry	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_geometry_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_image_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	set_body_shape_preset	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	set_body_shape_properties	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	set_body_shape_properties	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_properties_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_shadow	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	set_body_shape_stroke	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	set_body_shape_text	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	set_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_set_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_text_layout	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes/caption.rs	body_shape_title_caption	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes/caption.rs	remove_body_shape_caption	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
@@ -1816,71 +1816,71 @@ pages/editor/date_time_fields.rs	remove_text_box_date_time_field	1	pages	text.da
 pages/editor/date_time_fields.rs	text_box_date_time_fields	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
 pages/editor/date_time_fields.rs	update_text_box_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
 pages/editor/images.rs	add_body_image	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
-pages/editor/images.rs	body_image_geometry	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
-pages/editor/images.rs	body_image_properties	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
+pages/editor/images.rs	body_image_geometry	1	pages	drawable.image	migrated	litchi_pages::Package::body_drawable_properties	pages_body_image_geometry_parity	A	-	-
+pages/editor/images.rs	body_image_properties	1	pages	drawable.image	migrated	litchi_pages::Package::body_drawable_properties	pages_body_image_properties_parity	A	-	-
 pages/editor/images.rs	body_image_title_caption	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
 pages/editor/images.rs	body_images	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
 pages/editor/images.rs	duplicate_body_image	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
-pages/editor/images.rs	flip_body_image	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
+pages/editor/images.rs	flip_body_image	1	pages	drawable.image	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_image_flip_parity	A	-	-
 pages/editor/images.rs	remove_body_image	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
 pages/editor/images.rs	remove_body_image_caption	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
 pages/editor/images.rs	remove_body_image_title	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
 pages/editor/images.rs	replace_body_image_data	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
-pages/editor/images.rs	restore_body_image_original_size	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
+pages/editor/images.rs	restore_body_image_original_size	1	pages	drawable.image	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_image_original_size_parity	A	-	-
 pages/editor/images.rs	set_body_image_caption	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
-pages/editor/images.rs	set_body_image_geometry	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
-pages/editor/images.rs	set_body_image_properties	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
+pages/editor/images.rs	set_body_image_geometry	1	pages	drawable.image	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_image_geometry_parity	A	-	-
+pages/editor/images.rs	set_body_image_properties	1	pages	drawable.image	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_image_properties_parity	A	-	-
 pages/editor/images.rs	set_body_image_title	1	pages	drawable.image	host-only	litchi-pages	-	-	-	-
 pages/editor/movies.rs	add_body_movie	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	body_movie_geometry	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	body_movie_playback_settings	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	body_movie_properties	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
+pages/editor/movies.rs	body_movie_geometry	1	pages	drawable.movie	migrated	litchi_pages::Package::body_drawable_properties	pages_body_movie_geometry_parity	A	-	-
+pages/editor/movies.rs	body_movie_playback_settings	1	pages	drawable.movie	migrated	litchi_pages::Package::body_drawable_properties	pages_body_movie_playback_parity	A	-	-
+pages/editor/movies.rs	body_movie_properties	1	pages	drawable.movie	migrated	litchi_pages::Package::body_drawable_properties	pages_body_movie_properties_parity	A	-	-
 pages/editor/movies.rs	body_movies	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies.rs	duplicate_body_movie	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	flip_body_movie	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
+pages/editor/movies.rs	flip_body_movie	1	pages	drawable.movie	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_movie_flip_parity	A	-	-
 pages/editor/movies.rs	remove_body_movie	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies.rs	replace_body_movie_data	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies.rs	replace_body_movie_poster	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	restore_body_movie_original_size	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	set_body_movie_geometry	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	set_body_movie_playback_settings	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/movies.rs	set_body_movie_properties	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
+pages/editor/movies.rs	restore_body_movie_original_size	1	pages	drawable.movie	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_movie_original_size_parity	A	-	-
+pages/editor/movies.rs	set_body_movie_geometry	1	pages	drawable.movie	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_movie_geometry_parity	A	-	-
+pages/editor/movies.rs	set_body_movie_playback_settings	1	pages	drawable.movie	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_movie_playback_parity	A	-	-
+pages/editor/movies.rs	set_body_movie_properties	1	pages	drawable.movie	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_movie_properties_parity	A	-	-
 pages/editor/movies/caption.rs	body_movie_title_caption	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies/caption.rs	remove_body_movie_caption	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies/caption.rs	remove_body_movie_title	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies/caption.rs	set_body_movie_caption	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
 pages/editor/movies/caption.rs	set_body_movie_title	1	pages	drawable.movie	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	body_number_attachments	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	header_footer_number_attachments	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	insert_body_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	insert_header_footer_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
+pages/editor/number_attachments.rs	body_number_attachments	1	pages	text.number_attachment	migrated	litchi_pages::Package::number_attachments	pages_body_number_attachment_update_parity	A	-	-
+pages/editor/number_attachments.rs	header_footer_number_attachments	1	pages	text.number_attachment	migrated	litchi_pages::Package::number_attachments	pages_header_number_attachment_update_parity	A	-	-
+pages/editor/number_attachments.rs	insert_body_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_body_number_attachment_insert_parity	A	-	-
+pages/editor/number_attachments.rs	insert_header_footer_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_header_number_attachment_insert_parity	A	-	-
 pages/editor/number_attachments.rs	insert_text_box_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
 pages/editor/number_attachments.rs	remove_body_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
 pages/editor/number_attachments.rs	remove_header_footer_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
 pages/editor/number_attachments.rs	remove_text_box_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
 pages/editor/number_attachments.rs	text_box_number_attachments	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	update_body_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	update_header_footer_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
+pages/editor/number_attachments.rs	update_body_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_body_number_attachment_update_parity	A	-	-
+pages/editor/number_attachments.rs	update_header_footer_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_header_number_attachment_update_parity	A	-	-
 pages/editor/number_attachments.rs	update_text_box_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	add_body_bookmark	1	pages	text.bookmark	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	add_body_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	body_bookmarks	1	pages	text.bookmark	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	body_date_time_fields	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	clear_body	1	pages	text.storage	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	insert_body_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	remove_body_bookmark	1	pages	text.bookmark	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	remove_body_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	replace_body_text	1	pages	text.storage	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	set_body_text	1	pages	text.storage	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	update_body_bookmark	1	pages	text.bookmark	host-only	litchi-pages	-	-	-	-
-pages/editor/section_content.rs	update_body_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
+pages/editor/section_content.rs	add_body_bookmark	1	pages	text.bookmark	migrated	litchi_pages::Package::edit_body_bookmarks	pages_body_bookmark_add_parity	B	-	-
+pages/editor/section_content.rs	add_body_date_time_field	1	pages	text.date_time_field	migrated	litchi_pages::Package::edit_body_date_time_fields	pages_body_date_time_add_parity	B	-	-
+pages/editor/section_content.rs	body_bookmarks	1	pages	text.bookmark	migrated	litchi_pages::Package::body_bookmarks	pages_body_bookmark_update_parity	A	-	-
+pages/editor/section_content.rs	body_date_time_fields	1	pages	text.date_time_field	migrated	litchi_pages::Package::body_date_time_fields	pages_body_date_time_update_parity	A	-	-
+pages/editor/section_content.rs	clear_body	1	pages	text.storage	migrated	litchi_pages::Package::edit_body_text	pages_clear_body_parity	A	-	-
+pages/editor/section_content.rs	insert_body_date_time_field	1	pages	text.date_time_field	migrated	litchi_pages::Package::edit_body_date_time_fields	pages_body_date_time_insert_parity	B	-	-
+pages/editor/section_content.rs	remove_body_bookmark	1	pages	text.bookmark	migrated	litchi_pages::Package::edit_body_bookmarks	pages_body_bookmark_remove_parity	A	-	-
+pages/editor/section_content.rs	remove_body_date_time_field	1	pages	text.date_time_field	migrated	litchi_pages::Package::edit_body_date_time_fields	pages_body_date_time_remove_parity	A	-	-
+pages/editor/section_content.rs	replace_body_text	1	pages	text.storage	migrated	litchi_pages::Package::edit_section_text	pages_replace_body_text_parity	A	-	-
+pages/editor/section_content.rs	set_body_text	1	pages	text.storage	migrated	litchi_pages::Package::edit_body_text	pages_set_body_text_parity	A	-	-
+pages/editor/section_content.rs	update_body_bookmark	1	pages	text.bookmark	migrated	litchi_pages::Package::edit_body_bookmarks	pages_body_bookmark_update_parity	A	-	-
+pages/editor/section_content.rs	update_body_date_time_field	1	pages	text.date_time_field	migrated	litchi_pages::Package::edit_body_date_time_fields	pages_body_date_time_update_parity	A	-	-
 pages/editor/tables/comments.rs	add_table_cell_comment_reply	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/comments.rs	clear_table_cell_comment	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/comments.rs	remove_table_cell_comment_reply	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/comments.rs	set_table_cell_comment	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/comments.rs	set_table_cell_comment_reply	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/comments.rs	table_cell_comment	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/comments.rs	table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
+pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/conditional_highlight.rs	clear_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	set_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	table_cell_conditional_highlight_rules	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
@@ -1889,17 +1889,17 @@ pages/editor/tables/formula.rs	clear_table_formula	1	pages	table.formula	host-on
 pages/editor/tables/formula.rs	set_table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
+pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_clear_parity	A	-	-
 pages/editor/tables/semantic.rs	clear_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	comment_count	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	comment_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	duplicate_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	get_cell	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	get_comment	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	iter_cells	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	iter_comments	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	get_cell	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
+pages/editor/tables/semantic.rs	get_comment	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
+pages/editor/tables/semantic.rs	iter_cells	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
+pages/editor/tables/semantic.rs	iter_comments	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	merge_table_cells	1	pages	table.merge	migrated	litchi_pages::Package::edit_body_table_merges	pages_body_table_merge_parity	A	-	-
-pages/editor/tables/semantic.rs	merges	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	merges	1	pages	table.cells	migrated	litchi_pages::Package::body_table_merges	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	remove_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
@@ -1945,7 +1945,7 @@ pages/editor/tables/semantic.rs	reset_table_cell_text_script	1	pages	table.cell_
 pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
@@ -1993,8 +1993,8 @@ pages/editor/tables/semantic.rs	set_table_cell_text_outline	1	pages	table.cell_r
 pages/editor/tables/semantic.rs	set_table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cells	1	pages	table.cells	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table	1	pages	other	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cells	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cells_batch_parity	A	-	-
+pages/editor/tables/semantic.rs	table	1	pages	other	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	table_cell_borders	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
@@ -2043,7 +2043,7 @@ pages/editor/tables/semantic.rs	table_cell_text_outline	1	pages	table.cell_rich_
 pages/editor/tables/semantic.rs	table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	tables	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	tables	1	pages	table.lifecycle	migrated	litchi_pages::Package::body_tables	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	unmerge_table_cells	1	pages	table.merge	migrated	litchi_pages::Package::edit_body_table_merges	pages_body_table_unmerge_parity	A	-	-
 pages/editor/tables/sort.rs	apply_table_sort_order	1	pages	table.sort	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/sort.rs	apply_table_sort_order_to_rows	1	pages	table.sort	host-only	litchi-pages	-	-	-	-
@@ -2064,22 +2064,22 @@ shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	host-only	l
 shapes/fill/image.rs	without_tint	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 shapes/line.rs	length	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::line::Segment::length	numbers_line_segment_parity	A	-	-
 shapes/line.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::line::Segment::new	keynote_line_segment_parity	A	-	-
-text/date_time_field.rs	from_object_id	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/date_time_field.rs	from_object_id	1	shared	text.shared	retired	-	-	-	-	retired: raw native object ID constructor; ADR 0028 forbids raw native IDs on a supported facade. Leaf date-time fields are addressed by the ranged-table entry the engine reads (smart_field::date_time over ranged::entries) and by selector-based leaf routes (W1-B/W1-C/W2); record 0374
 text/editor.rs	add_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
-text/editor.rs	add_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	add_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_comment	1	shared	text.shared	migrated	litchi_iwa_text_wire::annotation::encode_comment_storage	text_comment_add_parity	B	-	ranged::rewrite(Table::Highlight, Add) + encode_highlight + encode_comment_storage; tier B for random UUIDs and creation date; host kept as the oracle (record 0374)
+text/editor.rs	add_text_comment_reply	1	shared	text.comment	migrated	litchi_iwa_text_wire::annotation::comment_storage_with_reply	text_comment_reply_add_parity	B	-	encode_comment_storage + comment_storage_with_reply(Add); tier B for random storage UUID and creation date; host kept as the oracle (record 0374)
 text/editor.rs	add_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::encode_date_time	text_date_time_add_parity	B	-	ranged::rewrite(Change::Add) plus smart_field::encode_date_time (caller UUID; host UUID random, masked); host kept as the oracle (record 0374)
-text/editor.rs	add_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	add_text_highlight	1	shared	text.highlight	migrated	litchi_iwa_text_wire::annotation::encode_highlight	text_highlight_add_parity	B	-	ranged::rewrite(Table::Highlight, Add) + encode_highlight + encode_comment_storage; tier B for the host's random text-attribute and storage UUIDs and creation date; host kept as the oracle (record 0374)
 text/editor.rs	add_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_add_parity	B	-	ranged::rewrite(Change::Add) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
-text/editor.rs	applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	apply_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	create_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	delete_applied_named_paragraph_style_with_replacement	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	delete_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	applied_named_paragraph_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::applied	text_named_paragraph_style_read_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	apply_named_paragraph_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::plan_apply	text_named_paragraph_style_apply_parity	A	-	ApplyPlan published by the format package; host kept as the oracle (record 0374)
+text/editor.rs	create_named_paragraph_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::named_copy	text_named_paragraph_style_create_parity	B	-	named_copy + stylesheet_with_named + theme_with_preset; tier B for the host's random object UUID; host kept as the oracle (record 0374)
+text/editor.rs	delete_applied_named_paragraph_style_with_replacement	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::plan_apply	text_named_paragraph_style_delete_parity	A	-	Catalog::plan_replacement, then apply and delete; host kept as the oracle (record 0374)
+text/editor.rs	delete_named_paragraph_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::stylesheet_without_named	text_named_paragraph_style_delete_parity	A	-	Catalog::plan_delete + stylesheet_without_named + theme_without_preset; host kept as the oracle (record 0374)
 text/editor.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	insert_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::encode_date_time	text_date_time_insert_parity	B	-	rewrite_storage_text_with_behavior then ranged::rewrite(Change::Add) and smart_field::encode_date_time; host kept as the oracle (record 0374)
 text/editor.rs	insert_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::anchor	text_number_attachment_insert_parity	A	-	U+FFFC insertion by rewrite_storage_text_with_behavior, number_attachment::anchor and number_attachment::encode; host kept as the oracle (record 0374)
-text/editor.rs	named_paragraph_styles	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	named_paragraph_styles	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::catalog	text_named_paragraph_style_read_parity	A	-	named::stylesheet + theme_presets + catalog; host kept as the oracle (record 0374)
 text/editor.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Alignment); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::ParagraphBackground); host kept as the oracle (record 0374)
@@ -2092,32 +2092,32 @@ text/editor.rs	paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_wire
 text/editor.rs	paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::FollowingStyle); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Indents); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_line_spacing	1	shared	drawable.shape	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::LineSpacing); host kept as the oracle (record 0374)
-text/editor.rs	paragraph_list	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_bullet	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_bullet_geometry	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_indentation	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_label_color	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_level	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_levels	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_number_format	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_number_scale	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_number_tiering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_list_numbering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	paragraph_lists	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	paragraph_list	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::preset	text_list_read_parity	A	-	list::uniform_style plus list::preset; host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_bullet	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::Bullet); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_bullet_geometry	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::BulletGeometry); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_indentation	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::Indentation); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_label_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::LabelColor); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_level	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::level	text_list_read_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_levels	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::levels	text_list_read_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_number_format	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::NumberFormat); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_number_scale	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::NumberScale); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_number_tiering	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::property	text_list_read_parity	A	-	list::property(PropertyKind::NumberTiering); host kept as the oracle (record 0374)
+text/editor.rs	paragraph_list_numbering	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::numbering	text_list_read_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	paragraph_lists	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::placements	text_list_read_parity	A	-	host kept as the oracle (record 0374)
 text/editor.rs	paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::Spacing); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TabStops); host kept as the oracle (record 0374)
 text/editor.rs	paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::WritingDirection); host kept as the oracle (record 0374)
-text/editor.rs	redefine_applied_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	redefine_applied_named_paragraph_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::redefine	text_named_paragraph_style_redefine_parity	A	-	redefine then plan_apply; host kept as the oracle (record 0374)
 text/editor.rs	remove_paragraph_drop_cap	1	shared	text.drop_cap	migrated	litchi_iwa_text_wire::drop_cap::plan	text_drop_cap_remove_parity	A	-	drop_cap::plan(Change::Remove) and drop_cap::point; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
-text/editor.rs	remove_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	remove_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_comment	1	shared	text.shared	migrated	litchi_iwa_text_wire::annotation::annotation	text_comment_edit_parity	A	-	annotation::annotation + ranged::rewrite(Remove); graph and generated-author removal by the format package; host kept as the oracle (record 0374)
+text/editor.rs	remove_text_comment_reply	1	shared	text.comment	migrated	litchi_iwa_text_wire::annotation::comment_storage_with_reply	text_comment_reply_edit_parity	A	-	comment_storage_with_reply(Remove); host kept as the oracle (record 0374)
 text/editor.rs	remove_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::ranged::rewrite	text_date_time_remove_parity	A	-	ranged::rewrite(Change::Remove); the format package drops the object; host kept as the oracle (record 0374)
-text/editor.rs	remove_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	remove_text_highlight	1	shared	text.highlight	migrated	litchi_iwa_text_wire::ranged::rewrite	text_highlight_edit_parity	A	-	annotation::annotation + ranged::rewrite(Table::Highlight, Remove); host kept as the oracle (record 0374)
 text/editor.rs	remove_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_remove_parity	A	-	ranged::rewrite(Change::Remove) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	remove_text_language_boundary	1	shared	text.language	migrated	litchi_iwa_text_wire::language::rewrite	text_language_remove_parity	A	-	language::rewrite(Change::RemoveBoundary); host kept as the oracle (record 0374)
 text/editor.rs	remove_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_number_attachment_remove_parity	A	-	deleting the U+FFFC drops the anchor; the format package prunes and drops the orphan object; host kept as the oracle (record 0374)
-text/editor.rs	rename_named_paragraph_style	1	shared	text.paragraph_style	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	rename_named_paragraph_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::named::renamed	text_named_paragraph_style_rename_parity	A	-	Catalog::plan_rename + renamed; host kept as the oracle (record 0374)
 text/editor.rs	replace_text	1	shared	text.shared	migrated	litchi_iwa_text_wire::rewrite_storage_text_with_behavior	text_replace_parity	A	-	host delegates the payload rewrite; object cleanup of removed references is the format package publication (record 0374)
 text/editor.rs	reset_paragraph_alignment	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Alignment)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_background	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::ParagraphBackground)); host kept as the oracle (record 0374)
@@ -2128,15 +2128,15 @@ text/editor.rs	reset_paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_tex
 text/editor.rs	reset_paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::FollowingStyle)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Indents)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_line_spacing	1	shared	drawable.shape	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::LineSpacing)); host kept as the oracle (record 0374)
-text/editor.rs	reset_paragraph_list	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_bullet	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_bullet_geometry	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_indentation	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_label_color	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_level	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_number_format	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_number_scale	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	reset_paragraph_list_number_tiering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	reset_paragraph_list	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::find_preset	text_list_preset_parity	B	-	set to the None preset; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_bullet	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::Bullet)) then list::plan_collapse; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_bullet_geometry	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::BulletGeometry)) then list::plan_collapse; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_indentation	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::Indentation)) then list::plan_collapse; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_label_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::LabelColor)) then list::plan_collapse; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_level	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::with_level	text_list_level_parity	A	-	list::with_level(ParagraphListLevel::ZERO); host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_number_format	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::NumberFormat)) then list::plan_collapse; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_number_scale	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::NumberScale)) then list::plan_collapse; host kept as the oracle (record 0374)
+text/editor.rs	reset_paragraph_list_number_tiering	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan_collapse	text_list_property_reset_parity	A	-	list::plan(Change::Reset(PropertyKind::NumberTiering)) then list::plan_collapse; host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::Spacing)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::TabStops)); host kept as the oracle (record 0374)
 text/editor.rs	reset_paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_reset_parity	A	-	merged into paragraph_style::plan(Change::Reset(PropertyKind::WritingDirection)); host kept as the oracle (record 0374)
@@ -2164,17 +2164,17 @@ text/editor.rs	set_paragraph_flow	1	shared	text.shared	migrated	litchi_iwa_text_
 text/editor.rs	set_paragraph_following_style	1	shared	text.paragraph_style	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::FollowingStyle)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_indents	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Indents)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_line_spacing	1	shared	drawable.shape	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::LineSpacing)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
-text/editor.rs	set_paragraph_list	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_bullet	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_bullet_geometry	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_indentation	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_label_color	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_level	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_number_format	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_number_scale	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_number_tiering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_list_numbering	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	set_paragraph_lists	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	set_paragraph_list	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::find_preset	text_list_preset_parity	B	-	list::find_preset or list::preset_payload, then list::replace_boundaries; new preset objects carry random host UUIDs; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_bullet	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::Bullet)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_bullet_geometry	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::BulletGeometry)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_indentation	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::Indentation)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_label_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::LabelColor)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_level	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::with_level	text_list_level_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_number_format	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::NumberFormat)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_number_scale	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::NumberScale)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_number_tiering	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::plan	text_list_property_set_parity	B	-	list::plan(Change::Set(Property::NumberTiering)); in-place rewrites tier A in text_list_property_rewrite_parity; host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_list_numbering	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::with_numbering	text_list_numbering_parity	A	-	host kept as the oracle (record 0374)
+text/editor.rs	set_paragraph_lists	1	shared	text.shared	migrated	litchi_iwa_text_wire::list::replace_boundaries	text_list_placements_parity	B	-	list::normalize, list::find_preset/preset_payload and list::replace_boundaries; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::Spacing)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_tab_stops	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::TabStops)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
 text/editor.rs	set_paragraph_writing_direction	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::plan	text_paragraph_property_set_parity	B	-	merged into paragraph_style::plan(Change::Set(Property::WritingDirection)); in-place rewrites tier A in text_paragraph_property_rewrite_parity; host kept as the oracle (record 0374)
@@ -2200,12 +2200,12 @@ text/editor.rs	text_bookmarks	1	shared	text.bookmark	migrated	litchi_iwa_text_wi
 text/editor.rs	text_capitalization	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCapitalization); host kept as the oracle (record 0374)
 text/editor.rs	text_character_spacing	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextCharacterSpacing); host kept as the oracle (record 0374)
 text/editor.rs	text_color	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextColor); host kept as the oracle (record 0374)
-text/editor.rs	text_comment_replies	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	text_comments	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_comment_replies	1	shared	text.comment	migrated	litchi_iwa_text_wire::annotation::annotation	text_annotation_read_parity	A	-	Annotation::comment_replies; host kept as the oracle (record 0374)
+text/editor.rs	text_comments	1	shared	text.shared	migrated	litchi_iwa_text_wire::annotation::annotations	text_annotation_read_parity	A	-	annotation::annotations + Annotation::comment; host kept as the oracle (record 0374)
 text/editor.rs	text_date_time_fields	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::date_time	text_date_time_read_parity	A	-	ranged::entries over the smart-field table plus smart_field::date_time; host kept as the oracle (record 0374)
 text/editor.rs	text_decorations	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextDecorations); host kept as the oracle (record 0374)
 text/editor.rs	text_font	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextFont); host kept as the oracle (record 0374)
-text/editor.rs	text_highlights	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	text_highlights	1	shared	text.highlight	migrated	litchi_iwa_text_wire::annotation::annotations	text_annotation_read_parity	A	-	annotation::annotations + Annotation::highlight; host kept as the oracle (record 0374)
 text/editor.rs	text_hyperlinks	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::entries	text_smart_field_read_parity	A	-	ranged::entries over the smart-field table plus smart_field::hyperlink; host kept as the oracle (record 0374)
 text/editor.rs	text_language	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::at	text_language_read_parity	A	-	host kept as the oracle (record 0374)
 text/editor.rs	text_languages	1	shared	text.shared	migrated	litchi_iwa_text_wire::language::runs	text_language_read_parity	A	-	host kept as the oracle (record 0374)
@@ -2217,13 +2217,13 @@ text/editor.rs	text_shadow	1	shared	text.shared	migrated	litchi_iwa_text_wire::p
 text/editor.rs	text_style	1	shared	text.shared	migrated	litchi_iwa_text_wire::paragraph_style::effective	text_paragraph_property_read_parity	A	-	merged into paragraph_style::effective(PropertyKind::TextStyle); host kept as the oracle (record 0374)
 text/editor.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 text/editor.rs	update_text_bookmark	1	shared	text.bookmark	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field bookmark codec; host kept as the oracle (record 0374)
-text/editor.rs	update_text_comment	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/editor.rs	update_text_comment_reply	1	shared	text.comment	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_comment	1	shared	text.shared	migrated	litchi_iwa_text_wire::annotation::comment_storage_with_body	text_comment_edit_parity	A	-	ranged::rewrite(Move) and/or comment_storage_with_body; host kept as the oracle (record 0374)
+text/editor.rs	update_text_comment_reply	1	shared	text.comment	migrated	litchi_iwa_text_wire::annotation::comment_storage_with_body	text_comment_reply_edit_parity	A	-	Annotation::reply + comment_storage_with_body; host kept as the oracle (record 0374)
 text/editor.rs	update_text_date_time_field	1	shared	text.date_time_field	migrated	litchi_iwa_text_wire::smart_field::date_time_with_settings	text_date_time_update_parity	A	-	ranged::rewrite(Change::Move) plus smart_field::date_time_with_settings; host kept as the oracle (record 0374)
-text/editor.rs	update_text_highlight	1	shared	text.highlight	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
+text/editor.rs	update_text_highlight	1	shared	text.highlight	migrated	litchi_iwa_text_wire::ranged::rewrite	text_highlight_edit_parity	A	-	ranged::rewrite(Table::Highlight, Move); host kept as the oracle (record 0374)
 text/editor.rs	update_text_hyperlink	1	shared	text.hyperlink	migrated	litchi_iwa_text_wire::ranged::rewrite	text_smart_field_update_parity	A	-	ranged::rewrite(Change::Move) plus the smart_field hyperlink codec; host kept as the oracle (record 0374)
 text/editor.rs	update_text_number_attachment	1	shared	text.number_attachment	migrated	litchi_iwa_text_wire::number_attachment::with_settings	text_number_attachment_update_parity	A	-	host kept as the oracle (record 0374)
-text/extractor.rs	extract_from_bundle	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/extractor.rs	extract_from_object	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/extractor.rs	get_text	1	shared	text.shared	host-only	litchi-iwa-text (values) + litchi-iwa-text-wire (storage transforms)	-	-	-	-
-text/extractor.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+text/extractor.rs	extract_from_bundle	1	shared	text.shared	retired	-	-	-	-	retired: method of the crate-private (pub(crate)) TextExtractor behind the host document text read; not a public surface and not a storage transformation, it leaves with the document text route (leaf Package text reads); record 0374
+text/extractor.rs	extract_from_object	1	shared	text.shared	retired	-	-	-	-	retired: method of the crate-private (pub(crate)) TextExtractor behind the host document text read; not a public surface and not a storage transformation, it leaves with the document text route (leaf Package text reads); record 0374
+text/extractor.rs	get_text	1	shared	text.shared	retired	-	-	-	-	retired: method of the crate-private (pub(crate)) TextExtractor behind the host document text read; not a public surface and not a storage transformation, it leaves with the document text route (leaf Package text reads); record 0374
+text/extractor.rs	new	1	shared	io	retired	-	-	-	-	retired: method of the crate-private (pub(crate)) TextExtractor behind the host document text read; not a public surface and not a storage transformation, it leaves with the document text route (leaf Package text reads); record 0374

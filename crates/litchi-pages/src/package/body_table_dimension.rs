@@ -13,7 +13,7 @@ use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{LimitKind as ArchiveLimitKind, SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::{LimitKind as ArchiveLimitKind, package::EntryEdit};
 use litchi_iwa_core::LimitKind as CoreLimitKind;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::table_dimension_codec as codec;
@@ -1138,8 +1138,7 @@ fn rewrite_dimension(
     if output.len() != requirements.output_bytes() {
         return Err(Error::Verification);
     }
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
-        .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
 
@@ -1300,7 +1299,10 @@ fn reopen_target(
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
         .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
