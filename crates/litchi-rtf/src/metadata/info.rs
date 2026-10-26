@@ -331,7 +331,7 @@ fn parse_legacy_timestamp_triplet(
 
 /// A possibly partial timestamp from an RTF information destination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct RtfTimestamp {
+pub struct Timestamp {
     /// Raw values are signed because legacy producers use invalid values such
     /// as zero as sentinels. Use [`Self::validate`] or [`Self::is_valid`]
     /// before interpreting a parsed value as a calendar timestamp.
@@ -343,7 +343,7 @@ pub struct RtfTimestamp {
     pub second: Option<i32>,
 }
 
-impl RtfTimestamp {
+impl Timestamp {
     #[must_use]
     pub fn is_valid(&self) -> bool {
         self.validate().is_ok()
@@ -434,16 +434,16 @@ pub struct DocumentInfo<'a> {
     pub revision: Option<u32>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub creation_time: Option<Cow<'a, str>>,
-    pub creation_timestamp: Option<RtfTimestamp>,
+    pub creation_timestamp: Option<Timestamp>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub revision_time: Option<Cow<'a, str>>,
-    pub revision_timestamp: Option<RtfTimestamp>,
+    pub revision_timestamp: Option<Timestamp>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub print_time: Option<Cow<'a, str>>,
-    pub print_timestamp: Option<RtfTimestamp>,
+    pub print_timestamp: Option<Timestamp>,
     /// Legacy complete timestamp mirror retained for API compatibility.
     pub backup_time: Option<Cow<'a, str>>,
-    pub backup_timestamp: Option<RtfTimestamp>,
+    pub backup_timestamp: Option<Timestamp>,
     pub editing_time: Option<u32>,
     pub pages: Option<u32>,
     pub words: Option<u32>,
@@ -545,7 +545,7 @@ impl<'a> DocumentInfo<'a> {
                     timestamp.validate()?;
                 }
             } else if let Some(legacy_text) = legacy {
-                RtfTimestamp::from_legacy(legacy_text)?;
+                Timestamp::from_legacy(legacy_text)?;
             }
         }
         self.protection.validate()?;

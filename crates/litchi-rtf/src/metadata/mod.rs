@@ -21,7 +21,7 @@ pub(crate) use external_reference::DocumentExternalReferenceSpans;
 
 pub use info::{
     DocumentInfo as Info, DocumentProtection as Protection, MAX_PASSWORD_HASH_BYTES, PasswordHash,
-    ProtectionLevel, ProtectionType, RtfTimestamp as Timestamp,
+    ProtectionLevel, ProtectionType, Timestamp,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use user_property::{

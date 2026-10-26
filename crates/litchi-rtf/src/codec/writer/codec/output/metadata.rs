@@ -9,8 +9,8 @@ use super::super::{
     Annotation, AnnotationType, Bookmark, CustomXmlTag, DocumentInfo, DocumentProtection,
     DocumentVariable, DrawingStoryTextMode, FieldOwner, HashSet, MathElement, MathElementRole,
     MathObject, MathProperties, MathPropertyName, MathRun, MathStructure, MathStructureChild,
-    MathStructureKind, MathZone, MathZoneKind, MoveBookmark, ProtectionRange, RtfTimestamp,
-    SmartTag, UserProperty, Write, Writer, document_variable, io, user_property,
+    MathStructureKind, MathZone, MathZoneKind, MoveBookmark, ProtectionRange, SmartTag, Timestamp,
+    UserProperty, Write, Writer, document_variable, io, user_property,
 };
 
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
@@ -200,12 +200,12 @@ impl<W: Write> Writer<W> {
     pub(in super::super) fn write_info_time(
         &mut self,
         control: &str,
-        typed: Option<RtfTimestamp>,
+        typed: Option<Timestamp>,
         legacy: Option<&str>,
     ) -> io::Result<()> {
         let timestamp = match (typed, legacy) {
             (Some(value), _) => value,
-            (None, Some(value)) => RtfTimestamp::from_legacy(value)
+            (None, Some(value)) => Timestamp::from_legacy(value)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?,
             (None, None) => return Ok(()),
         };

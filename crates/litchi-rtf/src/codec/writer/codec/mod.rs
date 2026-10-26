@@ -53,7 +53,7 @@ use super::super::{
     ParagraphGroupPropertyTable, ParagraphWrapping, Picture, PictureCompatibilityKind,
     PictureCompatibilityRecord, PictureShapeProperties, PresentNoteKinds, ProtectionRange,
     ProtectionUserTable, Revision, RevisionAuthor, RevisionMetadata, RevisionSaveMetadata,
-    RevisionType, Row, RtfTimestamp, Section, SectionBreakType, SectionFootnotePlacement,
+    RevisionType, Row, Section, SectionBreakType, SectionFootnotePlacement,
     SectionLineNumberRestart, SectionNoteOptions, SectionRendering, Shading, ShadingPattern, Shape,
     ShapeGroup, ShapeGroupChild, ShapeGroupInfo, ShapeProperty, ShapeResult, ShapeThemeColor,
     ShapeType, SmartTag, SoftBreak, SoftBreakKind, StoryDrawing, StoryEvent, StoryField, Style,
@@ -63,8 +63,8 @@ use super::super::{
     TableHorizontalReference, TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit,
     TableRowAlignment, TableRowBandIndex, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
     TableRowHeight, TableShading, TableVerticalPosition, TableVerticalReference, TextDirection,
-    UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation, document_variable,
-    field, form_field, navigation_entry, section, user_property,
+    Timestamp, UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation,
+    document_variable, field, form_field, navigation_entry, section, user_property,
 };
 use crate::model::document::Tree;
 use litchi_codepage::Mbcs;

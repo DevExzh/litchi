@@ -645,7 +645,7 @@ impl<'a> Parser<'a> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn parse_object_time_destination(&mut self) -> crate::Result<crate::RtfTimestamp> {
+    pub(super) fn parse_object_time_destination(&mut self) -> crate::Result<crate::Timestamp> {
         self.pos += 2; // opening brace and ignorable marker
         if !matches!(
             self.tokens.get(self.pos),
@@ -656,7 +656,7 @@ impl<'a> Parser<'a> {
             ));
         }
         self.pos += 1;
-        let mut timestamp = crate::RtfTimestamp::default();
+        let mut timestamp = crate::Timestamp::default();
         loop {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {

@@ -127,7 +127,7 @@ impl<'a> Parser<'a> {
             ));
         }
         self.pos += 1; // time destination
-        let mut timestamp = crate::RtfTimestamp::default();
+        let mut timestamp = crate::Timestamp::default();
         let mut depth = 1usize;
         while self.pos < self.tokens.len() && depth > 0 {
             match self.tokens.get(self.pos) {
