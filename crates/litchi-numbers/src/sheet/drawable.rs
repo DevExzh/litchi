@@ -49,6 +49,18 @@ pub mod properties {
     };
 }
 
+/// Exact-source Drop Cap transactions for the paragraphs of the text a
+/// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_drop_caps`].
+pub mod drop_cap {
+    pub use crate::package::sheet_drawable_drop_cap::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::paragraph::drop_cap::{
+        CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+    };
+}
+
 /// Exact-source paragraph-list transactions for the text a sheet text box
 /// or shape owns: [`crate::Package::edit_sheet_text_box_lists`].
 pub mod list {
