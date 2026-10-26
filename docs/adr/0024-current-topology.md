@@ -5030,8 +5030,11 @@ Edges, all downward:
   parity harness drives the engines against the legacy host routes; it goes
   with the host in W3.
 
-The leaves consume the crate privately when their W2 families adopt it; no
-facade re-exports it (ADR 0028's rule for focused low-level crates). The
+The leaves consume the crate privately when their families adopt it
+(`litchi-pages -> litchi-iwa-style` first, 2026-10-26: the W1-B body-media
+lifecycle reads its embedded-media inventory through
+`litchi_iwa_style::media`, which replaced the per-leaf `media_native` copy);
+no facade re-exports it (ADR 0028's rule for focused low-level crates). The
 package is runtime-neutral and iWork-only, so the non-iWork release gate
 counts it among the iWork and excluded packages (17 to 18, 20 to 21).
 `tools/check_crate_boundaries.py` reports 69 workspace packages with 12
