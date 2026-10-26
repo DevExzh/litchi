@@ -24,6 +24,7 @@ pub(crate) mod slide_chart_axis_title;
 pub(crate) mod slide_chart_caption;
 pub(crate) mod slide_chart_data;
 pub(crate) mod slide_chart_legend;
+pub(crate) mod slide_chart_lifecycle;
 pub(crate) mod slide_chart_metadata;
 pub(crate) mod slide_chart_title;
 pub(crate) mod slide_chart_value_axis;
