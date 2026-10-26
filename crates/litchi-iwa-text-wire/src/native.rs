@@ -214,6 +214,14 @@ impl<'a> Field<'a> {
         self.expect(LENGTH_DELIMITED)
     }
 
+    pub(crate) fn double(self) -> NativeResult<f64> {
+        let bytes: [u8; 8] = self
+            .expect(FIXED64)?
+            .try_into()
+            .map_err(|_| NativeError::Invalid("malformed protobuf fixed64"))?;
+        Ok(f64::from_le_bytes(bytes))
+    }
+
     pub(crate) fn string(self, budget: &Budget) -> NativeResult<String> {
         let text = std::str::from_utf8(self.bytes()?)
             .map_err(|_| NativeError::Invalid("protobuf string is not UTF-8"))?;
@@ -434,6 +442,13 @@ impl Writer {
     pub(crate) fn float(&mut self, number: u32, value: f32) -> NativeResult<()> {
         self.key(number, FIXED32)?;
         self.reserve(4)?;
+        self.output.extend_from_slice(&value.to_le_bytes());
+        Ok(())
+    }
+
+    pub(crate) fn double(&mut self, number: u32, value: f64) -> NativeResult<()> {
+        self.key(number, FIXED64)?;
+        self.reserve(8)?;
         self.output.extend_from_slice(&value.to_le_bytes());
         Ok(())
     }
