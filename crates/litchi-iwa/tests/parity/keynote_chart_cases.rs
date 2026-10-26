@@ -189,3 +189,22 @@ fn keynote_slide_chart_geometry_parity() -> TestResult {
         },
     )
 }
+
+#[test]
+fn keynote_slide_chart_remove_parity() -> TestResult {
+    run(
+        "keynote_slide_chart_remove_parity",
+        Tier::B,
+        Evidence::Queued,
+        |editor| {
+            editor.remove_slide_chart(SLIDE, ChartSelector::index(0))?;
+            Ok(())
+        },
+        |source| {
+            leaf_run(source, |edit| {
+                edit.remove(SlideSelector::index(SLIDE), ChartSelector::index(0))?;
+                Ok(())
+            })
+        },
+    )
+}

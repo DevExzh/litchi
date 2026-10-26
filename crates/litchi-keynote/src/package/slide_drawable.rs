@@ -2646,3 +2646,22 @@ pub(in crate::package) fn replace_message_payload(
         .ok_or(StructureError::Unexpected("message type"))?;
     stage::replace_payload(workspace, identifier, index, message_type, data)
 }
+
+/// Remove one slide-owned drawable and its private closure (shared with the
+/// chart lifecycle). Returns the removed object count and culled data.
+pub(in crate::package) fn remove_drawable_closure(
+    workspace: &mut Workspace<'_>,
+    slide: u64,
+    drawable: u64,
+) -> Result<(usize, usize), Error> {
+    let removal = stage::remove(workspace, slide, drawable)?;
+    Ok((removal.objects, removal.data))
+}
+
+/// Every object reference one staged object holds (headers and payloads).
+pub(in crate::package) fn outgoing_references(
+    workspace: &Workspace<'_>,
+    identifier: u64,
+) -> Result<Vec<u64>, StructureError> {
+    stage::outgoing(workspace, identifier)
+}

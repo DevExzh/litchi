@@ -95,6 +95,9 @@ pub enum Refusal {
     /// The frame is not finite with positive dimensions.
     #[error("the chart frame must be finite with positive dimensions")]
     InvalidGeometry,
+    /// The chart's graph is referenced from outside the chart.
+    #[error("the Keynote chart is referenced from outside its private graph")]
+    SharedGraph,
 }
 
 impl Refusal {
@@ -103,7 +106,7 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::UnsupportedSource => RefusalKind::UnsupportedContent,
+            Self::UnsupportedSource | Self::SharedGraph => RefusalKind::UnsupportedContent,
             Self::UnsupportedKind | Self::UnsupportedDirection | Self::InvalidGeometry => {
                 RefusalKind::InvalidValue
             },
@@ -116,6 +119,7 @@ enum Change {
     Kind(Kind),
     Direction(Direction),
     Geometry(Geometry),
+    Remove,
 }
 
 #[derive(Clone, Copy)]
@@ -231,6 +235,23 @@ impl<'a> Edit<'a> {
         self.stage(slide.into(), chart.into(), Change::Geometry(geometry))
     }
 
+    /// Stage the removal of one chart with its private title, caption and
+    /// styles (host `remove_slide_chart`): the chart's styles leave the
+    /// document stylesheet, its private preset leaves the theme, and data
+    /// the chart was the final owner of is culled.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors; [`Edit::commit`] refuses a chart
+    /// referenced from outside its private graph.
+    pub fn remove<'s, 'c>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        chart: impl Into<ChartSelector<'c>>,
+    ) -> Result<&mut Self, Error> {
+        self.stage(slide.into(), chart.into(), Change::Remove)
+    }
+
     /// Apply every staged operation, publish one candidate, reopen it and
     /// read the touched charts back.
     ///
@@ -327,12 +348,19 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
     }
     let mut workspace = Workspace::new(source).map_err(lift)?;
     let wire = workspace.wire;
+    let mut removed = 0;
     for operation in operations {
+        if matches!(operation.change, Change::Remove) {
+            remove_chart(&mut workspace, source, operation.chart)?;
+            removed += 1;
+            continue;
+        }
         let payload = workspace
             .payload(operation.chart, CHART_MESSAGE_TYPE)
             .map_err(lift)?
             .to_vec();
         let data = match operation.change {
+            Change::Remove => unreachable!("handled above"),
             Change::Kind(kind) => edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
                 fields.set_varint(CHART_TYPE, native(kind.native_value()));
                 Ok(())
@@ -370,9 +398,15 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
         )
         .map_err(lift)?;
     }
+    if removed > 0 {
+        workspace.release_removed_identifier_suffix();
+    }
     let bytes = workspace.publish().map_err(lift)?;
     let candidate = source.structure_reopen(bytes).map_err(map_read_error)?;
-    for operation in operations {
+    for operation in operations
+        .iter()
+        .filter(|operation| !matches!(operation.change, Change::Remove))
+    {
         let selection = select_chart(
             &candidate,
             SlideSelector::position(operation.slide),
@@ -396,6 +430,7 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
                 (geometry.x, geometry.y, geometry.width, geometry.height)
                     == (expected.x, expected.y, expected.width, expected.height)
             }),
+            Change::Remove => true,
         };
         if !ok {
             return Err(Error::Verification);
@@ -413,6 +448,201 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
         },
         patch,
     })
+}
+
+const SHOW_MESSAGE_TYPE: u32 = 2;
+const SHOW_THEME: u32 = 2;
+const THEME_MESSAGE_TYPE: u32 = 10;
+const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+const THEME_SUPER: u32 = 1;
+const THEME_DOCUMENT_STYLESHEET: u32 = 4;
+const THEME_CHART_PRESETS: u32 = 120;
+const STYLESHEET_STYLES: u32 = 1;
+
+fn reference_of(
+    fields: &Fields,
+    number: u32,
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<u64>, Error> {
+    fields
+        .unique(number)
+        .map_err(lift)?
+        .map(|field| {
+            super::structure::wire::reference_identifier(field.message().map_err(lift)?, wire)
+                .map_err(lift)
+        })
+        .transpose()
+}
+
+/// Remove a repeated reference field's entries naming any of `removed`,
+/// keeping the header aggregate in step.
+fn drop_references(
+    workspace: &mut Workspace<'_>,
+    object: u64,
+    message_type: u32,
+    path: &[u32],
+    number: u32,
+    removed: &std::collections::BTreeSet<u64>,
+) -> Result<usize, Error> {
+    let wire = workspace.wire;
+    let payload = workspace
+        .payload(object, message_type)
+        .map_err(lift)?
+        .to_vec();
+    let mut count = 0;
+    let data = edit_nested(&payload, path, wire, &mut |fields| {
+        let mut kept = Vec::new();
+        for field in fields.all(number) {
+            let raw = field.message()?.to_vec();
+            if removed.contains(&super::structure::wire::reference_identifier(&raw, wire)?) {
+                count += 1;
+            } else {
+                kept.push(raw);
+            }
+        }
+        if count > 0 {
+            fields.replace_all(number, super::structure::wire::LENGTH_DELIMITED, &kept);
+        }
+        Ok(())
+    })
+    .map_err(lift)?;
+    if count == 0 {
+        return Ok(0);
+    }
+    super::slide_drawable::replace_message_payload(workspace, object, message_type, data)
+        .map_err(lift)?;
+    let target = workspace.object_mut(object).map_err(lift)?;
+    let index = target
+        .messages
+        .iter()
+        .position(|message| message.type_ == message_type)
+        .ok_or(Error::InvalidSource)?;
+    let info = &mut target.archive_info.message_infos[index];
+    info.object_references.retain(|id| !removed.contains(id));
+    for field in &mut info.field_infos {
+        field.object_references.retain(|id| !removed.contains(id));
+    }
+    Ok(count)
+}
+
+/// Remove one chart (host `remove_slide_chart`).
+fn remove_chart(workspace: &mut Workspace<'_>, source: &Package, chart: u64) -> Result<(), Error> {
+    let wire = workspace.wire;
+    let member = workspace.component_of(chart).ok_or(Error::InvalidSource)?;
+    // The chart's private graph: everything reachable inside its component.
+    let internal = workspace
+        .member_objects(&member)
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let parent = {
+        let payload = workspace.payload(chart, CHART_MESSAGE_TYPE).map_err(lift)?;
+        let fields = Fields::parse(payload, wire).map_err(lift)?;
+        let drawable = fields
+            .unique(CHART_DRAWABLE)
+            .map_err(lift)?
+            .ok_or(Error::InvalidSource)?;
+        let drawable = Fields::parse(drawable.message().map_err(lift)?, wire).map_err(lift)?;
+        reference_of(&drawable, 2, wire)?.ok_or(Error::InvalidSource)?
+    };
+    let mut closure = std::collections::BTreeSet::from([chart]);
+    let mut pending = vec![chart];
+    while let Some(current) = pending.pop() {
+        for target in
+            super::slide_drawable::outgoing_references(workspace, current).map_err(lift)?
+        {
+            if target != parent && internal.contains(&target) && closure.insert(target) {
+                pending.push(target);
+            }
+        }
+    }
+    // Theme presets and the document stylesheet's style list.
+    let show = source
+        .root_show_identifier()
+        .map_err(|_| Error::InvalidSource)?;
+    let show = Fields::parse(
+        workspace.payload(show, SHOW_MESSAGE_TYPE).map_err(lift)?,
+        wire,
+    )
+    .map_err(lift)?;
+    let theme = reference_of(&show, SHOW_THEME, wire)?.ok_or(Error::InvalidSource)?;
+    let theme_payload = workspace
+        .payload(theme, THEME_MESSAGE_TYPE)
+        .map_err(lift)?
+        .to_vec();
+    let theme_fields = Fields::parse(&theme_payload, wire).map_err(lift)?;
+    let theme_super = theme_fields
+        .unique(THEME_SUPER)
+        .map_err(lift)?
+        .ok_or(Error::InvalidSource)?;
+    let theme_super = Fields::parse(theme_super.message().map_err(lift)?, wire).map_err(lift)?;
+    let stylesheet =
+        reference_of(&theme_super, THEME_DOCUMENT_STYLESHEET, wire)?.ok_or(Error::InvalidSource)?;
+    drop_references(
+        workspace,
+        stylesheet,
+        STYLESHEET_MESSAGE_TYPE,
+        &[],
+        STYLESHEET_STYLES,
+        &closure,
+    )?;
+    if theme_super
+        .unique(THEME_CHART_PRESETS)
+        .map_err(lift)?
+        .is_some()
+    {
+        drop_references(
+            workspace,
+            theme,
+            THEME_MESSAGE_TYPE,
+            &[THEME_SUPER, THEME_CHART_PRESETS],
+            1,
+            &closure,
+        )?;
+    }
+    // Every component's external references to the chart's objects.
+    let component = workspace
+        .registry
+        .component_for_member(&member)
+        .ok_or(Error::InvalidSource)?
+        .identifier;
+    let others = workspace
+        .registry
+        .components()
+        .filter(|other| {
+            other.external_references().iter().any(|reference| {
+                reference.component == component
+                    && reference
+                        .object
+                        .is_some_and(|object| closure.contains(&object))
+            })
+        })
+        .map(|other| other.identifier)
+        .collect::<Vec<_>>();
+    for other in others {
+        let entry = workspace
+            .registry
+            .component_mut(other)
+            .ok_or(Error::InvalidSource)?;
+        let kept = entry
+            .external_references()
+            .iter()
+            .filter(|reference| {
+                !(reference.component == component
+                    && reference
+                        .object
+                        .is_some_and(|object| closure.contains(&object)))
+            })
+            .copied()
+            .collect();
+        entry.set_external_references(kept);
+    }
+    super::slide_drawable::remove_drawable_closure(workspace, parent, chart).map_err(|error| {
+        match error {
+            super::slide_drawable::Error::Refused(_) => Error::Refused(Refusal::SharedGraph),
+            _ => Error::InvalidSource,
+        }
+    })?;
+    Ok(())
 }
 
 /// Exact-source-checked reversible chart-lifecycle patch.

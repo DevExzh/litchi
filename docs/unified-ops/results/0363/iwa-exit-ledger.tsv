@@ -296,7 +296,7 @@ keynote/editor/named_paragraph_styles.rs	slide_text_box_applied_named_paragraph_
 keynote/editor/named_paragraph_styles.rs	slide_text_box_named_paragraph_styles	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	add_slide_chart	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	duplicate_slide_chart	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts.rs	remove_slide_chart	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts.rs	remove_slide_chart	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::remove	keynote_slide_chart_remove_parity	B	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_data	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_direction	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_direction	keynote_slide_chart_direction_parity	B	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_geometry	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_geometry	keynote_slide_chart_geometry_parity	B	-	-
