@@ -6247,3 +6247,24 @@ See [0063](0063-source-pptx-modern-comments.md).
   reviewed harness fixture and test runtime admission. Original flat/W6
   repairs continue, with a retained e4a lock located for dependency review.
   C/P remain frozen and all 28 final qualifications remain open. No push.
+
+  ODG/ODP v5 then passes independent source review through runtime admission,
+  including the fixed tracked fixture and real producer-receipt interfaces.
+  Source-ready preparations reach 25 of 28; integrated-P rebinding and all
+  actual qualification remain pending. A one-digit review-hash transcription
+  error is corrected in a separate receipt, preserving the original. Root's
+  expanded 32-file consumer preview applies cleanly. W6 v2 is returned because
+  its guarded producer is still an unimplemented placeholder; v3 must supply
+  it. Flat-parts v2 has entered independent review. Nothing is pushed.
+
+
+  The gate then terminates at leaf Clippy: 35 checks pass, seven DrawingML
+  test lints fail one check, and 29 checks remain unrun (165h). An isolated
+  leaf commits the seven fixes as 472a89a3fa; production code is unchanged.
+  Root starts a bounded, isolated Clippy diagnostic with `--keep-going`.
+  The failed full65 receipt is preserved and no successor acceptance is
+  claimed. Composition v3 is returned for stale pristine-input paths; v4
+  independently reproduces all 32 outputs from 23 sealed pristine inputs.
+  W6 v3 and flat-parts v2 are returned for executable producer/admission
+  defects; both are in repair. C/P remain frozen, 25 of 28 preparations are
+  source-ready, and all actual qualification remains pending. No push.
