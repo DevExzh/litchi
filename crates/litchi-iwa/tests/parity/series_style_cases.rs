@@ -911,3 +911,39 @@ fn pages_shape_image_fill_read_parity() -> TestResult {
         Evidence::Queued,
     )
 }
+
+#[inline(never)]
+fn host_series_route(
+    bytes: &[u8],
+    target: Target,
+    chart: u64,
+    property: Property,
+) -> TestResult<String> {
+    host_read(bytes, target, chart, property)
+}
+
+#[inline(never)]
+fn leaf_series_route(bytes: &[u8], chart: u64, property: Property) -> TestResult<String> {
+    engine_read(bytes, chart, property, 2)
+}
+
+/// ABBA cost probe of the series-style reads (record 0375 §5); toggle
+/// `*series_style_cases::host_series_route*` or
+/// `*series_style_cases::leaf_series_route*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn series_style_read_cost_abba() -> TestResult {
+    for property in [Property::Strokes, Property::Fills, Property::Trendlines] {
+        for format in [Format::Keynote, Format::Numbers, Format::Pages] {
+            let mut input = input(format, property.kind())?;
+            let (target, chart) = (input.target, input.chart);
+            input.fixture.bytes = host_style(&input.fixture.bytes, target, chart, property)?;
+            let bytes = input.fixture.bytes.as_slice();
+            std::hint::black_box(host_series_route(bytes, target, chart, property)?);
+            std::hint::black_box(leaf_series_route(bytes, chart, property)?);
+            std::hint::black_box(leaf_series_route(bytes, chart, property)?);
+            std::hint::black_box(host_series_route(bytes, target, chart, property)?);
+        }
+    }
+    Ok(())
+}
