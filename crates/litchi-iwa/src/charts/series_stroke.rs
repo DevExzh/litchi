@@ -6,6 +6,8 @@
 
 use prost::Message;
 
+use litchi_iwa_common::chart::series;
+
 use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
@@ -308,19 +310,14 @@ pub enum ChartSeriesStrokeKind {
 impl ChartSeriesStrokeKind {
     /// Resolve the stroke family displayed by iWork for a chart kind.
     pub fn for_chart_kind(kind: Kind) -> Result<Self> {
-        match kind {
-            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
-            Kind::Bar2d
-            | Kind::StackedBar2d
-            | Kind::MultiDataBar2d
-            | Kind::Column2d
-            | Kind::StackedColumn2d
-            | Kind::MultiDataColumn2d => Ok(Self::BarOrColumn2d),
-            Kind::Bubble2d => Ok(Self::Bubble2d),
-            Kind::Line2d => Ok(Self::Line2d),
-            Kind::Pie2d | Kind::Donut2d => Ok(Self::Pie2d),
-            Kind::Radar2d => Ok(Self::Radar2d),
-            Kind::Scatter2d => Ok(Self::Scatter2d),
+        match series::StrokeFamily::for_chart_kind(kind) {
+            Some(series::StrokeFamily::Area2d) => Ok(Self::Area2d),
+            Some(series::StrokeFamily::BarOrColumn2d) => Ok(Self::BarOrColumn2d),
+            Some(series::StrokeFamily::Bubble2d) => Ok(Self::Bubble2d),
+            Some(series::StrokeFamily::Line2d) => Ok(Self::Line2d),
+            Some(series::StrokeFamily::Pie2d) => Ok(Self::Pie2d),
+            Some(series::StrokeFamily::Radar2d) => Ok(Self::Radar2d),
+            Some(series::StrokeFamily::Scatter2d) => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series stroke"
             ))),

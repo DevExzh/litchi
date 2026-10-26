@@ -148,3 +148,95 @@ fn non_lines_are_refused() {
         Err(Error::Malformed { .. })
     ));
 }
+
+fn rgb(r: f32) -> tsp::Color {
+    tsp::Color {
+        model: tsp::color::ColorModel::Rgb as i32,
+        r: Some(r),
+        g: Some(0.5),
+        b: Some(0.25),
+        a: Some(1.0),
+        rgbspace: Some(tsp::color::RgbColorSpace::P3 as i32),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn native_fills_and_strokes_decode_like_the_generated_types() -> TestResult {
+    use super::native;
+    let fill = tsd::FillArchive {
+        image: Some(tsd::ImageFillArchive {
+            imagedata: Some(tsp::DataReference { identifier: 42 }),
+            technique: Some(4),
+            tint: Some(rgb(0.1)),
+            fillsize: Some(tsp::Size {
+                width: 30.0,
+                height: 20.0,
+            }),
+            interprets_untagged_image_data_as_generic: Some(true),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let decoded = native::fill(&fill.encode_to_vec(), Limits::DEFAULT)?;
+    let image = decoded.image.ok_or("image")?;
+    assert_eq!(image.data, Some(42));
+    assert_eq!(image.technique, Some(4));
+    assert_eq!(image.fill_size, Some([30.0, 20.0]));
+    assert_eq!(image.generic, Some(true));
+    assert_eq!(image.tint.map(|color| color.rgb_space), Some(Some(2)));
+    assert!(!image.is_legacy && decoded.color.is_none() && decoded.gradient.is_none());
+
+    let gradient = tsd::FillArchive {
+        gradient: Some(tsd::GradientArchive {
+            r#type: Some(1),
+            stops: vec![tsd::gradient_archive::GradientStop {
+                color: Some(rgb(0.3)),
+                fraction: Some(0.0),
+                inflection: Some(0.5),
+            }],
+            opacity: Some(0.8),
+            advanced_gradient: Some(true),
+            anglegradient: Some(tsd::AngleGradientArchive {
+                gradientangle: Some(1.5),
+            }),
+            transformgradient: None,
+        }),
+        ..Default::default()
+    };
+    let decoded = native::fill(&gradient.encode_to_vec(), Limits::DEFAULT)?;
+    let gradient = decoded.gradient.ok_or("gradient")?;
+    assert_eq!(
+        (gradient.kind, gradient.opacity, gradient.angle),
+        (Some(1), Some(0.8), Some(1.5))
+    );
+    assert_eq!(
+        gradient.stops[0].color.and_then(|color| color.rgba[0]),
+        Some(0.3)
+    );
+
+    let stroke = tsd::StrokeArchive {
+        color: Some(rgb(0.9)),
+        width: Some(2.0),
+        cap: Some(1),
+        join: Some(2),
+        miter_limit: Some(4.0),
+        pattern: Some(tsd::StrokePatternArchive {
+            r#type: Some(0),
+            phase: Some(0.0),
+            count: Some(2),
+            pattern: vec![2.0, 2.0, 0.0, 0.0, 0.0, 0.0],
+        }),
+        ..Default::default()
+    };
+    let decoded = native::stroke(&stroke.encode_to_vec(), Limits::DEFAULT)?;
+    assert_eq!(
+        (decoded.width, decoded.cap, decoded.join),
+        (Some(2.0), Some(1), Some(2))
+    );
+    let pattern = decoded.pattern.ok_or("pattern")?;
+    assert_eq!(pattern.count, Some(2));
+    assert_eq!(pattern.lengths, vec![2.0, 2.0, 0.0, 0.0, 0.0, 0.0]);
+    assert!(!decoded.is_special);
+    Ok(())
+}
