@@ -487,31 +487,31 @@ impl std::error::Error for Error {}
 
 /// One wire field located in a payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Field {
-    number: u32,
-    wire_type: u8,
-    start: usize,
-    key_end: usize,
-    payload_start: usize,
-    end: usize,
+pub(crate) struct Field {
+    pub(crate) number: u32,
+    pub(crate) wire_type: u8,
+    pub(crate) start: usize,
+    pub(crate) key_end: usize,
+    pub(crate) payload_start: usize,
+    pub(crate) end: usize,
     /// The decoded varint, for wire type 0.
-    varint: u64,
+    pub(crate) varint: u64,
 }
 
 impl Field {
-    fn payload<'a>(&self, data: &'a [u8]) -> &'a [u8] {
+    pub(crate) fn payload<'a>(&self, data: &'a [u8]) -> &'a [u8] {
         &data[self.payload_start..self.end]
     }
 }
 
 /// Field visits charged against [`Limits::max_fields`].
-struct Budget {
+pub(crate) struct Budget {
     fields: usize,
     maximum: usize,
 }
 
 impl Budget {
-    const fn new(limits: Limits) -> Self {
+    pub(crate) const fn new(limits: Limits) -> Self {
         Self {
             fields: 0,
             maximum: limits.max_fields,
@@ -531,7 +531,7 @@ impl Budget {
     }
 }
 
-fn read_varint(data: &[u8], offset: &mut usize) -> Result<u64, Error> {
+pub(crate) fn read_varint(data: &[u8], offset: &mut usize) -> Result<u64, Error> {
     let mut value = 0_u64;
     for shift in (0..64).step_by(7) {
         let Some(&byte) = data.get(*offset) else {
@@ -555,7 +555,7 @@ fn read_varint(data: &[u8], offset: &mut usize) -> Result<u64, Error> {
     })
 }
 
-const fn varint_len(mut value: u64) -> usize {
+pub(crate) const fn varint_len(mut value: u64) -> usize {
     let mut length = 1;
     while value >= 0x80 {
         value >>= 7;
@@ -564,7 +564,7 @@ const fn varint_len(mut value: u64) -> usize {
     length
 }
 
-fn push_varint(output: &mut Vec<u8>, mut value: u64) {
+pub(crate) fn push_varint(output: &mut Vec<u8>, mut value: u64) {
     while value >= 0x80 {
         output.push((value as u8 & 0x7f) | 0x80);
         value >>= 7;
@@ -573,7 +573,7 @@ fn push_varint(output: &mut Vec<u8>, mut value: u64) {
 }
 
 /// Visit every top-level field of `data` once, validating its framing.
-fn visit_fields(
+pub(crate) fn visit_fields(
     data: &[u8],
     budget: &mut Budget,
     mut visit: impl FnMut(Field) -> Result<(), Error>,
@@ -632,7 +632,11 @@ fn visit_fields(
 }
 
 /// The unique occurrence of `number` in `data`, if any.
-fn singular(data: &[u8], number: u32, budget: &mut Budget) -> Result<Option<Field>, Error> {
+pub(crate) fn singular(
+    data: &[u8],
+    number: u32,
+    budget: &mut Budget,
+) -> Result<Option<Field>, Error> {
     let mut found = None;
     visit_fields(data, budget, |field| {
         if field.number == number && found.replace(field).is_some() {
@@ -643,7 +647,7 @@ fn singular(data: &[u8], number: u32, budget: &mut Budget) -> Result<Option<Fiel
     Ok(found)
 }
 
-const fn require_wire_type(field: &Field, expected: u8) -> Result<(), Error> {
+pub(crate) const fn require_wire_type(field: &Field, expected: u8) -> Result<(), Error> {
     if field.wire_type != expected {
         return Err(Error::WireType {
             field: field.number,
@@ -654,7 +658,7 @@ const fn require_wire_type(field: &Field, expected: u8) -> Result<(), Error> {
     Ok(())
 }
 
-fn check_bytes(observed: usize, limits: Limits) -> Result<(), Error> {
+pub(crate) fn check_bytes(observed: usize, limits: Limits) -> Result<(), Error> {
     if observed > limits.max_bytes {
         return Err(Error::Limit {
             kind: LimitKind::Bytes,
@@ -665,7 +669,7 @@ fn check_bytes(observed: usize, limits: Limits) -> Result<(), Error> {
     Ok(())
 }
 
-fn allocate(capacity: usize, limits: Limits) -> Result<Vec<u8>, Error> {
+pub(crate) fn allocate(capacity: usize, limits: Limits) -> Result<Vec<u8>, Error> {
     check_bytes(capacity, limits)?;
     let mut output = Vec::new();
     output
@@ -825,7 +829,7 @@ impl<'source> Properties<'source> {
     }
 }
 
-fn read_f32(payload: &[u8]) -> f32 {
+pub(crate) fn read_f32(payload: &[u8]) -> f32 {
     let mut bytes = [0_u8; 4];
     bytes.copy_from_slice(payload);
     f32::from_le_bytes(bytes)
@@ -867,6 +871,10 @@ pub struct Rewrite<'source> {
 }
 
 impl<'source> Rewrite<'source> {
+    pub(crate) const fn from_cow(bytes: Cow<'source, [u8]>) -> Self {
+        Self { bytes }
+    }
+
     /// Whether the candidate differs from the source.
     #[must_use]
     pub fn changed(&self) -> bool {
@@ -1194,7 +1202,7 @@ fn apply_component(
     }
 }
 
-fn replace_scalar(
+pub(crate) fn replace_scalar(
     data: &[u8],
     field: &Field,
     value: &[u8],
@@ -1213,7 +1221,7 @@ fn replace_scalar(
 
 /// Replace a length-delimited field's payload, keeping its key bytes and,
 /// when the length is unchanged, its length prefix.
-fn replace_payload(
+pub(crate) fn replace_payload(
     data: &[u8],
     field: &Field,
     payload: &[u8],
@@ -1239,7 +1247,7 @@ fn replace_payload(
     Ok(output)
 }
 
-fn remove_field(data: &[u8], field: &Field, limits: Limits) -> Result<Vec<u8>, Error> {
+pub(crate) fn remove_field(data: &[u8], field: &Field, limits: Limits) -> Result<Vec<u8>, Error> {
     let mut output = allocate(data.len() - (field.end - field.start), limits)?;
     output.extend_from_slice(&data[..field.start]);
     output.extend_from_slice(&data[field.end..]);

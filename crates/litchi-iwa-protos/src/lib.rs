@@ -2334,6 +2334,11 @@ pub mod keynote_chart_legend_codec;
 #[doc(hidden)]
 pub mod chart_style_codec;
 
+/// Internal bounded shape-geometry codec (native straight lines) shared by
+/// the Pages, Numbers and Keynote shape engines (record 0375).
+#[doc(hidden)]
+pub mod shape_style_codec;
+
 /// Internal strict shared chart Arrange-state projection. Generated types
 /// remain private and caller-owned source bytes remain the preservation
 /// authority.

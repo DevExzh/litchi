@@ -8,9 +8,11 @@ use crate::{Error, Result};
 pub use litchi_iwa_common::media::Type as MediaType;
 use litchi_iwa_index::ObjectId;
 
-const DEFAULT_MAX_MEDIA_ASSETS: usize = 100_000;
-const DEFAULT_MAX_MEDIA_ASSET_BYTES: u64 = 512 * 1024 * 1024;
-const DEFAULT_MAX_MEDIA_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const DEFAULT_MAX_MEDIA_ASSETS: usize = litchi_iwa_common::media::asset::Limits::HARD_MAX_ASSETS;
+const DEFAULT_MAX_MEDIA_ASSET_BYTES: u64 =
+    litchi_iwa_common::media::asset::Limits::HARD_MAX_ASSET_BYTES;
+const DEFAULT_MAX_MEDIA_TOTAL_BYTES: u64 =
+    litchi_iwa_common::media::asset::Limits::HARD_MAX_TOTAL_BYTES;
 
 /// Information about a materialized `Data/*` package member.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,21 +30,12 @@ pub struct MediaAsset {
 impl MediaAsset {
     /// Create a media asset entry.
     pub fn new(path: PathBuf, size: u64) -> Self {
-        let filename = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("unknown")
-            .to_owned();
-        let media_type = path
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .map(MediaType::from_extension)
-            .unwrap_or(MediaType::Unknown);
+        let asset = litchi_iwa_common::media::Asset::new(path, size);
         Self {
-            path,
-            media_type,
+            media_type: asset.media_type(),
+            filename: asset.file_name().to_owned(),
+            path: asset.path().to_path_buf(),
             size,
-            filename,
         }
     }
 
@@ -103,10 +96,16 @@ impl MediaLimits {
                 Self::HARD_MAX_TOTAL_BYTES
             )));
         }
-        Ok(Self {
+        let limits = litchi_iwa_common::media::asset::Limits::new(
             max_assets,
             max_asset_bytes,
             max_total_bytes,
+        )
+        .map_err(|error| Error::Bundle(error.to_string()))?;
+        Ok(Self {
+            max_assets: limits.max_assets(),
+            max_asset_bytes: limits.max_asset_bytes(),
+            max_total_bytes: limits.max_total_bytes(),
         })
     }
 
@@ -255,12 +254,5 @@ impl MediaStats {
 }
 
 pub(crate) fn format_bytes(bytes: u64) -> String {
-    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-    let mut size = bytes as f64;
-    let mut unit = 0;
-    while size >= 1024.0 && unit < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit += 1;
-    }
-    format!("{size:.2} {}", UNITS[unit])
+    litchi_iwa_common::media::asset::format_bytes(bytes)
 }
