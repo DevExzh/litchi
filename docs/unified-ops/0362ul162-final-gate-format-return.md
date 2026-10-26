@@ -28,4 +28,5 @@ External packet:
 
 Native and raw-census preparation stops at its source-identity boundary.
 No archive, native measurement or census capture uses the rejected C2.
-Already emitted external C2 preparation remains preserved. Final gates,+census, fidelity and performance remain required; nothing is pushed.
+Already emitted external C2 preparation remains preserved. Final gates,
+census, fidelity and performance remain required; nothing is pushed.

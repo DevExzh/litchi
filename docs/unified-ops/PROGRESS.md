@@ -6108,3 +6108,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   correction and passes the same check across all 588 changed Rust files.
   Native and census recipes wait at their source-identity boundary. A fresh
   committed successor and gate state are required; no final acceptance or push.
+
+  C2a freezes at 33a0a63d35 and its fresh full65 run passes all seven compiler
+  supplements, workspace formatting and all-feature Clippy (163). Root
+  verifies the initial nine rows; the gate remains live. Current, signed,
+  DrawingML, raw-census, OfficeCLI, notes and scanner126 preparations pass
+  source review after metadata/pin corrections. No archive, final census
+  capture or native measurement is claimed. C and pending P stay frozen;
+  coordinator documentation continues on trunk. Full qualification, protocol
+  installation and remaining control cleanup remain required. Nothing is pushed.
