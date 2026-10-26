@@ -3,7 +3,7 @@
 use std::fmt::{Debug, Write as _};
 use std::path::{Path, PathBuf};
 
-use crate::archive_diff::{self, first_difference};
+use crate::archive_diff::{self, MetadataPolicy, first_difference};
 use crate::known_fields::KnownFields;
 
 /// Result type of routes, reads and cases.
@@ -120,6 +120,8 @@ pub struct Case<'a> {
     reads: Vec<(&'static str, ReadFn<'a>)>,
     known: KnownFields,
     read_only: bool,
+    leaf_drops: &'static [&'static str],
+    metadata: MetadataPolicy,
 }
 
 /// What a passing case observed.
@@ -151,6 +153,8 @@ impl Case<'_> {
             reads: Vec::new(),
             known: KnownFields::for_format(format),
             read_only: false,
+            leaf_drops: &[],
+            metadata: MetadataPolicy::default(),
         }
     }
 }
@@ -191,6 +195,32 @@ impl<'a> Case<'a> {
     #[must_use]
     pub fn read_only(mut self) -> Self {
         self.read_only = true;
+        self
+    }
+
+    /// Accept that the leaf deletes Keynote's three root previews
+    /// (`preview.jpg`, `preview-micro.jpg`, `preview-web.jpg`) where the
+    /// host keeps them stale. The leaf's rendering invalidation is its
+    /// documented, natively verified policy (ADR 0028: "Each Rust candidate
+    /// deleted all three root previews; Keynote regenerated them on
+    /// resave"); every other member and object is still compared.
+    #[must_use]
+    pub fn leaf_invalidates_root_previews(mut self) -> Self {
+        self.leaf_drops = &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
+        self
+    }
+
+    /// Accept the leaf structural workspace's package-metadata policies
+    /// (record 0298 §2.1): the save token advances by one, and created
+    /// objects get deterministic UUIDs where the host draws random ones.
+    /// Both are checked for their documented shape and then compared as
+    /// equal; see [`MetadataPolicy`].
+    #[must_use]
+    pub fn leaf_structural_metadata(mut self) -> Self {
+        self.metadata = MetadataPolicy {
+            save_token: true,
+            fresh_uuids: true,
+        };
         self
     }
 
@@ -267,7 +297,14 @@ impl<'a> Case<'a> {
             ));
         }
 
-        let diff = archive_diff::compare(input, &host_output, leaf_output, &self.known)?;
+        let diff = archive_diff::compare_with_policies(
+            input,
+            &host_output,
+            leaf_output,
+            &self.known,
+            self.leaf_drops,
+            self.metadata,
+        )?;
         match self.tier {
             Tier::A => {
                 if host_output != leaf_output {
