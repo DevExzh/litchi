@@ -783,6 +783,20 @@ pub(super) fn materialize(
     position: At,
     key: u32,
 ) -> Result<(), Error> {
+    let mut cell = litchi_numbers_wire::BncCell::minimal();
+    cell.set_text_style_identifier(Some(key));
+    materialize_cell(working, store, columns, position, &cell)
+}
+
+/// Store `cell` at the empty position `position`, counting it in its row
+/// and column headers.
+pub(super) fn materialize_cell(
+    working: &mut Working<'_>,
+    store: &[u8],
+    columns: u32,
+    position: At,
+    cell: &litchi_numbers_wire::BncCell,
+) -> Result<(), Error> {
     let (tiles, size) = topology::tiles(store).map_err(from_topology)?;
     let tile_key = u64::from(position.row()) / size;
     let local =
@@ -792,9 +806,7 @@ pub(super) fn materialize(
         .find(|(candidate, _)| u64::from(*candidate) == tile_key)
         .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let limits = litchi_numbers_wire::Limits::DEFAULT;
-    let mut cell = litchi_numbers_wire::BncCell::minimal();
-    cell.set_text_style_identifier(Some(key));
-    let encoded = crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
+    let encoded = crate::cell::wire::encode(cell, &limits).map_err(|_| Error::InvalidSource)?;
     let (tile_index, tile_data) =
         topology::message(working, *tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
     let written = litchi_numbers_wire::table_write::tile_set_cell(

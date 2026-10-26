@@ -385,6 +385,17 @@ impl<'p> Working<'p> {
             .ok_or(Fault::Invalid)
     }
 
+    /// The names of every component, in catalog order.
+    pub(super) fn component_names(&self) -> Vec<String> {
+        self.source
+            .state
+            .components
+            .catalog()
+            .iter()
+            .map(|component| component.name().to_owned())
+            .collect()
+    }
+
     /// The component holding object `identifier`, if it exists.
     ///
     /// An identifier stored in more than one component (an alias the native

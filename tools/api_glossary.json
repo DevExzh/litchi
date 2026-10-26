@@ -23063,6 +23063,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::list",
         "litchi_numbers::cell::text",
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
@@ -23169,6 +23170,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_lists",
+          "ok": "litchi_numbers::cell::list::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_text",
@@ -23869,6 +23874,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::list",
         "litchi_numbers::cell::text",
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
@@ -23975,6 +23981,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_lists",
+          "ok": "litchi_numbers::cell::list::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_text",
