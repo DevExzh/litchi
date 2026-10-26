@@ -22415,6 +22415,36 @@
           "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
         },
         {
+          "method": "litchi_numbers_wire::formula_cache::author::plan",
+          "inputs": ["source", "row", "column", "change", "next_identifier", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::author::encode",
+          "inputs": ["expression", "owner", "row", "column", "rows", "columns", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::author::table_owner",
+          "inputs": ["source", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::formula_free",
+          "inputs": ["previous", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::with_formula",
+          "inputs": ["cell", "key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::formula_cache::refresh::plan",
           "inputs": ["source", "writes", "object", "limits"],
           "limits_argument": "limits",
@@ -22422,7 +22452,7 @@
         },
         {
           "method": "litchi_numbers_wire::formula_cache::refresh::TileCaches::apply",
-          "inputs": ["self", "tile", "columns", "limits"],
+          "inputs": ["self", "tile", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_numbers_wire::Limits"
         },

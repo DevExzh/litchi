@@ -588,6 +588,14 @@ enum Operation {
         column: u32,
         value: TableCellValue,
     },
+    TableFormula {
+        slide: u64,
+        drawable: u64,
+        row: u32,
+        column: u32,
+        expression: crate::slide::table::formula::FormulaExpression,
+        cached: TableCellValue,
+    },
     AddTable {
         slide: u64,
         slide_position: Position,
@@ -1043,6 +1051,8 @@ impl<'a> Edit<'a> {
             | Operation::LineSegment { .. }
             | Operation::TextProperty { .. }
             | Operation::TableCell { .. } => false,
+            | Operation::TableCell { .. }
+            | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::Duplicate { slide, .. }
@@ -1991,6 +2001,59 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// Stage the formula of the cell `row`/`column` of a table drawable, with
+    /// `cached` as its displayed result until the next native
+    /// recalculation; any formula the cell holds is replaced (record 0376a).
+    ///
+    /// The formula reads cells of its own table: a reference to another
+    /// table (`TableCell`, `TableRange`, `TableRows`, `TableColumns`, which
+    /// name it by native identifier) or a pivot category is refused. Formulas
+    /// that read the cell keep their caches, as in the native application's
+    /// unrecalculated state. Clear a formula with [`Edit::set_table_cell`].
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::Unsupported`] for a drawable that is not a table, and with
+    /// [`Unsupported::TableFormulas`] at commit for a reference outside the
+    /// table, an unknown function, a date or duration cache, or a table
+    /// whose dependency records would need a new tile.
+    pub fn set_table_formula_cached<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        row: u32,
+        column: u32,
+        expression: crate::slide::table::formula::FormulaExpression,
+        cached: crate::slide::table::formula::FormulaCachedValue,
+    ) -> Result<&mut Self, Error> {
+        use crate::slide::table::formula::FormulaCachedValue as Cached;
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        if item.kind != Kind::Table {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        let cached = match cached {
+            Cached::Number(number) => TableCellValue::Number(number.get()),
+            Cached::Text(text) => TableCellValue::Text(text),
+            Cached::Boolean(flag) => TableCellValue::Boolean(flag),
+            Cached::Date(_) | Cached::Duration(_) => {
+                return Err(Error::Refused(Refusal::Unsupported {
+                    reason: Unsupported::TableFormulas,
+                }));
+            },
+        };
+        self.operations.push(Operation::TableFormula {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            row,
+            column,
+            expression,
+            cached,
+        });
+        Ok(self)
+    }
+
     /// Apply every staged operation in one workspace, publish one candidate,
     /// reopen, validate and read it back.
     ///
@@ -2696,6 +2759,24 @@ fn commit_operations(
                 value,
             } => {
                 stage::set_table_cell(&mut workspace, *drawable, *row, *column, value)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TableFormula {
+                slide,
+                drawable,
+                row,
+                column,
+                expression,
+                cached,
+            } => {
+                stage::set_table_formula(
+                    &mut workspace,
+                    *drawable,
+                    *row,
+                    *column,
+                    expression,
+                    cached,
+                )?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::NotesStyle {
