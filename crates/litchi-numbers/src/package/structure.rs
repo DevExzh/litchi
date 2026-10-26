@@ -101,6 +101,17 @@ pub(super) enum FaultLimit {
 
 pub(super) type FaultResult<T> = Result<T, Fault>;
 
+impl From<litchi_numbers_wire::table_topology::Error> for Fault {
+    fn from(error: litchi_numbers_wire::table_topology::Error) -> Self {
+        use litchi_numbers_wire::table_topology::Error as E;
+        match error {
+            E::Unsupported => Self::Unsupported,
+            E::Allocation { amount } => Self::Allocation { amount },
+            _ => Self::Invalid,
+        }
+    }
+}
+
 pub(super) fn allocation(amount: usize) -> Fault {
     Fault::Allocation { amount }
 }

@@ -7,20 +7,20 @@
 //! bytes. Ported from the host editor's `row_insert`, `column_insert`,
 //! `table_delete` and `stroke_layers` storage phases.
 
-use super::super::structure::{Fault, FaultResult, reserve};
 use super::wire::{
     Field, bytes_field, fields, push_bytes_field, push_varint_field, rebuild, repeated_bytes,
     repeated_varints, single_bytes, single_varint, varint, varint_field,
 };
+use super::{Error, Result, reserve};
 
 /// Rows one native header bucket covers.
-pub(super) const HEADER_BUCKET_ROWS: u64 = 65_536;
+pub const HEADER_BUCKET_ROWS: u64 = 65_536;
 /// The "no cell" marker of a cell-offset table.
 const MISSING: [u8; 2] = [0xff, 0xff];
 
 /// One axis edit at a physical index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AxisEdit {
+pub enum AxisEdit {
     /// A blank row or column is inserted before `index` (`index` may equal
     /// the axis length to append).
     Insert(u32),
@@ -30,10 +30,10 @@ pub(super) enum AxisEdit {
 
 impl AxisEdit {
     /// The new position of index `value`, or `None` for the removed index.
-    pub(super) fn shift(self, value: u32) -> FaultResult<Option<u32>> {
+    pub fn shift(self, value: u32) -> Result<Option<u32>> {
         Ok(match self {
             Self::Insert(index) if value >= index => {
-                Some(value.checked_add(1).ok_or(Fault::Invalid)?)
+                Some(value.checked_add(1).ok_or(Error::Invalid)?)
             },
             Self::Insert(_) => Some(value),
             Self::Remove(index) if value == index => None,
@@ -48,24 +48,19 @@ impl AxisEdit {
 /// `key` is the tile's key and `size` the rows per tile. A removed row goes
 /// with its cells (the caller releases their list references); a row that
 /// would move into another tile is refused.
-pub(super) fn tile_rows(
-    tile: &[u8],
-    key: u32,
-    size: u32,
-    edit: AxisEdit,
-) -> FaultResult<Option<Vec<u8>>> {
+pub fn tile_rows(tile: &[u8], key: u32, size: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
     let base = u64::from(key) * u64::from(size);
     let original_rows = repeated_bytes(tile, 5)?;
-    let numrows = single_varint(tile, 4)?.ok_or(Fault::Invalid)?;
+    let numrows = single_varint(tile, 4)?.ok_or(Error::Invalid)?;
     let mut maximum = None;
     for row in &original_rows {
-        let index = single_varint(row, 1)?.ok_or(Fault::Invalid)?;
+        let index = single_varint(row, 1)?.ok_or(Error::Invalid)?;
         maximum = maximum.max(Some(index));
     }
-    let counts_rows = numrows == u64::try_from(original_rows.len()).map_err(|_e| Fault::Invalid)?;
+    let counts_rows = numrows == u64::try_from(original_rows.len()).map_err(|_e| Error::Invalid)?;
     let counts_extent = maximum.map_or(numrows == 0, |maximum| numrows == maximum + 1);
     if !counts_rows && !counts_extent {
-        return Err(Fault::Unsupported);
+        return Err(Error::Unsupported);
     }
     let mut changed = false;
     let mut kept = 0_u64;
@@ -74,8 +69,8 @@ pub(super) fn tile_rows(
         if field.number != 5 {
             return Ok(None);
         }
-        let local = single_varint(field.payload, 1)?.ok_or(Fault::Invalid)?;
-        let global = u32::try_from(base + local).map_err(|_error| Fault::Invalid)?;
+        let local = single_varint(field.payload, 1)?.ok_or(Error::Invalid)?;
+        let global = u32::try_from(base + local).map_err(|_error| Error::Invalid)?;
         let Some(shifted) = edit.shift(global)? else {
             // The removed row goes with its cells; the caller releases their
             // list references.
@@ -84,7 +79,7 @@ pub(super) fn tile_rows(
         };
         let shifted = u64::from(shifted);
         if shifted / u64::from(size) != u64::from(key) {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         kept += 1;
         let local_after = shifted - base;
@@ -121,26 +116,26 @@ pub(super) fn tile_rows(
 }
 
 /// Splice one cell-offset table (`2` bytes per column) for a column edit.
-fn splice_offsets(offsets: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<Option<Vec<u8>>> {
+fn splice_offsets(offsets: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
     if offsets.is_empty() {
         return Ok(None);
     }
     if offsets.len() % 2 != 0 {
-        return Err(Fault::Invalid);
+        return Err(Error::Invalid);
     }
     let entries = offsets.len() / 2;
-    let columns = usize::try_from(columns).map_err(|_error| Fault::Invalid)?;
+    let columns = usize::try_from(columns).map_err(|_error| Error::Invalid)?;
     let mut table: Vec<[u8; 2]> = Vec::new();
     reserve(&mut table, entries + 1)?;
     for pair in offsets.chunks_exact(2) {
         table.push([pair[0], pair[1]]);
     }
     if table.iter().skip(columns).any(|entry| *entry != MISSING) {
-        return Err(Fault::Unsupported);
+        return Err(Error::Unsupported);
     }
     match edit {
         AxisEdit::Insert(index) => {
-            let index = usize::try_from(index).map_err(|_error| Fault::Invalid)?;
+            let index = usize::try_from(index).map_err(|_error| Error::Invalid)?;
             if index >= entries {
                 return Ok(None);
             }
@@ -148,18 +143,18 @@ fn splice_offsets(offsets: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<O
             if entries > columns {
                 // Spare capacity: keep the table's length.
                 if table.pop() != Some(MISSING) {
-                    return Err(Fault::Unsupported);
+                    return Err(Error::Unsupported);
                 }
             }
         },
         AxisEdit::Remove(index) => {
-            let index = usize::try_from(index).map_err(|_error| Fault::Invalid)?;
+            let index = usize::try_from(index).map_err(|_error| Error::Invalid)?;
             if index >= entries {
                 return Ok(None);
             }
             if table.remove(index) != MISSING {
                 // A stored cell is removed with its bytes (`remove_slot`).
-                return Err(Fault::Invalid);
+                return Err(Error::Invalid);
             }
             if entries > columns {
                 table.push(MISSING);
@@ -177,9 +172,9 @@ fn splice_offsets(offsets: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<O
 /// The slots of one cell-offset table: `(start, end)` byte ranges of the
 /// stored cells in `storage`, `None` for a missing cell. `unit` is the
 /// offset unit in bytes (`4` for wide BNC offsets, else `1`).
-fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> FaultResult<Vec<Option<(usize, usize)>>> {
+fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> Result<Vec<Option<(usize, usize)>>> {
     if offsets.len() % 2 != 0 {
-        return Err(Fault::Invalid);
+        return Err(Error::Invalid);
     }
     let mut starts: Vec<Option<usize>> = Vec::new();
     reserve(&mut starts, offsets.len() / 2)?;
@@ -192,7 +187,7 @@ fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> FaultResult<Vec<Option<
         || present.last().is_some_and(|last| *last >= storage.len())
         || present.first().is_some_and(|first| *first != 0)
     {
-        return Err(Fault::Unsupported);
+        return Err(Error::Unsupported);
     }
     let mut output = Vec::new();
     reserve(&mut output, starts.len())?;
@@ -204,7 +199,7 @@ fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> FaultResult<Vec<Option<
 }
 
 /// The stored BNC cells of one tile row, as `(column, bytes)`.
-pub(in crate::package) fn bnc_cells(row: &[u8]) -> FaultResult<Vec<(u32, &[u8])>> {
+pub fn bnc_cells(row: &[u8]) -> Result<Vec<(u32, &[u8])>> {
     let (Some(storage), Some(offsets)) = (single_bytes(row, 6)?, single_bytes(row, 7)?) else {
         return Ok(Vec::new());
     };
@@ -218,8 +213,8 @@ pub(in crate::package) fn bnc_cells(row: &[u8]) -> FaultResult<Vec<(u32, &[u8])>
         if let Some((start, end)) = slot {
             reserve(&mut output, 1)?;
             output.push((
-                u32::try_from(column).map_err(|_error| Fault::Invalid)?,
-                storage.get(start..end).ok_or(Fault::Invalid)?,
+                u32::try_from(column).map_err(|_error| Error::Invalid)?,
+                storage.get(start..end).ok_or(Error::Invalid)?,
             ));
         }
     }
@@ -230,11 +225,7 @@ pub(in crate::package) fn bnc_cells(row: &[u8]) -> FaultResult<Vec<(u32, &[u8])>
 /// other cell keeps its bytes (later cells move with the new length).
 ///
 /// Returns `None` when the row stores no BNC cell in `column`.
-pub(in crate::package) fn replace_cell(
-    row: &[u8],
-    column: u32,
-    cell: &[u8],
-) -> FaultResult<Option<Vec<u8>>> {
+pub fn replace_cell(row: &[u8], column: u32, cell: &[u8]) -> Result<Option<Vec<u8>>> {
     let (Some(storage), Some(offsets)) = (single_bytes(row, 6)?, single_bytes(row, 7)?) else {
         return Ok(None);
     };
@@ -243,7 +234,7 @@ pub(in crate::package) fn replace_cell(
     } else {
         1
     };
-    let column = usize::try_from(column).map_err(|_error| Fault::Invalid)?;
+    let column = usize::try_from(column).map_err(|_error| Error::Invalid)?;
     let cells = slots(storage, offsets, unit)?;
     if cells.get(column).copied().flatten().is_none() {
         return Ok(None);
@@ -261,15 +252,15 @@ pub(in crate::package) fn replace_cell(
             new_storage.push(0);
         }
         let offset =
-            u16::try_from(new_storage.len() / unit).map_err(|_error| Fault::Unsupported)?;
+            u16::try_from(new_storage.len() / unit).map_err(|_error| Error::Unsupported)?;
         if offset.to_le_bytes() == MISSING {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         new_offsets.extend_from_slice(&offset.to_le_bytes());
         if index == column {
             new_storage.extend_from_slice(cell);
         } else {
-            new_storage.extend_from_slice(storage.get(start..end).ok_or(Fault::Invalid)?);
+            new_storage.extend_from_slice(storage.get(start..end).ok_or(Error::Invalid)?);
         }
     }
     while new_storage.len() % unit != 0 {
@@ -291,10 +282,10 @@ fn remove_slot(
     unit: usize,
     column: usize,
     columns: usize,
-) -> FaultResult<(Vec<u8>, Vec<u8>)> {
+) -> Result<(Vec<u8>, Vec<u8>)> {
     let mut cells = slots(storage, offsets, unit)?;
     if column >= cells.len() {
-        return Err(Fault::Invalid);
+        return Err(Error::Invalid);
     }
     let spare = cells.len() > columns;
     cells.remove(column);
@@ -314,12 +305,12 @@ fn remove_slot(
             new_storage.push(0);
         }
         let offset =
-            u16::try_from(new_storage.len() / unit).map_err(|_error| Fault::Unsupported)?;
+            u16::try_from(new_storage.len() / unit).map_err(|_error| Error::Unsupported)?;
         if offset.to_le_bytes() == MISSING {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         new_offsets.extend_from_slice(&offset.to_le_bytes());
-        new_storage.extend_from_slice(storage.get(start..end).ok_or(Fault::Invalid)?);
+        new_storage.extend_from_slice(storage.get(start..end).ok_or(Error::Invalid)?);
     }
     while new_storage.len() % unit != 0 {
         new_storage.push(0);
@@ -332,10 +323,10 @@ fn remove_slot(
 /// removed column's cell from the current (BNC) and pre-BNC storage (its
 /// list references are released by the caller) and lowers the row's cell
 /// count when a BNC cell went.
-fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<Option<Vec<u8>>> {
-    let columns_usize = usize::try_from(columns).map_err(|_error| Fault::Invalid)?;
+fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
+    let columns_usize = usize::try_from(columns).map_err(|_error| Error::Invalid)?;
     if let AxisEdit::Remove(index) = edit {
-        let column = usize::try_from(index).map_err(|_error| Fault::Invalid)?;
+        let column = usize::try_from(index).map_err(|_error| Error::Invalid)?;
         let wide = single_varint(row, 8)?.unwrap_or(0) != 0;
         let mut replacements: Vec<(u32, Vec<u8>)> = Vec::new();
         let mut removed_bnc = false;
@@ -369,10 +360,10 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<Option<V
         if replacements.is_empty() {
             return Ok(None);
         }
-        let count = single_varint(row, 2)?.ok_or(Fault::Invalid)?;
+        let count = single_varint(row, 2)?.ok_or(Error::Invalid)?;
         let rebuilt = rebuild(row, |field| {
             if field.number == 2 && removed_bnc {
-                return varint_field(2, count.checked_sub(1).ok_or(Fault::Invalid)?).map(Some);
+                return varint_field(2, count.checked_sub(1).ok_or(Error::Invalid)?).map(Some);
             }
             match replacements
                 .iter()
@@ -390,7 +381,7 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<Option<V
             return Ok(None);
         }
         if field.wire_type != 2 {
-            return Err(Fault::Invalid);
+            return Err(Error::Invalid);
         }
         match splice_offsets(field.payload, columns, edit)? {
             Some(offsets) if offsets != field.payload => {
@@ -414,11 +405,7 @@ fn row_columns(row: &[u8], columns: u32, edit: AxisEdit) -> FaultResult<Option<V
 }
 
 /// Rewrite the rows of one storage tile for a column edit.
-pub(super) fn tile_columns(
-    tile: &[u8],
-    columns: u32,
-    edit: AxisEdit,
-) -> FaultResult<Option<Vec<u8>>> {
+pub fn tile_columns(tile: &[u8], columns: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
     let mut changed = false;
     let output = rebuild(tile, |field| {
         if field.number != 5 {
@@ -443,30 +430,30 @@ pub(super) fn tile_columns(
 /// header must not hide its row or column. `released` gives, per source
 /// index, how many of its stored cells the edit drops (a row removal drops
 /// one cell from each column it stored a cell in, and the reverse).
-pub(super) fn header_bucket(
+pub fn header_bucket(
     payload: &[u8],
     bucket: u64,
     span: Option<u64>,
     edit: AxisEdit,
     released: &dyn Fn(u32) -> u64,
-) -> FaultResult<Option<Vec<u8>>> {
+) -> Result<Option<Vec<u8>>> {
     let mut changed = false;
     let output = rebuild(payload, |field| {
         if field.number != 2 {
             return Ok(None);
         }
-        let index = single_varint(field.payload, 1)?.ok_or(Fault::Invalid)?;
-        let index_u32 = u32::try_from(index).map_err(|_error| Fault::Invalid)?;
+        let index = single_varint(field.payload, 1)?.ok_or(Error::Invalid)?;
+        let index_u32 = u32::try_from(index).map_err(|_error| Error::Invalid)?;
         let release = released(index_u32);
         let cells_after = if release == 0 {
             None
         } else {
-            let cells = single_varint(field.payload, 4)?.ok_or(Fault::Invalid)?;
-            Some(cells.checked_sub(release).ok_or(Fault::Unsupported)?)
+            let cells = single_varint(field.payload, 4)?.ok_or(Error::Invalid)?;
+            Some(cells.checked_sub(release).ok_or(Error::Unsupported)?)
         };
         let Some(shifted) = edit.shift(index_u32)? else {
             if single_varint(field.payload, 3)?.unwrap_or(0) != 0 {
-                return Err(Fault::Unsupported);
+                return Err(Error::Unsupported);
             }
             changed = true;
             return Ok(Some(Vec::new()));
@@ -474,7 +461,7 @@ pub(super) fn header_bucket(
         if let Some(span) = span
             && u64::from(shifted) / span != bucket
         {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         if u64::from(shifted) == index && cells_after.is_none() {
             return Ok(None);
@@ -497,26 +484,26 @@ struct Uuid {
     lower: u64,
 }
 
-fn decode_uuid(payload: &[u8]) -> FaultResult<Uuid> {
+fn decode_uuid(payload: &[u8]) -> Result<Uuid> {
     let mut lower = None;
     let mut upper = None;
     for field in fields(payload)? {
         let slot = match (field.number, field.wire_type) {
             (1, 0) => &mut lower,
             (2, 0) => &mut upper,
-            _ => return Err(Fault::Unsupported),
+            _ => return Err(Error::Unsupported),
         };
         if slot.replace(varint(field.payload)?).is_some() {
-            return Err(Fault::Invalid);
+            return Err(Error::Invalid);
         }
     }
     Ok(Uuid {
-        lower: lower.ok_or(Fault::Invalid)?,
-        upper: upper.ok_or(Fault::Invalid)?,
+        lower: lower.ok_or(Error::Invalid)?,
+        upper: upper.ok_or(Error::Invalid)?,
     })
 }
 
-fn encode_uuid(output: &mut Vec<u8>, number: u32, uuid: Uuid) -> FaultResult<()> {
+fn encode_uuid(output: &mut Vec<u8>, number: u32, uuid: Uuid) -> Result<()> {
     let mut inner = Vec::new();
     push_varint_field(&mut inner, 1, uuid.lower)?;
     push_varint_field(&mut inner, 2, uuid.upper)?;
@@ -531,7 +518,7 @@ struct UidAxis {
 }
 
 impl UidAxis {
-    fn read(payload: &[u8], first: u32) -> FaultResult<Self> {
+    fn read(payload: &[u8], first: u32) -> Result<Self> {
         let mut sorted = Vec::new();
         for record in repeated_bytes(payload, first)? {
             reserve(&mut sorted, 1)?;
@@ -544,7 +531,7 @@ impl UidAxis {
         })
     }
 
-    fn write(&self, output: &mut Vec<u8>, first: u32) -> FaultResult<()> {
+    fn write(&self, output: &mut Vec<u8>, first: u32) -> Result<()> {
         for uuid in &self.sorted {
             encode_uuid(output, first, *uuid)?;
         }
@@ -557,30 +544,30 @@ impl UidAxis {
         Ok(())
     }
 
-    fn check(&self, length: u32) -> FaultResult<()> {
-        let length = usize::try_from(length).map_err(|_error| Fault::Invalid)?;
+    fn check(&self, length: u32) -> Result<()> {
+        let length = usize::try_from(length).map_err(|_error| Error::Invalid)?;
         if self.sorted.len() != length
             || self.index_for_uid.len() != length
             || self.uid_for_index.len() != length
         {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         Ok(())
     }
 
     /// The UUID at physical `index`.
-    fn uuid_at(&self, index: u32) -> FaultResult<Uuid> {
+    fn uuid_at(&self, index: u32) -> Result<Uuid> {
         let slot = self
             .uid_for_index
-            .get(usize::try_from(index).map_err(|_error| Fault::Invalid)?)
-            .ok_or(Fault::Invalid)?;
+            .get(usize::try_from(index).map_err(|_error| Error::Invalid)?)
+            .ok_or(Error::Invalid)?;
         self.sorted
-            .get(usize::try_from(*slot).map_err(|_error| Fault::Invalid)?)
+            .get(usize::try_from(*slot).map_err(|_error| Error::Invalid)?)
             .copied()
-            .ok_or(Fault::Invalid)
+            .ok_or(Error::Invalid)
     }
 
-    fn apply(&mut self, edit: AxisEdit) -> FaultResult<()> {
+    fn apply(&mut self, edit: AxisEdit) -> Result<()> {
         match edit {
             AxisEdit::Insert(index) => {
                 // A fresh identity above every existing one keeps the list
@@ -592,7 +579,7 @@ impl UidAxis {
                     .max()
                     .unwrap_or(0)
                     .checked_add(1)
-                    .ok_or(Fault::Unsupported)?;
+                    .ok_or(Error::Unsupported)?;
                 let lower = self
                     .sorted
                     .iter()
@@ -600,8 +587,8 @@ impl UidAxis {
                     .max()
                     .unwrap_or(0)
                     .checked_add(1)
-                    .ok_or(Fault::Unsupported)?;
-                let slot = u64::try_from(self.sorted.len()).map_err(|_error| Fault::Invalid)?;
+                    .ok_or(Error::Unsupported)?;
+                let slot = u64::try_from(self.sorted.len()).map_err(|_error| Error::Invalid)?;
                 for value in &mut self.index_for_uid {
                     if *value >= u64::from(index) {
                         *value += 1;
@@ -613,16 +600,16 @@ impl UidAxis {
                 self.index_for_uid.push(u64::from(index));
                 reserve(&mut self.uid_for_index, 1)?;
                 self.uid_for_index.insert(
-                    usize::try_from(index).map_err(|_error| Fault::Invalid)?,
+                    usize::try_from(index).map_err(|_error| Error::Invalid)?,
                     slot,
                 );
             },
             AxisEdit::Remove(index) => {
-                let position = usize::try_from(index).map_err(|_error| Fault::Invalid)?;
+                let position = usize::try_from(index).map_err(|_error| Error::Invalid)?;
                 let slot = self.uid_for_index.remove(position);
-                let slot_index = usize::try_from(slot).map_err(|_error| Fault::Invalid)?;
+                let slot_index = usize::try_from(slot).map_err(|_error| Error::Invalid)?;
                 if slot_index >= self.sorted.len() {
-                    return Err(Fault::Invalid);
+                    return Err(Error::Invalid);
                 }
                 self.sorted.remove(slot_index);
                 self.index_for_uid.remove(slot_index);
@@ -644,7 +631,7 @@ impl UidAxis {
 
 /// A decoded row/column UID map whose native encoding this module
 /// reproduces exactly.
-pub(super) struct UidMap {
+pub struct UidMap {
     columns: UidAxis,
     rows: UidAxis,
 }
@@ -652,26 +639,26 @@ pub(super) struct UidMap {
 impl UidMap {
     /// Decode `payload`, refusing a map this module would not re-encode
     /// byte for byte or whose lengths disagree with the table.
-    pub(super) fn read(payload: &[u8], rows: u32, columns: u32) -> FaultResult<Self> {
+    pub fn read(payload: &[u8], rows: u32, columns: u32) -> Result<Self> {
         if fields(payload)?
             .iter()
             .any(|field: &Field<'_>| !(1..=6).contains(&field.number))
         {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         let map = Self {
             columns: UidAxis::read(payload, 1)?,
             rows: UidAxis::read(payload, 4)?,
         };
         if map.encode()? != payload {
-            return Err(Fault::Unsupported);
+            return Err(Error::Unsupported);
         }
         map.columns.check(columns)?;
         map.rows.check(rows)?;
         Ok(map)
     }
 
-    fn encode(&self) -> FaultResult<Vec<u8>> {
+    fn encode(&self) -> Result<Vec<u8>> {
         let mut output = Vec::new();
         self.columns.write(&mut output, 1)?;
         self.rows.write(&mut output, 4)?;
@@ -679,7 +666,7 @@ impl UidMap {
     }
 
     /// The UUID halves `(lower, upper)` of physical row or column `index`.
-    pub(super) fn uuid_at(&self, row: bool, index: u32) -> FaultResult<(u64, u64)> {
+    pub fn uuid_at(&self, row: bool, index: u32) -> Result<(u64, u64)> {
         let uuid = if row {
             self.rows.uuid_at(index)?
         } else {
@@ -689,7 +676,7 @@ impl UidMap {
     }
 
     /// Apply one edit and encode the result.
-    pub(super) fn rewrite(mut self, row: bool, edit: AxisEdit) -> FaultResult<Vec<u8>> {
+    pub fn rewrite(mut self, row: bool, edit: AxisEdit) -> Result<Vec<u8>> {
         if row {
             self.rows.apply(edit)?;
         } else {
@@ -701,22 +688,22 @@ impl UidMap {
 
 /// The new runs of one perpendicular stroke layer, or `None` when nothing
 /// changes. A removal that would leave the layer without runs is refused.
-fn stroke_runs(layer: &[u8], length: u32, edit: AxisEdit) -> FaultResult<Option<Vec<u8>>> {
+fn stroke_runs(layer: &[u8], length: u32, edit: AxisEdit) -> Result<Option<Vec<u8>>> {
     let mut changed = false;
     let mut runs = 0_usize;
     let output = rebuild(layer, |field| {
         if field.number != 2 {
             return Ok(None);
         }
-        let origin = single_varint(field.payload, 1)?.ok_or(Fault::Invalid)?;
-        let run_length = single_varint(field.payload, 2)?.ok_or(Fault::Invalid)?;
-        let start = u32::try_from(origin).map_err(|_error| Fault::Unsupported)?;
-        let run_length = u32::try_from(run_length).map_err(|_error| Fault::Invalid)?;
-        let end = start.checked_add(run_length).ok_or(Fault::Invalid)?;
+        let origin = single_varint(field.payload, 1)?.ok_or(Error::Invalid)?;
+        let run_length = single_varint(field.payload, 2)?.ok_or(Error::Invalid)?;
+        let start = u32::try_from(origin).map_err(|_error| Error::Unsupported)?;
+        let run_length = u32::try_from(run_length).map_err(|_error| Error::Invalid)?;
+        let end = start.checked_add(run_length).ok_or(Error::Invalid)?;
         if run_length == 0 || end > length {
-            return Err(Fault::Invalid);
+            return Err(Error::Invalid);
         }
-        let patch = |payload: &[u8], origin: u32, run_length: u32| -> FaultResult<Vec<u8>> {
+        let patch = |payload: &[u8], origin: u32, run_length: u32| -> Result<Vec<u8>> {
             rebuild(payload, |inner| match inner.number {
                 1 => varint_field(1, u64::from(origin)).map(Some),
                 2 => varint_field(2, u64::from(run_length)).map(Some),
@@ -757,16 +744,16 @@ fn stroke_runs(layer: &[u8], length: u32, edit: AxisEdit) -> FaultResult<Option<
         Ok(replacement)
     })?;
     if changed && runs == 0 {
-        return Err(Fault::Unsupported);
+        return Err(Error::Unsupported);
     }
     Ok(changed.then_some(output))
 }
 
 /// The stroke-sidecar rewrite of one axis edit: the sidecar's new payload
 /// and each changed layer's new payload.
-pub(super) struct StrokePlan {
-    pub(super) sidecar: Vec<u8>,
-    pub(super) layers: Vec<(u64, Vec<u8>)>,
+pub struct StrokePlan {
+    pub sidecar: Vec<u8>,
+    pub layers: Vec<(u64, Vec<u8>)>,
 }
 
 /// Plan the stroke-sidecar rewrite. `layer` returns a layer's payload.
@@ -775,18 +762,18 @@ pub(super) struct StrokePlan {
 /// runs shift, split around an inserted index or shorten over a removed
 /// one. A layer sitting on a removed index is refused (it would need its
 /// object collected).
-pub(super) fn strokes<'p>(
+pub fn strokes<'p>(
     sidecar: &[u8],
     rows: u32,
     columns: u32,
     row_axis: bool,
     edit: AxisEdit,
-    mut layer: impl FnMut(u64) -> FaultResult<&'p [u8]>,
-) -> FaultResult<StrokePlan> {
+    mut layer: impl FnMut(u64) -> Result<&'p [u8]>,
+) -> Result<StrokePlan> {
     if single_varint(sidecar, 2)? != Some(u64::from(columns))
         || single_varint(sidecar, 3)? != Some(u64::from(rows))
     {
-        return Err(Fault::Unsupported);
+        return Err(Error::Unsupported);
     }
     let (rows_after, columns_after) = match (row_axis, edit) {
         (true, AxisEdit::Insert(_)) => (rows + 1, columns),
@@ -800,13 +787,13 @@ pub(super) fn strokes<'p>(
     for number in 4..=7_u32 {
         let fixed_is_row = number >= 6;
         for reference in repeated_bytes(sidecar, number)? {
-            let identifier = super::super::structure::references::reference_identifier(reference)?;
+            let identifier = super::reference_identifier(reference)?;
             let payload = layer(identifier)?;
-            let index = single_varint(payload, 1)?.ok_or(Fault::Invalid)?;
-            let index = u32::try_from(index).map_err(|_error| Fault::Invalid)?;
+            let index = single_varint(payload, 1)?.ok_or(Error::Invalid)?;
+            let index = u32::try_from(index).map_err(|_error| Error::Invalid)?;
             let rewritten = if fixed_is_row == row_axis {
                 let Some(shifted) = edit.shift(index)? else {
-                    return Err(Fault::Unsupported);
+                    return Err(Error::Unsupported);
                 };
                 (shifted != index)
                     .then(|| {
@@ -839,7 +826,7 @@ pub(super) fn strokes<'p>(
 #[cfg(test)]
 mod tests {
     use super::{AxisEdit, remove_slot, splice_offsets, stroke_runs};
-    use crate::package::table_topology::wire::{bytes_field, push_varint_field};
+    use crate::table_topology::wire::{bytes_field, push_varint_field};
 
     #[test]
     fn shift_moves_indices_at_or_after_the_edit() {
