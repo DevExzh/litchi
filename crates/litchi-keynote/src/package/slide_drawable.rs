@@ -636,6 +636,11 @@ enum Operation {
         message_type: u32,
         segment: litchi_iwa_common::shape::line::Segment,
     },
+    AddLine {
+        slide: u64,
+        slide_position: Position,
+        segment: litchi_iwa_common::shape::line::Segment,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1033,6 +1038,7 @@ impl<'a> Edit<'a> {
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::Duplicate { slide, .. }
+            | Operation::AddLine { slide, .. }
             | Operation::AddText { slide, .. }
             | Operation::AddImage { slide, .. }
             | Operation::AddTable { slide, .. } => *slide == selected.identifier,
@@ -1225,6 +1231,30 @@ impl<'a> Edit<'a> {
             message_type: item.message_type,
             preset,
             geometry,
+        });
+        Ok(self)
+    }
+
+    /// Stage a new straight line along `segment` in front of the slide's
+    /// drawables, with the theme's text-box style and empty text (host
+    /// `add_slide_line`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Error::Limit`] past the drawable
+    /// limit.
+    pub fn add_line<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        segment: litchi_iwa_common::shape::line::Segment,
+    ) -> Result<&mut Self, Error> {
+        let selected = self.slide(slide.into())?;
+        self.check_drawable_limit(selected.identifier)?;
+        *self.deltas.entry(selected.identifier).or_default() += 1;
+        self.operations.push(Operation::AddLine {
+            slide: selected.identifier,
+            slide_position: selected.position,
+            segment,
         });
         Ok(self)
     }
@@ -2694,6 +2724,23 @@ fn commit_operations(
                     return Err(Error::Verification);
                 }
                 touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::AddLine {
+                slide,
+                slide_position,
+                segment,
+            } => {
+                if context.is_none() {
+                    context = Some(author::Context::read(&workspace).map_err(lift)?);
+                }
+                let context = context.as_ref().ok_or(Error::InvalidSource)?;
+                let drawable = author::add_line(&mut workspace, context, *slide, *segment)?;
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                if staged.item(drawable).map(|item| item.kind) != Some(Kind::Line) {
+                    return Err(Error::Verification);
+                }
+                created.push((*slide_position, *slide, drawable));
+                touched.entry(*slide).or_default().insert(drawable);
             },
             Operation::LineSegment {
                 slide,
