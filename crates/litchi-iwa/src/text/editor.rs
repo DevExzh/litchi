@@ -552,7 +552,18 @@ impl Draft {
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
         let object_id = object_id.get();
-        remove_text_number_attachment(&mut self.package, object_id, id)
+        remove_text_number_attachment(&mut self.package, object_id, id, false)
+    }
+
+    /// Delete a number attachment and, unlike
+    /// [`Self::remove_text_number_attachment`], also its exclusively owned
+    /// object when the text rewrite could not prune it (Pages, record 0371).
+    pub(crate) fn remove_text_number_attachment_pruning(
+        &mut self,
+        object_id: TextStorageId,
+        id: TextNumberAttachmentId,
+    ) -> Result<TextNumberAttachment> {
+        remove_text_number_attachment(&mut self.package, object_id.get(), id, true)
     }
 
     /// Read every native plain highlight in a text storage.

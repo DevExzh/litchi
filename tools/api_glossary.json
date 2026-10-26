@@ -22256,6 +22256,54 @@
       "banned_names": [],
       "required_signatures": [
         {
+          "method": "litchi_numbers_wire::formula_cache::plan_final_cache",
+          "inputs": ["source", "overlay", "limits", "baseline", "evaluator"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::plan_final_cache_with_authored",
+          "inputs": ["source", "overlay", "authored", "limits", "baseline", "evaluator"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::plan_final_cache_with_logical_graph",
+          "inputs": ["source", "overlay", "authored", "logical", "limits", "baseline", "evaluator"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::collect_formula_hosts",
+          "inputs": ["selected", "owners", "record_tiles", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::refresh::plan",
+          "inputs": ["source", "writes", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::refresh::TileCaches::apply",
+          "inputs": ["self", "tile", "columns", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_dependencies::prepare_graph",
+          "inputs": ["graph", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_dependencies::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_list::prepare",
+          "inputs": ["source", "deltas", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_list::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::formula_graph::next_owner_id",
           "inputs": ["engine", "owners", "limits"],
           "limits_argument": "limits",
@@ -25530,6 +25578,7 @@
         "litchi_pages::section::paragraphs",
         "litchi_pages::table::creation",
         "litchi_pages::table::deletion",
+        "litchi_pages::drawable::caption",
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::bookmark",

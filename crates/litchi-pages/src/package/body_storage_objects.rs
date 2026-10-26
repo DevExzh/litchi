@@ -19,8 +19,9 @@ use litchi_iwa_common::wire::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject};
 use litchi_iwa_protos::package_metadata_codec::{
-    self, Batch, ComponentDescriptor, ExternalReferenceDescriptor, ObjectUuidDescriptor,
-    PackageMetadataVisitor, RewriteError as MetadataError, RewriteOptions,
+    self, Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceDescriptor,
+    ObjectUuidAddition, ObjectUuidDescriptor, PackageMetadataVisitor,
+    RewriteError as MetadataError, RewriteOptions, UuidBits,
 };
 
 use super::Package;
@@ -142,6 +143,7 @@ pub(crate) struct Metadata {
     max_registered: u64,
     components: Vec<(u64, String, bool)>,
     uuids: Vec<(u64, u64)>,
+    uuid_bits: std::collections::HashSet<(u64, u64)>,
 }
 
 #[derive(Default)]
@@ -149,6 +151,7 @@ struct FactsVisitor {
     max: u64,
     components: Vec<(u64, String, bool)>,
     uuids: Vec<(u64, u64)>,
+    uuid_bits: std::collections::HashSet<(u64, u64)>,
 }
 
 impl PackageMetadataVisitor for FactsVisitor {
@@ -167,6 +170,8 @@ impl PackageMetadataVisitor for FactsVisitor {
         binding: ObjectUuidDescriptor<'_>,
     ) -> Result<(), MetadataError> {
         self.max = self.max.max(binding.object_identifier());
+        self.uuid_bits
+            .insert((binding.uuid().lower(), binding.uuid().upper()));
         if binding.component().is_current() {
             self.uuids.push((
                 binding.component().identifier(),
@@ -273,6 +278,7 @@ pub(crate) fn metadata(package: &Package) -> GraphResult<Option<Metadata>> {
         max_registered: visitor.max,
         components: visitor.components,
         uuids: visitor.uuids,
+        uuid_bits: visitor.uuid_bits,
     }))
 }
 
@@ -348,6 +354,65 @@ impl Metadata {
         .map(package_metadata_codec::RewriteOutput::into_bytes)
         .map_err(|_| GraphError::InvalidSource)
     }
+}
+
+impl Metadata {
+    /// The payload with fresh UUID registrations for `objects` in the
+    /// current component `component` and the watermark raised to
+    /// `new_last` (the host's `add_component_object_uuids` followed by
+    /// `set_package_last_object_identifier`). The leaf draws deterministic
+    /// UUIDs, unique within the package, where the host draws random ones.
+    pub(crate) fn registered(
+        &self,
+        package: &Package,
+        component: u64,
+        objects: &[u64],
+        new_last: u64,
+    ) -> GraphResult<Vec<u8>> {
+        let locator = self
+            .components
+            .iter()
+            .filter(|(identifier, _, current)| *current && *identifier == component)
+            .map(|(_, locator, _)| locator.as_str())
+            .collect::<Vec<_>>();
+        let [locator] = locator.as_slice() else {
+            return Err(GraphError::InvalidSource);
+        };
+        if objects.iter().any(|object| {
+            self.uuids
+                .iter()
+                .any(|(_, registered)| registered == object)
+        }) {
+            return Err(GraphError::InvalidSource);
+        }
+        let selector = ComponentSelector::new(component, locator);
+        let mut taken = self.uuid_bits.clone();
+        let mut additions = Vec::with_capacity(objects.len());
+        for object in objects {
+            let uuid = fresh_uuid(&taken, *object);
+            taken.insert((uuid.lower(), uuid.upper()));
+            additions.push(ObjectUuidAddition::new(selector, *object, uuid));
+        }
+        package_metadata_codec::rewrite_package_metadata(
+            &self.payload,
+            Batch::new(self.last, new_last.max(self.last), &additions, &[]),
+            metadata_options(package, self.payload.len())?,
+        )
+        .map(package_metadata_codec::RewriteOutput::into_bytes)
+        .map_err(|_| GraphError::InvalidSource)
+    }
+}
+
+/// A deterministic UUID for a created object, distinct from every `taken`
+/// pair and never nil.
+fn fresh_uuid(taken: &std::collections::HashSet<(u64, u64)>, identifier: u64) -> UuidBits {
+    let mut lower = identifier.max(1);
+    let mut upper = identifier.rotate_left(17) ^ 0x9e37_79b9_7f4a_7c15;
+    while taken.contains(&(lower, upper)) {
+        lower = lower.wrapping_add(1).max(1);
+        upper = upper.rotate_left(7) ^ 0xd1b5_4a32_d192_ed03;
+    }
+    UuidBits::new(lower, upper)
 }
 
 /// Remove `component`'s external references to `object` from a metadata
