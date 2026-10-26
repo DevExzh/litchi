@@ -126,6 +126,7 @@ pub(super) fn remove_attached_table_row(
         DependencyAxis::Row,
         u32::try_from(row).map_err(|_| Error::ParseError("iWork row exceeds u32".to_owned()))?,
         retained_formula_hosts,
+        super::row_insert::removal_extents(&descriptor.model, updated_header_settings, 1, 0)?,
     )?;
     relocate_merge_anchors(package, table_id, &relocations)?;
     shift_merges_for_axis_deletion(package, table_id, MergeAxis::Row, row)?;
@@ -213,6 +214,7 @@ pub(super) fn remove_attached_table_column(
         u32::try_from(column)
             .map_err(|_| Error::ParseError("iWork column exceeds u32".to_owned()))?,
         retained_formula_hosts,
+        super::row_insert::removal_extents(&descriptor.model, updated_header_settings, 0, 1)?,
     )?;
     relocate_merge_anchors(package, table_id, &relocations)?;
     shift_merges_for_axis_deletion(package, table_id, MergeAxis::Column, column)?;

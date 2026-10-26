@@ -438,6 +438,11 @@ impl Draft {
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
+        super::prune_removed_body_attachment(
+            &mut staged,
+            self.body_storage_id.get(),
+            source.attachment_id,
+        )?;
         patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
         for &(data_identifier, object_identifier) in &source.data_references {
             remove_component_data_reference(

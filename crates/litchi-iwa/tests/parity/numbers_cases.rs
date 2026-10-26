@@ -237,38 +237,27 @@ fn numbers_table_insert_column_parity() -> TestResult {
     )
 }
 
-/// Row and column removal are not at parity yet (record 0370 §2): the leaf
-/// clears the removed cells through the cell writer first, which deletes
-/// the root previews, releases the cells' format keys and lowers the
-/// perpendicular header counts, where the host keeps the previews, leaks
-/// the format keys, keeps stale header counts and leaves the pre-BNC
-/// offset tables naming the removed column. Until a wave resolves it, this
-/// test pins the divergence so the routes stay listed, not shipped.
+/// Row and column removal (record 0370b): on a table no formula touches,
+/// the leaf drops the removed cells in its structural pass, as the host
+/// does; the host now releases a dropped cell's style and format entries.
 #[test]
-fn numbers_table_removal_divergence_is_reported() -> TestResult {
-    use litchi_numbers::table::topology::{ColumnDeletion, RowDeletion};
-    for (name, op) in [
-        ("remove row", TopologyOp::RemoveRow(RowDeletion::body(0))),
-        (
-            "remove column",
-            TopologyOp::RemoveColumn(ColumnDeletion::body(0)),
-        ),
-    ] {
-        let Err(error) = topology_case(
-            "numbers_table_removal_divergence_is_reported",
-            Tier::B,
-            Evidence::Queued,
-            op,
-        ) else {
-            return Err(
-                format!("the {name} routes now agree: turn this into a parity case").into(),
-            );
-        };
-        let text = error.to_string();
-        eprintln!("{text}");
-        assert!(text.contains("ZIP member sets differ"), "{text}");
-    }
-    Ok(())
+fn numbers_table_remove_row_parity() -> TestResult {
+    topology_case(
+        "numbers_table_remove_row_parity",
+        Tier::A,
+        Evidence::Queued,
+        TopologyOp::RemoveRow(litchi_numbers::table::topology::RowDeletion::body(0)),
+    )
+}
+
+#[test]
+fn numbers_table_remove_column_parity() -> TestResult {
+    topology_case(
+        "numbers_table_remove_column_parity",
+        Tier::A,
+        Evidence::Queued,
+        TopologyOp::RemoveColumn(litchi_numbers::table::topology::ColumnDeletion::body(0)),
+    )
 }
 
 /// Every tracked Numbers fixture the harness sweeps.
@@ -321,7 +310,8 @@ pub const NUMBERS_CORPUS: &[&str] = &[
 #[test]
 fn numbers_table_topology_corpus_parity() -> TestResult {
     use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
-    let ops = [
+    let (_tier, _evidence) = (Tier::B, Evidence::Queued);
+    topology_corpus(&[
         TopologyOp::InsertRow(RowInsertion::header(0)),
         TopologyOp::InsertRow(RowInsertion::body(0)),
         TopologyOp::InsertRow(RowInsertion::body(1)),
@@ -329,13 +319,33 @@ fn numbers_table_topology_corpus_parity() -> TestResult {
         TopologyOp::InsertColumn(ColumnInsertion::header(0)),
         TopologyOp::InsertColumn(ColumnInsertion::body(0)),
         TopologyOp::InsertColumn(ColumnInsertion::body(2)),
-    ];
+    ])
+}
+
+/// Row and column removal at seven positions on the whole corpus (record
+/// 0370b), compared as the insertion sweep is.
+#[test]
+fn numbers_table_removal_corpus_parity() -> TestResult {
+    use litchi_numbers::table::topology::{ColumnDeletion, RowDeletion};
+    let (_tier, _evidence) = (Tier::B, Evidence::Queued);
+    topology_corpus(&[
+        TopologyOp::RemoveRow(RowDeletion::header(0)),
+        TopologyOp::RemoveRow(RowDeletion::body(0)),
+        TopologyOp::RemoveRow(RowDeletion::body(1)),
+        TopologyOp::RemoveRow(RowDeletion::footer(0)),
+        TopologyOp::RemoveColumn(ColumnDeletion::header(0)),
+        TopologyOp::RemoveColumn(ColumnDeletion::body(0)),
+        TopologyOp::RemoveColumn(ColumnDeletion::body(1)),
+    ])
+}
+
+fn topology_corpus(ops: &[TopologyOp]) -> TestResult {
     let mut failures = Vec::new();
     let mut compared = 0_usize;
     let mut identical = 0_usize;
     for path in NUMBERS_CORPUS {
         let input = fixture(path)?;
-        for op in ops {
+        for &op in ops {
             let host = (|| -> TestResult<Vec<u8>> {
                 let mut editor = numbers::Draft::from_bytes(&input.bytes)?;
                 let table = litchi_numbers::TableSelector::index(0);

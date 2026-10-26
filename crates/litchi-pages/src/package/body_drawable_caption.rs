@@ -439,6 +439,9 @@ struct Slot {
     storage: Option<NonZeroU64>,
     text: Option<Arc<str>>,
     width: Option<f32>,
+    /// The label's private objects: the stand-in, or the CaptionInfo, its
+    /// style, storage and placement.
+    objects: Vec<NonZeroU64>,
 }
 
 impl Package {
@@ -518,6 +521,16 @@ impl Package {
     }
 }
 
+/// The private objects of one label of a body image, movie, audio clip or
+/// shape (an audio clip's labels are stand-ins), for the media lifecycle.
+pub(crate) fn label_objects(
+    package: &Package,
+    selector: DrawableSelector,
+    kind: Kind,
+) -> Result<Vec<NonZeroU64>, Error> {
+    Ok(resolve_any(package, selector, kind)?.objects)
+}
+
 fn resolve(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<Slot, Error> {
     if matches!(selector, DrawableSelector::Audio(_)) {
         return Err(Refusal::NoLabel {
@@ -525,6 +538,10 @@ fn resolve(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<
         }
         .into());
     }
+    resolve_any(package, selector, kind)
+}
+
+fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<Slot, Error> {
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
     let body = graph::resolve_body(&index, &mut budget)?;
@@ -561,6 +578,7 @@ fn resolve(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<
             storage: None,
             text: None,
             width,
+            objects: vec![reference],
         });
     };
     graph::validate_message_metadata(located.object, info_index)?;
@@ -620,6 +638,7 @@ fn resolve(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<
         storage: Some(storage),
         text: Some(Arc::from(text)),
         width,
+        objects: vec![reference, style, storage, placement],
     })
 }
 

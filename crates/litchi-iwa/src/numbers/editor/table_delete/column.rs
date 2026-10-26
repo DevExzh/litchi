@@ -30,6 +30,27 @@ pub(super) fn delete_table_tile_column(
             let mut current = previous.clone();
             let mut changed = false;
             for row in &mut current.row_infos {
+                // Host defect fixed with record 0370b: the pre-BNC table kept
+                // naming the removed column.
+                if let Some((storage, offsets)) =
+                    litchi_numbers_wire::table_topology::storage::pre_bnc_remove_column(
+                        &row.cell_storage_buffer_pre_bnc,
+                        &row.cell_offsets_pre_bnc,
+                        u32::try_from(deletion).map_err(|_| {
+                            Error::ParseError("Numbers column exceeds u32".to_owned())
+                        })?,
+                        u32::try_from(old_columns).map_err(|_| {
+                            Error::ParseError("Numbers column exceeds u32".to_owned())
+                        })?,
+                    )
+                    .map_err(|_| {
+                        Error::InvalidFormat("Numbers pre-BNC cell offsets are invalid".to_owned())
+                    })?
+                {
+                    row.cell_storage_buffer_pre_bnc = storage;
+                    row.cell_offsets_pre_bnc = offsets;
+                    changed = true;
+                }
                 let mut cells = split_row(row)?;
                 if cells.len() < old_columns {
                     return Err(Error::InvalidFormat(format!(
