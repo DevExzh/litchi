@@ -5,6 +5,8 @@
 
 use prost::Message;
 
+use litchi_iwa_common::chart::series;
+
 use crate::charts::Kind;
 use crate::charts::series_non_style::{
     NewChartSeriesNonStyleBase, chart_series_non_style_values,
@@ -82,7 +84,7 @@ pub struct ChartSeriesSymbolSize(f32);
 
 impl ChartSeriesSymbolSize {
     pub fn new(points: f32) -> Result<Self> {
-        if !points.is_finite() || points <= 0.0 {
+        if series::SymbolSize::new(points).is_err() {
             return Err(Error::InvalidFormat(format!(
                 "chart series symbol size must be finite and positive, got {points}"
             )));
@@ -133,11 +135,11 @@ pub enum ChartSeriesSymbolKind {
 
 impl ChartSeriesSymbolKind {
     pub fn for_chart_kind(kind: Kind) -> Result<Self> {
-        match kind {
-            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
-            Kind::Line2d => Ok(Self::Line2d),
-            Kind::Radar2d => Ok(Self::Radar2d),
-            Kind::Scatter2d => Ok(Self::Scatter2d),
+        match series::SymbolFamily::for_chart_kind(kind) {
+            Some(series::SymbolFamily::Area2d) => Ok(Self::Area2d),
+            Some(series::SymbolFamily::Line2d) => Ok(Self::Line2d),
+            Some(series::SymbolFamily::Radar2d) => Ok(Self::Radar2d),
+            Some(series::SymbolFamily::Scatter2d) => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol family"
             ))),

@@ -51,6 +51,7 @@ mod pages_table_cases;
 mod pages_text_cases;
 mod physical_cases;
 mod self_test;
+mod series_style_cases;
 mod shape_cases;
 mod text_annotation_cases;
 mod text_attachment_cases;

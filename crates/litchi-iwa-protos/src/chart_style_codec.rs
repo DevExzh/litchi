@@ -811,6 +811,40 @@ impl<'source> Properties<'source> {
             .map(|field| field.varint as i32))
     }
 
+    /// The raw varint of a varint-typed property (for strict boolean or
+    /// enumeration reads).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::DuplicateField`] or [`Error::WireType`].
+    pub fn varint(&self, number: u32) -> Result<Option<u64>, Error> {
+        Ok(self.scalar(number, WIRE_VARINT)?.map(|field| field.varint))
+    }
+
+    /// The raw payload of a bytes- or string-typed property.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::DuplicateField`] or [`Error::WireType`].
+    pub fn bytes(&self, number: u32) -> Result<Option<&'source [u8]>, Error> {
+        self.message(number)
+    }
+
+    /// The raw payload of a message-typed property (a stroke, fill or
+    /// shadow), for the `shape_style_codec::native` decoders.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::DuplicateField`] or [`Error::WireType`].
+    pub fn message(&self, number: u32) -> Result<Option<&'source [u8]>, Error> {
+        let Some(extension) = self.extension else {
+            return Ok(None);
+        };
+        Ok(self
+            .scalar(number, WIRE_LENGTH_DELIMITED)?
+            .map(|field| field.payload(extension)))
+    }
+
     /// A `TSCH.Chart3DVectorArchive` property.
     ///
     /// # Errors
@@ -862,6 +896,32 @@ fn decode_vector(payload: &[u8], budget: &mut Budget) -> Result<Vector, Error> {
         Ok(())
     })?;
     Ok(vector)
+}
+
+/// The `TSS.StyleArchive.parent` of a style payload (field 1 of every TSCH
+/// style archive; 0 reads as absent).
+///
+/// # Errors
+///
+/// Framing, duplicate-field, wire-type and limit errors.
+pub fn parent(source: &[u8], limits: Limits) -> Result<Option<u64>, Error> {
+    check_bytes(source.len(), limits)?;
+    let mut budget = Budget::new(limits);
+    let Some(style) = singular(source, 1, &mut budget)? else {
+        return Ok(None);
+    };
+    require_wire_type(&style, WIRE_LENGTH_DELIMITED)?;
+    let style = style.payload(source);
+    let Some(reference) = singular(style, 3, &mut budget)? else {
+        return Ok(None);
+    };
+    require_wire_type(&reference, WIRE_LENGTH_DELIMITED)?;
+    let reference = reference.payload(style);
+    let Some(identifier) = singular(reference, 1, &mut budget)? else {
+        return Ok(None);
+    };
+    require_wire_type(&identifier, WIRE_VARINT)?;
+    Ok((identifier.varint != 0).then_some(identifier.varint))
 }
 
 /// The candidate payload of a [`rewrite`].
@@ -1650,6 +1710,16 @@ impl StyleReferences {
         &self.paragraph_styles
     }
 
+    /// The effective series style of series `index`: the private override of
+    /// `series_private_styles`, else the theme style.
+    #[must_use]
+    pub fn series_style(&self, index: usize) -> Option<u64> {
+        let private = u32::try_from(index)
+            .ok()
+            .and_then(|index| self.series_private_styles.as_ref()?.get(index));
+        private.or_else(|| self.series_theme_styles.get(index).copied())
+    }
+
     /// The object that stores `archive` for this chart, for the chart- and
     /// legend-level archives (`None` for the per-axis and per-series ones).
     #[must_use]
@@ -1759,6 +1829,130 @@ pub fn references(chart_drawable: &[u8], limits: Limits) -> Result<StyleReferenc
         Ok(())
     })?;
     Ok(references)
+}
+
+const CHART_LEGEND_FRAME_FIELD: u32 = 3;
+
+fn chart_extension(chart_drawable: &[u8], budget: &mut Budget) -> Result<Field, Error> {
+    let chart = singular(chart_drawable, EXTENSION_FIELD, budget)?.ok_or(Error::Malformed {
+        reason: "the chart drawable has no chart extension",
+    })?;
+    require_wire_type(&chart, WIRE_LENGTH_DELIMITED)?;
+    Ok(chart)
+}
+
+fn exactly_one_float(data: &[u8], number: u32, budget: &mut Budget) -> Result<f32, Error> {
+    let field = singular(data, number, budget)?.ok_or(Error::Malformed {
+        reason: "a legend-frame coordinate is missing",
+    })?;
+    require_wire_type(&field, WIRE_FIXED32)?;
+    Ok(read_f32(field.payload(data)))
+}
+
+fn exactly_one_message<'a>(
+    data: &'a [u8],
+    number: u32,
+    budget: &mut Budget,
+) -> Result<&'a [u8], Error> {
+    let field = singular(data, number, budget)?.ok_or(Error::Malformed {
+        reason: "a legend-frame origin or size is missing",
+    })?;
+    require_wire_type(&field, WIRE_LENGTH_DELIMITED)?;
+    Ok(field.payload(data))
+}
+
+/// The explicit legend rectangle `[x, y, width, height]` of a chart
+/// (`TSCH.ChartArchive.legend_frame`), or `None` for automatic placement.
+/// Every component must be stored exactly once.
+///
+/// # Errors
+///
+/// [`Error::Malformed`] for a chart drawable without a chart extension or an
+/// incomplete rectangle; framing, duplicate-field, wire-type and limit
+/// errors.
+pub fn legend_frame(chart_drawable: &[u8], limits: Limits) -> Result<Option<[f32; 4]>, Error> {
+    check_bytes(chart_drawable.len(), limits)?;
+    let mut budget = Budget::new(limits);
+    let chart = chart_extension(chart_drawable, &mut budget)?;
+    let chart = chart.payload(chart_drawable);
+    let Some(frame) = singular(chart, CHART_LEGEND_FRAME_FIELD, &mut budget)? else {
+        return Ok(None);
+    };
+    require_wire_type(&frame, WIRE_LENGTH_DELIMITED)?;
+    let frame = frame.payload(chart);
+    let origin = exactly_one_message(frame, 1, &mut budget)?;
+    let size = exactly_one_message(frame, 2, &mut budget)?;
+    Ok(Some([
+        exactly_one_float(origin, 1, &mut budget)?,
+        exactly_one_float(origin, 2, &mut budget)?,
+        exactly_one_float(size, 1, &mut budget)?,
+        exactly_one_float(size, 2, &mut budget)?,
+    ]))
+}
+
+/// Set (`Some([x, y, width, height])`) or remove (`None`) a chart's legend
+/// rectangle, replacing the stored field in place or appending it to the
+/// chart archive and keeping every other byte.
+///
+/// # Errors
+///
+/// The [`legend_frame`] errors; [`Error::Limit`]/[`Error::Allocation`] for
+/// the candidate.
+pub fn rewrite_legend_frame(
+    chart_drawable: &[u8],
+    frame: Option<[f32; 4]>,
+    limits: Limits,
+) -> Result<Rewrite<'_>, Error> {
+    legend_frame(chart_drawable, limits)?;
+    let mut budget = Budget::new(limits);
+    let chart_field = chart_extension(chart_drawable, &mut budget)?;
+    let chart = chart_field.payload(chart_drawable);
+    let existing = singular(chart, CHART_LEGEND_FRAME_FIELD, &mut budget)?;
+    let encoded = frame.map(|[x, y, width, height]| {
+        let pair = |first: f32, second: f32| {
+            let mut bytes = Vec::with_capacity(10);
+            bytes.push(0x0d);
+            bytes.extend_from_slice(&first.to_le_bytes());
+            bytes.push(0x15);
+            bytes.extend_from_slice(&second.to_le_bytes());
+            bytes
+        };
+        let mut rect = Vec::with_capacity(24);
+        for part in [pair(x, y), pair(width, height)].iter().enumerate() {
+            rect.push(if part.0 == 0 { 0x0a } else { 0x12 });
+            push_varint(&mut rect, part.1.len() as u64);
+            rect.extend_from_slice(part.1);
+        }
+        rect
+    });
+    let next_chart = match (existing, encoded) {
+        (None, None) => None,
+        (Some(field), None) => Some(remove_field(chart, &field, limits)?),
+        (Some(field), Some(rect)) => {
+            if field.payload(chart) == rect.as_slice() {
+                None
+            } else {
+                Some(replace_payload(chart, &field, &rect, limits)?)
+            }
+        },
+        (None, Some(rect)) => {
+            let mut output = allocate(chart.len() + rect.len() + 2, limits)?;
+            output.extend_from_slice(chart);
+            push_varint(&mut output, (u64::from(CHART_LEGEND_FRAME_FIELD) << 3) | 2);
+            push_varint(&mut output, rect.len() as u64);
+            output.extend_from_slice(&rect);
+            Some(output)
+        },
+    };
+    let Some(next_chart) = next_chart else {
+        return Ok(Rewrite {
+            bytes: Cow::Borrowed(chart_drawable),
+        });
+    };
+    let output = replace_payload(chart_drawable, &chart_field, &next_chart, limits)?;
+    Ok(Rewrite {
+        bytes: Cow::Owned(output),
+    })
 }
 
 /// The identifier of one `TSP.Reference` field (`None` for 0).
