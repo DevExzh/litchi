@@ -6442,3 +6442,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   source metadata and a producer recipe still fixed to C33. A concrete
   source-rebinding repair is in progress. DOCX builds remain queued; all
   final qualification remains required. Nothing is pushed.
+
+  Golden checks, golden-file cleanliness and both existing benchmark-consumer
+  compiler rows pass (165ub). Root verifies all four rows and the diagnostic
+  proceeds to API glossary checks. Protocol v17 closes source-preparation
+  review: P2 requires the explicitly rebound recipe and cannot silently fall
+  back to C33. Actual final C/P1/P2 generation remains pending. Fuzz handoff
+  v2 repairs its guards but omits required Cargo target files; exact 7c target
+  blobs must be hydrated before its metadata commands can run. The DOCX
+  release builds remain queued, and all native/final qualification remains
+  required. Nothing is pushed.
