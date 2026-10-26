@@ -1052,8 +1052,8 @@ numbers/editor/semantic/workbook.rs	remove_table	1	numbers	table.lifecycle	host-
 numbers/editor/semantic/workbook.rs	resize_table	1	numbers	table.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	set_formula	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	set_formula_with_cached_value	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::sheets	numbers_workbook_catalog_read_parity	A	-	-
+numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	migrated	litchi_numbers::Sheet::tables	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/sheet_audio.rs	add_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_audio.rs	duplicate_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_audio.rs	remove_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-

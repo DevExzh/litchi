@@ -693,3 +693,61 @@ fn host_first_table_model_id(editor: &numbers::Draft) -> TestResult<u64> {
     }
     Err("the first sheet has no table".into())
 }
+
+/// The host's workbook catalog reads (`sheets`, `tables`) against the
+/// leaf's `Package::sheets` and each sheet's tables with
+/// `Package::table_appearance`, on every tracked fixture the host opens
+/// (record 0370).
+#[test]
+fn numbers_workbook_catalog_read_parity() -> TestResult {
+    // A read-only comparison of the same bytes; no native receipt needed
+    // beyond the fixtures' own.
+    let (_tier, _evidence) = (Tier::A, Evidence::Queued);
+    let mut compared = 0_usize;
+    for path in NUMBERS_CORPUS {
+        let input = fixture(path)?;
+        let editor = numbers::Draft::from_bytes(&input.bytes)?;
+        let leaf = litchi_numbers::Package::from_bytes(&input.bytes)?;
+        let host_sheets: Vec<String> = editor
+            .sheets()?
+            .into_iter()
+            .map(|sheet| sheet.name)
+            .collect();
+        let leaf_sheets: Vec<String> = leaf
+            .sheets()
+            .iter()
+            .map(|sheet| sheet.name().to_owned())
+            .collect();
+        assert_eq!(host_sheets, leaf_sheets, "{path}: sheets");
+        let Ok(host_tables) = editor.tables() else {
+            // The host's catalog refuses tables its appearance read rejects.
+            continue;
+        };
+        let mut leaf_tables = Vec::new();
+        for (sheet_index, sheet) in leaf.sheets().iter().enumerate() {
+            for (table_index, table) in sheet.tables().enumerate() {
+                let appearance = leaf.table_appearance(sheet_index, table_index)?;
+                leaf_tables.push(format!(
+                    "{} {}x{} {appearance:?}",
+                    table.name(),
+                    table.row_count(),
+                    table.column_count()
+                ));
+            }
+        }
+        let host_tables: Vec<String> = host_tables
+            .into_iter()
+            .map(|table| {
+                format!(
+                    "{} {}x{} {:?}",
+                    table.name, table.rows, table.columns, table.appearance
+                )
+            })
+            .collect();
+        assert_eq!(host_tables, leaf_tables, "{path}: tables");
+        compared += 1;
+    }
+    eprintln!("workbook catalogs compared: {compared}");
+    assert!(compared >= 20, "only {compared} catalogs compared");
+    Ok(())
+}
