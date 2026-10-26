@@ -271,6 +271,7 @@ pub struct CandidateEntry<'data> {
     ordinal: usize,
     wayfinder: soapberry_zip::ZipArchiveEntryWayfinder,
     kind: CandidateEntryKind,
+    operation_storage: bool,
     compression: CandidateCompression,
     metadata_bytes: usize,
     compressed_bytes: usize,
@@ -322,6 +323,15 @@ impl CandidateEntry<'_> {
     #[must_use]
     pub const fn is_iwa(self) -> bool {
         matches!(self.kind, CandidateEntryKind::Iwa)
+    }
+
+    /// Whether the exact source member basename is `OperationStorage.iwa`.
+    ///
+    /// Callers must additionally inspect the admitted decoded payload for the
+    /// `bvxn` marker before treating this member as an opaque operation log.
+    #[must_use]
+    pub const fn is_operation_storage(self) -> bool {
+        self.operation_storage
     }
 
     /// Central fixed and variable metadata bytes for this record.
@@ -775,6 +785,8 @@ impl<'data> CandidateIngressPlan<'data> {
             ordinal,
             wayfinder: entry.wayfinder(),
             kind,
+            operation_storage: raw_name.rsplit(|byte| matches!(*byte, b'/' | b'\\')).next()
+                == Some(b"OperationStorage.iwa".as_slice()),
             compression: compression(entry.compression_method()),
             metadata_bytes: ZIP_CENTRAL_FIXED_METADATA_BYTES.saturating_add(
                 usize_from_u64(entry.metadata_size_hint(), "ZIP metadata length")
@@ -986,6 +998,31 @@ mod tests {
     use crate::{Limits, SourceCatalog};
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use soapberry_zip::office::StreamingArchiveWriter;
+
+    #[test]
+    fn operation_log_descriptor_requires_exact_portable_basename() -> crate::Result<()> {
+        let names = [
+            ("OperationStorage.iwa", true),
+            ("Index/OperationStorage.iwa", true),
+            ("Index\\OperationStorage.iwa", true),
+            ("Index/OtherOperationStorage.iwa", false),
+            ("Index/OperationStorage.iwa.extra", false),
+        ];
+        for (name, expected) in names {
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
+            writer.write_stored(name, b"bvxn log")?;
+            let source = writer.finish_to_bytes()?;
+            let plan = CandidateIngressPlan::from_bytes(&source, Limits::default())?;
+            let entry =
+                plan.entries().next().transpose()?.ok_or_else(|| {
+                    crate::Error::InvalidBundle("test entry is missing".to_owned())
+                })?;
+            assert_eq!(entry.is_operation_storage(), expected, "{name}");
+        }
+        Ok(())
+    }
 
     fn package() -> crate::Result<Vec<u8>> {
         let archive = Archive {
