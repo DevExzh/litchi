@@ -670,7 +670,7 @@ impl Package {
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.iter().map(PackageEntry::name)
+        litchi_iwa_archive::unstable::entry_names(&self.state)
     }
 
     /// Enumerate package members that contain IWA object archives.
@@ -679,7 +679,7 @@ impl Package {
     /// `bvxn` payload is a separate operation-log format. It is intentionally
     /// retained as a raw entry but excluded from object-archive scans.
     pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.iwa_entry_names()
+        litchi_iwa_archive::unstable::iwa_entry_names(&self.state)
     }
 
     /// Locate the package's calculation-engine component without allocating.
@@ -708,8 +708,7 @@ impl Package {
     }
 
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
-        let position = self.state.position(normalize_entry_name(name))?;
-        Some(self.state.get_at(position)?.data())
+        litchi_iwa_archive::unstable::entry(&self.state, name)
     }
 
     /// Borrow a raw package member for package invariant tests.
@@ -859,23 +858,38 @@ impl Package {
         normalized: &str,
         archive_limits: IwaArchiveLimits,
     ) -> Result<(Archive, usize)> {
+        use litchi_iwa_archive::unstable::{ComponentReadError, parse_component};
+
+        // The physical read is archive-owned (record 0363 D5). Keep the
+        // Snappy profile lazy, as before, and map each typed refusal to the
+        // exact host error this facade has always returned.
         if !normalized.ends_with(".iwa") {
             return Err(Error::Bundle(format!(
                 "Package entry {normalized} is not an IWA component"
             )));
         }
-        let compressed = self
-            .entry(normalized)
-            .ok_or_else(|| Error::Bundle(format!("IWA package entry not found: {normalized}")))?;
-        if is_legacy_operation_storage(normalized, compressed) {
-            return Err(Error::InvalidFormat(format!(
-                "package entry {normalized} is a legacy operation log, not an IWA object archive"
-            )));
-        }
-        let stream = SnappyStream::decompress(compressed, self.limits.snappy_limits()?)?;
-        let weight = stream.as_bytes().len().max(1);
-        let archive = Archive::parse(stream.as_bytes(), archive_limits)?;
-        Ok((archive, weight))
+        let snappy = if self.entry(normalized).is_some_and(|compressed| {
+            !is_legacy_operation_storage(normalized, compressed)
+        }) {
+            self.limits.snappy_limits()?
+        } else {
+            SnappyLimits::default()
+        };
+        parse_component(&self.state, normalized, snappy, archive_limits).map_err(
+            |error| match error {
+                ComponentReadError::NotComponent { name } => {
+                    Error::Bundle(format!("Package entry {name} is not an IWA component"))
+                },
+                ComponentReadError::MissingEntry { name } => {
+                    Error::Bundle(format!("IWA package entry not found: {name}"))
+                },
+                ComponentReadError::OperationLog { name } => Error::InvalidFormat(format!(
+                    "package entry {name} is a legacy operation log, not an IWA object archive"
+                )),
+                ComponentReadError::Codec(error) => error.into(),
+                error => Error::Archive(error.to_string()),
+            },
+        )
     }
 
     /// Serialize and replace a parsed `.iwa` package member.
@@ -1244,7 +1258,7 @@ impl Edit {
 }
 
 fn normalize_entry_name(name: &str) -> &str {
-    name.strip_prefix('/').unwrap_or(name)
+    litchi_iwa_archive::unstable::normalize_entry_name(name)
 }
 
 pub(crate) fn is_calculation_engine_entry_name(name: &str) -> bool {
