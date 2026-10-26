@@ -38,6 +38,7 @@ mod keynote_drawable_cases;
 mod keynote_image_cases;
 mod keynote_slide_cases;
 mod keynote_table_cases;
+mod keynote_text_property_cases;
 mod keynote_w1c_cost;
 mod numbers_cases;
 mod numbers_cell_list_cases;

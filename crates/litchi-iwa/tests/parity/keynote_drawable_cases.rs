@@ -1049,3 +1049,35 @@ fn keynote_slide_line_segment_read_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+#[test]
+fn keynote_slide_line_add_parity() -> TestResult {
+    use litchi_keynote::slide::drawable::Segment;
+    let input = fixture(TEXT_BOX)?;
+    run_on(
+        "keynote_slide_line_add_parity",
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, _| {
+            editor.add_slide_line(
+                SLIDE,
+                DrawablePoint { x: 100.0, y: 120.0 },
+                DrawablePoint { x: 260.0, y: 200.0 },
+            )?;
+            Ok(())
+        },
+        |source| {
+            leaf_run(source, |edit| {
+                edit.add_line(
+                    SlideSelector::index(SLIDE),
+                    Segment::new(
+                        litchi_iwa_common::shape::geometry::Point { x: 100.0, y: 120.0 },
+                        litchi_iwa_common::shape::geometry::Point { x: 260.0, y: 200.0 },
+                    )?,
+                )?;
+                Ok(())
+            })
+        },
+    )
+}

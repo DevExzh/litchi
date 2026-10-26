@@ -17,6 +17,7 @@ mod inventory;
 mod stage;
 mod table;
 mod text;
+mod text_properties;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
@@ -636,6 +637,17 @@ enum Operation {
         message_type: u32,
         segment: litchi_iwa_common::shape::line::Segment,
     },
+    AddLine {
+        slide: u64,
+        slide_position: Position,
+        segment: litchi_iwa_common::shape::line::Segment,
+    },
+    TextProperty {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: litchi_iwa_text_wire::paragraph_style::Change,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1029,10 +1041,12 @@ impl<'a> Edit<'a> {
             | Operation::Properties { .. }
             | Operation::Preset { .. }
             | Operation::LineSegment { .. }
+            | Operation::TextProperty { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::Duplicate { slide, .. }
+            | Operation::AddLine { slide, .. }
             | Operation::AddText { slide, .. }
             | Operation::AddImage { slide, .. }
             | Operation::AddTable { slide, .. } => *slide == selected.identifier,
@@ -1225,6 +1239,97 @@ impl<'a> Edit<'a> {
             message_type: item.message_type,
             preset,
             geometry,
+        });
+        Ok(self)
+    }
+
+    fn text_storage(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+    ) -> Result<(SelectedSlide, inventory::Item, u64), Error> {
+        let (selected, item) = self.drawable(slide, drawable)?;
+        let storage = item
+            .storage
+            .filter(|_| matches!(item.kind, Kind::TextBox | Kind::Shape))
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))?;
+        Ok((selected, item, storage))
+    }
+
+    /// Stage `property` as the effective character or paragraph property of
+    /// the whole text of one text box or shape (host
+    /// `set_slide_text_box_text_*` / `set_slide_text_box_paragraph_*`). The
+    /// text must be uniformly styled by one paragraph style; the change is
+    /// published on the shared paragraph-style engine (rewrite of an
+    /// exclusive variation, a derived child variation, or a collapse back to
+    /// the parent).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
+    /// drawables without text; [`Self::commit`] refuses text that is not
+    /// uniformly styled ([`Unsupported::TextStyling`]).
+    pub fn set_text_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        property: litchi_iwa_text_wire::paragraph_style::Property,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::TextProperty {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change: litchi_iwa_text_wire::paragraph_style::Change::Set(property),
+        });
+        Ok(self)
+    }
+
+    /// Stage removing the text's own override of `kind`, so the value is
+    /// inherited again (host `reset_slide_text_box_text_*` /
+    /// `reset_slide_text_box_paragraph_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_text_property`].
+    pub fn reset_text_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        kind: litchi_iwa_text_wire::paragraph_style::PropertyKind,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::TextProperty {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
+        });
+        Ok(self)
+    }
+
+    /// Stage a new straight line along `segment` in front of the slide's
+    /// drawables, with the theme's text-box style and empty text (host
+    /// `add_slide_line`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Error::Limit`] past the drawable
+    /// limit.
+    pub fn add_line<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        segment: litchi_iwa_common::shape::line::Segment,
+    ) -> Result<&mut Self, Error> {
+        let selected = self.slide(slide.into())?;
+        self.check_drawable_limit(selected.identifier)?;
+        *self.deltas.entry(selected.identifier).or_default() += 1;
+        self.operations.push(Operation::AddLine {
+            slide: selected.identifier,
+            slide_position: selected.position,
+            segment,
         });
         Ok(self)
     }
@@ -2129,6 +2234,39 @@ impl Package {
         Ok(public_list(&inventory))
     }
 
+    /// Read the effective character or paragraph property `kind` of the
+    /// whole, uniformly styled text of one text box or shape (host
+    /// `slide_text_box_text_*` / `slide_text_box_paragraph_*`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
+    /// drawables without uniformly styled text.
+    pub fn slide_drawable_text_property<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        kind: litchi_iwa_text_wire::paragraph_style::PropertyKind,
+    ) -> Result<litchi_iwa_text_wire::paragraph_style::Property, Error> {
+        let selected = select_slide(self, slide.into())?;
+        let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
+        let drawable = drawable.into();
+        let item = inventory
+            .items
+            .get(drawable.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: drawable.as_position(),
+            }))?;
+        let storage = item
+            .storage
+            .filter(|_| matches!(item.kind, Kind::TextBox | Kind::Shape))
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))?;
+        let workspace = Workspace::new(self).map_err(lift)?;
+        text_properties::effective(&workspace, storage, kind)
+    }
+
     /// Read the segment one straight line draws (host `slide_line_segment`).
     ///
     /// # Errors
@@ -2694,6 +2832,38 @@ fn commit_operations(
                     return Err(Error::Verification);
                 }
                 touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TextProperty {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_properties::apply(&mut workspace, *storage, change)?;
+                if let litchi_iwa_text_wire::paragraph_style::Change::Set(property) = change
+                    && text_properties::effective(&workspace, *storage, property.kind())?
+                        != *property
+                {
+                    return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::AddLine {
+                slide,
+                slide_position,
+                segment,
+            } => {
+                if context.is_none() {
+                    context = Some(author::Context::read(&workspace).map_err(lift)?);
+                }
+                let context = context.as_ref().ok_or(Error::InvalidSource)?;
+                let drawable = author::add_line(&mut workspace, context, *slide, *segment)?;
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                if staged.item(drawable).map(|item| item.kind) != Some(Kind::Line) {
+                    return Err(Error::Verification);
+                }
+                created.push((*slide_position, *slide, drawable));
+                touched.entry(*slide).or_default().insert(drawable);
             },
             Operation::LineSegment {
                 slide,
