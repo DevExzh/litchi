@@ -20,6 +20,39 @@ pub enum Dialect {
     GitHubFlavored,
 }
 
+/// A bounded Markdown reader or editor resource dimension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete UTF-8 source bytes retained by a snapshot.
+    SourceBytes,
+    /// Bytes in one physical source line, excluding its line ending.
+    LineBytes,
+    /// Parser events produced while reading a source.
+    Events,
+    /// Top-level semantic blocks retained by a snapshot.
+    Blocks,
+    /// Simultaneous block and inline container nesting.
+    NestingDepth,
+    /// Structural operations staged by one atomic edit.
+    Operations,
+}
+
+impl LimitKind {
+    /// The corresponding [`ReadLimits`] field name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SourceBytes => "max_source_bytes",
+            Self::LineBytes => "max_line_bytes",
+            Self::Events => "max_events",
+            Self::Blocks => "max_blocks",
+            Self::NestingDepth => "max_nesting_depth",
+            Self::Operations => "max_operations",
+        }
+    }
+}
+
 /// Resource limits applied before and during Markdown parsing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReadLimits {
@@ -49,16 +82,16 @@ impl ReadLimits {
     };
 
     pub(crate) fn validate(self) -> Result<(), Error> {
-        for (name, value) in [
-            ("max_source_bytes", self.max_source_bytes),
-            ("max_line_bytes", self.max_line_bytes),
-            ("max_events", self.max_events),
-            ("max_blocks", self.max_blocks),
-            ("max_nesting_depth", self.max_nesting_depth),
-            ("max_operations", self.max_operations),
+        for (kind, value) in [
+            (LimitKind::SourceBytes, self.max_source_bytes),
+            (LimitKind::LineBytes, self.max_line_bytes),
+            (LimitKind::Events, self.max_events),
+            (LimitKind::Blocks, self.max_blocks),
+            (LimitKind::NestingDepth, self.max_nesting_depth),
+            (LimitKind::Operations, self.max_operations),
         ] {
             if value == 0 {
-                return Err(Error::InvalidLimit { name });
+                return Err(Error::InvalidLimit { kind });
             }
         }
         Ok(())
@@ -814,10 +847,10 @@ impl PartialEq for Snapshot {
 #[non_exhaustive]
 pub enum Error {
     /// A read-limit field was configured as zero.
-    #[error("Markdown read limit '{name}' must be nonzero")]
+    #[error("Markdown read limit '{}' must be nonzero", .kind.as_str())]
     InvalidLimit {
-        /// Stable field name.
-        name: &'static str,
+        /// Bounded resource dimension.
+        kind: LimitKind,
     },
     /// The complete source is larger than policy permits.
     #[error("Markdown source has {actual} bytes; limit is {limit}")]

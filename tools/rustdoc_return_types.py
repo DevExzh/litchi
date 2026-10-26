@@ -35,6 +35,8 @@ CANONICAL_REEXPORTS = {
     ("litchi_opc", "SourceLimits"): ("litchi_opc", "limits", "SourceLimits"),
     ("litchi_ooxml_common", "mce", "Limits"):
         ("litchi_ooxml_common", "mce", "model", "Limits"),
+    ("litchi_odf_common", "XmlStreamLimits"):
+        ("litchi_odf_common", "core", "stream_xml", "XmlStreamLimits"),
 }
 
 
