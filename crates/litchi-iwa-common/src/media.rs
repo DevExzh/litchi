@@ -5,6 +5,7 @@
 //! inspect protobuf records, or own package transactions.
 
 pub mod asset;
+pub mod embedded;
 pub mod playback;
 
 pub use asset::{Asset, Catalog, Stats};

@@ -21230,6 +21230,16 @@
           "replacement": "use chart::legend::Frame; no host prefix (record 0375)"
         },
         {
+          "name": "EmbeddedMediaAsset",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::embedded::Embedded; no host prefix (record 0375)"
+        },
+        {
+          "name": "MediaAssetId",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::embedded::AssetId; no host prefix (record 0375)"
+        },
+        {
           "name": "LineSegment",
           "scope": "litchi_iwa_common",
           "replacement": "use shape::line::Segment (record 0375)"
