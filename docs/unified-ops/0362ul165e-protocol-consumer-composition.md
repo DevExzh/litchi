@@ -94,6 +94,15 @@ whole prefix-to-policy flow, including failed builds and binary replacement.
 Sheet v5 likewise still fails the non-diagnostic runner's historical harness
 restriction; a tooling-and-test consumer patch is required in v6.
 
+OPC v5 subsequently closes the prefix-ordering return. Independent review
+passes all 18 tests and actual gate/source/lock admission. The whole public
+prefix is exercised with controlled synthetic build/report callbacks, then
+its actual terminal output is consumed by the policy. Successful ordering,
+failed builds, changed binaries and incomplete timing receipts are covered.
+The original baseline, physical/fidelity oracles, eight timing legs and 30/3
+sample contract are unchanged. This is source-preparation readiness only;
+the actual release builds, native correctness and timing runs remain pending.
+
 The three-lane ODG/ODF/ODP v2 preparation adds a checked reuse path for the
 retained ODF baseline in isolated leaf commit
 `b3ad6000d7fb2524228914f9578acb01beccb988`, plus external candidate binders.
@@ -119,6 +128,7 @@ source-only receipts; no Cargo, archive, native or measurement run is claimed.
 | `protocol-consumer-composition-C2a-20261026-v1-independent-review-20261026.json` | 5,189 | `8960afe56cabffec33aae4173475bfc45e509e1f171367a5bc3846fbe857ba25` |
 | `protocol-consumer-composition-C2a-20261026-v1-normalized-signed-followup-review-20261026.json` | 3,586 | `e244ef483c175efec5049c5ec8dbc231299822d04893330d05c2ab9325c40db5` |
 | `opc-read-ahead-C2a-33a0a63d35-v3-root-review-20261026/review-receipt.json` | 4,618 | `91edaa164a0d46b3c0ed11780664686be407fdc46a8f7f0b5ad0e4918435df94` |
+| `opc-read-ahead-C2a-33a0a63d35-v5-root-review-20261026/review-receipt.json` | 3,864 | `1e6a9a447f7f4f5f5130a3a558c045e9c74b85aaa4d649a0fa652407bf3bf843` |
 | `sheet-c2a-native-prep-20261026-v4-independent-review-20261026/review-receipt.json` | 5,237 | `168ee3b3098a6e5f1ceae38edca6c7a038790152f8cb1157c1759bc7430f5f6e` |
 | `final-C2a-three-lanes-source-only-20261026-v2-independent-review-20261026/review-receipt.json` | 9,800 | `9aecd1d069778e13837f46a7a367bcb08b81a7df60197319163d464cf4a17aae` |
 | `final-C2a-three-lanes-source-only-20261026-v2a-independent-review-20261026/correction-receipt.json` | 1,973 | `3fb0a119ff6ca442601cf29e410b6454b05065193f3ade35f6a728539cb65fcd` |

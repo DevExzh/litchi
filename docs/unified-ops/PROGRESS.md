@@ -6195,3 +6195,8 @@ See [0063](0063-source-pptx-modern-comments.md).
   returned for incomplete build-to-binding transitions. The
   same gate continues facade chunks with 33 checks complete; C/P stay frozen.
   All 25 actual qualification rows remain required. Nothing is pushed.
+
+  OPC v5 then passes independent source review with 18 tests, including the
+  complete public prefix-to-policy flow, failed builds, binary drift and
+  terminal status checks. Nineteen of 25 rows now have reviewed source
+  preparations; every actual native qualification remains pending.
