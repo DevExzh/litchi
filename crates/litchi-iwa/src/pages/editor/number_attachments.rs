@@ -42,7 +42,7 @@ impl Draft {
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
         self.text
-            .remove_text_number_attachment(self.body_storage_id, id)
+            .remove_text_number_attachment_pruning(self.body_storage_id, id)
     }
 
     /// Read every number attachment in a reachable header/footer slot.
@@ -85,7 +85,8 @@ impl Draft {
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
         let storage_id = self.require_header_footer_selector(selector)?;
-        self.text.remove_text_number_attachment(storage_id, id)
+        self.text
+            .remove_text_number_attachment_pruning(storage_id, id)
     }
 
     /// Read every number attachment in one ordinary Pages text box.
@@ -134,7 +135,7 @@ impl Draft {
     ) -> Result<TextNumberAttachment> {
         let graph = self.text_box_graph(drawable_object_id.get())?;
         let mut staged = self.text.clone();
-        let attachment = staged.remove_text_number_attachment(graph.storage_id, id)?;
+        let attachment = staged.remove_text_number_attachment_pruning(graph.storage_id, id)?;
         *self = Self::from_package(staged.into_package())?;
         Ok(attachment)
     }

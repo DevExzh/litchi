@@ -26,6 +26,7 @@
 | `a408e00fbd`, `9bac132398` | `litchi_pages::bookmark` — `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add, update, remove}` by position or name; on W1-D's `ranged` and `smart_field` engines | 4 |
 | `c0ec0bac27`, `9bac132398` | `litchi_pages::date_time` — `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add, insert, update, remove}` (insert adds the display text) | 5 |
 | `a9d2af35ca`, `de1dbad71e` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}`; on W1-D's `number_attachment` engine | 6 |
+| (number-attachment host fix commit, below) | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -58,7 +59,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | table values and reads | 4 + one read sweep over four native fixtures | A | reads: `body-table-cells-native-receipt.json`; writes queued |
 | bookmarks | add (B), update (A), remove (A) | A/B | queued |
 | Date & Time fields | add (B), insert (B), update (A), remove (A) | A/B | queued |
-| number attachments | body insert/update, first-header insert/update | A | queued |
+| number attachments | body insert/update/remove, first-header insert/update/remove | A | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -77,9 +78,8 @@ corpus has no native file with them.
 
 ### Pinned divergences (routes left host-only)
 
-| Route | Divergence | Owner |
-|---|---|---|
-| `remove_body_number_attachment` (and the header/footer remove) | the host deletes the U+FFFC and its table entry but keeps the attachment object and the storage header's reference to it (its pruning proof fails when the header lists references the payload does not count); the leaf deletes the object with its metadata — `pages_body_number_attachment_remove_divergence_is_reported` | W1-B decides with the owner whether the leaf mirrors the host or the host defect is fixed |
+None. The number-attachment removal divergence pinned in the first slice
+was a host defect and is fixed (§3, item 3).
 
 ## 3. Host defects found
 
@@ -92,7 +92,20 @@ corpus has no native file with them.
    writer `table_write::header_adjust`; a source that never counted the
    column keeps its bucket. Two host tests that pinned the old counts were
    updated. Both changes are queued for macOS on the three set-cell routes.
-3. **Number-attachment removal** keeps an orphan object (§2), not fixed.
+3. **Number-attachment removal kept an orphan object.** The host deleted
+   the U+FFFC and its table entry, but its text-rewrite pruning proof fails
+   when the storage header lists references the payload does not count
+   (application-saved storages do), so the attachment object, the header
+   reference to it and its metadata stayed. Fixed for Pages storages
+   (`text::number_attachment::prune_exclusive_number_attachment`, reached
+   through `text::Draft::remove_text_number_attachment_pruning` from the
+   three Pages remove routes): after the existing exclusivity proof the
+   header reference is dropped and the object deleted through the existing
+   `remove_unreferenced_number_attachment_objects` (external references, UUID,
+   watermark suffix). The shared Keynote/Numbers text route is unchanged
+   (W1-D's leaf matches it). Body and first-header removal are now tier A
+   (`pages_body_number_attachment_remove_parity`,
+   `pages_header_number_attachment_remove_parity`); queued for macOS.
 
 ## 4. Performance
 
@@ -153,8 +166,7 @@ Both pre-commit size checks printed nothing for every commit.
 
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
-| number-attachment removal | 3 | owner choice (§2) |
-| text-box attachments and date-time fields | 4 + 5 | text boxes are W2-B |
+| text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
 | media lifecycle (add, duplicate, remove, replace data/poster) | 16 | next; donor `refactor/pages-media-lifecycle-admission-20261024` |
 | image, movie and shape titles/captions | 15 | next |
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |

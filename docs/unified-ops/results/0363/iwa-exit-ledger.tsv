@@ -1855,8 +1855,8 @@ pages/editor/number_attachments.rs	header_footer_number_attachments	1	pages	text
 pages/editor/number_attachments.rs	insert_body_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_body_number_attachment_insert_parity	A	-	-
 pages/editor/number_attachments.rs	insert_header_footer_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_header_number_attachment_insert_parity	A	-	-
 pages/editor/number_attachments.rs	insert_text_box_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	remove_body_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
-pages/editor/number_attachments.rs	remove_header_footer_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
+pages/editor/number_attachments.rs	remove_body_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_body_number_attachment_remove_parity	A	-	-
+pages/editor/number_attachments.rs	remove_header_footer_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_header_number_attachment_remove_parity	A	-	-
 pages/editor/number_attachments.rs	remove_text_box_number_attachment	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
 pages/editor/number_attachments.rs	text_box_number_attachments	1	pages	text.number_attachment	host-only	litchi-pages	-	-	-	-
 pages/editor/number_attachments.rs	update_body_number_attachment	1	pages	text.number_attachment	migrated	litchi_pages::Package::edit_number_attachments	pages_body_number_attachment_update_parity	A	-	-
