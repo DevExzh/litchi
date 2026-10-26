@@ -55,6 +55,7 @@ pub mod text {
     pub use crate::package::sheet_drawable_text::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
+    pub use litchi_iwa_text::{appearance, character, font, paragraph};
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
 

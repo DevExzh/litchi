@@ -34,7 +34,10 @@ use super::structure::{
     references,
 };
 use crate::selector::SheetSelector;
-use crate::sheet::drawable::{Drawable, DrawableSelector, Kind};
+use crate::sheet::drawable::{Drawable, DrawableSelector, Geometry, Kind};
+use litchi_iwa_common::shape::path::Preset;
+
+use super::sheet_drawable_author::{self as author, Context};
 
 structure::structural_family!("sheet-drawable");
 
@@ -95,6 +98,10 @@ pub enum Refusal {
         /// The number of drawables on the sheet.
         count: usize,
     },
+    /// A new drawable's frame needs a finite position and a positive size
+    /// (and a rounded-rectangle radius at most half the shorter side).
+    #[error("invalid frame for a new drawable")]
+    InvalidGeometry,
     /// The drawable was already removed by an earlier operation of this edit.
     #[error("the drawable was removed earlier in this edit")]
     AlreadyRemoved,
@@ -127,7 +134,7 @@ impl Refusal {
             Self::SheetNotFound | Self::DrawableNotFound { .. } | Self::AlreadyRemoved => {
                 RefusalKind::NotFound
             },
-            Self::ZPositionOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::ZPositionOutOfRange { .. } | Self::InvalidGeometry => RefusalKind::InvalidValue,
             Self::UnsupportedOperation { .. } | Self::NoStagedOperation => {
                 RefusalKind::UnsupportedOperation
             },
@@ -145,10 +152,20 @@ impl From<Refusal> for Error {
 }
 
 /// One staged operation, with the native identity resolved from the base.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Operation {
     Remove { drawable: u64 },
     MoveTo { drawable: u64, position: usize },
+    Add(Box<NewShape>),
+}
+
+/// One staged text box or preset shape.
+#[derive(Debug, Clone, PartialEq)]
+struct NewShape {
+    preset: Preset,
+    geometry: Geometry,
+    text: String,
+    text_box: bool,
 }
 
 /// Drawable operations staged against one sheet of an immutable package.
@@ -189,7 +206,70 @@ impl Edit<'_> {
             .iter()
             .filter(|operation| matches!(operation, Operation::Remove { .. }))
             .count();
-        self.base.entries.len() - removed
+        let added = self
+            .operations
+            .iter()
+            .filter(|operation| matches!(operation, Operation::Add(_)))
+            .count();
+        self.base.entries.len() - removed + added
+    }
+
+    fn stage_shape(
+        &mut self,
+        preset: Preset,
+        geometry: Geometry,
+        text: &str,
+        text_box: bool,
+    ) -> Result<&mut Self, Error> {
+        let valid = geometry.is_valid()
+            && geometry.position.is_some()
+            && geometry
+                .size
+                .is_some_and(|size| size.width > 0.0 && size.height > 0.0);
+        if !valid {
+            return Err(Refusal::InvalidGeometry.into());
+        }
+        let mut owned = String::new();
+        owned
+            .try_reserve_exact(text.len())
+            .map_err(|_error| Error::Allocation { amount: text.len() })?;
+        owned.push_str(text);
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::Add(Box::new(NewShape {
+            preset,
+            geometry,
+            text: owned,
+            text_box,
+        })));
+        Ok(self)
+    }
+
+    /// Stage a new text box holding `text` at `geometry` (position and a
+    /// positive size required), styled by the theme's text-box preset. It
+    /// joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidGeometry`], [`Error::Allocation`].
+    pub fn add_text_box(&mut self, geometry: Geometry, text: &str) -> Result<&mut Self, Error> {
+        self.stage_shape(Preset::Rectangle, geometry, text, true)
+    }
+
+    /// Stage a new preset shape holding `text` at `geometry`, styled by the
+    /// theme's text-box preset (as Numbers' own shape insertion does). It
+    /// joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidGeometry`] (also a rounded-rectangle radius above
+    /// half the shorter side, at commit), [`Error::Allocation`].
+    pub fn add_shape(
+        &mut self,
+        preset: Preset,
+        geometry: Geometry,
+        text: &str,
+    ) -> Result<&mut Self, Error> {
+        self.stage_shape(preset, geometry, text, false)
     }
 
     /// Stage the removal of a text box or ordinary shape and the objects
@@ -253,36 +333,29 @@ impl Edit<'_> {
         if self.operations.is_empty() {
             return Err(Refusal::NoStagedOperation.into());
         }
+        let structural = self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::MoveTo { .. }));
+        if structural {
+            let (published, order) = publish_structural(self.source, &self.base, &self.operations)?;
+            let reopened = graph::sheet_drawables(&published.package, self.base.sheet.position)?;
+            if reopened.identifiers() != order {
+                return Err(Error::Verification);
+            }
+            return Commit::new(self.source, published);
+        }
         let before = self.base.identifiers();
         let mut order = before.clone();
-        let mut removed = Vec::new();
         for operation in &self.operations {
-            match *operation {
-                Operation::Remove { drawable } => {
-                    order.retain(|identifier| *identifier != drawable);
-                    removed.push(drawable);
-                },
-                Operation::MoveTo { drawable, position } => {
-                    let current = order
-                        .iter()
-                        .position(|identifier| *identifier == drawable)
-                        .ok_or(Error::InvalidSource)?;
-                    let moved = order.remove(current);
-                    if position > order.len() {
-                        return Err(Refusal::ZPositionOutOfRange {
-                            position: Position::new(position),
-                            count: order.len() + 1,
-                        }
-                        .into());
-                    }
-                    order.insert(position, moved);
-                },
+            if let Operation::MoveTo { drawable, position } = *operation {
+                move_in(&mut order, drawable, position)?;
             }
         }
-        if removed.is_empty() && order == before {
+        if order == before {
             return Commit::unchanged(self.source);
         }
-        let published = publish(self.source, &self.base, &order, &removed)?;
+        let published = publish_order(self.source, &self.base, &order)?;
         let reopened = graph::sheet_drawables(&published.package, self.base.sheet.position)?;
         if reopened.identifiers() != order {
             return Err(Error::Verification);
@@ -291,75 +364,166 @@ impl Edit<'_> {
     }
 }
 
-fn publish(
+fn move_in(order: &mut Vec<u64>, drawable: u64, position: usize) -> Result<(), Error> {
+    let current = order
+        .iter()
+        .position(|identifier| *identifier == drawable)
+        .ok_or(Error::InvalidSource)?;
+    let moved = order.remove(current);
+    if position > order.len() {
+        return Err(Refusal::ZPositionOutOfRange {
+            position: Position::new(position),
+            count: order.len() + 1,
+        }
+        .into());
+    }
+    order.insert(position, moved);
+    Ok(())
+}
+
+/// A pure z-order change: the sheet's list is rewritten in place.
+fn publish_order(
     source: &Package,
     base: &SheetDrawables,
     order: &[u64],
-    removed: &[u64],
 ) -> Result<structure::Published, Error> {
     let sheet = &base.sheet;
-    let before = base.identifiers();
-    if removed.is_empty() {
-        // A pure z-order change rewrites the sheet's list in place.
-        let mut rewrite = |object: &mut litchi_iwa_core::ArchiveObject,
-                           limits: litchi_iwa_core::Limits| {
-            let data = references::rewrite(
-                &object.messages[sheet.message_index].data,
-                sheet.path,
-                order,
-            )?;
-            references::replace(
-                object,
-                sheet.message_index,
-                data,
-                &[],
-                &[],
-                sheet.path,
-                limits,
-            )
-        };
-        return Ok(graph::publish_in_place(
-            source,
-            &mut [(sheet.identifier, &mut rewrite)],
-        )?);
-    }
+    let mut rewrite = |object: &mut litchi_iwa_core::ArchiveObject,
+                       limits: litchi_iwa_core::Limits| {
+        let data = references::rewrite(
+            &object.messages[sheet.message_index].data,
+            sheet.path,
+            order,
+        )?;
+        references::replace(
+            object,
+            sheet.message_index,
+            data,
+            &[],
+            &[],
+            sheet.path,
+            limits,
+        )
+    };
+    Ok(graph::publish_in_place(
+        source,
+        &mut [(sheet.identifier, &mut rewrite)],
+    )?)
+}
+
+/// Removals, additions and moves in one structural working set; returns
+/// the candidate and the sheet's final list.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one staged publication: removals, creations, the sheet list, the registry"
+)]
+fn publish_structural(
+    source: &Package,
+    base: &SheetDrawables,
+    operations: &[Operation],
+) -> Result<(structure::Published, Vec<u64>), Error> {
+    let sheet = &base.sheet;
     let mut working = Working::new(source)?;
-    let census = Census::new(&working)?;
-    let closure: BTreeSet<u64> = census.private_closure(&working, removed)?;
-    let detached: Vec<(u64, u64)> = removed
-        .iter()
-        .map(|drawable| (sheet.identifier, *drawable))
-        .collect();
-    census.require_detached(&closure, &detached)?;
+    let registry = metadata::registry(&working)?;
+    let sheet_member = working
+        .locate(sheet.identifier)?
+        .ok_or(Error::InvalidSource)?;
+    let mut order = base.identifiers();
+    let mut removed = Vec::new();
+    let mut created: Vec<u64> = Vec::new();
+    let mut context = None;
+    let mut transition = Transition::default();
+    for operation in operations {
+        match operation {
+            Operation::Remove { drawable } => {
+                order.retain(|identifier| identifier != drawable);
+                removed.push(*drawable);
+            },
+            Operation::MoveTo { drawable, position } => move_in(&mut order, *drawable, *position)?,
+            Operation::Add(shape) => {
+                if context.is_none() {
+                    context = Some(Context::read(source)?);
+                }
+                let context = context.as_ref().ok_or(Error::InvalidSource)?;
+                let identifiers = working.allocate(4)?;
+                let identifiers: [u64; 4] = identifiers
+                    .try_into()
+                    .map_err(|_error| Error::InvalidSource)?;
+                let authored = author::author(
+                    context,
+                    identifiers,
+                    sheet.identifier,
+                    shape.geometry,
+                    shape.preset,
+                    &shape.text,
+                    shape.text_box,
+                    working.archive_limits(),
+                )?
+                .ok_or(Refusal::InvalidGeometry)?;
+                for object in authored.objects {
+                    working.insert(&sheet_member, object)?;
+                }
+                if let Some(registry) = &registry {
+                    let component = registry.component_for_entry(&sheet_member)?.identifier;
+                    for identifier in authored.identifiers {
+                        let seed = metadata::identity_seed(&working, identifier)?;
+                        transition.register_uuid(registry, component, identifier, seed)?;
+                    }
+                    let style_member = working
+                        .locate(context.shape_style)?
+                        .ok_or(Error::InvalidSource)?;
+                    let style_component = registry.component_for_entry(&style_member)?.identifier;
+                    transition.reference(
+                        registry,
+                        component,
+                        style_component,
+                        context.shape_style,
+                    )?;
+                }
+                order.push(authored.identifiers[0]);
+                created.push(authored.identifiers[0]);
+            },
+        }
+    }
+    let mut closure = BTreeSet::new();
+    if !removed.is_empty() {
+        let census = Census::new(&working)?;
+        closure = census.private_closure(&working, &removed)?;
+        let detached: Vec<(u64, u64)> = removed
+            .iter()
+            .map(|drawable| (sheet.identifier, *drawable))
+            .collect();
+        census.require_detached(&closure, &detached)?;
+    }
     let limits = working.archive_limits();
     let object = working.object_mut(sheet.identifier)?;
     let data = references::rewrite(
         &object.messages[sheet.message_index].data,
         sheet.path,
-        order,
+        &order,
     )?;
     references::replace(
         object,
         sheet.message_index,
         data,
-        removed,
-        &[],
+        &removed,
+        &created,
         sheet.path,
         limits,
     )?;
-    let mut transition = Transition::default();
-    let list: Vec<u64> = closure.iter().copied().collect();
-    if let Some(registry) = metadata::registry(&working)? {
-        transition.remove_objects(&registry, &list)?;
+    if !closure.is_empty() {
+        let list: Vec<u64> = closure.iter().copied().collect();
+        if let Some(registry) = &registry {
+            transition.remove_objects(registry, &list)?;
+        }
+        transition.release_suffix(&list)?;
+        for identifier in &list {
+            working.remove(*identifier)?;
+        }
     }
-    transition.release_suffix(&list)?;
-    for identifier in &list {
-        working.remove(*identifier)?;
-    }
-    debug_assert_eq!(before.len(), order.len() + removed.len());
     let published = working.publish(&transition)?;
     verify_removed(&published.package, &closure)?;
-    Ok(published)
+    Ok((published, order))
 }
 
 fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {

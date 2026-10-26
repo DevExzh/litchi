@@ -50,6 +50,7 @@ mod save;
 )]
 mod sheet;
 pub(crate) mod sheet_drawable;
+mod sheet_drawable_author;
 mod sheet_drawable_graph;
 pub(crate) mod sheet_drawable_properties;
 pub(crate) mod sheet_drawable_text;

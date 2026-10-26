@@ -176,3 +176,52 @@ fn z_order_moves_reorder_the_list_and_tables_are_not_removed() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn a_created_text_box_takes_text_properties_and_can_be_removed() -> TestResult {
+    use litchi_numbers::sheet::drawable::text::font::Font;
+    use litchi_numbers::sheet::drawable::text::{Property, PropertyKind};
+    use litchi_numbers::sheet::drawable::{Geometry, Size};
+
+    let package = open("basic.numbers")?;
+    let before = package.sheet_drawable_list(0)?.len();
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_text_box(
+        Geometry::new(
+            Point { x: 40.0, y: 60.0 },
+            Size {
+                width: 200.0,
+                height: 50.0,
+            },
+        ),
+        "Leaf text box",
+    )?;
+    let created = edit.commit()?.into_package();
+    let list = created.sheet_drawable_list(0)?;
+    assert_eq!(list.len(), before + 1);
+    assert_eq!(list[before].kind(), Kind::TextBox);
+
+    let alignment =
+        created.sheet_text_box_text(0, DrawableSelector::text_box(0), PropertyKind::Alignment)?;
+    let mut edit = created.edit_sheet_text_box_text(0, DrawableSelector::text_box(0))?;
+    edit.set(Property::TextFont(Font::named("Courier")?))?;
+    let styled = edit.commit()?;
+    assert_eq!(
+        styled.package().sheet_text_box_text(
+            0,
+            DrawableSelector::text_box(0),
+            PropertyKind::Alignment
+        )?,
+        alignment
+    );
+    let restored = styled
+        .package()
+        .apply_sheet_text_box_text(&styled.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&created)?);
+
+    let mut edit = created.edit_sheet_drawables(0)?;
+    edit.remove(DrawableSelector::text_box(0))?;
+    let removed = edit.commit()?.into_package();
+    assert_eq!(removed.sheet_drawable_list(0)?.len(), before);
+    Ok(())
+}
