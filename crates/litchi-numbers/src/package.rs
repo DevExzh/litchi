@@ -50,6 +50,14 @@ mod save;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_chart_style;
+pub(crate) mod sheet_drawable;
+mod sheet_drawable_author;
+mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_language;
+pub(crate) mod sheet_drawable_plain_text;
+pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_order;
 mod storage_list;
