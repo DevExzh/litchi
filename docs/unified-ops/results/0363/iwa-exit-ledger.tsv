@@ -506,7 +506,7 @@ keynote/editor/slide_shapes.rs	set_slide_shape_effects	1	keynote	drawable.shape	
 keynote/editor/slide_shapes.rs	set_slide_shape_fill	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_geometry	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::set_geometry	keynote_slide_shape_geometry_parity	B	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_image_fill	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes.rs	set_slide_shape_preset	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	set_slide_shape_preset	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::set_preset	keynote_slide_shape_preset_parity	B	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_properties	1	keynote	drawable.shape	migrated	litchi_keynote::slide::drawable::Edit::set_properties	keynote_slide_shape_properties_parity	B	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_shadow	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes.rs	set_slide_shape_stroke	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-

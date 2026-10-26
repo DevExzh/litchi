@@ -910,3 +910,42 @@ fn keynote_slide_shape_text_clear_parity() -> TestResult {
         "",
     )
 }
+
+#[test]
+fn keynote_slide_shape_preset_parity() -> TestResult {
+    use litchi_iwa_common::shape::path::{InnerRadiusRatio, StarPoints};
+    let input = shape_fixture()?;
+    let (points, inner_radius) = (StarPoints::new(6)?, InnerRadiusRatio::new(0.4)?);
+    run_on(
+        "keynote_slide_shape_preset_parity",
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::Shape)?)?;
+            editor.set_slide_shape_preset(
+                SLIDE,
+                id,
+                litchi_iwa_common::shape::path::Preset::Star {
+                    points,
+                    inner_radius,
+                },
+            )?;
+            Ok(())
+        },
+        |source| {
+            let position = leaf_position(source, Kind::Shape)?;
+            leaf_run(source, |edit| {
+                edit.set_preset(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                    litchi_keynote::slide::drawable::Preset::Star {
+                        points,
+                        inner_radius,
+                    },
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
