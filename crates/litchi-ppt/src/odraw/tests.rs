@@ -29,7 +29,13 @@ fn ppt_text_atoms_use_their_specified_encodings() {
     bytes.extend_from_slice(&[0x80, 0xe9]);
 
     let mut text = String::new();
-    text_from_ppt_records(&bytes, &mut text, super::package::MAX_HOST_RECORDS).unwrap();
+    text_from_ppt_records(
+        &bytes,
+        &mut text,
+        super::package::MAX_HOST_RECORDS,
+        crate::SourceLimits::DEFAULT_MAX_DEPTH,
+    )
+    .unwrap();
 
     assert_eq!(text, "😀\n\u{80}é");
 }
@@ -37,7 +43,15 @@ fn ppt_text_atoms_use_their_specified_encodings() {
 #[test]
 fn malformed_embedded_record_stops_without_panicking() {
     let mut text = String::new();
-    assert!(text_from_ppt_records(&[0; 7], &mut text, super::package::MAX_HOST_RECORDS).is_err());
+    assert!(
+        text_from_ppt_records(
+            &[0; 7],
+            &mut text,
+            super::package::MAX_HOST_RECORDS,
+            crate::SourceLimits::DEFAULT_MAX_DEPTH,
+        )
+        .is_err()
+    );
     assert!(text.is_empty());
 }
 
@@ -48,7 +62,34 @@ fn embedded_text_records_honor_the_caller_event_limit() {
     let data = [first.as_slice(), second.as_slice()].concat();
     let mut text = String::new();
 
-    assert!(text_from_ppt_records(&data, &mut text, 1).is_err());
+    let error = text_from_ppt_records(&data, &mut text, 1, crate::SourceLimits::DEFAULT_MAX_DEPTH)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            observed: 2,
+            maximum: 1,
+        }
+    ));
+}
+
+#[test]
+fn embedded_text_records_honor_the_caller_depth_limit() {
+    let text_atom = record(0, 0, 4000, &[0; 2]);
+    let inner = record(0, 0, 1000, &text_atom);
+    let outer = record(0, 0, 1000, &inner);
+    let mut text = String::new();
+
+    let error = text_from_ppt_records(&outer, &mut text, 16, 1).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::Error::Limit {
+            kind: crate::SourceLimitKind::Depth,
+            observed: 2,
+            maximum: 1,
+        }
+    ));
 }
 
 #[test]
@@ -190,6 +231,72 @@ fn source_limits_intersect_officeart_safety_ceiling() {
         parse(&nested_drawing, &restrictive).is_err(),
         "a nested group beyond the caller's depth must remain rejected"
     );
+}
+
+#[test]
+fn admitted_shapes_keep_host_loop_event_limits_typed() {
+    use crate::officeart_wire::{ShapeBuilder, record_type, write_atom, write_container};
+
+    let child = record(0, 0, 1000, &[]);
+    let host_records = child.repeat(9);
+    let mut shape_children = Vec::new();
+    ShapeBuilder::new(1, 1)
+        .with_flags(0x0800u32)
+        .write(&mut shape_children, Default::default())
+        .unwrap();
+    write_container(
+        &mut shape_children,
+        0,
+        record_type::CLIENT_DATA,
+        &host_records,
+        Default::default(),
+    )
+    .unwrap();
+
+    let mut shape = Vec::new();
+    write_container(
+        &mut shape,
+        0,
+        record_type::SP_CONTAINER,
+        &shape_children,
+        Default::default(),
+    )
+    .unwrap();
+    let mut drawing_body = Vec::new();
+    write_atom(
+        &mut drawing_body,
+        0,
+        0,
+        record_type::DG,
+        &[0; 8],
+        Default::default(),
+    )
+    .unwrap();
+    drawing_body.extend_from_slice(&shape);
+    let mut drawing = Vec::new();
+    write_container(
+        &mut drawing,
+        0,
+        record_type::DG_CONTAINER,
+        &drawing_body,
+        Default::default(),
+    )
+    .unwrap();
+
+    let limits = super::Limits {
+        max_records: 8,
+        ..super::Limits::default()
+    };
+    let shapes = parse(&drawing, &limits).expect("OfficeArt shape admission");
+    assert_eq!(shapes.len(), 1);
+    assert!(matches!(
+        super::codec::validate_host_framing(&shapes[0]),
+        Err(crate::package::Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            observed: 9,
+            maximum: 8,
+        })
+    ));
 }
 
 #[test]

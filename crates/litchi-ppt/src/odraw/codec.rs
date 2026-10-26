@@ -2,7 +2,7 @@ use litchi_odraw::shape::Shape;
 use litchi_odraw::{Container, Record, RecordKind};
 
 use crate::embedded::reference::Reference;
-use crate::package::{Result, SourceLimits};
+use crate::package::{Error, Result, SourceLimitKind, SourceLimits};
 
 use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt, ShapeLimitsExt};
 use super::package::{
@@ -315,25 +315,34 @@ fn drawing_text(
 /// Returns an error if the operation fails.
 pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
     validate_host_record(textbox, CLIENT_TEXTBOX_RAW_KIND, "ClientTextbox")?;
-    text_from_textbox_payload_bounded(textbox.data(), textbox.limits().max_records)
+    text_from_textbox_payload_bounded(
+        textbox.data(),
+        textbox.limits().max_records,
+        usize::from(textbox.limits().max_depth),
+    )
 }
 
 /// Decode the text of a `ClientTextbox` payload, or of a slide-list text
 /// body framed as one: every character atom's text, trimmed and joined with
 /// `\n`, then trimmed at the end; `None` when nothing remains.
 pub(crate) fn text_from_textbox_payload(payload: &[u8]) -> Result<Option<String>> {
-    text_from_textbox_payload_bounded(payload, super::package::MAX_HOST_RECORDS)
+    text_from_textbox_payload_bounded(
+        payload,
+        super::package::MAX_HOST_RECORDS,
+        crate::SourceLimits::DEFAULT_MAX_DEPTH,
+    )
 }
 
 pub(crate) fn text_from_textbox_payload_bounded(
     payload: &[u8],
     max_records: u32,
+    max_depth: usize,
 ) -> Result<Option<String>> {
     if payload.is_empty() {
         return Ok(None);
     }
     let mut text = String::with_capacity(256);
-    text_from_ppt_records(payload, &mut text, max_records)?;
+    text_from_ppt_records(payload, &mut text, max_records, max_depth)?;
     let trimmed = text.trim_end().len();
     text.truncate(trimmed);
     Ok((!text.is_empty()).then_some(text))
@@ -623,24 +632,43 @@ fn text_from_container(
     let mut visited = 0usize;
 
     while let Some((record, depth)) = pending.pop() {
-        visited = visited
-            .checked_add(1)
-            .ok_or_else(|| corrupted("OfficeArt traversal count overflow"))?;
+        visited = visited.checked_add(1).ok_or(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: max_records,
+        })?;
         if visited > max_records {
-            return Err(corrupted("OfficeArt drawing exceeds the PPT record limit"));
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: visited,
+                maximum: max_records,
+            });
         }
 
         if record.kind() == RecordKind::ClientTextbox {
             let before = text.len();
             match outline {
-                None => text_from_ppt_records(record.data(), text, limits.max_records)?,
+                None => text_from_ppt_records(
+                    record.data(),
+                    text,
+                    limits.max_records,
+                    usize::from(limits.max_depth),
+                )?,
                 Some(bodies) => {
                     match textbox_text_records(record.data(), bodies, limits.max_records)? {
-                        TextRecords::Inline(payload) => {
-                            text_from_ppt_records(payload, text, limits.max_records)?
-                        },
+                        TextRecords::Inline(payload) => text_from_ppt_records(
+                            payload,
+                            text,
+                            limits.max_records,
+                            usize::from(limits.max_depth),
+                        )?,
                         TextRecords::Outline { body, .. } => {
-                            outline_text_into(body, text, limits.max_records)?;
+                            outline_text_into(
+                                body,
+                                text,
+                                limits.max_records,
+                                usize::from(limits.max_depth),
+                            )?;
                         },
                         TextRecords::Unresolved(_) => {},
                     }
@@ -656,7 +684,11 @@ fn text_from_container(
 
         if record.is_container() {
             if depth >= max_depth {
-                return Err(corrupted("OfficeArt drawing exceeds the PPT nesting limit"));
+                return Err(Error::Limit {
+                    kind: SourceLimitKind::Depth,
+                    observed: depth.saturating_add(1),
+                    maximum: max_depth,
+                });
             }
             let nested = Container::try_new(record)?;
             push_children(&nested, depth + 1, &mut pending, max_records)?;
@@ -676,9 +708,10 @@ fn outline_text_into(
     body: &crate::OutlineTextBody,
     text: &mut String,
     max_records: u32,
+    max_depth: usize,
 ) -> Result<()> {
     let mark = text.len();
-    match text_from_ppt_records(body.records(), text, max_records) {
+    match text_from_ppt_records(body.records(), text, max_records, max_depth) {
         Ok(()) => Ok(()),
         Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
             text.truncate(mark);
@@ -697,7 +730,14 @@ fn push_children<'data>(
     let mut children = Vec::new();
     for child in container.children() {
         if pending.len().saturating_add(children.len()) >= max_records {
-            return Err(corrupted("OfficeArt drawing exceeds the PPT record limit"));
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: pending
+                    .len()
+                    .saturating_add(children.len())
+                    .saturating_add(1),
+                maximum: max_records,
+            });
         }
         children.push(child?);
     }
@@ -709,8 +749,8 @@ pub(super) fn text_from_ppt_records(
     data: &[u8],
     text: &mut String,
     max_records: u32,
+    max_depth: usize,
 ) -> Result<()> {
-    const MAX_DEPTH: usize = 256;
     let max_records_u32 = max_records;
     let max_records = usize::try_from(max_records_u32).unwrap_or(usize::MAX);
 
@@ -722,19 +762,30 @@ pub(super) fn text_from_ppt_records(
             continue;
         };
         let record = raw?;
-        visited = visited
-            .checked_add(1)
-            .ok_or_else(|| corrupted("ClientTextbox traversal count overflow"))?;
+        visited = visited.checked_add(1).ok_or(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: max_records,
+        })?;
         if visited > max_records {
-            return Err(corrupted("ClientTextbox exceeds the PPT record limit"));
+            return Err(Error::Limit {
+                kind: SourceLimitKind::Events,
+                observed: visited,
+                maximum: max_records,
+            });
         }
 
         let decoded = match record.kind {
             4000 | 4026 => Some(crate::text::extractor::from_utf16le_lossy(record.data)),
             4008 => Some(crate::text::extractor::decode_text_bytes(record.data)),
             kind if is_text_container(kind) => {
-                if pending.len() >= MAX_DEPTH {
-                    return Err(corrupted("ClientTextbox exceeds the PPT nesting limit"));
+                let depth = pending.len().saturating_sub(1);
+                if depth >= max_depth {
+                    return Err(Error::Limit {
+                        kind: SourceLimitKind::Depth,
+                        observed: depth.saturating_add(1),
+                        maximum: max_depth,
+                    });
                 }
                 pending.push(RawRecords::new(record.data, max_records_u32));
                 None

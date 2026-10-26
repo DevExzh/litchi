@@ -1811,7 +1811,11 @@ fn outline_bodies() -> Vec<crate::OutlineTextBody> {
         records.push(record);
         offset += consumed;
     }
-    crate::OutlineTextBody::collect(&records.iter().collect::<Vec<_>>()).unwrap()
+    crate::OutlineTextBody::collect(
+        &records.iter().collect::<Vec<_>>(),
+        crate::SourceLimits::default(),
+    )
+    .unwrap()
 }
 
 /// A shape container whose `ClientTextbox` holds `textbox_records`, with a

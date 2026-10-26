@@ -244,15 +244,21 @@ impl Slide<'_> {
             return Ok(None);
         };
         let max_records = escher_shape.container().record().limits().max_records;
+        let max_depth = usize::from(escher_shape.container().record().limits().max_depth);
         let unresolved =
             match crate::odraw::textbox_text_records(textbox.data(), outline, max_records)? {
                 TextRecords::Inline(payload) => {
-                    return crate::odraw::text_from_textbox_payload_bounded(payload, max_records);
+                    return crate::odraw::text_from_textbox_payload_bounded(
+                        payload,
+                        max_records,
+                        max_depth,
+                    );
                 },
                 TextRecords::Outline { index, body } => {
                     match crate::odraw::text_from_textbox_payload_bounded(
                         body.records(),
                         max_records,
+                        max_depth,
                     ) {
                         Ok(text) => return Ok(text),
                         Err(error) if super::validation::is_isolatable_shape_error(&error) => index,

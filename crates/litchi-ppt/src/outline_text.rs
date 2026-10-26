@@ -16,7 +16,7 @@
 //! same decoders as a shape that holds its text inline.
 
 use crate::consts::RecordType;
-use crate::package::{Error, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 use crate::text_interaction::TextType;
 
@@ -58,6 +58,8 @@ pub struct OutlineTextBody {
     /// The body's records, from its `TextHeaderAtom` on, each with its
     /// eight-byte record header.
     records: Box<[u8]>,
+    /// Source policy retained by this source-backed projection.
+    source_limits: SourceLimits,
 }
 
 impl OutlineTextBody {
@@ -73,7 +75,7 @@ impl OutlineTextBody {
     /// Returns [`Error::Corrupted`] when a `TextHeaderAtom` is malformed or
     /// a record was truncated by the containing stream, and
     /// [`Error::AllocationFailed`] when a body cannot be allocated.
-    pub(crate) fn collect(records: &[&Record]) -> Result<Vec<Self>> {
+    pub(crate) fn collect(records: &[&Record], source_limits: SourceLimits) -> Result<Vec<Self>> {
         let headers = records
             .iter()
             .filter(|record| record.record_type == RecordType::TextHeaderAtom)
@@ -97,6 +99,7 @@ impl OutlineTextBody {
                 text_type: text_header_type(header)?,
                 text_header_instance: header.instance,
                 records: framed(&body[..end])?,
+                source_limits,
             });
             rest = &body[end..];
         }
@@ -132,7 +135,15 @@ impl OutlineTextBody {
     ///
     /// Returns an error when the body's records cannot be traversed.
     pub fn text(&self) -> Result<String> {
-        Ok(crate::odraw::text_from_textbox_payload(&self.records)?.unwrap_or_default())
+        Ok(crate::odraw::text_from_textbox_payload_bounded(
+            &self.records,
+            self.source_limits
+                .max_events()
+                .try_into()
+                .unwrap_or(u32::MAX),
+            self.source_limits.max_depth(),
+        )?
+        .unwrap_or_default())
     }
 }
 
@@ -233,7 +244,7 @@ mod tests {
         let records = parse(&bytes);
         let borrowed = records.iter().collect::<Vec<_>>();
 
-        let bodies = OutlineTextBody::collect(&borrowed).unwrap();
+        let bodies = OutlineTextBody::collect(&borrowed, SourceLimits::default()).unwrap();
         assert_eq!(bodies.len(), 2);
         assert_eq!(bodies[0].text_type(), TextType::Title);
         assert_eq!(bodies[0].text_header_instance(), 0);
@@ -256,9 +267,41 @@ mod tests {
         ]
         .concat();
         let records = parse(&bytes);
-        let bodies = OutlineTextBody::collect(&records.iter().collect::<Vec<_>>()).unwrap();
+        let bodies =
+            OutlineTextBody::collect(&records.iter().collect::<Vec<_>>(), SourceLimits::default())
+                .unwrap();
         assert_eq!(bodies.len(), 1);
         assert_eq!(bodies[0].text().unwrap(), "");
+    }
+
+    #[test]
+    fn body_text_honors_the_retained_source_depth_and_event_limits() {
+        let header = record_bytes(0, 0, 3999, &1u32.to_le_bytes());
+        let text = record_bytes(0, 0, 4000, &[b'A', 0]);
+        let nested = record_bytes(0, 0, 1000, &text);
+        let outer = record_bytes(0, 0, 1000, &nested);
+        let records = parse(&[header, outer].concat());
+        let depth_limited = SourceLimits::builder()
+            .max_depth(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let bodies =
+            OutlineTextBody::collect(&records.iter().collect::<Vec<_>>(), depth_limited).unwrap();
+        assert!(bodies[0].text().is_err());
+
+        let header = record_bytes(0, 0, 3999, &1u32.to_le_bytes());
+        let first = record_bytes(0, 0, 4000, &[b'A', 0]);
+        let second = record_bytes(0, 0, 4000, &[b'B', 0]);
+        let records = parse(&[header, first, second].concat());
+        let event_limited = SourceLimits::builder()
+            .max_events(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let bodies =
+            OutlineTextBody::collect(&records.iter().collect::<Vec<_>>(), event_limited).unwrap();
+        assert!(bodies[0].text().is_err());
     }
 
     #[test]
@@ -273,7 +316,10 @@ mod tests {
         ] {
             let records = parse(&bytes);
             assert!(matches!(
-                OutlineTextBody::collect(&records.iter().collect::<Vec<_>>()),
+                OutlineTextBody::collect(
+                    &records.iter().collect::<Vec<_>>(),
+                    SourceLimits::default(),
+                ),
                 Err(Error::Corrupted(_))
             ));
         }
@@ -297,12 +343,12 @@ mod tests {
         .0;
         let mut truncated = text.clone();
         truncated.data_length = 9;
-        assert!(OutlineTextBody::collect(&[&header, &text]).is_ok());
+        assert!(OutlineTextBody::collect(&[&header, &text], SourceLimits::default()).is_ok());
         assert!(matches!(
-            OutlineTextBody::collect(&[&header, &truncated]),
+            OutlineTextBody::collect(&[&header, &truncated], SourceLimits::default()),
             Err(Error::Corrupted(_))
         ));
         header.data_length = 8;
-        assert!(OutlineTextBody::collect(&[&header]).is_err());
+        assert!(OutlineTextBody::collect(&[&header], SourceLimits::default()).is_err());
     }
 }
