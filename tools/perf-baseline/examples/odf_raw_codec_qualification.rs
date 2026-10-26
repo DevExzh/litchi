@@ -680,7 +680,7 @@ mod probe {
                 "id": id,
                 "family": "consumers",
                 "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
-                "boundary": "each prebuilt ODF family package is reopened through raw and facade consumers inside the clock; package generation is outside",
+                "boundary": "prebuilt owned per-iteration family inputs; raw split and unified facade reopen/projection only; package generation and ownership copies/output comparison are outside the clock",
             }),
             _ => panic!("unknown route {id}"),
         }

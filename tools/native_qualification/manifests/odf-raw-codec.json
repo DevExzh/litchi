@@ -33,7 +33,7 @@
     },
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128,
-    "sha256": "a8353f198c3ced1bb3e3856efb3162742daef9f9796fdc37098276ad98f5672a"
+    "sha256": "2dc8167625b9d0211d635f98c2c02c68f7e98375394501b1bbdc2e7fad41db38"
   },
   "routes": [
     {

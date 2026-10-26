@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -47,6 +48,30 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             digest(str(runner.CONSUMER_MANIFEST)),
         )
         self.assertEqual(value["source"]["candidate_lock_sha256"], digest(str(runner.LOCK_PATH)))
+
+    def test_rust_route_descriptors_match_manifest(self) -> None:
+        source = (ROOT / "tools/perf-baseline/examples/odf_raw_codec_qualification.rs").read_text(encoding="utf-8")
+        descriptor_source = source[source.index("fn descriptor"):source.index("fn proof")]
+        pattern = re.compile(
+            r'\s*"(?P<id>[^"]+)" => json!\(\{\s*'
+            r'"id": id,\s*'
+            r'"family": "(?P<family>[^"]+)",\s*'
+            r'"operations": \[(?P<operations>.*?)\],\s*'
+            r'"boundary": "(?P<boundary>[^"]+)",\s*'
+            r'\}\),',
+            re.DOTALL,
+        )
+        rust_routes = []
+        for match in pattern.finditer(descriptor_source):
+            rust_routes.append(
+                {
+                    "id": match.group("id"),
+                    "family": match.group("family"),
+                    "operations": re.findall(r'"([^"]+)"', match.group("operations")),
+                    "boundary": match.group("boundary"),
+                }
+            )
+        self.assertEqual(rust_routes, manifest()["routes"])
 
     def test_manifest_rejects_stale_hashes_and_route_mutation(self) -> None:
         value = manifest()
