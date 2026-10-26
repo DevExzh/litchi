@@ -967,6 +967,19 @@ fn promote_plain_cell(
         Some(identifier) => identifier,
         None => take_id(&mut next_id)?,
     };
+    // The payload and its storage live beside the rich-text list, which
+    // native Numbers keeps in its own `DataList` component (record 0370b);
+    // a new list goes beside the table model.
+    let list_archive = match rich_text_table_id {
+        Some(identifier) => location
+            .object_locations
+            .get(&identifier)
+            .cloned()
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("iWork rich-text table {identifier} is missing"))
+            })?,
+        None => archive_name.clone(),
+    };
     let storage_id = take_id(&mut next_id)?;
     let payload_id = take_id(&mut next_id)?;
 
@@ -1028,10 +1041,31 @@ fn promote_plain_cell(
     payload_object.archive_info.message_infos[0]
         .object_references
         .push(storage_id);
-    package.update_archive(&archive_name, |archive| {
+    package.update_archive(&list_archive, |archive| {
         archive.insert_object(storage_object, Default::default())?;
         Ok(archive.insert_object(payload_object, Default::default())?)
     })?;
+    // The storage's styles live in the stylesheet's component.
+    let stylesheet_archive = location
+        .object_locations
+        .get(&stylesheet_id)
+        .cloned()
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork stylesheet {stylesheet_id} is missing"))
+        })?;
+    for style in [stylesheet_id, paragraph_style_id, list_style_id] {
+        let style_archive = location
+            .object_locations
+            .get(&style)
+            .cloned()
+            .unwrap_or_else(|| stylesheet_archive.clone());
+        crate::text::style_registry::register_style_reference(
+            package,
+            &list_archive,
+            &style_archive,
+            style,
+        )?;
+    }
 
     let locations = storage::object_locations(package)?;
     let resolved = storage::resolve_table_data_list(
@@ -1041,7 +1075,7 @@ fn promote_plain_cell(
         tst::table_data_list::ListType::RichTextPayload,
     )?;
     let key = storage::next_table_data_list_key(&resolved.list, &resolved.entries)?;
-    package.update_archive(&archive_name, |archive| {
+    package.update_archive(&list_archive, |archive| {
         let object = archive.object_mut(list_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork rich-text table {list_id} is missing"))
         })?;

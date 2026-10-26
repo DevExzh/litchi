@@ -23,6 +23,8 @@ use super::structure::workspace::Workspace;
 use super::{Package, PhysicalSource, ReadError};
 use crate::{ChartSelector, SlideSelector};
 
+mod create;
+
 const CHART_MESSAGE_TYPE: u32 = 5_021;
 /// `TSCH.ChartDrawableArchive.super` (`TSD.DrawableArchive`).
 const CHART_DRAWABLE: u32 = 1;
@@ -128,10 +130,12 @@ enum Change {
     Geometry(Geometry),
     Remove,
     Duplicate,
+    Add(Box<create::NewChart>),
 }
 
 #[derive(Clone)]
 struct Operation {
+    /// The chart's drawable; for [`Change::Add`], the slide's identifier.
     chart: u64,
     slide: crate::Position,
     position: crate::Position,
@@ -293,6 +297,66 @@ impl<'a> Edit<'a> {
         self.stage(slide.into(), chart.into(), Change::Duplicate)
     }
 
+    /// Stage a new chart on a slide, built from typed values (host
+    /// `add_slide_chart`): series run by rows, the frame records no
+    /// rotation unless given one, and the chart gets its own title and
+    /// caption stand-ins, theme style preset and sixteen styles. The new
+    /// chart is the last in the slide's chart order.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors, [`Refusal::UnsupportedKind`],
+    /// [`Refusal::InvalidGeometry`] and [`Refusal::InvalidData`] when the
+    /// data does not form the kind's series (scatter charts need two rows,
+    /// bubble charts three).
+    pub fn add<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        kind: Kind,
+        data: litchi_iwa_common::chart::data::ChartData,
+        geometry: Geometry,
+    ) -> Result<&mut Self, Error> {
+        if kind == Kind::Undefined || kind.is_unsupported() {
+            return Err(Error::Refused(Refusal::UnsupportedKind));
+        }
+        if !geometry.is_valid() {
+            return Err(Error::Refused(Refusal::InvalidGeometry));
+        }
+        if create::series_count(kind, &data).is_none() {
+            return Err(Error::Refused(Refusal::InvalidData));
+        }
+        let slide = slide.into();
+        let slide_position = slide_chart_title::resolve_slide_position(self.source, slide)
+            .map_err(Error::Selection)?;
+        let existing = slide_chart_title::select_charts(self.source, slide, true)
+            .map_err(Error::Selection)?
+            .len();
+        let staged = self
+            .operations
+            .iter()
+            .filter(|operation| {
+                operation.slide == slide_position && matches!(operation.change, Change::Add(_))
+            })
+            .count();
+        let slide_identifier = self
+            .source
+            .slide_record_at(slide_position.get())
+            .map_err(map_read_error)?
+            .ok_or(Error::InvalidSource)?
+            .slide_identifier;
+        self.operations.push(Operation {
+            chart: slide_identifier,
+            slide: slide_position,
+            position: crate::Position::new(existing + staged),
+            change: Change::Add(Box::new(create::NewChart {
+                kind,
+                data,
+                geometry,
+            })),
+        });
+        Ok(self)
+    }
+
     /// Apply every staged operation, publish one candidate, reopen it and
     /// read the touched charts back.
     ///
@@ -400,12 +464,16 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
             duplicate_chart(&mut workspace, source, operation.chart)?;
             continue;
         }
+        if let Change::Add(chart) = &operation.change {
+            create::add_chart(&mut workspace, source, operation.chart, chart)?;
+            continue;
+        }
         let payload = workspace
             .payload(operation.chart, CHART_MESSAGE_TYPE)
             .map_err(lift)?
             .to_vec();
         let data = match &operation.change {
-            Change::Remove | Change::Duplicate => unreachable!("handled above"),
+            Change::Remove | Change::Duplicate | Change::Add(_) => unreachable!("handled above"),
             Change::Data(data) => {
                 let request =
                     litchi_iwa_protos::chart_grid_creation_codec::ChartGridCreationRequest::new(
@@ -506,6 +574,26 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
                 (geometry.x, geometry.y, geometry.width, geometry.height)
                     == (expected.x, expected.y, expected.width, expected.height)
             }),
+            Change::Add(chart) => {
+                kind == Some(native(chart.kind.native_value()))
+                    && direction == Some(1)
+                    && geometry.is_some_and(|geometry| {
+                        (geometry.x, geometry.y, geometry.width, geometry.height)
+                            == (
+                                chart.geometry.x,
+                                chart.geometry.y,
+                                chart.geometry.width,
+                                chart.geometry.height,
+                            )
+                    })
+                    && candidate
+                        .slide_chart_data(
+                            SlideSelector::position(operation.slide),
+                            ChartSelector::index(operation.position.get()),
+                        )
+                        .map_err(|_error| Error::Verification)?
+                        == chart.data
+            },
             Change::Remove | Change::Duplicate => true,
         };
         if !ok {

@@ -8,9 +8,9 @@ charts/donut_inner_radius.rs	from_percent	1	shared	chart	migrated	litchi_iwa_com
 charts/donut_inner_radius.rs	percent	1	shared	chart	migrated	litchi_iwa_common::chart::donut::InnerRadius::percent	numbers_chart_donut_inner_radius_parity	A	-	-
 charts/font.rs	from_points	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
 charts/font.rs	named	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/legend_frame.rs	from_points	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/legend_frame.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/legend_frame.rs	new	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+charts/legend_frame.rs	from_points	1	shared	chart	migrated	litchi_iwa_common::chart::legend::Rect::from_points	keynote_chart_legend_frame_parity	A	-	-
+charts/legend_frame.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::legend::Coordinate::new	numbers_chart_legend_frame_parity	A	-	-
+charts/legend_frame.rs	new	2	shared	io	migrated	litchi_iwa_common::chart::legend::Extent::new	pages_chart_legend_frame_parity	A	-	-
 charts/pie_label_distance.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart::pie::LabelDistance::from_percent	keynote_chart_pie_label_distance_parity	A	-	-
 charts/pie_start_angle.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart::pie::StartAngle::from_degrees	keynote_chart_pie_start_angle_parity	A	-	-
 charts/pie_wedge_explosion.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart::pie::WedgeExplosion::from_percent	keynote_chart_pie_wedge_explosion_parity	A	-	-
@@ -18,23 +18,23 @@ charts/pie_wedge_explosion.rs	percent	1	shared	chart	migrated	litchi_iwa_common:
 charts/radar_start_angle.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart::radar::StartAngle::from_degrees	keynote_chart_radar_start_angle_parity	A	-	-
 charts/rounded_corners.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::corner::Radius::new	keynote_chart_rounded_corners_parity	A	-	-
 charts/scene_3d.rs	from_degrees	1	shared	chart	migrated	litchi_iwa_common::chart3d::Rotation::from_degrees	keynote_chart_3d_rotation_parity	A	-	-
-charts/series_connection_line.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_fill.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
+charts/series_connection_line.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::ConnectionLineFamily::for_chart_kind	keynote_chart_series_connection_lines_read_parity	A	-	-
+charts/series_fill.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::FillFamily::for_chart_kind	keynote_chart_series_fills_read_parity	A	-	-
 charts/series_gap_3d.rs	new	1	shared	io	migrated	litchi_iwa_common::chart3d::SeriesGap::new	keynote_chart_3d_series_gap_parity	A	-	-
-charts/series_stroke.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_symbol.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_symbol.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/series_symbol_fill.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_symbol_outline.rs	for_chart_kind	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_trendline.rs	custom_name	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_trendline.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/series_trendline.rs	new	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/series_trendline.rs	unsupported	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/series_trendline.rs	with_equation_visibility	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	with_legend_name	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	with_legend_visibility	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	with_r_squared_visibility	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-charts/series_trendline.rs	without_custom_name	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
+charts/series_stroke.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::StrokeFamily::for_chart_kind	keynote_chart_series_strokes_read_parity	A	-	-
+charts/series_symbol.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::SymbolFamily::for_chart_kind	keynote_chart_series_symbols_read_parity	A	-	-
+charts/series_symbol.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::series::SymbolSize::new	numbers_chart_series_symbols_read_parity	A	-	-
+charts/series_symbol_fill.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::SymbolFillFamily::for_chart_kind	keynote_chart_series_symbol_fills_read_parity	A	-	-
+charts/series_symbol_outline.rs	for_chart_kind	1	shared	chart.lifecycle	migrated	litchi_iwa_common::chart::series::SymbolOutlineFamily::for_chart_kind	keynote_chart_series_symbol_outlines_read_parity	A	-	-
+charts/series_trendline.rs	custom_name	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::custom_name	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	new	1	shared	io	migrated	litchi_iwa_common::chart::series::PolynomialOrder::new	numbers_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	new	2	shared	io	migrated	litchi_iwa_common::chart::series::MovingAveragePeriod::new	pages_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	unsupported	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::unsupported	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_equation_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_equation_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_legend_name	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_legend_name	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_legend_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_legend_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	with_r_squared_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_r_squared_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
+charts/series_trendline.rs	without_custom_name	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::without_custom_name	keynote_chart_series_trendlines_read_parity	A	-	-
 comments.rs	add_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 comments.rs	application	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
 comments.rs	clear_comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
@@ -294,7 +294,7 @@ keynote/editor/named_paragraph_styles.rs	redefine_applied_slide_text_box_named_p
 keynote/editor/named_paragraph_styles.rs	rename_slide_text_box_named_paragraph_style	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/named_paragraph_styles.rs	slide_text_box_applied_named_paragraph_style	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/named_paragraph_styles.rs	slide_text_box_named_paragraph_styles	1	keynote	text.paragraph_style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts.rs	add_slide_chart	1	keynote	chart.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts.rs	add_slide_chart	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::add	keynote_slide_chart_add_parity	B	-	-
 keynote/editor/slide_charts.rs	duplicate_slide_chart	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::duplicate	keynote_slide_chart_duplicate_parity	B	-	-
 keynote/editor/slide_charts.rs	remove_slide_chart	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::remove	keynote_slide_chart_remove_parity	B	-	-
 keynote/editor/slide_charts.rs	set_slide_chart_data	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_data	keynote_slide_chart_data_set_parity	B	-	-
@@ -708,48 +708,48 @@ lib.rs	publication_error	1	shared	other	host-only	litchi-iwa-archive / litchi-iw
 lib.rs	publication_was_committed	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 media/model.rs	is_audio	1	shared	drawable.audio	migrated	litchi_iwa_common::media::Asset::is_audio	keynote_media_catalog_parity	A	-	-
 media/model.rs	is_image	1	shared	drawable.image	migrated	litchi_iwa_common::media::Asset::is_image	pages_media_catalog_parity	A	-	-
-media/model.rs	is_materialized	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/model.rs	is_referenced	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/model.rs	is_materialized	1	shared	media.asset	migrated	litchi_iwa_common::media::embedded::Embedded::is_materialized	keynote_embedded_media_parity	A	-	-
+media/model.rs	is_referenced	1	shared	media.asset	migrated	litchi_iwa_common::media::embedded::Embedded::is_referenced	pages_embedded_media_parity	A	-	-
 media/model.rs	is_video	1	shared	media.asset	migrated	litchi_iwa_common::media::Asset::is_video	keynote_media_catalog_parity	A	-	-
 media/model.rs	new	1	shared	io	migrated	litchi_iwa_common::media::Asset::new	keynote_media_catalog_parity	A	-	-
 media/model.rs	new	2	shared	io	migrated	litchi_iwa_common::media::asset::Limits::new	keynote_media_catalog_parity	A	-	-
 media/model.rs	summary	1	shared	media.asset	migrated	litchi_iwa_common::media::Stats::summary	numbers_media_catalog_parity	A	-	-
 media/model.rs	total_size_human	1	shared	media.asset	migrated	litchi_iwa_common::media::Stats::total_size_human	numbers_media_catalog_parity	A	-	-
-media/package.rs	asset	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	asset	1	shared	media.asset	retired	-	-	-	-	lookup by identifier in the identifier-ordered `litchi_iwa_common::media::embedded::Inventory::finish` result (record 0375)
 media/package.rs	assets	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::assets	keynote_media_catalog_parity	A	-	-
-media/package.rs	assets	2	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	assets	2	shared	media.asset	migrated	litchi_iwa_common::media::embedded::Inventory::finish	numbers_embedded_media_parity	A	-	-
 media/package.rs	assets_by_type	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::by_type	keynote_media_catalog_parity	A	-	-
 media/package.rs	assets_in_order	1	shared	media.asset	retired	-	-	-	-	duplicate of `litchi_iwa_common::media::Catalog::assets`, which is already path-ordered (record 0375)
 media/package.rs	audio	1	shared	drawable.audio	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Audio)` (record 0375)
-media/package.rs	extract	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	extract	2	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	extract_to_file	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	extract_to_writer	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	from_bytes	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	from_bytes_with_options	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	from_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	from_package	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	from_package_with_options	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	extract	1	shared	media.asset	migrated	litchi_iwa_archive::unstable::entry	keynote_media_extraction_parity	A	-	-
+media/package.rs	extract	2	shared	media.asset	migrated	litchi_iwa_archive::unstable::entry	pages_media_extraction_parity	A	-	-
+media/package.rs	extract_to_file	1	shared	media.asset	retired	-	-	-	-	I/O convenience: write the bytes `litchi_iwa_archive::unstable::entry` returns (record 0375)
+media/package.rs	extract_to_writer	1	shared	media.asset	retired	-	-	-	-	I/O convenience: write the bytes `litchi_iwa_archive::unstable::entry` returns (record 0375)
+media/package.rs	from_bytes	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	from_bytes	2	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	from_bytes_with_options	1	shared	media.asset	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	from_package	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	from_package	2	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	from_package_with_options	1	shared	media.asset	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	get	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::get	pages_media_catalog_parity	A	-	-
 media/package.rs	images	1	shared	drawable.image	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Image)` (record 0375)
 media/package.rs	insert_unreferenced	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	into_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+media/package.rs	into_package	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	iter_assets	1	shared	media.asset	retired	-	-	-	-	duplicate of `litchi_iwa_common::media::Catalog::assets` (slice iteration; record 0375)
-media/package.rs	limits	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	open	2	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	open_with_options	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-media/package.rs	package_limits	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
+media/package.rs	limits	1	shared	media.asset	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	new	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	open	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	open	2	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	open_with_options	1	shared	media.asset	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	package	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
+media/package.rs	package_limits	1	shared	media.asset	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	remove_unreferenced	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
 media/package.rs	replace	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	save	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+media/package.rs	save	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	set_max_replacement_bytes	1	shared	media.asset	host-only	litchi-iwa-archive (Data/ members, unstable) + leaf media families	-	-	-	-
-media/package.rs	snapshot	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+media/package.rs	snapshot	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	stats	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::stats	numbers_media_catalog_parity	A	-	-
-media/package.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
+media/package.rs	to_bytes	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	videos	1	shared	media.asset	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Video)` (record 0375)
 numbers/creation.rs	build	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	builder	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
@@ -807,15 +807,15 @@ numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_ap
 numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_indentation	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_label_color	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_level	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_preset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_indentation	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_label_color	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_level	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_level_numbering_parity	A	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_alignment	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
@@ -841,17 +841,17 @@ numbers/editor/semantic/table.rs	set_table_cell_layout	1	numbers	table.cell_appe
 numbers/editor/semantic/table.rs	set_table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_indentation	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_label_color	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_level	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_numbering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_paragraph_lists	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_preset_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_indentation	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_label_color	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_level	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_level_numbering_parity	A	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_property_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_list_numbering	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_level_numbering_parity	A	-	-
+numbers/editor/semantic/table.rs	set_table_cell_paragraph_lists	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_preset_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_alignment	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
@@ -875,17 +875,17 @@ numbers/editor/semantic/table.rs	table_cell_merges	1	numbers	table.merge	migrate
 numbers/editor/semantic/table.rs	table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_indentation	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_label_color	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_levels	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_list_numbering	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_paragraph_lists	1	numbers	table.cell_rich_text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_bullet	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_bullet_geometry	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_indentation	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_label_color	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_levels	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_levels	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_scale	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_number_tiering	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_property	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_list_numbering	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list_numbering	numbers_cell_list_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_paragraph_lists	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_lists	numbers_cell_list_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_tab_stops	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_text_alignment	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
@@ -2052,16 +2052,16 @@ pages/editor/tables/topology.rs	insert_table_row	1	pages	table.topology	host-onl
 pages/editor/tables/topology.rs	remove_table_column	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/topology.rs	remove_table_row	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
 pages/editor/text_box_create.rs	add_text_box	1	pages	drawable.text_box_lifecycle	host-only	litchi-pages	-	-	-	-
-shapes/fill/image.rs	embedded	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-shapes/fill/image.rs	placeholder	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	with_fill_size	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	with_generic_untagged_image	1	shared	drawable.image	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	with_reference_color	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	with_technique	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	with_tint	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-shapes/fill/image.rs	without_tint	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+shapes/fill/image.rs	embedded	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::embedded	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::fill::ImageData::new	numbers_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	placeholder	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::placeholder	pages_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_fill_size	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_fill_size	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_generic_untagged_image	1	shared	drawable.image	migrated	litchi_iwa_common::shape::fill::Image::with_generic_untagged_image	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_reference_color	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_reference_color	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_technique	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_technique	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	with_tint	1	shared	keynote.build	migrated	litchi_iwa_common::shape::fill::Image::with_tint	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	without_reference_color	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::without_reference_color	keynote_shape_image_fill_read_parity	A	-	-
+shapes/fill/image.rs	without_tint	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::without_tint	keynote_shape_image_fill_read_parity	A	-	-
 shapes/line.rs	length	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::line::Segment::length	numbers_line_segment_parity	A	-	-
 shapes/line.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::line::Segment::new	keynote_line_segment_parity	A	-	-
 text/date_time_field.rs	from_object_id	1	shared	text.shared	retired	-	-	-	-	retired: raw native object ID constructor; ADR 0028 forbids raw native IDs on a supported facade. Leaf date-time fields are addressed by the ranged-table entry the engine reads (smart_field::date_time over ranged::entries) and by selector-based leaf routes (W1-B/W1-C/W2); record 0374

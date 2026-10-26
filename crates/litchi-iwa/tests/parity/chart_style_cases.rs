@@ -18,13 +18,14 @@ use litchi_iwa::charts::{
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::{keynote, numbers, pages};
+use litchi_iwa_archive::Limits as ArchiveLimits;
 use litchi_iwa_archive::iwa::{
     Archive as IwaArchive, Limits as CoreLimits, RawMessage, SnappyLimits, SnappyStream,
 };
+use litchi_iwa_archive::package::Catalog as PackageCatalog;
 use litchi_iwa_archive::unstable::EntryEdit;
-use litchi_iwa_archive::{Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::chart::kind::Kind;
-use litchi_iwa_common::chart::{ChartData, corner, donut, pie, radar};
+use litchi_iwa_common::chart::{ChartData, corner, donut, legend, pie, radar};
 use litchi_iwa_common::chart3d::{self, Scale};
 use litchi_iwa_protos::chart_style_codec::{
     self as codec, Archive, EmptyExtension, Limits, Properties, Write, field, property,
@@ -41,18 +42,18 @@ const SIZE: DrawableSize = DrawableSize {
 
 /// Where the host added the chart.
 #[derive(Clone, Copy, Debug)]
-enum Target {
+pub(crate) enum Target {
     Keynote { slide: usize },
     Numbers { sheet: u64 },
     Pages,
 }
 
 /// A native-saved fixture with one chart of a given kind added by the host.
-struct Input {
-    fixture: Fixture,
-    format: Format,
-    target: Target,
-    chart: u64,
+pub(crate) struct Input {
+    pub(crate) fixture: Fixture,
+    pub(crate) format: Format,
+    pub(crate) target: Target,
+    pub(crate) chart: u64,
 }
 
 fn pie_data() -> TestResult<ChartData> {
@@ -82,7 +83,7 @@ fn data_for(kind: Kind) -> TestResult<ChartData> {
     }
 }
 
-fn input(format: Format, kind: Kind) -> TestResult<Input> {
+pub(crate) fn input(format: Format, kind: Kind) -> TestResult<Input> {
     let (path, extension) = match format {
         Format::Keynote => ("iwork/keynote/chart-data-native.key", "key"),
         Format::Numbers => ("iwork/numbers/chart-data-native.numbers", "numbers"),
@@ -254,7 +255,7 @@ const fn scale3d(scale: Scale) -> property::Scale3d {
 
 /// The library write rules (`chart_style_codec::property`) for `value`:
 /// what a format family calls with its common value.
-fn property_write(value: Property) -> property::PropertyWrite {
+fn property_write(value: Property) -> property::PropertyWrite<'static> {
     match value {
         Property::PieStartAngle(angle) => property::pie_start_angle(angle.degrees()),
         Property::DonutInnerRadius(radius) => {
@@ -279,15 +280,16 @@ fn property_write(value: Property) -> property::PropertyWrite {
 
 /// Every IWA component of a package, decoded once.
 pub(crate) struct Components {
-    catalog: SourceCatalog,
+    catalog: PackageCatalog,
     archives: Vec<(String, IwaArchive)>,
 }
 
 impl Components {
     pub(crate) fn read(source: &[u8]) -> TestResult<Self> {
-        let catalog = SourceCatalog::from_bytes(source, ArchiveLimits::default())?;
+        // The ZIP member table only: each IWA component is parsed once below.
+        let catalog = PackageCatalog::from_bytes(source, ArchiveLimits::default())?;
         let mut archives = Vec::new();
-        for entry in catalog.package().iter() {
+        for entry in catalog.iter() {
             if !entry.name().ends_with(".iwa") {
                 continue;
             }
@@ -296,6 +298,23 @@ impl Components {
             archives.push((entry.name().to_owned(), archive));
         }
         Ok(Self { catalog, archives })
+    }
+
+    /// Every IWA object of every component.
+    pub(crate) fn objects(
+        &self,
+    ) -> impl Iterator<Item = &litchi_iwa_archive::iwa::ArchiveObject> + Clone {
+        self.archives
+            .iter()
+            .flat_map(|(_, archive)| archive.objects.iter())
+    }
+
+    /// The length of a package member, if present.
+    pub(crate) fn member_size(&self, name: &str) -> Option<u64> {
+        self.catalog
+            .iter()
+            .find(|entry| entry.name() == name)
+            .map(|entry| entry.data().len() as u64)
     }
 
     /// `(component index, message index)` of the unique `message_type`
@@ -1206,7 +1225,7 @@ impl SeriesProperty {
     }
 
     /// The library write rules for wedge `index`.
-    fn write(&self, index: usize) -> property::PropertyWrite {
+    fn write(&self, index: usize) -> property::PropertyWrite<'static> {
         match self {
             Self::WedgeExplosions(values) => {
                 property::pie_wedge_explosion(values[index].native_fraction())
@@ -1569,4 +1588,180 @@ fn chart_style_set_cost_abba() -> TestResult {
         }
     }
     Ok(())
+}
+
+// ---- legend frame ------------------------------------------------------
+
+fn host_legend_frame(frame: legend::Frame) -> TestResult<litchi_iwa::charts::ChartLegendFrame> {
+    use litchi_iwa::charts::{ChartLegendFrame, ChartLegendRect};
+    Ok(match frame {
+        legend::Frame::Automatic => ChartLegendFrame::Automatic,
+        legend::Frame::Frame(rect) => {
+            let [x, y, width, height] = rect.native();
+            ChartLegendFrame::Frame(ChartLegendRect::from_points(x, y, width, height)?)
+        },
+    })
+}
+
+fn host_legend_write(
+    source: &[u8],
+    target: Target,
+    chart: u64,
+    frame: legend::Frame,
+) -> TestResult<Vec<u8>> {
+    let frame = host_legend_frame(frame)?;
+    Ok(match target {
+        Target::Keynote { slide } => {
+            let mut editor = keynote::Draft::from_bytes(source)?;
+            editor.set_slide_chart_legend_frame(slide, chart, frame)?;
+            editor.to_bytes()?
+        },
+        Target::Numbers { sheet } => {
+            let mut editor = numbers::Draft::from_bytes(source)?;
+            editor.set_sheet_chart_legend_frame(sheet, chart, frame)?;
+            editor.to_bytes()?
+        },
+        Target::Pages => {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            editor.set_body_chart_legend_frame(chart, frame)?;
+            editor.to_bytes()?
+        },
+    })
+}
+
+fn host_legend_read(bytes: &[u8], target: Target, chart: u64) -> TestResult<String> {
+    use litchi_iwa::charts::ChartLegendFrame;
+    let frame = match target {
+        Target::Keynote { slide } => {
+            keynote::Draft::from_bytes(bytes)?.slide_chart_legend_frame(slide, chart)?
+        },
+        Target::Numbers { sheet } => {
+            numbers::Draft::from_bytes(bytes)?.sheet_chart_legend_frame(sheet, chart)?
+        },
+        Target::Pages => pages::Draft::from_bytes(bytes)?.body_chart_legend_frame(chart)?,
+    };
+    let common = match frame {
+        ChartLegendFrame::Automatic => legend::Frame::Automatic,
+        ChartLegendFrame::Frame(rect) => legend::Frame::Frame(legend::Rect::from_points(
+            rect.x().points(),
+            rect.y().points(),
+            rect.width().points(),
+            rect.height().points(),
+        )?),
+    };
+    Ok(format!("{common:?}"))
+}
+
+fn engine_legend_read(bytes: &[u8], chart: u64) -> TestResult<String> {
+    let components = Components::read(bytes)?;
+    let location = components.locate(chart, CHART_MESSAGE_TYPE)?;
+    let stored = codec::legend_frame(components.payload(chart, location)?, Limits::DEFAULT)?;
+    Ok(format!("{:?}", legend::Frame::from_native(stored)?))
+}
+
+fn engine_legend_write(source: &[u8], chart: u64, frame: legend::Frame) -> TestResult<Vec<u8>> {
+    let components = Components::read(source)?;
+    let location = components.locate(chart, CHART_MESSAGE_TYPE)?;
+    let payload = components.payload(chart, location)?;
+    if legend::Frame::from_native(codec::legend_frame(payload, Limits::DEFAULT)?)? == frame {
+        return Ok(source.to_vec());
+    }
+    let rewritten = codec::rewrite_legend_frame(payload, frame.native(), Limits::DEFAULT)?;
+    let data = rewritten.into_bytes().into_owned();
+    publish(source, components, vec![(chart, CHART_MESSAGE_TYPE, data)])
+}
+
+fn legend_case(
+    name: &'static str,
+    format: Format,
+    tier: Tier,
+    evidence: Evidence,
+    step: Step,
+) -> TestResult {
+    let mut input = input(format, Kind::Column2d)?;
+    let (target, chart) = (input.target, input.chart);
+    let explicit = legend::Frame::Frame(legend::Rect::from_points(24.0, 36.0, 0.0, 48.0)?);
+    let frame = if step == Step::Reset {
+        input.fixture.bytes = host_legend_write(&input.fixture.bytes, target, chart, explicit)?;
+        legend::Frame::Automatic
+    } else {
+        explicit
+    };
+    Case::new(name, input.format, tier, evidence, &input.fixture)
+        .host(|source| host_legend_write(source, target, chart, frame))
+        .leaf(|source| Ok(LeafRun::output(engine_legend_write(source, chart, frame)?)))
+        .read("host legend frame", move |bytes| {
+            host_legend_read(bytes, target, chart)
+        })
+        .read("engine legend frame", move |bytes| {
+            engine_legend_read(bytes, chart)
+        })
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn keynote_chart_legend_frame_parity() -> TestResult {
+    legend_case(
+        "keynote_chart_legend_frame_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        Step::Set,
+    )
+}
+
+#[test]
+fn numbers_chart_legend_frame_parity() -> TestResult {
+    legend_case(
+        "numbers_chart_legend_frame_parity",
+        Format::Numbers,
+        Tier::A,
+        Evidence::Queued,
+        Step::Set,
+    )
+}
+
+#[test]
+fn pages_chart_legend_frame_parity() -> TestResult {
+    legend_case(
+        "pages_chart_legend_frame_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        Step::Set,
+    )
+}
+
+#[test]
+fn keynote_chart_legend_frame_reset_parity() -> TestResult {
+    legend_case(
+        "keynote_chart_legend_frame_reset_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        Step::Reset,
+    )
+}
+
+#[test]
+fn numbers_chart_legend_frame_reset_parity() -> TestResult {
+    legend_case(
+        "numbers_chart_legend_frame_reset_parity",
+        Format::Numbers,
+        Tier::A,
+        Evidence::Queued,
+        Step::Reset,
+    )
+}
+
+#[test]
+fn pages_chart_legend_frame_reset_parity() -> TestResult {
+    legend_case(
+        "pages_chart_legend_frame_reset_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        Step::Reset,
+    )
 }

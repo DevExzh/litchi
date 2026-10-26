@@ -21105,6 +21105,141 @@
           "replacement": "use media::asset::Limits; no host `Media` prefix (record 0375)"
         },
         {
+          "name": "ChartSeriesStroke",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::Stroke; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesStrokePattern",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::StrokePattern; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesStrokeKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::StrokeFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesFillKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::FillFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesConnectionLine",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::ConnectionLine; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesConnectionLineKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::ConnectionLineFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbol",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::Symbol; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolShape",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolShape; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolSize",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolSize; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolFill",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolFill; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolFillKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolFillFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesSymbolOutlineKind",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::SymbolOutlineFamily; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendline",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::Trendline; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendlineType",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::TrendlineType; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendlinePolynomialOrder",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::PolynomialOrder; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartSeriesTrendlineMovingAveragePeriod",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::series::MovingAveragePeriod; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeFill",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::Fill; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeImageFill",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::Image; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeImageFillTechnique",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::ImageTechnique; no host prefix (record 0375)"
+        },
+        {
+          "name": "ShapeImageDataIdentifier",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::fill::ImageData; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendCoordinate",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Coordinate; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendExtent",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Extent; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendRect",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Rect; no host prefix (record 0375)"
+        },
+        {
+          "name": "ChartLegendFrame",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::legend::Frame; no host prefix (record 0375)"
+        },
+        {
+          "name": "EmbeddedMediaAsset",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::embedded::Embedded; no host prefix (record 0375)"
+        },
+        {
+          "name": "MediaAssetId",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::embedded::AssetId; no host prefix (record 0375)"
+        },
+        {
           "name": "LineSegment",
           "scope": "litchi_iwa_common",
           "replacement": "use shape::line::Segment (record 0375)"
@@ -23111,6 +23246,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::list",
         "litchi_numbers::cell::text",
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
@@ -23217,6 +23353,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_lists",
+          "ok": "litchi_numbers::cell::list::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_text",
@@ -23917,6 +24057,7 @@
         "litchi_numbers::cell::data_format::pop_up_menu::transaction",
         "litchi_numbers::cell::data_format::scientific::transaction",
         "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::cell::list",
         "litchi_numbers::cell::text",
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
@@ -24023,6 +24164,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_cell_text_format",
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_lists",
+          "ok": "litchi_numbers::cell::list::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_cell_text",
@@ -26352,32 +26497,32 @@
         {
           "name": "SlideMediaPropertiesCommit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Commit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesDiagnostics",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesEdit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Edit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesError",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Error (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesLimitKind",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesPatch",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Patch (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMovieCaptionCommit",
@@ -27236,7 +27381,7 @@
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_properties",
-          "ok": "litchi_keynote::slide::drawable::properties::Commit"
+          "ok": "litchi_keynote::slide::media::properties::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_movie_caption",
@@ -27962,32 +28107,32 @@
         {
           "name": "SlideMediaPropertiesCommit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Commit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesDiagnostics",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesEdit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Edit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesError",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Error (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesLimitKind",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesPatch",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Patch (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMovieCaptionCommit",
@@ -28846,7 +28991,7 @@
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_properties",
-          "ok": "litchi_keynote::slide::drawable::properties::Commit"
+          "ok": "litchi_keynote::slide::media::properties::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_movie_caption",
@@ -29386,6 +29531,54 @@
         {
           "method": "litchi_iwa_protos::shape_style_codec::rewrite_line",
           "inputs": ["shape_info", "replacement", "width", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::style_reference",
+          "inputs": ["shape_info", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::color",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::stroke",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::fill",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::native::shape_style",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::legend_frame",
+          "inputs": ["chart_drawable", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::rewrite_legend_frame",
+          "inputs": ["chart_drawable", "frame", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::chart_style_codec::parent",
+          "inputs": ["source", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
         }

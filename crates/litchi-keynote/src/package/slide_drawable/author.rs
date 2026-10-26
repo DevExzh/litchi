@@ -256,7 +256,7 @@ fn point(x: f32, y: f32) -> Writer {
     Writer::new().float(1, x).float(2, y)
 }
 
-fn drawable_archive(geometry: Geometry, slide: u64, title: u64, caption: u64) -> Writer {
+pub(super) fn drawable_archive(geometry: Geometry, slide: u64, title: u64, caption: u64) -> Writer {
     Writer::new()
         .message(
             1,

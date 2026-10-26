@@ -577,7 +577,7 @@ fn with(input: &Fixture, storage: u64, operation: &Operation) -> TestResult<Fixt
     })
 }
 
-fn samples() -> TestResult<Vec<Property>> {
+pub fn samples() -> TestResult<Vec<Property>> {
     let color = Rgba::new(0.8, 0.2, 0.1, 1.0, RgbColorSpace::Srgb)?;
     Ok(vec![
         Property::Bullet(ParagraphListBullet::new("✓")?),
@@ -599,7 +599,7 @@ fn samples() -> TestResult<Vec<Property>> {
     ])
 }
 
-const fn preset_for(kind: PropertyKind) -> ParagraphList {
+pub const fn preset_for(kind: PropertyKind) -> ParagraphList {
     match kind {
         PropertyKind::Bullet | PropertyKind::BulletGeometry | PropertyKind::LabelColor => {
             ParagraphList::Bullet
@@ -905,7 +905,7 @@ fn text_list_read_parity() -> TestResult {
     Ok(())
 }
 
-fn list_second(property: &Property) -> TestResult<Property> {
+pub fn list_second(property: &Property) -> TestResult<Property> {
     let color = Rgba::new(0.1, 0.6, 0.3, 1.0, RgbColorSpace::DisplayP3)?;
     Ok(match property {
         Property::Bullet(_) => Property::Bullet(ParagraphListBullet::new("➤")?),
