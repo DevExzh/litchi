@@ -6213,3 +6213,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   verified. Root reclaims 3.86 GB of retired crypto debug caches, preserves
   their evidence, and confirms 75 heads/62 worktrees with no further unused
   unified leaf. All 28 actual qualifications remain open; nothing is pushed.
+
+  Independent public-flow review returns ODG/ODP v3 (165g): the ODG fixture
+  is inside a source root forbidden by final admission, and ODP's build
+  producer records the shared helper's 64 MiB output cap instead of its
+  required 4 MiB cap. Forty-five focused tests did not cover these composed
+  failures. The author repairs both; flat-parts preparation enters independent
+  review and original W6 preparation continues. Root commits a read-only
+  final-gate receipt verifier, checks the existing 33 rows and exercises ten
+  negative controls. The same gate remains active; C/P stay frozen and all
+  28 final qualifications remain open. Nothing is pushed.
