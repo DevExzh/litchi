@@ -406,6 +406,71 @@ pub(super) fn set_preset(
     replace_payload(workspace, drawable, message_index, message_type, data).map_err(lift)
 }
 
+/// The segment one native straight line draws (host `slide_line_segment`).
+pub(super) fn line_segment(
+    workspace: &Workspace<'_>,
+    drawable: u64,
+    message_index: usize,
+) -> Result<litchi_iwa_common::shape::line::Segment, Error> {
+    use litchi_iwa_common::shape::geometry::{Point, Size};
+    use litchi_iwa_protos::shape_style_codec as codec;
+    let payload = payload(workspace, drawable, message_index)?;
+    let stored = codec::line(&payload, codec::Limits::DEFAULT)
+        .map_err(|_| Error::InvalidSource)?
+        .ok_or(Error::Refused(super::Refusal::Unsupported {
+            reason: super::Unsupported::Kind {
+                kind: super::Kind::Line,
+            },
+        }))?;
+    let [x, y] = stored.geometry.position.ok_or(Error::InvalidSource)?;
+    let [width, height] = stored.geometry.size.ok_or(Error::InvalidSource)?;
+    let segment = litchi_iwa_common::shape::line::Segment::from_geometry(
+        Point { x, y },
+        Size { width, height },
+        stored.geometry.angle.ok_or(Error::InvalidSource)?,
+        stored.natural_width,
+    )
+    .map_err(|_| Error::InvalidSource)?;
+    Ok(if stored.horizontal_flip {
+        segment.reversed()
+    } else {
+        segment
+    })
+}
+
+/// Move one native straight line onto `segment` (host
+/// `set_slide_line_segment`), keeping its stored direction.
+pub(super) fn set_line_segment(
+    workspace: &mut Workspace<'_>,
+    drawable: u64,
+    message_index: usize,
+    message_type: u32,
+    segment: litchi_iwa_common::shape::line::Segment,
+) -> Result<(), Error> {
+    use litchi_iwa_protos::shape_style_codec as codec;
+    let source = payload(workspace, drawable, message_index)?;
+    let stored = codec::line(&source, codec::Limits::DEFAULT)
+        .map_err(|_| Error::InvalidSource)?
+        .ok_or(Error::InvalidSource)?;
+    let directed = if stored.horizontal_flip {
+        segment.reversed()
+    } else {
+        segment
+    };
+    let (position, size, angle) = directed.geometry();
+    let geometry = codec::Geometry {
+        position: Some([position.x, position.y]),
+        size: Some([size.width, size.height]),
+        flags: Some(codec::LINE_FLAGS),
+        angle: Some(angle),
+    };
+    let rewritten =
+        codec::rewrite_line(&source, geometry, segment.length(), codec::Limits::DEFAULT)
+            .map_err(|_| Error::InvalidSource)?;
+    let data = rewritten.into_bytes().into_owned();
+    replace_payload(workspace, drawable, message_index, message_type, data).map_err(lift)
+}
+
 #[cfg(test)]
 mod tests {
     use super::vertical_flip_angle;

@@ -629,6 +629,13 @@ enum Operation {
         preset: Preset,
         geometry: Geometry,
     },
+    LineSegment {
+        slide: u64,
+        drawable: u64,
+        message_index: usize,
+        message_type: u32,
+        segment: litchi_iwa_common::shape::line::Segment,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1021,6 +1028,7 @@ impl<'a> Edit<'a> {
             | Operation::Flip { .. }
             | Operation::Properties { .. }
             | Operation::Preset { .. }
+            | Operation::LineSegment { .. }
             | Operation::TableCell { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
@@ -1217,6 +1225,36 @@ impl<'a> Edit<'a> {
             message_type: item.message_type,
             preset,
             geometry,
+        });
+        Ok(self)
+    }
+
+    /// Stage moving one straight line onto `segment` (host
+    /// `set_slide_line_segment`); the line keeps its stored direction,
+    /// style and end decorations.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for other
+    /// drawables (including curved lines).
+    pub fn set_line_segment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        segment: litchi_iwa_common::shape::line::Segment,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        if item.kind != Kind::Line {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        self.operations.push(Operation::LineSegment {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            message_index: item.message_index,
+            message_type: item.message_type,
+            segment,
         });
         Ok(self)
     }
@@ -2091,6 +2129,35 @@ impl Package {
         Ok(public_list(&inventory))
     }
 
+    /// Read the segment one straight line draws (host `slide_line_segment`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for other
+    /// drawables.
+    pub fn slide_line_segment<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<litchi_iwa_common::shape::line::Segment, Error> {
+        let selected = select_slide(self, slide.into())?;
+        let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
+        let drawable = drawable.into();
+        let item = inventory
+            .items
+            .get(drawable.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: drawable.as_position(),
+            }))?;
+        if item.kind != Kind::Line {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        let workspace = Workspace::new(self).map_err(lift)?;
+        arrange::line_segment(&workspace, item.identifier, item.message_index)
+    }
+
     /// Read the hyperlink, lock and accessibility properties and the flip
     /// state of one text box, shape or line (host `slide_shape_properties`,
     /// `slide_text_box_properties`).
@@ -2626,6 +2693,22 @@ fn commit_operations(
                 {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::LineSegment {
+                slide,
+                drawable,
+                message_index,
+                message_type,
+                segment,
+            } => {
+                arrange::set_line_segment(
+                    &mut workspace,
+                    *drawable,
+                    *message_index,
+                    *message_type,
+                    *segment,
+                )?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::Preset {
