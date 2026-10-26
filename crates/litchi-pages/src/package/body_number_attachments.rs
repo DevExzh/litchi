@@ -13,33 +13,17 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use litchi_iwa_common::wire::{
-    WireView, patch_length_delimited_field, patch_nested_length_delimited_field,
-    patch_nested_varint_field, patch_varint_field, repeated_length_delimited_payloads,
-};
 use litchi_iwa_text::TextPosition;
-use litchi_iwa_text::number_attachment::{
-    TextNumberAttachmentFormat, TextNumberAttachmentKind, TextNumberAttachmentSettings,
-    TextNumberAttachmentText,
-};
+use litchi_iwa_text::number_attachment::TextNumberAttachmentSettings;
 use thiserror::Error as ThisError;
 
 use super::Package;
 use super::body_drawable_graph::{self as graph, GraphError, GraphLimit, map_wire_error};
 use super::body_storage_objects::{self as objects, Storage};
 use crate::header_footer::HeaderFooterSelector;
+use litchi_iwa_text_wire::number_attachment;
 
-const ATTACHMENT_TABLE_FIELD: u32 = 9;
-const TABLE_ENTRIES_FIELD: u32 = 1;
-const ENTRY_INDEX_FIELD: u32 = 1;
-const ENTRY_OBJECT_FIELD: u32 = 2;
 const NUMBER_ATTACHMENT_MESSAGE_TYPE: u32 = 2_043;
-const SUPER_FIELD: u32 = 1;
-const STRING_EQUIVALENT_FIELD: u32 = 1;
-const KIND_FIELD: u32 = 2;
-const NUMBER_FORMAT_FIELD: u32 = 2;
-const STRING_VALUE_FIELD: u32 = 3;
-const NUMBER_FORMAT_NAME_FIELD: u32 = 4;
 const OBJECT_REPLACEMENT: &str = "\u{fffc}";
 
 /// A finite resource charged by one body number attachment operation.
@@ -495,38 +479,31 @@ fn storage(package: &Package, identifier: u64) -> Result<Storage, Error> {
     Ok(objects::storage_by_identifier(package, identifier)?)
 }
 
-/// Raw attachment-table entries `(index, object, raw)` of a storage payload.
-fn entries(payload: &[u8]) -> Result<(Option<Vec<u8>>, Vec<(u32, u64, Vec<u8>)>), Error> {
-    let tables = repeated_length_delimited_payloads(payload, ATTACHMENT_TABLE_FIELD)?;
-    let table = match tables.as_slice() {
-        [] => return Ok((None, Vec::new())),
-        [table] => table.to_vec(),
-        _ => return Err(Error::InvalidSource),
-    };
-    let limits = litchi_iwa_common::WireLimits::default();
-    let mut entries = Vec::new();
-    for raw in repeated_length_delimited_payloads(&table, TABLE_ENTRIES_FIELD)? {
-        let view = WireView::parse(raw, limits).map_err(map_wire_error)?;
-        let index =
-            graph::unique_field(&view, ENTRY_INDEX_FIELD, 0)?.ok_or(Error::InvalidSource)?;
-        let index = u32::try_from(graph::canonical_varint(index.payload())?)
-            .map_err(|_| Error::InvalidSource)?;
-        let Some(object) = graph::unique_field(&view, ENTRY_OBJECT_FIELD, 2)? else {
-            continue;
-        };
-        let object = WireView::parse(object.payload(), limits).map_err(map_wire_error)?;
-        let identifier = graph::unique_field(&object, 1, 0)?.ok_or(Error::InvalidSource)?;
-        entries.push((
-            index,
-            graph::canonical_varint(identifier.payload())?,
-            raw.to_vec(),
-        ));
+fn wire_limits() -> litchi_iwa_common::WireLimits {
+    litchi_iwa_common::WireLimits::DEFAULT
+}
+
+fn map_engine_error(error: number_attachment::Error) -> Error {
+    match error {
+        number_attachment::Error::Refused(number_attachment::Refusal::Occupied) => {
+            Refusal::Overlap.into()
+        },
+        number_attachment::Error::Refused(_) => Refusal::InvalidRange.into(),
+        number_attachment::Error::Allocation { amount } => Error::Allocation { amount },
+        number_attachment::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        _ => Error::InvalidSource,
     }
-    Ok((Some(table), entries))
 }
 
 fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Attachment)>, Error> {
-    let (_, entries) = entries(&storage.payload)?;
+    let anchors =
+        number_attachment::anchors(&storage.payload, wire_limits()).map_err(map_engine_error)?;
     let archive = package
         .state
         .source
@@ -536,190 +513,41 @@ fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Attachment)>, 
         .archive();
     let mut attachments = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    for (index, object, _) in entries {
+    for anchor in anchors {
+        let object = anchor.object();
         let Some(found) = archive.object(object) else {
             continue;
         };
-        let Some(settings) = attachment_settings(found)? else {
-            continue;
+        let payloads = found
+            .messages
+            .iter()
+            .filter(|message| message.type_ == NUMBER_ATTACHMENT_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        let message = match payloads.as_slice() {
+            [] => continue,
+            [message] if found.messages.len() == 1 => message,
+            _ => return Err(Error::InvalidSource),
         };
+        let settings =
+            number_attachment::settings(&message.data, wire_limits()).map_err(map_engine_error)?;
         if !seen.insert(object) {
             return Err(Error::InvalidSource);
         }
         attachments.push((
             object,
             Attachment {
-                position: TextPosition::from_utf16_code_units(index),
+                position: anchor.position(),
                 settings,
             },
         ));
     }
-    attachments.sort_by_key(|(_, attachment)| attachment.position);
     Ok(attachments)
-}
-
-fn attachment_settings(
-    object: &litchi_iwa_core::ArchiveObject,
-) -> Result<Option<TextNumberAttachmentSettings>, Error> {
-    let payloads = object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == NUMBER_ATTACHMENT_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    let message = match payloads.as_slice() {
-        [] => return Ok(None),
-        [message] if object.messages.len() == 1 => message,
-        _ => return Err(Error::InvalidSource),
-    };
-    let limits = litchi_iwa_common::WireLimits::default();
-    let view = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
-    let textual = graph::unique_field(&view, SUPER_FIELD, 2)?.ok_or(Error::InvalidSource)?;
-    let textual = WireView::parse(textual.payload(), limits).map_err(map_wire_error)?;
-    let kind = graph::unique_field(&textual, KIND_FIELD, 0)?.ok_or(Error::InvalidSource)?;
-    #[allow(clippy::cast_possible_truncation, reason = "native enum is 32-bit")]
-    let kind = graph::canonical_varint(kind.payload())? as i64 as i32;
-    let text =
-        |view: &WireView<'_>, number: u32| -> Result<Option<TextNumberAttachmentText>, Error> {
-            graph::unique_field(view, number, 2)?
-                .map(|field| {
-                    let value =
-                        std::str::from_utf8(field.payload()).map_err(|_| Error::InvalidSource)?;
-                    TextNumberAttachmentText::new(value).map_err(|_| Error::InvalidSource)
-                })
-                .transpose()
-        };
-    let number_format = graph::unique_field(&view, NUMBER_FORMAT_FIELD, 0)?
-        .map(|field| graph::canonical_varint(field.payload()))
-        .transpose()?
-        .map(|value| u32::try_from(value).map_err(|_| Error::InvalidSource))
-        .transpose()?
-        .map(TextNumberAttachmentFormat::from_native_value);
-    Ok(Some(TextNumberAttachmentSettings {
-        kind: TextNumberAttachmentKind::from_raw(kind),
-        string_equivalent: text(&textual, STRING_EQUIVALENT_FIELD)?,
-        number_format,
-        string_value: text(&view, STRING_VALUE_FIELD)?,
-        number_format_name: text(&view, NUMBER_FORMAT_NAME_FIELD)?,
-    }))
-}
-
-const fn i32_varint(value: i32) -> u64 {
-    value as i64 as u64
-}
-
-fn encode_attachment(settings: &TextNumberAttachmentSettings) -> Result<Vec<u8>, Error> {
-    use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-    let limits = litchi_iwa_common::WireLimits::default();
-    let mut textual = Vec::new();
-    if let Some(value) = &settings.string_equivalent {
-        append_length_delimited_field(
-            &mut textual,
-            STRING_EQUIVALENT_FIELD,
-            value.as_str().as_bytes(),
-            limits,
-        )?;
-    }
-    append_varint_field(&mut textual, KIND_FIELD, i32_varint(settings.kind.as_raw()))?;
-    let mut data = Vec::new();
-    append_length_delimited_field(&mut data, SUPER_FIELD, &textual, limits)?;
-    if let Some(format) = settings.number_format {
-        append_varint_field(
-            &mut data,
-            NUMBER_FORMAT_FIELD,
-            u64::from(format.native_value()),
-        )?;
-    }
-    if let Some(value) = &settings.string_value {
-        append_length_delimited_field(
-            &mut data,
-            STRING_VALUE_FIELD,
-            value.as_str().as_bytes(),
-            limits,
-        )?;
-    }
-    if let Some(value) = &settings.number_format_name {
-        append_length_delimited_field(
-            &mut data,
-            NUMBER_FORMAT_NAME_FIELD,
-            value.as_str().as_bytes(),
-            limits,
-        )?;
-    }
-    Ok(data)
-}
-
-fn patch_attachment(
-    original: &[u8],
-    settings: &TextNumberAttachmentSettings,
-) -> Result<Vec<u8>, Error> {
-    let current = attachment_settings_from_payload(original)?;
-    let mut data = patch_nested_length_delimited_field(
-        original,
-        &[SUPER_FIELD, STRING_EQUIVALENT_FIELD],
-        current.string_equivalent.is_some(),
-        settings
-            .string_equivalent
-            .as_ref()
-            .map(|value| value.as_str().as_bytes()),
-    )?;
-    data = patch_nested_varint_field(
-        &data,
-        &[SUPER_FIELD, KIND_FIELD],
-        true,
-        Some(i32_varint(settings.kind.as_raw())),
-    )?;
-    data = patch_varint_field(
-        &data,
-        NUMBER_FORMAT_FIELD,
-        current.number_format.is_some(),
-        settings
-            .number_format
-            .map(|value| u64::from(value.native_value())),
-    )?;
-    data = patch_length_delimited_field(
-        &data,
-        STRING_VALUE_FIELD,
-        current.string_value.is_some(),
-        settings
-            .string_value
-            .as_ref()
-            .map(|value| value.as_str().as_bytes()),
-    )?;
-    data = patch_length_delimited_field(
-        &data,
-        NUMBER_FORMAT_NAME_FIELD,
-        current.number_format_name.is_some(),
-        settings
-            .number_format_name
-            .as_ref()
-            .map(|value| value.as_str().as_bytes()),
-    )?;
-    Ok(data)
-}
-
-fn attachment_settings_from_payload(payload: &[u8]) -> Result<TextNumberAttachmentSettings, Error> {
-    let object = litchi_iwa_core::ArchiveObject::new(
-        1,
-        vec![litchi_iwa_core::RawMessage {
-            type_: NUMBER_ATTACHMENT_MESSAGE_TYPE,
-            data: payload.to_vec(),
-        }],
-        litchi_iwa_core::Limits::default(),
-    )
-    .map_err(graph::map_core_error)?;
-    attachment_settings(&object)?.ok_or(Error::InvalidSource)
 }
 
 impl From<litchi_iwa_common::Error> for Error {
     fn from(error: litchi_iwa_common::Error) -> Self {
         map_wire_error(error).into()
     }
-}
-
-fn encode_reference(identifier: u64) -> Result<Vec<u8>, Error> {
-    let mut reference = Vec::new();
-    litchi_iwa_common::wire::append_varint_field(&mut reference, 1, identifier)?;
-    Ok(reference)
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
@@ -770,8 +598,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     match operation {
         Operation::Insert(position, settings) => {
             let at = position.utf16_index();
-            let (_, existing) = entries(&storage.payload)?;
-            if existing.iter().any(|(index, _, _)| *index == at) {
+            if current
+                .iter()
+                .any(|(_, attachment)| attachment.position == position)
+            {
                 return Err(Refusal::Overlap.into());
             }
             if at > storage.utf16_len() || !objects::scalar_boundaries(&storage.text, [at]) {
@@ -779,52 +609,14 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             }
             objects::splice_text(source, &mut storage, at, at, OBJECT_REPLACEMENT)?;
             let identifier = objects::next_identifier(source, metadata.as_ref())?;
-            let (table, mut rows) = entries(&storage.payload)?;
-            let mut entry = Vec::new();
-            litchi_iwa_common::wire::append_varint_field(
-                &mut entry,
-                ENTRY_INDEX_FIELD,
-                u64::from(at),
-            )?;
-            litchi_iwa_common::wire::append_length_delimited_field(
-                &mut entry,
-                ENTRY_OBJECT_FIELD,
-                &encode_reference(identifier)?,
-                litchi_iwa_common::WireLimits::default(),
-            )?;
-            rows.push((at, identifier, entry));
-            rows.sort_by_key(|(index, _, _)| *index);
-            let raw = rows.into_iter().map(|(_, _, raw)| raw).collect::<Vec<_>>();
-            let table_payload = match &table {
-                Some(table) => litchi_iwa_common::wire::rewrite_repeated_length_delimited_fields(
-                    table,
-                    TABLE_ENTRIES_FIELD,
-                    &raw,
-                )?,
-                None => {
-                    let mut table = Vec::new();
-                    for entry in &raw {
-                        litchi_iwa_common::wire::append_length_delimited_field(
-                            &mut table,
-                            TABLE_ENTRIES_FIELD,
-                            entry,
-                            litchi_iwa_common::WireLimits::default(),
-                        )?;
-                    }
-                    table
-                },
-            };
-            storage.payload = patch_length_delimited_field(
-                &storage.payload,
-                ATTACHMENT_TABLE_FIELD,
-                table.is_some(),
-                Some(&table_payload),
-            )?;
+            storage.payload =
+                number_attachment::anchor(&storage.payload, position, identifier, wire_limits())
+                    .map_err(map_engine_error)?;
             let object = objects::new_object(
                 source,
                 identifier,
                 NUMBER_ATTACHMENT_MESSAGE_TYPE,
-                encode_attachment(&settings)?,
+                number_attachment::encode(&settings, wire_limits()).map_err(map_engine_error)?,
             )?;
             if let Some(metadata) = &metadata {
                 metadata_payload = Some(metadata.raised(source, identifier)?);
@@ -835,7 +627,12 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             let identifier = current[position].0;
             require_exclusive(source, storage.identifier.get(), identifier)?;
             let object = archive.object_mut(identifier).ok_or(Error::InvalidSource)?;
-            let data = patch_attachment(&object.messages[0].data, &settings)?;
+            let data = number_attachment::with_settings(
+                &object.messages[0].data,
+                &settings,
+                wire_limits(),
+            )
+            .map_err(map_engine_error)?;
             object
                 .replace_message_preserving_header(
                     0,
