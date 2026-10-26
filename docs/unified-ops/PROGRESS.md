@@ -6238,3 +6238,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   top-level gate checks. Facade logs report 209 passing tests, including 19
   library tests and 20 doctests. The same gate proceeds to core tests; no
   full65 or native acceptance is claimed.
+
+  The core suite passes six chunks and 332 tests (165h), including 253 library
+  tests and 59 doctests. Root verifies 35 completed gate checks while the same
+  run continues. ODG/ODP v4 repairs pass their producer checks, but ODG is
+  returned because its sealed fixture path fails the later runtime validator;
+  its handoff test stopped at builder validation. V5 must preserve the fixed
+  reviewed harness fixture and test runtime admission. Original flat/W6
+  repairs continue, with a retained e4a lock located for dependency review.
+  C/P remain frozen and all 28 final qualifications remain open. No push.
