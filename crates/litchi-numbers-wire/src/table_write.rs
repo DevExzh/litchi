@@ -649,7 +649,26 @@ pub fn tile_set_cell(
     let mut removed = false;
     let mut output = Vec::new();
     reserve(&mut output, tile.len().min(limits.max_output_bytes()))?;
-    for field in fields(tile, limits)? {
+    // A row after every stored row follows the last row record (or, in a
+    // tile without rows, precedes the storage-version fields), as the host
+    // writer's encoder places it (record 0370b).
+    let all_fields = fields(tile, limits)?;
+    let trailing = all_fields
+        .iter()
+        .rposition(|field| field.number == 5)
+        .map(|last| last + 1)
+        .or_else(|| all_fields.iter().position(|field| field.number > 5))
+        .unwrap_or(all_fields.len());
+    for (position, field) in all_fields.into_iter().enumerate() {
+        if position == trailing
+            && !exists
+            && insert_before.is_none()
+            && let Some(cell) = cell
+        {
+            let row = new_row(cell)?;
+            append(&mut output, &row, limits)?;
+            inserted = true;
+        }
         if field.number == 5 {
             let this = row_index;
             row_index += 1;
