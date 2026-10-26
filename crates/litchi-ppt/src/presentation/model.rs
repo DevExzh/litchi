@@ -476,7 +476,7 @@ impl Presentation {
             record: &Record,
             out: &mut Vec<TextMetachar>,
             report: &mut crate::leniency::ToleranceReport,
-            source_limits: crate::SourceLimits,
+            source_limits: SourceLimits,
         ) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
                 for textbox in super::codec::drawing_textboxes(&record.data, source_limits)? {
@@ -594,7 +594,7 @@ impl Presentation {
             record: &Record,
             out: &mut Vec<OutlineTextRef>,
             report: &mut crate::leniency::ToleranceReport,
-            source_limits: crate::SourceLimits,
+            source_limits: SourceLimits,
         ) -> Result<()> {
             if record.record_type == RecordType::PPDrawing {
                 for textbox in super::codec::drawing_textboxes(&record.data, source_limits)? {

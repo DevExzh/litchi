@@ -226,7 +226,7 @@ mod tests {
         let mut offset = 0;
         while offset < bytes.len() {
             let (record, consumed) =
-                Record::parse(bytes, offset, &crate::SourceLimits::default()).unwrap();
+                Record::parse(bytes, offset, &SourceLimits::default()).unwrap();
             records.push(record);
             offset += consumed;
         }
@@ -340,14 +340,14 @@ mod tests {
         let mut header = Record::parse(
             &record_bytes(0, 0, 3999, &0u32.to_le_bytes()),
             0,
-            &crate::SourceLimits::default(),
+            &SourceLimits::default(),
         )
         .unwrap()
         .0;
         let text = Record::parse(
             &record_bytes(0, 0, 4008, b"abc"),
             0,
-            &crate::SourceLimits::default(),
+            &SourceLimits::default(),
         )
         .unwrap()
         .0;

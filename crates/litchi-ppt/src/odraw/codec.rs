@@ -325,14 +325,6 @@ pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
 /// Decode the text of a `ClientTextbox` payload, or of a slide-list text
 /// body framed as one: every character atom's text, trimmed and joined with
 /// `\n`, then trimmed at the end; `None` when nothing remains.
-pub(crate) fn text_from_textbox_payload(payload: &[u8]) -> Result<Option<String>> {
-    text_from_textbox_payload_bounded(
-        payload,
-        super::package::MAX_HOST_RECORDS,
-        crate::SourceLimits::DEFAULT_MAX_DEPTH,
-    )
-}
-
 pub(crate) fn text_from_textbox_payload_bounded(
     payload: &[u8],
     max_records: u32,
