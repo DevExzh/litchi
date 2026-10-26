@@ -1,21 +1,21 @@
-//! Private engine for the objects a rooted text storage owns: its ranged
-//! object tables (bookmarks, smart fields), the package-metadata watermark
-//! and registry edits that creating or deleting such an object requires.
+//! Private engine for the objects a rooted text storage owns: the storage
+//! itself, the package-metadata watermark and registry edits that creating
+//! or deleting such an object requires, and text splices. The ranged-object
+//! tables are the shared `litchi_iwa_text_wire::ranged` engine.
 //!
 //! The rules follow the native graph the migration host writes (record 0371):
 //! a new object takes the identifier one above every physical object and
 //! every metadata registration, and raises the metadata watermark to it; a
 //! deleted object loses its external references and UUID registration, and a
 //! deleted watermark identifier releases the suffix to the largest remaining
-//! object. Table entries keep their raw bytes; new entries are canonical.
+//! object.
 
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_iwa_common::wire::{
-    WireView, patch_length_delimited_field, patch_varint_field,
-    remove_repeated_length_delimited_field_where, repeated_length_delimited_payloads,
-    rewrite_repeated_length_delimited_fields, transform_length_delimited_fields_at_path,
+    WireView, patch_varint_field, remove_repeated_length_delimited_field_where,
+    repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
 };
 use litchi_iwa_core::{Archive, ArchiveObject};
 use litchi_iwa_protos::package_metadata_codec::{
@@ -38,9 +38,6 @@ const COMPONENT_OBJECT_UUIDS_FIELD: u32 = 11;
 const EXTERNAL_COMPONENT_FIELD: u32 = 1;
 const EXTERNAL_OBJECT_FIELD: u32 = 2;
 const UUID_ENTRY_IDENTIFIER_FIELD: u32 = 1;
-const TABLE_ENTRIES_FIELD: u32 = 1;
-const ENTRY_INDEX_FIELD: u32 = 1;
-const ENTRY_OBJECT_FIELD: u32 = 2;
 
 /// The rooted body text storage.
 pub(crate) struct Storage {
@@ -116,93 +113,6 @@ fn storage_at(
     })
 }
 
-/// One boundary of an `ObjectAttributeTable`: the object that starts at a
-/// UTF-16 index (or `None`, a gap), with its raw entry bytes.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Boundary {
-    pub(crate) index: u32,
-    pub(crate) object: Option<u64>,
-    raw: Vec<u8>,
-}
-
-/// The raw ranged table `field` of a storage payload and its boundaries.
-pub(crate) fn ranged_table(
-    storage: &Storage,
-    field: u32,
-) -> GraphResult<(Option<Vec<u8>>, Vec<Boundary>)> {
-    let tables =
-        repeated_length_delimited_payloads(&storage.payload, field).map_err(map_wire_error)?;
-    let table = match tables.as_slice() {
-        [] => return Ok((None, Vec::new())),
-        [table] => table.to_vec(),
-        _ => return Err(GraphError::InvalidSource),
-    };
-    let entries =
-        repeated_length_delimited_payloads(&table, TABLE_ENTRIES_FIELD).map_err(map_wire_error)?;
-    if entries.is_empty() {
-        return Err(GraphError::InvalidSource);
-    }
-    let mut boundaries = Vec::with_capacity(entries.len());
-    for raw in entries {
-        let view = WireView::parse(raw, litchi_iwa_common::WireLimits::default())
-            .map_err(map_wire_error)?;
-        let index =
-            graph::unique_field(&view, ENTRY_INDEX_FIELD, 0)?.ok_or(GraphError::InvalidSource)?;
-        let index = u32::try_from(graph::canonical_varint(index.payload())?)
-            .map_err(|_| GraphError::InvalidSource)?;
-        let object = graph::unique_field(&view, ENTRY_OBJECT_FIELD, 2)?
-            .map(|field| reference_identifier(field.payload()))
-            .transpose()?;
-        boundaries.push(Boundary {
-            index,
-            object,
-            raw: raw.to_vec(),
-        });
-    }
-    validate_boundaries(&boundaries, storage)?;
-    let table = Some(table);
-    Ok((table, boundaries))
-}
-
-fn reference_identifier(payload: &[u8]) -> GraphResult<u64> {
-    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::default())
-        .map_err(map_wire_error)?;
-    let field = graph::unique_field(&view, 1, 0)?.ok_or(GraphError::InvalidSource)?;
-    let identifier = graph::canonical_varint(field.payload())?;
-    if identifier == 0 {
-        return Err(GraphError::InvalidSource);
-    }
-    Ok(identifier)
-}
-
-fn validate_boundaries(boundaries: &[Boundary], storage: &Storage) -> GraphResult<()> {
-    let Some(first) = boundaries.first() else {
-        return Ok(());
-    };
-    if first.index != 0 {
-        return Err(GraphError::InvalidSource);
-    }
-    let length = storage.utf16_len();
-    for pair in boundaries.windows(2) {
-        if pair[0].index >= pair[1].index {
-            return Err(GraphError::InvalidSource);
-        }
-    }
-    if boundaries
-        .iter()
-        .any(|boundary| boundary.object.is_some() && boundary.index == length)
-    {
-        return Err(GraphError::InvalidSource);
-    }
-    if !scalar_boundaries(
-        &storage.text,
-        boundaries.iter().map(|boundary| boundary.index),
-    ) {
-        return Err(GraphError::InvalidSource);
-    }
-    Ok(())
-}
-
 /// Whether every sorted UTF-16 index falls on a scalar boundary of `text`.
 pub(crate) fn scalar_boundaries(text: &str, indexes: impl IntoIterator<Item = u32>) -> bool {
     let mut indexes = indexes.into_iter().peekable();
@@ -220,165 +130,6 @@ pub(crate) fn scalar_boundaries(text: &str, indexes: impl IntoIterator<Item = u3
         }
     }
     indexes.next().is_none()
-}
-
-/// The ranges `[start, end)` each object of the table covers.
-pub(crate) fn ranges(boundaries: &[Boundary], length: u32) -> Vec<(u64, u32, u32)> {
-    boundaries
-        .iter()
-        .enumerate()
-        .filter_map(|(position, boundary)| {
-            let object = boundary.object?;
-            let end = boundaries
-                .get(position + 1)
-                .map_or(length, |next| next.index);
-            Some((object, boundary.index, end))
-        })
-        .collect()
-}
-
-/// Whether `[start, end)` overlaps an object's range other than `ignored`.
-pub(crate) fn overlaps(
-    boundaries: &[Boundary],
-    length: u32,
-    start: u32,
-    end: u32,
-    ignored: Option<u64>,
-) -> bool {
-    ranges(boundaries, length)
-        .into_iter()
-        .any(|(object, from, to)| Some(object) != ignored && start < to && from < end)
-}
-
-/// Add `[start, end)` for `object` (the host's `add_range`).
-pub(crate) fn add_range(
-    boundaries: &mut Vec<Boundary>,
-    start: u32,
-    end: u32,
-    object: u64,
-) -> GraphResult<()> {
-    if boundaries.is_empty() {
-        boundaries.push(new_boundary(0, None));
-    }
-    set_boundary(boundaries, start, Some(object))?;
-    set_boundary(boundaries, end, None)?;
-    boundaries.dedup_by(|current, previous| current.object == previous.object);
-    Ok(())
-}
-
-/// Remove the range of `object` (the host's `remove_range`).
-pub(crate) fn remove_range(boundaries: &mut Vec<Boundary>, object: u64) -> GraphResult<()> {
-    let matches = boundaries
-        .iter()
-        .enumerate()
-        .filter(|(_, boundary)| boundary.object == Some(object))
-        .map(|(position, _)| position)
-        .collect::<Vec<_>>();
-    let [position] = matches.as_slice() else {
-        return Err(GraphError::InvalidSource);
-    };
-    let boundary = &mut boundaries[*position];
-    boundary.raw = patch_entry_object(&boundary.raw, boundary.object, None)?;
-    boundary.object = None;
-    boundaries.dedup_by(|current, previous| current.object == previous.object);
-    Ok(())
-}
-
-fn set_boundary(
-    boundaries: &mut Vec<Boundary>,
-    index: u32,
-    object: Option<u64>,
-) -> GraphResult<()> {
-    if let Some(boundary) = boundaries
-        .iter_mut()
-        .find(|boundary| boundary.index == index)
-    {
-        if boundary.object != object {
-            boundary.raw = patch_entry_object(&boundary.raw, boundary.object, object)?;
-            boundary.object = object;
-        }
-        return Ok(());
-    }
-    boundaries.push(new_boundary(index, object));
-    boundaries.sort_by_key(|boundary| boundary.index);
-    Ok(())
-}
-
-fn encode_reference(identifier: u64) -> Vec<u8> {
-    let mut reference = Vec::new();
-    litchi_iwa_common::wire::append_varint_field(&mut reference, 1, identifier).unwrap_or_default();
-    reference
-}
-
-fn new_boundary(index: u32, object: Option<u64>) -> Boundary {
-    let mut raw = Vec::new();
-    let _ =
-        litchi_iwa_common::wire::append_varint_field(&mut raw, ENTRY_INDEX_FIELD, u64::from(index));
-    if let Some(object) = object {
-        let _ = litchi_iwa_common::wire::append_length_delimited_field(
-            &mut raw,
-            ENTRY_OBJECT_FIELD,
-            &encode_reference(object),
-            litchi_iwa_common::WireLimits::default(),
-        );
-    }
-    Boundary { index, object, raw }
-}
-
-fn patch_entry_object(
-    raw: &[u8],
-    current: Option<u64>,
-    replacement: Option<u64>,
-) -> GraphResult<Vec<u8>> {
-    let reference = replacement.map(encode_reference);
-    patch_length_delimited_field(
-        raw,
-        ENTRY_OBJECT_FIELD,
-        current.is_some(),
-        reference.as_deref(),
-    )
-    .map_err(map_wire_error)
-}
-
-/// The table payload for `boundaries`; `None` when no object remains.
-pub(crate) fn encode_table(
-    original: Option<&[u8]>,
-    boundaries: &[Boundary],
-) -> GraphResult<Vec<u8>> {
-    let entries = boundaries
-        .iter()
-        .map(|boundary| boundary.raw.clone())
-        .collect::<Vec<_>>();
-    match original {
-        Some(table) => {
-            rewrite_repeated_length_delimited_fields(table, TABLE_ENTRIES_FIELD, &entries)
-                .map_err(map_wire_error)
-        },
-        None => {
-            let mut table = Vec::new();
-            for entry in &entries {
-                litchi_iwa_common::wire::append_length_delimited_field(
-                    &mut table,
-                    TABLE_ENTRIES_FIELD,
-                    entry,
-                    litchi_iwa_common::WireLimits::default(),
-                )
-                .map_err(map_wire_error)?;
-            }
-            Ok(table)
-        },
-    }
-}
-
-/// Replace (or remove, with `None`) the ranged table `field` of a storage
-/// payload.
-pub(crate) fn replace_table(
-    payload: &[u8],
-    field: u32,
-    present: bool,
-    table: Option<&[u8]>,
-) -> GraphResult<Vec<u8>> {
-    patch_length_delimited_field(payload, field, present, table).map_err(map_wire_error)
 }
 
 /// The package metadata component and its facts.

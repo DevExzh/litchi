@@ -26,8 +26,8 @@ use thiserror::Error as ThisError;
 use super::Package;
 use super::body_drawable_graph::{self as graph, GraphError, GraphLimit, map_wire_error};
 use super::body_storage_objects::{self as objects, Storage};
+use litchi_iwa_text_wire::ranged;
 
-const SMART_FIELD_TABLE_FIELD: u32 = 11;
 const DATE_TIME_MESSAGE_TYPE: u32 = 2_034;
 const SMART_FIELD_FIELD: u32 = 1;
 const SMART_FIELD_UUID_FIELD: u32 = 1;
@@ -462,7 +462,8 @@ impl Package {
 }
 
 fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Field)>, Error> {
-    let (_, boundaries) = objects::ranged_table(storage, SMART_FIELD_TABLE_FIELD)?;
+    let entries = ranged::entries(&storage.payload, ranged::Table::SmartField, wire_limits())
+        .map_err(map_ranged_error)?;
     let archive = package
         .state
         .source
@@ -470,17 +471,17 @@ fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Field)>, Error
         .get(storage.component.as_ref())
         .ok_or(Error::InvalidSource)?
         .archive();
-    read_from(archive, storage, &boundaries)
+    read_from(archive, &entries)
 }
 
 fn read_from(
     archive: &litchi_iwa_core::Archive,
-    storage: &Storage,
-    boundaries: &[objects::Boundary],
+    entries: &[ranged::Entry],
 ) -> Result<Vec<(u64, Field)>, Error> {
     let mut fields = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    for (object, start, end) in objects::ranges(boundaries, storage.utf16_len()) {
+    for entry in entries {
+        let object = entry.object();
         let found = archive.object(object).ok_or(Error::InvalidSource)?;
         let Some(settings) = field_settings(found)? else {
             continue;
@@ -488,9 +489,13 @@ fn read_from(
         if !seen.insert(object) {
             return Err(Error::InvalidSource);
         }
-        let range = TextRange::from_utf16_indexes(start as usize, end as usize)
-            .map_err(|_| Error::InvalidSource)?;
-        fields.push((object, Field { range, settings }));
+        fields.push((
+            object,
+            Field {
+                range: entry.range(),
+                settings,
+            },
+        ));
     }
     Ok(fields)
 }
@@ -806,8 +811,6 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         },
         other => other,
     };
-    let (table, mut boundaries) = objects::ranged_table(&storage, SMART_FIELD_TABLE_FIELD)?;
-    let length = storage.utf16_len();
     let metadata = objects::metadata(source)?;
     let archive_limits = source
         .state
@@ -823,14 +826,18 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .collect::<Vec<_>>();
     let mut added = None;
     let mut removed = None;
+    let rewrite;
     match operation {
         Operation::Add(range, settings) => {
-            let (start, end) = check_range(&storage, range)?;
-            if objects::overlaps(&boundaries, length, start, end, None) {
-                return Err(Refusal::Overlap.into());
-            }
+            check_range(&storage, range)?;
             let identifier = objects::next_identifier(source, metadata.as_ref())?;
-            objects::add_range(&mut boundaries, start, end, identifier)?;
+            rewrite = table_change(
+                &storage,
+                &ranged::Change::Add {
+                    object: identifier,
+                    range,
+                },
+            )?;
             let uuid = objects::text_attribute_uuid()?;
             let object = objects::new_object(
                 source,
@@ -850,13 +857,15 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         },
         Operation::Update(position, range, settings) => {
             let identifier = current[position].0;
-            let (start, end) = check_range(&storage, range)?;
-            if objects::overlaps(&boundaries, length, start, end, Some(identifier)) {
-                return Err(Refusal::Overlap.into());
-            }
+            check_range(&storage, range)?;
             require_exclusive(source, storage.identifier.get(), identifier)?;
-            objects::remove_range(&mut boundaries, identifier)?;
-            objects::add_range(&mut boundaries, start, end, identifier)?;
+            rewrite = table_change(
+                &storage,
+                &ranged::Change::Move {
+                    object: identifier,
+                    range,
+                },
+            )?;
             let object = archive.object_mut(identifier).ok_or(Error::InvalidSource)?;
             let original = object.messages[0].data.clone();
             let data = patch_settings(&original, &settings)?;
@@ -877,7 +886,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         Operation::Remove(position) => {
             let identifier = current[position].0;
             require_exclusive(source, storage.identifier.get(), identifier)?;
-            objects::remove_range(&mut boundaries, identifier)?;
+            rewrite = table_change(&storage, &ranged::Change::Remove { object: identifier })?;
             if let Some(metadata) = &metadata {
                 let mut payload = metadata.payload.clone();
                 if let Some(component) = metadata.component_for_entry(&storage.component)? {
@@ -896,18 +905,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         },
     }
     // The storage's field table and its object-reference metadata.
-    let keep = boundaries.iter().any(|boundary| boundary.object.is_some());
-    let table_payload = if keep {
-        Some(objects::encode_table(table.as_deref(), &boundaries)?)
-    } else {
-        None
-    };
-    let payload = objects::replace_table(
-        &storage.payload,
-        SMART_FIELD_TABLE_FIELD,
-        table.is_some(),
-        table_payload.as_deref(),
-    )?;
+    let payload = rewrite.into_payload();
     let storage_object = archive
         .object_mut(storage.identifier.get())
         .ok_or(Error::InvalidSource)?;
@@ -1011,4 +1009,36 @@ fn require_exclusive(package: &Package, storage: u64, object: u64) -> Result<(),
         return Err(Refusal::SharedObject.into());
     }
     Ok(())
+}
+
+const fn wire_limits() -> litchi_iwa_common::WireLimits {
+    litchi_iwa_common::WireLimits::DEFAULT
+}
+
+/// One change of the storage's smart-field table through the shared engine.
+fn table_change(storage: &Storage, change: &ranged::Change) -> Result<ranged::Rewrite, Error> {
+    ranged::rewrite(
+        &storage.payload,
+        ranged::Table::SmartField,
+        change,
+        wire_limits(),
+    )
+    .map_err(map_ranged_error)
+}
+
+fn map_ranged_error(error: ranged::Error) -> Error {
+    match error {
+        ranged::Error::Refused(ranged::Refusal::NotABoundary) => Refusal::InvalidRange.into(),
+        ranged::Error::Refused(ranged::Refusal::Occupied) => Refusal::Overlap.into(),
+        ranged::Error::Refused(_) => Refusal::SharedObject.into(),
+        ranged::Error::Allocation { amount } => Error::Allocation { amount },
+        ranged::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        _ => Error::InvalidSource,
+    }
 }

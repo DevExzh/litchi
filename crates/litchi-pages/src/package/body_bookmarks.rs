@@ -12,23 +12,16 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use litchi_iwa_common::wire::{WireView, patch_length_delimited_field, patch_varint_field};
 use litchi_iwa_text::TextRange;
-use litchi_iwa_text::bookmark::{Name, Settings, Visibility};
+use litchi_iwa_text::bookmark::{Name, Settings};
 use thiserror::Error as ThisError;
 
 use super::Package;
 use super::body_drawable_graph::{self as graph, GraphError, GraphLimit, map_wire_error};
 use super::body_storage_objects::{self as objects, Storage};
+use litchi_iwa_text_wire::{ranged, smart_field};
 
-const BOOKMARK_TABLE_FIELD: u32 = 15;
 const BOOKMARK_MESSAGE_TYPE: u32 = 2_035;
-const SMART_FIELD_FIELD: u32 = 1;
-const SMART_FIELD_UUID_FIELD: u32 = 1;
-const NAME_FIELD: u32 = 2;
-const RANGED_FIELD: u32 = 3;
-const HIDDEN_FIELD: u32 = 4;
-const RANGED: u64 = 1;
 
 /// A finite resource charged by one body-bookmark operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -488,7 +481,8 @@ fn select(bookmarks: &[Bookmark], selector: Selector<'_>) -> Result<usize, Error
 
 /// The body's bookmarks with their native object identifiers.
 fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Bookmark)>, Error> {
-    let (_, boundaries) = objects::ranged_table(storage, BOOKMARK_TABLE_FIELD)?;
+    let entries = ranged::entries(&storage.payload, ranged::Table::Bookmark, wire_limits())
+        .map_err(map_ranged_error)?;
     let archive = package
         .state
         .source
@@ -498,7 +492,8 @@ fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Bookmark)>, Er
         .archive();
     let mut bookmarks = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    for (object, start, end) in objects::ranges(&boundaries, storage.utf16_len()) {
+    for entry in entries {
+        let object = entry.object();
         let Some(found) = archive.object(object) else {
             return Err(Error::InvalidSource);
         };
@@ -508,9 +503,13 @@ fn read(package: &Package, storage: &Storage) -> Result<Vec<(u64, Bookmark)>, Er
         if !seen.insert(object) {
             return Err(Error::InvalidSource);
         }
-        let range = TextRange::from_utf16_indexes(start as usize, end as usize)
-            .map_err(|_| Error::InvalidSource)?;
-        bookmarks.push((object, Bookmark { range, settings }));
+        bookmarks.push((
+            object,
+            Bookmark {
+                range: entry.range(),
+                settings,
+            },
+        ));
     }
     Ok(bookmarks)
 }
@@ -527,83 +526,30 @@ fn bookmark_settings(object: &litchi_iwa_core::ArchiveObject) -> Result<Option<S
         [message] if object.messages.len() == 1 => message,
         _ => return Err(Error::InvalidSource),
     };
-    let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::default())
-        .map_err(map_wire_error)?;
-    let smart = graph::unique_field(&view, SMART_FIELD_FIELD, 2)?.ok_or(Error::InvalidSource)?;
-    let smart = WireView::parse(smart.payload(), litchi_iwa_common::WireLimits::default())
-        .map_err(map_wire_error)?;
-    let uuid =
-        graph::unique_field(&smart, SMART_FIELD_UUID_FIELD, 2)?.ok_or(Error::InvalidSource)?;
-    let uuid = std::str::from_utf8(uuid.payload()).map_err(|_| Error::InvalidSource)?;
-    if !objects::valid_text_attribute_uuid(uuid) {
-        return Err(Error::InvalidSource);
-    }
-    let ranged = graph::unique_field(&view, RANGED_FIELD, 0)?
-        .map(|field| graph::canonical_varint(field.payload()))
-        .transpose()?;
-    if ranged != Some(RANGED) {
-        return Err(Error::InvalidSource);
-    }
-    let hidden = graph::unique_field(&view, HIDDEN_FIELD, 0)?
-        .map(|field| graph::canonical_varint(field.payload()))
-        .transpose()?
-        .unwrap_or(0);
-    let hidden = u32::try_from(hidden).map_err(|_| Error::InvalidSource)?;
-    let mut settings = Settings::new().with_visibility(visibility(hidden));
-    if let Some(name) = graph::unique_field(&view, NAME_FIELD, 2)? {
-        let name = std::str::from_utf8(name.payload()).map_err(|_| Error::InvalidSource)?;
-        settings = settings.with_name(Name::new(name).map_err(|_| Error::InvalidSource)?);
-    }
+    let (_, settings) =
+        smart_field::bookmark(&message.data, wire_limits()).map_err(|_| Error::InvalidSource)?;
     Ok(Some(settings))
 }
 
-const fn visibility(raw: u32) -> Visibility {
-    match raw {
-        0 => Visibility::Visible,
-        1 => Visibility::Hidden,
-        other => Visibility::Unknown(other),
-    }
+const fn wire_limits() -> litchi_iwa_common::WireLimits {
+    litchi_iwa_common::WireLimits::DEFAULT
 }
 
-const fn native_visibility(visibility: Visibility) -> u32 {
-    match visibility {
-        Visibility::Visible => 0,
-        Visibility::Hidden => 1,
-        Visibility::Unknown(raw) => raw,
+fn map_ranged_error(error: ranged::Error) -> Error {
+    match error {
+        ranged::Error::Refused(ranged::Refusal::NotABoundary) => Refusal::InvalidRange.into(),
+        ranged::Error::Refused(ranged::Refusal::Occupied) => Refusal::Overlap.into(),
+        ranged::Error::Refused(_) => Refusal::SharedObject.into(),
+        ranged::Error::Allocation { amount } => Error::Allocation { amount },
+        ranged::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        _ => Error::InvalidSource,
     }
-}
-
-fn encode_bookmark(uuid: &str, settings: &Settings) -> Result<Vec<u8>, Error> {
-    use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-    let mut smart = Vec::new();
-    append_length_delimited_field(
-        &mut smart,
-        SMART_FIELD_UUID_FIELD,
-        uuid.as_bytes(),
-        litchi_iwa_common::WireLimits::default(),
-    )?;
-    let mut data = Vec::new();
-    append_length_delimited_field(
-        &mut data,
-        SMART_FIELD_FIELD,
-        &smart,
-        litchi_iwa_common::WireLimits::default(),
-    )?;
-    if let Some(name) = settings.name() {
-        append_length_delimited_field(
-            &mut data,
-            NAME_FIELD,
-            name.as_str().as_bytes(),
-            litchi_iwa_common::WireLimits::default(),
-        )?;
-    }
-    append_varint_field(&mut data, RANGED_FIELD, RANGED)?;
-    append_varint_field(
-        &mut data,
-        HIDDEN_FIELD,
-        u64::from(native_visibility(settings.visibility())),
-    )?;
-    Ok(data)
 }
 
 impl From<litchi_iwa_common::Error> for Error {
@@ -653,8 +599,6 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     {
         return Err(Error::PatchConflict);
     }
-    let (table, mut boundaries) = objects::ranged_table(&storage, BOOKMARK_TABLE_FIELD)?;
-    let length = storage.utf16_len();
     let metadata = objects::metadata(source)?;
     let archive_limits = source
         .state
@@ -667,20 +611,31 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut expected = edit.before.to_vec();
     let mut added = None;
     let mut removed = None;
+    let rewrite;
     match operation {
         Operation::Add(range, settings) => {
-            let (start, end) = check_range(&storage, range)?;
-            if objects::overlaps(&boundaries, length, start, end, None) {
-                return Err(Refusal::Overlap.into());
-            }
+            check_range(&storage, range)?;
             let identifier = objects::next_identifier(source, metadata.as_ref())?;
-            objects::add_range(&mut boundaries, start, end, identifier)?;
-            let uuid = objects::text_attribute_uuid()?;
+            rewrite = Some(
+                ranged::rewrite(
+                    &storage.payload,
+                    ranged::Table::Bookmark,
+                    &ranged::Change::Add {
+                        object: identifier,
+                        range,
+                    },
+                    wire_limits(),
+                )
+                .map_err(map_ranged_error)?,
+            );
+            let uuid = smart_field::TextAttributeUuid::new(&objects::text_attribute_uuid()?)
+                .map_err(|_| Error::InvalidSource)?;
             let object = objects::new_object(
                 source,
                 identifier,
                 BOOKMARK_MESSAGE_TYPE,
-                encode_bookmark(&uuid, &settings)?,
+                smart_field::encode_bookmark(&uuid, &settings, wire_limits())
+                    .map_err(|_| Error::InvalidSource)?,
             )?;
             archive
                 .insert_object(object, archive_limits)
@@ -695,30 +650,27 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         },
         Operation::Update(position, range, settings) => {
             let identifier = current[position].0;
-            let (start, end) = check_range(&storage, range)?;
-            if objects::overlaps(&boundaries, length, start, end, Some(identifier)) {
-                return Err(Refusal::Overlap.into());
-            }
+            check_range(&storage, range)?;
             require_exclusive(source, storage.identifier.get(), identifier)?;
-            objects::remove_range(&mut boundaries, identifier)?;
-            objects::add_range(&mut boundaries, start, end, identifier)?;
+            rewrite = Some(
+                ranged::rewrite(
+                    &storage.payload,
+                    ranged::Table::Bookmark,
+                    &ranged::Change::Move {
+                        object: identifier,
+                        range,
+                    },
+                    wire_limits(),
+                )
+                .map_err(map_ranged_error)?,
+            );
             let object = archive.object_mut(identifier).ok_or(Error::InvalidSource)?;
-            let original = object.messages[0].data.clone();
-            let view = WireView::parse(&original, litchi_iwa_common::WireLimits::default())?;
-            let name_present = graph::unique_field(&view, NAME_FIELD, 2)?.is_some();
-            let hidden_present = graph::unique_field(&view, HIDDEN_FIELD, 0)?.is_some();
-            let data = patch_length_delimited_field(
-                &original,
-                NAME_FIELD,
-                name_present,
-                settings.name().map(|name| name.as_str().as_bytes()),
-            )?;
-            let data = patch_varint_field(
-                &data,
-                HIDDEN_FIELD,
-                hidden_present,
-                Some(u64::from(native_visibility(settings.visibility()))),
-            )?;
+            let data = smart_field::bookmark_with_settings(
+                &object.messages[0].data,
+                &settings,
+                wire_limits(),
+            )
+            .map_err(|_| Error::InvalidSource)?;
             object
                 .replace_message_preserving_header(
                     0,
@@ -735,7 +687,15 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         Operation::Remove(position) => {
             let identifier = current[position].0;
             require_exclusive(source, storage.identifier.get(), identifier)?;
-            objects::remove_range(&mut boundaries, identifier)?;
+            rewrite = Some(
+                ranged::rewrite(
+                    &storage.payload,
+                    ranged::Table::Bookmark,
+                    &ranged::Change::Remove { object: identifier },
+                    wire_limits(),
+                )
+                .map_err(map_ranged_error)?,
+            );
             if let Some(metadata) = &metadata {
                 let mut payload = metadata.payload.clone();
                 if let Some(component) = metadata.component_for_entry(&storage.component)? {
@@ -754,18 +714,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         },
     }
     // The storage's bookmark table and its object-reference metadata.
-    let keep = boundaries.iter().any(|boundary| boundary.object.is_some());
-    let table_payload = if keep {
-        Some(objects::encode_table(table.as_deref(), &boundaries)?)
-    } else {
-        None
-    };
-    let payload = objects::replace_table(
-        &storage.payload,
-        BOOKMARK_TABLE_FIELD,
-        table.is_some(),
-        table_payload.as_deref(),
-    )?;
+    let payload = rewrite.ok_or(Error::InvalidSource)?.into_payload();
     let storage_object = archive
         .object_mut(storage.identifier.get())
         .ok_or(Error::InvalidSource)?;
