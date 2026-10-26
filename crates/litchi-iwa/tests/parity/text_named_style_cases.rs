@@ -531,7 +531,7 @@ fn run(
 }
 
 /// Storages with a resolvable named style, with their catalog.
-fn targets(
+pub fn targets(
     bytes: &[u8],
     limit: usize,
 ) -> TestResult<Vec<(u64, Vec<ParagraphStyleId>, ParagraphStyleId)>> {
@@ -567,7 +567,7 @@ fn with(input: &Fixture, storage: u64, operation: &Operation) -> TestResult<Fixt
     })
 }
 
-fn overridden(input: &Fixture, storage: u64) -> TestResult<Fixture> {
+pub fn overridden(input: &Fixture, storage: u64) -> TestResult<Fixture> {
     for alignment in [Alignment::Right, Alignment::Center] {
         if let Ok(bytes) = host_change(
             &input.bytes,
