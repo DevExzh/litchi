@@ -794,6 +794,35 @@ impl UidMap {
     }
 
     /// Apply one edit and encode the result.
+    /// The map for a table resized from `old_rows` × `old_columns` to
+    /// `rows` × `columns`: trailing identities go, and new trailing ones
+    /// are allocated above every existing one (the host editor's
+    /// `resize_uid_axis`; record 0370e).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::rewrite`].
+    pub fn resize(
+        mut self,
+        old_rows: u32,
+        rows: u32,
+        old_columns: u32,
+        columns: u32,
+    ) -> Result<Vec<u8>> {
+        for (axis, old, new) in [
+            (&mut self.rows, old_rows, rows),
+            (&mut self.columns, old_columns, columns),
+        ] {
+            for index in (new..old).rev() {
+                axis.apply(AxisEdit::Remove(index))?;
+            }
+            for index in old..new {
+                axis.apply(AxisEdit::Insert(index))?;
+            }
+        }
+        self.encode()
+    }
+
     pub fn rewrite(mut self, row: bool, edit: AxisEdit) -> Result<Vec<u8>> {
         if row {
             self.rows.apply(edit)?;

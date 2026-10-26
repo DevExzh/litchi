@@ -101,6 +101,7 @@ pub(crate) mod table_relocation;
     reason = "The physical-only relocation seam is retained solely for the legacy migration host."
 )]
 mod table_relocation_compat;
+pub(crate) mod table_resize;
 pub(crate) mod table_sort;
 #[allow(
     dead_code,
