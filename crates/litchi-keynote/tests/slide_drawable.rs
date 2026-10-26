@@ -1056,9 +1056,12 @@ fn slide_table_cells_take_values() -> TestResult {
     Ok(())
 }
 
-/// A formula cell, and a cell a formula reads, refuse a value write.
+/// A formula cell refuses a value write; a cell a formula reads takes it
+/// and the formula's cached result is refreshed (record 0376).
 #[test]
-fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
+fn formula_cells_refuse_and_precedents_refresh_value_writes() -> TestResult {
+    use litchi_iwa_common::table::cell::value::Value;
+    use litchi_iwa_common::table::coordinate::At;
     use litchi_keynote::slide::drawable::TableCellValue;
     let package = open("slide-table-read-native.key")?;
     let slide_index = (0..package.slides()?.len())
@@ -1072,24 +1075,37 @@ fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
         .iter()
         .position(|item| item.kind() == Kind::Table)
         .expect("table");
-    for (row, column) in [(1, 3), (1, 1)] {
-        let mut edit = package.edit_slide_drawables();
-        edit.set_table_cell(
-            slide,
-            DrawableSelector::index(table),
-            row,
-            column,
-            TableCellValue::Number(1.0),
-        )?;
-        assert!(matches!(
-            edit.commit(),
-            Err(Error::Refused(
-                litchi_keynote::slide::drawable::Refusal::Unsupported {
-                    reason: Unsupported::TableFormulas
-                }
-            ))
-        ));
-    }
+    let mut edit = package.edit_slide_drawables();
+    edit.set_table_cell(
+        slide,
+        DrawableSelector::index(table),
+        1,
+        3,
+        TableCellValue::Number(1.0),
+    )?;
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::TableFormulas
+            }
+        ))
+    ));
+    // D2 = B2 + 1: writing B2 refreshes D2's cache.
+    let mut edit = package.edit_slide_drawables();
+    edit.set_table_cell(
+        slide,
+        DrawableSelector::index(table),
+        1,
+        1,
+        TableCellValue::Number(41.0),
+    )?;
+    let written = edit.commit()?.into_package();
+    let read = written.slide_table_cells(slide, 0_usize)?;
+    assert!(matches!(
+        read.table().get(At::new(1, 1)),
+        Some(Value::Number(number)) if number.get() == 41.0
+    ));
     Ok(())
 }
 

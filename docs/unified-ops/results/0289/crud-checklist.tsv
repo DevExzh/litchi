@@ -5619,7 +5619,7 @@ pages	cell	get	supported		ok 8 instances, first `iwork/pages/body-table-read-nat
 pages	cell	find	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
 pages	cell	query	supported		ok matches in iwork/pages/body-table-read-native.pages
 pages	cell	view	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
-pages	cell	set	supported		ok `iwork/pages/body-table-name-focused.pages` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
+pages	cell	set	supported		ok `iwork/pages/body-table-read-native.pages + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 pages	cell	add	n/a	add not offered for this element	-
 pages	cell	remove	n/a	remove not offered for this element	-
 pages	cell	move	format-verb		refused invalid_argument

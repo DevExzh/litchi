@@ -25,6 +25,7 @@
 mod archive_diff;
 mod chart_style_cases;
 mod cost_probes;
+mod formula_refresh_cases;
 mod harness;
 mod known_fields;
 mod media_cases;
@@ -34,6 +35,7 @@ mod keynote_builder_cases;
 mod keynote_cases;
 mod keynote_chart_cases;
 mod keynote_drawable_cases;
+mod keynote_image_cases;
 mod keynote_slide_cases;
 mod keynote_table_cases;
 mod keynote_w1c_cost;

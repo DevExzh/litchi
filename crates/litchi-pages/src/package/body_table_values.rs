@@ -14,7 +14,10 @@ use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use litchi_numbers_wire::table_write::{self, CellInput, FormulaState};
+use litchi_numbers_wire::{
+    formula_cache::{self, refresh},
+    table_write::{self, CellInput},
+};
 use thiserror::Error as ThisError;
 
 use super::section_text_style::{component_name_of, parse_member};
@@ -26,6 +29,8 @@ const TILE: u32 = 6_002;
 const DATA_LIST: [u32; 2] = [6_005, 6_201];
 const HEADER_BUCKET: u32 = 6_006;
 const FORMULA_OWNER: u32 = 4_008;
+/// `TSCE.CalculationEngineArchive`.
+const CALCULATION_ENGINE: u32 = 4_000;
 const HEADER_BUCKET_ROWS: u32 = 65_536;
 
 /// A value a body-table cell takes.
@@ -102,7 +107,8 @@ pub enum Refusal {
     /// The cell is outside the table, or a number is not finite.
     #[error("cell outside the table or value not finite")]
     InvalidCell,
-    /// The cell holds a formula, or a formula or chart reads it.
+    /// The cell holds a formula, or a formula that reads it is outside the
+    /// shared cache refresh (record 0376).
     #[error("the cell takes part in a formula graph")]
     Formulas,
     /// The cell storage is outside the shared writer (a legacy tile, a
@@ -324,8 +330,8 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Refusal::NoStagedOperation`]; [`Refusal::Formulas`] for a cell in a
-    /// formula graph; [`Refusal::UnsupportedStorage`]; source, resource and
+    /// [`Refusal::NoStagedOperation`]; [`Refusal::Formulas`] for a formula
+    /// cell or a dependent formula the cache refresh does not support; [`Refusal::UnsupportedStorage`]; source, resource and
     /// verification errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
         let mut this = self;
@@ -453,6 +459,15 @@ fn message(payload: &[u8], number: u32) -> Result<Vec<&[u8]>, Error> {
         .collect())
 }
 
+fn cell_input(value: &Value) -> CellInput<'_> {
+    match value {
+        Value::Text(text) => CellInput::Text(text),
+        Value::Number(number) => CellInput::Number(*number),
+        Value::Boolean(flag) => CellInput::Boolean(*flag),
+        Value::Empty => CellInput::Empty,
+    }
+}
+
 #[allow(clippy::too_many_lines, reason = "one staged publication")]
 fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let target = edit.target.as_ref().ok_or(Error::InvalidSource)?;
@@ -460,12 +475,22 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let limits = package
         .numbers_wire_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let mut owners: Vec<&[u8]> = Vec::new();
+    // The calculation graph: plan the refresh of the formula caches that
+    // read the written cells (record 0376) before any payload changes.
+    let mut engine = None;
+    let mut owners = Vec::new();
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             for message in &object.messages {
                 if message.type_ == FORMULA_OWNER {
-                    owners.push(&message.data);
+                    owners.push(formula_cache::DependencyPayload {
+                        identifier: object.archive_info.identifier.ok_or(Error::InvalidSource)?,
+                        bytes: &message.data,
+                    });
+                } else if message.type_ == CALCULATION_ENGINE
+                    && engine.replace(message.data.as_slice()).is_some()
+                {
+                    return Err(Error::InvalidSource);
                 }
             }
         }
@@ -474,6 +499,43 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         find_object(package.state.source.components(), identifier)
             .and_then(|object| object.messages.first())
             .map(|message| message.data.as_slice())
+    };
+    let refresh = match engine {
+        Some(engine) if !owners.is_empty() => {
+            let mut inputs = Vec::new();
+            inputs
+                .try_reserve_exact(edit.cells.len())
+                .map_err(|_error| Error::Allocation {
+                    amount: edit.cells.len(),
+                })?;
+            for (row, column, value) in &edit.cells {
+                inputs.push((*row, *column, cell_input(value)));
+            }
+            inputs.sort_unstable_by_key(|(row, column, _)| (*row, *column));
+            let writes: Vec<refresh::Write<'_>> = inputs
+                .iter()
+                .map(|(row, column, value)| refresh::Write {
+                    row: *row,
+                    column: *column,
+                    value,
+                })
+                .collect();
+            refresh::plan(
+                refresh::Source {
+                    engine,
+                    owners: &owners,
+                    table: target.drawable_identifier.get(),
+                },
+                &writes,
+                &object,
+                &limits,
+            )
+            .map_err(|error| match error {
+                formula_cache::Error::UnsupportedDependency(_) => Error::Refused(Refusal::Formulas),
+                _ => Error::Refused(Refusal::UnsupportedStorage),
+            })?
+        },
+        _ => refresh::Plan::default(),
     };
     let mut staged = Staged {
         package,
@@ -521,19 +583,6 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         .unwrap_or_default();
     let column_headers = reference(&store, 2)?;
     for (row, column, value) in &edit.cells {
-        match table_write::cell_formula_state(
-            &owners,
-            &object,
-            target.drawable_identifier.get(),
-            *row,
-            *column,
-            &limits,
-        )
-        .map_err(storage_error)?
-        {
-            FormulaState::Inert => {},
-            _ => return Err(Error::Refused(Refusal::Formulas)),
-        }
         let tile = *tile_ids
             .get(&(u64::from(*row) / size))
             .ok_or(Error::Refused(Refusal::UnsupportedStorage))?;
@@ -545,18 +594,13 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         let (list_type, list_payload) = staged.payload(strings, &DATA_LIST)?;
         let mut list = list_payload.to_vec();
         let mut key = None;
-        let input = match value {
-            Value::Text(text) => {
-                let (interned, interned_key) =
-                    table_write::list_intern(&list, text, &limits).map_err(storage_error)?;
-                list = interned;
-                key = Some(interned_key);
-                CellInput::Text(text)
-            },
-            Value::Number(number) => CellInput::Number(*number),
-            Value::Boolean(flag) => CellInput::Boolean(*flag),
-            Value::Empty => CellInput::Empty,
-        };
+        if let Value::Text(text) = value {
+            let (interned, interned_key) =
+                table_write::list_intern(&list, text, &limits).map_err(storage_error)?;
+            list = interned;
+            key = Some(interned_key);
+        }
+        let input = cell_input(value);
         let (cell, released) = table_write::cell_bytes(previous.as_deref(), &input, key, &limits)
             .map_err(storage_error)?;
         if let Some(released) = released {
@@ -591,6 +635,13 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
                     .insert(column_headers, (header_type, adjusted));
             }
         }
+    }
+    for caches in &refresh.tiles {
+        let (tile_type, payload) = staged.payload(caches.tile, &[TILE])?;
+        let refreshed = caches
+            .apply(payload, target.table_columns, &limits)
+            .map_err(|_error| Error::Refused(Refusal::Formulas))?;
+        staged.payloads.insert(caches.tile, (tile_type, refreshed));
     }
     // One rewrite per touched member.
     let catalog = &package.state.source;

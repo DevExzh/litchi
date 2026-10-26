@@ -25,6 +25,9 @@ use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{MovieSelector, SlideSelector};
 
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const IMAGE_MESSAGE_TYPE: u32 = 3_005;
+/// `TSD.ImageArchive.flags` bit of an image materialized from the layout.
+const LAYOUT_IMAGE_FLAG: u64 = 1;
 const STANDIN_MESSAGE_TYPE: u32 = 3_097;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
@@ -844,6 +847,45 @@ pub(super) fn select_movie_text(
     mutation_guards: bool,
     kind: MovieTextKind,
 ) -> Result<MovieCaptionSelection, Error> {
+    select_drawable_text(
+        package,
+        slide_selector,
+        CaptionedDrawable::Movie,
+        movie_selector.as_position(),
+        mutation_guards,
+        kind,
+    )
+}
+
+/// A slide drawable whose title and caption share the movie edge codec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CaptionedDrawable {
+    /// A file movie or audio control (`KN.MovieArchive`, 3007).
+    Movie,
+    /// An ordinary file image (`TSD.ImageArchive`, 3005).
+    Image,
+}
+
+impl CaptionedDrawable {
+    const fn message_type(self) -> u32 {
+        match self {
+            Self::Movie => MOVIE_MESSAGE_TYPE,
+            Self::Image => IMAGE_MESSAGE_TYPE,
+        }
+    }
+}
+
+/// Resolve the caption or title edge of the drawable of `drawable` kind at
+/// `drawable_position` among the slide's drawables of that kind.
+pub(super) fn select_drawable_text(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    drawable: CaptionedDrawable,
+    drawable_position: Position,
+    mutation_guards: bool,
+    kind: MovieTextKind,
+) -> Result<MovieCaptionSelection, Error> {
+    let drawable_type = drawable.message_type();
     let slide_position = resolve_slide_position(package, slide_selector)?;
     let record = package
         .slide_record_at(slide_position.get())
@@ -877,7 +919,7 @@ pub(super) fn select_movie_text(
         let movie_messages = movie
             .messages
             .iter()
-            .filter(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+            .filter(|message| message.type_ == drawable_type)
             .count();
         match movie_messages {
             0 => {},
@@ -887,7 +929,7 @@ pub(super) fn select_movie_text(
             _ => return Err(Error::InvalidSource),
         }
     }
-    let movie_position = movie_selector.as_position();
+    let movie_position = drawable_position;
     let movie_identifier = *movies.get(movie_position.get()).ok_or(Error::Refused(
         Refusal::MoviePositionNotFound {
             position: movie_position,
@@ -898,17 +940,26 @@ pub(super) fn select_movie_text(
         .ok_or(Error::InvalidSource)?;
     validate_selected_message_metadata(movie, 0)?;
     let movie_payload = &movie.messages[0].data;
-    let (movie_info, _movie_references) = super::decode_movie_info(
-        movie_payload,
-        package.semantic_wire_limits().map_err(map_read_error)?,
-        super::SemanticPath::SlideDrawable {
-            slide: slide_position.get(),
-            index: movie_position.get(),
+    match drawable {
+        CaptionedDrawable::Movie => {
+            let (movie_info, _movie_references) = super::decode_movie_info(
+                movie_payload,
+                package.semantic_wire_limits().map_err(map_read_error)?,
+                super::SemanticPath::SlideDrawable {
+                    slide: slide_position.get(),
+                    index: movie_position.get(),
+                },
+            )
+            .map_err(map_read_error)?;
+            if movie_info.kind() != crate::MovieKind::File {
+                return Err(Error::InvalidSource);
+            }
         },
-    )
-    .map_err(map_read_error)?;
-    if movie_info.kind() != crate::MovieKind::File {
-        return Err(Error::InvalidSource);
+        CaptionedDrawable::Image => {
+            if image_is_layout(movie_payload, limits)? {
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
+            }
+        },
     }
     let movie_options = movie_decode_options(package, movie_payload)?;
     let movie_snapshot =
@@ -965,7 +1016,13 @@ pub(super) fn select_movie_text(
             return Err(Error::InvalidSource);
         }
         if mutation_guards {
-            prove_exclusive_caption_standin(package, movie_identifier, reference_identifier, kind)?;
+            prove_exclusive_caption_standin(
+                package,
+                movie_identifier,
+                reference_identifier,
+                kind,
+                drawable_type,
+            )?;
         }
         return Ok(empty(Some(reference_identifier)));
     }
@@ -1037,6 +1094,7 @@ pub(super) fn select_movie_text(
             placement_identifier,
             style_identifier,
             kind,
+            drawable_type,
         )?;
     }
     let text = super::slide_text::read_owned_storage_text(package, storage_identifier)
@@ -1055,6 +1113,22 @@ pub(super) fn select_movie_text(
         style_identifier: Some(style_identifier),
         text: Some(text),
     })
+}
+
+/// Whether an image payload carries the layout-image flag
+/// (`TSD.ImageArchive.flags`, field 7).
+fn image_is_layout(payload: &[u8], limits: litchi_iwa_common::WireLimits) -> Result<bool, Error> {
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let mut flags = None;
+    for field in view.fields().filter(|field| field.number() == 7) {
+        if flags.is_some() || field.wire_type() != 0 {
+            return Err(Error::InvalidSource);
+        }
+        let (value, _width) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
+            .map_err(|_| Error::InvalidSource)?;
+        flags = Some(value);
+    }
+    Ok(flags.unwrap_or(0) & LAYOUT_IMAGE_FLAG != 0)
 }
 
 fn resolve_slide_position(
@@ -1408,6 +1482,7 @@ fn prove_exclusive_caption_storage(
     placement_identifier: u64,
     style_identifier: u64,
     kind: MovieTextKind,
+    drawable_type: u32,
 ) -> Result<(), Error> {
     let mut movie_edges = 0usize;
     let mut info_aggregate_edges = 0usize;
@@ -1430,7 +1505,7 @@ fn prove_exclusive_caption_storage(
                     .message_infos
                     .get(message_index)
                     .ok_or(Error::InvalidSource)?;
-                if message.type_ == MOVIE_MESSAGE_TYPE {
+                if message.type_ == drawable_type {
                     let snapshot = keynote_movie_caption_codec::decode_movie_caption(
                         &message.data,
                         movie_decode_options(package, &message.data)?,
@@ -1484,7 +1559,7 @@ fn prove_exclusive_caption_storage(
                     }
                     if field_count != 0 {
                         if owner_identifier != movie_identifier
-                            || message.type_ != MOVIE_MESSAGE_TYPE
+                            || message.type_ != drawable_type
                             || field_count != 1
                             || !kind.accepts_edge_path(field.path.path.as_slice())
                         {
@@ -1497,7 +1572,7 @@ fn prove_exclusive_caption_storage(
                 }
                 if aggregate_info != 0 {
                     if owner_identifier != movie_identifier
-                        || message.type_ != MOVIE_MESSAGE_TYPE
+                        || message.type_ != drawable_type
                         || aggregate_info != 1
                     {
                         return Err(Error::Refused(Refusal::UnsupportedDependency));
@@ -1562,8 +1637,7 @@ fn prove_exclusive_caption_storage(
                 if aggregate_style != 0 {
                     let allowed_owner = (owner_identifier == caption_info_identifier
                         && message.type_ == CAPTION_INFO_MESSAGE_TYPE)
-                        || (owner_identifier == movie_identifier
-                            && message.type_ == MOVIE_MESSAGE_TYPE);
+                        || (owner_identifier == movie_identifier && message.type_ == drawable_type);
                     if !allowed_owner || aggregate_style != 1 {
                         return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
@@ -1696,7 +1770,8 @@ fn prove_exclusive_caption_storage(
         && storage_aggregate_owner == 1
         && storage_field_owner <= 2
         && style_payload_owner == 1
-        && style_aggregate_owner == 2
+        // Movies also list the graph style in their header; images do not.
+        && style_aggregate_owner == if drawable_type == MOVIE_MESSAGE_TYPE { 2 } else { 1 }
         && style_field_owner <= 1
         && placement_payload_owner == 1
         && placement_aggregate_owner == 1
@@ -1713,6 +1788,7 @@ fn prove_exclusive_caption_standin(
     movie_identifier: u64,
     standin_identifier: u64,
     kind: MovieTextKind,
+    drawable_type: u32,
 ) -> Result<(), Error> {
     let mut payload_edges = 0usize;
     let mut aggregate_edges = 0usize;
@@ -1721,7 +1797,7 @@ fn prove_exclusive_caption_standin(
         for object in &component.archive().objects {
             let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for (message_index, message) in object.messages.iter().enumerate() {
-                if message.type_ == MOVIE_MESSAGE_TYPE {
+                if message.type_ == drawable_type {
                     let snapshot = keynote_movie_caption_codec::decode_movie_caption(
                         &message.data,
                         movie_decode_options(package, &message.data)?,
@@ -1760,7 +1836,7 @@ fn prove_exclusive_caption_standin(
                     .count();
                 if aggregate != 0 {
                     if owner_identifier != movie_identifier
-                        || message.type_ != MOVIE_MESSAGE_TYPE
+                        || message.type_ != drawable_type
                         || aggregate != 1
                     {
                         return Err(Error::Refused(Refusal::UnsupportedDependency));
@@ -1778,7 +1854,7 @@ fn prove_exclusive_caption_standin(
                     }
                     if field_count != 0 {
                         if owner_identifier != movie_identifier
-                            || message.type_ != MOVIE_MESSAGE_TYPE
+                            || message.type_ != drawable_type
                             || field_count != 1
                             || !kind.accepts_edge_path(field.path.path.as_slice())
                         {

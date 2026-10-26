@@ -22256,6 +22256,54 @@
       "banned_names": [],
       "required_signatures": [
         {
+          "method": "litchi_numbers_wire::formula_cache::plan_final_cache",
+          "inputs": ["source", "overlay", "limits", "baseline", "evaluator"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::plan_final_cache_with_authored",
+          "inputs": ["source", "overlay", "authored", "limits", "baseline", "evaluator"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::plan_final_cache_with_logical_graph",
+          "inputs": ["source", "overlay", "authored", "logical", "limits", "baseline", "evaluator"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::collect_formula_hosts",
+          "inputs": ["selected", "owners", "record_tiles", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::refresh::plan",
+          "inputs": ["source", "writes", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::refresh::TileCaches::apply",
+          "inputs": ["self", "tile", "columns", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_dependencies::prepare_graph",
+          "inputs": ["graph", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_dependencies::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_list::prepare",
+          "inputs": ["source", "deltas", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::formula_list::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::formula_graph::next_owner_id",
           "inputs": ["engine", "owners", "limits"],
           "limits_argument": "limits",
@@ -27069,6 +27117,8 @@
         "litchi_keynote::slide::creation",
         "litchi_keynote::slide::build",
         "litchi_keynote::chart::lifecycle",
+        "litchi_keynote::slide::image::lifecycle",
+        "litchi_keynote::slide::image::text",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -27150,6 +27200,14 @@
         {
           "method": "litchi_keynote::Package::apply_slide_chart_lifecycle",
           "ok": "litchi_keynote::chart::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_image_lifecycle",
+          "ok": "litchi_keynote::slide::image::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_image_text",
+          "ok": "litchi_keynote::slide::image::text::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_deletion",
@@ -28669,6 +28727,8 @@
         "litchi_keynote::slide::creation",
         "litchi_keynote::slide::build",
         "litchi_keynote::chart::lifecycle",
+        "litchi_keynote::slide::image::lifecycle",
+        "litchi_keynote::slide::image::text",
         "litchi_keynote::slide::drawable",
         "litchi_keynote::slide::delete",
         "litchi_keynote::transition",
@@ -28750,6 +28810,14 @@
         {
           "method": "litchi_keynote::Package::apply_slide_chart_lifecycle",
           "ok": "litchi_keynote::chart::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_image_lifecycle",
+          "ok": "litchi_keynote::slide::image::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_image_text",
+          "ok": "litchi_keynote::slide::image::text::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_deletion",

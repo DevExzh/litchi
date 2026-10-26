@@ -24,8 +24,38 @@ use litchi_iwa_text_wire::paragraph_style::{Change, Property, PropertyKind};
 
 use crate::harness::{TestResult, fixture};
 use crate::text_annotation_cases::{self, text_storages};
+use crate::text_comment_cases as comment;
 use crate::text_glue::Workspace;
+use crate::text_named_style_cases as named;
 use crate::text_style_cases::{self, apply_change, sample};
+
+#[inline(never)]
+fn host_named(source: &[u8], storage: u64, operation: &named::Operation) -> TestResult<Vec<u8>> {
+    named::host_route(source, storage, operation)
+}
+
+#[inline(never)]
+fn leaf_named(source: &[u8], storage: u64, operation: &named::Operation) -> TestResult<Vec<u8>> {
+    named::leaf_route(source, storage, operation)
+}
+
+#[inline(never)]
+fn host_comment(
+    source: &[u8],
+    storage: u64,
+    operation: &comment::Operation,
+) -> TestResult<Vec<u8>> {
+    comment::host_route(source, storage, operation)
+}
+
+#[inline(never)]
+fn leaf_comment(
+    source: &[u8],
+    storage: u64,
+    operation: &comment::Operation,
+) -> TestResult<Vec<u8>> {
+    comment::leaf_route(source, storage, operation)
+}
 
 const FIXTURE: &str = "iwork/keynote/basic.key";
 
@@ -147,6 +177,50 @@ fn text_engine_cost_abba() -> TestResult {
     black_box(leaf_language(&input.bytes, storage, &set)?);
     black_box(leaf_language(&input.bytes, storage, &set)?);
     black_box(host_language(&input.bytes, storage, &set)?);
+    Ok(())
+}
+
+/// Named-style apply (removing the storage's exclusive override) and a
+/// redefine, then a comment add and a reply add, each host/leaf/leaf/host.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn text_named_annotation_cost_abba() -> TestResult {
+    let input = fixture(FIXTURE)?;
+    let (storage, styles, applied) = named::targets(&input.bytes, 1)?
+        .into_iter()
+        .next()
+        .ok_or("no named storage")?;
+    let derived = named::overridden(&input, storage)?;
+    let other = *styles
+        .iter()
+        .find(|style| **style != applied)
+        .ok_or("one style")?;
+    for operation in [named::Operation::Apply(other), named::Operation::Redefine] {
+        black_box(host_named(&derived.bytes, storage, &operation)?);
+        black_box(leaf_named(&derived.bytes, storage, &operation)?);
+        black_box(leaf_named(&derived.bytes, storage, &operation)?);
+        black_box(host_named(&derived.bytes, storage, &operation)?);
+    }
+    let (storage, range, _) = text_storages(&input.bytes, 1)?
+        .into_iter()
+        .next()
+        .ok_or("no storage")?;
+    let add = comment::Operation::AddComment(range, "Check this");
+    black_box(host_comment(&input.bytes, storage, &add)?);
+    black_box(leaf_comment(&input.bytes, storage, &add)?);
+    black_box(leaf_comment(&input.bytes, storage, &add)?);
+    black_box(host_comment(&input.bytes, storage, &add)?);
+    let commented = comment::host_route(&input.bytes, storage, &add)?;
+    let id = litchi_iwa::text::Draft::from_bytes(&commented)?
+        .text_comments(litchi_iwa::text::TextStorageId::try_from(storage)?)?
+        .first()
+        .map(|comment| litchi_iwa_text::comment::raw::comment_id_value(comment.id()))
+        .ok_or("no comment")?;
+    let reply = comment::Operation::AddReply(id, "Agreed");
+    black_box(host_comment(&commented, storage, &reply)?);
+    black_box(leaf_comment(&commented, storage, &reply)?);
+    black_box(leaf_comment(&commented, storage, &reply)?);
+    black_box(host_comment(&commented, storage, &reply)?);
     Ok(())
 }
 
