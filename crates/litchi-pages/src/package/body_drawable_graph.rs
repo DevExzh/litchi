@@ -355,6 +355,33 @@ pub(crate) fn resolve_body(index: &ObjectIndex<'_>, budget: &mut Budget) -> Grap
     Ok(Body { root, anchors })
 }
 
+/// The document root's theme and document language.
+pub(crate) fn root_theme(
+    package: &Package,
+    budget: &mut Budget,
+) -> GraphResult<(Option<NonZeroU64>, Option<String>)> {
+    let document = package
+        .state
+        .source
+        .components()
+        .get(DOCUMENT_COMPONENT)
+        .ok_or(GraphError::InvalidSource)?;
+    let root = document
+        .archive()
+        .object(ROOT_OBJECT_IDENTIFIER)
+        .ok_or(GraphError::InvalidSource)?;
+    let (_, root_message) = unique_message(root, ROOT_MESSAGE_TYPE)?;
+    let payload = root_message.data.as_slice();
+    let options = body_options(budget, payload)?;
+    budget.work(payload.len())?;
+    let facts = pages_body_codec::decode_document_root(payload, options)
+        .map_err(|_| GraphError::InvalidSource)?;
+    Ok((
+        facts.theme().map(|reference| reference.identifier()),
+        facts.document_language().map(str::to_owned),
+    ))
+}
+
 fn body_options(budget: &Budget, source: &[u8]) -> GraphResult<pages_body_codec::DecodeOptions> {
     let limits = budget.wire_limits();
     let recursion = u32::try_from(limits.max_nesting()).map_err(|_| GraphError::InvalidSource)?;

@@ -37,6 +37,14 @@ pub mod properties {
     };
 }
 
+/// Exact-source title and caption transactions for body images, movies and
+/// shapes.
+pub mod caption {
+    pub use crate::package::body_drawable_caption::{
+        Commit, Diagnostics, Edit, Error, Kind, LimitKind, Patch, Refusal,
+    };
+}
+
 /// Exact-source plain-text transactions for the storage a body drawable
 /// owns (ordinary shapes).
 pub mod text {

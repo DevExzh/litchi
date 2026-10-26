@@ -867,3 +867,33 @@ fn text_number_attachment_insert_cost_abba() -> TestResult {
         },
     )
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn text_number_attachment_remove_cost_abba() -> TestResult {
+    let mut editor = pages::Draft::from_bytes(&fixture(BASIC)?.bytes)?;
+    editor.insert_body_number_attachment(
+        litchi_pages::TextPosition::from_utf16_index(3)?,
+        page_count(),
+    )?;
+    let input = crate::harness::Fixture {
+        path: "iwork/pages/basic.pages + host page count at 3",
+        bytes: editor.to_bytes()?,
+    };
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let id = editor.body_number_attachments()?.first().ok_or("none")?.id;
+            drop(editor.remove_body_number_attachment(id)?);
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_number_attachments(litchi_pages::number_attachment::Target::Body)?;
+            edit.remove(litchi_core::Position::new(0))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

@@ -26,6 +26,7 @@
 | `a408e00fbd`, `9bac132398` | `litchi_pages::bookmark` — `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add, update, remove}` by position or name; on W1-D's `ranged` and `smart_field` engines | 4 |
 | `c0ec0bac27`, `9bac132398` | `litchi_pages::date_time` — `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add, insert, update, remove}` (insert adds the display text) | 5 |
 | `a9d2af35ca`, `de1dbad71e` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}`; on W1-D's `number_attachment` engine | 6 |
+| (caption commit, below) | `litchi_pages::drawable::caption` — `Package::{body_drawable_caption, edit_body_drawable_caption, apply_body_drawable_caption}` over `DrawableSelector` + `Kind::{Title, Caption}`; `Edit::{set, clear}`. A present label's storage text is rewritten; an absent label gets the native inline graph from the shared `keynote_chart_caption_graph_codec` (style, CaptionInfo, storage, placement; the payloads the host writes); clearing points the drawable at a fresh stand-in and keeps the old graph. New objects get deterministic UUIDs in the document component and raise the watermark (`body_storage_objects::Metadata::registered`) | 15 |
 | (number-attachment host fix commit, below) | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
@@ -60,6 +61,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | bookmarks | add (B), update (A), remove (A) | A/B | queued |
 | Date & Time fields | add (B), insert (B), update (A), remove (A) | A/B | queued |
 | number attachments | body insert/update/remove, first-header insert/update/remove | A | queued |
+| titles and captions (image, movie, shape × title, caption) | set: create on an unlabelled drawable, then replace on a host-labelled one; remove on a host-labelled one | B (fresh UUIDs; the replace runs are byte-identical) | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -127,6 +129,9 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | number attachment insert (`basic`) | 120,964,310 | 86,901,649 | — | −28.2% (before reopen) |
 | table cell value (`body-table-catalog-native`) | 2,532,811,983 | 78,390,305 | 78,390,305 | −96.9% |
 | table cell values, 16-cell batch | 2,788,732,498 | 110,195,326 | — | −96.1% (before reopen) |
+| number attachment remove (`basic` + host page count) | 159,628,677 | — | 52,679,103 | −67.0% |
+| image title create (`image-adjustments-native`) | 546,895,891 | — | 85,626,043 | −84.3% |
+| image caption remove (host-labelled image) | 710,021,022 | — | 85,975,944 | −87.9% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -168,7 +173,6 @@ Both pre-commit size checks printed nothing for every commit.
 |---|---:|---|
 | text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
 | media lifecycle (add, duplicate, remove, replace data/poster) | 16 | next; donor `refactor/pages-media-lifecycle-admission-20261024` |
-| image, movie and shape titles/captions | 15 | next |
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
 | table cell formats, rich text, appearance, conditional highlights, formulas, topology, duplicate/resize, sort execution, comment writes | ~150 | W1-A engines (topology engine landed; formats/styles follow), W1-F formula caches, W1-D paragraph/list engines |
 | Builder `language`, `locale`, `body_table` | 6 | next (W1-C did the Keynote pair) |
