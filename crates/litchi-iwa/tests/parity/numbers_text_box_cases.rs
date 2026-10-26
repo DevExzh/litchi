@@ -373,14 +373,18 @@ fn language_case(name: &'static str, input: &Fixture, change: LanguageChange) ->
             let mut edit =
                 package.edit_sheet_drawable_text_languages(0, DrawableSelector::text_box(0))?;
             match change {
-                LanguageChange::Set(position, tag) => drop(edit.set(
-                    TextPosition::from_utf16_index(*position)?,
-                    TextLanguage::tag(*tag)?,
-                )?),
-                LanguageChange::Remove(position) => {
-                    drop(edit.remove_boundary(TextPosition::from_utf16_index(*position)?)?);
+                LanguageChange::Set(position, tag) => {
+                    edit.set(
+                        TextPosition::from_utf16_index(*position)?,
+                        TextLanguage::tag(*tag)?,
+                    )?;
                 },
-                LanguageChange::Reset => drop(edit.reset()?),
+                LanguageChange::Remove(position) => {
+                    edit.remove_boundary(TextPosition::from_utf16_index(*position)?)?;
+                },
+                LanguageChange::Reset => {
+                    edit.reset()?;
+                },
             }
             let commit = edit.commit()?;
             let restored = commit
