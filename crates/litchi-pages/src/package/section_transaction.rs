@@ -3,7 +3,7 @@
 use std::num::NonZeroU64;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
 };
@@ -1161,8 +1161,7 @@ pub(super) fn rewrite_package(
             path: Path::Package,
         });
     }
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
-        .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     budget.charge_candidate_scan(&candidate, Path::Package)?;
     let target_layout_state = if invalidate_layout {

@@ -3,7 +3,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, encode_varint_into,
     varint::encoded_len,
@@ -542,9 +542,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source =
-            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), source_catalog.limits())
-                .map_err(map_archive_error)?;
+        let candidate_source = source_catalog
+            .reopen(Arc::clone(&patch.target))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         verify_candidate(
@@ -901,7 +901,8 @@ fn rewrite_page_layout(
     drop(edits);
     drop(deleted_previews);
     drop(compressed);
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), source_catalog.limits())
+    let candidate_source = source_catalog
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     verify_candidate(source, &candidate, after, None, 0)?;

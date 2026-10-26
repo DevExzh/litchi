@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::Entry};
+use litchi_iwa_archive::package::Entry;
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
@@ -183,11 +183,11 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             .saturating_add(128),
         Path::Package,
     )?;
-    let catalog = SourceCatalog::from_shared_bytes(
-        Arc::clone(patch.target_artifact()),
-        source.state.source.limits(),
-    )
-    .map_err(transaction::map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::clone(patch.target_artifact()))
+        .map_err(transaction::map_archive_error)?;
     let candidate =
         Package::from_source_catalog(catalog).map_err(transaction::map_package_error)?;
     let (_candidate_target, candidate_settings) =

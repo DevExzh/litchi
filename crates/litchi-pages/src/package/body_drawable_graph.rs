@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::wire::{WireFieldView, WireView};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, varint::encoded_len};
@@ -616,14 +615,20 @@ pub(crate) fn publish_archives(
             maximum: limits.max_input_bytes(),
         });
     }
-    let catalog =
-        SourceCatalog::from_shared_bytes(output.into(), limits).map_err(map_archive_error)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
     Package::from_source_catalog(catalog).map_err(|_| GraphError::InvalidSource)
 }
 
 /// Reopen the target artifact of an exact patch under the source's limits.
 pub(crate) fn reopen(source: &Package, target: Arc<[u8]>) -> GraphResult<Package> {
-    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
         .map_err(map_archive_error)?;
     Package::from_source_catalog(catalog).map_err(|_| GraphError::InvalidSource)
 }

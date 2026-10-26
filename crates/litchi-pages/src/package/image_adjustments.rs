@@ -12,7 +12,6 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 use litchi_iwa_common::{
@@ -884,9 +883,11 @@ impl Package {
         if !self.state.source.source_is_exact() {
             return Err(Error::PatchConflict);
         }
-        let candidate_source =
-            SourceCatalog::from_shared_bytes(patch.artifacts.target(), self.state.source.limits())
-                .map_err(map_archive_error)?;
+        let candidate_source = self
+            .state
+            .source
+            .reopen(patch.artifacts.target())
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
         candidate.validate().map_err(|_| Error::Verification)?;
@@ -1851,7 +1852,10 @@ fn rewrite_image(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     Package::from_source_catalog(catalog).map_err(|_| Error::Verification)
 }
