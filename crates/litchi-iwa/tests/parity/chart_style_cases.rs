@@ -27,7 +27,7 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::{ChartData, corner, donut, pie, radar};
 use litchi_iwa_common::chart3d::{self, Scale};
 use litchi_iwa_protos::chart_style_codec::{
-    self as codec, Archive, EmptyExtension, Limits, Properties, Vector, Write, field,
+    self as codec, Archive, EmptyExtension, Limits, Properties, Write, field, property,
 };
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -169,11 +169,6 @@ const fn scale_field(scale: Scale) -> u32 {
     }
 }
 
-const fn vector(components: [f32; 4]) -> Vector {
-    let [x, y, z, w] = components;
-    Vector { x, y, z, w }
-}
-
 /// The engine's read of a property from decoded style properties.
 fn read(properties: &Properties<'_>, property: Property) -> TestResult<Property> {
     use field::{chart_non_style as non_style, chart_style as style};
@@ -247,72 +242,38 @@ fn same(left: Property, right: Property) -> bool {
     }
 }
 
-/// The codec writes that store `property` (the host's per-property rules).
-fn writes(property: Property) -> Vec<Write> {
-    use field::{chart_non_style as non_style, chart_style as style};
-    let float = |field, value| Write::Float { field, value };
-    match property {
-        Property::PieStartAngle(angle) => vec![float(
-            non_style::PIE_START_ANGLE,
-            (angle != pie::StartAngle::ZERO).then(|| angle.degrees()),
-        )],
-        Property::DonutInnerRadius(radius) => vec![float(
-            non_style::DONUT_INNER_RADIUS,
-            (radius != donut::InnerRadius::DEFAULT).then(|| radius.native_fraction()),
-        )],
-        Property::RadarStartAngle(angle) => vec![float(
-            non_style::RADAR_START_ANGLE,
-            (angle != radar::StartAngle::ZERO).then(|| angle.degrees()),
-        )],
-        Property::SeriesGap(gap) => vec![float(
-            non_style::SERIES_GAP_3D,
-            (gap != chart3d::SeriesGap::NATIVE_DEFAULT).then(|| gap.native_ratio()),
-        )],
-        Property::Rotation(rotation) if rotation == chart3d::Rotation::DEFAULT => {
-            vec![Write::Vector {
-                field: non_style::ROTATION_3D,
-                value: None,
-            }]
+const fn scale3d(scale: Scale) -> property::Scale3d {
+    match scale {
+        Scale::Area => property::Scale3d::Area,
+        Scale::Bar => property::Scale3d::Bar,
+        Scale::Column => property::Scale3d::Column,
+        Scale::Line => property::Scale3d::Line,
+        _ => property::Scale3d::Pie,
+    }
+}
+
+/// The library write rules (`chart_style_codec::property`) for `value`:
+/// what a format family calls with its common value.
+fn property_write(value: Property) -> property::PropertyWrite {
+    match value {
+        Property::PieStartAngle(angle) => property::pie_start_angle(angle.degrees()),
+        Property::DonutInnerRadius(radius) => {
+            property::donut_inner_radius(radius.native_fraction())
         },
-        Property::Rotation(rotation) => vec![Write::VectorComponents {
-            field: non_style::ROTATION_3D,
-            components: [
-                Some(rotation.x_degrees()),
-                Some(rotation.y_degrees()),
-                None,
-                None,
-            ],
-            absent: Some(vector(rotation.native_vector())),
-        }],
-        Property::Depth(depth, scale) => vec![Write::VectorDepth {
-            field: scale_field(scale),
-            ratio: depth.native_ratio(scale),
-            denominator: if scale.is_horizontal() {
-                field::vector::Y
-            } else {
-                field::vector::X
-            },
-            absent: (depth != chart3d::Depth::DEFAULT).then(|| vector(depth.native_vector(scale))),
-        }],
-        Property::Rounding(rounding) if rounding == corner::Rounding::NONE => vec![
-            float(style::ROUNDED_CORNER_RADIUS, None),
-            Write::Bool {
-                field: style::ROUNDED_CORNER_OUTER_END_ONLY,
-                value: None,
-            },
-        ],
-        Property::Rounding(rounding) => vec![
-            Write::FloatUnlessAbsentDefault {
-                field: style::ROUNDED_CORNER_RADIUS,
-                value: rounding.radius().native_fraction(),
-                default: 0.0,
-            },
-            Write::BoolUnlessAbsentDefault {
-                field: style::ROUNDED_CORNER_OUTER_END_ONLY,
-                value: rounding.outside_corners_only(),
-                default: false,
-            },
-        ],
+        Property::RadarStartAngle(angle) => property::radar_start_angle(angle.degrees()),
+        Property::SeriesGap(gap) => property::series_gap_3d(gap.native_ratio()),
+        Property::Rotation(rotation) => {
+            property::rotation_3d(rotation.x_degrees(), rotation.y_degrees())
+        },
+        Property::Depth(depth, scale) => property::depth_3d(
+            scale3d(scale),
+            depth.native_ratio(scale),
+            (depth != chart3d::Depth::DEFAULT).then(|| depth.native_vector(scale)),
+        ),
+        Property::Rounding(rounding) => property::rounded_corners(
+            rounding.radius().native_fraction(),
+            rounding.outside_corners_only(),
+        ),
     }
 }
 
@@ -456,7 +417,9 @@ fn engine_write(source: &[u8], chart: u64, property: Property) -> TestResult<Vec
     if same(read(&properties, property)?, property) {
         return Ok(source.to_vec());
     }
-    let edits = [(style, archive, writes(property), EmptyExtension::Keep)];
+    let write = property_write(property);
+    assert_eq!(write.archive(), archive);
+    let edits = [(style, archive, write.writes().to_vec(), write.empty())];
     engine_rewrite(source, components, &edits)
 }
 
@@ -1218,38 +1181,13 @@ impl SeriesProperty {
         }
     }
 
-    /// The codec writes for wedge `index`, and the empty-extension policy.
-    fn writes(&self, index: usize) -> (Vec<Write>, EmptyExtension) {
-        use field::series_non_style as series;
+    /// The library write rules for wedge `index`.
+    fn write(&self, index: usize) -> property::PropertyWrite {
         match self {
             Self::WedgeExplosions(values) => {
-                let value = values[index];
-                (
-                    vec![Write::Float {
-                        field: series::PIE_WEDGE_EXPLOSION,
-                        value: (value != pie::WedgeExplosion::ZERO)
-                            .then(|| value.native_fraction()),
-                    }],
-                    EmptyExtension::Remove,
-                )
+                property::pie_wedge_explosion(values[index].native_fraction())
             },
-            Self::LabelDistances(values) => {
-                let value = values[index];
-                let stored = (value != pie::LabelDistance::DEFAULT).then(|| value.percent());
-                (
-                    vec![
-                        Write::Float {
-                            field: series::PIE_LEGACY_LABEL_EXPLOSION,
-                            value: stored,
-                        },
-                        Write::Float {
-                            field: series::PIE_LABEL_EXPLOSION,
-                            value: stored,
-                        },
-                    ],
-                    EmptyExtension::Remove,
-                )
-            },
+            Self::LabelDistances(values) => property::pie_label_distance(values[index].percent()),
         }
     }
 }
@@ -1321,8 +1259,13 @@ fn engine_series_write(
         let object = non_styles.get(u32::try_from(index)?).ok_or(
             "a wedge has no series non-style object; allocation is a format-family graph operation",
         )?;
-        let (writes, empty) = property.writes(index);
-        edits.push((object, Archive::SeriesNonStyle, writes, empty));
+        let write = property.write(index);
+        edits.push((
+            object,
+            write.archive(),
+            write.writes().to_vec(),
+            write.empty(),
+        ));
     }
     engine_rewrite(source, components, &edits)
 }
@@ -1552,4 +1495,54 @@ fn pages_chart_pie_label_distance_parity() -> TestResult {
         distances([40.0, 90.0, 150.0])?,
         distances([120.0, 35.0, 200.0])?,
     )
+}
+
+/// Callgrind toggle target: the host route of one chart property set
+/// (open, set, the host's own reopen check, serialize).
+#[inline(never)]
+fn host_style_route(
+    source: &[u8],
+    target: Target,
+    chart: u64,
+    property: Property,
+) -> TestResult<Vec<u8>> {
+    host_write(source, target, chart, property)
+}
+
+/// Callgrind toggle target: the engine route of the same set (catalog,
+/// component decode, reference projection, codec rewrite, reassembly).
+#[inline(never)]
+fn leaf_style_route(source: &[u8], chart: u64, property: Property) -> TestResult<Vec<u8>> {
+    engine_write(source, chart, property)
+}
+
+/// ABBA cost probe of the chart property set route (record 0375 §5):
+///
+/// ```sh
+/// CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --test parity --no-run
+/// taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*chart_style_cases::host_style_route*' \
+///   target/release/deps/parity-<hash> --ignored --exact \
+///   chart_style_cases::chart_style_set_cost_abba --test-threads=1
+/// # likewise with '--toggle-collect=*chart_style_cases::leaf_style_route*'
+/// ```
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn chart_style_set_cost_abba() -> TestResult {
+    let cases = [
+        (Kind::Pie2d, pie_start_angle()?),
+        (Kind::Column3d, depth(Scale::Column)?),
+        (Kind::Column2d, rounding()?),
+    ];
+    for format in [Format::Keynote, Format::Numbers, Format::Pages] {
+        for (kind, property) in cases {
+            let input = input(format, kind)?;
+            let source = input.fixture.bytes.as_slice();
+            let (target, chart) = (input.target, input.chart);
+            std::hint::black_box(host_style_route(source, target, chart, property)?);
+            std::hint::black_box(leaf_style_route(source, chart, property)?);
+            std::hint::black_box(leaf_style_route(source, chart, property)?);
+            std::hint::black_box(host_style_route(source, target, chart, property)?);
+        }
+    }
+    Ok(())
 }

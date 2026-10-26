@@ -1246,6 +1246,281 @@ fn remove_field(data: &[u8], field: &Field, limits: Limits) -> Result<Vec<u8>, E
     Ok(output)
 }
 
+/// The native write rules of the inspector properties the shared chart
+/// engine edits: one call maps a property's stored value to the archive it
+/// lives in, the batch of [`Write`]s that stores it and the empty-extension
+/// policy (the migration host's per-property rules, record 0375). Format
+/// families convert their `litchi_iwa_common` value to the stored natives
+/// (`degrees()`, `native_fraction()`, `native_ratio()`, …) and pass the
+/// result to [`rewrite`] unchanged.
+pub mod property {
+    use super::{Archive, EmptyExtension, Vector, Write, field};
+
+    const MAX_WRITES: usize = 2;
+    const NO_WRITE: Write = Write::Float {
+        field: field::chart_non_style::PIE_START_ANGLE,
+        value: None,
+    };
+    /// Stored donut inner radius when the property is absent (75%).
+    pub const DEFAULT_DONUT_INNER_RADIUS: f32 = 75.0 / 100.0;
+    /// Stored 3D series-gap ratio when the property is absent (100%).
+    pub const DEFAULT_SERIES_GAP_3D: f32 = 1.0;
+    /// Rotation `(x, y)` degrees when no rotation vector is stored.
+    pub const DEFAULT_ROTATION_3D: (f32, f32) = (18.5, -18.125);
+    /// Stored per-wedge label distance (percent) when no override exists.
+    pub const DEFAULT_PIE_LABEL_DISTANCE: f32 = 67.0;
+
+    /// The archive, writes and empty-extension policy of one property value.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct PropertyWrite {
+        archive: Archive,
+        writes: [Write; MAX_WRITES],
+        len: usize,
+        empty: EmptyExtension,
+    }
+
+    impl PropertyWrite {
+        const fn one(archive: Archive, write: Write, empty: EmptyExtension) -> Self {
+            Self {
+                archive,
+                writes: [write, NO_WRITE],
+                len: 1,
+                empty,
+            }
+        }
+
+        const fn two(archive: Archive, first: Write, second: Write, empty: EmptyExtension) -> Self {
+            Self {
+                archive,
+                writes: [first, second],
+                len: 2,
+                empty,
+            }
+        }
+
+        /// The style archive that stores the property.
+        #[must_use]
+        pub const fn archive(&self) -> Archive {
+            self.archive
+        }
+
+        /// The writes, in order.
+        #[must_use]
+        pub fn writes(&self) -> &[Write] {
+            &self.writes[..self.len]
+        }
+
+        /// The policy for an extension the writes leave empty.
+        #[must_use]
+        pub const fn empty(&self) -> EmptyExtension {
+            self.empty
+        }
+    }
+
+    /// The per-kind scale vector that stores a 3D chart's depth.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum Scale3d {
+        /// `tschchartinfoarea3dscale`.
+        Area,
+        /// `tschchartinfobar3dscale` (horizontal: the ratio is relative to `y`).
+        Bar,
+        /// `tschchartinfocolumn3dscale`.
+        Column,
+        /// `tschchartinfoline3dscale`.
+        Line,
+        /// `tschchartinfopie3dscale`.
+        Pie,
+    }
+
+    impl Scale3d {
+        /// The extension field of the scale vector.
+        #[must_use]
+        pub const fn field(self) -> u32 {
+            match self {
+                Self::Area => field::chart_non_style::AREA_SCALE_3D,
+                Self::Bar => field::chart_non_style::BAR_SCALE_3D,
+                Self::Column => field::chart_non_style::COLUMN_SCALE_3D,
+                Self::Line => field::chart_non_style::LINE_SCALE_3D,
+                Self::Pie => field::chart_non_style::PIE_SCALE_3D,
+            }
+        }
+
+        const fn denominator(self) -> u32 {
+            match self {
+                Self::Bar => field::vector::Y,
+                _ => field::vector::X,
+            }
+        }
+    }
+
+    const fn chart_float(field: u32, value: f32, default: f32) -> PropertyWrite {
+        PropertyWrite::one(
+            Archive::ChartNonStyle,
+            Write::Float {
+                field,
+                value: if value == default { None } else { Some(value) },
+            },
+            EmptyExtension::Keep,
+        )
+    }
+
+    /// Pie/donut start angle (stored degrees; 0 clears).
+    #[must_use]
+    pub const fn pie_start_angle(degrees: f32) -> PropertyWrite {
+        chart_float(field::chart_non_style::PIE_START_ANGLE, degrees, 0.0)
+    }
+
+    /// Donut inner radius (stored fraction; the default clears).
+    #[must_use]
+    pub const fn donut_inner_radius(fraction: f32) -> PropertyWrite {
+        chart_float(
+            field::chart_non_style::DONUT_INNER_RADIUS,
+            fraction,
+            DEFAULT_DONUT_INNER_RADIUS,
+        )
+    }
+
+    /// Radar start angle (stored degrees; 0 clears).
+    #[must_use]
+    pub const fn radar_start_angle(degrees: f32) -> PropertyWrite {
+        chart_float(field::chart_non_style::RADAR_START_ANGLE, degrees, 0.0)
+    }
+
+    /// 3D series gap (stored ratio; the default clears).
+    #[must_use]
+    pub const fn series_gap_3d(ratio: f32) -> PropertyWrite {
+        chart_float(
+            field::chart_non_style::SERIES_GAP_3D,
+            ratio,
+            DEFAULT_SERIES_GAP_3D,
+        )
+    }
+
+    /// 3D scene rotation in degrees: the default clears the vector; otherwise
+    /// a stored vector keeps `z`/`w` and an absent one is written as
+    /// `(x, y, 0, 0)`.
+    #[must_use]
+    pub const fn rotation_3d(x_degrees: f32, y_degrees: f32) -> PropertyWrite {
+        let field = field::chart_non_style::ROTATION_3D;
+        let write = if x_degrees == DEFAULT_ROTATION_3D.0 && y_degrees == DEFAULT_ROTATION_3D.1 {
+            Write::Vector { field, value: None }
+        } else {
+            Write::VectorComponents {
+                field,
+                components: [Some(x_degrees), Some(y_degrees), None, None],
+                absent: Some(Vector {
+                    x: x_degrees,
+                    y: y_degrees,
+                    z: 0.0,
+                    w: 0.0,
+                }),
+            }
+        };
+        PropertyWrite::one(Archive::ChartNonStyle, write, EmptyExtension::Keep)
+    }
+
+    /// 3D depth: a stored scale vector gets `z = ratio × denominator`; an
+    /// absent one is written as `absent`, or left absent when `absent` is
+    /// `None` (the caller passes `None` for the default depth).
+    #[must_use]
+    pub const fn depth_3d(scale: Scale3d, ratio: f32, absent: Option<[f32; 4]>) -> PropertyWrite {
+        let absent = match absent {
+            Some([x, y, z, w]) => Some(Vector { x, y, z, w }),
+            None => None,
+        };
+        PropertyWrite::one(
+            Archive::ChartNonStyle,
+            Write::VectorDepth {
+                field: scale.field(),
+                ratio,
+                denominator: scale.denominator(),
+                absent,
+            },
+            EmptyExtension::Keep,
+        )
+    }
+
+    /// Rounded corners (stored radius fraction, outside-corners switch): the
+    /// default (0, false) clears both; otherwise a default-valued field is
+    /// written only when it is already present.
+    #[must_use]
+    pub const fn rounded_corners(radius: f32, outside_corners_only: bool) -> PropertyWrite {
+        let radius_field = field::chart_style::ROUNDED_CORNER_RADIUS;
+        let flag_field = field::chart_style::ROUNDED_CORNER_OUTER_END_ONLY;
+        if radius == 0.0 && !outside_corners_only {
+            return PropertyWrite::two(
+                Archive::ChartStyle,
+                Write::Float {
+                    field: radius_field,
+                    value: None,
+                },
+                Write::Bool {
+                    field: flag_field,
+                    value: None,
+                },
+                EmptyExtension::Keep,
+            );
+        }
+        PropertyWrite::two(
+            Archive::ChartStyle,
+            Write::FloatUnlessAbsentDefault {
+                field: radius_field,
+                value: radius,
+                default: 0.0,
+            },
+            Write::BoolUnlessAbsentDefault {
+                field: flag_field,
+                value: outside_corners_only,
+                default: false,
+            },
+            EmptyExtension::Keep,
+        )
+    }
+
+    /// One wedge's explosion (stored fraction; 0 clears and an emptied
+    /// extension is removed).
+    #[must_use]
+    pub const fn pie_wedge_explosion(fraction: f32) -> PropertyWrite {
+        PropertyWrite::one(
+            Archive::SeriesNonStyle,
+            Write::Float {
+                field: field::series_non_style::PIE_WEDGE_EXPLOSION,
+                value: if fraction == 0.0 {
+                    None
+                } else {
+                    Some(fraction)
+                },
+            },
+            EmptyExtension::Remove,
+        )
+    }
+
+    /// One wedge's label distance (stored percent, in the legacy and the
+    /// current field; the default clears both and an emptied extension is
+    /// removed).
+    #[must_use]
+    pub const fn pie_label_distance(percent: f32) -> PropertyWrite {
+        let value = if percent == DEFAULT_PIE_LABEL_DISTANCE {
+            None
+        } else {
+            Some(percent)
+        };
+        PropertyWrite::two(
+            Archive::SeriesNonStyle,
+            Write::Float {
+                field: field::series_non_style::PIE_LEGACY_LABEL_EXPLOSION,
+                value,
+            },
+            Write::Float {
+                field: field::series_non_style::PIE_LABEL_EXPLOSION,
+                value,
+            },
+            EmptyExtension::Remove,
+        )
+    }
+}
+
 /// A `TSP.SparseReferenceArray`: a series count and the present entries.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SparseReferences {
