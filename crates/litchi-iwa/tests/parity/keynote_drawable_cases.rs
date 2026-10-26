@@ -850,3 +850,63 @@ fn keynote_slide_drawable_properties_read_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+fn shape_text_case(
+    name: &'static str,
+    host: impl FnOnce(&mut keynote::Draft, u64) -> TestResult,
+    text: &'static str,
+) -> TestResult {
+    let input = shape_fixture()?;
+    run_on(
+        name,
+        &input,
+        Tier::B,
+        Evidence::Queued,
+        |editor, source| {
+            let id = host_id(editor, source, leaf_position(source, Kind::Shape)?)?;
+            host(editor, id)
+        },
+        |source| {
+            let position = leaf_position(source, Kind::Shape)?;
+            leaf_run(source, |edit| {
+                edit.set_text(
+                    SlideSelector::index(SLIDE),
+                    DrawableSelector::index(position),
+                    text,
+                )?;
+                Ok(())
+            })
+        },
+    )
+}
+
+#[test]
+fn keynote_slide_shape_text_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_text_set_parity",
+        |editor, id| Ok(editor.set_slide_shape_text(SLIDE, id, "Boxed in")?),
+        "Boxed in",
+    )
+}
+
+#[test]
+fn keynote_slide_shape_text_replace_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    // The leaf replaces a range by setting the spliced whole text.
+    shape_text_case(
+        "keynote_slide_shape_text_replace_parity",
+        |editor, id| Ok(editor.replace_slide_shape_text(SLIDE, id, 1..2, "ee")?),
+        "Beex",
+    )
+}
+
+#[test]
+fn keynote_slide_shape_text_clear_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_text_clear_parity",
+        |editor, id| Ok(editor.clear_slide_shape_text(SLIDE, id)?),
+        "",
+    )
+}
