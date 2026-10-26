@@ -20291,6 +20291,61 @@
           "name": "with_limits",
           "scope": "litchi_iwa_common",
           "replacement": "raw wire scans require RawWireLimits in RawWireFields::new (record 0362b)"
+        },
+        {
+          "name": "ChartPieStartAngle",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::StartAngle; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartPieWedgeExplosion",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::WedgeExplosion; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartPieWedgeIndex",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::WedgeIndex; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartPieLabelDistance",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::pie::LabelDistance; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartDonutInnerRadius",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::donut::InnerRadius; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartRadarStartAngle",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::radar::StartAngle; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartCornerRadius",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::corner::Radius; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "ChartRoundedCorners",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart::corner::Rounding; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "Chart3dDepth",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart3d::Depth; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "Chart3dRotation",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart3d::Rotation; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "Chart3dSeriesGap",
+          "scope": "litchi_iwa_common",
+          "replacement": "use chart3d::SeriesGap; the shared chart values carry no host `Chart` prefix (record 0375)"
         }
       ],
       "families": []
