@@ -28374,6 +28374,16 @@
       "features": [],
       "banned_names": [
         {
+          "name": "decode_shape_properties",
+          "scope": "litchi_iwa_protos::shape_properties_codec",
+          "replacement": "use decode_drawable_archive; one name per entry point (record 0368)"
+        },
+        {
+          "name": "rewrite_shape_properties",
+          "scope": "litchi_iwa_protos::shape_properties_codec",
+          "replacement": "use rewrite_drawable_archive; one name per entry point (record 0368)"
+        },
+        {
           "name": "PreparedDataStoreControlCellSpecTableReferenceRewrite",
           "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
           "replacement": "use PreparedDataStoreControlCellSpecTableRewrite (record 0362ul14)"

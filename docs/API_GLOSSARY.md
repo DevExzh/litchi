@@ -2822,6 +2822,9 @@ not an alias (no second name exists).
 | `litchi_iwa_common::table::topology::{RowInsertion, ColumnInsertion, RowDeletion, ColumnDeletion}` | Section-relative topology coordinates, moved from `litchi_numbers::table::topology` (re-exported there) | ✅ 0368 |
 | `litchi_numbers_wire::formula_graph::{remap_owner, remap_cell_record_tile, remap_range_precedents_tile, append_owners_to_engine, Remap, Limits, LimitKind, Error}` | Bounded source-preserving formula-graph remaps for table/sheet duplication, moved from the host's `formula_clone`; required `&Limits`, typed `Error::{Limit, InvalidLimit, InvalidRemap, UnsupportedDependency, InvalidSource, Allocation}`; no `*_with_limits` twin | ✅ 0368 |
 | `litchi_numbers_wire::formula_owner::{Uuid, TABLE_OWNER_KIND, Error, encode_empty_table}` | Formula-owner identity arithmetic (`for_table`, `cfuuid_words`, `translate_from`) and the host's empty table owner, byte for byte | ✅ 0368 |
+| `litchi_numbers_wire::table_lifecycle::{ReferenceRemap, TABLE_MODEL_REFERENCE_PATHS, TABLE_INFO_REFERENCE_PATHS, Error, rewrite_table_model, rewrite_table_info, rewrite_table_data_list, rewrite_reference, remap_reference_paths}` | Table duplicate/remove reference rewrites (donor `numbers_table_lifecycle_codec`), required `&Limits` | ✅ 0368 |
+| `litchi_iwa_protos::{theme_codec, keynote_theme_codec, theme_presets_codec, shape_properties_codec, keynote_shape_creation_codec, number_attachment_codec}` | Bounded Buffa codecs ported from the donors; each entry point takes its `DecodeOptions`/`EncodeOptions`; no limit-less twin | ✅ 0368 |
+| `shape_properties_codec::{decode_shape_properties, rewrite_shape_properties}` | banned donor aliases: use `decode_drawable_archive`, `rewrite_drawable_archive` (never ported) | ✅ 0368 |
 
 ## iWork facade retirement and iWork open options (record 0306)
 
