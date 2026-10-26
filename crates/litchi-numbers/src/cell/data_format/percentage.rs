@@ -8,7 +8,9 @@
 //! The values are the neutral `litchi_iwa_common::table::cell::data_format::percentage`
 //! vocabulary (record 0368), re-exported here at their established path.
 
-pub use litchi_iwa_common::table::cell::data_format::percentage::*;
+pub use litchi_iwa_common::table::cell::data_format::percentage::{
+    DecimalPlaces, NegativeStyle, Percentage, ThousandsSeparator,
+};
 
 /// Selector-first exact-source transactions for one existing table cell's
 /// explicit Percentage format.

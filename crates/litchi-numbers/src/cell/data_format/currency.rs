@@ -8,7 +8,9 @@
 //! The values are the neutral `litchi_iwa_common::table::cell::data_format::currency`
 //! vocabulary (record 0368), re-exported here at their established path.
 
-pub use litchi_iwa_common::table::cell::data_format::currency::*;
+pub use litchi_iwa_common::table::cell::data_format::currency::{
+    Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, NegativeStyle, ThousandsSeparator,
+};
 
 /// Selector-first exact-source transactions for one existing table cell's
 /// explicit Currency format.

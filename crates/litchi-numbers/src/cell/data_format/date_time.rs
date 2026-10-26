@@ -3,7 +3,9 @@
 //! The values are the neutral `litchi_iwa_common::table::cell::data_format::date_time`
 //! vocabulary (record 0368), re-exported here at their established path.
 
-pub use litchi_iwa_common::table::cell::data_format::date_time::*;
+pub use litchi_iwa_common::table::cell::data_format::date_time::{
+    DateTime, Error, MAX_PATTERN_BYTES, Result,
+};
 
 /// Selector-first exact-source transactions for one existing table cell's
 /// explicit Date & Time display format.
