@@ -69,11 +69,35 @@ xlsb-crud = ["litchi/xlsb"]
 # precedence, so the ordinary performance package profile remains buildable.
 legacy-owner-api = []
 legacy-property-api = []
+# The ODF raw-codec qualification probe is a consumer-only adapter.  These
+# features select all ten ODF facade paths, while the example chooses the old
+# or current raw constructor/writer call shape with cfg.  They do not alter a
+# production crate or copy candidate implementation files into the baseline.
+raw-codec-odf = [
+    "litchi-ops/odt",
+    "litchi-ops/ods",
+    "litchi-ops/odp",
+    "litchi-ops/odg",
+    "litchi-ops/odc",
+    "litchi-ops/odi",
+    "litchi-ops/odb",
+    "litchi-ops/odf-formula",
+    "litchi-ops/oth",
+    "litchi-ops/odm",
+]
+raw-codec-original = ["raw-codec-odf"]
+raw-codec-current = ["raw-codec-odf"]
+raw-codec-allocator = []
 
 [[bin]]
 name = "litchi-perf-baseline-alloc"
 path = "src/bin/litchi-perf-baseline-alloc.rs"
 required-features = ["allocator-metrics"]
+
+[[example]]
+name = "odf_raw_codec_qualification"
+path = "examples/odf_raw_codec_qualification.rs"
+required-features = ["raw-codec-odf"]
 
 [[bin]]
 name = "xlsx_managed_compression_alloc"

@@ -1,0 +1,156 @@
+{
+  "schema": "litchi.odf.raw-codec-qualification.manifest.v1",
+  "lane": "odf-raw-codec",
+  "baseline_commit": "70d64634c9d1d4328447d8724d3b076114a91fd0",
+  "candidate_commit": "33a0a63d3553712c1276da592f7846a0c7dcabd6",
+  "source": {
+    "consumer_manifest": "tools/perf-baseline/Cargo.toml",
+    "production_manifest": "crates/litchi-ops/Cargo.toml",
+    "lock_path": "tools/perf-baseline/Cargo.lock",
+    "candidate_consumer_manifest_sha256": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
+    "candidate_lock_sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
+    "baseline_overlay": [
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/Cargo.lock",
+      "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
+    ]
+  },
+  "probe": {
+    "path": "tools/perf-baseline/examples/odf_raw_codec_qualification.rs",
+    "features": [
+      "raw-codec-original",
+      "raw-codec-current",
+      "raw-codec-allocator"
+    ],
+    "modes": ["validate", "timed", "allocator"],
+    "max_iterations": 128,
+    "sha256": "2c69298c04ae48f7ae4de4401d9ca22f174ae151b7dc816f48c64f9a0aaa652b"
+  },
+  "routes": [
+    {
+      "id": "archive_catalog_and_raw_split",
+      "family": "raw",
+      "operations": ["Archive::new", "file_names", "contains", "metadata", "is_stored", "read"],
+      "boundary": "borrowed Archive catalog/read only; input bytes and expected names prepared outside the clock"
+    },
+    {
+      "id": "manifest_xml_stream_and_parse",
+      "family": "manifest",
+      "operations": ["Archive::read_manifest_xml", "read_manifest", "parse_manifest"],
+      "boundary": "manifest read/materialization/parse only; XML bytes and limits prepared outside the clock"
+    },
+    {
+      "id": "metadata_xml_and_namespace_resolution",
+      "family": "xml",
+      "operations": ["Metadata::from_xml", "ResolvedReader::from_xml", "read_resolved_event_into"],
+      "boundary": "bounded metadata/namespace parse only; XML construction and event-result serialization stay outside"
+    },
+    {
+      "id": "writer_memory_publication",
+      "family": "writer",
+      "operations": ["PackageWriter::new", "add_authored_xml", "add_file", "finish"],
+      "boundary": "in-memory writer publication only; payloads, limits and output comparison stay outside"
+    },
+    {
+      "id": "writer_stream_publication",
+      "family": "writer",
+      "operations": ["PackageWriter::with_writer", "add_file_reader_with_media_type_and_compression", "finish_to_writer"],
+      "boundary": "reader-to-sink publication only; bounded reader and sink are prepared outside"
+    },
+    {
+      "id": "writer_bounded_policy",
+      "family": "writer",
+      "operations": ["PackageWriter::new_bounded", "finish_to_bounded_bytes"],
+      "boundary": "bounded writer success/refusal only; error/report serialization stays outside"
+    },
+    {
+      "id": "raw_split_merge_and_opaque_preservation",
+      "family": "merge",
+      "operations": ["replace_content_xml", "replace_content_xml_with_payload_verification", "raw_identical_members"],
+      "boundary": "source-preserving raw replacement only; source index and member comparison stay outside"
+    },
+    {
+      "id": "raw_xml_splice_merge_publication",
+      "family": "splice",
+      "operations": ["XmlSourcePart::checked_range", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
+      "boundary": "audited XML splice/rebuild only; provenance proofs and fragment construction stay outside"
+    },
+    {
+      "id": "unified_facade_raw_parts_and_publication",
+      "family": "facade",
+      "operations": ["open_bytes_with", "File::parts", "File::raw", "File::to_bytes", "File::metadata"],
+      "boundary": "facade raw part/publication operation; facade input ownership clone is included and explicitly reported"
+    },
+    {
+      "id": "consumer_reopen_matrix",
+      "family": "consumers",
+      "operations": ["Archive::new", "open_bytes_with", "File::parts", "File::raw"],
+      "boundary": "one prebuilt package per ODF family reopened through raw and facade consumers"
+    }
+  ],
+  "families": ["odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm"],
+  "phases": {
+    "setup_outside_clock": [
+      "deterministic package and tracked corpus fixture read",
+      "Archive/OwnedPackage/File opening for correctness proofs",
+      "XML, metadata, namespace, reader/sink and expected-hash construction",
+      "route-specific limit and refusal inputs"
+    ],
+    "inside_clock": "the route operation named by the descriptor boundary only",
+    "output_proof": [
+      "operation_ok",
+      "changed_ok",
+      "no_op_ok",
+      "reopen_ok",
+      "source_bytes_ok",
+      "facade_bytes_ok",
+      "untouched_members_ok",
+      "manifest_ok",
+      "metadata_ok",
+      "namespace_ok",
+      "bounded_error_ok",
+      "negative_cases_ok"
+    ],
+    "negative_cases": [
+      "duplicate_manifest_path",
+      "manifest_limit",
+      "malformed_xml",
+      "undeclared_namespace",
+      "stale_xml_range",
+      "foreign_xml_source",
+      "bounded_output",
+      "failing_reader_or_sink",
+      "corrupt_stored_payload_without_verification"
+    ]
+  },
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmup_iterations_per_leg": 3,
+    "samples_per_leg": 30,
+    "probe_iterations": 128,
+    "roles": ["baseline", "candidate"],
+    "variants": ["normal", "allocator"],
+    "calibration": {"mode": "validate", "iterations": 1},
+    "allocator": {
+      "scope": "operation_global_system_allocator",
+      "elapsed_claimable": false,
+      "counters": ["allocations", "deallocations", "allocated_bytes", "deallocated_bytes", "reallocations"]
+    },
+    "quiet": {
+      "process_guard": "tools.native_qualification_runner.ProcessGuard",
+      "cpu_affinity_required": true,
+      "resource_monitor": "loadavg+proc-descendants+RSS+target-bytes"
+    }
+  },
+  "guards": {
+    "cargo": {"offline": true, "locked": true, "jobs": 1, "incremental": false},
+    "target_preflight_bytes": 19200000000,
+    "target_hard_limit_bytes": 20000000000,
+    "memory_hard_limit_bytes": 20000000000,
+    "max_probe_output_bytes": 1048576,
+    "fresh_no_follow_outputs": true,
+    "full_source_closure": true,
+    "quiet_host": true
+  },
+  "claim_scope": "correctness and reproducible paired protocol only; no native acceptance claim"
+}
