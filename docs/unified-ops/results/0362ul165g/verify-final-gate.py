@@ -66,7 +66,13 @@ def verify_row(row, phase, plan):
     require(env == required_env, f'{label} recorded environment mismatch')
     pre = row['preflight']; live = row['target_live_guard']; post = row['post_exit']
     require(pre['target_bytes'] <= 18_000_000_000 and pre['free_bytes'] >= 12_000_000_000 and not pre['builders'], f'{label} preflight resource/process guard')
-    require(live['samples'] > 0 and live['live_target'] == 19_000_000_000 and live['max_sampled_bytes'] < 19_000_000_000, f'{label} live target guard')
+    # The approved watcher records an initial measurement before its loop;
+    # a short command can finish with zero subsequent periodic samples.
+    require(type(live['samples']) is int and live['samples'] >= 0
+            and type(live['max_sampled_bytes']) is int
+            and 0 <= live['max_sampled_bytes'] < 19_000_000_000
+            and live['live_target'] == 19_000_000_000
+            and not live.get('measurement_error'), f'{label} live target guard')
     require(row['target_bytes_after'] <= 20_000_000_000 and row['free_bytes_after'] >= 12_000_000_000, f'{label} post resources')
     require(post['target_bytes'] == row['target_bytes_after'] and len(post['samples']) >= 3, f'{label} post-exit sampling')
     require(all(not x['owned'] and not x['builders'] and x['target_bytes'] <= 20_000_000_000 for x in post['samples']), f'{label} post-exit holders/resources')

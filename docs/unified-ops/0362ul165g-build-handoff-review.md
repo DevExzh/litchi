@@ -36,17 +36,55 @@ launch or restart the gate. Partial mode requires the same service to be
 currently active; terminal mode requires all 65 rows and successful service
 exit, the final result and the row-37 preservation barrier.
 
-The actual partial invocation verifies the existing 33 rows. Ten negative
+The initial partial invocation verifies the existing 33 rows. Ten negative
 controls reject incomplete terminal coverage, sequence and command changes,
 effective failures, phase gaps, source drift, remaining builders, lost live
 guards, changed logs and changed target traces. This is not a new gate pass.
 Nested chunk completeness/logs and preserved OfficeCLI bytes still need their
 separate checks, as do the raw census and every native qualification row.
 
+Independent review confirms the real partial CLI and terminal refusal, then
+finds one false rejection: the approved watcher records an initial size before
+its polling loop, so a valid short command can have zero subsequent periodic
+samples. The successor accepts a nonnegative integer sample count, requires a
+nonnegative integer initial maximum below 19 GB and the exact limit, and
+rejects measurement errors. Existing resource and monitor-error checks remain.
+Twelve focused controls cover the valid zero-sample case and eleven refusal
+cases. The original tested source and receipts remain preserved.
+
+Independent successor review exercises all twelve controls and the actual
+partial and terminal CLIs again. The partial invocation verifies 33 rows on
+the live service; terminal mode refuses incomplete coverage without creating
+output. The narrow correction passes review and leaves source/plan/state
+unchanged. No terminal gate acceptance is inferred.
+
 Run the verifier with a fresh external output directory; omit
 `--allow-partial` for terminal verification. Its fixed inputs are the exact
-C2a gate artifacts, not a generic or rebindable acceptance policy. The tested
-external source and committed source have identical bytes.
+C2a gate artifacts, not a generic or rebindable acceptance policy. The v2
+external source and corrected committed source have identical bytes.
+
+## Restored ODF lanes also require repair
+
+Flat-parts v1 passes nine isolated tests and preserves its historical inputs,
+but independent review returns four admission/provenance gaps: unrelated
+nonempty bytes are accepted as the candidate lock, copied probe inputs are not
+resealed, child output is unbounded and report validation can bypass the run
+receipt, and the symlink check runs after resolution. The 36 synthetic legs
+exercise allocation/fidelity orchestration only. The native timing obligation
+still needs its own executable protocol, preserving the original allocator
+control. This packet is not source-ready for final qualification.
+
+W6 v1 recovers the original f755/e4a baselines and generated workloads, but
+its proposed C2a lock overlay is not admitted: C2a uses path-vendored packages
+while the historical trees use registry dependencies. There is no checked
+dependency/vendor closure. The recipe also checks two origins and then clones
+all four endpoints from C; its candidate overlay assertion requires changes
+to side-workspace locks whose copied bytes are already identical, causing a
+deterministic preparation failure. Later build/run stages lack the required
+source, lock, executable, bounded-output and producer-receipt checks. Seven
+policy and two output-validator tests passing do not close these failures.
+Both restored-lane packets are returned for concrete repairs; no input waiver
+or performance exception is recorded.
 
 ## Evidence
 
@@ -58,7 +96,13 @@ Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
 | `final-gate-C2a-root-verifier-20261026/verify.py` | 8,722 | `8f4c0ac2ea83de890b4eb267e92c599751bf928efce49e3aac4179145208ecf4` |
 | `final-gate-C2a-root-verifier-20261026/partial-1/verification.json` | 25,186 | `31848d58c5018a20f160f6fe1280f0bd06bb18a9a5f2eaade5feeffad0e1fadd` |
 | `final-gate-C2a-root-verifier-20261026/negative-controls.json` | 1,935 | `e6fb6b87882d92dc0e7c4356d6da279d073175d3938ac930e79f3b275fb01687` |
+| `final-gate-C2a-root-verifier-20261026-independent-review-20261026/review-receipt.json` | 6,090 | `5ed4639169ad3acc89df84dfa1acbfea1570f92d65d99bff0a466a2e1c742cca` |
+| `final-gate-C2a-root-verifier-20261026-v2/verify.py` | 9,037 | `29a6831801de026e994fe7b56156dc326a4004a3f8b23e66be122f1b605ab0a7` |
+| `final-gate-C2a-root-verifier-20261026-v2/guard-controls.json` | 2,039 | `851d7b6365b7b846f71f1ee2086d99b2ab81a74897d1055763c158b035c08801` |
+| `final-gate-C2a-root-verifier-20261026-v2-independent-review-20261026/review-receipt.json` | 4,762 | `a9c2c2b988597ef7db946e2cadb24c5e87a4caeefff58ad124854918c3906d0c` |
+| `odf-flat-parts-C2a-prep-20261026-v1-independent-review-20261026/review-receipt.json` | 8,482 | `20c6888e7546ed7c95c89887b2344103280290ef8493c9bf864f47e53b2bbaad` |
+| `w6-odt-ods-C2a-prep-20261026-v1-independent-review-20261026/review-receipt.json` | 11,542 | `76747562bb685631e432fd03fd7d2f9344b51bd57568710e23afcb57f83cd704` |
 
-The flat-parts packet has entered independent review. Original W6 ODT/ODS
-preparation continues. The corrected 28-row scope remains required, with no
-final-C2a native acceptance yet. Only memo 22 is deferred. Nothing is pushed.
+Flat-parts and W6 ODT/ODS repairs remain required. The corrected 28-row scope
+remains required, with no final-C2a native acceptance yet. Only memo 22 is
+deferred. Nothing is pushed.

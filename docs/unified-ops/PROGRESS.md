@@ -6223,3 +6223,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   final-gate receipt verifier, checks the existing 33 rows and exercises ten
   negative controls. The same gate remains active; C/P stay frozen and all
   28 final qualifications remain open. Nothing is pushed.
+
+  Flat-parts v1 is returned for unbound candidate-lock admission, unsealed
+  materialized probe inputs, unbounded child output and detached reports;
+  its allocation-only probe also leaves native timing unprepared. W6 v1 is
+  returned for incompatible historical lock treatment, a deterministic
+  candidate-overlay assertion failure and incomplete bounded build/run proof.
+  Root corrects the new receipt verifier's rejection of valid zero-periodic-
+  sample rows while preserving initial-size and error checks. All prior
+  packets and review receipts remain preserved; qualification stays open.
