@@ -276,3 +276,105 @@ fn formula_refresh_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+/// A batch of slide-table writes in one edit: C3, then B2 (read by D2), the
+/// second planned over the first's staged state, against the host's
+/// one-pass `set_slide_table_cells`.
+#[test]
+fn keynote_slide_table_formula_refresh_batch_parity() -> TestResult {
+    use litchi_keynote::slide::drawable::TableCellValue;
+    let input = fixture(KEYNOTE)?;
+    Case::new(
+        "keynote_slide_table_formula_refresh_batch_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        let model = keynote_model(&editor)?;
+        editor.set_slide_table_cells(
+            0,
+            model,
+            [
+                keynote::TableCellUpdate::new(
+                    1,
+                    1,
+                    keynote::TableCellValue::Number(30.0.try_into()?),
+                ),
+                keynote::TableCellUpdate::new(2, 2, keynote::TableCellValue::Boolean(false)),
+            ],
+        )?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        let package = litchi_keynote::Package::from_bytes(source)?;
+        for drawable in 0..64 {
+            let mut edit = package.edit_slide_drawables();
+            let selector = litchi_keynote::DrawableSelector::index(drawable);
+            if edit
+                .set_table_cell(0, selector, 2, 2, TableCellValue::Boolean(false))
+                .is_err()
+            {
+                continue;
+            }
+            edit.set_table_cell(0, selector, 1, 1, TableCellValue::Number(30.0))?;
+            let output = leaf_bytes!(edit.commit()?.package());
+            if formula_caches(&output, 1, 3)? == formula_caches(source, 1, 3)? {
+                return Err("the leaf left D2's cached result unchanged".into());
+            }
+            return Ok(LeafRun::output(output));
+        }
+        Err("no table drawable".into())
+    })
+    .leaf_invalidates_root_previews()
+    .leaf_structural_metadata()
+    .read("cached result of D2", |bytes| formula_caches(bytes, 1, 3))
+    .read("host cell B2", |bytes| keynote_cell(bytes, 1, 1))
+    .read("host cell C3", |bytes| keynote_cell(bytes, 2, 2))
+    .run()?;
+    Ok(())
+}
+
+/// A write that a formula in another table reads: on
+/// `body-table-cross-reference-native.pages`, table 2 A3 = Table 1::B2 + 1
+/// and table 1 B4 = SUM(B2:B3); writing table 1 B2 refreshes both, as the
+/// host does.
+#[test]
+fn pages_body_table_formula_refresh_cross_table_parity() -> TestResult {
+    let input = fixture("iwork/pages/body-table-cross-reference-native.pages")?;
+    Case::new(
+        "pages_body_table_formula_refresh_cross_table_parity",
+        Format::Pages,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = pages::Draft::from_bytes(source)?;
+        let model = pages_model(&editor)?;
+        editor.set_table_cell(model, 1, 1, Value::Number(FiniteF64::new(41.0)?))?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        let package = litchi_pages::Package::from_bytes(source)?;
+        let mut edit = package.edit_body_table_values(0usize)?;
+        edit.set(1, 1, litchi_pages::table::values::Value::Number(41.0))?;
+        let output = leaf_bytes!(edit.commit()?.package());
+        for (row, column) in [(3, 1), (2, 0)] {
+            if formula_caches(&output, row, column)? == formula_caches(source, row, column)? {
+                return Err(format!("the leaf left ({row}, {column})'s cache unchanged").into());
+            }
+        }
+        Ok(LeafRun::output(output))
+    })
+    .read("cached result of table 1 B4", |bytes| {
+        formula_caches(bytes, 3, 1)
+    })
+    .read("cached result of table 2 A3", |bytes| {
+        formula_caches(bytes, 2, 0)
+    })
+    .run()?;
+    Ok(())
+}

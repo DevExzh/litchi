@@ -631,7 +631,7 @@ keynote/editor/slide_tables.rs	set_slide_table_cell_text_outline	1	keynote	table
 keynote/editor/slide_tables.rs	set_slide_table_cell_text_script	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_text_style	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cells	1	keynote	table.cells	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cells	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_batch_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_geometry	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_borders	1	keynote	table.cell_appearance	host-only	litchi-keynote	-	-	-	-
