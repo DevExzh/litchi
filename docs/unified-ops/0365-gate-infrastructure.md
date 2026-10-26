@@ -153,11 +153,35 @@ left to the coordinator or the owner. Instead:
 
 ## Results
 
-Run `0365-b`: rows 39, 41, 43, 47–52 on this branch, launched with
-`systemd-run --user --scope … env -i …`. Logs are under
-`.coord/fin-gate-infra/gate-0365-b/`.
+Every run used `tools/gate/run_gate.sh` under
+`systemd-run --user --scope … env -i …`, with `CARGO_BUILD_JOBS=6` and the
+trunk lock as the seed. The root lock SHA-256 was `846cf70f…7eed7`. Logs are in
+`.coord/fin-gate-infra/gate-0365-{a,b,c}/`.
 
-RESULTS_TABLE
+| Row | Name | Exit | Run (commit) |
+| --- | --- | --- | --- |
+| 0 | fmt | 0 | c (`09712fb6c1`) |
+| 39 | feature-matrix | 0 (491 s) | b (`95698d479a`) |
+| 41 | fuzz, 20 workspaces, `--locked` | 0 | b, c |
+| 43 | golden-clean | 0 | c |
+| 47 | iwork-leaf-api | 0 | a, b, c |
+| 48 | tooling-unit | 0 | c (1,792 tests) |
+| 49 | crate-boundaries | 0 | a, b, c |
+| 50 | non-iwork-gate | 0 | a, b, c |
+| 51 | bench-matrix | 0 | c |
+| 52 | corpus-dispositions | 0 | a, b, c |
+
+Failures in the earlier runs, and what fixed them:
+
+- Run b, row 43: the record file was still uncommitted when the row ran.
+- Run b, row 51: the bench matrix needed regenerating for this record.
+- Run b, row 48: the bench matrix's unit test failed for the same reason.
+
+All three pass in run c. The tool unit tests required by the rules also
+pass from a session shell with `CARGO_TARGET_DIR` exported. So do
+`officecli_capability_delta.py --check`, `officecli_corpus.py --check` and
+`unified_bench_matrix.py --check`. A plain-shell runner launch (rows 47 and
+52) exits 0.
 
 The first run (`0365-a`, before the pages fix) had rows 47–52 at 0 and row 41
 at 101. The 101 came from the pages fuzz target described above.
