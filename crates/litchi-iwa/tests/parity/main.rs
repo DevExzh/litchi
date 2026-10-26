@@ -28,6 +28,7 @@ mod cost_probes;
 mod harness;
 mod known_fields;
 
+mod keynote_build_cases;
 mod keynote_builder_cases;
 mod keynote_cases;
 mod keynote_drawable_cases;
