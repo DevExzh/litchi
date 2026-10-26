@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0362ul165uf | [Tooling import and adapter identities](0362ul165uf-tooling-identity-repair.md) | Merged leaf `ed12bd5528`: consistent PPT protocol exception imports and reviewed current ODF consumer manifest pin; focused Python checks pass; launch PATH repair and final gate pending |
 | 0362ul165ug | [Gate dependency and evidence registrations](0362ul165ug-gate-registry-repair.md) | Merged leaf `d9979bf2ff`: explicit shared ZIP dev edge and optional operations VBA edge; five validation-only evidence dispositions; focused policy and matrix checks pass; native/final gate pending |
 | 0349 | [Workspace gate hygiene and canonical durable JSON](0349-workspace-gate-hygiene.md) | Merged (R19 `uo2/ws-hygiene`, `55517a5d02`): feature-unification determinism fix, workspace clippy/test/doc clean |
 | 0348 | [PPTX batch budget](0348-pptx-batch-budget.md) | Merged (R19 `uo2/pptx-batch`, `b70dd3e182`): every PPTX batch within 2× with batch equivalence; bench TSV split |
@@ -6465,3 +6466,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   focused Python tests passing. Original failed rows remain preserved, and
   runtime supplements continue on immutable 7c. Final source selection and
   qualification remain pending. Nothing is pushed.
+
+  Root also merges tooling leaf ed12bd5528 (165uf). Package-qualified imports
+  now share the same PPT guard exception class in combined Python runs. The
+  DrawingML preparer binds the accepted current ODF consumer manifest; the
+  historical RTF manifest remains independently pinned. Direct/combined PPT,
+  DrawingML and legacy protocol checks pass. DOCX integration must update
+  that current manifest pin together with its two new probe registrations.
+  The missing-rustc diagnostic remains a launch PATH issue to repair before
+  rerun. Runtime PPTX minimal-feature tests (58 chunks), batch equivalence
+  and OOXML metadata pass; facade runtime checks continue. Nothing is pushed.

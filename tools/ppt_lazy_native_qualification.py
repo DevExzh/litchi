@@ -25,21 +25,26 @@ import time
 from typing import Any, Mapping, Sequence
 
 try:
-    from odg_joined_qualification_builder import (
+    # Prefer package-qualified imports even when another tooling test has
+    # inserted ``tools/`` at the front of ``sys.path``.  Mixing a top-level
+    # ``odp_native_qualification`` with the package-qualified builder creates
+    # two distinct RunFailure classes; combined unittest runs then fail to
+    # catch the builder's intentional guard refusals.
+    from tools.odg_joined_qualification_builder import (
         _check_worktree_shape,
         _directory_bytes,
         _quiet_guard,
         _stream_command,
     )
-    from odp_native_qualification import RunFailure, _digest, binary_identity
+    from tools.odp_native_qualification import RunFailure, _digest, binary_identity
 except ImportError:  # pragma: no cover - direct package/module loading.
-    from tools.odg_joined_qualification_builder import (  # type: ignore[no-redef]
+    from odg_joined_qualification_builder import (  # type: ignore[no-redef]
         _check_worktree_shape,
         _directory_bytes,
         _quiet_guard,
         _stream_command,
     )
-    from tools.odp_native_qualification import (  # type: ignore[no-redef]
+    from odp_native_qualification import (  # type: ignore[no-redef]
         RunFailure,
         _digest,
         binary_identity,

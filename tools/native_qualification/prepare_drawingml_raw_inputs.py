@@ -95,7 +95,11 @@ CONSUMER_API_TRANSFORM_BYTES = sum(
 # preparer means a future protocol edit cannot silently become historical
 # baseline evidence merely because it is copied into a worktree.
 STATIC_REVIEWED_ADAPTER_SHA256 = {
-    "tools/perf-baseline/Cargo.toml": "61e103809753ffc528b2cd2c2e00a1525d40fc4e6360668ad982bec22a60bb73",
+    # The current shared consumer manifest includes the DOCX and ODF probe
+    # registrations composed after the original DrawingML adapter review.
+    # Keep the reviewed identity bound to the actual checked-in candidate;
+    # the detached historical RTF manifest pins remain separate.
+    "tools/perf-baseline/Cargo.toml": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
     "tools/perf-baseline/src/lib.rs": CONSUMER_API_CURRENT_SHA256,
     "tools/perf-baseline/src/drawingml_raw_probe.rs": "539e4641b1eecda7ef97f1bfca2e526348f0a0d4941cdec781cadb3c99a18477",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
