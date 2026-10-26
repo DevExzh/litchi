@@ -5,6 +5,7 @@
 use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawableProperties};
 use litchi_keynote::slide::image::lifecycle::{Commit, Edit, FlipAxis, Info, MediaProperties};
+use litchi_keynote::slide::image::text::Text;
 use litchi_keynote::{ImageSelector, Package, SlideSelector};
 
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
@@ -266,6 +267,198 @@ fn keynote_slide_image_read_parity() -> TestResult {
     .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
     .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
     .read("host and leaf images agree", images_agree)
+    .run()?;
+    Ok(())
+}
+
+/// `IMAGE` with a host-authored title and caption on its first image (the
+/// input of the replace and remove cases).
+fn texted_fixture() -> TestResult<crate::harness::Fixture> {
+    let base = fixture(IMAGE)?;
+    let mut editor = keynote::Draft::from_bytes(&base.bytes)?;
+    let image = host_image(&editor)?;
+    editor.set_slide_image_title(SLIDE, image, "Abstract")?;
+    editor.set_slide_image_caption(SLIDE, image, "Photo: litchi")?;
+    Ok(crate::harness::Fixture {
+        path: base.path,
+        bytes: editor.to_bytes()?,
+    })
+}
+
+/// Run one title/caption case: the host route against one leaf commit
+/// (`Some(text)` sets, `None` clears).
+fn run_text(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &crate::harness::Fixture,
+    host: impl FnOnce(&mut keynote::Draft, u64) -> TestResult,
+    text: Text,
+    step: Option<&'static str>,
+) -> TestResult {
+    Case::new(name, Format::Keynote, tier, evidence, input)
+        .host(|source| {
+            let mut editor = keynote::Draft::from_bytes(source)?;
+            let image = host_image(&editor)?;
+            host(&mut editor, image)?;
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let edit = package.edit_slide_image_text(
+                SlideSelector::index(SLIDE),
+                ImageSelector::index(0),
+                text,
+            )?;
+            let edit = match step {
+                Some(value) => edit.set(value)?,
+                None => edit.clear()?,
+            };
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_slide_image_text(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .read("leaf image title and caption", leaf_texts)
+        .read("host image title and caption", host_texts)
+        .run()?;
+    Ok(())
+}
+
+fn leaf_texts(bytes: &[u8]) -> TestResult<(Option<String>, Option<String>)> {
+    let package = Package::from_bytes(bytes)?;
+    let read =
+        |text| package.slide_image_text(SlideSelector::index(SLIDE), ImageSelector::index(0), text);
+    Ok((read(Text::Title)?, read(Text::Caption)?))
+}
+
+fn host_texts(bytes: &[u8]) -> TestResult<(Option<String>, Option<String>)> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let texts = editor.slide_image_title_caption(SLIDE, host_image(&editor)?)?;
+    Ok((texts.title, texts.caption))
+}
+
+#[test]
+fn keynote_slide_image_title_create_parity() -> TestResult {
+    run_text(
+        "keynote_slide_image_title_create_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(IMAGE)?,
+        |editor, image| {
+            editor.set_slide_image_title(SLIDE, image, "Abstract")?;
+            Ok(())
+        },
+        Text::Title,
+        Some("Abstract"),
+    )
+}
+
+#[test]
+fn keynote_slide_image_title_set_parity() -> TestResult {
+    run_text(
+        "keynote_slide_image_title_set_parity",
+        Tier::B,
+        Evidence::Queued,
+        &texted_fixture()?,
+        |editor, image| {
+            editor.set_slide_image_title(SLIDE, image, "Abstract art")?;
+            Ok(())
+        },
+        Text::Title,
+        Some("Abstract art"),
+    )
+}
+
+#[test]
+fn keynote_slide_image_title_remove_parity() -> TestResult {
+    run_text(
+        "keynote_slide_image_title_remove_parity",
+        Tier::B,
+        Evidence::Queued,
+        &texted_fixture()?,
+        |editor, image| {
+            if !editor.remove_slide_image_title(SLIDE, image)? {
+                return Err("host removed nothing".into());
+            }
+            Ok(())
+        },
+        Text::Title,
+        None,
+    )
+}
+
+#[test]
+fn keynote_slide_image_caption_create_parity() -> TestResult {
+    run_text(
+        "keynote_slide_image_caption_create_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(IMAGE)?,
+        |editor, image| {
+            editor.set_slide_image_caption(SLIDE, image, "Photo: litchi")?;
+            Ok(())
+        },
+        Text::Caption,
+        Some("Photo: litchi"),
+    )
+}
+
+#[test]
+fn keynote_slide_image_caption_set_parity() -> TestResult {
+    run_text(
+        "keynote_slide_image_caption_set_parity",
+        Tier::B,
+        Evidence::Queued,
+        &texted_fixture()?,
+        |editor, image| {
+            editor.set_slide_image_caption(SLIDE, image, "Photo: litchi, 2026")?;
+            Ok(())
+        },
+        Text::Caption,
+        Some("Photo: litchi, 2026"),
+    )
+}
+
+#[test]
+fn keynote_slide_image_caption_remove_parity() -> TestResult {
+    run_text(
+        "keynote_slide_image_caption_remove_parity",
+        Tier::B,
+        Evidence::Queued,
+        &texted_fixture()?,
+        |editor, image| {
+            if !editor.remove_slide_image_caption(SLIDE, image)? {
+                return Err("host removed nothing".into());
+            }
+            Ok(())
+        },
+        Text::Caption,
+        None,
+    )
+}
+
+#[test]
+fn keynote_slide_image_text_read_parity() -> TestResult {
+    let input = texted_fixture()?;
+    Case::new(
+        "keynote_slide_image_text_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("leaf image title and caption", leaf_texts)
+    .read("host image title and caption", host_texts)
     .run()?;
     Ok(())
 }
