@@ -178,7 +178,6 @@ impl Archive {
     /// values. The returned facts are intended for a caller-owned aggregate
     /// transaction ledger immediately before archive parsing.
     pub fn preflight(data: &[u8], limits: Limits) -> Result<ArchiveIngressRequirements> {
-        let limits = limits.validate()?;
         if data.len() > limits.max_archive_bytes() {
             return Err(limit(
                 LimitKind::ArchiveBytes,

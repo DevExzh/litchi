@@ -1715,6 +1715,11 @@ impl Catalog {
                     "canonical logical entry {authority} has mismatched local and central compression methods"
                 )));
             }
+            if entry.metadata().local().flags() != entry.metadata().central().flags() {
+                return Err(Error::InvalidBundle(format!(
+                    "canonical logical entry {authority} has mismatched local and central flags"
+                )));
+            }
             let value = PackageMetadataEntry {
                 data: entry.data(),
                 opaque: entry.is_opaque(),
@@ -4921,6 +4926,11 @@ fn preflight_semantic_supported_entry(
             "{label} {name} has mismatched local and central compression methods"
         )));
     }
+    if local.flags != central.flags {
+        return Err(Error::InvalidBundle(format!(
+            "{label} {name} has mismatched local and central flags"
+        )));
+    }
     if !matches!(central.compression_method, 0 | 8) {
         return Err(Error::InvalidBundle(format!(
             "{label} {name} uses unsupported ZIP compression"
@@ -5056,6 +5066,12 @@ fn preflight_logical_entry(
     if local.compression_method != central.compression_method {
         return Err(Error::InvalidBundle(format!(
             "canonical logical entry {} has mismatched local and central compression methods",
+            String::from_utf8_lossy(logical_name)
+        )));
+    }
+    if local.flags != central.flags {
+        return Err(Error::InvalidBundle(format!(
+            "canonical logical entry {} has mismatched local and central flags",
             String::from_utf8_lossy(logical_name)
         )));
     }
@@ -6189,7 +6205,37 @@ mod tests {
                 if message.contains("mismatched local and central compression methods")
         ));
         assert_eq!(crate::zip::test_entry_read_count(), 0);
+
+        let flag_mismatch = with_local_central_flag_mismatch(raw_named_zip(
+            authority,
+            authority,
+            0,
+            0,
+            b"properties",
+        ))?;
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &flag_mismatch,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            ),
+            Err(Error::InvalidBundle(message))
+                if message.contains("mismatched local and central flags")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
         Ok(())
+    }
+
+    // Set the data-descriptor flag in the local header only.
+    fn with_local_central_flag_mismatch(mut bytes: Vec<u8>) -> Result<Vec<u8>> {
+        let central = bytes
+            .windows(4)
+            .position(|window| window == b"PK\x01\x02")
+            .ok_or_else(|| Error::InvalidBundle("central test record is missing".to_owned()))?;
+        bytes[6..8].copy_from_slice(&0x0008_u16.to_le_bytes());
+        bytes[central + 8..central + 10].copy_from_slice(&0_u16.to_le_bytes());
+        Ok(bytes)
     }
 
     #[test]
