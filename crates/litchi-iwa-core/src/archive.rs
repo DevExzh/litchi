@@ -4540,6 +4540,8 @@ impl Archive {
     /// The calculation validates object/message/header/archive ceilings,
     /// checked arithmetic, duplicate identifiers, and retained raw-header
     /// selection without allocating an encoded header or output buffer.
+    /// Archives of more than 32 objects reserve one fallible identifier index
+    /// so duplicate detection stays `O(n log n)`.
     pub fn encoded_len(&self, limits: Limits) -> Result<usize> {
         encoded_archive_len_preflight(&self.objects, limits)
     }
@@ -9090,7 +9092,7 @@ impl<'a> CanonicalHeaderProbe<'a> {
             let equal = self
                 .target
                 .and_then(|target| target.get(self.offset..end))
-                .is_some_and(|target| target == bytes);
+                .is_some_and(|target| short_bytes_equal(target, bytes));
             if !equal {
                 self.matches = false;
             }
@@ -9201,9 +9203,68 @@ impl<'a> CanonicalHeaderProbe<'a> {
     }
 }
 
+/// Position of the first object whose identifier already occurred earlier.
+///
+/// This is the object at which the ordered preflight reports a duplicate
+/// identifier. Only the prefix the preflight can reach (the object ceiling)
+/// is considered, and objects without an identifier are skipped because the
+/// preflight refuses them at their own position first. Small archives use an
+/// allocation-free pairwise scan; larger ones sort one fallibly reserved
+/// `(identifier, position)` vector instead of comparing every earlier object.
+fn first_duplicate_identifier(objects: &[ArchiveObject], limits: Limits) -> Result<Option<usize>> {
+    const PAIRWISE_OBJECTS: usize = 32;
+    let reachable = &objects[..objects.len().min(limits.max_objects())];
+    if reachable.len() <= PAIRWISE_OBJECTS {
+        return Ok(reachable.iter().enumerate().position(|(index, object)| {
+            object.archive_info.identifier.is_some_and(|identifier| {
+                reachable[..index]
+                    .iter()
+                    .any(|previous| previous.archive_info.identifier == Some(identifier))
+            })
+        }));
+    }
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(reachable.len())
+        .map_err(|_| Error::allocation("IWA object identifier index", reachable.len()))?;
+    entries.extend(
+        reachable
+            .iter()
+            .enumerate()
+            .filter_map(|(index, object)| object.archive_info.identifier.map(|id| (id, index))),
+    );
+    entries.sort_unstable();
+    Ok(entries
+        .windows(2)
+        .filter(|pair| pair[0].0 == pair[1].0)
+        .map(|pair| pair[1].1)
+        .min())
+}
+
+/// Compare two equal-length slices of probe output.
+///
+/// The probe compares one varint or key (at most ten bytes) or one packed
+/// payload at a time. A library `memcmp` call costs a data-dependent branch
+/// per call on such short inputs; an OR-reduction of byte differences is
+/// branch-free for them and falls back to the slice comparison otherwise.
+#[inline]
+fn short_bytes_equal(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    if left.len() > 16 {
+        return left == right;
+    }
+    left.iter()
+        .zip(right)
+        .fold(0u8, |difference, (left, right)| difference | (left ^ right))
+        == 0
+}
+
 fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> Result<usize> {
     let mut archive_length = 0usize;
     let mut total_messages = 0usize;
+    let first_duplicate = first_duplicate_identifier(objects, limits)?;
 
     for (object_index, object) in objects.iter().enumerate() {
         if object_index >= limits.max_objects() {
@@ -9213,13 +9274,10 @@ fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> R
                 limits.max_objects(),
             ));
         }
-        let identifier = object.archive_info.identifier.ok_or_else(|| {
+        object.archive_info.identifier.ok_or_else(|| {
             Error::invalid_archive(object_index, "object is missing its archive identifier")
         })?;
-        if objects[..object_index]
-            .iter()
-            .any(|previous| previous.archive_info.identifier == Some(identifier))
-        {
+        if first_duplicate == Some(object_index) {
             return Err(Error::invalid_archive(
                 object_index,
                 "duplicate object identifier",
@@ -10590,6 +10648,66 @@ mod tests {
                 maximum,
             } if observed == Limits::MAX_MESSAGE_BYTES + 1
                 && maximum == Limits::MAX_MESSAGE_BYTES
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_identifier_position_matches_the_ordered_scan() -> Result<()> {
+        let limits = Limits::default();
+        let object = |identifier| {
+            ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 1,
+                    data: vec![1],
+                }],
+                limits,
+            )
+        };
+        // Small (pairwise) and large (sorted) archives; the reported object is
+        // always the first one whose identifier already occurred.
+        for count in [4u64, 40, 200] {
+            let mut objects = (1..=count).map(object).collect::<Result<Vec<_>>>()?;
+            assert!(
+                Archive {
+                    objects: objects.clone()
+                }
+                .encoded_len(limits)
+                .is_ok()
+            );
+            let last = usize::try_from(count).expect("small count") - 1;
+            objects[last] = object(2)?;
+            objects[last - 1] = object(3)?;
+            let expected = (0..objects.len())
+                .find(|&index| {
+                    objects[..index].iter().any(|previous| {
+                        previous.archive_info.identifier == objects[index].archive_info.identifier
+                    })
+                })
+                .expect("fixture has a duplicate");
+            let error = Archive { objects }.encoded_len(limits).unwrap_err();
+            assert!(
+                matches!(
+                    error,
+                    Error::InvalidArchive {
+                        offset,
+                        reason: "duplicate object identifier",
+                    } if offset == expected
+                ),
+                "{count}: {error:?}"
+            );
+        }
+        // A missing identifier before the first duplicate is reported first.
+        let mut objects = (1..=40).map(object).collect::<Result<Vec<_>>>()?;
+        objects[39] = object(1)?;
+        objects[5].archive_info.identifier = None;
+        assert!(matches!(
+            Archive { objects }.encoded_len(limits),
+            Err(Error::InvalidArchive {
+                offset: 5,
+                reason: "object is missing its archive identifier",
+            })
         ));
         Ok(())
     }
