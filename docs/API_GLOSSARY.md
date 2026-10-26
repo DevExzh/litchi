@@ -2860,6 +2860,20 @@ text-flow position, never a native identifier.
 | `litchi_pages::date_time::{Field, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextRange, DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan}` | Registered family in `pages`; `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add(TextRange, Settings), insert(TextPosition, DisplayText, Settings), update(position, TextRange, Settings), remove(position)}`, one operation per edit; `Field::{range, settings}` | ✅ 0371 |
 | `litchi_pages::number_attachment::{Attachment, Target, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextNumberAttachmentSettings, TextNumberAttachmentKind, TextNumberAttachmentFormat, TextNumberAttachmentText}` | Registered family in `pages`; `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert(TextPosition, settings), update(position, settings), remove(position)}`; `Attachment::{position, settings}` carries no native identifier (the host's `TextNumberAttachmentId` stays out) | ✅ 0371 |
 
+## Numbers sheet drawables out of the host (record 0378)
+
+Wave W2-A of record 0363 moves the host's Numbers sheet-drawable editors
+into `litchi-numbers` families. Host runs of `x()`/`set_x()`/`flip_x()`/
+`restore_x()` per drawable kind collapse into one property family; selectors
+carry a list position or a kind and position, never a native identifier.
+
+| Name | Meaning | Status |
+|---|---|---|
+| `litchi_numbers::DrawableSelector::{Position, Of { kind, position }}` (`position`, `index`, `of`, `text_box`, `shape`, `image`, `movie`, `audio`, `chart`, `kind`, `as_position`, `as_index`; also `litchi_numbers::sheet::drawable::DrawableSelector`; `From<usize>`, `From<Position>`, `From<ImageSelector>`, `From<ChartSelector>`) | One sheet drawable by its back-to-front list position or by its position among one kind — the 0363 §3.2 Numbers drawable selector | ✅ 0378 |
+| `litchi_numbers::sheet::drawable::{Kind, Drawable, Geometry, GeometryFlags, Properties, Point, Size, FlipAxis, MediaPlaybackSettings, MediaLoopMode, MediaVolume}` | `Kind::{TextBox, Shape, Image, Movie, Audio, Chart, Table, Other}` (`has_text`, `name`); `Drawable::{selector, kind_selector, kind, z_position, geometry}`; the archive-free frame, flag set and shared properties as in Pages | ✅ 0378 |
+| `litchi_numbers::sheet::drawable::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered family in `numbers-minimal`/`numbers-full`; `Package::{sheet_drawable_list, edit_sheet_drawables, apply_sheet_drawables}`; `Edit::{move_to(drawable, Position), remove(drawable)}`, several per edit, selectors resolve against the base; replaces `sheet_drawable_order`, `set_sheet_drawable_order`, `move_sheet_drawable`, `remove_sheet_{text_box,shape}` | ✅ 0378 |
+| `litchi_numbers::sheet::drawable::properties::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Snapshot}` | Registered family; `Package::{sheet_drawable_properties, edit_sheet_drawable_properties, apply_sheet_drawable_properties}(sheet, drawable)`; `Edit::{set_geometry, set_position, flip, restore_original_size, set_properties, set_playback}` replace the host's 30 text-box/shape/image/movie/audio/chart geometry, flip, Original Size, property, audio position and playback methods; a verb that does not apply to the kind is `Refusal::UnsupportedOperation` | ✅ 0378 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |
