@@ -334,17 +334,6 @@ pub(super) fn duplicate(
     Ok((copy, remap))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::vertical_flip_angle;
-
-    #[test]
-    fn vertical_flip_adds_a_half_turn() {
-        assert_eq!(vertical_flip_angle(None), 180.0);
-        assert_eq!(vertical_flip_angle(Some(270.0)), 90.0);
-    }
-}
-
 /// `TSWP.ShapeInfoArchive.super` (`TSD.ShapeArchive`) and its path source.
 const SHAPE_ARCHIVE: u32 = 1;
 const SHAPE_PATH_SOURCE: u32 = 3;
@@ -415,4 +404,15 @@ pub(super) fn set_preset(
     })
     .map_err(lift)?;
     replace_payload(workspace, drawable, message_index, message_type, data).map_err(lift)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::vertical_flip_angle;
+
+    #[test]
+    fn vertical_flip_adds_a_half_turn() {
+        assert_eq!(vertical_flip_angle(None), 180.0);
+        assert_eq!(vertical_flip_angle(Some(270.0)), 90.0);
+    }
 }
