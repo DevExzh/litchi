@@ -251,11 +251,7 @@ impl Package {
         // every budget are still checked in full).
         let candidate = match &self.state.source {
             PhysicalSource::Package(base) => {
-                let catalog = litchi_iwa_archive::SourceCatalog::__from_shared_bytes_reusing(
-                    Arc::from(bytes),
-                    self.state.options.archive(),
-                    base,
-                )?;
+                let catalog = base.reopen(Arc::from(bytes))?;
                 Self::from_source_catalog(catalog, self.state.options)?
             },
             PhysicalSource::Semantic(_) => {

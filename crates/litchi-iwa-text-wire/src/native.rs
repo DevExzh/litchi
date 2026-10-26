@@ -214,6 +214,14 @@ impl<'a> Field<'a> {
         self.expect(LENGTH_DELIMITED)
     }
 
+    pub(crate) fn double(self) -> NativeResult<f64> {
+        let bytes: [u8; 8] = self
+            .expect(FIXED64)?
+            .try_into()
+            .map_err(|_| NativeError::Invalid("malformed protobuf fixed64"))?;
+        Ok(f64::from_le_bytes(bytes))
+    }
+
     pub(crate) fn string(self, budget: &Budget) -> NativeResult<String> {
         let text = std::str::from_utf8(self.bytes()?)
             .map_err(|_| NativeError::Invalid("protobuf string is not UTF-8"))?;
@@ -438,6 +446,13 @@ impl Writer {
         Ok(())
     }
 
+    pub(crate) fn double(&mut self, number: u32, value: f64) -> NativeResult<()> {
+        self.key(number, FIXED64)?;
+        self.reserve(8)?;
+        self.output.extend_from_slice(&value.to_le_bytes());
+        Ok(())
+    }
+
     pub(crate) fn bytes(&mut self, number: u32, value: &[u8]) -> NativeResult<()> {
         self.key(number, LENGTH_DELIMITED)?;
         self.raw_varint(value.len() as u64)?;
@@ -549,7 +564,12 @@ pub(crate) struct Color {
 }
 
 impl Color {
-    fn merge(&mut self, data: &[u8], depth: usize, budget: &mut Budget) -> NativeResult<()> {
+    pub(crate) fn merge(
+        &mut self,
+        data: &[u8],
+        depth: usize,
+        budget: &mut Budget,
+    ) -> NativeResult<()> {
         fields(data, depth, budget, |field, _| {
             match field.number {
                 1 => self.model = field.int32()?,

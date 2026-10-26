@@ -18,8 +18,11 @@
 #![forbid(unsafe_code)]
 
 mod char_style;
+pub mod drop_cap;
 pub mod language;
+pub mod list;
 mod native;
+pub mod number_attachment;
 pub mod paragraph_style;
 pub mod ranged;
 mod rewrite;

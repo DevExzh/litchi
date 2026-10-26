@@ -595,7 +595,7 @@ fn clear_stored_cells(
         if has_comment {
             clear_attached_cell_comment_in_package(package, table_id, row, column)?;
         }
-        set_attached_cell_in_package(package, table_id, row, column, CellValue::Empty)?;
+        model::remove_attached_cell_in_package(package, table_id, row, column)?;
     }
     Ok(())
 }

@@ -22,7 +22,7 @@
 | `ebbce329e2` | `litchi-iwa` tests, ledger, queue | drawable and slide-lifecycle parity cases; harness learns the leaf's documented policies (root-preview invalidation, save-token advance, deterministic UUIDs of created objects); Keynote drawable schemas registered |
 | `e2de754f3b` | `litchi-keynote` | the 0368 gap: `slide::table::number_format::{Number, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, ThousandsSeparator, MAX_DECIMAL_PLACES, NumberError, At, AtError}` are now re-exports of `litchi_iwa_common::table` (`tests/neutral_table_vocabulary.rs` proves nominal identity); no workspace caller needed a change |
 | `8ff06a2d5e` | `litchi-iwa` tests | paired callgrind probe `keynote_w1c_cost` |
-| `3d006110be` | `litchi-iwa-archive` | `SourceCatalog::__from_shared_bytes_reusing`: a derived candidate reuses the base's parsed archive for byte-identical IWA members (ZIP and budgets still checked in full); parsed components are `Arc`-shared |
+| `3d006110be` | `litchi-iwa-archive` | `SourceCatalog::reopen` (introduced as a hidden `__from_shared_bytes_reusing`, renamed in the follow-up slice): a derived candidate reuses the base's parsed archive for byte-identical IWA members (ZIP and budgets still checked in full); parsed components are `Arc`-shared |
 | `ba7155292b` | `litchi-keynote` | every structural commit reopens its candidate through the reuse path |
 | `a9660091a6` | `litchi-keynote` | layout reassignment: `slide::creation::Edit::set_layout(slide, layout)` (port of host `set_slide_layout`, including the layout-media swap) |
 | `4e85d30500` | `litchi-iwa` tests, ledger, queue | layout-reassignment parity on 48 layout pairs |
@@ -107,8 +107,8 @@ are kept out of the tree until then.
 - `slide::table::number_format` and the crate root: the Number format and
   coordinate names are the shared types (breaking only for code matching
   `NumberError`/`AtError` variants exhaustively; none in the workspace).
-- `litchi_iwa_archive::SourceCatalog::__from_shared_bytes_reusing`
-  (doc-hidden, unstable).
+- `litchi_iwa_archive::SourceCatalog::reopen(&self, candidate)`
+  (public, documented; physical-layer reopen of a derived candidate).
 
 The Keynote glossary profiles pass unchanged (no new banned names, no new
 family; `set_layout` joins the registered `slide::creation` family).
