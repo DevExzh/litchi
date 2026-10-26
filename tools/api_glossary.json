@@ -20537,6 +20537,11 @@
           "replacement": "use media::asset::Limits; no host `Media` prefix (record 0375)"
         },
         {
+          "name": "LineSegment",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::line::Segment (record 0375)"
+        },
+        {
           "name": "MediaManager",
           "scope": "litchi_iwa_common",
           "replacement": "use media::Catalog (discovery); per-format package families own extraction and replacement; no host `Media` prefix (record 0375)"
