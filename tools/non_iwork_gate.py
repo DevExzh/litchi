@@ -979,6 +979,11 @@ def _metadata_packages(metadata: Mapping[str, Any]) -> dict[str, Package]:
             if dependency.path is None:
                 continue
             dependency_dir = dependency.path.resolve()
+            if (dependency_dir.parent == ROOT / "vendor"
+                    and dependency.original_name not in packages):
+                # A vendored third-party crate (`vendor/<name>`, excluded
+                # from the workspace) is an external dependency, never iWork.
+                continue
             if dependency_dir not in package_dirs:
                 raise GateError(
                     f"package {package.name!r} dependency {dependency.name!r} path "

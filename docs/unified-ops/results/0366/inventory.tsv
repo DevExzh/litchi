@@ -1,0 +1,21 @@
+crate	category	path	detail	target
+litchi-core	edit_type	litchi_core::SubEdit		rename to the focused module's Edit
+litchi-doc	edit_type	litchi_doc::body_text::SubEdit		rename to the focused module's Edit
+litchi-formula	mut_owner	litchi_formula::Formula::set_display_style	&mut self	display_style::Edit via Package::edit_display_style() / apply_display_style(&Patch)
+litchi-formula	mut_owner	litchi_formula::Formula::set_root	&mut self	root::Edit via Package::edit_root() / apply_root(&Patch)
+litchi-iwa-archive	edit_type	litchi_iwa_archive::package::EntryEdit		rename to the focused module's Edit
+litchi-iwa-common	edit_type	litchi_iwa_common::wire::NestedFieldEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::keynote_media_lifecycle_codec::BuildChunkLifecycleEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::keynote_media_lifecycle_codec::BuildLifecycleEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::keynote_media_lifecycle_codec::SlideLifecycleEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::keynote_media_lifecycle_codec::node_cache::SlideNodeBuildCacheEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::numbers_table_cell_storage_codec::HeaderSizeEdit		rename to the focused module's Edit
+litchi-iwa-protos	edit_type	litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntryRefCountEdit		rename to the focused module's Edit
+litchi-odb	edit_type	litchi_odb::SubEdit		rename to the focused module's Edit
+litchi-odg	edit_type	litchi_odg::edit::SubEdit		rename to the focused module's Edit
+litchi-opc	edit_type	litchi_opc::ContentTypeEdit		rename to the focused module's Edit
+litchi-opc	edit_type	litchi_opc::ContentTypeFragmentEdit		rename to the focused module's Edit
+litchi-opc	edit_type	litchi_opc::OwnedElementEdit		rename to the focused module's Edit
+litchi-opc	edit_type	litchi_opc::RelationshipEdit		rename to the focused module's Edit
+litchi-opc	edit_type	litchi_opc::RelationshipFragmentEdit		rename to the focused module's Edit
