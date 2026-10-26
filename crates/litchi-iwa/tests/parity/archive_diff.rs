@@ -139,7 +139,12 @@ impl Diff {
 /// [`crate::harness::Case::leaf_invalidates_root_previews`]): when such a
 /// member is in the input and the host output and absent from the leaf
 /// output, the difference is a note instead of a violation.
-pub fn compare(
+pub fn compare(input: &[u8], host: &[u8], leaf: &[u8], known: &KnownFields) -> TestResult<Diff> {
+    compare_with_policies(input, host, leaf, known, &[], MetadataPolicy::default())
+}
+
+/// [`compare`] with the documented leaf policies a case accepts.
+pub fn compare_with_policies(
     input: &[u8],
     host: &[u8],
     leaf: &[u8],

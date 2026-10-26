@@ -153,6 +153,25 @@ pub(crate) fn compatibility_document_from_bytes(
         .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
 }
 
+/// The `TST.Tile.numrows` a topology edit writes for `rows` (record 0370).
+///
+/// Native Numbers saves the number of stored row records, not the row
+/// extent: on every tracked native fixture where the two differ the tile
+/// holds the count. A tile whose source `numrows` already counts its
+/// records keeps counting them; any other tile keeps the extent convention
+/// this editor wrote before.
+pub(super) fn topology_tile_numrows(previous: &Tile, rows: &[TileRowInfo]) -> u32 {
+    if usize::try_from(previous.numrows).ok() == Some(previous.row_infos.len())
+        && let Ok(count) = u32::try_from(rows.len())
+    {
+        return count;
+    }
+    rows.iter()
+        .map(|row| row.tile_row_index + 1)
+        .max()
+        .unwrap_or(0)
+}
+
 #[path = "editor/package.rs"]
 mod package;
 #[path = "editor/semantic.rs"]

@@ -547,24 +547,37 @@ fn rewrite_optional_range_coordinate(
 ) -> Result<Vec<u8>> {
     match (previous, current) {
         (Some(previous), Some(current)) => {
-            let mut immutable = *current;
-            match axis {
-                DependencyAxis::Column => {
-                    immutable.bottom_right_column = previous.bottom_right_column;
-                },
-                DependencyAxis::Row => immutable.bottom_right_row = previous.bottom_right_row,
-            }
-            if immutable != *previous {
+            // An insertion moves the far edge on its axis; a table extent
+            // that follows a section change (record 0370) moves its near
+            // edge too. The other axis's coordinates never change.
+            let (fixed_previous, fixed_current) = match axis {
+                DependencyAxis::Column => (
+                    (previous.top_left_row, previous.bottom_right_row),
+                    (current.top_left_row, current.bottom_right_row),
+                ),
+                DependencyAxis::Row => (
+                    (previous.top_left_column, previous.bottom_right_column),
+                    (current.top_left_column, current.bottom_right_column),
+                ),
+            };
+            if fixed_previous != fixed_current {
                 return Err(Error::InvalidFormat(
                     "Numbers dependency range changed outside its final coordinate".to_owned(),
                 ));
             }
             transform_length_delimited_field(data, field_number, |range| {
-                let (field, value) = match axis {
-                    DependencyAxis::Column => (3, current.bottom_right_column),
-                    DependencyAxis::Row => (4, current.bottom_right_row),
-                };
-                let patched = patch_varint_field(range, field, true, Some(u64::from(value)))?;
+                let mut patched = range.to_vec();
+                for (field, before, after) in [
+                    (1, previous.top_left_column, current.top_left_column),
+                    (2, previous.top_left_row, current.top_left_row),
+                    (3, previous.bottom_right_column, current.bottom_right_column),
+                    (4, previous.bottom_right_row, current.bottom_right_row),
+                ] {
+                    if before != after {
+                        patched =
+                            patch_varint_field(&patched, field, true, Some(u64::from(after)))?;
+                    }
+                }
                 if tsce::RangeCoordinateArchive::decode(patched.as_slice())? != *current {
                     return Err(Error::InvalidFormat(
                         "Numbers dependency range row shift failed wire validation".to_owned(),

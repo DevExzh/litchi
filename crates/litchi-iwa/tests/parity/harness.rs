@@ -297,7 +297,7 @@ impl<'a> Case<'a> {
             ));
         }
 
-        let diff = archive_diff::compare(
+        let diff = archive_diff::compare_with_policies(
             input,
             &host_output,
             leaf_output,

@@ -5,7 +5,9 @@ use super::*;
 mod storage;
 
 use cell_merge::{MergeAxis, shift_merges_for_axis_insertion};
-use formula_dependency_shift::{DependencyAxis, FooterRangeInsertion, shift_formula_dependencies};
+use formula_dependency_shift::{
+    DependencyAxis, FooterRangeInsertion, TableExtents, shift_formula_dependencies,
+};
 use storage::{
     insert_column_uid, set_table_column_count, shift_column_headers, shift_table_tile_columns,
 };
@@ -68,6 +70,12 @@ pub(super) fn insert_attached_table_column(
     validate_table_sort_order_for_topology(package, table_id)?;
     validate_column_insertion_features(package, &locations, &descriptor.model)?;
 
+    let extents = super::row_insert::insertion_extents(
+        &descriptor.model,
+        resolved.updated_header_settings,
+        0,
+        1,
+    )?;
     shift_formula_dependencies(
         package,
         descriptor.table_info_id,
@@ -75,6 +83,7 @@ pub(super) fn insert_attached_table_column(
         u32::try_from(column)
             .map_err(|_| Error::ParseError("iWork column exceeds u32".to_owned()))?,
         FooterRangeInsertion::FixedSection,
+        extents,
     )?;
     shift_table_tile_columns(package, &locations, &descriptor.model, column)?;
     shift_column_headers(
