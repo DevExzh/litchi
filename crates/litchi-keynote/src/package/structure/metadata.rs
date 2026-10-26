@@ -600,6 +600,126 @@ impl Registry {
         }))
     }
 
+    /// The stored file name (`file_name`, else `preferred_file_name`) of the
+    /// `DataInfo` record of `identifier`.
+    pub(in crate::package) fn data_file_name(
+        &self,
+        identifier: u64,
+        limits: WireLimits,
+    ) -> Result<Option<String>, StructureError> {
+        let mut found = None;
+        for entry in &self.entries {
+            let Entry::Raw(raw) = entry else { continue };
+            if field_number(raw) != Some(DATAS) {
+                continue;
+            }
+            let outer = parse_wire_fields(raw, limits)?;
+            let [field] = outer.as_slice() else {
+                return Err(StructureError::Registry("data info"));
+            };
+            let inner = field.payload(raw)?;
+            let mut id = None;
+            let mut preferred = None;
+            let mut stored = None;
+            for part in parse_wire_fields(inner, limits)? {
+                match (part.number(), part.wire_type()) {
+                    (1, VARINT) => id = Some(varint(part, inner)?),
+                    (3, LENGTH_DELIMITED) => preferred = Some(part.payload(inner)?),
+                    (4, LENGTH_DELIMITED) => stored = Some(part.payload(inner)?),
+                    _ => {},
+                }
+            }
+            if id == Some(identifier) {
+                let name = std::str::from_utf8(
+                    stored
+                        .or(preferred)
+                        .ok_or(StructureError::Registry("data file name"))?,
+                )
+                .map_err(|_| StructureError::Registry("data file name"))?;
+                if found.replace(name.to_owned()).is_some() {
+                    return Err(StructureError::Registry("duplicate data info"));
+                }
+            }
+        }
+        Ok(found)
+    }
+
+    /// Replace the SHA-1 `digest` (field 2) and materialized length (field
+    /// 18) of the `DataInfo` record of `identifier`, keeping every other
+    /// field and the record's position; returns the record's stored file
+    /// name, or `None` when the registry has no such record.
+    pub(in crate::package) fn patch_data_info(
+        &mut self,
+        identifier: u64,
+        digest: &[u8],
+        length: u64,
+        limits: WireLimits,
+    ) -> Result<Option<String>, StructureError> {
+        let mut found = None;
+        for (position, entry) in self.entries.iter().enumerate() {
+            let Entry::Raw(raw) = entry else { continue };
+            if field_number(raw) != Some(DATAS) {
+                continue;
+            }
+            let outer = parse_wire_fields(raw, limits)?;
+            let [field] = outer.as_slice() else {
+                return Err(StructureError::Registry("data info"));
+            };
+            let inner = field.payload(raw)?;
+            let mut id = None;
+            let mut preferred = None;
+            let mut stored = None;
+            let mut patched = Vec::with_capacity(inner.len() + digest.len());
+            let (mut digests, mut lengths) = (0, 0);
+            for part in parse_wire_fields(inner, limits)? {
+                match (part.number(), part.wire_type()) {
+                    (1, VARINT) => id = Some(varint(part, inner)?),
+                    (3, LENGTH_DELIMITED) => preferred = Some(part.payload(inner)?.to_vec()),
+                    (4, LENGTH_DELIMITED) => stored = Some(part.payload(inner)?.to_vec()),
+                    _ => {},
+                }
+                match (part.number(), part.wire_type()) {
+                    (2, LENGTH_DELIMITED) => {
+                        digests += 1;
+                        message_field(&mut patched, 2, digest);
+                    },
+                    (18, VARINT) => {
+                        lengths += 1;
+                        encode_varint_into(&mut patched, u64::from(18_u32 << 3));
+                        encode_varint_into(&mut patched, length);
+                    },
+                    _ => patched.extend_from_slice(part.raw(inner)?),
+                }
+            }
+            if id != Some(identifier) {
+                continue;
+            }
+            if found.is_some() || digests > 1 || lengths > 1 {
+                return Err(StructureError::Registry("data info digest"));
+            }
+            if digests == 0 {
+                message_field(&mut patched, 2, digest);
+            }
+            if lengths == 0 {
+                encode_varint_into(&mut patched, u64::from(18_u32 << 3));
+                encode_varint_into(&mut patched, length);
+            }
+            let name = stored
+                .or(preferred)
+                .map(String::from_utf8)
+                .transpose()
+                .map_err(|_| StructureError::Registry("data file name"))?
+                .ok_or(StructureError::Registry("data file name"))?;
+            let mut replacement = Vec::with_capacity(patched.len() + 4);
+            message_field(&mut replacement, DATAS, &patched);
+            found = Some((position, name, replacement));
+        }
+        Ok(found.map(|(position, name, replacement)| {
+            self.entries[position] = Entry::Raw(replacement);
+            name
+        }))
+    }
+
     pub(in crate::package) fn components(&self) -> impl Iterator<Item = &Component> {
         self.entries.iter().filter_map(|entry| match entry {
             Entry::Component(component, _) => Some(component.as_ref()),

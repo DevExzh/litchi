@@ -180,6 +180,19 @@ impl Package {
                 .any(|entry| entry.name() == member)
     }
 
+    /// The stored bytes of one package member, when present.
+    pub(in crate::package) fn structure_member_bytes(&self, member: &str) -> Option<&[u8]> {
+        if !self.structure_is_exact() {
+            return None;
+        }
+        self.state
+            .source
+            .package()
+            .iter()
+            .find(|entry| entry.name() == member)
+            .map(|entry| entry.data())
+    }
+
     /// The component member holding one object.
     pub(in crate::package) fn structure_object_component(&self, identifier: u64) -> Option<&str> {
         self.object_with_component(identifier)

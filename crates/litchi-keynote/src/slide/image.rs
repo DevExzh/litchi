@@ -149,6 +149,16 @@ pub mod adjustments {
     };
 }
 
+/// Image lifecycle of ordinary slide images: duplicate, flip, original
+/// size, properties, data replacement and reads (record 0372).
+pub mod lifecycle {
+    pub use crate::package::slide_image_lifecycle::{
+        Commit, Diagnostics, Edit, Error, Info, Kind, LimitKind, Patch, Refusal,
+    };
+    pub use crate::slide::media::MediaProperties;
+    pub use litchi_iwa_common::shape::geometry::{FlipAxis, Size};
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
