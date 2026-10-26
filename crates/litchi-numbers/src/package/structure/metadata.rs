@@ -469,6 +469,12 @@ pub(super) fn apply(
     let mut restore = None;
     let output = if transition.is_empty() && last == current {
         None
+    } else if transition.is_empty() && last < current {
+        // Only the watermark goes down (the last issued object was removed
+        // and nothing else changes in the registry): a field patch, as the
+        // host editor's `release_package_identifier_suffix` writes it.
+        restore = Some(last);
+        None
     } else if transition.is_empty() {
         Some(
             rewrite_package_metadata(source, Batch::new(current, last, &[], &[]), options)
