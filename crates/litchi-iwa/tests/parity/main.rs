@@ -29,6 +29,7 @@ mod known_fields;
 mod keynote_cases;
 mod keynote_drawable_cases;
 mod keynote_slide_cases;
+mod keynote_w1c_cost;
 mod numbers_cases;
 mod pages_cases;
 mod self_test;
