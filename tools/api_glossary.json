@@ -24693,7 +24693,8 @@
         "litchi_pages::table::creation",
         "litchi_pages::table::deletion",
         "litchi_pages::drawable::properties",
-        "litchi_pages::drawable::text"
+        "litchi_pages::drawable::text",
+        "litchi_pages::bookmark"
       ],
       "immutable_owners": [
         "litchi_pages::Package",

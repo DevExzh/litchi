@@ -153,3 +153,158 @@ fn text_set_body_text_cost_abba() -> TestResult {
         },
     )
 }
+
+/// `TSWP.BookmarkFieldArchive` with its random `text_attribute_uuid_string`
+/// replaced by a fixed placeholder: both routes draw a fresh UUID for a new
+/// bookmark, as Pages does, so only its presence and form are compared.
+fn bookmark_without_uuid(data: &[u8]) -> Result<crate::known_fields::Decoded, prost::DecodeError> {
+    use prost::Message as _;
+    let mut bookmark = litchi_iwa_protos::tswp::BookmarkFieldArchive::decode(data)?;
+    if let Some(smart) = bookmark.super_.as_mut()
+        && let Some(uuid) = smart.text_attribute_uuid_string.as_mut()
+    {
+        assert_eq!(uuid.len(), 36, "text-attribute UUID form");
+        *uuid = "00000000-0000-0000-0000-000000000000".to_owned();
+    }
+    crate::known_fields::decode_as::<litchi_iwa_protos::tswp::BookmarkFieldArchive>(
+        &bookmark.encode_to_vec(),
+    )
+}
+
+fn host_bookmarks(bytes: &[u8]) -> TestResult<String> {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    Ok(format!(
+        "{:#?}",
+        editor
+            .body_bookmarks()?
+            .into_iter()
+            .map(|bookmark| (bookmark.range, bookmark.settings))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_bookmarks(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:#?}",
+        Package::from_bytes(bytes)?
+            .body_bookmarks()?
+            .into_iter()
+            .map(|bookmark| (bookmark.range(), bookmark.settings().clone()))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn bookmark_settings(name: &str) -> TestResult<litchi_pages::bookmark::Settings> {
+    Ok(litchi_pages::bookmark::Settings::new().with_name(litchi_pages::bookmark::Name::new(name)?))
+}
+
+/// `basic.pages` with one host-authored bookmark "Intro" over UTF-16 0..4.
+fn bookmarked_fixture() -> TestResult<crate::harness::Fixture> {
+    let input = fixture(BASIC)?;
+    let mut editor = pages::Draft::from_bytes(&input.bytes)?;
+    editor.add_body_bookmark(
+        litchi_pages::bookmark::TextRange::from_utf16_indexes(0, 4)?,
+        bookmark_settings("Intro")?,
+    )?;
+    Ok(crate::harness::Fixture {
+        path: "iwork/pages/basic.pages + host bookmark Intro 0..4",
+        bytes: editor.to_bytes()?,
+    })
+}
+
+enum BookmarkOp {
+    Add(usize, usize, &'static str),
+    Update(usize, usize, &'static str),
+    Remove,
+}
+
+fn bookmark_case(name: &'static str, tier: Tier, evidence: Evidence, op: BookmarkOp) -> TestResult {
+    let input = match op {
+        BookmarkOp::Add(..) => fixture(BASIC)?,
+        _ => bookmarked_fixture()?,
+    };
+    let op = &op;
+    Case::new(name, Format::Pages, tier, evidence, &input)
+        .known_fields(|known| known.with(2_035, "TSWP.BookmarkFieldArchive", bookmark_without_uuid))
+        .host(|source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            match *op {
+                BookmarkOp::Add(start, end, label) => drop(editor.add_body_bookmark(
+                    litchi_pages::bookmark::TextRange::from_utf16_indexes(start, end)?,
+                    bookmark_settings(label)?,
+                )?),
+                BookmarkOp::Update(start, end, label) => {
+                    let id = editor.body_bookmarks()?.first().ok_or("no bookmark")?.id;
+                    drop(editor.update_body_bookmark(
+                        id,
+                        litchi_pages::bookmark::TextRange::from_utf16_indexes(start, end)?,
+                        bookmark_settings(label)?,
+                    )?);
+                },
+                BookmarkOp::Remove => {
+                    let id = editor.body_bookmarks()?.first().ok_or("no bookmark")?.id;
+                    drop(editor.remove_body_bookmark(id)?);
+                },
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_bookmarks()?;
+            match *op {
+                BookmarkOp::Add(start, end, label) => drop(edit.add(
+                    litchi_pages::bookmark::TextRange::from_utf16_indexes(start, end)?,
+                    bookmark_settings(label)?,
+                )?),
+                BookmarkOp::Update(start, end, label) => drop(edit.update(
+                    0,
+                    litchi_pages::bookmark::TextRange::from_utf16_indexes(start, end)?,
+                    bookmark_settings(label)?,
+                )?),
+                BookmarkOp::Remove => drop(edit.remove("Intro")?),
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_bookmarks(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host body_bookmarks", host_bookmarks)
+        .read("leaf body_bookmarks", leaf_bookmarks)
+        .read("leaf text", |bytes| Ok(Package::from_bytes(bytes)?.text()?))
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_bookmark_add_parity() -> TestResult {
+    bookmark_case(
+        "pages_body_bookmark_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        BookmarkOp::Add(2, 7, "Methods"),
+    )
+}
+
+#[test]
+fn pages_body_bookmark_update_parity() -> TestResult {
+    bookmark_case(
+        "pages_body_bookmark_update_parity",
+        Tier::A,
+        Evidence::Queued,
+        BookmarkOp::Update(1, 6, "Renamed"),
+    )
+}
+
+#[test]
+fn pages_body_bookmark_remove_parity() -> TestResult {
+    bookmark_case(
+        "pages_body_bookmark_remove_parity",
+        Tier::A,
+        Evidence::Queued,
+        BookmarkOp::Remove,
+    )
+}
