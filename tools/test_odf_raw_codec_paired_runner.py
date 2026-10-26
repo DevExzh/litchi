@@ -28,6 +28,10 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["paired"]["warmup_iterations_per_leg"], runner.WARMUPS)
         self.assertEqual(value["paired"]["samples_per_leg"], runner.SAMPLES)
         self.assertEqual(value["paired"]["probe_iterations"], runner.PROBE_ITERATIONS)
+        self.assertEqual(
+            value["source"]["candidate_overlay"],
+            [str(runner.CONSUMER_MANIFEST), str(runner.PROBE_PATH)],
+        )
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
 
     def test_manifest_rejects_stale_hashes_and_route_mutation(self) -> None:
@@ -39,6 +43,65 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         value["routes"][0], value["routes"][1] = value["routes"][1], value["routes"][0]
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
+        value = manifest()
+        value["candidate_commit"] = "a" * 40
+        with self.assertRaises(runner.RunnerError):
+            runner.validate_manifest(value)
+
+    def test_manifest_rejects_boundary_setup_and_proof_mutations(self) -> None:
+        for path, mutation in (
+            (("routes", 0, "operations"), lambda value: value.append("unreviewed")),
+            (("routes", 1, "boundary"), lambda value: value + " changed"),
+            (("phases", "setup_outside_clock"), lambda value: value[:-1]),
+            (("phases", "output_proof"), lambda value: value[:-1]),
+        ):
+            value = manifest()
+            target = value
+            for key in path[:-1]:
+                target = target[key]
+            key = path[-1]
+            changed = mutation(target[key])
+            if changed is not None:
+                target[key] = changed
+            with self.assertRaises(runner.RunnerError, msg=f"mutation {path} was accepted"):
+                runner.validate_manifest(value)
+
+    def test_cli_forwards_separate_adapter_endpoint(self) -> None:
+        captured: dict[str, object] = {}
+
+        class FakeRunner:
+            def __init__(self, **kwargs: object) -> None:
+                captured.update(kwargs)
+
+            def abba(self) -> None:
+                return None
+
+            def build(self) -> None:
+                return None
+
+        original = runner.PairedRunner
+        runner.PairedRunner = FakeRunner  # type: ignore[assignment]
+        try:
+            result = runner.main(
+                [
+                    "--manifest", "/e/manifest.json",
+                    "--preparation", "/e/preparation.json",
+                    "--baseline-root", "/e/baseline",
+                    "--candidate-root", "/e/candidate",
+                    "--adapter-root", "/e/adapter",
+                    "--candidate-commit", "a" * 40,
+                    "--candidate-lock-sha256", "b" * 64,
+                    "--output", "/e/output",
+                    "--target-root", "/e/target",
+                    "--tmp-root", "/e/tmp",
+                    "--cpu", "0",
+                    "--phase", "abba",
+                ]
+            )
+        finally:
+            runner.PairedRunner = original
+        self.assertEqual(result, 0)
+        self.assertEqual(captured["adapter_root"], Path("/e/adapter"))
 
     def test_build_journal_is_variant_major_and_hashed(self) -> None:
         events = [{"event_id": f"build-{key.replace('/', '-')}"} for key in runner._build_keys()]
@@ -78,6 +141,9 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             self.assertIn(case, probe)
         for proof in ("source_bytes_ok", "facade_bytes_ok", "untouched_members_ok", "negative_cases_ok"):
             self.assertIn(f'"{proof}"', probe)
+        self.assertIn("archive_comment_sha256", probe)
+        self.assertIn("version_needed", probe)
+        self.assertIn("external_attributes", probe)
         self.assertIn("PackageCompression::Stored", probe)
 
 

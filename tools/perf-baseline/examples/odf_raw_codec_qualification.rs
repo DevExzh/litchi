@@ -109,7 +109,6 @@ mod probe {
     use std::fmt::Write as _;
     use std::hint::black_box;
     use std::io::{self, Cursor, Read, Write};
-    use std::path::PathBuf;
     use std::time::Instant;
 
     use super::allocation;
@@ -243,6 +242,32 @@ mod probe {
         ResolvedReader::from_xml(xml, limits).map_err(error_text)
     }
 
+    fn undeclared_namespace_rejected(xml: &str, limits: XmlStreamLimits) -> bool {
+        let mut reader = match resolved_document(xml, limits) {
+            // Construction is intentionally lazy.  A setup error is not the
+            // event-consumption proof this lane requires.
+            Ok(reader) => reader,
+            Err(_) => return false,
+        };
+        let mut buffer = Vec::new();
+        loop {
+            match reader.read_resolved_event_into(&mut buffer) {
+                Ok((_, event)) => {
+                    if matches!(event, Event::Eof) {
+                        return false;
+                    }
+                    buffer.clear();
+                },
+                Err(error) => {
+                    let message = error_text(error).to_ascii_lowercase();
+                    return message.contains("namespace")
+                        || message.contains("undeclared")
+                        || message.contains("prefix");
+                },
+            }
+        }
+    }
+
     fn memory_writer() -> PackageWriter<Cursor<Vec<u8>>> {
         #[cfg(feature = "raw-codec-current")]
         {
@@ -283,12 +308,11 @@ mod probe {
             .collect()
     }
 
-    fn package_with_mime(mime: &str) -> Vec<u8> {
-        let opaque = opaque_payload();
+    fn package_with_content_and_opaque(mime: &str, content: &[u8], opaque: &[u8]) -> Vec<u8> {
         let mut writer = memory_writer();
         writer.set_mimetype(mime).expect("mimetype");
         writer
-            .add_authored_xml("content.xml", SOURCE_CONTENT.as_bytes(), "text/xml")
+            .add_authored_xml("content.xml", content, "text/xml")
             .expect("content XML");
         writer
             .add_authored_xml("styles.xml", STYLES_XML.as_bytes(), "text/xml")
@@ -302,7 +326,7 @@ mod probe {
         writer
             .add_file_reader_with_media_type_and_compression(
                 OPAQUE_MEMBER,
-                Cursor::new(opaque),
+                Cursor::new(opaque.to_vec()),
                 "application/octet-stream",
                 PackageCompression::Stored,
             )
@@ -311,6 +335,10 @@ mod probe {
             .add_file_with_media_type("Vendor/unknown.bin", b"vendor", "application/octet-stream")
             .expect("vendor member");
         writer.finish().expect("package finish")
+    }
+
+    fn package_with_mime(mime: &str) -> Vec<u8> {
+        package_with_content_and_opaque(mime, SOURCE_CONTENT.as_bytes(), &opaque_payload())
     }
 
     fn family_packages() -> Vec<(String, Vec<u8>)> {
@@ -378,6 +406,52 @@ mod probe {
                 "members": members,
             }),
         )
+    }
+
+    fn untouched_archive_members_equal(source: &[u8], output: &[u8], changed_member: &str) -> bool {
+        let (_, source_audit) = archive_fingerprint(source);
+        let (_, output_audit) = archive_fingerprint(output);
+        if source_audit["archive_comment_sha256"] != output_audit["archive_comment_sha256"] {
+            return false;
+        }
+        let Some(source_members) = source_audit["members"].as_array() else {
+            return false;
+        };
+        let Some(output_members) = output_audit["members"].as_array() else {
+            return false;
+        };
+        let source_untouched = source_members
+            .iter()
+            .filter(|member| member["name"] != changed_member)
+            .collect::<Vec<_>>();
+        let output_untouched = output_members
+            .iter()
+            .filter(|member| member["name"] != changed_member)
+            .collect::<Vec<_>>();
+        let source_changed = source_members
+            .iter()
+            .filter(|member| member["name"] == changed_member)
+            .collect::<Vec<_>>();
+        let output_changed = output_members
+            .iter()
+            .filter(|member| member["name"] == changed_member)
+            .collect::<Vec<_>>();
+        if source_changed.len() != 1 || output_changed.len() != 1 {
+            return false;
+        }
+        let metadata_keys = [
+            "name",
+            "name_raw_sha256",
+            "compression",
+            "version_needed",
+            "flags",
+            "external_attributes",
+            "comment",
+        ];
+        let changed_metadata_ok = metadata_keys
+            .iter()
+            .all(|key| source_changed[0][*key] == output_changed[0][*key]);
+        source_untouched == output_untouched && changed_metadata_ok
     }
 
     fn corrupt_stored_payload(bytes: &[u8]) -> Vec<u8> {
@@ -455,7 +529,7 @@ mod probe {
         );
         cases.insert(
             "undeclared_namespace".to_string(),
-            resolved_document("<office:meta/>", xml_limits).is_err(),
+            undeclared_namespace_rejected("<office:meta/>", xml_limits),
         );
 
         let source = OwnedPackage::from_bytes(package.to_vec()).expect("source package");
@@ -519,61 +593,61 @@ mod probe {
                 "id": id,
                 "family": "raw",
                 "operations": ["Archive::new", "file_names", "contains", "metadata", "is_stored", "read"],
-                "boundary": "borrowed Archive catalog/read only; input bytes and expected names prepared outside the clock",
+                "boundary": "Archive construction and catalog/read operation; package bytes and expected content are prepared outside the clock",
             }),
             "manifest_xml_stream_and_parse" => json!({
                 "id": id,
                 "family": "manifest",
                 "operations": ["Archive::read_manifest_xml", "read_manifest", "parse_manifest"],
-                "boundary": "manifest read/materialization/parse only; XML bytes and limits prepared outside the clock",
+                "boundary": "prebuilt Archive manifest materialization/read/parse only; package bytes, Archive and limits are prepared outside the clock",
             }),
             "metadata_xml_and_namespace_resolution" => json!({
                 "id": id,
                 "family": "xml",
-                "operations": ["Metadata::from_xml", "ResolvedReader::from_xml", "read_resolved_event_into"],
-                "boundary": "bounded metadata/namespace parse only; XML construction and event-result serialization stay outside",
+                "operations": ["Metadata::from_xml", "ResolvedReader::from_xml baseline/from_xml_document current", "read_resolved_event_into"],
+                "boundary": "bounded metadata/namespace construction and event consumption; XML constants, limits and proof serialization are outside the clock",
             }),
             "writer_memory_publication" => json!({
                 "id": id,
                 "family": "writer",
-                "operations": ["PackageWriter::new", "add_authored_xml", "add_file", "finish"],
-                "boundary": "in-memory writer publication only; payloads, limits and output comparison stay outside",
+                "operations": ["PackageWriter::new", "add_authored_xml", "add_file_reader_with_media_type_and_compression", "finish"],
+                "boundary": "in-memory writer construction/publication; deterministic payload values are prepared outside and output proof is outside the clock",
             }),
             "writer_stream_publication" => json!({
                 "id": id,
                 "family": "writer",
                 "operations": ["PackageWriter::with_writer", "add_file_reader_with_media_type_and_compression", "finish_to_writer"],
-                "boundary": "reader-to-sink publication only; bounded reader and sink are prepared outside",
+                "boundary": "stream writer/sink construction and reader-to-sink publication; deterministic payload is prepared outside the clock",
             }),
             "writer_bounded_policy" => json!({
                 "id": id,
                 "family": "writer",
-                "operations": ["PackageWriter::new_bounded", "finish_to_bounded_bytes"],
-                "boundary": "bounded writer success/refusal only; error/report serialization stays outside",
+                "operations": ["PackageWriter::new_bounded", "add_file", "finish_to_bounded_bytes"],
+                "boundary": "bounded writer construction/publication and refusal; payload and output/error proof are outside the clock",
             }),
             "raw_split_merge_and_opaque_preservation" => json!({
                 "id": id,
                 "family": "merge",
-                "operations": ["replace_content_xml", "replace_content_xml_with_payload_verification", "raw_identical_members"],
-                "boundary": "source-preserving raw replacement only; source index and member comparison stay outside",
+                "operations": ["OwnedPackage::from_bytes", "replace_content_xml", "raw_identical_members"],
+                "boundary": "source reopen and raw replacement/publication; expected payload, member audit and output proof are outside the clock",
             }),
             "raw_xml_splice_merge_publication" => json!({
                 "id": id,
                 "family": "splice",
-                "operations": ["XmlSourcePart::checked_range", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
-                "boundary": "audited XML splice/rebuild only; provenance proofs and fragment construction stay outside",
+                "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
+                "boundary": "prebuilt source part/range and fragment publication/rebuild only; source reopen/index/proof and output audit are outside the clock",
             }),
             "unified_facade_raw_parts_and_publication" => json!({
                 "id": id,
                 "family": "facade",
                 "operations": ["open_bytes_with", "File::parts", "File::raw", "File::to_bytes", "File::metadata"],
-                "boundary": "facade raw part/publication operation; facade input ownership clone is included and explicitly reported",
+                "boundary": "facade open, raw/parts/metadata access and byte-identical no-op publication; input bytes are intentionally cloned inside the measured API boundary",
             }),
             "consumer_reopen_matrix" => json!({
                 "id": id,
                 "family": "consumers",
-                "operations": ["Archive::new", "open_bytes_with", "File::parts", "File::raw"],
-                "boundary": "one prebuilt package per ODF family reopened through raw and facade consumers",
+                "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
+                "boundary": "each prebuilt ODF family package is reopened through raw and facade consumers inside the clock; package generation is outside",
             }),
             _ => panic!("unknown route {id}"),
         }
@@ -622,6 +696,8 @@ mod probe {
             allocation::begin();
             operation();
             if allocation::ENABLED {
+                // Snapshot and disable the observer before allocating the
+                // serde value that records this sample.
                 let sample = allocation::end();
                 allocation_samples.push(json!({
                     "allocations": sample[0],
@@ -754,12 +830,15 @@ mod probe {
                 true,
             ],
         );
+        let timed_archive = archive(package).expect("timed manifest archive");
+        let timed_limits = XmlStreamLimits::default();
         (
             json!({ "proof": row_proof, "manifest_bytes": xml.len() }),
             move || {
-                let value = archive(package).expect("timed manifest archive");
-                let xml = read_manifest_xml(&value).expect("timed manifest XML");
-                black_box(xml);
+                let xml = read_manifest_xml(&timed_archive).expect("timed manifest XML");
+                let manifest = read_manifest(&timed_archive, timed_limits).expect("timed manifest");
+                let parsed = parse_manifest(&xml, timed_limits).expect("timed manifest parse");
+                black_box((manifest, parsed));
             },
         )
     }
@@ -804,24 +883,48 @@ mod probe {
                 true,
             ],
         );
+        let timed_limits = XmlStreamLimits::default();
+        let mut timed_buffer = Vec::with_capacity(META_XML.len());
         (json!({ "proof": row_proof, "events": events }), move || {
-            black_box(
-                Metadata::from_xml(META_XML, XmlStreamLimits::default()).expect("timed metadata"),
-            );
+            let metadata = Metadata::from_xml(META_XML, timed_limits).expect("timed metadata");
+            let mut reader = resolved_document(META_XML, timed_limits).expect("timed reader");
+            let mut timed_events = 0usize;
+            loop {
+                let (_, event) = reader
+                    .read_resolved_event_into(&mut timed_buffer)
+                    .expect("timed resolved event");
+                timed_events += 1;
+                timed_buffer.clear();
+                if matches!(event, Event::Eof) {
+                    break;
+                }
+            }
+            black_box((metadata, timed_events));
         })
     }
 
     fn memory_route(package: &[u8]) -> (Value, impl FnMut()) {
-        let output = package_with_mime(constants::ODF_TEXT);
+        let opaque = opaque_payload();
+        let output = package_with_content_and_opaque(
+            constants::ODF_TEXT,
+            TARGET_CONTENT.as_bytes(),
+            &opaque,
+        );
         let (_, output_members) = archive_fingerprint(&output);
         let reopened = OwnedPackage::from_bytes(output.clone()).expect("writer reopen");
         assert_eq!(
             reopened.get_file("content.xml").expect("writer content"),
-            SOURCE_CONTENT.as_bytes()
+            TARGET_CONTENT.as_bytes()
         );
         assert!(output_members["members"].as_array().is_some());
         let operation_ok = !output.is_empty();
         let changed_ok = output != package;
+        let no_op = package_with_content_and_opaque(
+            constants::ODF_TEXT,
+            SOURCE_CONTENT.as_bytes(),
+            &opaque,
+        );
+        let no_op_ok = no_op == package;
         let reopen_ok = reopened.get_file("content.xml").is_ok();
         let untouched_members_ok = output_members["members"]
             .as_array()
@@ -833,10 +936,10 @@ mod probe {
             [
                 operation_ok,
                 changed_ok,
-                reopen_ok,
+                no_op_ok,
                 reopen_ok,
                 reopened.get_file("content.xml").expect("writer content")
-                    == SOURCE_CONTENT.as_bytes(),
+                    == TARGET_CONTENT.as_bytes(),
                 true,
                 untouched_members_ok,
                 true,
@@ -848,7 +951,11 @@ mod probe {
         (
             json!({ "proof": row_proof, "output_sha256": digest(&output), "output_bytes": output.len() }),
             move || {
-                black_box(package_with_mime(constants::ODF_TEXT));
+                black_box(package_with_content_and_opaque(
+                    constants::ODF_TEXT,
+                    TARGET_CONTENT.as_bytes(),
+                    &opaque,
+                ));
             },
         )
     }
@@ -914,7 +1021,7 @@ mod probe {
                 writer
                     .add_file_reader_with_media_type_and_compression(
                         OPAQUE_MEMBER,
-                        Cursor::new(opaque_payload()),
+                        Cursor::new(opaque.as_slice()),
                         "application/octet-stream",
                         PackageCompression::Stored,
                     )
@@ -988,8 +1095,9 @@ mod probe {
         let changed_ok = reopened.get_file("content.xml").is_ok();
         let no_op_ok = no_op == package;
         let source_bytes_ok = source.as_bytes() == package;
-        let untouched_members_ok =
-            identical.contains(OPAQUE_MEMBER) && identical.contains("META-INF/manifest.xml");
+        let untouched_members_ok = identical.contains(OPAQUE_MEMBER)
+            && identical.contains("META-INF/manifest.xml")
+            && untouched_archive_members_equal(package, &output, "content.xml");
         let row_proof = proof(
             negative,
             [
@@ -1025,13 +1133,11 @@ mod probe {
             .position(|window| window == b"source")
             .expect("source marker");
         let range = start..start + b"source".len();
-        let proof = part.checked_range(range, b"source").expect("splice proof");
-        let mut publication = XmlSplicePublication::new(part);
+        let range_proof = part.checked_range(range, b"source").expect("splice proof");
+        let fragment = AuthoredXmlFragment::text(b"target".to_vec()).expect("splice text");
+        let mut publication = XmlSplicePublication::new(part.clone());
         publication
-            .replace(
-                proof,
-                AuthoredXmlFragment::text(b"target".to_vec()).expect("splice text"),
-            )
+            .replace(range_proof.clone(), fragment.clone())
             .expect("splice replace");
         let output = rebuild_package_with_xml_splices(&source, vec![publication], 1 << 20)
             .expect("splice rebuild");
@@ -1079,6 +1185,7 @@ mod probe {
             .unwrap_or(false);
         let no_op_ok = no_op == package;
         let source_bytes_ok = source.as_bytes() == package;
+        let untouched_members_ok = untouched_archive_members_equal(package, &output, "content.xml");
         let row_proof = proof(
             negative,
             [
@@ -1088,82 +1195,84 @@ mod probe {
                 direct_changed,
                 source_bytes_ok,
                 changed_ok,
-                true,
+                untouched_members_ok,
                 true,
                 true,
                 true,
                 true,
             ],
         );
+        let timed_source = source.clone();
+        let timed_part = part.clone();
+        let timed_proof = range_proof.clone();
+        let timed_fragment = fragment.clone();
         (
             json!({ "proof": row_proof, "output_sha256": digest(&output) }),
             move || {
-                let source =
-                    OwnedPackage::from_bytes(package.to_vec()).expect("timed splice source");
-                let part = XmlSourcePart::load(&source, "content.xml").expect("timed splice part");
-                let start = part
-                    .bytes()
-                    .windows(b"source".len())
-                    .position(|window| window == b"source")
-                    .expect("timed marker");
-                let checked = part
-                    .checked_range(start..start + b"source".len(), b"source")
-                    .expect("timed proof");
-                let mut publication = XmlSplicePublication::new(part);
+                let mut publication = XmlSplicePublication::new(timed_part.clone());
                 publication
-                    .replace(
-                        checked,
-                        AuthoredXmlFragment::text(b"target".to_vec()).expect("timed text"),
-                    )
+                    .replace(timed_proof.clone(), timed_fragment.clone())
                     .expect("timed replace");
                 black_box(
-                    rebuild_package_with_xml_splices(&source, vec![publication], 1 << 20)
+                    rebuild_package_with_xml_splices(&timed_source, vec![publication], 1 << 20)
                         .expect("timed splice"),
                 );
             },
         )
     }
 
-    fn facade_route(families: &[(String, Vec<u8>)]) -> (Value, impl FnMut()) {
-        let (name, bytes) = families.first().expect("ODF family package");
-        let file = open_bytes_with(bytes.clone(), &OpenOptions::new())
-            .unwrap_or_else(|error| panic!("facade {name}: {error}"));
+    fn facade_route(package: &[u8]) -> (Value, impl FnMut()) {
+        let file = open_bytes_with(package.to_vec(), &OpenOptions::new())
+            .unwrap_or_else(|error| panic!("facade: {error}"));
         let parts = file.parts().expect("facade parts");
         let raw = file.raw("/content.xml").expect("facade content");
         let published = file.to_bytes().expect("facade publish");
         let metadata = file.metadata().expect("facade metadata");
+        let reopened =
+            open_bytes_with(published.clone(), &OpenOptions::new()).expect("facade reopen");
+        let source_content = archive(package)
+            .expect("facade source archive")
+            .read("content.xml")
+            .expect("facade source content");
         assert!(!parts.is_empty());
         assert_eq!(
             raw.bytes(),
             file.raw("/content.xml").expect("facade repeat").bytes()
         );
         assert!(!published.is_empty());
+        let no_op_ok = published == package;
         let operation_ok = !parts.is_empty() && !published.is_empty();
-        let source_bytes_ok =
-            raw.bytes() == file.raw("/content.xml").expect("facade source").bytes();
+        let source_bytes_ok = raw.bytes() == source_content.as_slice();
+        let facade_bytes_ok = reopened.to_bytes().expect("facade repeat publish") == package;
         let metadata_ok = metadata.is_some();
+        let untouched_members_ok =
+            archive_fingerprint(package).1 == archive_fingerprint(&published).1;
         let row_proof = proof(
             &BTreeMap::new(),
             [
                 operation_ok,
-                published != *bytes,
+                no_op_ok,
+                no_op_ok,
+                reopened.to_bytes().is_ok(),
                 source_bytes_ok,
-                operation_ok,
-                source_bytes_ok,
-                source_bytes_ok,
-                !parts.is_empty(),
+                facade_bytes_ok,
+                untouched_members_ok,
                 true,
                 metadata_ok,
-                source_bytes_ok,
+                true,
                 true,
             ],
         );
         (
-            json!({ "proof": row_proof, "parts": parts.len(), "metadata_present": metadata.is_some(), "source_sha256": digest(bytes), "published_sha256": digest(&published) }),
+            json!({ "proof": row_proof, "parts": parts.len(), "metadata_present": metadata.is_some(), "source_sha256": digest(package), "published_sha256": digest(&published) }),
             move || {
-                let file =
-                    open_bytes_with(bytes.clone(), &OpenOptions::new()).expect("timed facade open");
-                black_box(file.raw("/content.xml").expect("timed facade raw"));
+                let file = open_bytes_with(package.to_vec(), &OpenOptions::new())
+                    .expect("timed facade open");
+                let parts = file.parts().expect("timed facade parts");
+                let raw = file.raw("/content.xml").expect("timed facade raw");
+                let metadata = file.metadata().expect("timed facade metadata");
+                let published = file.to_bytes().expect("timed facade publish");
+                black_box((parts, raw, metadata, published));
             },
         )
     }
@@ -1207,7 +1316,12 @@ mod probe {
         (json!({ "proof": row_proof, "families": rows }), move || {
             for (_, bytes) in families {
                 let raw = archive(bytes).expect("timed consumer raw");
-                black_box(raw.read("content.xml").expect("timed consumer content"));
+                let raw_content = raw.read("content.xml").expect("timed consumer content");
+                let file = open_bytes_with(bytes.clone(), &OpenOptions::new())
+                    .expect("timed consumer facade");
+                let parts = file.parts().expect("timed consumer parts");
+                let facade_content = file.raw("/content.xml").expect("timed consumer facade raw");
+                black_box((raw_content, parts, facade_content));
             }
         })
     }
@@ -1229,7 +1343,7 @@ mod probe {
             "writer_bounded_policy" => bounded_route(),
             "raw_split_merge_and_opaque_preservation" => merge_route(package, negative),
             "raw_xml_splice_merge_publication" => splice_route(package, negative),
-            "unified_facade_raw_parts_and_publication" => facade_route(families),
+            "unified_facade_raw_parts_and_publication" => facade_route(package),
             "consumer_reopen_matrix" => consumer_route(families),
             _ => panic!("unknown route {id}"),
         };

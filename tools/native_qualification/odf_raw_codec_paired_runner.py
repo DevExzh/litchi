@@ -38,7 +38,7 @@ from native_qualification import odf_shared_triad_paired_runner as reviewed  # n
 
 
 SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v1"
-PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v1"
+PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v2"
 ROLES = ("baseline", "candidate")
 VARIANTS = ("normal", "allocator")
 ABBA_ORDER = ("baseline", "candidate", "candidate", "baseline")
@@ -54,6 +54,7 @@ PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
 PRODUCTION_MANIFEST = Path("crates/litchi-ops/Cargo.toml")
 LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
+CANDIDATE_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
 PROBE_NAME = PROBE_PATH.stem
 ROUTE_IDS = (
     "archive_catalog_and_raw_split",
@@ -66,6 +67,68 @@ ROUTE_IDS = (
     "raw_xml_splice_merge_publication",
     "unified_facade_raw_parts_and_publication",
     "consumer_reopen_matrix",
+)
+EXPECTED_ROUTES = (
+    {
+        "id": "archive_catalog_and_raw_split",
+        "family": "raw",
+        "operations": ["Archive::new", "file_names", "contains", "metadata", "is_stored", "read"],
+        "boundary": "Archive construction and catalog/read operation; package bytes and expected content are prepared outside the clock",
+    },
+    {
+        "id": "manifest_xml_stream_and_parse",
+        "family": "manifest",
+        "operations": ["Archive::read_manifest_xml", "read_manifest", "parse_manifest"],
+        "boundary": "prebuilt Archive manifest materialization/read/parse only; package bytes, Archive and limits are prepared outside the clock",
+    },
+    {
+        "id": "metadata_xml_and_namespace_resolution",
+        "family": "xml",
+        "operations": ["Metadata::from_xml", "ResolvedReader::from_xml baseline/from_xml_document current", "read_resolved_event_into"],
+        "boundary": "bounded metadata/namespace construction and event consumption; XML constants, limits and proof serialization are outside the clock",
+    },
+    {
+        "id": "writer_memory_publication",
+        "family": "writer",
+        "operations": ["PackageWriter::new", "add_authored_xml", "add_file_reader_with_media_type_and_compression", "finish"],
+        "boundary": "in-memory writer construction/publication; deterministic payload values are prepared outside and output proof is outside the clock",
+    },
+    {
+        "id": "writer_stream_publication",
+        "family": "writer",
+        "operations": ["PackageWriter::with_writer", "add_file_reader_with_media_type_and_compression", "finish_to_writer"],
+        "boundary": "stream writer/sink construction and reader-to-sink publication; deterministic payload is prepared outside the clock",
+    },
+    {
+        "id": "writer_bounded_policy",
+        "family": "writer",
+        "operations": ["PackageWriter::new_bounded", "add_file", "finish_to_bounded_bytes"],
+        "boundary": "bounded writer construction/publication and refusal; payload and output/error proof are outside the clock",
+    },
+    {
+        "id": "raw_split_merge_and_opaque_preservation",
+        "family": "merge",
+        "operations": ["OwnedPackage::from_bytes", "replace_content_xml", "raw_identical_members"],
+        "boundary": "source reopen and raw replacement/publication; expected payload, member audit and output proof are outside the clock",
+    },
+    {
+        "id": "raw_xml_splice_merge_publication",
+        "family": "splice",
+        "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
+        "boundary": "prebuilt source part/range and fragment publication/rebuild only; source reopen/index/proof and output audit are outside the clock",
+    },
+    {
+        "id": "unified_facade_raw_parts_and_publication",
+        "family": "facade",
+        "operations": ["open_bytes_with", "File::parts", "File::raw", "File::to_bytes", "File::metadata"],
+        "boundary": "facade open, raw/parts/metadata access and byte-identical no-op publication; input bytes are intentionally cloned inside the measured API boundary",
+    },
+    {
+        "id": "consumer_reopen_matrix",
+        "family": "consumers",
+        "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
+        "boundary": "each prebuilt ODF family package is reopened through raw and facade consumers inside the clock; package generation is outside",
+    },
 )
 FAMILY_IDS = ("odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm")
 ALLOCATOR_COUNTERS = (
@@ -200,6 +263,25 @@ def _source_state(root: Path) -> dict[str, Any]:
     return state
 
 
+def _production_source_tree(root: Path) -> str:
+    return _sha256_bytes(
+        _git(
+            root,
+            "ls-tree",
+            "-r",
+            "--full-tree",
+            "HEAD",
+            "--",
+            "Cargo.toml",
+            "Cargo.lock",
+            ".cargo",
+            "rust-toolchain.toml",
+            "rust-toolchain",
+            "crates",
+        ).encode()
+    )
+
+
 def _cheap_snapshot(root: Path) -> dict[str, Any]:
     status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     tracked_flags = _git(root, "ls-files", "-v", "-z")
@@ -246,21 +328,31 @@ def _package_identity(root: Path, relative: Path, expected_name: str) -> dict[st
 
 
 def _validate_route_descriptors(routes: Any) -> list[dict[str, Any]]:
-    if not isinstance(routes, list) or [route.get("id") for route in routes if isinstance(route, Mapping)] != list(ROUTE_IDS):
-        raise RunnerError("manifest routes must contain the exact ten raw-codec route IDs in order")
-    normalized: list[dict[str, Any]] = []
-    for index, route in enumerate(routes):
-        if not isinstance(route, Mapping) or set(route) != {"id", "family", "operations", "boundary"}:
-            raise RunnerError(f"route {index} descriptor is incomplete")
-        if not isinstance(route["family"], str) or not route["family"]:
-            raise RunnerError(f"route {index} family is missing")
-        operations = route["operations"]
-        if not isinstance(operations, list) or not operations or not all(isinstance(value, str) for value in operations):
-            raise RunnerError(f"route {index} operations are invalid")
-        if not isinstance(route["boundary"], str) or not route["boundary"]:
-            raise RunnerError(f"route {index} boundary is missing")
-        normalized.append(dict(route))
-    return normalized
+    if routes != list(EXPECTED_ROUTES):
+        raise RunnerError("manifest route protocol differs from the reviewed ODF raw-codec contract")
+    return [dict(route) for route in routes]
+
+
+EXPECTED_SETUP_OUTSIDE = [
+    "deterministic package and ODF family packages prepared before timing",
+    "Archive/OwnedPackage/File opening for correctness proofs",
+    "XML, metadata, namespace, reader/sink and expected-hash construction",
+    "route-specific limit and refusal inputs",
+]
+EXPECTED_OUTPUT_PROOF = [
+    "operation_ok",
+    "changed_ok",
+    "no_op_ok",
+    "reopen_ok",
+    "source_bytes_ok",
+    "facade_bytes_ok",
+    "untouched_members_ok",
+    "manifest_ok",
+    "metadata_ok",
+    "namespace_ok",
+    "bounded_error_ok",
+    "negative_cases_ok",
+]
 
 
 def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -272,6 +364,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     candidate = _require_sha(data.get("candidate_commit"), "candidate_commit", 40)
     if candidate == "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee":
         raise RunnerError("historical 15ab candidate is not admissible")
+    if candidate != CANDIDATE_COMMIT:
+        raise RunnerError(f"candidate production pin must remain {CANDIDATE_COMMIT}")
     source = data.get("source")
     if not isinstance(source, Mapping):
         raise RunnerError("manifest source identity is missing")
@@ -280,6 +374,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         "production_manifest": str(PRODUCTION_MANIFEST),
         "lock_path": str(LOCK_PATH),
         "baseline_overlay": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
+        "candidate_overlay": [str(CONSUMER_MANIFEST), str(PROBE_PATH)],
     }
     for key, expected in expected_source.items():
         if source.get(key) != expected:
@@ -298,7 +393,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     if data.get("families") != list(FAMILY_IDS):
         raise RunnerError("manifest ODF family order differs")
     phases = data.get("phases")
-    if not isinstance(phases, Mapping) or not isinstance(phases.get("setup_outside_clock"), list) or not isinstance(phases.get("inside_clock"), str):
+    if not isinstance(phases, Mapping) or phases.get("setup_outside_clock") != EXPECTED_SETUP_OUTSIDE or phases.get("inside_clock") != "the route operation named by the exact descriptor boundary only" or phases.get("output_proof") != EXPECTED_OUTPUT_PROOF:
         raise RunnerError("manifest timing phase boundary is incomplete")
     if phases.get("negative_cases") != [
         "duplicate_manifest_path",
@@ -347,7 +442,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Mapping[str, Any], baseline_root: Path, candidate_root: Path, candidate_commit: str, candidate_lock_sha256: str) -> dict[str, Any]:
+def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Mapping[str, Any], baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_commit: str, candidate_lock_sha256: str) -> dict[str, Any]:
     if data.get("schema") != PREPARATION_SCHEMA or data.get("lane") != "odf-raw-codec":
         raise RunnerError("preparation schema/lane differs")
     baseline = data.get("baseline")
@@ -365,10 +460,32 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
     if baseline.get("commit") != manifest["baseline_commit"] or baseline.get("production_tree_sha256") != reviewed._production_tree(baseline_root):
         raise RunnerError("preparation baseline identity differs")
     overlay = baseline.get("overlay_paths")
-    if sorted(overlay or []) != sorted([str(LOCK_PATH), str(PROBE_PATH)]):
-        raise RunnerError("preparation overlay is not exactly lock plus probe")
+    if sorted(overlay or []) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]):
+        raise RunnerError("preparation baseline overlay is not exactly consumer, lock plus probe")
     if _resolve(str(candidate.get("root"))) != candidate_root or candidate.get("commit") != candidate_commit:
         raise RunnerError("preparation candidate identity differs")
+    candidate_before = candidate.get("before")
+    candidate_after = candidate.get("after_overlay")
+    if not isinstance(candidate_before, Mapping) or not isinstance(candidate_after, Mapping):
+        raise RunnerError("preparation candidate source states are missing")
+    if _resolve(str(candidate_before.get("root"))) != candidate_root or candidate_before.get("head") != manifest["candidate_commit"] or candidate_before.get("clean") is not True:
+        raise RunnerError("preparation candidate production before-state differs")
+    if _resolve(str(candidate_after.get("root"))) != candidate_root or candidate_after.get("tree") != candidate_before.get("tree") or sorted(_status_paths(str(candidate_after.get("status", "")))) != sorted([str(CONSUMER_MANIFEST), str(PROBE_PATH)]) or sorted(candidate.get("overlay_paths") or []) != sorted([str(CONSUMER_MANIFEST), str(PROBE_PATH)]):
+        raise RunnerError("preparation candidate overlay differs")
+    if candidate.get("production_tree_sha256") != reviewed._production_tree(candidate_root):
+        raise RunnerError("preparation candidate production tree differs")
+    adapter = data.get("adapter")
+    if not isinstance(adapter, Mapping) or _resolve(str(adapter.get("root"))) != adapter_root:
+        raise RunnerError("preparation adapter endpoint is missing or overlaps a source endpoint")
+    if adapter_root in {baseline_root, candidate_root} or _under(adapter_root, baseline_root) or _under(adapter_root, candidate_root) or _under(baseline_root, adapter_root) or _under(candidate_root, adapter_root):
+        raise RunnerError("preparation adapter endpoint overlaps a source endpoint")
+    adapter_state = _source_state(adapter_root)
+    if adapter_state.get("commit") != adapter.get("head") or adapter_state.get("tree") != adapter.get("tree") or adapter_state.get("status_paths"):
+        raise RunnerError("consumer adapter endpoint changed or is dirty")
+    if adapter.get("production_source_tree_sha256") != candidate.get("production_source_tree_sha256"):
+        raise RunnerError("adapter production source does not match the pinned candidate")
+    if adapter.get("production_source_tree_sha256") != _production_source_tree(adapter_root) or candidate.get("production_source_tree_sha256") != _production_source_tree(candidate_root):
+        raise RunnerError("adapter or candidate production source tree is not bound")
     if candidate_commit != manifest["candidate_commit"] or candidate_commit == "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee":
         raise RunnerError("preparation candidate is stale or differs from manifest")
     candidate_consumer = candidate.get("consumer_manifest")
@@ -387,17 +504,29 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
         raise RunnerError("preparation adapter/lock does not match selected manifest")
     if _resolve(str(candidate_consumer.get("path"))) != _resolve(CONSUMER_MANIFEST, base=candidate_root):
         raise RunnerError("preparation candidate consumer manifest path is not canonical")
-    if _resolve(str(baseline_consumer.get("source_path"))) != _resolve(CONSUMER_MANIFEST, base=candidate_root):
-        raise RunnerError("preparation baseline consumer source is not the selected candidate manifest")
+    if _resolve(str(baseline_consumer.get("source_path"))) != _resolve(str(adapter["consumer_manifest"]["path"])):
+        raise RunnerError("preparation baseline consumer source is not the selected adapter manifest")
     if _resolve(str(candidate_probe.get("path"))) != _resolve(PROBE_PATH, base=candidate_root):
         raise RunnerError("preparation candidate probe path is not canonical")
     if _resolve(str(candidate_lock.get("path"))) != _resolve(LOCK_PATH, base=candidate_root):
         raise RunnerError("preparation candidate lock path is not canonical")
-    if _resolve(str(baseline_probe.get("source_path"))) != _resolve(PROBE_PATH, base=candidate_root):
-        raise RunnerError("preparation baseline probe source is not the selected candidate probe")
+    if _resolve(str(baseline_probe.get("source_path"))) != _resolve(str(adapter["probe"]["path"])):
+        raise RunnerError("preparation baseline probe source is not the selected adapter probe")
+    adapter_consumer = adapter.get("consumer_manifest")
+    adapter_probe = adapter.get("probe")
+    for value, label in ((adapter_consumer, "adapter consumer manifest"), (adapter_probe, "adapter probe")):
+        if not isinstance(value, Mapping) or _resolve(str(value.get("path"))).is_symlink():
+            raise RunnerError(f"preparation {label} identity is missing or symlinked")
+        observed, size = _sha256_file(_resolve(str(value["path"])))
+        if observed != value.get("sha256") or size != value.get("bytes"):
+            raise RunnerError(f"preparation {label} bytes differ")
+    if adapter_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or adapter_probe["sha256"] != manifest["probe_sha256"]:
+        raise RunnerError("adapter overlay bytes differ from the manifest")
+    if _resolve(str(candidate_consumer.get("source_path"))) != _resolve(str(adapter_consumer["path"])) or _resolve(str(candidate_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])):
+        raise RunnerError("candidate overlay source is not the selected adapter")
     baseline_lock_source = _resolve(str(baseline_lock.get("source_path")))
-    if _under(baseline_lock_source, baseline_root) or _under(baseline_lock_source, candidate_root):
-        raise RunnerError("preparation baseline lock source must be external to both endpoints")
+    if _under(baseline_lock_source, baseline_root) or _under(baseline_lock_source, candidate_root) or _under(baseline_lock_source, adapter_root):
+        raise RunnerError("preparation baseline lock source must be external to every source endpoint")
     source_lock_sha, source_lock_bytes = _sha256_file(baseline_lock_source)
     if source_lock_sha != baseline_lock["sha256"] or source_lock_bytes != baseline_lock["bytes"]:
         raise RunnerError("preparation baseline lock source bytes differ")
@@ -416,7 +545,7 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
     claim = data.get("claim_scope")
     if not isinstance(claim, str) or NON_ACCEPTANCE not in claim:
         raise RunnerError("preparation is not explicitly non-acceptance")
-    return {"schema": data["schema"], "sha256": digest, "baseline": baseline, "candidate": candidate}
+    return {"schema": data["schema"], "sha256": digest, "baseline": baseline, "candidate": candidate, "adapter": adapter}
 
 
 def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation: Mapping[str, Any], candidate_commit: str, candidate_lock_sha256: str) -> dict[str, Any]:
@@ -435,8 +564,10 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
         if consumer["sha256"] != preparation["baseline"]["consumer_manifest"]["sha256"] or probe["sha256"] != manifest["probe_sha256"] or lock["sha256"] != preparation["baseline"]["lock"]["sha256"]:
             raise RunnerError("baseline overlay file identity differs")
     elif role == "candidate":
-        if state.get("commit") != candidate_commit or state["status_paths"]:
-            raise RunnerError("candidate source is stale or dirty")
+        if state.get("commit") != candidate_commit or sorted(state["status_paths"]) != sorted(preparation["candidate"]["overlay_paths"]):
+            raise RunnerError("candidate source is stale or has an unexpected overlay")
+        if state.get("production_tree_sha256") != preparation["candidate"]["production_tree_sha256"] or _production_source_tree(root) != preparation["candidate"]["production_source_tree_sha256"]:
+            raise RunnerError("candidate production source identity differs")
         if consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or probe["sha256"] != manifest["probe_sha256"] or lock["sha256"] != candidate_lock_sha256:
             raise RunnerError("candidate probe/lock identity differs")
     else:
@@ -447,6 +578,7 @@ def _endpoint(manifest: Mapping[str, Any], *, role: str, root: Path, preparation
         "commit": state["commit"],
         "tree": state["tree"],
         "production_tree_sha256": state["production_tree_sha256"],
+        "production_source_tree_sha256": _production_source_tree(root),
         "source_tree_sha256": state["source_tree_sha256"],
         "status_sha256": state["status_sha256"],
         "status_paths": state["status_paths"],
@@ -500,7 +632,7 @@ def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
 
 
 class PairedRunner:
-    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, candidate_commit: str, candidate_lock_sha256: str, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
+    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, candidate_commit: str, candidate_lock_sha256: str, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
         if phase not in {"build", "abba"}:
             raise RunnerError("phase must be build or abba")
         if not isinstance(cpu, int) or cpu < 0 or cpu >= (os.cpu_count() or 1):
@@ -510,17 +642,18 @@ class PairedRunner:
         self.preparation_path = _resolve(preparation_path)
         self.baseline_root = _resolve(baseline_root)
         self.candidate_root = _resolve(candidate_root)
+        self.adapter_root = _resolve(adapter_root)
         self.candidate_commit = _require_sha(candidate_commit, "candidate_commit", 40)
         self.candidate_lock_sha256 = _require_sha(candidate_lock_sha256, "candidate_lock_sha256", 64)
         self.output = _resolve(output)
         self.target_root = _resolve(target_root)
         self.tmp_root = _resolve(tmp_root)
         self.cpu = cpu
-        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
+        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
-        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, candidate_commit=self.candidate_commit, candidate_lock_sha256=self.candidate_lock_sha256)
+        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, candidate_commit=self.candidate_commit, candidate_lock_sha256=self.candidate_lock_sha256)
         self.runner_sha256, _ = _sha256_file(Path(__file__).resolve())
         self.guard = generic.ProcessGuard()
         self.endpoint_cache: dict[str, dict[str, Any]] = {}
@@ -541,7 +674,8 @@ class PairedRunner:
             root.mkdir(parents=True, exist_ok=True)
 
     def _fresh_file(self, path: Path, label: str) -> None:
-        if _under(path, self.baseline_root) or _under(path, self.candidate_root):
+        adapter_root = getattr(self, "adapter_root", None)
+        if _under(path, self.baseline_root) or _under(path, self.candidate_root) or (adapter_root is not None and _under(path, adapter_root)):
             raise RunnerError(f"{label} must be external to source")
         _reject_symlink_ancestors(path, label)
         if path.exists() or path.is_symlink():
@@ -549,7 +683,8 @@ class PairedRunner:
         path.parent.mkdir(parents=True, exist_ok=True)
 
     def _fresh_dir(self, path: Path, label: str) -> None:
-        if _under(path, self.baseline_root) or _under(path, self.candidate_root):
+        adapter_root = getattr(self, "adapter_root", None)
+        if _under(path, self.baseline_root) or _under(path, self.candidate_root) or (adapter_root is not None and _under(path, adapter_root)):
             raise RunnerError(f"{label} must be external to source")
         _reject_symlink_ancestors(path, label)
         if path.exists() and (path.is_symlink() or not path.is_dir() or any(path.iterdir())):
@@ -901,7 +1036,7 @@ class PairedRunner:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "candidate-commit", "candidate-lock-sha256", "output", "target-root", "tmp-root"):
+    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "candidate-commit", "candidate-lock-sha256", "output", "target-root", "tmp-root"):
         parser.add_argument(f"--{name}", required=True, type=Path if name.endswith(("manifest", "preparation", "root", "output")) else str)
     parser.add_argument("--cpu", required=True, type=int)
     parser.add_argument("--phase", required=True, choices=("build", "abba"))
@@ -911,7 +1046,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, candidate_commit=args.candidate_commit, candidate_lock_sha256=args.candidate_lock_sha256, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
+        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, candidate_commit=args.candidate_commit, candidate_lock_sha256=args.candidate_lock_sha256, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
         if args.phase == "build":
             runner.build()
         else:

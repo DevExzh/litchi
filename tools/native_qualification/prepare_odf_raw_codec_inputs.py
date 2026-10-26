@@ -4,7 +4,8 @@
 This is source preparation only.  It never invokes Cargo, Rust, a probe, or
 timing code.  The baseline is the exact pre-migration commit; its only
 overlay is the reviewed consumer adapter and a separately hashed lockfile.
-Production files are never copied from the candidate.
+The candidate remains pinned to C33 and receives only that adapter overlay;
+production files are never copied from the adapter endpoint.
 """
 
 from __future__ import annotations
@@ -17,12 +18,14 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 from typing import Any
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v1"
+SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v2"
 LANE = "odf-raw-codec"
 BASELINE_COMMIT = "70d64634c9d1d4328447d8724d3b076114a91fd0"
+CANDIDATE_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
 HISTORICAL_CANDIDATE = "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee"
 PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
@@ -120,6 +123,63 @@ def _production_tree(root: Path) -> str:
     return hashlib.sha256(_git(root, "ls-tree", "-r", "--full-tree", "HEAD").encode()).hexdigest()
 
 
+def _production_source_tree(root: Path) -> str:
+    """Bind production/workspace provenance without binding the consumer overlay."""
+
+    return hashlib.sha256(
+        _git(
+            root,
+            "ls-tree",
+            "-r",
+            "--full-tree",
+            "HEAD",
+            "--",
+            "Cargo.toml",
+            "Cargo.lock",
+            ".cargo",
+            "rust-toolchain.toml",
+            "rust-toolchain",
+            "crates",
+        ).encode()
+    ).hexdigest()
+
+
+def _external_output(path: Path, roots: tuple[Path, ...]) -> Path:
+    lexical = path.absolute()
+    cursor = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        cursor /= component
+        if cursor.is_symlink():
+            raise PreparationError(f"preparation receipt path contains a symlink component: {cursor}")
+    if lexical.exists() or lexical.is_symlink():
+        raise PreparationError(f"refusing to overwrite preparation receipt: {path}")
+    resolved = lexical.parent.resolve() / lexical.name
+    for root in roots:
+        root = root.resolve()
+        if resolved == root or root in resolved.parents:
+            raise PreparationError(f"preparation receipt must be outside source roots: {path}")
+    if not resolved.parent.is_dir():
+        raise PreparationError(f"preparation receipt parent is not a directory: {resolved.parent}")
+    return resolved
+
+
+def _write_exclusive_json(path: Path, value: dict[str, Any]) -> None:
+    payload = (json.dumps(value, indent=2) + "\n").encode("utf-8")
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        with temporary.open("wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)
+    except FileExistsError as error:
+        raise PreparationError(f"refusing to overwrite preparation receipt: {path}") from error
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _status_paths(status: str) -> list[str]:
     paths = []
     for line in status.splitlines():
@@ -148,6 +208,7 @@ def prepare(
     *,
     baseline_root: Path,
     candidate_root: Path,
+    adapter_root: Path,
     candidate_ref: str,
     candidate_lock_sha256: str,
     baseline_lock: Path,
@@ -155,23 +216,34 @@ def prepare(
 ) -> dict[str, Any]:
     baseline_root = _resolve(baseline_root)
     candidate_root = _resolve(candidate_root)
+    adapter_root = _resolve(adapter_root)
+    output = _external_output(output, (baseline_root, candidate_root, adapter_root))
     baseline = _source_state(baseline_root)
     candidate = _source_state(candidate_root)
+    adapter = _source_state(adapter_root)
     _require_sha(candidate_ref, "candidate_ref")
     if candidate_ref == HISTORICAL_CANDIDATE:
         raise PreparationError("historical 15ab candidate is not admissible")
+    if candidate_ref != CANDIDATE_COMMIT:
+        raise PreparationError(f"candidate production pin must remain {CANDIDATE_COMMIT}")
     _require_hash(candidate_lock_sha256, "candidate_lock_sha256")
     if baseline["head"] != BASELINE_COMMIT:
         raise PreparationError(f"baseline HEAD must be {BASELINE_COMMIT}")
     if not baseline["clean"]:
         raise PreparationError("baseline must be clean before overlay")
     if not candidate["clean"] or candidate["head"] != candidate_ref:
-        raise PreparationError("candidate must be clean and at candidate_ref")
-    if baseline_root == candidate_root or _under(baseline_root, candidate_root) or _under(candidate_root, baseline_root):
-        raise PreparationError("baseline and candidate worktrees must be disjoint")
-    if baseline["skip_worktree_count"] or candidate["skip_worktree_count"]:
+        raise PreparationError("candidate production endpoint must be clean and at the pinned C33 commit")
+    if not adapter["clean"]:
+        raise PreparationError("consumer adapter endpoint must be clean")
+    if baseline["skip_worktree_count"] or candidate["skip_worktree_count"] or adapter["skip_worktree_count"]:
         raise PreparationError("sparse/skip-worktree source is not admissible for preparation")
+    if len({baseline_root, candidate_root, adapter_root}) != 3:
+        raise PreparationError("baseline, candidate production, and adapter endpoints must be disjoint")
+    if _production_source_tree(adapter_root) != _production_source_tree(candidate_root):
+        raise PreparationError("adapter production source does not match the pinned C33 endpoint")
 
+    adapter_probe = _resolve(PROBE_PATH, base=adapter_root)
+    adapter_consumer = _resolve(CONSUMER_MANIFEST, base=adapter_root)
     candidate_probe = _resolve(PROBE_PATH, base=candidate_root)
     candidate_consumer = _resolve(CONSUMER_MANIFEST, base=candidate_root)
     candidate_lock = _resolve(LOCK_PATH, base=candidate_root)
@@ -179,48 +251,67 @@ def prepare(
     baseline_consumer = _resolve(CONSUMER_MANIFEST, base=baseline_root)
     baseline_lock_destination = _resolve(LOCK_PATH, base=baseline_root)
     external_lock = _resolve(baseline_lock)
-    candidate_probe_sha, candidate_probe_bytes = _sha256(candidate_probe)
-    candidate_consumer_sha, candidate_consumer_bytes = _sha256(candidate_consumer)
+    if _under(external_lock, baseline_root) or _under(external_lock, candidate_root) or _under(external_lock, adapter_root):
+        raise PreparationError("baseline lock source must be external to every source endpoint")
+    adapter_probe_sha, adapter_probe_bytes = _sha256(adapter_probe)
+    adapter_consumer_sha, adapter_consumer_bytes = _sha256(adapter_consumer)
     observed_candidate_lock_sha, candidate_lock_bytes = _sha256(candidate_lock)
     if observed_candidate_lock_sha != candidate_lock_sha256:
         raise PreparationError("candidate Cargo.lock hash does not match supplied identity")
+    if candidate_probe.exists() or candidate_probe.is_symlink():
+        raise PreparationError(f"candidate probe destination must be absent: {candidate_probe}")
     baseline_lock_sha, baseline_lock_bytes = _sha256(external_lock)
     if baseline_probe.exists() or baseline_probe.is_symlink():
         raise PreparationError(f"baseline probe destination must be absent: {baseline_probe}")
-    baseline_probe.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(candidate_probe, baseline_probe)
-    if baseline_consumer.is_symlink():
-        raise PreparationError("baseline consumer manifest destination may not be a symlink")
-    baseline_consumer.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(candidate_consumer, baseline_consumer)
-    if baseline_lock_destination.is_symlink():
-        raise PreparationError("baseline Cargo.lock destination may not be a symlink")
-    baseline_lock_destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(external_lock, baseline_lock_destination)
+    if candidate_consumer.is_symlink() or baseline_consumer.is_symlink() or baseline_lock_destination.is_symlink():
+        raise PreparationError("consumer/lock overlay destination may not be a symlink")
+
+    destinations = (baseline_probe, baseline_consumer, baseline_lock_destination, candidate_probe, candidate_consumer)
+    for destination in destinations:
+        if destination.exists() and not destination.is_file():
+            raise PreparationError(f"overlay destination must be a regular file or absent: {destination}")
+    backups: dict[Path, bytes | None] = {
+        path: path.read_bytes() if path.is_file() else None for path in destinations
+    }
+    try:
+        baseline_probe.parent.mkdir(parents=True, exist_ok=True)
+        candidate_probe.parent.mkdir(parents=True, exist_ok=True)
+        baseline_consumer.parent.mkdir(parents=True, exist_ok=True)
+        candidate_consumer.parent.mkdir(parents=True, exist_ok=True)
+        baseline_lock_destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(adapter_probe, baseline_probe)
+        shutil.copyfile(adapter_probe, candidate_probe)
+        shutil.copyfile(adapter_consumer, baseline_consumer)
+        shutil.copyfile(adapter_consumer, candidate_consumer)
+        shutil.copyfile(external_lock, baseline_lock_destination)
+    except BaseException:
+        for path, content in backups.items():
+            if content is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(content)
+        raise
     prepared_probe_sha, prepared_probe_bytes = _sha256(baseline_probe)
     prepared_consumer_sha, prepared_consumer_bytes = _sha256(baseline_consumer)
     prepared_lock_sha, prepared_lock_size = _sha256(baseline_lock_destination)
-    if (prepared_probe_sha, prepared_probe_bytes) != (candidate_probe_sha, candidate_probe_bytes):
-        raise PreparationError("baseline adapter differs from candidate probe")
-    if (prepared_consumer_sha, prepared_consumer_bytes) != (candidate_consumer_sha, candidate_consumer_bytes):
-        raise PreparationError("baseline consumer manifest differs from candidate")
+    if (prepared_probe_sha, prepared_probe_bytes) != (adapter_probe_sha, adapter_probe_bytes):
+        raise PreparationError("baseline adapter differs from the reviewed adapter probe")
+    if (prepared_consumer_sha, prepared_consumer_bytes) != (adapter_consumer_sha, adapter_consumer_bytes):
+        raise PreparationError("baseline consumer manifest differs from the reviewed adapter")
     if (prepared_lock_sha, prepared_lock_size) != (baseline_lock_sha, baseline_lock_bytes):
         raise PreparationError("baseline Cargo.lock differs from pinned external lock")
 
     after = _source_state(baseline_root)
+    candidate_after = _source_state(candidate_root)
     allowed_status = [str(CONSUMER_MANIFEST), str(PROBE_PATH)]
     if str(LOCK_PATH) in _status_paths(after["status"]):
         allowed_status.append(str(LOCK_PATH))
     if sorted(_status_paths(after["status"])) != sorted(allowed_status):
         raise PreparationError(f"baseline overlay changed unexpected paths: {_status_paths(after['status'])!r}")
+    if sorted(_status_paths(candidate_after["status"])) != sorted([str(CONSUMER_MANIFEST), str(PROBE_PATH)]):
+        raise PreparationError(f"candidate overlay changed unexpected paths: {_status_paths(candidate_after['status'])!r}")
     if after["tree"] != baseline["tree"]:
         raise PreparationError("baseline tracked production tree changed during overlay")
-    output = _resolve(output)
-    if _under(output, baseline_root) or _under(output, candidate_root):
-        raise PreparationError("preparation output must be outside both source worktrees")
-    if output.exists():
-        raise PreparationError(f"preparation output already exists: {output}")
-    output.parent.mkdir(parents=True, exist_ok=True)
     preparation = {
         "schema": SCHEMA,
         "lane": LANE,
@@ -230,20 +321,33 @@ def prepare(
             "commit": BASELINE_COMMIT,
             "production_tree_sha256": _production_tree(baseline_root),
             "overlay_paths": allowed_status,
-            "probe": {"source_path": str(candidate_probe), "destination_path": str(baseline_probe), "sha256": prepared_probe_sha, "bytes": prepared_probe_bytes},
-            "consumer_manifest": {"source_path": str(candidate_consumer), "destination_path": str(baseline_consumer), "sha256": prepared_consumer_sha, "bytes": prepared_consumer_bytes},
+            "probe": {"source_path": str(adapter_probe), "destination_path": str(baseline_probe), "sha256": prepared_probe_sha, "bytes": prepared_probe_bytes},
+            "consumer_manifest": {"source_path": str(adapter_consumer), "destination_path": str(baseline_consumer), "sha256": prepared_consumer_sha, "bytes": prepared_consumer_bytes},
             "lock": {"source_path": str(external_lock), "destination_path": str(baseline_lock_destination), "sha256": prepared_lock_sha, "bytes": prepared_lock_size},
         },
         "candidate": {
             "root": str(candidate_root),
             "commit": candidate_ref,
-            "consumer_manifest": {"path": str(candidate_consumer), "sha256": candidate_consumer_sha, "bytes": candidate_consumer_bytes},
-            "probe": {"path": str(candidate_probe), "sha256": candidate_probe_sha, "bytes": candidate_probe_bytes},
+            "before": candidate,
+            "after_overlay": candidate_after,
+            "production_tree_sha256": _production_tree(candidate_root),
+            "production_source_tree_sha256": _production_source_tree(candidate_root),
+            "overlay_paths": [str(CONSUMER_MANIFEST), str(PROBE_PATH)],
+            "consumer_manifest": {"source_path": str(adapter_consumer), "path": str(candidate_consumer), "sha256": adapter_consumer_sha, "bytes": adapter_consumer_bytes},
+            "probe": {"source_path": str(adapter_probe), "path": str(candidate_probe), "sha256": adapter_probe_sha, "bytes": adapter_probe_bytes},
             "lock": {"path": str(candidate_lock), "sha256": observed_candidate_lock_sha, "bytes": candidate_lock_bytes},
         },
-        "claim_scope": "source preparation identity only; no build, timing, or acceptance claim",
+        "adapter": {
+            "root": str(adapter_root),
+            "head": adapter["head"],
+            "tree": adapter["tree"],
+            "production_source_tree_sha256": _production_source_tree(adapter_root),
+            "consumer_manifest": {"path": str(adapter_consumer), "sha256": adapter_consumer_sha, "bytes": adapter_consumer_bytes},
+            "probe": {"path": str(adapter_probe), "sha256": adapter_probe_sha, "bytes": adapter_probe_bytes},
+        },
+        "claim_scope": "source preparation identity only; no native acceptance claim; no build or timing claim",
     }
-    output.write_text(json.dumps(preparation, indent=2) + "\n", encoding="utf-8")
+    _write_exclusive_json(output, preparation)
     return preparation
 
 
@@ -251,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-root", type=Path, required=True)
     parser.add_argument("--candidate-root", type=Path, required=True)
+    parser.add_argument("--adapter-root", type=Path, required=True)
     parser.add_argument("--candidate-ref", required=True)
     parser.add_argument("--candidate-lock-sha256", required=True)
     parser.add_argument("--baseline-lock", type=Path, required=True)
@@ -260,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
         prepare(
             baseline_root=args.baseline_root,
             candidate_root=args.candidate_root,
+            adapter_root=args.adapter_root,
             candidate_ref=args.candidate_ref,
             candidate_lock_sha256=args.candidate_lock_sha256,
             baseline_lock=args.baseline_lock,

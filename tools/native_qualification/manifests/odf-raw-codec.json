@@ -13,6 +13,10 @@
       "tools/perf-baseline/Cargo.toml",
       "tools/perf-baseline/Cargo.lock",
       "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
+    ],
+    "candidate_overlay": [
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
     ]
   },
   "probe": {
@@ -31,72 +35,72 @@
       "id": "archive_catalog_and_raw_split",
       "family": "raw",
       "operations": ["Archive::new", "file_names", "contains", "metadata", "is_stored", "read"],
-      "boundary": "borrowed Archive catalog/read only; input bytes and expected names prepared outside the clock"
+      "boundary": "Archive construction and catalog/read operation; package bytes and expected content are prepared outside the clock"
     },
     {
       "id": "manifest_xml_stream_and_parse",
       "family": "manifest",
       "operations": ["Archive::read_manifest_xml", "read_manifest", "parse_manifest"],
-      "boundary": "manifest read/materialization/parse only; XML bytes and limits prepared outside the clock"
+      "boundary": "prebuilt Archive manifest materialization/read/parse only; package bytes, Archive and limits are prepared outside the clock"
     },
     {
       "id": "metadata_xml_and_namespace_resolution",
       "family": "xml",
-      "operations": ["Metadata::from_xml", "ResolvedReader::from_xml", "read_resolved_event_into"],
-      "boundary": "bounded metadata/namespace parse only; XML construction and event-result serialization stay outside"
+      "operations": ["Metadata::from_xml", "ResolvedReader::from_xml baseline/from_xml_document current", "read_resolved_event_into"],
+      "boundary": "bounded metadata/namespace construction and event consumption; XML constants, limits and proof serialization are outside the clock"
     },
     {
       "id": "writer_memory_publication",
       "family": "writer",
-      "operations": ["PackageWriter::new", "add_authored_xml", "add_file", "finish"],
-      "boundary": "in-memory writer publication only; payloads, limits and output comparison stay outside"
+      "operations": ["PackageWriter::new", "add_authored_xml", "add_file_reader_with_media_type_and_compression", "finish"],
+      "boundary": "in-memory writer construction/publication; deterministic payload values are prepared outside and output proof is outside the clock"
     },
     {
       "id": "writer_stream_publication",
       "family": "writer",
       "operations": ["PackageWriter::with_writer", "add_file_reader_with_media_type_and_compression", "finish_to_writer"],
-      "boundary": "reader-to-sink publication only; bounded reader and sink are prepared outside"
+      "boundary": "stream writer/sink construction and reader-to-sink publication; deterministic payload is prepared outside the clock"
     },
     {
       "id": "writer_bounded_policy",
       "family": "writer",
-      "operations": ["PackageWriter::new_bounded", "finish_to_bounded_bytes"],
-      "boundary": "bounded writer success/refusal only; error/report serialization stays outside"
+      "operations": ["PackageWriter::new_bounded", "add_file", "finish_to_bounded_bytes"],
+      "boundary": "bounded writer construction/publication and refusal; payload and output/error proof are outside the clock"
     },
     {
       "id": "raw_split_merge_and_opaque_preservation",
       "family": "merge",
-      "operations": ["replace_content_xml", "replace_content_xml_with_payload_verification", "raw_identical_members"],
-      "boundary": "source-preserving raw replacement only; source index and member comparison stay outside"
+      "operations": ["OwnedPackage::from_bytes", "replace_content_xml", "raw_identical_members"],
+      "boundary": "source reopen and raw replacement/publication; expected payload, member audit and output proof are outside the clock"
     },
     {
       "id": "raw_xml_splice_merge_publication",
       "family": "splice",
-      "operations": ["XmlSourcePart::checked_range", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
-      "boundary": "audited XML splice/rebuild only; provenance proofs and fragment construction stay outside"
+      "operations": ["XmlSplicePublication::new", "XmlSplicePublication::replace", "rebuild_package_with_xml_splices"],
+      "boundary": "prebuilt source part/range and fragment publication/rebuild only; source reopen/index/proof and output audit are outside the clock"
     },
     {
       "id": "unified_facade_raw_parts_and_publication",
       "family": "facade",
       "operations": ["open_bytes_with", "File::parts", "File::raw", "File::to_bytes", "File::metadata"],
-      "boundary": "facade raw part/publication operation; facade input ownership clone is included and explicitly reported"
+      "boundary": "facade open, raw/parts/metadata access and byte-identical no-op publication; input bytes are intentionally cloned inside the measured API boundary"
     },
     {
       "id": "consumer_reopen_matrix",
       "family": "consumers",
-      "operations": ["Archive::new", "open_bytes_with", "File::parts", "File::raw"],
-      "boundary": "one prebuilt package per ODF family reopened through raw and facade consumers"
+      "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
+      "boundary": "each prebuilt ODF family package is reopened through raw and facade consumers inside the clock; package generation is outside"
     }
   ],
   "families": ["odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm"],
   "phases": {
     "setup_outside_clock": [
-      "deterministic package and tracked corpus fixture read",
+      "deterministic package and ODF family packages prepared before timing",
       "Archive/OwnedPackage/File opening for correctness proofs",
       "XML, metadata, namespace, reader/sink and expected-hash construction",
       "route-specific limit and refusal inputs"
     ],
-    "inside_clock": "the route operation named by the descriptor boundary only",
+    "inside_clock": "the route operation named by the exact descriptor boundary only",
     "output_proof": [
       "operation_ok",
       "changed_ok",
