@@ -20,6 +20,7 @@ pub(crate) mod comments_metadata;
     reason = "The private native reply transition is reached through package::comments."
 )]
 pub(crate) mod comments_reply_native;
+pub(crate) mod conditional_highlight;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
@@ -49,6 +50,14 @@ mod save;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_chart_style;
+pub(crate) mod sheet_drawable;
+mod sheet_drawable_author;
+mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_language;
+pub(crate) mod sheet_drawable_plain_text;
+pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_order;
 mod storage_list;

@@ -364,6 +364,7 @@ pub use package::{
 };
 pub use selector::{ChartSelector, SheetSelector, TableSelector};
 pub use shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector};
+pub use sheet::drawable::DrawableSelector;
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
 pub use table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};
 pub use table::dimension::{Dimension, Points, Size};

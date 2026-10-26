@@ -8,6 +8,14 @@ pub mod catalog {
 pub mod cells {
     pub use crate::package::table_cells::{Error, LimitKind};
 }
+/// Formula values of [`values::Edit::set_formula_cached`] (record 0376a).
+pub mod formula {
+    pub use litchi_iwa_common::formula::{
+        FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
+        FormulaExpression,
+    };
+}
+
 /// Cell values of one body table (record 0309).
 pub mod values {
     pub use crate::package::body_table_values::{
