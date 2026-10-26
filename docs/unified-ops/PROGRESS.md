@@ -6150,3 +6150,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   with seven Python checks and rustfmt passing; independent review and Rust
   builds remain open. The same full65 gate continues its Ops integration
   chunks. All 25 qualification rows remain required; nothing is pushed.
+
+  Independent review returns the ODF raw-codec source leaf for eleven
+  concrete findings (165b), including contradictory source/overlay bindings,
+  a lazy-reader negative that panics, inverted no-op fidelity, incorrect
+  timing boundaries, incomplete preservation proofs and unsafe preparation
+  ordering. Seven Python checks did not cover these seams. The author repairs
+  the isolated leaf; it is not merged or execution-ready. C/P remain frozen
+  and the same full65 run stays active. No native exception or push.
