@@ -22,7 +22,7 @@
 | `06c52406c2` | host `set_body_text`/`clear_body` → `Package::edit_body_text`; `replace_body_text` (body-absolute range, never across a section break) → a section-relative `Package::edit_section_text` replace | 3 |
 | `db808798af` | `litchi_pages::drawable::text` — `Package::{body_drawable_text, edit_body_drawable_text, apply_body_drawable_text}`: the plain text an ordinary body shape owns, one TSWP splice per edit; a splice that would drop a referenced object is refused | 3 |
 | `907f3afcf2` (and `e805eca0f5` on `uo2/iwa-w1b-cellwriter`, merged to trunk) | **host defect fixes** in the shared TST cell writer (`crates/litchi-iwa/src/numbers/editor/{storage,model}.rs`): tile `numrows` keeps the native row-count convention on cell writes (record 0370's helper), and a cell write adjusts the column-header cell count as native saves do (`body-table-cells-native.pages` counts both axes); macOS queue rows for the Numbers, Keynote and Pages host set-cell routes | — |
-| `b8599dfd3b`, `96bdc43cd2`, `1d0ddd2e3e` | host `set_table_cell`/`set_table_cells` → `Package::edit_body_table_values`; the cell, table-list, merge and comment reads (`tables`, `table`, `get_cell`, `iter_cells`, `cell_count`, `get_comment`, `iter_comments`, `comment_count`, `merges`, `table_cell_comment[_replies]`) → `body_tables`, `body_table_cells`, `body_table_merges` | 13 |
+| `b8599dfd3b`, `96bdc43cd2`, `1d0ddd2e3e` | host `set_table_cell`/`set_table_cells`/`clear_table_cell` → `Package::edit_body_table_values` (the clear after W1-A's writer and host fix); the cell, table-list, merge and comment reads (`tables`, `table`, `get_cell`, `iter_cells`, `cell_count`, `get_comment`, `iter_comments`, `comment_count`, `merges`, `table_cell_comment[_replies]`) → `body_tables`, `body_table_cells`, `body_table_merges` | 14 |
 | `a408e00fbd`, `9bac132398` | `litchi_pages::bookmark` — `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add, update, remove}` by position or name; on W1-D's `ranged` and `smart_field` engines | 4 |
 | `c0ec0bac27`, `9bac132398` | `litchi_pages::date_time` — `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add, insert, update, remove}` (insert adds the display text) | 5 |
 | `a9d2af35ca` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}` | 6 |
@@ -34,7 +34,7 @@ above every physical object and metadata registration, the metadata
 watermark raise, external-reference and UUID-registration removal and the
 watermark-suffix release, and the TSWP text splice.
 
-In all, 59 Pages ledger rows flip to `migrated` in this slice (62 with
+In all, 60 Pages ledger rows flip to `migrated` in this slice (63 with
 W0-C's merge rows). Every new public type follows ADR 0034; the families are
 registered in the `pages` glossary profile (`drawable::properties`,
 `drawable::text`, `bookmark`, `date_time`, `number_attachment`) and listed
@@ -54,7 +54,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | drawable properties (image ×4, movie ×5, audio ×3, shape ×3) | 15 + one read sweep over every media and shape | A | audio playback: `pages/audio-playback-native-resaved.pages`; others queued |
 | whole-body text | 3 | A | queued |
 | shape text | 3 | A | queued |
-| table values and reads | 3 + one read sweep over four native fixtures | A | reads: `body-table-cells-native-receipt.json`; writes queued |
+| table values and reads | 4 + one read sweep over four native fixtures | A | reads: `body-table-cells-native-receipt.json`; writes queued |
 | bookmarks | add (B), update (A), remove (A) | A/B | queued |
 | Date & Time fields | add (B), insert (B), update (A), remove (A) | A/B | queued |
 | number attachments | body insert/update, first-header insert/update | A | queued |
@@ -79,7 +79,6 @@ corpus has no native file with them.
 | Route | Divergence | Owner |
 |---|---|---|
 | `remove_body_number_attachment` (and the header/footer remove) | the host deletes the U+FFFC and its table entry but keeps the attachment object and the storage header's reference to it (its pruning proof fails when the header lists references the payload does not count); the leaf deletes the object with its metadata — `pages_body_number_attachment_remove_divergence_is_reported` | W1-B decides with the owner whether the leaf mirrors the host or the host defect is fixed |
-| `clear_table_cell` | was pinned in `2f287d94e9`; W1-A has since fixed the shared writer and the host (record 0370 follow-up) — see §6 | W1-A |
 
 ## 3. Host defects found
 
@@ -151,7 +150,6 @@ Both pre-commit size checks printed nothing for every commit.
 
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
-| `clear_table_cell` | 1 | W1-A's writer fix landed on trunk: merge, drop the pin, flip |
 | number-attachment removal | 3 | owner choice (§2) |
 | text-box attachments and date-time fields | 4 + 5 | text boxes are W2-B |
 | media lifecycle (add, duplicate, remove, replace data/poster) | 16 | next; donor `refactor/pages-media-lifecycle-admission-20261024` |

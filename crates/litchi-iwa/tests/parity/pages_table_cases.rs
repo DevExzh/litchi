@@ -294,22 +294,13 @@ fn table_cell_value_batch_cost_abba() -> TestResult {
 }
 
 /// `clear_table_cell` against the values family's `Value::Empty` on a cell
-/// the host filled first. Not at parity: clearing the row's only (unstyled)
-/// cell, the host drops the empty tile row and its row header, while the
-/// shared leaf writer (`litchi_numbers_wire::table_write`) keeps an empty
-/// row record and a zero-count header. The route stays host-only and the
-/// divergence goes to W1-A, which owns the writer (record 0371).
+/// the host filled first (both drop the emptied row and its bare header).
 #[test]
-fn pages_body_table_cell_clear_divergence_is_reported() -> TestResult {
-    let Err(error) = clear_case() else {
-        return Err("table-cell clear is now at parity; migrate the route".into());
-    };
-    let report = error.to_string();
-    assert!(report.contains("host     row_infos: []"), "{report}");
-    Ok(())
+fn pages_body_table_cell_clear_parity() -> TestResult {
+    clear_case(Tier::A, Evidence::Queued)
 }
 
-fn clear_case() -> TestResult {
+fn clear_case(tier: Tier, evidence: Evidence) -> TestResult {
     let source = fixture(CATALOG)?;
     let mut editor = pages::Draft::from_bytes(&source.bytes)?;
     let model = host_model(&editor)?;
@@ -319,10 +310,10 @@ fn clear_case() -> TestResult {
         bytes: editor.to_bytes()?,
     };
     Case::new(
-        "pages_body_table_cell_clear_divergence_is_reported",
+        "pages_body_table_cell_clear_parity",
         Format::Pages,
-        Tier::A,
-        Evidence::Queued,
+        tier,
+        evidence,
         &input,
     )
     .host(|source| {
