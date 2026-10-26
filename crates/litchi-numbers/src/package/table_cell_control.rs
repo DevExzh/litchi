@@ -305,7 +305,7 @@ impl Package {
         position: At,
     ) -> Result<Option<CellControl>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position)?;
-        popup::read_cell_control(self, target)
+        Ok(popup::read_cell_control(self, target)?)
     }
 
     /// Start a selector-first complete-control edit.
@@ -320,8 +320,8 @@ impl Package {
         Ok(Edit {
             source: self,
             path: Path::Cell {
-                sheet: target.sheet_position,
-                table: target.table_position,
+                sheet: target.scope,
+                table: target.table,
                 position,
             },
             before: before.clone(),
@@ -363,23 +363,23 @@ impl Package {
         }
         let target_owner = patch.artifacts.target_owner();
         let mut budget = popup::TransactionBudget::new(self);
-        budget.charge_package_source(catalog, patch.path)?;
-        budget.charge_output(target_owner.as_ref().len(), patch.path)?;
-        budget.charge_allocations(2, patch.path)?;
+        budget.charge_package_source(catalog, patch.path.into())?;
+        budget.charge_output(target_owner.as_ref().len(), patch.path.into())?;
+        budget.charge_allocations(2, patch.path.into())?;
         budget.charge_transaction_work(
             target_owner
                 .as_ref()
                 .len()
                 .saturating_mul(2)
                 .saturating_add(catalog.package().iter().count().saturating_mul(1024)),
-            patch.path,
+            patch.path.into(),
         )?;
-        budget.charge_candidate_input_bytes(target_owner.as_ref().len(), patch.path)?;
+        budget.charge_candidate_input_bytes(target_owner.as_ref().len(), patch.path.into())?;
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
             .map_err(|_| Error::Verification)?;
         let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
             .map_err(|_| Error::Verification)?;
-        budget.charge_candidate_reopen(candidate_catalog, patch.path)?;
+        budget.charge_candidate_reopen(candidate_catalog, patch.path.into())?;
         let after = candidate.table_cell_control_format(
             SheetSelector::index(sheet),
             TableSelector::index(table),
@@ -390,10 +390,10 @@ impl Package {
         }
         let target_catalog = super::table_headers::rewrite::physical_source(&candidate)
             .map_err(|_| Error::Verification)?;
-        budget.charge_payload_items(target_catalog.package().iter().count(), patch.path)?;
+        budget.charge_payload_items(target_catalog.package().iter().count(), patch.path.into())?;
         budget.charge_transaction_work(
             target_catalog.source_bytes().len().saturating_mul(2),
-            patch.path,
+            patch.path.into(),
         )?;
         let touched_components = changed_component_count(self, &candidate)?;
         let deleted_previews = catalog
@@ -590,21 +590,21 @@ fn rewrite(
     // owner clones any archive or stages a list candidate.  The native helper
     // returns a conservative private-candidate bound; its exact serialized
     // size is checked again before compression.
-    budget.charge_package_source(catalog, path)?;
+    budget.charge_package_source(catalog, path.into())?;
     let native_bound =
-        native::preflight_copy_on_write_scalar_control(source, target, path, &mut budget)?;
+        native::preflight_copy_on_write_scalar_control(source, target, path.into(), &mut budget)?;
     let native_output = native::rewrite_scalar_control(
         source,
         target,
         before.as_ref(),
         after.as_ref(),
-        path,
+        path.into(),
         &mut budget,
     )?;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes
             || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
-                .map_err(|error| popup::map_core_error(error, path))?
+                .map_err(|error| popup::map_core_error(error, path.into()))?
                 > native_bound.compressed_bytes
         {
             return Err(Error::Limit {
@@ -616,13 +616,13 @@ fn rewrite(
         }
         let maximum_compressed =
             SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
-                .map_err(|error| popup::map_core_error(error, path))?;
-        budget.charge_compressed_bytes(maximum_compressed, path)?;
+                .map_err(|error| popup::map_core_error(error, path.into()))?;
+        budget.charge_compressed_bytes(maximum_compressed, path.into())?;
     }
     let metadata_bytes = popup::rewrite_component_save_tokens(
         source,
         &native_output.component_indices,
-        path,
+        path.into(),
         &mut budget,
     )?;
     let previews = super::table_headers::rewrite::root_preview_deletions(catalog)
@@ -631,14 +631,14 @@ fn rewrite(
     // bounded private staging allowance before asking the archive package to
     // build that plan; the exact requirements are charged immediately after
     // preparation and before its output buffer is allocated.
-    budget.charge_allocations(2, path)?;
-    budget.charge_transaction_work(catalog.source_bytes().len().saturating_mul(2), path)?;
+    budget.charge_allocations(2, path.into())?;
+    budget.charge_transaction_work(catalog.source_bytes().len().saturating_mul(2), path.into())?;
     let compressed_members = native_output
         .members
         .iter()
         .map(|member| {
             SnappyStream::compress(&member.archive_bytes, snappy_limits)
-                .map_err(|error| popup::map_core_error(error, path))
+                .map_err(|error| popup::map_core_error(error, path.into()))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut changed_names = native_output
@@ -663,26 +663,26 @@ fn rewrite(
         .prepare_reassembly_with_deletions(&edits, &previews, catalog.limits())
         .map_err(|_| Error::Verification)?;
     let requirements = prepared.execution_requirements();
-    budget.preflight_reassembly(requirements, path)?;
+    budget.preflight_reassembly(requirements, path.into())?;
     // Candidate parsing/readback is a second private phase.  It is charged
     // before execute so an allocation or semantic reread limit cannot occur
     // after the final ZIP buffer has been published.
-    budget.charge_allocations(2, path)?;
+    budget.charge_allocations(2, path.into())?;
     budget.charge_transaction_work(
         requirements
             .output_bytes()
             .saturating_mul(2)
             .saturating_add(catalog.package().iter().count().saturating_mul(1024)),
-        path,
+        path.into(),
     )?;
     let limits = requirements.exact_limits();
-    budget.charge_candidate_input_bytes(requirements.output_bytes(), path)?;
+    budget.charge_candidate_input_bytes(requirements.output_bytes(), path.into())?;
     let bytes = prepared.execute(limits).map_err(|_| Error::Verification)?;
     let candidate = Package::from_owned_bytes_with_options(bytes, source.state.options)
         .map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?;
-    budget.charge_candidate_reopen(candidate_catalog, path)?;
+    budget.charge_candidate_reopen(candidate_catalog, path.into())?;
     let candidate_value = candidate.table_cell_control_format(
         SheetSelector::index(sheet),
         TableSelector::index(table),

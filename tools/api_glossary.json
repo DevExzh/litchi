@@ -22604,6 +22604,26 @@
       "families": []
     },
     {
+      "id": "iwa-table",
+      "package": "litchi-iwa-table",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_table",
+          "replacement": "table engines take their limits through the supplied TableSource and TransactionBudget on canonical names (records 0351, 0379)",
+          "match": "suffix"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_iwa_table",
+          "replacement": "use Error::Limit { kind, observed, maximum, path } (record 0351)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "numbers-minimal",
       "features": [],
       "package": "litchi-numbers",
