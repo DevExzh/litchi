@@ -17,7 +17,9 @@ use litchi_core::Position;
 use litchi_iwa::numbers;
 use litchi_iwa::shapes::DrawablePoint;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings};
+use litchi_iwa_text::paragraph::format::Alignment;
 use litchi_numbers::Package;
+use litchi_numbers::sheet::drawable::text::Property;
 use litchi_numbers::sheet::drawable::{DrawableSelector, Kind, Point};
 
 use crate::harness::{TestResult, fixture};
@@ -35,6 +37,7 @@ const ROUTES: &[(&str, Kind, usize)] = &[
     ("drawable_move", Kind::TextBox, 0),
     ("text_box_remove", Kind::TextBox, 0),
     ("shape_remove", Kind::Shape, 0),
+    ("text_box_alignment", Kind::TextBox, 0),
 ];
 
 fn playback() -> MediaPlaybackSettings {
@@ -72,6 +75,9 @@ fn w2a_host_route(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult
         },
         "text_box_remove" => drop(editor.remove_sheet_text_box(sheet, id)?),
         "shape_remove" => drop(editor.remove_sheet_shape(sheet, id)?),
+        "text_box_alignment" => {
+            editor.set_sheet_text_box_paragraph_alignment(sheet, id, Alignment::Center)?;
+        },
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(editor.to_bytes()?)
@@ -88,6 +94,11 @@ fn w2a_leaf_route(route: &str, source: &[u8], selector: DrawableSelector) -> Tes
             } else {
                 edit.remove(selector)?;
             }
+            edit.commit()?.into_package()
+        },
+        "text_box_alignment" => {
+            let mut edit = package.edit_sheet_text_box_text(0, selector)?;
+            edit.set(Property::Alignment(Alignment::Center))?;
             edit.commit()?.into_package()
         },
         _ => {

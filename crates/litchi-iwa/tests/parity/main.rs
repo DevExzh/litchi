@@ -43,6 +43,7 @@ mod numbers_cases;
 mod numbers_cell_text_cases;
 mod numbers_drawable_cases;
 mod numbers_owner_allocation;
+mod numbers_text_box_cases;
 mod numbers_w2a_cost;
 mod pages_cases;
 mod pages_cost_probes;
