@@ -9,7 +9,7 @@
 mod limits;
 pub use limits::{EditOptions, SemanticLimits, SemanticLimitsBuilder};
 
-use crate::{Package, RtfError};
+use crate::Package;
 use litchi_core::{
     ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion, patch::BlobId,
 };
@@ -473,7 +473,7 @@ pub enum Error {
         requested: usize,
     },
     /// Candidate transport parsing or semantic readback failed.
-    Rtf(RtfError),
+    Rtf(crate::Error),
     /// A durable wire envelope is malformed or exceeds its caller bound.
     DurablePatch(&'static str),
     /// A patch was applied to a source with a different exact artifact digest.
@@ -553,8 +553,8 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<RtfError> for Error {
-    fn from(error: RtfError) -> Self {
+impl From<crate::Error> for Error {
+    fn from(error: crate::Error) -> Self {
         Self::Rtf(error)
     }
 }

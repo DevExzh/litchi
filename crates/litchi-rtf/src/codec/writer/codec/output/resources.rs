@@ -12,11 +12,11 @@ use super::super::{
     ListJustification, ListLevel, ListLevelType, ListOverrideTable, ListTable, MailMerge,
     NoteNumberingStyle, NoteOptions, NotePlacement, NoteSeparatorElement, NoteSeparatorKind,
     NoteSeparatorTable, ParagraphGroupPropertyTable, Picture, PresentNoteKinds,
-    ProtectionUserTable, Revision, RevisionAuthor, RevisionSaveMetadata, RtfWriter, StoryDrawing,
-    Style, StyleSheet, StyleType, Write, XmlNamespace, annotation, io,
+    ProtectionUserTable, Revision, RevisionAuthor, RevisionSaveMetadata, StoryDrawing, Style,
+    StyleSheet, StyleType, Write, Writer, XmlNamespace, annotation, io,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write font table
     pub(in super::super) fn write_font_table(&mut self) -> io::Result<()> {
         self.font_table

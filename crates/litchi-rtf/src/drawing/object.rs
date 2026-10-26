@@ -2,8 +2,6 @@
 
 use std::borrow::Cow;
 
-use crate::{RtfError, RtfResult};
-
 const COMPOUND_FILE_SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
 
 /// Maximum number of inert object destinations retained from one document.
@@ -202,9 +200,9 @@ impl EmbeddedObject<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self, body: &str, picture_count: usize) -> RtfResult<()> {
+    pub fn validate(&self, body: &str, picture_count: usize) -> crate::Result<()> {
         if body.get(..self.position).is_none() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object position is not a UTF-8 body boundary".to_string(),
             ));
         }
@@ -219,17 +217,17 @@ impl EmbeddedObject<'_> {
             })
             .and_then(|size| size.checked_add(self.result_text.len()))
             .ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF embedded object metadata size overflow".to_string(),
                 )
             })?;
         if metadata_bytes > MAX_OBJECT_METADATA_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object metadata exceeds the safety limit".to_string(),
             ));
         }
         if self.data.len() > MAX_OBJECT_DATA_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object data exceeds the safety limit".to_string(),
             ));
         }
@@ -238,7 +236,7 @@ impl EmbeddedObject<'_> {
             .iter()
             .any(|index| *index >= picture_count)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF embedded object references a missing result picture".to_string(),
             ));
         }

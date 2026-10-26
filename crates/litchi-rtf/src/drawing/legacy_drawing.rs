@@ -1,6 +1,6 @@
 //! Inert Word 6/95 RTF drawing primitives.
 
-use crate::{LegacyTextBox, RtfError, RtfResult};
+use crate::LegacyTextBox;
 
 pub const MAX_LEGACY_DRAWINGS: usize = 16_384;
 pub const MAX_LEGACY_DRAWING_DEPTH: usize = 64;
@@ -20,9 +20,9 @@ impl LegacyDrawingGeometry {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(self) -> RtfResult<()> {
+    pub fn validate(self) -> crate::Result<()> {
         if self.width < 0 || self.height < 0 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing size cannot be negative".to_string(),
             ));
         }
@@ -51,14 +51,14 @@ impl LegacyDrawingColor {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn gray_half_percent(value: i32) -> RtfResult<Self> {
+    pub fn gray_half_percent(value: i32) -> crate::Result<Self> {
         let gray = u8::try_from(value).map_err(|_err| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF legacy drawing grayscale is outside 0..=200".to_string(),
             )
         })?;
         if gray > 200 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing grayscale is outside 0..=200".to_string(),
             ));
         }
@@ -115,7 +115,7 @@ pub enum LegacyDrawingFillPattern {
 }
 
 impl TryFrom<i32> for LegacyDrawingFillPattern {
-    type Error = RtfError;
+    type Error = crate::Error;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -146,7 +146,7 @@ impl TryFrom<i32> for LegacyDrawingFillPattern {
             24 => Self::LightGrid,
             25 => Self::LightTrellis,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF legacy drawing fill pattern is outside 0..=25".to_string(),
                 ));
             },
@@ -176,14 +176,14 @@ pub enum LegacyDrawingArrowSize {
 }
 
 impl TryFrom<i32> for LegacyDrawingArrowSize {
-    type Error = RtfError;
+    type Error = crate::Error;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Self::Small),
             2 => Ok(Self::Medium),
             3 => Ok(Self::Large),
-            _ => Err(RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing arrow size is outside 1..=3".to_string(),
             )),
         }
@@ -299,17 +299,19 @@ impl LegacyDrawingPrimitive<'_> {
         depth: usize,
         primitives: &mut usize,
         points: &mut usize,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if depth > MAX_LEGACY_DRAWING_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing nesting exceeds the safety limit".to_string(),
             ));
         }
         *primitives = primitives.checked_add(1).ok_or_else(|| {
-            RtfError::MalformedDocument("RTF legacy drawing primitive count overflow".to_string())
+            crate::Error::MalformedDocument(
+                "RTF legacy drawing primitive count overflow".to_string(),
+            )
         })?;
         if *primitives > MAX_LEGACY_DRAWING_PRIMITIVES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF legacy drawing primitive count exceeds the safety limit".to_string(),
             ));
         }
@@ -322,7 +324,7 @@ impl LegacyDrawingPrimitive<'_> {
                 geometry.validate()?;
                 end_geometry.validate()?;
                 if children.is_empty() {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy drawing group cannot be empty".to_string(),
                     ));
                 }
@@ -335,7 +337,7 @@ impl LegacyDrawingPrimitive<'_> {
                 if !matches!(*callout.polyline, Self::Polyline { .. })
                     || !matches!(*callout.text_box, Self::TextBox { .. })
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy callout requires a polyline followed by a text box".to_string(),
                     ));
                 }
@@ -343,7 +345,7 @@ impl LegacyDrawingPrimitive<'_> {
                     .angle
                     .is_some_and(|angle| !matches!(angle, 0 | 30 | 45 | 60 | 90))
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy callout angle is invalid".to_string(),
                     ));
                 }
@@ -366,17 +368,17 @@ impl LegacyDrawingPrimitive<'_> {
             } => {
                 geometry.validate()?;
                 if item_points.is_empty() || item_points.len() > MAX_LEGACY_DRAWING_POINTS {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy drawing polyline point count is invalid".to_string(),
                     ));
                 }
                 *points = points.checked_add(item_points.len()).ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF legacy drawing point count overflow".to_string(),
                     )
                 })?;
                 if *points > MAX_LEGACY_DRAWING_TOTAL_POINTS {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF legacy drawing aggregate point count exceeds the safety limit"
                             .to_string(),
                     ));
@@ -488,7 +490,7 @@ impl LegacyDrawing<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         let mut primitives = 0;
         let mut points = 0;
         self.primitive.validate_at(1, &mut primitives, &mut points)

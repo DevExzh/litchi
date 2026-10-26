@@ -6,7 +6,7 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
-use super::super::error::{RtfError, RtfResult};
+
 use super::super::lexer::{ControlWord, Token};
 use super::super::limits::SourceLimits;
 use super::super::types::{
@@ -83,7 +83,7 @@ enum DeferredTextPart {
 }
 
 impl DeferredText {
-    fn push_transport(&mut self, text: &str) -> RtfResult<()> {
+    fn push_transport(&mut self, text: &str) -> crate::Result<()> {
         let mut incoming = Vec::with_capacity(text.len());
         append_transport_bytes(&mut incoming, text)?;
         self.source_len = self.source_len.saturating_add(incoming.len());
@@ -116,7 +116,12 @@ impl DeferredText {
 
     /// Decode with `encoding`, substituting U+FFFD for undefined bytes when
     /// `lossy` (the font-charset fallback) and failing on them otherwise.
-    fn decode_with(self, encoding: RtfEncoding, context: &str, lossy: bool) -> RtfResult<String> {
+    fn decode_with(
+        self,
+        encoding: RtfEncoding,
+        context: &str,
+        lossy: bool,
+    ) -> crate::Result<String> {
         if !lossy {
             return self.decode(encoding, context);
         }
@@ -130,7 +135,7 @@ impl DeferredText {
         Ok(output)
     }
 
-    fn decode(self, encoding: RtfEncoding, context: &str) -> RtfResult<String> {
+    fn decode(self, encoding: RtfEncoding, context: &str) -> crate::Result<String> {
         let mut output = String::with_capacity(self.source_len);
         for part in self.parts {
             match part {
@@ -144,58 +149,60 @@ impl DeferredText {
     }
 }
 
-fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> Result<bool, RtfError> {
+fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> Result<bool, crate::Error> {
     match value {
         None | Some(1) => Ok(true),
         Some(0) => Ok(false),
-        Some(_) => Err(RtfError::MalformedDocument(format!(
+        Some(_) => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} accepts only 0 or 1"
         ))),
     }
 }
 
 #[cold]
-pub(super) fn parser_classification_error() -> RtfError {
-    RtfError::ParserError("RTF parser control classification invariant failed".to_string())
+pub(super) fn parser_classification_error() -> crate::Error {
+    crate::Error::ParserError("RTF parser control classification invariant failed".to_string())
 }
 
-fn strict_paragraph_selector(value: Option<i32>, name: &str) -> Result<(), RtfError> {
+fn strict_paragraph_selector(value: Option<i32>, name: &str) -> Result<(), crate::Error> {
     if value.is_some() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {name} must not have a numeric parameter"
         )));
     }
     Ok(())
 }
 
-fn required_paragraph_bool(value: Option<i32>, name: &str) -> Result<bool, RtfError> {
+fn required_paragraph_bool(value: Option<i32>, name: &str) -> Result<bool, crate::Error> {
     match value {
         Some(0) => Ok(false),
         Some(1) => Ok(true),
-        None => Err(RtfError::MalformedDocument(format!(
+        None => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} requires 0 or 1"
         ))),
-        Some(_) => Err(RtfError::MalformedDocument(format!(
+        Some(_) => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} accepts only 0 or 1"
         ))),
     }
 }
 
-fn required_list_spacing(raw_value: Option<i32>, name: &str) -> Result<u32, RtfError> {
+fn required_list_spacing(raw_value: Option<i32>, name: &str) -> Result<u32, crate::Error> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     u32::try_from(value)
         .ok()
         .filter(|parsed| *parsed <= 1_000_000)
-        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} must be in 0..=1000000")))
+        .ok_or_else(|| {
+            crate::Error::MalformedDocument(format!("RTF {name} must be in 0..=1000000"))
+        })
 }
-fn required_paragraph_indent(raw_value: Option<i32>, name: &str) -> Result<i32, RtfError> {
+fn required_paragraph_indent(raw_value: Option<i32>, name: &str) -> Result<i32, crate::Error> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     if value.unsigned_abs() > 10_000_000 {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {name} exceeds the supported range"
         )));
     }
@@ -211,10 +218,10 @@ impl RtfEncoding {
         }
     }
 
-    fn decode_strict<'b>(self, bytes: &'b [u8], context: &str) -> RtfResult<Cow<'b, str>> {
+    fn decode_strict<'b>(self, bytes: &'b [u8], context: &str) -> crate::Result<Cow<'b, str>> {
         match self {
             Self::Standard(page) => page.decode(bytes).map_err(|error| {
-                RtfError::MalformedDocument(format!("invalid RTF {context}: {error}"))
+                crate::Error::MalformedDocument(format!("invalid RTF {context}: {error}"))
             }),
             Self::Cp437 => Ok(decode_dos_codepage(bytes, &CP437_HIGH)),
             Self::Cp850 => Ok(decode_dos_codepage(bytes, &CP850_HIGH)),
@@ -287,7 +294,7 @@ const CP850_HIGH: [char; 128] = [
     '\u{00B0}', '\u{00A8}', '\u{00B7}', '\u{00B9}', '\u{00B3}', '\u{00B2}', '\u{25A0}', '\u{00A0}',
 ];
 
-fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> RtfResult<()> {
+fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> crate::Result<()> {
     if text.is_ascii() {
         buffer.extend(text.bytes());
         return Ok(());
@@ -295,7 +302,7 @@ fn append_transport_bytes(buffer: &mut impl Extend<u8>, text: &str) -> RtfResult
 
     for character in text.chars() {
         let byte = u8::try_from(character as u32).map_err(|_err| {
-            RtfError::InvalidUnicode(
+            crate::Error::InvalidUnicode(
                 "RTF source text is not a byte-preserving transport string".to_string(),
             )
         })?;
@@ -333,15 +340,15 @@ fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
     }
 }
 
-fn duplicate_mail_merge(name: &str) -> RtfError {
-    RtfError::MalformedDocument(format!(
+fn duplicate_mail_merge(name: &str) -> crate::Error {
+    crate::Error::MalformedDocument(format!(
         "RTF mail-merge destination contains duplicate {name} metadata"
     ))
 }
 
-fn nonnegative_mail_merge(value: i32, name: &str) -> RtfResult<u32> {
+fn nonnegative_mail_merge(value: i32, name: &str) -> crate::Result<u32> {
     u32::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument(format!("RTF mail-merge {name} cannot be negative"))
+        crate::Error::MalformedDocument(format!("RTF mail-merge {name} cannot be negative"))
     })
 }
 
@@ -349,7 +356,7 @@ fn set_mail_merge_text<'a>(
     slot: &mut Option<Cow<'a, str>>,
     value: Cow<'a, str>,
     name: &str,
-) -> RtfResult<()> {
+) -> crate::Result<()> {
     if slot.replace(value).is_some() {
         return Err(duplicate_mail_merge(name));
     }
@@ -767,9 +774,11 @@ fn apply_table_distance_side(
     edge: crate::TableEdge,
     parameter: Option<i32>,
     unit: bool,
-) -> RtfResult<()> {
+) -> crate::Result<()> {
     let value = parameter.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF table distance control requires a parameter".to_string())
+        crate::Error::MalformedDocument(
+            "RTF table distance control requires a parameter".to_string(),
+        )
     })?;
     let side = distances.side_mut(edge);
     if unit {
@@ -777,14 +786,14 @@ fn apply_table_distance_side(
             0 => crate::TableDistanceUnit::Null,
             3 => crate::TableDistanceUnit::Twips,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table distance unit must be 0 or 3".to_string(),
                 ));
             },
         });
     } else {
         if !(0..=crate::MAX_TABLE_DISTANCE_TWIPS).contains(&value) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table distance value is out of range".to_string(),
             ));
         }
@@ -798,7 +807,7 @@ fn apply_table_distance(
     target: crate::TableDistanceTarget,
     parameter: Option<i32>,
     unit: bool,
-) -> RtfResult<()> {
+) -> crate::Result<()> {
     let distances = match (target.scope, target.kind) {
         (crate::TableDistanceScope::Row, crate::TableDistanceKind::Padding) => {
             &mut state.table_row_padding
@@ -816,30 +825,30 @@ fn apply_table_distance(
     apply_table_distance_side(distances, target.edge, parameter, unit)
 }
 
-fn table_width_unit(parameter: Option<i32>) -> RtfResult<crate::TablePreferredWidthUnit> {
+fn table_width_unit(parameter: Option<i32>) -> crate::Result<crate::TablePreferredWidthUnit> {
     match parameter {
         Some(0) => Ok(crate::TablePreferredWidthUnit::Null),
         Some(1) => Ok(crate::TablePreferredWidthUnit::Auto),
         Some(2) => Ok(crate::TablePreferredWidthUnit::Percent),
         Some(3) => Ok(crate::TablePreferredWidthUnit::Twips),
-        None => Err(RtfError::MalformedDocument(
+        None => Err(crate::Error::MalformedDocument(
             "RTF preferred-width unit requires a parameter".to_string(),
         )),
-        Some(_) => Err(RtfError::MalformedDocument(
+        Some(_) => Err(crate::Error::MalformedDocument(
             "RTF preferred-width unit must be in 0..=3".to_string(),
         )),
     }
 }
-fn table_indent_unit(parameter: Option<i32>) -> RtfResult<crate::TableIndentUnit> {
+fn table_indent_unit(parameter: Option<i32>) -> crate::Result<crate::TableIndentUnit> {
     match parameter {
         Some(0) => Ok(crate::TableIndentUnit::Auto),
         Some(1) => Ok(crate::TableIndentUnit::Twips),
         Some(2) => Ok(crate::TableIndentUnit::Nil),
         Some(3) => Ok(crate::TableIndentUnit::Percent),
-        None => Err(RtfError::MalformedDocument(
+        None => Err(crate::Error::MalformedDocument(
             "RTF tblindtype requires a parameter".to_string(),
         )),
-        Some(_) => Err(RtfError::MalformedDocument(
+        Some(_) => Err(crate::Error::MalformedDocument(
             "RTF tblindtype must be in 0..=3".to_string(),
         )),
     }
@@ -852,12 +861,12 @@ fn table_indent_unit(parameter: Option<i32>) -> RtfResult<crate::TableIndentUnit
 fn resolve_preferred_width(
     unit: Option<crate::TablePreferredWidthUnit>,
     value: Option<i32>,
-) -> RtfResult<Option<crate::TablePreferredWidth>> {
+) -> crate::Result<Option<crate::TablePreferredWidth>> {
     let Some(width_unit) = unit else {
         return if value.is_none() {
             Ok(None)
         } else {
-            Err(RtfError::MalformedDocument(
+            Err(crate::Error::MalformedDocument(
                 "RTF preferred-width value lacks its unit control".to_string(),
             ))
         };
@@ -865,7 +874,7 @@ fn resolve_preferred_width(
     let width_value = match width_unit {
         crate::TablePreferredWidthUnit::Null | crate::TablePreferredWidthUnit::Auto => {
             if value.is_some_and(|v| v != 0) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF null or auto preferred width must omit its value or use zero".to_string(),
                 ));
             }
@@ -896,12 +905,12 @@ fn resolve_invisible_width(
     unit: Option<crate::TablePreferredWidthUnit>,
     value: Option<i32>,
     side: &str,
-) -> RtfResult<Option<crate::TablePreferredWidth>> {
+) -> crate::Result<Option<crate::TablePreferredWidth>> {
     let Some(width_unit) = unit else {
         return if value.is_none() {
             Ok(None)
         } else {
-            Err(RtfError::MalformedDocument(format!(
+            Err(crate::Error::MalformedDocument(format!(
                 "RTF {side} invisible-width value lacks its unit control"
             )))
         };
@@ -909,7 +918,7 @@ fn resolve_invisible_width(
     let width_value = match width_unit {
         crate::TablePreferredWidthUnit::Null | crate::TablePreferredWidthUnit::Auto => {
             if value.is_some_and(|v| v != 0) {
-                return Err(RtfError::MalformedDocument(format!(
+                return Err(crate::Error::MalformedDocument(format!(
                     "RTF null or auto {side} invisible width must omit its value or use zero"
                 )));
             }
@@ -931,7 +940,7 @@ fn resolve_invisible_width(
         width_value,
     )?))
 }
-fn resolve_row_geometry(state: &State) -> RtfResult<crate::TableRowGeometry> {
+fn resolve_row_geometry(state: &State) -> crate::Result<crate::TableRowGeometry> {
     let mut geometry = state.table_row_geometry;
     geometry.set_preferred_width(resolve_preferred_width(
         state.table_width_unit,
@@ -959,9 +968,10 @@ fn resolve_row_geometry(state: &State) -> RtfResult<crate::TableRowGeometry> {
     geometry.validate()?;
     Ok(geometry)
 }
-fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> RtfResult<i32> {
-    let value = parameter
-        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} requires a parameter")))?;
+fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> crate::Result<i32> {
+    let value = parameter.ok_or_else(|| {
+        crate::Error::MalformedDocument(format!("RTF {name} requires a parameter"))
+    })?;
     let valid = if signed {
         value.unsigned_abs() <= crate::MAX_TABLE_GEOMETRY_TWIPS as u32
     } else {
@@ -970,7 +980,7 @@ fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> Rtf
     if valid {
         Ok(value)
     } else {
-        Err(RtfError::MalformedDocument(format!(
+        Err(crate::Error::MalformedDocument(format!(
             "RTF {name} is out of range"
         )))
     }
@@ -980,11 +990,12 @@ fn table_geometry_twips(parameter: Option<i32>, name: &str, signed: bool) -> Rtf
     clippy::cast_sign_loss,
     reason = "adjacent range checks bound each narrowing conversion to the target type's range"
 )]
-fn table_row_height(parameter: Option<i32>) -> RtfResult<crate::TableRowHeight> {
-    let value = parameter
-        .ok_or_else(|| RtfError::MalformedDocument("RTF trrh requires a parameter".to_string()))?;
+fn table_row_height(parameter: Option<i32>) -> crate::Result<crate::TableRowHeight> {
+    let value = parameter.ok_or_else(|| {
+        crate::Error::MalformedDocument("RTF trrh requires a parameter".to_string())
+    })?;
     if value.unsigned_abs() > crate::MAX_TABLE_GEOMETRY_TWIPS as u32 {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF trrh is out of range".to_string(),
         ));
     }
@@ -995,32 +1006,32 @@ fn table_row_height(parameter: Option<i32>) -> RtfResult<crate::TableRowHeight> 
     })
 }
 
-fn require_parameterless(parameter: Option<i32>, name: &str) -> RtfResult<()> {
+fn require_parameterless(parameter: Option<i32>, name: &str) -> crate::Result<()> {
     if parameter.is_some() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {name} does not accept a parameter"
         )));
     }
     Ok(())
 }
 
-fn required_table_value(value: Option<i32>, name: &str, maximum: u16) -> RtfResult<u16> {
+fn required_table_value(value: Option<i32>, name: &str, maximum: u16) -> crate::Result<u16> {
     let parameter = value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
     })?;
     let table_value = u16::try_from(parameter).map_err(|_err| {
-        RtfError::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}"))
+        crate::Error::MalformedDocument(format!("RTF {name} value must be in 0..={maximum}"))
     })?;
     if table_value > maximum {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {name} value must be in 0..={maximum}"
         )));
     }
     Ok(table_value)
 }
-fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> RtfResult<i32> {
+fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> crate::Result<i32> {
     let value = parameter.ok_or_else(|| {
-        RtfError::MalformedDocument(format!(
+        crate::Error::MalformedDocument(format!(
             "RTF floating-table {axis} offset requires a parameter"
         ))
     })?;
@@ -1030,7 +1041,7 @@ fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> 
         (0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value)
     };
     if !valid {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF floating-table {axis} offset is out of range"
         )));
     }
@@ -1041,14 +1052,14 @@ fn floating_table_offset(parameter: Option<i32>, negative: bool, axis: &str) -> 
     clippy::cast_sign_loss,
     reason = "adjacent range checks bound each narrowing conversion to the target type's range"
 )]
-fn floating_table_wrap_distance(parameter: Option<i32>) -> RtfResult<u16> {
+fn floating_table_wrap_distance(parameter: Option<i32>) -> crate::Result<u16> {
     let value = parameter.ok_or_else(|| {
-        RtfError::MalformedDocument(
+        crate::Error::MalformedDocument(
             "RTF floating-table wrap distance requires a parameter".to_string(),
         )
     })?;
     if !(0..=crate::MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value) {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF floating-table wrap distance is out of range".to_string(),
         ));
     }
@@ -1105,12 +1116,12 @@ enum RootDrawingOwner {
     Body,
 }
 
-fn associated_font_ref(raw_value: Option<i32>) -> RtfResult<FontRef> {
+fn associated_font_ref(raw_value: Option<i32>) -> crate::Result<FontRef> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF af control requires a numeric parameter".to_string())
+        crate::Error::MalformedDocument("RTF af control requires a numeric parameter".to_string())
     })?;
     u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF af value must be in 0..=65535".to_string())
+        crate::Error::MalformedDocument("RTF af value must be in 0..=65535".to_string())
     })
 }
 
@@ -1118,141 +1129,156 @@ fn character_type_selector(
     parameter: Option<i32>,
     name: &str,
     value: CharacterType,
-) -> RtfResult<CharacterType> {
+) -> crate::Result<CharacterType> {
     require_parameterless(parameter, name)?;
     Ok(value)
 }
 
-fn complex_script_selector(value: Option<i32>) -> RtfResult<bool> {
+fn complex_script_selector(value: Option<i32>) -> crate::Result<bool> {
     match value {
         Some(0) => Ok(false),
         Some(1) => Ok(true),
-        _ => Err(RtfError::MalformedDocument(
+        _ => Err(crate::Error::MalformedDocument(
             "RTF fcs control requires a numeric parameter of 0 or 1".to_string(),
         )),
     }
 }
 
-fn character_grid(value: Option<i32>) -> RtfResult<CharacterGrid> {
+fn character_grid(value: Option<i32>) -> crate::Result<CharacterGrid> {
     match value {
         None => Ok(CharacterGrid::Parameterless),
         Some(raw) => i16::try_from(raw)
             .map(CharacterGrid::Value)
             .map_err(|_err| {
-                RtfError::MalformedDocument("RTF cgrid value must be in -32768..=32767".to_string())
+                crate::Error::MalformedDocument(
+                    "RTF cgrid value must be in -32768..=32767".to_string(),
+                )
             }),
     }
 }
 
-fn animated_text(raw_value: Option<i32>) -> RtfResult<AnimatedTextEffect> {
+fn animated_text(raw_value: Option<i32>) -> crate::Result<AnimatedTextEffect> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF animtext control requires a numeric parameter".to_string())
+        crate::Error::MalformedDocument(
+            "RTF animtext control requires a numeric parameter".to_string(),
+        )
     })?;
     AnimatedTextEffect::from_rtf(value).ok_or_else(|| {
-        RtfError::MalformedDocument(format!(
+        crate::Error::MalformedDocument(format!(
             "RTF animtext value must be in 0..={}",
             AnimatedTextEffect::MAX_RTF_VALUE
         ))
     })
 }
 
-fn fit_text(raw_value: Option<i32>) -> RtfResult<FitText> {
+fn fit_text(raw_value: Option<i32>) -> crate::Result<FitText> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF fittext control requires a numeric parameter".to_string())
+        crate::Error::MalformedDocument(
+            "RTF fittext control requires a numeric parameter".to_string(),
+        )
     })?;
     FitText::from_rtf(value).ok_or_else(|| {
-        RtfError::MalformedDocument(format!(
+        crate::Error::MalformedDocument(format!(
             "RTF fittext value must be -1 or 0..={}",
             FitText::MAX_TWIPS
         ))
     })
 }
 
-fn emphasis_mark(mark: EmphasisMark, value: Option<i32>) -> RtfResult<EmphasisMark> {
+fn emphasis_mark(mark: EmphasisMark, value: Option<i32>) -> crate::Result<EmphasisMark> {
     require_parameterless(value, mark.control_word())?;
     Ok(mark)
 }
 
-fn paper_source_bin(raw_value: Option<i32>, name: &str) -> RtfResult<u16> {
+fn paper_source_bin(raw_value: Option<i32>, name: &str) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
     })?;
     u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument(format!(
+        crate::Error::MalformedDocument(format!(
             "RTF {name} value must be in 0..={}",
             super::super::section::MAX_SECTION_PAPER_BIN
         ))
     })
 }
 
-fn associated_font_size(raw_value: Option<i32>) -> RtfResult<NonZeroU16> {
+fn associated_font_size(raw_value: Option<i32>) -> crate::Result<NonZeroU16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF afs control requires a numeric parameter".to_string())
+        crate::Error::MalformedDocument("RTF afs control requires a numeric parameter".to_string())
     })?;
     let size = u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
+        crate::Error::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
     })?;
     NonZeroU16::new(size).ok_or_else(|| {
-        RtfError::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
+        crate::Error::MalformedDocument("RTF afs value must be in 1..=65535".to_string())
     })
 }
 
-fn font_size(raw_value: i32) -> RtfResult<NonZeroU16> {
+fn font_size(raw_value: i32) -> crate::Result<NonZeroU16> {
     let size = u16::try_from(raw_value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF fs value must be in 1..=65535".to_string())
+        crate::Error::MalformedDocument("RTF fs value must be in 1..=65535".to_string())
     })?;
-    NonZeroU16::new(size)
-        .ok_or_else(|| RtfError::MalformedDocument("RTF fs value must be in 1..=65535".to_string()))
+    NonZeroU16::new(size).ok_or_else(|| {
+        crate::Error::MalformedDocument("RTF fs value must be in 1..=65535".to_string())
+    })
 }
 
-fn associated_language(raw_value: Option<i32>) -> RtfResult<crate::LanguageId> {
+fn associated_language(raw_value: Option<i32>) -> crate::Result<crate::LanguageId> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF alang control requires a numeric parameter".to_string())
+        crate::Error::MalformedDocument(
+            "RTF alang control requires a numeric parameter".to_string(),
+        )
     })?;
     crate::LanguageId::from_rtf(value)
 }
 
-fn character_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+fn character_style_reference(raw_value: Option<i32>) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF cs control requires a numeric style handle".to_string())
+        crate::Error::MalformedDocument(
+            "RTF cs control requires a numeric style handle".to_string(),
+        )
     })?;
     u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF cs style handle must be in 0..=65535".to_string())
+        crate::Error::MalformedDocument("RTF cs style handle must be in 0..=65535".to_string())
     })
 }
 
-fn paragraph_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+fn paragraph_style_reference(raw_value: Option<i32>) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF s control requires a numeric style handle".to_string())
+        crate::Error::MalformedDocument("RTF s control requires a numeric style handle".to_string())
     })?;
     u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF s style handle must be in 0..=65535".to_string())
+        crate::Error::MalformedDocument("RTF s style handle must be in 0..=65535".to_string())
     })
 }
 
-fn section_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+fn section_style_reference(raw_value: Option<i32>) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF ds control requires a numeric style handle".to_string())
+        crate::Error::MalformedDocument(
+            "RTF ds control requires a numeric style handle".to_string(),
+        )
     })?;
     u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF ds style handle must be in 0..=65535".to_string())
+        crate::Error::MalformedDocument("RTF ds style handle must be in 0..=65535".to_string())
     })
 }
 
-fn table_style_reference(raw_value: Option<i32>) -> RtfResult<u16> {
+fn table_style_reference(raw_value: Option<i32>) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument("RTF ts control requires a numeric style handle".to_string())
+        crate::Error::MalformedDocument(
+            "RTF ts control requires a numeric style handle".to_string(),
+        )
     })?;
     u16::try_from(value).map_err(|_err| {
-        RtfError::MalformedDocument("RTF ts style handle must be in 0..=65535".to_string())
+        crate::Error::MalformedDocument("RTF ts style handle must be in 0..=65535".to_string())
     })
 }
 
 /// Validate a structural revision-author index (`prauth`, `srauth`,
 /// `trauth`, or a `\cl*auth` control).
-fn nonnegative_author_index(value: i32, name: &str) -> RtfResult<i32> {
+fn nonnegative_author_index(value: i32, name: &str) -> crate::Result<i32> {
     if value < 0 {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {name} revision author index cannot be negative"
         )));
     }
@@ -1265,24 +1291,24 @@ fn pending_cell_revision<'a>(
     state: &'a mut State,
     kind: crate::CellRevisionKind,
     name: &str,
-) -> RtfResult<&'a mut crate::CellRevision> {
+) -> crate::Result<&'a mut crate::CellRevision> {
     state
         .pending_cell_revision
         .as_mut()
         .filter(|revision| revision.kind == kind)
         .ok_or_else(|| {
-            RtfError::MalformedDocument(format!(
+            crate::Error::MalformedDocument(format!(
                 "RTF {name} requires a preceding \\{} cell revision marker",
                 kind.control_word(),
             ))
         })
 }
 
-fn associated_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
+fn associated_toggle(value: Option<i32>, name: &str) -> crate::Result<bool> {
     match value {
         None | Some(1) => Ok(true),
         Some(0) => Ok(false),
-        Some(_) => Err(RtfError::MalformedDocument(format!(
+        Some(_) => Err(crate::Error::MalformedDocument(format!(
             "RTF {name} toggle parameter must be 0 or 1"
         ))),
     }
@@ -1293,12 +1319,12 @@ fn associated_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
     clippy::cast_sign_loss,
     reason = "adjacent range checks bound each narrowing conversion to the target type's range"
 )]
-fn associated_required_u16(raw_value: Option<i32>, name: &str, maximum: i32) -> RtfResult<u16> {
+fn associated_required_u16(raw_value: Option<i32>, name: &str, maximum: i32) -> crate::Result<u16> {
     let value = raw_value.ok_or_else(|| {
-        RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
+        crate::Error::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
     })?;
     if !(0..=maximum).contains(&value) {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {name} value must be in 0..={maximum}"
         )));
     }
@@ -1317,7 +1343,7 @@ fn associated_required_u16(raw_value: Option<i32>, name: &str, maximum: i32) -> 
 fn apply_associated_character_control(
     formatting: &mut AssociatedCharacterFormatting,
     control: &ControlWord<'_>,
-) -> RtfResult<bool> {
+) -> crate::Result<bool> {
     use crate::{AssociatedCharacterBaseline as Baseline, AssociatedUnderlineStyle as Underline};
 
     match control {
@@ -1338,14 +1364,14 @@ fn apply_associated_character_control(
         },
         ControlWord::AssociatedExpansion(value) => {
             let expansion = value.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF aexpnd control requires a numeric parameter".to_string(),
                 )
             })?;
             if !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
                 .contains(&expansion)
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF aexpnd value must be in -31680..=31680".to_string(),
                 ));
             }
@@ -1903,7 +1929,7 @@ impl LegacyColorBuilder {
             && !self.palette
     }
 
-    fn finish(&self, name: &str) -> RtfResult<Option<crate::LegacyDrawingColor>> {
+    fn finish(&self, name: &str) -> crate::Result<Option<crate::LegacyDrawingColor>> {
         if let Some(gray) = self.gray {
             if self.red.is_some() || self.green.is_some() || self.blue.is_some() || self.palette {
                 return Err(Parser::legacy_error(&format!(
@@ -1915,7 +1941,7 @@ impl LegacyColorBuilder {
         if self.is_empty() {
             return Ok(None);
         }
-        let component = |value: Option<i32>| -> RtfResult<u8> {
+        let component = |value: Option<i32>| -> crate::Result<u8> {
             u8::try_from(
                 value
                     .ok_or_else(|| Parser::legacy_error(&format!("incomplete {name} RGB color")))?,
@@ -1941,7 +1967,7 @@ struct LegacyArrowBuilder {
 }
 
 impl LegacyArrowBuilder {
-    fn finish(&self, name: &str) -> RtfResult<Option<crate::LegacyDrawingArrow>> {
+    fn finish(&self, name: &str) -> crate::Result<Option<crate::LegacyDrawingArrow>> {
         if self.fill.is_none() && self.length.is_none() && self.width.is_none() {
             return Ok(None);
         }
@@ -1977,11 +2003,11 @@ struct LegacyPropertiesBuilder {
 }
 
 impl LegacyPropertiesBuilder {
-    fn set<T>(slot: &mut Option<T>, value: T, name: &str) -> RtfResult<()> {
+    fn set<T>(slot: &mut Option<T>, value: T, name: &str) -> crate::Result<()> {
         Parser::set_legacy_once(slot, value, name)
     }
 
-    fn flag(slot: &mut bool, name: &str) -> RtfResult<()> {
+    fn flag(slot: &mut bool, name: &str) -> crate::Result<()> {
         if *slot {
             return Err(Parser::legacy_error(&format!("duplicate {name}")));
         }
@@ -1993,7 +2019,7 @@ impl LegacyPropertiesBuilder {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    fn apply(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
+    fn apply(&mut self, control: &ControlWord<'_>) -> crate::Result<bool> {
         match control {
             ControlWord::LegacyDrawingLineStyle(value) => {
                 Self::set(&mut self.line_style, *value, "line style")?;
@@ -2083,7 +2109,7 @@ impl LegacyPropertiesBuilder {
         Ok(true)
     }
 
-    fn finish(self) -> RtfResult<crate::LegacyDrawingProperties> {
+    fn finish(self) -> crate::Result<crate::LegacyDrawingProperties> {
         let line_color = self.line_color.finish("line")?;
         let line = if self.line_style.is_some() || line_color.is_some() || self.line_width.is_some()
         {
@@ -2347,7 +2373,7 @@ mod unicode;
 mod tests {
     use super::{
         BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER, ControlWord, MAX_BODY_BLOCK_RESERVE_BYTES,
-        MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, Parser, RtfError, SourceLimits, StyleBlock,
+        MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, Parser, SourceLimits, StyleBlock,
         append_transport_bytes, disables_body_block_reservation, initial_body_block_capacity,
     };
     use crate::codec::lexer::Lexer;
@@ -2395,7 +2421,7 @@ mod tests {
             .expect_err("non-byte Unicode must be rejected");
 
         assert_eq!(buffer, b"ok");
-        assert!(matches!(error, RtfError::InvalidUnicode(_)));
+        assert!(matches!(error, crate::Error::InvalidUnicode(_)));
     }
 
     #[test]

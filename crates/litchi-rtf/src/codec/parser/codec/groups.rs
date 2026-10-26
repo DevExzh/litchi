@@ -1,6 +1,6 @@
 use super::{
-    ControlWord, Cow, Destination, DrawingStoryCapture, MAX_GROUP_NESTING_DEPTH, Parser, RtfError,
-    RtfResult, State, Token, control_symbol_text, require_parameterless,
+    ControlWord, Cow, Destination, DrawingStoryCapture, MAX_GROUP_NESTING_DEPTH, Parser, State,
+    Token, control_symbol_text, require_parameterless,
 };
 
 impl<'a> Parser<'a> {
@@ -31,7 +31,7 @@ impl<'a> Parser<'a> {
     /// destination.  A modern hash is legal only as a direct root-header
     /// group; accepting it through an opaque or specialized child parser
     /// would turn malformed data into an apparently valid document.
-    fn reject_nested_password_hash(&self) -> RtfResult<()> {
+    fn reject_nested_password_hash(&self) -> crate::Result<()> {
         let is_direct_password_hash = matches!(
             self.tokens.get(self.pos..self.pos + 2),
             Some([
@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
             && !is_direct_password_hash
             && self.current_group_contains_password_hash()
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF passwordhash destination must occur in the root header".to_string(),
             ));
         }
@@ -51,7 +51,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a group (content between braces).
-    pub(super) fn parse_group(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_group(&mut self) -> crate::Result<()> {
         self.expect_token(&Token::OpenBrace)?;
 
         // Perform this before destination dispatch.  Field, object, picture,
@@ -63,7 +63,7 @@ impl<'a> Parser<'a> {
         // exhaust the call stack. Reporting a typed error keeps a hostile file
         // recoverable instead of aborting the process.
         if self.states.len() >= MAX_GROUP_NESTING_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF group nesting depth exceeds the safety limit".to_string(),
             ));
         }
@@ -163,7 +163,7 @@ impl<'a> Parser<'a> {
                 ))
             )
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision text cannot contain active or external destinations".to_string(),
             ));
         }
@@ -180,7 +180,7 @@ impl<'a> Parser<'a> {
         if self.current_state()?.revision_type.is_some()
             && self.revision_text_bytes == revision_text_bytes_before
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF revision marker has no tracked text".to_string(),
             ));
         }
@@ -204,10 +204,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_unicode_alternate_group(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_unicode_alternate_group(&mut self) -> crate::Result<()> {
         self.pos += 1; // upr
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF upr lacks its ANSI fallback group".to_string(),
             ));
         }
@@ -225,17 +225,17 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::UnicodeAlternateDestination),
             ])
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF upr lacks its starred ud destination".to_string(),
             ));
         }
         self.pos += 3;
-        self.unicode_alternate_depth = self
-            .unicode_alternate_depth
-            .checked_add(1)
-            .ok_or_else(|| RtfError::MalformedDocument("RTF upr nesting overflow".to_string()))?;
+        self.unicode_alternate_depth =
+            self.unicode_alternate_depth.checked_add(1).ok_or_else(|| {
+                crate::Error::MalformedDocument("RTF upr nesting overflow".to_string())
+            })?;
         if self.unicode_alternate_depth > 8 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF upr nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -249,14 +249,14 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_note_separator_destination(
         &mut self,
         kind: crate::NoteSeparatorKind,
-    ) -> RtfResult<crate::NoteSeparator<'a>> {
+    ) -> crate::Result<crate::NoteSeparator<'a>> {
         if self.states.len() != 3
             || self
                 .blocks
                 .iter()
                 .any(|block| !block.text.trim().is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note separators must occur at document scope before body text".to_string(),
             ));
         }
@@ -282,9 +282,9 @@ impl<'a> Parser<'a> {
         &mut self,
         unicode_skip: &mut i32,
         depth: usize,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if depth > 16 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF note-separator nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -325,7 +325,7 @@ impl<'a> Parser<'a> {
                                 | ControlWord::ShapeGroup(_)
                         ))
                     )) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF note separator cannot contain fields, objects, pictures, or active destinations".to_string(),
                         ));
                     }
@@ -369,18 +369,18 @@ impl<'a> Parser<'a> {
                         control_symbol_text(control).unwrap_or_default().to_string(),
                     ),
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF note separator cannot contain binary data".to_string(),
                     ));
                 },
                 Some(Token::Control(_)) => {}, // formatting is inert
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             self.pos += 1;
             if self.current_note_separator_elements.len()
                 > crate::note_separator::MAX_NOTE_SEPARATOR_ELEMENTS
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF note separator contains too many elements".to_string(),
                 ));
             }
@@ -397,12 +397,12 @@ impl<'a> Parser<'a> {
                 })
                 .sum::<usize>();
             if text_bytes > crate::note_separator::MAX_NOTE_SEPARATOR_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF note-separator text exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
     pub(super) fn push_note_separator_text(&mut self, text: String) {

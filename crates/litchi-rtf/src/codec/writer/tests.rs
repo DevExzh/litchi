@@ -8,7 +8,7 @@
 )]
 
 use super::super::*;
-use super::codec::{Charset, RtfWriter, WriterOptions};
+use super::codec::{Charset, Options, Writer};
 use crate::Tree;
 use crate::codec::limits::OpenOptions;
 use litchi_codepage::Mbcs;
@@ -22,7 +22,7 @@ fn write_body_story_for_test(
     let bookmarks = BookmarkTable::new();
     let mut output = Vec::new();
     {
-        let mut writer = RtfWriter::new(&mut output);
+        let mut writer = Writer::new(&mut output);
         writer.write_blocks_with_markup(
             &[], // blocks
             &[], // body boundaries
@@ -95,7 +95,7 @@ fn header_footer_writer_rejects_non_utf8_story_boundaries() {
         .push(StoryEvent::PageBreak(PageBreak::new(1)));
     let mut output = Vec::new();
 
-    let error = RtfWriter::new(&mut output)
+    let error = Writer::new(&mut output)
         .write_header_footer(&header)
         .unwrap_err();
 
@@ -105,7 +105,7 @@ fn header_footer_writer_rejects_non_utf8_story_boundaries() {
 #[test]
 fn test_simple_document() {
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
 
     writer.write_document_header().unwrap();
     writer.write_text("Hello World").unwrap();
@@ -137,7 +137,7 @@ fn plain_ascii_text_is_written_as_one_chunk() {
     }
 
     let mut sink = CountingSink::default();
-    RtfWriter::new(&mut sink)
+    Writer::new(&mut sink)
         .write_text("A long ordinary ASCII fragment 0123456789")
         .unwrap();
 
@@ -148,7 +148,7 @@ fn plain_ascii_text_is_written_as_one_chunk() {
 #[test]
 fn chunked_text_writer_preserves_all_escape_spellings() {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
+    Writer::new(&mut output)
         .write_text("plain\\{}\n\t\r—é")
         .unwrap();
 
@@ -169,11 +169,11 @@ fn checked_charsets_write_their_exact_header_controls() {
         (Charset::Pca, "\\pca"),
     ] {
         let mut output = Vec::new();
-        let options = WriterOptions {
+        let options = Options {
             charset,
-            ..WriterOptions::default()
+            ..Options::default()
         };
-        let mut writer = RtfWriter::with_options(&mut output, options);
+        let mut writer = Writer::with_options(&mut output, options);
         writer.write_document_header().unwrap();
         writer.write_str("}").unwrap();
 
@@ -189,7 +189,7 @@ fn checked_charsets_write_their_exact_header_controls() {
 #[test]
 fn test_control_words() {
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
 
     writer.write_control_word("test", Some(42)).unwrap();
     writer.write_control_word("flag", None).unwrap();
@@ -201,7 +201,7 @@ fn test_control_words() {
 #[test]
 fn equation_writer_uses_an_empty_cached_result_without_evaluation() {
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_document_header().unwrap();
     writer.write_equation(r"\f(1,2)").unwrap();
     writer.write_str("}").unwrap();
@@ -227,9 +227,7 @@ fn document_writer_round_trips_caller_authored_eq_fields() {
     document.push_field(equation).unwrap();
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let serialized = String::from_utf8(output).unwrap();
     assert!(serialized.contains(r"{\fldrslt}"));
 
@@ -248,7 +246,7 @@ fn document_info_writer_round_trips() {
     info.characters_with_spaces = Some(42);
 
     let mut output = Vec::new();
-    let mut writer = RtfWriter::new(&mut output);
+    let mut writer = Writer::new(&mut output);
     writer.write_document_header().unwrap();
     writer.write_document_info(&info).unwrap();
     writer.write_text("Body").unwrap();
@@ -272,9 +270,7 @@ fn document_writer_round_trips_bookmark_ranges() {
     let source = r"{\rtf1\ansi Start {\*\bkmkstart\bkmkcolf2\bkmkcoll4\bkmkpub Link}R\'e9sum\'e9 \u20320?{\*\bkmkend Link} end}";
     let document = Tree::parse(source, OpenOptions::default()).unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
@@ -293,9 +289,7 @@ fn document_writer_preserves_bookmark_in_empty_body() {
     )
     .unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     let bookmark = reparsed.bookmarks().get("Empty").unwrap();
@@ -309,9 +303,7 @@ fn document_writer_round_trips_annotations() {
     let source = r"{\rtf1\ansi Before {\*\atrfstart 12}range{\*\atrfend 12}{\*\atnid AM}{\*\atnauthor Ada M}\chatn{\*\annotation{\*\atnref 12}{\*\atndate 12345}{\*\atnparent 4}{\*\atnicn 3}{\*\atntime 99}Review \u20320? now} after}";
     let document = Tree::parse(source, OpenOptions::default()).unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
@@ -336,9 +328,7 @@ fn document_writer_round_trips_headers_and_footers() {
     )
     .unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Body");
@@ -362,9 +352,7 @@ fn document_writer_round_trips_stylesheets() {
     )
     .unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Body");
@@ -413,9 +401,7 @@ fn document_writer_round_trips_list_tables() {
     )
     .unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Body");
@@ -445,9 +431,7 @@ fn document_writer_round_trips_tracked_revision_ranges() {
     )
     .unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
 
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap_or_else(|error| {
         panic!(
@@ -485,9 +469,7 @@ fn document_writer_round_trips_multiple_section_boundaries() {
     );
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let serialized = String::from_utf8_lossy(&output);
     assert!(serialized.contains("\\sect\\sectd"));
 
@@ -536,9 +518,7 @@ fn document_writer_round_trips_boundary_to_first_explicit_section() {
     );
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
@@ -570,9 +550,7 @@ fn document_writer_preserves_inherited_section_boundary() {
     );
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.sections().len(), 1);
@@ -600,9 +578,7 @@ fn document_writer_preserves_page_then_section_break_order() {
     );
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.body_story_events(), document.body_story_events());
@@ -622,9 +598,7 @@ fn document_writer_round_trips_libreoffice_multi_section_fixture() {
     assert!(document.section_breaks().count() >= 3);
 
     let mut output = Vec::new();
-    RtfWriter::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::from_bytes(&output, OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.sections().len(), document.sections().len());

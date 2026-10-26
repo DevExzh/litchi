@@ -397,9 +397,9 @@ impl ShapeThemeValue {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.tint < 255 && self.shade < 255 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF hsv cannot apply tint and shade simultaneously".to_string(),
             ));
         }
@@ -421,9 +421,9 @@ impl ShapeResult<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.drawing.position != 0 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-result drawing must not have a document-body position".to_string(),
             ));
         }
@@ -465,14 +465,14 @@ pub struct ShapeHyperlink<'a> {
 }
 
 impl ShapeHyperlink<'_> {
-    fn validate_string(kind: &str, value: &str) -> crate::RtfResult<()> {
+    fn validate_string(kind: &str, value: &str) -> crate::Result<()> {
         if value.len() > MAX_SHAPE_HYPERLINK_BYTES {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF shape-hyperlink {kind} string exceeds the safety limit"
             )));
         }
         if value.contains(['\0', '\r', '\n']) {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF shape-hyperlink {kind} string contains a forbidden control character"
             )));
         }
@@ -483,9 +483,9 @@ impl ShapeHyperlink<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.location.is_none() && self.source.is_none() && self.friendly_name.is_none() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape hyperlink must carry at least one string".to_string(),
             ));
         }
@@ -579,27 +579,27 @@ impl<'a> ShapeProperty<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.name.is_empty() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-property name must not be empty".to_string(),
             ));
         }
         if let Some(value) = &self.binary_value {
             if !self.value.is_empty() {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape property cannot contain scalar and binary values".to_string(),
                 ));
             }
             if value.is_empty() || value.len() > MAX_SHAPE_PROPERTY_BINARY_BYTES {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF svb payload is empty or exceeds the safety limit".to_string(),
                 ));
             }
         }
         if let Some(theme_value) = self.theme_value {
             if self.binary_value.is_some() || self.value.is_empty() {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF hsv requires a nonempty scalar shape-property value".to_string(),
                 ));
             }
@@ -956,7 +956,7 @@ impl<'a> Shape<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_text_shape(&mut self, shape: Shape<'a>) -> crate::RtfResult<()> {
+    pub fn push_text_shape(&mut self, shape: Shape<'a>) -> crate::Result<()> {
         validate_story_shape(
             self.text.as_ref(),
             &shape,
@@ -965,7 +965,7 @@ impl<'a> Shape<'a> {
         )?;
         shape.validate()?;
         if self.text_shapes.len() >= 65_536 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-text shape count exceeds the safety limit".to_string(),
             ));
         }
@@ -984,7 +984,7 @@ impl<'a> Shape<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_text_shape_group(&mut self, group: ShapeGroup<'a>) -> crate::RtfResult<()> {
+    pub fn push_text_shape_group(&mut self, group: ShapeGroup<'a>) -> crate::Result<()> {
         validate_story_group(
             self.text.as_ref(),
             &group,
@@ -993,7 +993,7 @@ impl<'a> Shape<'a> {
         )?;
         group.validate()?;
         if self.text_shape_groups.len() >= 16_384 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-text shape-group count exceeds the safety limit".to_string(),
             ));
         }
@@ -1029,7 +1029,7 @@ impl<'a> Shape<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         self.text_destination_present = true;
         crate::field::push_story_page_break(
             &mut self.text_story_events,
@@ -1114,10 +1114,10 @@ impl<'a> Shape<'a> {
     pub fn set_property(
         &mut self,
         property: ShapeProperty<'a>,
-    ) -> crate::RtfResult<Option<ShapeProperty<'a>>> {
+    ) -> crate::Result<Option<ShapeProperty<'a>>> {
         property.validate()?;
         if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape property exceeds the safety limit".to_string(),
             ));
         }
@@ -1127,14 +1127,14 @@ impl<'a> Shape<'a> {
             .rposition(|current| current.name == property.name)
         {
             let current = self.properties.get_mut(index).ok_or_else(|| {
-                crate::RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF shape property index is out of bounds".to_string(),
                 )
             })?;
             return Ok(Some(std::mem::replace(current, property)));
         }
         if self.properties.len() >= 65_536 {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-property count exceeds the safety limit".to_string(),
             ));
         }
@@ -1155,13 +1155,13 @@ impl<'a> Shape<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         self.validate_at_depth(0)
     }
 
-    pub(crate) fn validate_at_depth(&self, depth: usize) -> crate::RtfResult<()> {
+    pub(crate) fn validate_at_depth(&self, depth: usize) -> crate::Result<()> {
         if depth >= MAX_SHAPE_NESTING_DEPTH {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape story nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -1169,7 +1169,7 @@ impl<'a> Shape<'a> {
             || self.text.len() > 16 * 1_048_576
             || self.info.len() > 32
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape exceeds the safety limit".to_string(),
             ));
         }
@@ -1177,7 +1177,7 @@ impl<'a> Shape<'a> {
             .x
             .checked_add(self.geometry.width)
             .ok_or_else(|| {
-                crate::RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF shape horizontal geometry overflows".to_string(),
                 )
             })?;
@@ -1185,14 +1185,12 @@ impl<'a> Shape<'a> {
             .y
             .checked_add(self.geometry.height)
             .ok_or_else(|| {
-                crate::RtfError::MalformedDocument(
-                    "RTF shape vertical geometry overflows".to_string(),
-                )
+                crate::Error::MalformedDocument("RTF shape vertical geometry overflows".to_string())
             })?;
         for property in &self.properties {
             property.validate()?;
             if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape property exceeds the safety limit".to_string(),
                 ));
             }
@@ -1212,7 +1210,7 @@ impl<'a> Shape<'a> {
                 || self.geometry != ShapeGeometry::default()
                 || self.shape_type != ShapeType::Unknown)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF fallback-only shape cannot contain shape instructions".to_string(),
             ));
         }
@@ -1471,11 +1469,11 @@ impl<'a> ShapeGroup<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add_shape(&mut self, shape: Shape<'a>) -> crate::RtfResult<usize> {
+    pub fn add_shape(&mut self, shape: Shape<'a>) -> crate::Result<usize> {
         if self.shapes.len() >= MAX_SHAPES_PER_GROUP
             || self.child_order.len() >= MAX_SHAPE_GROUP_CHILDREN
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group child count exceeds the safety limit".to_string(),
             ));
         }
@@ -1493,11 +1491,11 @@ impl<'a> ShapeGroup<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add_group(&mut self, group: ShapeGroup<'a>) -> crate::RtfResult<usize> {
+    pub fn add_group(&mut self, group: ShapeGroup<'a>) -> crate::Result<usize> {
         if self.groups.len() >= MAX_GROUPS_PER_GROUP
             || self.child_order.len() >= MAX_SHAPE_GROUP_CHILDREN
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group child count exceeds the safety limit".to_string(),
             ));
         }
@@ -1576,7 +1574,7 @@ impl<'a> ShapeGroup<'a> {
         &mut self,
         index: usize,
         replacement: Shape<'a>,
-    ) -> crate::RtfResult<Shape<'a>> {
+    ) -> crate::Result<Shape<'a>> {
         if self.shapes.get(index).is_none() {
             return Err(grouped_shape_index_error(index));
         }
@@ -1593,7 +1591,7 @@ impl<'a> ShapeGroup<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn remove_shape(&mut self, index: usize) -> crate::RtfResult<Shape<'a>> {
+    pub fn remove_shape(&mut self, index: usize) -> crate::Result<Shape<'a>> {
         if self.shapes.get(index).is_none() {
             return Err(grouped_shape_index_error(index));
         }
@@ -1618,7 +1616,7 @@ impl<'a> ShapeGroup<'a> {
         &mut self,
         index: usize,
         replacement: ShapeGroup<'a>,
-    ) -> crate::RtfResult<ShapeGroup<'a>> {
+    ) -> crate::Result<ShapeGroup<'a>> {
         if self.groups.get(index).is_none() {
             return Err(nested_group_index_error(index));
         }
@@ -1635,7 +1633,7 @@ impl<'a> ShapeGroup<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn remove_group(&mut self, index: usize) -> crate::RtfResult<ShapeGroup<'a>> {
+    pub fn remove_group(&mut self, index: usize) -> crate::Result<ShapeGroup<'a>> {
         if self.groups.get(index).is_none() {
             return Err(nested_group_index_error(index));
         }
@@ -1657,9 +1655,9 @@ impl<'a> ShapeGroup<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn move_child(&mut self, from: usize, to: usize) -> crate::RtfResult<()> {
+    pub fn move_child(&mut self, from: usize, to: usize) -> crate::Result<()> {
         if from >= self.child_order.len() || to >= self.child_order.len() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape-group child reorder index is out of bounds".to_string(),
             ));
         }
@@ -1676,7 +1674,7 @@ impl<'a> ShapeGroup<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         self.validate_at_depth(0, true)
     }
 
@@ -1711,9 +1709,9 @@ impl<'a> ShapeGroup<'a> {
         }
     }
 
-    pub(crate) fn validate_at_depth(&self, depth: usize, root: bool) -> crate::RtfResult<()> {
+    pub(crate) fn validate_at_depth(&self, depth: usize, root: bool) -> crate::Result<()> {
         if depth >= MAX_SHAPE_NESTING_DEPTH {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -1723,12 +1721,12 @@ impl<'a> ShapeGroup<'a> {
             || self.info.len() > 32
             || self.properties.len() > 65_536
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group count exceeds the safety limit".to_string(),
             ));
         }
         if !root && self.result.is_some() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shprslt is allowed only on a root shape group".to_string(),
             ));
         }
@@ -1739,7 +1737,7 @@ impl<'a> ShapeGroup<'a> {
             .x
             .checked_add(self.geometry.width)
             .ok_or_else(|| {
-                crate::RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF shape group horizontal geometry overflows".to_string(),
                 )
             })?;
@@ -1747,14 +1745,14 @@ impl<'a> ShapeGroup<'a> {
             .y
             .checked_add(self.geometry.height)
             .ok_or_else(|| {
-                crate::RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF shape group vertical geometry overflows".to_string(),
                 )
             })?;
         for property in &self.properties {
             property.validate()?;
             if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape group property exceeds the safety limit".to_string(),
                 ));
             }
@@ -1771,18 +1769,18 @@ impl<'a> ShapeGroup<'a> {
                 },
             };
             if !valid {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape group child order is invalid".to_string(),
                 ));
             }
         }
         if saw_shapes.iter().any(|seen| !seen) || saw_groups.iter().any(|seen| !seen) {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group child order is incomplete".to_string(),
             ));
         }
         let child_depth = depth.checked_add(1).ok_or_else(|| {
-            crate::RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF shape group nesting exceeds the safety limit".to_string(),
             )
         })?;
@@ -1796,38 +1794,38 @@ impl<'a> ShapeGroup<'a> {
     }
 }
 
-fn grouped_shape_index_error(index: usize) -> crate::RtfError {
-    crate::RtfError::MalformedDocument(format!("RTF grouped shape index {index} is out of bounds"))
+fn grouped_shape_index_error(index: usize) -> crate::Error {
+    crate::Error::MalformedDocument(format!("RTF grouped shape index {index} is out of bounds"))
 }
 
-fn nested_group_index_error(index: usize) -> crate::RtfError {
-    crate::RtfError::MalformedDocument(format!(
+fn nested_group_index_error(index: usize) -> crate::Error {
+    crate::Error::MalformedDocument(format!(
         "RTF nested shape-group index {index} is out of bounds"
     ))
 }
 
-fn validate_grouped_shape_at_depth(shape: &Shape<'_>, depth: usize) -> crate::RtfResult<()> {
+fn validate_grouped_shape_at_depth(shape: &Shape<'_>, depth: usize) -> crate::Result<()> {
     if shape.position != 0 {
-        return Err(crate::RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF grouped shape position must be zero".to_string(),
         ));
     }
     if !shape.instruction_present {
-        return Err(crate::RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF grouped shape must contain shpinst".to_string(),
         ));
     }
     if shape.result.is_some() {
-        return Err(crate::RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF grouped shape cannot contain shprslt".to_string(),
         ));
     }
     shape.validate_at_depth(depth)
 }
 
-fn validate_nested_group_at_depth(group: &ShapeGroup<'_>, depth: usize) -> crate::RtfResult<()> {
+fn validate_nested_group_at_depth(group: &ShapeGroup<'_>, depth: usize) -> crate::Result<()> {
     if group.position != 0 {
-        return Err(crate::RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF nested shape-group position must be zero".to_string(),
         ));
     }
@@ -1850,7 +1848,7 @@ pub(crate) fn validate_story_drawings(
     groups: &[ShapeGroup<'_>],
     order: &[StoryDrawing],
     story: &str,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     validate_story_drawings_at_depth(text, shapes, groups, order, story, 0)
 }
 
@@ -1861,13 +1859,13 @@ fn validate_story_drawings_at_depth(
     order: &[StoryDrawing],
     story: &str,
     depth: usize,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     if depth >= MAX_SHAPE_NESTING_DEPTH
         || shapes.len() > MAX_SHAPES_PER_GROUP
         || groups.len() > MAX_GROUPS_PER_GROUP
         || order.len() != shapes.len().saturating_add(groups.len())
     {
-        return Err(crate::RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {story} drawing nesting or count exceeds the safety limit"
         )));
     }
@@ -1896,10 +1894,10 @@ fn validate_story_drawings_at_depth(
             },
         }
         .ok_or_else(|| {
-            crate::RtfError::MalformedDocument(format!("RTF {story} drawing order is invalid"))
+            crate::Error::MalformedDocument(format!("RTF {story} drawing order is invalid"))
         })?;
         if previous_position.is_some_and(|previous| previous > position) {
-            return Err(crate::RtfError::MalformedDocument(format!(
+            return Err(crate::Error::MalformedDocument(format!(
                 "RTF {story} drawing order moves backwards"
             )));
         }
@@ -1913,12 +1911,12 @@ fn validate_story_shape(
     shape: &Shape<'_>,
     previous: Option<&Shape<'_>>,
     story: &str,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     if shape.is_background
         || text.get(shape.position..shape.position).is_none()
         || previous.is_some_and(|prior| prior.position > shape.position)
     {
-        return Err(crate::RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {story} shapes are outside or out of story order"
         )));
     }
@@ -1930,11 +1928,11 @@ fn validate_story_group(
     group: &ShapeGroup<'_>,
     previous: Option<&ShapeGroup<'_>>,
     story: &str,
-) -> crate::RtfResult<()> {
+) -> crate::Result<()> {
     if text.get(group.position..group.position).is_none()
         || previous.is_some_and(|prior| prior.position > group.position)
     {
-        return Err(crate::RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF {story} shape groups are outside or out of story order"
         )));
     }

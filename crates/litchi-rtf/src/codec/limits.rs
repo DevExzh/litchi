@@ -1,7 +1,7 @@
 //! Finite physical-source profiles for RTF opening.
 
 use crate::DEFAULT_MAX_DECOMPRESSED_RTF_BYTES;
-use crate::codec::error::RtfError;
+
 use crate::leniency::Leniency;
 
 const MEBIBYTE: usize = 1_048_576;
@@ -177,63 +177,63 @@ pub struct SourceLimitsBuilder {
 
 impl SourceLimitsBuilder {
     /// Set the encoded or uncompressed source-byte ceiling.
-    pub fn max_input_bytes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_input_bytes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::InputBytes, value)?;
         self.limits.max_input_bytes = value;
         Ok(self)
     }
 
     /// Set the lexer-event ceiling.
-    pub fn max_events(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_events(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::Events, value)?;
         self.limits.max_events = value;
         Ok(self)
     }
 
     /// Set the per-payload binary ceiling.
-    pub fn max_binary_bytes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_binary_bytes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::BinaryBytes, value)?;
         self.limits.max_binary_bytes = value;
         Ok(self)
     }
 
     /// Set the aggregate binary-payload ceiling.
-    pub fn max_aggregate_binary_bytes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_aggregate_binary_bytes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::AggregateBinaryBytes, value)?;
         self.limits.max_aggregate_binary_bytes = value;
         Ok(self)
     }
 
     /// Set the compressed-RTF expansion ceiling.
-    pub fn max_decompressed_bytes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_decompressed_bytes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::DecompressedBytes, value)?;
         self.limits.max_decompressed_bytes = value;
         Ok(self)
     }
 
     /// Set the unsupported-node count ceiling.
-    pub fn max_opaque_nodes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_opaque_nodes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::OpaqueNodes, value)?;
         self.limits.max_opaque_nodes = value;
         Ok(self)
     }
 
     /// Set the per-node unsupported-byte ceiling.
-    pub fn max_opaque_node_bytes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_opaque_node_bytes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::OpaqueNodeBytes, value)?;
         self.limits.max_opaque_node_bytes = value;
         Ok(self)
     }
 
     /// Set the aggregate unsupported-byte ceiling.
-    pub fn max_aggregate_opaque_bytes(mut self, value: usize) -> Result<Self, RtfError> {
+    pub fn max_aggregate_opaque_bytes(mut self, value: usize) -> Result<Self, crate::Error> {
         validate(SourceLimitKind::AggregateOpaqueBytes, value)?;
         self.limits.max_aggregate_opaque_bytes = value;
         Ok(self)
     }
 
     /// Finalize this checked profile.
-    pub fn build(self) -> Result<SourceLimits, RtfError> {
+    pub fn build(self) -> Result<SourceLimits, crate::Error> {
         validate(SourceLimitKind::InputBytes, self.limits.max_input_bytes)?;
         validate(SourceLimitKind::Events, self.limits.max_events)?;
         validate(SourceLimitKind::BinaryBytes, self.limits.max_binary_bytes)?;
@@ -258,9 +258,9 @@ impl SourceLimitsBuilder {
     }
 }
 
-fn validate(kind: SourceLimitKind, value: usize) -> Result<(), RtfError> {
+fn validate(kind: SourceLimitKind, value: usize) -> Result<(), crate::Error> {
     if value > SourceLimits::MAX_VALUE {
-        return Err(RtfError::InvalidLimit {
+        return Err(crate::Error::InvalidLimit {
             kind,
             value,
             maximum: SourceLimits::MAX_VALUE,
@@ -372,7 +372,7 @@ mod tests {
         assert_eq!(limits.max_opaque_nodes(), 0);
         assert!(matches!(
             SourceLimits::builder().max_input_bytes(usize::MAX),
-            Err(RtfError::InvalidLimit {
+            Err(crate::Error::InvalidLimit {
                 kind: SourceLimitKind::InputBytes,
                 value,
                 maximum,

@@ -7,26 +7,25 @@
 use super::{
     ColorRef, ControlWord, Cow, MAX_GROUPS_PER_GROUP, MAX_SHAPE_GROUP_DEPTH, MAX_SHAPE_GROUPS,
     MAX_SHAPE_PROPERTIES, MAX_SHAPE_PROPERTY_BYTES, MAX_SHAPE_TEXT_BYTES, MAX_SHAPES,
-    MAX_SHAPES_PER_GROUP, Parser, RtfError, RtfResult, Token, control_symbol_text,
-    require_parameterless,
+    MAX_SHAPES_PER_GROUP, Parser, Token, control_symbol_text, require_parameterless,
 };
 
 impl<'a> Parser<'a> {
     /// Parse the unique starred root document-background destination.
     pub(super) fn parse_background_destination(
         &mut self,
-    ) -> RtfResult<super::super::super::shape::Shape<'a>> {
+    ) -> crate::Result<super::super::super::shape::Shape<'a>> {
         self.pos += 2; // consume \* and \background
         while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
             if !text.chars().all(char::is_whitespace) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF background destination contains text outside its shape".to_string(),
                 ));
             }
             self.pos += 1;
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background destination must contain exactly one shape group".to_string(),
             ));
         }
@@ -35,21 +34,21 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::Shape(None)))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background destination must contain an unstarred shp destination".to_string(),
             ));
         }
         let mut shape = self.parse_shape_destination(true)?;
         while let Some(Token::Text(text)) = self.tokens.get(self.pos) {
             if !text.chars().all(char::is_whitespace) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF background destination contains trailing text".to_string(),
                 ));
             }
             self.pos += 1;
         }
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background destination must contain exactly one shape group".to_string(),
             ));
         }
@@ -59,7 +58,7 @@ impl<'a> Parser<'a> {
             .iter()
             .any(|property| property.name.is_empty())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF background shape property names cannot be empty".to_string(),
             ));
         }
@@ -71,7 +70,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_shape_destination(
         &mut self,
         allow_shape_result: bool,
-    ) -> RtfResult<super::super::super::shape::Shape<'a>> {
+    ) -> crate::Result<super::super::super::shape::Shape<'a>> {
         use super::super::super::shape::{Shape, ShapeType};
 
         let mut shape = Shape::new(ShapeType::Unknown);
@@ -89,7 +88,7 @@ impl<'a> Parser<'a> {
         let parameter = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::Shape(parameter))) => *parameter,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape parser is not at shp".to_string(),
                 ));
             },
@@ -106,7 +105,7 @@ impl<'a> Parser<'a> {
                 {
                     let valid_parent = shape_instance_depth == Some(depth);
                     if !valid_parent || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shptxt must be one final destination after shape properties"
                                 .to_string(),
                         ));
@@ -139,7 +138,7 @@ impl<'a> Parser<'a> {
                         .is_some_and(|control| matches!(control, ControlWord::ShapeResult(_))) =>
                 {
                     if depth != 0 || !allow_shape_result || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shprslt must be a single direct child of a root shape".to_string(),
                         ));
                     }
@@ -150,14 +149,14 @@ impl<'a> Parser<'a> {
                     if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
                 {
                     if shape_instance_depth != Some(depth) || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape properties must be direct shpinst children before shptxt"
                                 .to_string(),
                         ));
                     }
                     saw_property = true;
                     if shape.properties.len() >= MAX_SHAPE_PROPERTIES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape property count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -188,7 +187,7 @@ impl<'a> Parser<'a> {
                         || saw_shape_instance
                         || saw_shape_text
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shpinst must be a single direct shape child before shptxt"
                                 .to_string(),
                         ));
@@ -200,7 +199,7 @@ impl<'a> Parser<'a> {
                     self.pos += 3;
                 },
                 Token::OpenBrace => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape contains a misplaced or unknown group".to_string(),
                     ));
                 },
@@ -218,14 +217,14 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeType(value)) => {
                     let _ = value;
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shpinst destination must not have a parameter".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeLeft(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -235,7 +234,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeTop(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -245,7 +244,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeRight(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -255,7 +254,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeBottom(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -265,7 +264,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeWidth(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -275,7 +274,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeHeight(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -285,7 +284,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeRotation(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -295,7 +294,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeZOrder(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -305,7 +304,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeWrap(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -322,7 +321,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeBelowText(value)) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -336,7 +335,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeLockAnchor) => {
                     saw_shape_info = true;
                     if saw_property || saw_shape_text || saw_shape_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape info must precede properties".to_string(),
                         ));
                     }
@@ -366,14 +365,14 @@ impl<'a> Parser<'a> {
                         ("shpbyignore", None) => crate::ShapeGroupInfo::IgnoreVertical,
                         ("shpwrk", Some(value)) => crate::ShapeGroupInfo::WrapSide(value),
                         _ => {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF shape contains an unknown or malformed shape-info control"
                                     .to_string(),
                             ));
                         },
                     };
                     if shape.info.len() >= 32 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-info count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -382,40 +381,40 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Text(value) if !value.bytes().all(|byte| byte.is_ascii_whitespace()) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape destination contains direct text".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeResult(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shprslt destination must be grouped".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeText(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shptxt destination must be grouped and unstarred".to_string(),
                     ));
                 },
                 Token::Control(_) if saw_shape_text => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape controls must precede shptxt".to_string(),
                     ));
                 },
                 Token::Text(_) => self.pos += 1,
                 Token::Binary(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape cannot contain direct binary data".to_string(),
                     ));
                 },
                 Token::Control(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape contains a misplaced control".to_string(),
                     ));
                 },
             }
         }
         if !closed {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         let fallback_only = allow_shape_result
             && shape.result.is_some()
@@ -423,7 +422,7 @@ impl<'a> Parser<'a> {
             && !saw_property
             && !saw_shape_text;
         if shape_instance_depth.is_some() || (!saw_shape_instance && !fallback_only) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape must contain exactly one starred shpinst".to_string(),
             ));
         }
@@ -444,7 +443,7 @@ impl<'a> Parser<'a> {
     )]
     pub(super) fn parse_shape_text_destination(
         &mut self,
-    ) -> RtfResult<(
+    ) -> crate::Result<(
         String,
         Vec<super::super::super::shape::Shape<'a>>,
         Vec<super::super::super::shape::ShapeGroup<'a>>,
@@ -460,7 +459,7 @@ impl<'a> Parser<'a> {
             ],
         ) = self.tokens.get(self.pos..self.pos + 3)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shptxt destination must not be starred".to_string(),
             ));
         }
@@ -479,12 +478,12 @@ impl<'a> Parser<'a> {
                     Token::Control(ControlWord::ShapeText(Some(_))),
                 ],
             ) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shptxt destination must not have a parameter".to_string(),
                 ));
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF shptxt destination".to_string(),
                 ));
             },
@@ -502,13 +501,13 @@ impl<'a> Parser<'a> {
             ($visible:expr) => {
                 if $visible {
                     let current = *background_stack.last().ok_or_else(|| {
-                        RtfError::ParserError(
+                        crate::Error::ParserError(
                             "RTF shape-text background state is missing".to_string(),
                         )
                     })?;
                     if let Some(observed) = observed_background {
                         if observed != current {
-                            return Err(RtfError::MalformedDocument(
+                            return Err(crate::Error::MalformedDocument(
                                 "RTF shape text has multiple visible background colors".to_string(),
                             ));
                         }
@@ -545,14 +544,14 @@ impl<'a> Parser<'a> {
                         &mut drawing_order,
                     )?;
                     let added = drawing_order.get(order_start..).ok_or_else(|| {
-                        RtfError::ParserError(
+                        crate::Error::ParserError(
                             "RTF shape-text drawing order shrank during parsing".to_string(),
                         )
                     })?;
                     story_events.extend(added.iter().copied().map(crate::StoryEvent::Drawing));
                 },
                 Some(Token::OpenBrace) if self.is_custom_xml_markup_group() => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF custom XML markup destinations are supported only in the main body story"
                             .to_string(),
                     ));
@@ -584,12 +583,12 @@ impl<'a> Parser<'a> {
                 Some(Token::OpenBrace) => {
                     depth += 1;
                     if depth > 64 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shptxt nesting exceeds the safety limit".to_string(),
                         ));
                     }
                     let inherited = *background_stack.last().ok_or_else(|| {
-                        RtfError::ParserError(
+                        crate::Error::ParserError(
                             "RTF shape-text background state is missing".to_string(),
                         )
                     })?;
@@ -597,7 +596,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::ShapeText(_))) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shptxt cannot contain another shptxt destination".to_string(),
                     ));
                 },
@@ -633,7 +632,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::ColorBackground(value))) => {
                     *background_stack.last_mut().ok_or_else(|| {
-                        RtfError::ParserError(
+                        crate::Error::ParserError(
                             "RTF shape-text background state is missing".to_string(),
                         )
                     })? = Some(Self::required_character_value(*value, "cb", u16::MAX)?);
@@ -641,7 +640,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::Plain)) => {
                     *background_stack.last_mut().ok_or_else(|| {
-                        RtfError::ParserError(
+                        crate::Error::ParserError(
                             "RTF shape-text background state is missing".to_string(),
                         )
                     })? = None;
@@ -656,7 +655,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shptxt contains direct binary data".to_string(),
                     ));
                 },
@@ -669,7 +668,7 @@ impl<'a> Parser<'a> {
                     | ControlWord::AssociatedBaselineUp(_)
                     | ControlWord::AssociatedBaselineDown(_),
                 )) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape text character baseline formatting cannot be represented losslessly"
                             .to_string(),
                     ));
@@ -680,10 +679,10 @@ impl<'a> Parser<'a> {
                     self.mark_unknown_syntax()?;
                     self.pos += 1;
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if text.len() > MAX_SHAPE_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape text exceeds the safety limit".to_string(),
                 ));
             }
@@ -713,7 +712,7 @@ impl<'a> Parser<'a> {
         shapes: &mut Vec<super::super::super::shape::Shape<'a>>,
         shape_groups: &mut Vec<super::super::super::shape::ShapeGroup<'a>>,
         drawing_order: &mut Vec<crate::StoryDrawing>,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let shape_start = self.shapes.len();
         let group_start = self.shape_groups.len();
         let order_start = self.drawing_order.len();
@@ -723,7 +722,7 @@ impl<'a> Parser<'a> {
         let added = self.shapes.len().saturating_sub(shape_start)
             + self.shape_groups.len().saturating_sub(group_start);
         if added != 1 {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF story drawing group must contain exactly one root shp or shpgrp destination"
                     .to_string(),
             ));
@@ -747,14 +746,14 @@ impl<'a> Parser<'a> {
             }
         }
         if shapes.len() > MAX_SHAPES || shape_groups.len() > MAX_SHAPE_GROUPS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF story drawing count exceeds the safety limit".to_string(),
             ));
         }
         Ok(())
     }
 
-    pub(super) fn parse_shape_result(&mut self) -> RtfResult<Option<crate::ShapeResult<'a>>> {
+    pub(super) fn parse_shape_result(&mut self) -> crate::Result<Option<crate::ShapeResult<'a>>> {
         let control_index = match self.tokens.get(self.pos..self.pos + 3) {
             Some(
                 [
@@ -770,7 +769,7 @@ impl<'a> Parser<'a> {
                     Token::Control(ControlWord::ShapeResult(Some(_))),
                 ],
             ) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shprslt destination must not have a parameter".to_string(),
                 ));
             },
@@ -787,12 +786,12 @@ impl<'a> Parser<'a> {
                         Token::Control(ControlWord::ShapeResult(Some(_))),
                     ],
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shprslt destination must not have a parameter".to_string(),
                     ));
                 },
                 _ => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "invalid RTF shprslt destination".to_string(),
                     ));
                 },
@@ -810,14 +809,14 @@ impl<'a> Parser<'a> {
         ) {
             self.pos += 1;
             let mut drawing = self.parse_legacy_drawing_at(0)?.ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF shprslt legacy drawing must contain one primitive".to_string(),
                 )
             })?;
             drawing.position = 0;
             self.skip_legacy_whitespace();
             if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shprslt must contain exactly one legacy drawing".to_string(),
                 ));
             }
@@ -833,7 +832,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::LegacyDrawingObject),
             ])
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shprslt legacy drawing destination must be starred".to_string(),
             ));
         }
@@ -844,12 +843,12 @@ impl<'a> Parser<'a> {
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
                     depth = depth.checked_add(1).ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF shprslt nesting depth overflow".to_string(),
                         )
                     })?;
                     if depth > 64 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shprslt nesting exceeds the safety limit".to_string(),
                         ));
                     }
@@ -866,7 +865,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(value)) => {
                     retained_bytes = retained_bytes.saturating_add(value.len());
                     if retained_bytes > 16 * 1_048_576 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shprslt content exceeds the safety limit".to_string(),
                         ));
                     }
@@ -875,14 +874,14 @@ impl<'a> Parser<'a> {
                 Some(Token::Binary(value)) => {
                     retained_bytes = retained_bytes.saturating_add(value.len());
                     if retained_bytes > 16 * 1_048_576 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shprslt content exceeds the safety limit".to_string(),
                         ));
                     }
                     self.pos += 1;
                 },
                 Some(Token::Control(_)) => self.pos += 1,
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -893,7 +892,7 @@ impl<'a> Parser<'a> {
     )]
     pub(super) fn parse_shape_property_group(
         &mut self,
-    ) -> RtfResult<(
+    ) -> crate::Result<(
         String,
         String,
         Option<Vec<u8>>,
@@ -926,7 +925,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if depth != 0 || part.is_some() || !seen_name || hyperlink.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF hl must be the single direct hyperlink group after sn in sp"
                                 .to_string(),
                         ));
@@ -943,7 +942,7 @@ impl<'a> Parser<'a> {
                         ])
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF hl destination must not be starred".to_string(),
                     ));
                 },
@@ -957,7 +956,7 @@ impl<'a> Parser<'a> {
                         ))
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape-hyperlink string destinations may occur only inside hl"
                             .to_string(),
                     ));
@@ -975,7 +974,7 @@ impl<'a> Parser<'a> {
                         || binary_value.is_some()
                         || !value.trim().is_empty()
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF svb must be the only value inside one sv destination".to_string(),
                         ));
                     }
@@ -996,7 +995,7 @@ impl<'a> Parser<'a> {
                         || theme_value.is_some()
                         || binary_value.is_some()
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF hsv must be the single direct child after scalar sv in sp"
                                 .to_string(),
                         ));
@@ -1009,7 +1008,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ShapeBinaryValue(_)))
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF svb destination must be starred".to_string(),
                     ));
                 },
@@ -1019,7 +1018,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ShapeThemeValue(_)))
                     ) =>
                 {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF hsv destination must be starred".to_string(),
                     ));
                 },
@@ -1030,12 +1029,12 @@ impl<'a> Parser<'a> {
                 Token::CloseBrace if depth == 0 => {
                     self.pos += 1;
                     if !seen_name || !seen_value {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF sp requires exactly one sn followed by one sv".to_string(),
                         ));
                     }
                     if binary_value.is_some() && !value.trim().is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape property cannot mix scalar and binary values".to_string(),
                         ));
                     }
@@ -1057,7 +1056,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapePropertyName) => {
                     if depth != 1 || seen_name || seen_value || theme_value.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF sp requires exactly one direct sn before sv".to_string(),
                         ));
                     }
@@ -1068,7 +1067,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapePropertyValue) => {
                     if depth != 1 || !seen_name || seen_value || theme_value.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF sp requires exactly one direct sv after sn".to_string(),
                         ));
                     }
@@ -1078,7 +1077,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::ShapeBinaryValue(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF svb destination must be grouped and starred".to_string(),
                     ));
                 },
@@ -1088,12 +1087,12 @@ impl<'a> Parser<'a> {
                     | ControlWord::ShapeHyperlinkSource
                     | ControlWord::ShapeHyperlinkFriendlyName,
                 ) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape-hyperlink destinations must be grouped".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeThemeValue(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF hsv destination must be a direct starred group after sv".to_string(),
                     ));
                 },
@@ -1128,15 +1127,15 @@ impl<'a> Parser<'a> {
                 Token::Control(_) | Token::Binary(_) => self.pos += 1,
             }
             if name.len().saturating_add(value.len()) > MAX_SHAPE_PROPERTY_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape property exceeds the safety limit".to_string(),
                 ));
             }
         }
-        Err(RtfError::UnexpectedEof)
+        Err(crate::Error::UnexpectedEof)
     }
 
-    pub(super) fn parse_shape_theme_value(&mut self) -> RtfResult<crate::ShapeThemeValue> {
+    pub(super) fn parse_shape_theme_value(&mut self) -> crate::Result<crate::ShapeThemeValue> {
         match self.tokens.get(self.pos..self.pos + 3) {
             Some(
                 [
@@ -1152,12 +1151,12 @@ impl<'a> Parser<'a> {
                     Token::Control(ControlWord::ShapeThemeValue(Some(_))),
                 ],
             ) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF hsv destination must not have a parameter".to_string(),
                 ));
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF hsv destination".to_string(),
                 ));
             },
@@ -1172,17 +1171,17 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     let theme = crate::ShapeThemeValue {
                         color: color.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF hsv requires exactly one accent selector".to_string(),
                             )
                         })?,
                         tint: tint.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF hsv requires exactly one ctint value".to_string(),
                             )
                         })?,
                         shade: shade.ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF hsv requires exactly one cshade value".to_string(),
                             )
                         })?,
@@ -1200,7 +1199,7 @@ impl<'a> Parser<'a> {
                     if tint.is_none() =>
                 {
                     tint = Some(u8::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF hsv ctint must be between 0 and 255".to_string(),
                         )
                     })?);
@@ -1210,7 +1209,7 @@ impl<'a> Parser<'a> {
                     if shade.is_none() =>
                 {
                     shade = Some(u8::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF hsv cshade must be between 0 and 255".to_string(),
                         )
                     })?);
@@ -1221,24 +1220,24 @@ impl<'a> Parser<'a> {
                 {
                     whitespace_bytes = whitespace_bytes.saturating_add(value.len());
                     if whitespace_bytes > 4_096 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF hsv whitespace exceeds the safety limit".to_string(),
                         ));
                     }
                     self.pos += 1;
                 },
                 Some(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF hsv contains duplicate, parameterless, nested, or active content"
                             .to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
 
-    pub(super) fn parse_shape_binary_value(&mut self) -> RtfResult<Vec<u8>> {
+    pub(super) fn parse_shape_binary_value(&mut self) -> crate::Result<Vec<u8>> {
         match self.tokens.get(self.pos..self.pos + 3) {
             Some(
                 [
@@ -1254,12 +1253,12 @@ impl<'a> Parser<'a> {
                     Token::Control(ControlWord::ShapeBinaryValue(Some(_))),
                 ],
             ) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF svb destination must not have a parameter".to_string(),
                 ));
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF svb destination".to_string(),
                 ));
             },
@@ -1271,7 +1270,7 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if high_nibble.is_some() || bytes.is_empty() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF svb payload is empty or has an odd hexadecimal length".to_string(),
                         ));
                     }
@@ -1286,7 +1285,7 @@ impl<'a> Parser<'a> {
                     Self::reserve_shape_binary_payload(&mut bytes, decoded_bytes)?;
                     for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
                         let nibble = Self::hex_nibble(byte).ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF svb contains a non-hexadecimal character".to_string(),
                             )
                         })?;
@@ -1300,7 +1299,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Binary(value)) => {
                     if high_nibble.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF svb binary payload splits a hexadecimal byte".to_string(),
                         ));
                     }
@@ -1309,16 +1308,16 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace | Token::Control(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF svb contains nested or active content".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
 
-    fn reserve_shape_binary_payload(data: &mut Vec<u8>, additional: usize) -> RtfResult<()> {
+    fn reserve_shape_binary_payload(data: &mut Vec<u8>, additional: usize) -> crate::Result<()> {
         Self::reserve_shape_binary_payload_with_limit(
             data,
             additional,
@@ -1334,13 +1333,13 @@ impl<'a> Parser<'a> {
         limit: usize,
         resource: &'static str,
         message: &'static str,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let remaining = limit.saturating_sub(data.len());
         if additional > remaining {
-            return Err(RtfError::MalformedDocument(message.to_string()));
+            return Err(crate::Error::MalformedDocument(message.to_string()));
         }
         data.try_reserve_exact(additional)
-            .map_err(|_err| RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource,
                 requested: data.len().saturating_add(additional),
             })?;
@@ -1472,7 +1471,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_shape_group_destination(
         &mut self,
-    ) -> RtfResult<super::super::super::shape::ShapeGroup<'a>> {
+    ) -> crate::Result<super::super::super::shape::ShapeGroup<'a>> {
         self.parse_shape_group_destination_at_depth(0, true)
     }
 
@@ -1480,9 +1479,9 @@ impl<'a> Parser<'a> {
         &mut self,
         nesting_depth: usize,
         root: bool,
-    ) -> RtfResult<super::super::super::shape::ShapeGroup<'a>> {
+    ) -> crate::Result<super::super::super::shape::ShapeGroup<'a>> {
         if nesting_depth >= MAX_SHAPE_GROUP_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group nesting exceeds the safety limit".to_string(),
             ));
         }
@@ -1497,7 +1496,7 @@ impl<'a> Parser<'a> {
         let parameter = match self.tokens.get(self.pos) {
             Some(Token::Control(ControlWord::ShapeGroup(parameter))) => *parameter,
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF shape group parser is not at shpgrp".to_string(),
                 ));
             },
@@ -1518,7 +1517,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if in_instance || saw_instance || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape group must contain exactly one shpinst".to_string(),
                         ));
                     }
@@ -1530,13 +1529,13 @@ impl<'a> Parser<'a> {
                     if self.nested_control_word() == Some(ControlWord::ShapeProperty) =>
                 {
                     if !in_instance || saw_child {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape group properties must precede direct children inside shpinst"
                                 .to_string(),
                         ));
                     }
                     if group.properties.len() >= MAX_SHAPE_PROPERTIES {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape group property count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1562,7 +1561,7 @@ impl<'a> Parser<'a> {
                     ) =>
                 {
                     if !in_instance || group.child_order.len() >= MAX_SHAPES_PER_GROUP {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape group child is misplaced or exceeds the safety limit"
                                 .to_string(),
                         ));
@@ -1581,7 +1580,7 @@ impl<'a> Parser<'a> {
                         || group.groups.len() >= MAX_GROUPS_PER_GROUP
                         || group.child_order.len() >= MAX_SHAPES_PER_GROUP
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF nested shape group is misplaced or exceeds the safety limit"
                                 .to_string(),
                         ));
@@ -1600,7 +1599,7 @@ impl<'a> Parser<'a> {
                         .is_some_and(|control| matches!(control, ControlWord::ShapeResult(_))) =>
                 {
                     if in_instance || !root || !saw_instance || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shprslt may occur once after root shape-group shpinst".to_string(),
                         ));
                     }
@@ -1608,7 +1607,7 @@ impl<'a> Parser<'a> {
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::IgnorableDestination))
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group shprslt destination must be starred".to_string(),
                         ));
                     }
@@ -1616,7 +1615,7 @@ impl<'a> Parser<'a> {
                     saw_result = true;
                 },
                 Token::OpenBrace => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape group contains a misplaced or unknown group".to_string(),
                     ));
                 },
@@ -1631,7 +1630,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeLeft(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1640,7 +1639,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeTop(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1649,7 +1648,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeRight(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1658,7 +1657,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeBottom(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1667,7 +1666,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeWidth(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1676,7 +1675,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeHeight(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1685,7 +1684,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeRotation(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1694,7 +1693,7 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::ShapeZOrder(value)) => {
                     if saw_child || saw_result {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group geometry must precede children".to_string(),
                         ));
                     }
@@ -1733,13 +1732,13 @@ impl<'a> Parser<'a> {
                         ("shpbypara", None) => crate::ShapeGroupInfo::VerticalParagraph,
                         ("shpbyignore", None) => crate::ShapeGroupInfo::IgnoreVertical,
                         ("shpwrk", Some(value)) => crate::ShapeGroupInfo::WrapSide(value),
-                        _ => return Err(RtfError::MalformedDocument(
+                        _ => return Err(crate::Error::MalformedDocument(
                             "RTF shape group contains an unknown or malformed shape-info control"
                                 .to_string(),
                         )),
                     };
                     if group.info.len() >= 32 {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF shape-group info count exceeds the safety limit".to_string(),
                         ));
                     }
@@ -1748,22 +1747,22 @@ impl<'a> Parser<'a> {
                 },
                 Token::Text(text) if text.chars().all(char::is_whitespace) => self.pos += 1,
                 Token::Binary(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape group cannot contain direct binary data".to_string(),
                     ));
                 },
                 Token::Control(_) | Token::Text(_) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF shape group contains misplaced content".to_string(),
                     ));
                 },
             }
         }
         if !closed {
-            return Err(RtfError::UnexpectedEof);
+            return Err(crate::Error::UnexpectedEof);
         }
         if in_instance || !saw_instance {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF shape group must contain exactly one starred shpinst".to_string(),
             ));
         }

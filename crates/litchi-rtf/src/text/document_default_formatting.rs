@@ -1,6 +1,6 @@
 //! Passive document default-formatting metadata.
 
-use crate::{Formatting, Paragraph, RtfError, RtfResult};
+use crate::{Formatting, Paragraph};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DefaultFormattingDestination {
@@ -81,7 +81,7 @@ impl DocumentDefaultFormatting {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.destination_order.len() > 2
             || self
                 .destination_order
@@ -96,7 +96,7 @@ impl DocumentDefaultFormatting {
                 .count()
                 != usize::from(self.paragraph.is_some())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF default-formatting destination order is inconsistent".to_string(),
             ));
         }
@@ -114,12 +114,12 @@ impl DocumentDefaultFormatting {
                 .table_nesting_level
                 .is_some_and(|value| value > 32)
             {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF defpap itap value must be in 0..=32".to_string(),
                 ));
             }
             if paragraph.paragraph.legacy_numbering.is_some() {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF defpap cannot reference a legacy pn destination".to_string(),
                 ));
             }

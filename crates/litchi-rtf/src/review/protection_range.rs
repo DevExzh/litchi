@@ -12,7 +12,6 @@
 //! are kept verbatim, and no editing restriction is ever evaluated or
 //! enforced.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 pub(crate) const MAX_PROTECTION_RANGES: usize = 65_536;
@@ -40,7 +39,7 @@ impl<'a> ProtectionRange<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(id: Cow<'a, str>, position: usize, content: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(id: Cow<'a, str>, position: usize, content: Cow<'a, str>) -> crate::Result<Self> {
         let range = Self {
             id,
             position,
@@ -50,9 +49,9 @@ impl<'a> ProtectionRange<'a> {
         Ok(range)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.id.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-range identifier cannot be empty".to_string(),
             ));
         }
@@ -60,7 +59,7 @@ impl<'a> ProtectionRange<'a> {
             || !self.id.len().is_multiple_of(2)
             || !self.id.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-range identifier must be even-length hexadecimal within the safety limit"
                     .to_string(),
             ));

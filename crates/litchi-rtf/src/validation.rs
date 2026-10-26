@@ -5,7 +5,6 @@
 //! syntax that the parser has already proved to be present. Unknown retained
 //! syntax is surfaced as `Unknown`; it is never treated as safe.
 
-use crate::codec::error::RtfResult;
 use crate::codec::limits::{OpenOptions, SourceLimits};
 use crate::content::field::{FieldType, ParsedFieldCode};
 use crate::model::document::Tree;
@@ -452,14 +451,14 @@ impl ValidationReport {
         clippy::should_implement_trait,
         reason = "the inherent constructor keeps the validation API parallel with Package::parse"
     )]
-    pub fn from_str(input: &str, options: OpenOptions) -> RtfResult<Self> {
+    pub fn from_str(input: &str, options: OpenOptions) -> crate::Result<Self> {
         let document = crate::Package::parse_with_options(input, options)?;
         Ok(document.validation_report())
     }
 
     /// Parse original RTF bytes once, including bounded compressed-RTF
     /// decompression when the transport header is present.
-    pub fn from_bytes(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
+    pub fn from_bytes(input: &[u8], options: OpenOptions) -> crate::Result<Self> {
         let document = crate::Package::from_bytes_with_options(input, options)?;
         Ok(document.validation_report())
     }
@@ -581,12 +580,12 @@ impl ValidationReport {
 }
 
 /// Validate original RTF bytes with the caller's explicit opening profile.
-pub fn validate(input: &[u8], options: OpenOptions) -> RtfResult<ValidationReport> {
+pub fn validate(input: &[u8], options: OpenOptions) -> crate::Result<ValidationReport> {
     ValidationReport::from_bytes(input, options)
 }
 
 /// Validate UTF-8 RTF with the caller's explicit opening profile.
-pub fn validate_str(input: &str, options: OpenOptions) -> RtfResult<ValidationReport> {
+pub fn validate_str(input: &str, options: OpenOptions) -> crate::Result<ValidationReport> {
     ValidationReport::from_str(input, options)
 }
 

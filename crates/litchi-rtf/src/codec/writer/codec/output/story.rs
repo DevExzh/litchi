@@ -15,12 +15,12 @@ use super::super::{
     MAX_EMBEDDED_OBJECTS, MAX_LEGACY_DRAWINGS, MAX_PICTURE_COMPATIBILITY_RECORDS, MathZone,
     MoveBookmark, NavigationEntry, Note, ObjectKind, ObjectResultKind, Picture,
     PictureCompatibilityKind, PictureCompatibilityRecord, PictureShapeProperties, ProtectionRange,
-    Revision, RevisionType, RtfWriter, Section, Shape, ShapeGroup, ShapeGroupInfo, ShapeType,
-    SmartTag, SoftBreakKind, StoryDrawing, StyleBlock, Write, field, form_field,
+    Revision, RevisionType, Section, Shape, ShapeGroup, ShapeGroupInfo, ShapeType, SmartTag,
+    SoftBreakKind, StoryDrawing, StyleBlock, Write, Writer, field, form_field,
     invalid_story_reference, io, navigation_entry, section, take_story_item,
 };
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     pub(in super::super) fn write_annotation_value(
         &mut self,
         control: &str,

@@ -1,6 +1,5 @@
 //! Inert usernames from the RTF `protusertbl` destination.
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 
 /// Maximum number of protection-user entries retained from one document.
@@ -22,25 +21,25 @@ impl<'a> ProtectionUser<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(name: Cow<'a, str>) -> RtfResult<Self> {
+    pub fn new(name: Cow<'a, str>) -> crate::Result<Self> {
         let user = Self { name };
         user.validate()?;
         Ok(user)
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.name.trim().is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection username cannot be empty".to_string(),
             ));
         }
         if self.name.len() > MAX_PROTECTION_USER_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection username exceeds the safety limit".to_string(),
             ));
         }
         if self.name.contains(['\0', '\r', '\n']) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection username contains a forbidden control character".to_string(),
             ));
         }
@@ -65,7 +64,7 @@ impl<'a> ProtectionUserTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(users: Vec<ProtectionUser<'a>>) -> RtfResult<Self> {
+    pub fn new(users: Vec<ProtectionUser<'a>>) -> crate::Result<Self> {
         let table = Self { users };
         table.validate()?;
         Ok(table)
@@ -81,10 +80,10 @@ impl<'a> ProtectionUserTable<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push(&mut self, user: ProtectionUser<'a>) -> RtfResult<()> {
+    pub fn push(&mut self, user: ProtectionUser<'a>) -> crate::Result<()> {
         user.validate()?;
         if self.users.len() >= MAX_PROTECTION_USERS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-user count exceeds the safety limit".to_string(),
             ));
         }
@@ -93,13 +92,13 @@ impl<'a> ProtectionUserTable<'a> {
             .iter()
             .try_fold(user.name.len(), |total, existing| {
                 total.checked_add(existing.name.len()).ok_or_else(|| {
-                    RtfError::MalformedDocument(
+                    crate::Error::MalformedDocument(
                         "RTF protection-user aggregate size overflow".to_string(),
                     )
                 })
             })?;
         if total > MAX_PROTECTION_USER_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-user aggregate text exceeds the safety limit".to_string(),
             ));
         }
@@ -107,14 +106,14 @@ impl<'a> ProtectionUserTable<'a> {
         Ok(())
     }
 
-    pub(crate) fn validate(&self) -> RtfResult<()> {
+    pub(crate) fn validate(&self) -> crate::Result<()> {
         if self.users.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-user table cannot be empty".to_string(),
             ));
         }
         if self.users.len() > MAX_PROTECTION_USERS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF protection-user count exceeds the safety limit".to_string(),
             ));
         }
@@ -122,12 +121,12 @@ impl<'a> ProtectionUserTable<'a> {
         for user in &self.users {
             user.validate()?;
             total = total.checked_add(user.name.len()).ok_or_else(|| {
-                RtfError::MalformedDocument(
+                crate::Error::MalformedDocument(
                     "RTF protection-user aggregate size overflow".to_string(),
                 )
             })?;
             if total > MAX_PROTECTION_USER_TOTAL_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF protection-user aggregate text exceeds the safety limit".to_string(),
                 ));
             }

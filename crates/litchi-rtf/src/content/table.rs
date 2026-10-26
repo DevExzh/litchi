@@ -99,7 +99,7 @@ impl TablePreferredWidth {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(unit: TablePreferredWidthUnit, value: Option<u16>) -> crate::RtfResult<Self> {
+    pub fn new(unit: TablePreferredWidthUnit, value: Option<u16>) -> crate::Result<Self> {
         let width = Self { unit, value };
         width.validate()?;
         Ok(width)
@@ -112,7 +112,7 @@ impl TablePreferredWidth {
     pub const fn value(self) -> Option<u16> {
         self.value
     }
-    pub(crate) fn validate(self) -> crate::RtfResult<()> {
+    pub(crate) fn validate(self) -> crate::Result<()> {
         match (self.unit, self.value) {
             (TablePreferredWidthUnit::Null | TablePreferredWidthUnit::Auto, None) => Ok(()),
             (TablePreferredWidthUnit::Percent, Some(value))
@@ -126,16 +126,16 @@ impl TablePreferredWidth {
                 Ok(())
             },
             (TablePreferredWidthUnit::Null | TablePreferredWidthUnit::Auto, Some(_)) => {
-                Err(crate::RtfError::MalformedDocument(
+                Err(crate::Error::MalformedDocument(
                     "RTF null or auto preferred width cannot carry a value".to_string(),
                 ))
             },
             (TablePreferredWidthUnit::Percent | TablePreferredWidthUnit::Twips, None) => {
-                Err(crate::RtfError::MalformedDocument(
+                Err(crate::Error::MalformedDocument(
                     "RTF percentage or twip preferred width requires a value".to_string(),
                 ))
             },
-            _ => Err(crate::RtfError::MalformedDocument(
+            _ => Err(crate::Error::MalformedDocument(
                 "RTF preferred table width is out of range".to_string(),
             )),
         }
@@ -178,7 +178,7 @@ impl TableIndent {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn new(unit: TableIndentUnit, value: i32) -> crate::RtfResult<Self> {
+    pub fn new(unit: TableIndentUnit, value: i32) -> crate::Result<Self> {
         let indent = Self { unit, value };
         indent.validate()?;
         Ok(indent)
@@ -191,7 +191,7 @@ impl TableIndent {
     pub const fn value(self) -> i32 {
         self.value
     }
-    pub(crate) fn validate(self) -> crate::RtfResult<()> {
+    pub(crate) fn validate(self) -> crate::Result<()> {
         let cap = match self.unit {
             TableIndentUnit::Twips => MAX_TABLE_GEOMETRY_TWIPS,
             TableIndentUnit::Percent => MAX_TABLE_WIDTH_PERCENT,
@@ -199,7 +199,7 @@ impl TableIndent {
                 return if self.value == 0 {
                     Ok(())
                 } else {
-                    Err(crate::RtfError::MalformedDocument(
+                    Err(crate::Error::MalformedDocument(
                         "RTF auto or nil table indent requires zero".to_string(),
                     ))
                 };
@@ -208,7 +208,7 @@ impl TableIndent {
         if self.value.unsigned_abs() <= cap.cast_unsigned() {
             Ok(())
         } else {
-            Err(crate::RtfError::MalformedDocument(
+            Err(crate::Error::MalformedDocument(
                 "RTF table indent is out of range".to_string(),
             ))
         }
@@ -291,7 +291,7 @@ impl TableRowGeometry {
     pub fn set_indent(&mut self, value: Option<TableIndent>) {
         self.indent = value;
     }
-    pub(crate) fn validate(self) -> crate::RtfResult<()> {
+    pub(crate) fn validate(self) -> crate::Result<()> {
         if self
             .half_gap_twips
             .is_some_and(|value| i32::from(value) > MAX_TABLE_GEOMETRY_TWIPS)
@@ -300,7 +300,7 @@ impl TableRowGeometry {
                 .is_some_and(|value| value.unsigned_abs() > MAX_TABLE_GEOMETRY_TWIPS as u32)
             || matches!(self.height,TableRowHeight::Minimum(value)|TableRowHeight::Exact(value)if i32::from(value)>MAX_TABLE_GEOMETRY_TWIPS)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table row geometry is out of range".to_string(),
             ));
         }
@@ -478,13 +478,13 @@ impl TableWrapDistances {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if [self.left, self.right, self.top, self.bottom]
             .into_iter()
             .flatten()
             .any(|value| i32::from(value) > MAX_FLOATING_TABLE_DISTANCE_TWIPS)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF floating-table wrap distance is out of range".to_string(),
             ));
         }
@@ -514,7 +514,7 @@ impl FloatingTablePosition {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         let offset = |value| (0..=MAX_FLOATING_TABLE_DISTANCE_TWIPS).contains(&value);
         let negative = |value| (-MAX_FLOATING_TABLE_DISTANCE_TWIPS..=-1).contains(&value);
         if matches!(self.horizontal_position,Some(TableHorizontalPosition::Offset(value))if !offset(value))
@@ -522,7 +522,7 @@ impl FloatingTablePosition {
             || matches!(self.horizontal_position,Some(TableHorizontalPosition::NegativeOffset(value))if !negative(value))
             || matches!(self.vertical_position,Some(TableVerticalPosition::NegativeOffset(value))if !negative(value))
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF floating-table position is out of range".to_string(),
             ));
         }
@@ -649,7 +649,7 @@ impl TableRowBorders {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         for border in [
             self.top,
             self.left,
@@ -719,7 +719,7 @@ impl TableStyleDefaultBorders {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         for border in [
             self.top,
             self.left,
@@ -764,7 +764,7 @@ impl TableRowCellDefaults {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         self.borders.validate()?;
         self.padding.validate()?;
         self.spacing.validate()?;
@@ -802,7 +802,7 @@ impl TableCellBorders {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         for border in [
             self.top,
             self.left,
@@ -840,19 +840,19 @@ impl TableShading {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self
             .amount
             .into_iter()
             .chain(self.raw_amount)
             .any(|value| value > 10_000)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table shading must be in 0..=10000".to_string(),
             ));
         }
         if self.pattern.is_some() && self.pattern_index.is_some() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table shading has conflicting pattern controls".to_string(),
             ));
         }
@@ -1048,13 +1048,13 @@ impl TableEdgeDistances {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> crate::RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         for side in [&self.left, &self.right, &self.top, &self.bottom] {
             if side
                 .value
                 .is_some_and(|value| i32::from(value) > MAX_TABLE_DISTANCE_TWIPS)
             {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table distance is out of range".to_string(),
                 ));
             }
@@ -1087,7 +1087,7 @@ impl<'a> Table<'a> {
         self.rows.push(row);
     }
 
-    pub(crate) fn try_add_row(&mut self, row: Row<'a>) -> crate::RtfResult<()> {
+    pub(crate) fn try_add_row(&mut self, row: Row<'a>) -> crate::Result<()> {
         crate::error::try_reserve_one(&mut self.rows, "table rows")?;
         self.rows.push(row);
         Ok(())
@@ -1177,7 +1177,7 @@ impl<'a> Row<'a> {
         self.cells.push(cell);
     }
 
-    pub(crate) fn try_add_cell(&mut self, cell: Cell<'a>) -> crate::RtfResult<()> {
+    pub(crate) fn try_add_cell(&mut self, cell: Cell<'a>) -> crate::Result<()> {
         crate::error::try_reserve_one(&mut self.cells, "table row cells")?;
         self.cells.push(cell);
         Ok(())
@@ -1545,11 +1545,7 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add_nested_table(
-        &mut self,
-        text_offset: usize,
-        table: Table<'a>,
-    ) -> crate::RtfResult<()> {
+    pub fn add_nested_table(&mut self, text_offset: usize, table: Table<'a>) -> crate::Result<()> {
         let last_story_position = self.last_story_position()?;
         if text_offset > self.text.len()
             || !self.text.is_char_boundary(text_offset)
@@ -1559,7 +1555,7 @@ impl<'a> Cell<'a> {
                 .is_some_and(|entry| entry.text_offset > text_offset)
             || last_story_position.is_some_and(|position| position > text_offset)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid nested-table text insertion offset".to_string(),
             ));
         }
@@ -1590,7 +1586,7 @@ impl<'a> Cell<'a> {
     pub fn story_events(&self) -> &[CellStoryEvent] {
         &self.story_events
     }
-    fn event_position(&self, event: CellStoryEvent) -> crate::RtfResult<usize> {
+    fn event_position(&self, event: CellStoryEvent) -> crate::Result<usize> {
         Self::event_position_in(&self.nested_tables, &self.shapes, &self.shape_groups, event)
     }
 
@@ -1599,7 +1595,7 @@ impl<'a> Cell<'a> {
         shapes: &[crate::Shape<'_>],
         shape_groups: &[crate::ShapeGroup<'_>],
         event: CellStoryEvent,
-    ) -> crate::RtfResult<usize> {
+    ) -> crate::Result<usize> {
         match event {
             CellStoryEvent::NestedTable(index) => {
                 nested_tables.get(index).map(|nested| nested.text_offset)
@@ -1619,13 +1615,13 @@ impl<'a> Cell<'a> {
             | CellStoryEvent::RevisionDeletion(reference) => Some(reference.position),
         }
         .ok_or_else(|| {
-            crate::RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF table-cell story event references missing metadata".to_string(),
             )
         })
     }
 
-    fn last_story_position(&self) -> crate::RtfResult<Option<usize>> {
+    fn last_story_position(&self) -> crate::Result<Option<usize>> {
         self.story_events
             .last()
             .copied()
@@ -1640,7 +1636,7 @@ impl<'a> Cell<'a> {
         shape_groups: &[crate::ShapeGroup<'_>],
         drawing_order: &[crate::StoryDrawing],
         story_events: &[CellStoryEvent],
-    ) -> crate::RtfResult<()> {
+    ) -> crate::Result<()> {
         crate::shape::validate_story_drawings(
             text,
             shapes,
@@ -1664,7 +1660,7 @@ impl<'a> Cell<'a> {
         let mut saw_fields = HashSet::new();
         saw_fields
             .try_reserve(field_count)
-            .map_err(|_err| crate::RtfError::AllocationFailed {
+            .map_err(|_err| crate::Error::AllocationFailed {
                 resource: "table-cell field references",
                 requested: field_count.saturating_mul(size_of::<usize>()),
             })?;
@@ -1675,13 +1671,13 @@ impl<'a> Cell<'a> {
             let position = match *event {
                 CellStoryEvent::NestedTable(index) => {
                     let seen = saw_nested.get_mut(index).ok_or_else(|| {
-                        crate::RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF table-cell story order has an invalid nested-table reference"
                                 .to_string(),
                         )
                     })?;
                     if std::mem::replace(seen, true) {
-                        return Err(crate::RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF table-cell story order has a duplicate nested-table reference"
                                 .to_string(),
                         ));
@@ -1690,7 +1686,7 @@ impl<'a> Cell<'a> {
                 },
                 CellStoryEvent::Drawing(drawing) => {
                     if drawings.next() != Some(drawing) {
-                        return Err(crate::RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF table-cell story order changes drawing order".to_string(),
                         ));
                     }
@@ -1698,7 +1694,7 @@ impl<'a> Cell<'a> {
                 },
                 CellStoryEvent::Field(field) => {
                     if !saw_fields.insert(field.field_index) {
-                        return Err(crate::RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF table-cell story order has a duplicate field reference"
                                 .to_string(),
                         ));
@@ -1713,19 +1709,19 @@ impl<'a> Cell<'a> {
                 | CellStoryEvent::RevisionDeletion(reference) => reference.position,
             };
             if text.get(position..position).is_none() {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table-cell story event is outside a UTF-8 boundary".to_string(),
                 ));
             }
             if previous.is_some_and(|value| value > position) {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table-cell story order moves backwards".to_string(),
                 ));
             }
             previous = Some(position);
         }
         if saw_nested.iter().any(|seen| !*seen) || drawings.next().is_some() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-cell story order is incomplete or changes drawing order".to_string(),
             ));
         }
@@ -1735,7 +1731,7 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate_drawings(&self) -> crate::RtfResult<()> {
+    pub fn validate_drawings(&self) -> crate::Result<()> {
         Self::validate_story_content(
             self.text.as_ref(),
             &self.nested_tables,
@@ -1748,10 +1744,10 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::Result<()> {
         let position = shape.position;
         if self.shapes.len() >= crate::shape::MAX_SHAPES_PER_GROUP {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-cell shape count exceeds the safety limit".to_string(),
             ));
         }
@@ -1779,7 +1775,7 @@ impl<'a> Cell<'a> {
             || last_drawing_position.is_some_and(|previous| previous > position)
             || last_story_position.is_some_and(|previous| previous > position)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-cell shape is outside or out of story order".to_string(),
             ));
         }
@@ -1795,10 +1791,10 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
+    pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::Result<()> {
         let position = group.position;
         if self.shape_groups.len() >= crate::shape::MAX_GROUPS_PER_GROUP {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-cell shape-group count exceeds the safety limit".to_string(),
             ));
         }
@@ -1825,7 +1821,7 @@ impl<'a> Cell<'a> {
             || last_drawing_position.is_some_and(|previous| previous > position)
             || last_story_position.is_some_and(|previous| previous > position)
         {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-cell shape group is outside or out of story order".to_string(),
             ));
         }
@@ -1861,7 +1857,7 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
+    pub fn push_page_break(&mut self, position: usize) -> crate::Result<()> {
         self.push_ordered_story_events(
             [CellStoryEvent::PageBreak(crate::PageBreak::new(position))],
             "invalid table-cell page-break insertion offset",
@@ -1887,7 +1883,7 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn push_column_break(&mut self, position: usize) -> crate::RtfResult<()> {
+    pub fn push_column_break(&mut self, position: usize) -> crate::Result<()> {
         self.push_ordered_story_events(
             [CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
                 position,
@@ -1929,7 +1925,7 @@ impl<'a> Cell<'a> {
         &mut self,
         index: usize,
         position: usize,
-    ) -> crate::RtfResult<()> {
+    ) -> crate::Result<()> {
         self.push_positional_event(CellStoryEvent::NavigationEntry(CellStoryReference {
             index,
             position,
@@ -1943,9 +1939,9 @@ impl<'a> Cell<'a> {
         index: usize,
         position: usize,
         range_end: usize,
-    ) -> crate::RtfResult<()> {
+    ) -> crate::Result<()> {
         if range_end <= position || self.text.get(position..range_end).is_none() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "invalid table-cell insertion revision range".to_string(),
             ));
         }
@@ -1967,29 +1963,27 @@ impl<'a> Cell<'a> {
         &mut self,
         index: usize,
         position: usize,
-    ) -> crate::RtfResult<()> {
+    ) -> crate::Result<()> {
         self.push_positional_event(CellStoryEvent::RevisionDeletion(CellStoryReference {
             index,
             position,
         }))
     }
-    fn push_positional_event(&mut self, event: CellStoryEvent) -> crate::RtfResult<()> {
+    fn push_positional_event(&mut self, event: CellStoryEvent) -> crate::Result<()> {
         self.push_ordered_story_events([event], "invalid or out-of-order table-cell story event")
     }
     fn push_ordered_story_events<const N: usize>(
         &mut self,
         events: [CellStoryEvent; N],
         error_message: &'static str,
-    ) -> crate::RtfResult<()> {
+    ) -> crate::Result<()> {
         let mut previous_position = self.last_story_position()?;
         for event in &events {
             let position = self.event_position(*event)?;
             if self.text.get(position..position).is_none()
                 || previous_position.is_some_and(|previous| previous > position)
             {
-                return Err(crate::RtfError::MalformedDocument(
-                    error_message.to_string(),
-                ));
+                return Err(crate::Error::MalformedDocument(error_message.to_string()));
             }
             previous_position = Some(position);
         }
@@ -2000,7 +1994,7 @@ impl<'a> Cell<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn set_text(&mut self, text: Cow<'a, str>) -> crate::RtfResult<()> {
+    pub fn set_text(&mut self, text: Cow<'a, str>) -> crate::Result<()> {
         Self::validate_story_content(
             text.as_ref(),
             &self.nested_tables,
@@ -2031,7 +2025,7 @@ impl<'a> Cell<'a> {
                     .text
                     .get(paragraph.start..paragraph.end)
                     .ok_or_else(|| {
-                        crate::RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF table-cell paragraph span is invalid".to_string(),
                         )
                     })?;
@@ -2070,7 +2064,7 @@ impl<'a> Cell<'a> {
                         .and_then(|paragraph| paragraph.frame());
                     paragraphs.push(CellParagraph::new(start, end, frame, true));
                     start = end.checked_add(character.len_utf8()).ok_or_else(|| {
-                        crate::RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF table-cell paragraph offset overflow".to_string(),
                         )
                     })?;
@@ -2091,16 +2085,13 @@ impl<'a> Cell<'a> {
         Ok(())
     }
 
-    pub(crate) fn set_paragraphs(
-        &mut self,
-        paragraphs: Vec<CellParagraph>,
-    ) -> crate::RtfResult<()> {
+    pub(crate) fn set_paragraphs(&mut self, paragraphs: Vec<CellParagraph>) -> crate::Result<()> {
         Self::validate_paragraphs(self.text.as_ref(), &paragraphs)?;
         self.paragraphs = paragraphs;
         Ok(())
     }
 
-    fn validate_paragraphs(text: &str, paragraphs: &[CellParagraph]) -> crate::RtfResult<()> {
+    fn validate_paragraphs(text: &str, paragraphs: &[CellParagraph]) -> crate::Result<()> {
         if paragraphs.is_empty() {
             return Ok(());
         }
@@ -2112,19 +2103,19 @@ impl<'a> Cell<'a> {
                 || !text.is_char_boundary(paragraph.start)
                 || !text.is_char_boundary(paragraph.end)
             {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table-cell paragraph span is invalid".to_string(),
                 ));
             }
             if paragraph.paragraph_break {
                 if text.get(paragraph.end..paragraph.end.saturating_add(1)) != Some("\n") {
-                    return Err(crate::RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF table-cell paragraph break is missing from cell text".to_string(),
                     ));
                 }
                 expected_start = paragraph.end.saturating_add(1);
             } else if index + 1 != paragraphs.len() {
-                return Err(crate::RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF table-cell paragraph without a break is not final".to_string(),
                 ));
             } else {
@@ -2132,7 +2123,7 @@ impl<'a> Cell<'a> {
             }
         }
         if expected_start != text.len() {
-            return Err(crate::RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF table-cell paragraph spans do not cover cell text".to_string(),
             ));
         }
@@ -2181,7 +2172,7 @@ impl<'a> Cell<'a> {
         shape_groups: Vec<crate::ShapeGroup<'a>>,
         drawing_order: Vec<crate::StoryDrawing>,
         story_events: Vec<CellStoryEvent>,
-    ) -> crate::RtfResult<()> {
+    ) -> crate::Result<()> {
         Self::validate_story_content(
             self.text.as_ref(),
             &self.nested_tables,

@@ -1,14 +1,14 @@
 use super::{
     ControlWord, Cow, Destination, IndexEntry, IndexPageReference, MAX_NAVIGATION_ENTRIES,
     MAX_NAVIGATION_ENTRY_DEPTH, MAX_NAVIGATION_ENTRY_TEXT_BYTES,
-    MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES, NavigationEntry, ParsedBodyStoryEvent, Parser, RtfError,
-    RtfResult, TableOfContentsEntry, Token, control_symbol_text,
+    MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES, NavigationEntry, ParsedBodyStoryEvent, Parser,
+    TableOfContentsEntry, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
-    pub(super) fn parse_navigation_entry_destination(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_navigation_entry_destination(&mut self) -> crate::Result<()> {
         if self.navigation_entries.len() >= MAX_NAVIGATION_ENTRIES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry count limit exceeded".to_string(),
             ));
         }
@@ -22,24 +22,24 @@ impl<'a> Parser<'a> {
                 self.parse_table_of_contents_entry(true)?
             },
             _ => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF navigation-entry destination".to_string(),
                 ));
             },
         };
         entry.validate()?;
         let added = entry.text_bytes().ok_or_else(|| {
-            RtfError::MalformedDocument("RTF navigation-entry size overflow".to_string())
+            crate::Error::MalformedDocument("RTF navigation-entry size overflow".to_string())
         })?;
         let position = entry.position();
         self.navigation_entry_text_bytes = self
             .navigation_entry_text_bytes
             .checked_add(added)
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF navigation-entry size overflow".to_string())
+                crate::Error::MalformedDocument("RTF navigation-entry size overflow".to_string())
             })?;
         if self.navigation_entry_text_bytes > MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry aggregate text limit exceeded".to_string(),
             ));
         }
@@ -64,16 +64,16 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_generated_list_marker(
         &mut self,
         kind: crate::GeneratedListMarkerKind,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if self.current_state()?.destination != Destination::DocumentBody {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list marker may occur only in the visible document body".to_string(),
             ));
         }
         if self.generated_list_markers.len()
             >= crate::generated_list_marker::MAX_GENERATED_LIST_MARKERS
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF generated list-marker count exceeds the safety limit".to_string(),
             ));
         }
@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
                     if self.generated_list_markers.last().is_some_and(|previous| {
                         previous.position == marker.position && previous.kind == marker.kind
                     }) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF contains duplicate generated list markers at one body position"
                                 .to_string(),
                         ));
@@ -104,14 +104,14 @@ impl<'a> Parser<'a> {
                         .generated_list_marker_text_bytes
                         .checked_add(marker.text.len())
                         .ok_or_else(|| {
-                            RtfError::MalformedDocument(
+                            crate::Error::MalformedDocument(
                                 "RTF generated list-marker text size overflow".to_string(),
                             )
                         })?;
                     if self.generated_list_marker_text_bytes
                         > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_TOTAL_BYTES
                     {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF generated list-marker text exceeds the aggregate safety limit"
                                 .to_string(),
                         ));
@@ -143,13 +143,13 @@ impl<'a> Parser<'a> {
                                 | ControlWord::DataField
                         ))
                     ) {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF generated list marker contains an active nested destination"
                                 .to_string(),
                         ));
                     }
                     depth = depth.checked_add(1).ok_or_else(|| {
-                        RtfError::MalformedDocument(
+                        crate::Error::MalformedDocument(
                             "RTF generated list-marker nesting depth overflow".to_string(),
                         )
                     })?;
@@ -181,7 +181,7 @@ impl<'a> Parser<'a> {
                     | ControlWord::Par
                     | ControlWord::Line,
                 )) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF generated list marker contains active or structural content"
                             .to_string(),
                     ));
@@ -192,21 +192,21 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Some(Token::Binary(_)) => {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF generated list marker cannot contain binary data".to_string(),
                     ));
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
             if text.len() > crate::generated_list_marker::MAX_GENERATED_LIST_MARKER_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF generated list marker exceeds the safety limit".to_string(),
                 ));
             }
         }
     }
 
-    pub(super) fn parse_index_entry(&mut self) -> RtfResult<NavigationEntry<'a>> {
+    pub(super) fn parse_index_entry(&mut self) -> crate::Result<NavigationEntry<'a>> {
         let position = self.current_story_position()?;
         self.pos += 1; // \xe
         let mut text = String::new();
@@ -229,7 +229,7 @@ impl<'a> Parser<'a> {
                     match (self.tokens.get(self.pos + 1), self.tokens.get(self.pos + 2)) {
                         (Some(Token::Control(ControlWord::IndexReplacementText)), _) => {
                             if !saw_text || saw_reference {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                 "RTF index entry has a misplaced or duplicate txe/rxe destination".to_string(),
                             ));
                             }
@@ -240,7 +240,7 @@ impl<'a> Parser<'a> {
                         },
                         (Some(Token::Control(ControlWord::IndexBookmarkRange)), _) => {
                             if !saw_text || saw_reference {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                 "RTF index entry has a misplaced or duplicate txe/rxe destination".to_string(),
                             ));
                             }
@@ -254,7 +254,7 @@ impl<'a> Parser<'a> {
                             Some(Token::Control(ControlWord::IndexPronunciation)),
                         ) => {
                             if !saw_yomi || yomi.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF pxe pronunciation requires one preceding yxe".to_string(),
                                 ));
                             }
@@ -262,7 +262,7 @@ impl<'a> Parser<'a> {
                         },
                         (Some(Token::Control(ControlWord::IndexYomi)), _) => {
                             if !saw_text || saw_yomi || yomi.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF index entry has a misplaced or duplicate yxe group"
                                         .to_string(),
                                 ));
@@ -272,7 +272,7 @@ impl<'a> Parser<'a> {
                         },
                         _ => {
                             if saw_reference || yomi.is_some() {
-                                return Err(RtfError::MalformedDocument(
+                                return Err(crate::Error::MalformedDocument(
                                     "RTF index entry text must precede its subdestinations"
                                         .to_string(),
                                 ));
@@ -284,21 +284,23 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::IndexIdentifier(value))) => {
                     if saw_text || index_id.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF xef must occur once before index text".to_string(),
                         ));
                     }
                     let identifier = value.ok_or_else(|| {
-                        RtfError::MalformedDocument("RTF xef requires a parameter".to_string())
+                        crate::Error::MalformedDocument("RTF xef requires a parameter".to_string())
                     })?;
                     index_id = Some(u8::try_from(identifier).map_err(|_err| {
-                        RtfError::MalformedDocument("RTF xef parameter is out of range".to_string())
+                        crate::Error::MalformedDocument(
+                            "RTF xef parameter is out of range".to_string(),
+                        )
                     })?);
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::IndexBold(value))) => {
                     if saw_text || bold_page_number {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF bxe must occur once before index text".to_string(),
                         ));
                     }
@@ -307,7 +309,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::IndexItalic(value))) => {
                     if saw_text || italic_page_number {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF ixe must occur once before index text".to_string(),
                         ));
                     }
@@ -316,7 +318,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::IndexYomi)) => {
                     if !saw_text || saw_yomi {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF yxe must occur once after index text".to_string(),
                         ));
                     }
@@ -325,18 +327,18 @@ impl<'a> Parser<'a> {
                 },
                 Some(_) => {
                     if saw_reference || yomi.is_some() {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF index text cannot follow a subdestination".to_string(),
                         ));
                     }
                     self.parse_navigation_text_token(&mut text, true, 1)?;
                     saw_text = !text.is_empty();
                 },
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
         if saw_yomi != yomi.is_some() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF yxe and pxe pronunciation controls must occur together".to_string(),
             ));
         }
@@ -350,7 +352,7 @@ impl<'a> Parser<'a> {
         Ok(NavigationEntry::Index(entry))
     }
 
-    pub(super) fn parse_index_yomi_group(&mut self) -> RtfResult<String> {
+    pub(super) fn parse_index_yomi_group(&mut self) -> crate::Result<String> {
         self.pos += 2; // group open and \yxe
         let state = self.current_state()?.clone();
         self.states.push(state);
@@ -364,13 +366,13 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos + 2),
             Some(Token::Control(ControlWord::IndexPronunciation))
         ) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF yxe group must contain one immediate starred pxe destination".to_string(),
             ));
         }
         let value = self.parse_navigation_subdestination(true)?;
         if !matches!(self.tokens.get(self.pos), Some(Token::CloseBrace)) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF yxe group must contain only its pxe destination".to_string(),
             ));
         }
@@ -382,7 +384,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_table_of_contents_entry(
         &mut self,
         suppress_page_number: bool,
-    ) -> RtfResult<NavigationEntry<'a>> {
+    ) -> crate::Result<NavigationEntry<'a>> {
         let position = self.current_story_position()?;
         self.pos += 1; // \tc or \tcn
         let mut text = String::new();
@@ -398,31 +400,35 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::TableOfContentsTable(value))) => {
                     if !text.is_empty() || saw_table {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF tcf must occur once before TOC-entry text".to_string(),
                         ));
                     }
                     table_id = u8::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument("RTF tcf parameter is out of range".to_string())
+                        crate::Error::MalformedDocument(
+                            "RTF tcf parameter is out of range".to_string(),
+                        )
                     })?;
                     saw_table = true;
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::TableOfContentsLevel(value))) => {
                     if !text.is_empty() || saw_level {
-                        return Err(RtfError::MalformedDocument(
+                        return Err(crate::Error::MalformedDocument(
                             "RTF tcl must occur once before TOC-entry text".to_string(),
                         ));
                     }
                     level = u8::try_from(*value).map_err(|_err| {
-                        RtfError::MalformedDocument("RTF tcl parameter is out of range".to_string())
+                        crate::Error::MalformedDocument(
+                            "RTF tcl parameter is out of range".to_string(),
+                        )
                     })?;
                     saw_level = true;
                     self.pos += 1;
                 },
                 Some(Token::OpenBrace) => self.parse_navigation_text_group(&mut text, true, 1)?,
                 Some(_) => self.parse_navigation_text_token(&mut text, true, 1)?,
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
         let mut entry = TableOfContentsEntry::new(position, Cow::Owned(text))?;
@@ -433,7 +439,10 @@ impl<'a> Parser<'a> {
         Ok(NavigationEntry::TableOfContents(entry))
     }
 
-    pub(super) fn parse_navigation_subdestination(&mut self, starred: bool) -> RtfResult<String> {
+    pub(super) fn parse_navigation_subdestination(
+        &mut self,
+        starred: bool,
+    ) -> crate::Result<String> {
         self.pos += if starred { 3 } else { 2 }; // group, optional star, destination
         let state = self.current_state()?.clone();
         self.states.push(state);
@@ -449,11 +458,11 @@ impl<'a> Parser<'a> {
                     self.parse_navigation_text_group(&mut value, false, 1)?;
                 },
                 Some(_) => self.parse_navigation_text_token(&mut value, false, 1)?,
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
         if value.is_empty() {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation subdestination text cannot be empty".to_string(),
             ));
         }
@@ -465,9 +474,9 @@ impl<'a> Parser<'a> {
         output: &mut String,
         visible: bool,
         depth: usize,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         if depth > MAX_NAVIGATION_ENTRY_DEPTH {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF navigation-entry nesting limit exceeded".to_string(),
             ));
         }
@@ -485,7 +494,7 @@ impl<'a> Parser<'a> {
                     self.parse_navigation_text_group(output, visible, depth + 1)?;
                 },
                 Some(_) => self.parse_navigation_text_token(output, visible, depth)?,
-                None => return Err(RtfError::UnexpectedEof),
+                None => return Err(crate::Error::UnexpectedEof),
             }
         }
     }
@@ -495,7 +504,7 @@ impl<'a> Parser<'a> {
         output: &mut String,
         visible: bool,
         _depth: usize,
-    ) -> RtfResult<()> {
+    ) -> crate::Result<()> {
         let decoded = match self.tokens.get(self.pos) {
             Some(Token::Text(text)) => {
                 let decoded = self.decode_transport_text(text)?;
@@ -520,7 +529,7 @@ impl<'a> Parser<'a> {
             },
             Some(Token::Control(control)) => {
                 if Self::forbidden_navigation_control(control) {
-                    return Err(RtfError::MalformedDocument(
+                    return Err(crate::Error::MalformedDocument(
                         "RTF navigation entries cannot contain active or nested destinations"
                             .to_string(),
                     ));
@@ -531,26 +540,28 @@ impl<'a> Parser<'a> {
                 None
             },
             Some(Token::Binary(_)) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF navigation entries cannot contain binary data".to_string(),
                 ));
             },
             Some(Token::OpenBrace | Token::CloseBrace) => {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "invalid RTF navigation-entry group structure".to_string(),
                 ));
             },
-            None => return Err(RtfError::UnexpectedEof),
+            None => return Err(crate::Error::UnexpectedEof),
         };
         if let Some(decoded_text) = decoded {
             let new_len = output
                 .len()
                 .checked_add(decoded_text.len())
                 .ok_or_else(|| {
-                    RtfError::MalformedDocument("RTF navigation-entry size overflow".to_string())
+                    crate::Error::MalformedDocument(
+                        "RTF navigation-entry size overflow".to_string(),
+                    )
                 })?;
             if new_len > MAX_NAVIGATION_ENTRY_TEXT_BYTES {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF navigation-entry text limit exceeded".to_string(),
                 ));
             }
@@ -570,7 +581,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_navigation_unicode_sequence(
         &mut self,
         first_code: i32,
-    ) -> RtfResult<String> {
+    ) -> crate::Result<String> {
         let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = super::unicode::UnicodeRun::default();
         let mut code = first_code;

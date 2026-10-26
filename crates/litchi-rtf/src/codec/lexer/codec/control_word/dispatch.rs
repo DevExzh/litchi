@@ -1,15 +1,15 @@
 use super::ControlWord;
 use super::repair::{binary, flag, toggle, toggled_selector, value};
-use crate::codec::error::{RtfError, RtfResult};
+
 use crate::leniency::ParameterDefect;
 
 /// `\fs` default when the parameter is missing: 12 points, as in
 /// LibreOffice's keyword table.
 const DEFAULT_FONT_SIZE_HALF_POINTS: i32 = 24;
 
-fn reject_numeric_parameter(word: &str, param: Option<i32>) -> RtfResult<()> {
+fn reject_numeric_parameter(word: &str, param: Option<i32>) -> crate::Result<()> {
     if param.is_some() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF \\{word} does not accept a numeric parameter"
         )));
     }
@@ -33,7 +33,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
     word: &'a str,
     param: Option<i32>,
     repair: &mut Option<ParameterDefect>,
-) -> RtfResult<ControlWord<'a>> {
+) -> crate::Result<ControlWord<'a>> {
     let param_value = param.unwrap_or(1);
     let param_bool = param.unwrap_or(1) != 0;
 
@@ -44,7 +44,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
     let control = match word {
         // Document
         "rtf" => ControlWord::Rtf(param.ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF \\rtf control requires a version parameter".to_string(),
             )
         })?),
@@ -453,7 +453,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
             ControlWord::XmlNamespaceTable
         },
         "xmlns" => ControlWord::XmlNamespace(param.ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF \\xmlns control requires a namespace parameter".to_string(),
             )
         })?),
@@ -470,7 +470,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
             None => ControlWord::XmlAttributeGroup,
         },
         "xmlattrns" => ControlWord::XmlAttributeNamespace(param.ok_or_else(|| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF \\xmlattrns control requires a namespace parameter".to_string(),
             )
         })?),
@@ -752,7 +752,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
         "fromhtml" => ControlWord::FromHtml(param),
         "htmlrtf" => ControlWord::HtmlRtf(param_bool),
         "htmltag" => ControlWord::HtmlTag(param.ok_or_else(|| {
-            RtfError::MalformedDocument("RTF htmltag requires a numeric parameter".to_string())
+            crate::Error::MalformedDocument("RTF htmltag requires a numeric parameter".to_string())
         })?),
         "doctype" => ControlWord::DocumentType(param),
         "makebackup" => ControlWord::MakeBackup(flag(param, repair)),
@@ -2732,7 +2732,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
 
         // Unicode
         "u" => ControlWord::Unicode(param.ok_or_else(|| {
-            RtfError::InvalidUnicode("RTF \\u requires a numeric parameter".to_string())
+            crate::Error::InvalidUnicode("RTF \\u requires a numeric parameter".to_string())
         })?),
         "uc" => ControlWord::UnicodeSkip(param_value),
 

@@ -10,12 +10,12 @@ use super::super::{
     DocumentVariable, DrawingStoryTextMode, FieldOwner, HashSet, MathElement, MathElementRole,
     MathObject, MathProperties, MathPropertyName, MathRun, MathStructure, MathStructureChild,
     MathStructureKind, MathZone, MathZoneKind, MoveBookmark, ProtectionRange, RtfTimestamp,
-    RtfWriter, SmartTag, UserProperty, Write, document_variable, io, user_property,
+    SmartTag, UserProperty, Write, Writer, document_variable, io, user_property,
 };
 
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 
-fn write_password_hash_hex<W: Write>(writer: &mut RtfWriter<W>, bytes: &[u8]) -> io::Result<()> {
+fn write_password_hash_hex<W: Write>(writer: &mut Writer<W>, bytes: &[u8]) -> io::Result<()> {
     let mut chunk = [0_u8; 512];
     let mut used = 0usize;
     for byte in bytes {
@@ -70,7 +70,7 @@ fn write_password_hash_hex<W: Write>(writer: &mut RtfWriter<W>, bytes: &[u8]) ->
     Ok(())
 }
 
-impl<W: Write> RtfWriter<W> {
+impl<W: Write> Writer<W> {
     /// Write the standard RTF document-information destination.
     ///
     /// # Errors

@@ -4,7 +4,7 @@
     clippy::shadow_reuse,
     reason = "builder-style helpers deliberately rebind a working value as it is refined"
 )]
-use crate::{RtfError, RtfResult};
+
 use std::borrow::Cow;
 
 /// Maximum decoded size of one mail-merge text destination.
@@ -42,9 +42,9 @@ impl MailMergeColumnIndex {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_rtf(value: i32) -> RtfResult<Self> {
+    pub fn from_rtf(value: i32) -> crate::Result<Self> {
         let value = u32::try_from(value).map_err(|_err| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF mail-merge column index cannot be negative".to_string(),
             )
         })?;
@@ -63,9 +63,9 @@ impl MailMergeColumnIndex {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn rtf_value(self) -> RtfResult<i32> {
+    pub fn rtf_value(self) -> crate::Result<i32> {
         i32::try_from(self.0).map_err(|_err| {
-            RtfError::MalformedDocument(
+            crate::Error::MalformedDocument(
                 "RTF mail-merge column index exceeds the signed control-word range".to_string(),
             )
         })
@@ -106,7 +106,7 @@ impl<'a> MailMergeFieldMapping<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         self.column.rtf_value()?;
         validate_required_text("field name", self.name.as_ref())?;
         validate_optional_text("mapped field name", self.mapped_name.as_deref())
@@ -168,26 +168,26 @@ impl MailMergeDataSourceObject<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         for (name, value) in [
             ("active record", self.active_record),
             ("column count", self.column_count),
         ] {
             if let Some(value) = value {
                 i32::try_from(value).map_err(|_err| {
-                    RtfError::MalformedDocument(format!(
+                    crate::Error::MalformedDocument(format!(
                         "RTF mail-merge {name} exceeds the signed control-word range"
                     ))
                 })?;
             }
         }
         if self.field_mappings.len() > MAX_MAIL_MERGE_FIELD_MAPPINGS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF mail-merge field-mapping count exceeds the safety limit".to_string(),
             ));
         }
         if self.recipient_data.len() > MAX_MAIL_MERGE_RECIPIENT_DATA {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF mail-merge recipient-data count exceeds the safety limit".to_string(),
             ));
         }
@@ -241,7 +241,7 @@ impl MailMerge<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         let mut total = 0usize;
         for (name, value) in [
             ("connection string", self.connect_string.as_deref()),
@@ -292,37 +292,37 @@ fn owned(value: Option<Cow<'_, str>>) -> Option<Cow<'static, str>> {
     value.map(|value| Cow::Owned(value.into_owned()))
 }
 
-fn validate_required_text(name: &str, value: &str) -> RtfResult<()> {
+fn validate_required_text(name: &str, value: &str) -> crate::Result<()> {
     if value.is_empty() {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF mail-merge {name} cannot be empty"
         )));
     }
     validate_text(name, value)
 }
 
-fn validate_optional_text(name: &str, value: Option<&str>) -> RtfResult<()> {
+fn validate_optional_text(name: &str, value: Option<&str>) -> crate::Result<()> {
     if let Some(value) = value {
         validate_text(name, value)?;
     }
     Ok(())
 }
 
-fn validate_text(name: &str, value: &str) -> RtfResult<()> {
+fn validate_text(name: &str, value: &str) -> crate::Result<()> {
     if value.len() > MAX_MAIL_MERGE_STRING_BYTES {
-        return Err(RtfError::MalformedDocument(format!(
+        return Err(crate::Error::MalformedDocument(format!(
             "RTF mail-merge {name} exceeds the per-string safety limit"
         )));
     }
     Ok(())
 }
 
-fn add_size(total: &mut usize, size: usize) -> RtfResult<()> {
+fn add_size(total: &mut usize, size: usize) -> crate::Result<()> {
     *total = total.checked_add(size).ok_or_else(|| {
-        RtfError::MalformedDocument("RTF mail-merge aggregate size overflow".to_string())
+        crate::Error::MalformedDocument("RTF mail-merge aggregate size overflow".to_string())
     })?;
     if *total > MAX_MAIL_MERGE_TOTAL_BYTES {
-        return Err(RtfError::MalformedDocument(
+        return Err(crate::Error::MalformedDocument(
             "RTF mail-merge aggregate text exceeds the safety limit".to_string(),
         ));
     }

@@ -1,6 +1,5 @@
 //! Inert legacy section-numbering defaults (`pnseclvl`).
 
-use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -60,9 +59,9 @@ impl LegacySectionNumberingLevel<'_> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if !(1..=9).contains(&self.level) {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl index must be between 1 and 9".to_string(),
             ));
         }
@@ -72,14 +71,14 @@ impl LegacySectionNumberingLevel<'_> {
             .chain(self.space)
             .any(|value| value.unsigned_abs() > MAX_LEGACY_NUMBERING_TWIPS as u32)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl layout value exceeds the safety limit".to_string(),
             ));
         }
         if self.text_before.len() > MAX_LEGACY_NUMBERING_TEXT_BYTES
             || self.text_after.len() > MAX_LEGACY_NUMBERING_TEXT_BYTES
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl text exceeds the safety limit".to_string(),
             ));
         }
@@ -126,10 +125,10 @@ impl<'a> LegacySectionNumbering<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn add(&mut self, level: LegacySectionNumberingLevel<'a>) -> RtfResult<()> {
+    pub fn add(&mut self, level: LegacySectionNumberingLevel<'a>) -> crate::Result<()> {
         level.validate()?;
         if self.levels.len() >= MAX_LEGACY_NUMBERING_LEVELS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF contains too many pnseclvl destinations".to_string(),
             ));
         }
@@ -138,7 +137,7 @@ impl<'a> LegacySectionNumbering<'a> {
             .last()
             .is_some_and(|last| last.level >= level.level)
         {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl destinations are duplicated or out of order".to_string(),
             ));
         }
@@ -148,9 +147,9 @@ impl<'a> LegacySectionNumbering<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn validate(&self) -> RtfResult<()> {
+    pub fn validate(&self) -> crate::Result<()> {
         if self.levels.len() > MAX_LEGACY_NUMBERING_LEVELS {
-            return Err(RtfError::MalformedDocument(
+            return Err(crate::Error::MalformedDocument(
                 "RTF contains too many pnseclvl destinations".to_string(),
             ));
         }
@@ -159,7 +158,7 @@ impl<'a> LegacySectionNumbering<'a> {
         for level in &self.levels {
             level.validate()?;
             if !seen.insert(level.level) || level.level <= previous {
-                return Err(RtfError::MalformedDocument(
+                return Err(crate::Error::MalformedDocument(
                     "RTF pnseclvl destinations are duplicated or out of order".to_string(),
                 ));
             }
