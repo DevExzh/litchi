@@ -938,8 +938,16 @@ const DATA_LIST: [u32; 2] = [6_005, 6_201];
 const HEADER_BUCKET: u32 = 6_006;
 /// `TSCE.FormulaOwnerDependenciesArchive`.
 const FORMULA_OWNER: u32 = 4_008;
+/// `TSCE.CalculationEngineArchive`.
+const CALCULATION_ENGINE: u32 = 4_000;
 /// Rows one header bucket covers.
 const HEADER_BUCKET_ROWS: u32 = 65_536;
+
+fn table_formulas() -> Error {
+    Error::Refused(crate::slide::drawable::Refusal::Unsupported {
+        reason: Unsupported::TableFormulas,
+    })
+}
 
 fn table_storage() -> Error {
     Error::Refused(crate::slide::drawable::Refusal::Unsupported {
@@ -1009,17 +1017,35 @@ pub(super) fn set_table_cell(
     column: u32,
     value: &super::TableCellValue,
 ) -> Result<(), Error> {
-    use litchi_numbers_wire::table_write::{self, CellInput, FormulaState};
+    use litchi_numbers_wire::{
+        formula_cache::{self, DependencyPayload, refresh},
+        table_write::{self, CellInput},
+    };
     let wire = workspace.wire;
     let package = workspace.package();
     let limits = package.numbers_wire_limits().map_err(|_| table_storage())?;
-    // The calculation graph: no formula reads or is read by the table.
-    let mut owners: Vec<&[u8]> = Vec::new();
+    let input = match value {
+        super::TableCellValue::Text(text) => CellInput::Text(text),
+        super::TableCellValue::Number(number) => CellInput::Number(*number),
+        super::TableCellValue::Boolean(flag) => CellInput::Boolean(*flag),
+        super::TableCellValue::Empty => CellInput::Empty,
+    };
+    // The calculation graph: plan the refresh of the formula caches that
+    // read the cell (record 0376) before any payload changes.
+    let mut engine = None;
+    let mut owners = Vec::new();
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             for message in &object.messages {
                 if message.type_ == FORMULA_OWNER {
-                    owners.push(&message.data);
+                    owners.push(DependencyPayload {
+                        identifier: object.archive_info.identifier.ok_or(Error::InvalidSource)?,
+                        bytes: &message.data,
+                    });
+                } else if message.type_ == CALCULATION_ENGINE
+                    && engine.replace(message.data.as_slice()).is_some()
+                {
+                    return Err(Error::InvalidSource);
                 }
             }
         }
@@ -1030,18 +1056,27 @@ pub(super) fn set_table_cell(
             .and_then(|(_, object)| object.messages.first())
             .map(|message| message.data.as_slice())
     };
-    match table_write::cell_formula_state(&owners, &object, info, row, column, &limits)
-        .map_err(|_| table_storage())?
-    {
-        FormulaState::Inert => {},
-        _ => {
-            return Err(Error::Refused(
-                crate::slide::drawable::Refusal::Unsupported {
-                    reason: Unsupported::TableFormulas,
-                },
-            ));
-        },
-    }
+    let refresh = match engine {
+        Some(engine) if !owners.is_empty() => refresh::plan(
+            refresh::Source {
+                engine,
+                owners: &owners,
+                table: info,
+            },
+            &[refresh::Write {
+                row,
+                column,
+                value: &input,
+            }],
+            &object,
+            &limits,
+        )
+        .map_err(|error| match error {
+            formula_cache::Error::UnsupportedDependency(_) => table_formulas(),
+            _ => table_storage(),
+        })?,
+        _ => refresh::Plan::default(),
+    };
     let (_, _, info_payload) = payload_of(workspace, info, &[TABLE_INFO])?;
     let model = first_reference(info_payload, 2, wire)?.ok_or(Error::InvalidSource)?;
     let (_, _, model_payload) = payload_of(workspace, model, &[TABLE_MODEL])?;
@@ -1071,18 +1106,12 @@ pub(super) fn set_table_cell(
     let (list_index, list_type, list_payload) = payload_of(workspace, strings, &DATA_LIST)?;
     let mut list = list_payload.to_vec();
     let mut string_key = None;
-    let input = match value {
-        super::TableCellValue::Text(text) => {
-            let (interned, key) =
-                table_write::list_intern(&list, text, &limits).map_err(|_| table_storage())?;
-            list = interned;
-            string_key = Some(key);
-            CellInput::Text(text)
-        },
-        super::TableCellValue::Number(number) => CellInput::Number(*number),
-        super::TableCellValue::Boolean(flag) => CellInput::Boolean(*flag),
-        super::TableCellValue::Empty => CellInput::Empty,
-    };
+    if let super::TableCellValue::Text(text) = value {
+        let (interned, key) =
+            table_write::list_intern(&list, text, &limits).map_err(|_| table_storage())?;
+        list = interned;
+        string_key = Some(key);
+    }
     let (cell, released) =
         table_write::cell_bytes(previous.as_deref(), &input, string_key, &limits)
             .map_err(|_| table_storage())?;
@@ -1132,6 +1161,13 @@ pub(super) fn set_table_cell(
     }
     for (identifier, index, message_type, data) in replacements {
         replace_payload(workspace, identifier, index, message_type, data).map_err(lift)?;
+    }
+    for caches in &refresh.tiles {
+        let (index, message_type, payload) = payload_of(workspace, caches.tile, &[TILE])?;
+        let refreshed = caches
+            .apply(payload, columns, &limits)
+            .map_err(|_| table_formulas())?;
+        replace_payload(workspace, caches.tile, index, message_type, refreshed).map_err(lift)?;
     }
     Ok(())
 }

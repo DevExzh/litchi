@@ -149,14 +149,14 @@ fn fixed32_field(output: &mut Vec<u8>, number: u32, value: u32, limits: &Limits)
     append(output, &value.to_le_bytes(), limits)
 }
 
-struct Field<'a> {
-    number: u32,
-    wire_type: u8,
+pub(crate) struct Field<'a> {
+    pub(crate) number: u32,
+    pub(crate) wire_type: u8,
     raw: &'a [u8],
-    payload: &'a [u8],
+    pub(crate) payload: &'a [u8],
 }
 
-fn fields<'a>(data: &'a [u8], limits: &Limits) -> Result<Vec<Field<'a>>> {
+pub(crate) fn fields<'a>(data: &'a [u8], limits: &Limits) -> Result<Vec<Field<'a>>> {
     limits.check_input(data.len()).map_err(map_limits)?;
     let view = WireView::parse(data, limits.wire()).map_err(map_wire_error)?;
     let count = view.fields().count();
@@ -218,7 +218,7 @@ fn varint(payload: &[u8]) -> Result<u64> {
     Ok(value)
 }
 
-fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>> {
+pub(crate) fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>> {
     let mut found = None;
     for field in fields(data, limits)? {
         if field.number == number {
@@ -230,7 +230,11 @@ fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64
     Ok(found)
 }
 
-fn single_bytes<'a>(data: &'a [u8], number: u32, limits: &Limits) -> Result<Option<&'a [u8]>> {
+pub(crate) fn single_bytes<'a>(
+    data: &'a [u8],
+    number: u32,
+    limits: &Limits,
+) -> Result<Option<&'a [u8]>> {
     let mut found = None;
     for field in fields(data, limits)? {
         if field.number == number {
@@ -493,6 +497,49 @@ pub fn tile_cell(
         return Ok(Some(copy));
     }
     Ok(None)
+}
+
+/// Every stored BNC cell of a modern tile, as `(local row, column, bytes)`
+/// in row then column order (the formula-cache refresh's tile scan).
+pub(crate) fn stored_cells<'a>(
+    tile: &'a [u8],
+    limits: &Limits,
+) -> Result<Vec<(u32, u32, &'a [u8])>> {
+    let mut cells = Vec::new();
+    for field in fields(tile, limits)? {
+        if field.number != 5 {
+            continue;
+        }
+        let row = single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?;
+        let row = u32::try_from(row).map_err(|_| WriteError::Invalid)?;
+        let (Some(storage), Some(offsets)) = (
+            single_bytes(field.payload, 6, limits)?,
+            single_bytes(field.payload, 7, limits)?,
+        ) else {
+            return Err(WriteError::Unsupported);
+        };
+        let unit = if single_varint(field.payload, 8, limits)?.unwrap_or(0) != 0 {
+            4
+        } else {
+            1
+        };
+        for (column, slot) in slots(storage, offsets, unit, limits)?
+            .into_iter()
+            .enumerate()
+        {
+            let Some((start, end)) = slot else {
+                continue;
+            };
+            let column = u32::try_from(column).map_err(|_| WriteError::Invalid)?;
+            let next = cells.len().checked_add(1).ok_or(WriteError::Invalid)?;
+            limits.check_items(next).map_err(map_limits)?;
+            cells
+                .try_reserve(1)
+                .map_err(|_| WriteError::Allocation { requested: 1 })?;
+            cells.push((row, column, &storage[start..end]));
+        }
+    }
+    Ok(cells)
 }
 
 /// Set (`Some`) or remove (`None`) the BNC cell at `local_row`/`column` of

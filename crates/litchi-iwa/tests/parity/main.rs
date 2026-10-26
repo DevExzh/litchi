@@ -25,6 +25,7 @@
 mod archive_diff;
 mod chart_style_cases;
 mod cost_probes;
+mod formula_refresh_cases;
 mod harness;
 mod known_fields;
 mod media_cases;
