@@ -41,7 +41,7 @@ pub mod properties {
 /// and audio clips.
 pub mod lifecycle {
     pub use crate::package::body_media_lifecycle::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+        Commit, Diagnostics, Edit, Error, LimitKind, Media, Patch, Refusal,
     };
 }
 
