@@ -437,6 +437,11 @@ def prepare(
     candidate_identity = identity["candidate"]
     if identity["sealed_by"]["p1_pin_sha256"] != protocol_p_pin_sha256:
         raise PreparationError("candidate identity is sealed against a different protocol-P1 pin")
+    if (
+        identity["sealed_by"]["commit"] != protocol_p_pin["p1"]["commit"]
+        or identity["sealed_by"]["tree"] != protocol_p_pin["p1"]["tree"]
+    ):
+        raise PreparationError("candidate identity seal does not name the pinned protocol-P1 object")
     protocol_p_anchor = _verify_protocol_p_pin(protocol_p_root, protocol_p_pin, candidate_identity)
     baseline = _source_state(baseline_root)
     candidate = _source_state(candidate_root)

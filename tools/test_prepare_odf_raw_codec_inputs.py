@@ -256,6 +256,16 @@ class OdfRawPreparationTests(unittest.TestCase):
             with self.assertRaises(prep.PreparationError):
                 prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "assume-unchanged.json")
 
+    def test_rejects_p1_seal_fields_that_do_not_equal_the_pin(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-raw-p1-seal-") as directory:
+            root = Path(directory)
+            baseline, candidate, adapter, protocol_p, pin_path, external_lock, identity_path, identity = self.fixture(root)
+            identity["sealed_by"]["commit"] = "f" * 40
+            identity["sealed_by"]["tree"] = "e" * 40
+            identity_path.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+            with self.assertRaises(prep.PreparationError):
+                prep.prepare(baseline_root=baseline, candidate_root=candidate, adapter_root=adapter, protocol_p_root=protocol_p, protocol_p_pin_path=pin_path, candidate_identity_path=identity_path, baseline_lock=external_lock, output=root / "bad-seal.json")
+
     def test_public_prepare_to_runner_positive_and_identity_rejection(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-cli-composition-") as directory:
             root = Path(directory)
@@ -286,6 +296,17 @@ class OdfRawPreparationTests(unittest.TestCase):
                 args = ["--manifest", str(manifest_path), "--preparation", str(preparation_path), "--baseline-root", str(baseline), "--candidate-root", str(candidate), "--adapter-root", str(adapter), "--protocol-p-root", str(protocol_p), "--protocol-p-pin", str(pin_path), "--candidate-identity", str(identity_path), "--output", str(root / "runner-output"), "--target-root", str(root / "target"), "--tmp-root", str(root / "tmp"), "--cpu", "0", "--phase", "build"]
                 self.assertEqual(runner.main(args), 0)
                 self.assertEqual(len(instances), 1)
+                bad_seal = copy.deepcopy(identity)
+                bad_seal["sealed_by"]["commit"] = "f" * 40
+                bad_seal["sealed_by"]["tree"] = "e" * 40
+                bad_seal_path = root / "bad-seal-identity.json"
+                bad_seal_path.write_text(json.dumps(bad_seal, indent=2) + "\n", encoding="utf-8")
+                bad_seal_args = list(args)
+                bad_seal_args[bad_seal_args.index(str(identity_path))] = str(bad_seal_path)
+                bad_seal_args[bad_seal_args.index(str(root / "runner-output"))] = str(root / "bad-seal-output")
+                bad_seal_args[bad_seal_args.index(str(root / "target"))] = str(root / "bad-seal-target")
+                bad_seal_args[bad_seal_args.index(str(root / "tmp"))] = str(root / "bad-seal-tmp")
+                self.assertEqual(runner.main(bad_seal_args), 2)
                 drifted = json.loads(identity_path.read_text(encoding="utf-8"))
                 identity_path.write_text(json.dumps(drifted, separators=(",", ":")) + "\n", encoding="utf-8")
                 with self.assertRaises(runner.RunnerError):

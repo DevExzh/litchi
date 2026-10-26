@@ -726,6 +726,11 @@ def _validate_preparation(
         raise RunnerError("preparation protocol-P1 pin handoff differs")
     if candidate_identity["sealed_by"]["p1_pin_sha256"] != protocol_p_pin_sha256:
         raise RunnerError("candidate identity is sealed against a different protocol-P1 pin")
+    if (
+        candidate_identity["sealed_by"]["commit"] != protocol_p_pin["p1"]["commit"]
+        or candidate_identity["sealed_by"]["tree"] != protocol_p_pin["p1"]["tree"]
+    ):
+        raise RunnerError("candidate identity seal does not name the pinned protocol-P1 object")
     protocol_p_anchor = data.get("protocol_p_anchor")
     expected_p_anchor = _verify_protocol_p_pin(protocol_p_root, protocol_p_pin, candidate_identity["candidate"])
     if protocol_p_anchor != expected_p_anchor:
@@ -973,6 +978,11 @@ class PairedRunner:
         self.candidate_identity, self.candidate_identity_sha256, self.candidate_identity_bytes, self.candidate_identity_path = _load_candidate_identity(self.candidate_identity_path, manifest=self.manifest, roots=(self.baseline_root, self.candidate_root, self.adapter_root, self.protocol_p_root))
         if self.candidate_identity["sealed_by"]["p1_pin_sha256"] != self.protocol_p_pin_sha256:
             raise RunnerError("candidate identity is sealed against a different protocol-P1 pin")
+        if (
+            self.candidate_identity["sealed_by"]["commit"] != self.protocol_p_pin["p1"]["commit"]
+            or self.candidate_identity["sealed_by"]["tree"] != self.protocol_p_pin["p1"]["tree"]
+        ):
+            raise RunnerError("candidate identity seal does not name the pinned protocol-P1 object")
         self.protocol_p_anchor = _verify_protocol_p_pin(self.protocol_p_root, self.protocol_p_pin, self.candidate_identity["candidate"])
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
         self.preparation_sha256 = prep_sha
@@ -1045,6 +1055,11 @@ class PairedRunner:
             raise RunnerError(f"candidate identity changed after initialization before {boundary}")
         if identity["sealed_by"]["p1_pin_sha256"] != self.protocol_p_pin_sha256:
             raise RunnerError(f"candidate identity pin binding changed before {boundary}")
+        if (
+            identity["sealed_by"]["commit"] != pin["p1"]["commit"]
+            or identity["sealed_by"]["tree"] != pin["p1"]["tree"]
+        ):
+            raise RunnerError(f"candidate identity P1 seal changed before {boundary}")
         p_anchor = _verify_protocol_p_pin(self.protocol_p_root, pin, identity["candidate"])
         if p_anchor != self.protocol_p_anchor:
             raise RunnerError(f"protocol-P anchor changed before {boundary}")
