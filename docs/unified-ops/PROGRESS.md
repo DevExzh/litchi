@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0362ul165uh | [Post-diagnostic build prerequisites](0362ul165uh-post-diagnostic-build-prerequisites.md) | DOCX sparse vendor closure repaired and release builds active; fuzz cache fetch/offline validation and canonical API tests source-ready and queued; two more obsolete worktrees retired |
 | 0362ul165ue | [Terminal diagnostic and leaf cleanup](0362ul165ue-diagnostic-returns-and-leaf-cleanup.md) | Twenty checks complete: thirteen pass, seven preserved failures, all five runtime supplements pass; two reviewed leaves merged and retired; final qualification pending |
 | 0362ul165uf | [Tooling import and adapter identities](0362ul165uf-tooling-identity-repair.md) | Merged leaf `ed12bd5528`: consistent PPT protocol exception imports and reviewed current ODF consumer manifest pin; focused Python checks pass; launch PATH repair and final gate pending |
 | 0362ul165ug | [Gate dependency and evidence registrations](0362ul165ug-gate-registry-repair.md) | Merged leaf `d9979bf2ff`: explicit shared ZIP dev edge and optional operations VBA edge; five validation-only evidence dispositions; focused policy and matrix checks pass; native/final gate pending |
@@ -6488,3 +6489,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   for Rust validation. Fresh fuzz lock preparation and the four DOCX release
   compiler checks can now use the serial heavy slot. All native and final
   candidate acceptance remains required. Nothing is pushed.
+
+  Post-diagnostic compilation exposes two preparation gaps (165uh): the DOCX
+  baseline lacks a vendored manifest, and offline fuzz metadata needs five
+  locked registry archives. Both failures are preserved. Exact DOCX source
+  materialization passes independent review and the v3 release builds are
+  running with explicit toolchain PATH. Fuzz v4 separates reviewed locked
+  cache hydration from fresh offline validation; canonical API validation v2
+  uses the current bounded runner/helper and is queued. Three-way previews
+  preserve current ODF work; DOCX will update its coupled DrawingML manifest
+  pin in the integration commit. Two superseded fuzz worktrees are retired,
+  reaching 288 worktrees/448 refs removed. A newly created concurrent IWA plan
+  leaf is retained for review. All 70 excluded office refs remain unchanged;
+  final native/source/gate acceptance is still pending. Nothing is pushed.
