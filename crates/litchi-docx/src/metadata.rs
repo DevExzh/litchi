@@ -473,6 +473,13 @@ mod tests {
         assert!(set_patch.parts().is_noop());
         assert_eq!(created.metadata(), Some(&default));
 
+        let reopened = Package::from_bytes(&created.to_bytes()?)?;
+        assert_eq!(reopened.metadata(), Some(&default));
+
+        let reopened_cleared = Package::from_bytes(&cleared.to_bytes()?)?;
+        let replayed = reopened_cleared.apply_metadata(&set_patch)?.into_package();
+        assert_eq!(replayed.metadata(), Some(&default));
+
         let restored = created.apply_metadata(&set_patch.inverse())?.into_package();
         assert!(restored.metadata().is_none());
         assert_eq!(restored.to_bytes()?, cleared.to_bytes()?);
@@ -506,6 +513,7 @@ mod tests {
     fn app_and_custom_props_publish_replay_and_invert() -> Result<()> {
         let package = package_with_opaque_app()?;
         let original = package.clone().to_bytes()?;
+        let original_metadata = package.metadata().cloned();
         let app_before = package.app_props()?.expect("app properties");
         let mut edit = package.edit_metadata();
         edit.update(|props| props.title = Some("Quarterly".to_owned()));
@@ -544,7 +552,7 @@ mod tests {
         // `Package::new` owns an explicit, empty core-properties part.  The
         // edit must preserve that present-vs-absent distinction on the source
         // snapshot while changing the staged value in the new package.
-        assert_eq!(package.metadata(), Some(&Metadata::default()));
+        assert_eq!(package.metadata(), original_metadata.as_ref());
         assert_eq!(package.clone().to_bytes()?, original);
         let reopened = Package::from_bytes(&next.clone().to_bytes()?)?;
         assert_eq!(
