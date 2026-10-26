@@ -19,7 +19,7 @@
 use std::fmt;
 
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
-use litchi_iwa_common::chart::{corner, donut, pie, radar};
+use litchi_iwa_common::chart::{corner, donut, legend, pie, radar};
 use litchi_iwa_common::chart3d::{self, Scale};
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::chart_style_codec::{
@@ -53,6 +53,8 @@ pub enum Property {
     Depth3d(chart3d::Depth),
     /// Rounded corners of bars and columns.
     RoundedCorners(corner::Rounding),
+    /// Placement of the legend (automatic or an explicit frame).
+    LegendFrame(legend::Frame),
 }
 
 /// The property a [`Property`] value sets, for reads and resets.
@@ -73,6 +75,8 @@ pub enum PropertyKind {
     Depth3d,
     /// [`Property::RoundedCorners`].
     RoundedCorners,
+    /// [`Property::LegendFrame`].
+    LegendFrame,
 }
 
 impl Property {
@@ -87,6 +91,7 @@ impl Property {
             Self::Rotation3d(_) => PropertyKind::Rotation3d,
             Self::Depth3d(_) => PropertyKind::Depth3d,
             Self::RoundedCorners(_) => PropertyKind::RoundedCorners,
+            Self::LegendFrame(_) => PropertyKind::LegendFrame,
         }
     }
 }
@@ -103,6 +108,7 @@ impl PropertyKind {
             Self::Rotation3d => Property::Rotation3d(chart3d::Rotation::DEFAULT),
             Self::Depth3d => Property::Depth3d(chart3d::Depth::DEFAULT),
             Self::RoundedCorners => Property::RoundedCorners(corner::Rounding::NONE),
+            Self::LegendFrame => Property::LegendFrame(legend::Frame::Automatic),
         }
     }
 
@@ -121,7 +127,7 @@ impl PropertyKind {
             Self::SeriesGap3d => kind.supports_3d_series_gap(),
             Self::Rotation3d => kind.supports_3d_scene(),
             Self::Depth3d => kind.supports_3d_depth(),
-            Self::RoundedCorners => true,
+            Self::RoundedCorners | Self::LegendFrame => true,
         }
     }
 }
@@ -321,6 +327,70 @@ struct Target {
     index: usize,
 }
 
+/// The chart drawable object and its chart message.
+fn chart_drawable(
+    package: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+) -> Result<(u64, usize), Error> {
+    let drawables = graph::sheet_drawables(package, sheet)?;
+    let entry = drawables
+        .select(DrawableSelector::from(chart))
+        .ok_or(Refusal::ChartNotFound)?;
+    let (index, message_type) = entry.message.ok_or(Error::InvalidSource)?;
+    if message_type != CHART_MESSAGE_TYPE {
+        return Err(Error::InvalidSource);
+    }
+    Ok((entry.identifier, index))
+}
+
+fn read_legend(package: &Package, sheet: usize, chart: ChartSelector) -> Result<Property, Error> {
+    let (identifier, index) = chart_drawable(package, sheet, chart)?;
+    let object = graph::object(package, identifier)?;
+    let stored = codec::legend_frame(&object.messages[index].data, Limits::DEFAULT)?;
+    Ok(Property::LegendFrame(
+        legend::Frame::from_native(stored).map_err(invalid)?,
+    ))
+}
+
+fn apply_legend(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    frame: legend::Frame,
+) -> Result<Option<Published>, Error> {
+    if read_legend(source, sheet, chart)? == Property::LegendFrame(frame) {
+        return Ok(None);
+    }
+    let (identifier, index) = chart_drawable(source, sheet, chart)?;
+    let object = graph::object(source, identifier)?;
+    let rewritten = codec::rewrite_legend_frame(
+        &object.messages[index].data,
+        frame.native(),
+        Limits::DEFAULT,
+    )?;
+    let mut data = Some(rewritten.into_bytes().into_owned());
+    let mut replace = |object: &mut litchi_iwa_core::ArchiveObject,
+                       limits: litchi_iwa_core::Limits| {
+        object
+            .replace_message_preserving_header(
+                index,
+                RawMessage {
+                    type_: CHART_MESSAGE_TYPE,
+                    data: data.take().ok_or(Fault::Invalid)?,
+                },
+                limits,
+            )
+            .map(drop)
+            .map_err(|error| structure::map_core(&error))
+    };
+    let published = graph::publish_in_place(source, &mut [(identifier, &mut replace)])?;
+    if read_legend(&published.package, sheet, chart)? != Property::LegendFrame(frame) {
+        return Err(Error::Verification);
+    }
+    Ok(Some(published))
+}
+
 fn target(
     package: &Package,
     sheet: usize,
@@ -438,6 +508,7 @@ fn read_value(
                 .bool(style::ROUNDED_CORNER_OUTER_END_ONLY)?
                 .unwrap_or(false),
         )),
+        PropertyKind::LegendFrame => return Err(Error::InvalidSource),
     })
 }
 
@@ -465,6 +536,7 @@ fn write_for(value: Property, chart: ChartKind) -> Result<property::PropertyWrit
             rounding.radius().native_fraction(),
             rounding.outside_corners_only(),
         ),
+        Property::LegendFrame(_) => return Err(Error::InvalidSource),
     })
 }
 
@@ -474,6 +546,9 @@ fn read(
     chart: ChartSelector,
     kind: PropertyKind,
 ) -> Result<Property, Error> {
+    if kind == PropertyKind::LegendFrame {
+        return read_legend(package, sheet, chart);
+    }
     let archive = kind.archive();
     let target = target(package, sheet, chart, archive)?;
     if !kind.applies_to(target.kind) {
@@ -494,6 +569,9 @@ fn apply_one(
     chart: ChartSelector,
     value: Property,
 ) -> Result<Option<Published>, Error> {
+    if let Property::LegendFrame(frame) = value {
+        return apply_legend(source, sheet, chart, frame);
+    }
     let kind = value.kind();
     let archive = kind.archive();
     let target = target(source, sheet, chart, archive)?;

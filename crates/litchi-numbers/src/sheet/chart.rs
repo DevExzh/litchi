@@ -29,6 +29,6 @@ pub mod style {
     pub use crate::package::sheet_chart_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
     };
-    pub use litchi_iwa_common::chart::{corner, donut, pie, radar};
+    pub use litchi_iwa_common::chart::{corner, donut, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;
 }
