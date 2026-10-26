@@ -127,18 +127,18 @@ pub enum Error {
 /// A replayable document-properties change: the core-properties value the
 /// edit started from and the value it published (`None` is an absent
 /// core-properties part), and the exact part changes of the application and
-/// custom properties. The exact core-part delta is retained privately for
-/// byte-faithful replay and inversion; [`Patch::parts`] remains the public
-/// application/custom-properties scope.
+/// custom properties. The exact composed package-properties delta is retained
+/// privately for byte-faithful replay and inversion; [`Patch::parts`] remains
+/// the public application/custom-properties scope.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     base: Option<Metadata>,
     target: Option<Metadata>,
     parts: families::Patch,
-    /// The exact shared-codec patch for the core-properties family, when the
-    /// core transition changed. `parts` deliberately remains the public
+    /// The exact composed shared-codec patch for all changed property
+    /// families. `parts` deliberately remains the public
     /// application/custom-properties scope.
-    core: Option<families::Patch>,
+    whole: families::Patch,
 }
 
 impl Patch {
@@ -160,16 +160,14 @@ impl Patch {
         &self.parts
     }
 
-    pub(crate) fn core(&self) -> Option<&families::Patch> {
-        self.core.as_ref()
+    pub(crate) const fn whole(&self) -> &families::Patch {
+        &self.whole
     }
 
     /// Whether applying the patch leaves every package byte unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.base == self.target
-            && self.parts.is_noop()
-            && self.core.as_ref().map_or(true, families::Patch::is_noop)
+        self.base == self.target && self.whole.is_noop()
     }
 
     /// The patch that restores the base value.
@@ -179,7 +177,7 @@ impl Patch {
             base: self.target.clone(),
             target: self.base.clone(),
             parts: self.parts.inverse(),
-            core: self.core.as_ref().map(families::Patch::inverse),
+            whole: self.whole.inverse(),
         }
     }
 }
@@ -302,22 +300,22 @@ impl Edit {
     /// cannot be written, and [`Error::Package`] when the codec or package
     /// graph refuses the value.
     pub fn commit(self) -> Result<Commit> {
-        let parts = if self.app.is_some() || self.custom.is_some() || self.remove_custom {
-            self.source
-                .property_parts_patch(self.app, self.custom, self.remove_custom)?
-        } else {
-            families::Patch::default()
-        };
+        let Self {
+            source,
+            base,
+            staged,
+            app,
+            custom,
+            remove_custom,
+        } = self;
+        let (package, changed, parts, whole) =
+            source.publish_metadata(staged.as_ref(), app, custom, remove_custom)?;
         let patch = Patch {
-            base: self.base,
-            target: self.staged,
+            base,
+            target: staged,
             parts,
-            core: None,
+            whole,
         };
-        let (package, changed, core) =
-            self.source
-                .publish_metadata(patch.target.as_ref(), &patch.parts, None)?;
-        let patch = Patch { core, ..patch };
         Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 }
@@ -410,6 +408,29 @@ mod tests {
             br#"><!--opaque keep="yes"--></cp:coreProperties>"#.iter().copied(),
         );
         part.set_blob(bytes);
+        Ok(Package::from_opc_package(opc)?)
+    }
+
+    fn package_without_property_parts() -> Result<Package> {
+        let package = Package::new()?;
+        let mut opc = package.opc_package().clone();
+        for name in [
+            "/docProps/core.xml",
+            "/docProps/app.xml",
+            "/docProps/custom.xml",
+        ] {
+            let part = PackURI::new(name).expect("static property URI");
+            let relationship_ids: Vec<_> = opc
+                .rels()
+                .iter()
+                .filter(|relationship| relationship.target_partname().ok().as_ref() == Some(&part))
+                .map(|relationship| relationship.r_id().to_owned())
+                .collect();
+            for relationship_id in relationship_ids {
+                opc.rels_mut().remove(&relationship_id);
+            }
+            opc.remove_part(&part);
+        }
         Ok(Package::from_opc_package(opc)?)
     }
 
@@ -534,11 +555,21 @@ mod tests {
         let package = package_with_opaque_core()?;
         let original = package.clone().to_bytes()?;
         let original_core = core_bytes(&package);
+        let original_app = app_bytes(&package);
         let mut edit = package.edit_metadata();
+        let app = edit.app_props()?;
+        edit.set_app_props(app);
         edit.update(|props| props.title = Some("Opaque core target".to_owned()));
         let (next, patch) = edit.commit()?.into_parts();
-        assert!(patch.core.is_some());
+        assert!(
+            patch
+                .whole
+                .changes()
+                .iter()
+                .any(|change| change.family() == families::Family::Core)
+        );
         assert_ne!(core_bytes(&next), original_core);
+        assert_eq!(app_bytes(&next), original_app);
 
         let reopened_source = Package::from_bytes(&package.to_bytes()?)?;
         let replayed = reopened_source.apply_metadata(&patch)?.into_package();
@@ -550,6 +581,62 @@ mod tests {
             .apply_metadata(&patch.inverse())?
             .into_package();
         assert_eq!(core_bytes(&restored), original_core);
+        assert_eq!(restored.to_bytes()?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn absent_property_parts_combined_create_replay_and_inverse() -> Result<()> {
+        let package = package_without_property_parts()?;
+        assert!(package.metadata().is_none());
+        assert!(package.app_props()?.is_none());
+        assert!(package.custom_props().is_empty());
+        let original = package.clone().to_bytes()?;
+
+        let mut edit = package.edit_metadata();
+        edit.set(Metadata::default());
+        let mut app = app::Props::default();
+        app.company = Some("Acme".to_owned());
+        edit.set_app_props(Some(app));
+        let mut custom = CustomProps::new();
+        custom
+            .insert("Reviewed", litchi_ooxml_common::custom::Value::Bool(true))
+            .map_err(families::Error::from)?;
+        edit.set_custom_props(custom);
+        let (next, patch) = edit.commit()?.into_parts();
+        let next_bytes = next.clone().to_bytes()?;
+        assert!(
+            patch
+                .whole
+                .changes()
+                .iter()
+                .any(|change| { change.family() == families::Family::Core })
+        );
+        assert!(
+            patch
+                .parts()
+                .changes()
+                .iter()
+                .all(|change| change.family() != families::Family::Core)
+        );
+        assert_eq!(next.metadata(), Some(&Metadata::default()));
+        assert_eq!(
+            next.app_props()?.and_then(|props| props.company),
+            Some("Acme".to_owned())
+        );
+        assert_eq!(
+            next.custom_props().get("Reviewed"),
+            Some(&litchi_ooxml_common::custom::Value::Bool(true))
+        );
+
+        let reopened_source = Package::from_bytes(&original)?;
+        let replayed = reopened_source.apply_metadata(&patch)?.into_package();
+        assert_eq!(replayed.to_bytes()?, next_bytes);
+
+        let reopened_target = Package::from_bytes(&next_bytes)?;
+        let restored = reopened_target
+            .apply_metadata(&patch.inverse())?
+            .into_package();
         assert_eq!(restored.to_bytes()?, original);
         Ok(())
     }
@@ -598,7 +685,13 @@ mod tests {
         assert!(commit.diagnostics().changed());
         assert!(!commit.patch().is_noop());
         let (next, patch) = commit.into_parts();
-        assert!(patch.core.is_some());
+        assert!(
+            patch
+                .whole
+                .changes()
+                .iter()
+                .any(|change| change.family() == families::Family::Core)
+        );
         let app = next.app_props()?.unwrap_or_default();
         assert_eq!(app.company.as_deref(), Some("Acme"));
         assert_eq!(app.manager.as_deref(), Some("Dana"));
