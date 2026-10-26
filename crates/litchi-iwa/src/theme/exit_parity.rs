@@ -196,3 +196,48 @@ fn theme_reads_equal_the_host_on_every_fixture() {
     eprintln!("theme parity: {wrapped} Pages/Numbers themes, {keynote} Keynote themes");
     assert!(wrapped > 0 && keynote > 0, "{wrapped} {keynote}");
 }
+
+fn wrapped_themes() -> Vec<Vec<u8>> {
+    fixtures()
+        .iter()
+        .flat_map(|path| themes(path))
+        .filter(|(message_type, _)| *message_type != KEYNOTE_THEME)
+        .map(|(_, data)| data)
+        .collect()
+}
+
+#[inline(never)]
+fn host_theme_route(themes: &[Vec<u8>]) -> usize {
+    themes
+        .iter()
+        .map(|data| {
+            let theme = IWorkThemeArchive::decode(data).unwrap();
+            usize::from(theme.base.theme_identifier.is_some())
+        })
+        .sum()
+}
+
+#[inline(never)]
+fn leaf_theme_route(themes: &[Vec<u8>]) -> usize {
+    themes
+        .iter()
+        .map(|data| {
+            let theme =
+                leaf::decode_theme_archive(data, leaf::DecodeOptions::for_source(data)).unwrap();
+            usize::from(theme.theme_identifier().is_some())
+        })
+        .sum()
+}
+
+/// Paired cost probe for record 0368 (callgrind `--toggle-collect` on
+/// `host_theme_route`/`leaf_theme_route`), ABBA.
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn theme_decode_cost_abba() {
+    let themes = wrapped_themes();
+    let a1 = host_theme_route(&themes);
+    let b1 = leaf_theme_route(&themes);
+    let b2 = leaf_theme_route(&themes);
+    let a2 = host_theme_route(&themes);
+    assert_eq!((a1, a2), (b1, b2));
+}

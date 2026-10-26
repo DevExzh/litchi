@@ -190,3 +190,50 @@ fn drawable_and_attachment_reads_equal_the_host_on_every_fixture() {
     eprintln!("drawable parity: {drawables} drawables, {attachments} number attachments");
     assert!(drawables > 0, "{drawables}");
 }
+
+fn drawable_payloads() -> Vec<Vec<u8>> {
+    fixtures()
+        .iter()
+        .flat_map(|path| messages(path, &[SHAPE, IMAGE]))
+        .filter_map(|(_, data)| drawable_payload(&data))
+        .collect()
+}
+
+#[inline(never)]
+fn host_drawable_route(payloads: &[Vec<u8>]) -> usize {
+    payloads
+        .iter()
+        .map(|payload| {
+            let drawable = tsd::DrawableArchive::decode(payload.as_slice()).unwrap();
+            usize::from(drawable.geometry.is_some())
+        })
+        .sum()
+}
+
+#[inline(never)]
+fn leaf_drawable_route(payloads: &[Vec<u8>]) -> usize {
+    payloads
+        .iter()
+        .map(|payload| {
+            let drawable = leaf_shape::decode_drawable_archive(
+                payload,
+                leaf_shape::DecodeOptions::for_source(payload),
+            )
+            .unwrap();
+            usize::from(drawable.geometry().is_some())
+        })
+        .sum()
+}
+
+/// Paired cost probe for record 0368 (callgrind `--toggle-collect` on
+/// `host_drawable_route`/`leaf_drawable_route`), ABBA.
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn drawable_decode_cost_abba() {
+    let payloads = drawable_payloads();
+    let a1 = host_drawable_route(&payloads);
+    let b1 = leaf_drawable_route(&payloads);
+    let b2 = leaf_drawable_route(&payloads);
+    let a2 = host_drawable_route(&payloads);
+    assert_eq!((a1, a2), (b1, b2));
+}
