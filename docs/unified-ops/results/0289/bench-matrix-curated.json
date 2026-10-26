@@ -3286,6 +3286,10 @@
   {
    "record": "0366",
    "reason": "Final API inventory and OfficeCLI corpus census only. The evidence is the rustdoc manifest, the debt inventory and its dispositions; no leaf-versus-unified timing or allocation measurement."
+  },
+  {
+   "record": "0367",
+   "reason": "Substrate constructor and retained-header return (0361fda) and W0-A owner routes: callgrind instruction counts, allocation counts and tolerant (unqualified) ABBA of raw IWA constructors against baseline ddf2ac8ae2 and of the 0361fd owner probe against trunk. These are substrate micro-routes, not leaf-versus-unified rows."
   }
  ]
 }
