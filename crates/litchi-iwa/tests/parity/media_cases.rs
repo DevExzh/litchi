@@ -1,12 +1,13 @@
 //! Shared media asset discovery (wave W1-E, record 0375): the host's
 //! `MediaManager` reads against the archive-free
 //! `litchi_iwa_common::media::Catalog` fed with the package members of the
-//! leaf `SourceCatalog`, on native-saved fixtures of the three formats.
+//! leaf physical package catalog, on native-saved fixtures of the three formats.
 
 use std::path::PathBuf;
 
 use litchi_iwa::media::MediaManager;
-use litchi_iwa_archive::{Limits as ArchiveLimits, SourceCatalog};
+use litchi_iwa_archive::Limits as ArchiveLimits;
+use litchi_iwa_archive::package::Catalog as PackageCatalog;
 use litchi_iwa_common::media::{Asset, Catalog, Type, asset::Limits};
 
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
@@ -16,11 +17,11 @@ use crate::leaf_bytes;
 /// image/video/audio predicates.
 type Row = (PathBuf, Type, u64, String, [bool; 3]);
 
-/// The engine catalog of a package.
+/// The engine catalog of a package: the ZIP member table of the leaf
+/// physical catalog (no IWA component is parsed) fed to the common catalog.
 fn engine_catalog(bytes: &[u8]) -> TestResult<Catalog> {
-    let catalog = SourceCatalog::from_bytes(bytes, ArchiveLimits::default())?;
+    let catalog = PackageCatalog::from_bytes(bytes, ArchiveLimits::default())?;
     let members: Vec<(String, u64)> = catalog
-        .package()
         .iter()
         .map(|entry| Ok((entry.name().to_owned(), u64::try_from(entry.data().len())?)))
         .collect::<TestResult<_>>()?;
@@ -169,4 +170,38 @@ fn numbers_media_catalog_parity() -> TestResult {
         Tier::A,
         Evidence::Queued,
     )
+}
+
+#[inline(never)]
+fn host_media_route(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!("{:?}{}", host_rows(bytes)?, host_queries(bytes)?))
+}
+
+#[inline(never)]
+fn leaf_media_route(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:?}{}",
+        engine_rows(bytes)?,
+        engine_queries(bytes)?
+    ))
+}
+
+/// ABBA cost probe of the media catalog read (open + list + queries, record
+/// 0375 §5); toggle `*media_cases::host_media_route*` or
+/// `*media_cases::leaf_media_route*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn media_catalog_cost_abba() -> TestResult {
+    for path in [
+        "iwork/keynote/slide-movie-geometry-source-native.key",
+        "iwork/pages/image-adjustments-native.pages",
+        "iwork/numbers/table-relocation-native.numbers",
+    ] {
+        let input = fixture(path)?;
+        std::hint::black_box(host_media_route(&input.bytes)?);
+        std::hint::black_box(leaf_media_route(&input.bytes)?);
+        std::hint::black_box(leaf_media_route(&input.bytes)?);
+        std::hint::black_box(host_media_route(&input.bytes)?);
+    }
+    Ok(())
 }
