@@ -49,6 +49,24 @@ pub mod properties {
     };
 }
 
+/// Exact-source paragraph-list transactions for the text a sheet text box
+/// or shape owns: [`crate::Package::edit_sheet_text_box_lists`].
+pub mod list {
+    pub use crate::package::sheet_drawable_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+
 /// Exact-source text-language transactions for the storage a sheet text
 /// box or shape owns: [`crate::Package::edit_sheet_drawable_text_languages`].
 pub mod language {
