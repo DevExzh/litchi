@@ -1229,7 +1229,20 @@ class EditTests(WriteAssertions):
 
     def test_protected_files_refuse(self):
         signed = L.open(fixture(SIGNED_DOCX))
-        error = raised(lambda: signed.edit(lambda tx: None))
+        before = signed.to_bytes()
+        noop = signed.edit(lambda tx: None)
+        self.assertFalse(noop.changed)
+        self.assertEqual(noop.operations, 0)
+        self.assertTrue(noop.patch.is_noop())
+        self.assertEqual(noop.file.to_bytes(), before)
+        self.assertTrue(noop.file.signed)
+        replayed = noop.patch.apply(signed)
+        self.assertTrue(replayed.signed)
+        self.assertEqual(replayed.to_bytes(), before)
+
+        error = raised(
+            lambda: signed.edit(lambda tx: tx.set("/body/p[1]", {"text": "changed"}))
+        )
         self.assertError(error, L.ProtectedError, "document_protected", SIGNED_SUGGESTION)
         for relative in LOCKED:
             with self.subTest(fixture=relative):

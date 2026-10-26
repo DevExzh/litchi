@@ -6408,3 +6408,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   leaf is the only active unmerged unified branch. All 29 native groups,
   actual final-candidate rebinding and final all-65 remain required.
   Nothing is pushed.
+
+  The Python signed-file failure is a stale individual no-op assertion
+  (165t). Root merges leaf 85126247dc after confirming the existing Rust
+  contract and two focused Python passes against the preserved row-38
+  extension. The corrected test asserts unchanged signed bytes and no-op
+  replay, then checks that a real mutation still refuses. Signed batches
+  retain immediate refusal. Production source is unchanged; the complete
+  Python row remains part of the fresh final gate. The twenty-check
+  diagnostic continues on its immutable 7c source. The merged test worktree
+  and ref are retired, reaching cumulative cleanup of 284 worktrees and
+  446 refs. The census is again 76 heads/65 worktrees; the DOCX native leaf
+  is the only active unmerged unified branch. Nothing is pushed.
