@@ -618,3 +618,114 @@ fn media_assets_read_cost_abba() -> TestResult {
         |source| Ok(format!("{:?}", leaf_assets(source)?).into_bytes()),
     )
 }
+
+type MediaFacts = (
+    &'static str,
+    u32,
+    u64,
+    Option<u64>,
+    Option<u64>,
+    Option<(u32, u32)>,
+    Option<(u32, u32)>,
+);
+
+fn bits(size: Option<(f32, f32)>) -> Option<(u32, u32)> {
+    size.map(|(width, height)| (width.to_bits(), height.to_bits()))
+}
+
+fn host_media_facts(bytes: &[u8]) -> TestResult<Vec<MediaFacts>> {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    let mut facts = Vec::new();
+    for image in editor.body_images()? {
+        facts.push((
+            "image",
+            image.anchor_character_index,
+            raw_id(image.image_data_identifier),
+            image.thumbnail_data_identifier.map(raw_id),
+            None,
+            bits(image.original_size.map(|size| (size.width, size.height))),
+            bits(image.natural_size.map(|size| (size.width, size.height))),
+        ));
+    }
+    for movie in editor.body_movies()? {
+        facts.push((
+            "movie",
+            movie.anchor_character_index,
+            raw_id(movie.movie_data_identifier),
+            None,
+            Some(raw_id(movie.poster_image_data_identifier)),
+            bits(movie.original_size.map(|size| (size.width, size.height))),
+            bits(movie.natural_size.map(|size| (size.width, size.height))),
+        ));
+    }
+    for audio in editor.body_audio()? {
+        facts.push((
+            "audio",
+            audio.anchor_character_index,
+            raw_id(audio.audio_data_identifier),
+            None,
+            None,
+            None,
+            None,
+        ));
+    }
+    Ok(facts)
+}
+
+fn leaf_media_facts(bytes: &[u8]) -> TestResult<Vec<MediaFacts>> {
+    Ok(Package::from_bytes(bytes)?
+        .body_media()?
+        .into_iter()
+        .map(|media| {
+            (
+                match media.selector() {
+                    DrawableSelector::Image(_) => "image",
+                    DrawableSelector::Movie(_) => "movie",
+                    _ => "audio",
+                },
+                media.anchor().utf16_index(),
+                media.data().get(),
+                media.thumbnail().map(|asset| asset.get()),
+                media.poster().map(|asset| asset.get()),
+                bits(media.original_size().map(|size| (size.width, size.height))),
+                bits(media.natural_size().map(|size| (size.width, size.height))),
+            )
+        })
+        .collect())
+}
+
+/// `body_images`, `body_movies` and `body_audio` against `body_media`.
+#[test]
+fn pages_body_media_read_parity() -> TestResult {
+    let input = fixture(IMAGES)?;
+    Case::new(
+        "pages_body_media_read_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host body media", host_media_facts)
+    .read("leaf body_media", leaf_media_facts)
+    .run()?;
+    for document in [
+        fixture(IMAGES)?,
+        fixture(crate::pages_drawable_cases::AUDIO)?,
+        image_fixture()?,
+        movie_fixture()?,
+        audio_fixture()?,
+    ] {
+        let host = host_media_facts(&document.bytes)?;
+        assert!(!host.is_empty(), "{}", document.path);
+        assert_eq!(
+            host,
+            leaf_media_facts(&document.bytes)?,
+            "{}",
+            document.path
+        );
+    }
+    Ok(())
+}

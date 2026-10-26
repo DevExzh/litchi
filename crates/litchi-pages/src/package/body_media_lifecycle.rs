@@ -495,7 +495,95 @@ impl Commit {
     }
 }
 
+/// One body image, movie or audio clip as the media lifecycle sees it:
+/// where it is anchored and which embedded assets it shows. Its frame,
+/// properties and playback are read through
+/// [`Package::body_drawable_properties`] with [`Media::selector`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Media {
+    selector: DrawableSelector,
+    anchor: TextPosition,
+    data: AssetId,
+    thumbnail: Option<AssetId>,
+    poster: Option<AssetId>,
+    original_size: Option<crate::drawable::Size>,
+    natural_size: Option<crate::drawable::Size>,
+}
+
+impl Media {
+    /// The selector of this drawable (kind and text-flow position).
+    #[must_use]
+    pub const fn selector(&self) -> DrawableSelector {
+        self.selector
+    }
+
+    /// The UTF-16 body position of the anchoring U+FFFC.
+    #[must_use]
+    pub const fn anchor(&self) -> TextPosition {
+        self.anchor
+    }
+
+    /// The image, movie or audio data asset.
+    #[must_use]
+    pub const fn data(&self) -> AssetId {
+        self.data
+    }
+
+    /// An image's thumbnail asset.
+    #[must_use]
+    pub const fn thumbnail(&self) -> Option<AssetId> {
+        self.thumbnail
+    }
+
+    /// A movie's poster image asset.
+    #[must_use]
+    pub const fn poster(&self) -> Option<AssetId> {
+        self.poster
+    }
+
+    /// The size the media was imported at (images and movies).
+    #[must_use]
+    pub const fn original_size(&self) -> Option<crate::drawable::Size> {
+        self.original_size
+    }
+
+    /// The media's intrinsic size (images and movies).
+    #[must_use]
+    pub const fn natural_size(&self) -> Option<crate::drawable::Size> {
+        self.natural_size
+    }
+}
+
 impl Package {
+    /// The body's images, movies and audio clips: images first, then movies,
+    /// then audio clips, each in text-flow order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidSource`] for an invalid body graph.
+    pub fn body_media(&self) -> Result<Vec<Media>, Error> {
+        let mut budget = Budget::new(self)?;
+        let index = ObjectIndex::new(self, &mut budget)?;
+        let body = graph::resolve_body(&index, &mut budget)?;
+        let mut media = Vec::new();
+        let kinds: [fn(usize) -> DrawableSelector; 3] = [
+            DrawableSelector::image,
+            DrawableSelector::movie,
+            DrawableSelector::audio,
+        ];
+        for kind in kinds {
+            for position in 0.. {
+                let selector = kind(position);
+                let Some(selected) = graph::select_drawable(&index, &body, selector, &mut budget)?
+                else {
+                    break;
+                };
+                media.push(media_facts(selector, &selected, &mut budget)?);
+            }
+        }
+        Ok(media)
+    }
+
     /// The embedded media assets reachable from the document's object graph
     /// (the host's `media_assets`), ordered by identifier.
     ///
@@ -1849,4 +1937,94 @@ fn media_assets(package: &Package, root: u64) -> Result<Vec<Embedded>, Error> {
         .into_iter()
         .filter(|asset| live.contains(&asset.data().get()))
         .collect())
+}
+
+const IMAGE_THUMBNAIL_FIELD: u32 = 12;
+const IMAGE_ORIGINAL_SIZE_FIELD: u32 = 4;
+const IMAGE_NATURAL_SIZE_FIELD: u32 = 9;
+const MOVIE_ORIGINAL_SIZE_FIELD: u32 = 20;
+const MOVIE_NATURAL_SIZE_FIELD: u32 = 21;
+
+fn data_reference(
+    view: &litchi_iwa_common::wire::WireView<'_>,
+    field: u32,
+    budget: &mut Budget,
+) -> Result<Option<AssetId>, Error> {
+    let Some(reference) = graph::unique_field(view, field, 2)? else {
+        return Ok(None);
+    };
+    let reference = budget.parse(reference.payload(), 2)?;
+    let identifier = graph::unique_field(&reference, 1, 0)?.ok_or(Error::InvalidSource)?;
+    AssetId::new(graph::canonical_varint(identifier.payload())?)
+        .map(Some)
+        .map_err(|_| Error::InvalidSource)
+}
+
+fn size_field(
+    view: &litchi_iwa_common::wire::WireView<'_>,
+    field: u32,
+    budget: &mut Budget,
+) -> Result<Option<crate::drawable::Size>, Error> {
+    let Some(size) = graph::unique_field(view, field, 2)? else {
+        return Ok(None);
+    };
+    let size = budget.parse(size.payload(), 2)?;
+    let float = |number| -> Result<f32, Error> {
+        let field = graph::unique_field(&size, number, 5)?.ok_or(Error::InvalidSource)?;
+        let bytes: [u8; 4] = field
+            .payload()
+            .try_into()
+            .map_err(|_| Error::InvalidSource)?;
+        Ok(f32::from_le_bytes(bytes))
+    };
+    Ok(Some(crate::drawable::Size {
+        width: float(1)?,
+        height: float(2)?,
+    }))
+}
+
+fn media_facts(
+    selector: DrawableSelector,
+    selected: &graph::Selected<'_>,
+    budget: &mut Budget,
+) -> Result<Media, Error> {
+    let view = budget.parse(selected.payload, 1)?;
+    let image = matches!(selector, DrawableSelector::Image(_));
+    let data_field = if image {
+        IMAGE_DATA_FIELD
+    } else {
+        MOVIE_DATA_FIELD
+    };
+    let (original, natural) = if image {
+        (IMAGE_ORIGINAL_SIZE_FIELD, IMAGE_NATURAL_SIZE_FIELD)
+    } else {
+        (MOVIE_ORIGINAL_SIZE_FIELD, MOVIE_NATURAL_SIZE_FIELD)
+    };
+    let audio = matches!(selector, DrawableSelector::Audio(_));
+    Ok(Media {
+        selector,
+        anchor: TextPosition::from_utf16_index(selected.anchor.character_index as usize)
+            .map_err(|_| Error::InvalidSource)?,
+        data: data_reference(&view, data_field, budget)?.ok_or(Error::InvalidSource)?,
+        thumbnail: if image {
+            data_reference(&view, IMAGE_THUMBNAIL_FIELD, budget)?
+        } else {
+            None
+        },
+        poster: if image || audio {
+            None
+        } else {
+            data_reference(&view, MOVIE_POSTER_FIELD, budget)?
+        },
+        original_size: if audio {
+            None
+        } else {
+            size_field(&view, original, budget)?
+        },
+        natural_size: if audio {
+            None
+        } else {
+            size_field(&view, natural, budget)?
+        },
+    })
 }
