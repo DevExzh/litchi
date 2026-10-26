@@ -6,7 +6,9 @@ timing code.  The baseline is the exact pre-migration commit; its only
 overlay is the reviewed consumer adapter and a separately hashed baseline
 lockfile.  The candidate is an already-integrated final-C worktree.  Its
 commit, tree, production closure, and three consumer files are supplied by a
-separate protocol-P-sealed identity; the preparer never writes to it.
+separate protocol-P1-sealed identity.  P1 is independently pinned and may
+have a later clean P2 binding installed on the protocol worktree; the
+preparer never writes to either source endpoint.
 """
 
 from __future__ import annotations
@@ -23,13 +25,12 @@ import tempfile
 from typing import Any, Mapping
 
 
-SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v3"
-IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v1"
+SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v4"
+IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v2"
+PROTOCOL_P_PIN_SCHEMA = "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1"
 CANDIDATE_MODE = "integrated_final_c"
 LANE = "odf-raw-codec"
 BASELINE_COMMIT = "70d64634c9d1d4328447d8724d3b076114a91fd0"
-PROTOCOL_P_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
-PROTOCOL_P_TREE = "656d66603b33aec273d529263aa10b504bd3b7f8"
 HISTORICAL_CANDIDATE = "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee"
 PROBE_PATH = Path("tools/perf-baseline/examples/odf_raw_codec_qualification.rs")
 CONSUMER_MANIFEST = Path("tools/perf-baseline/Cargo.toml")
@@ -232,7 +233,7 @@ def _file_identity(value: Any, label: str, expected_path: Path) -> dict[str, Any
 
 
 def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate the small identity envelope sealed by protocol P.
+    """Validate the small identity envelope sealed by protocol P1.
 
     The seal is deliberately a digest over the candidate object, not over the
     candidate worktree itself.  The preparer then re-measures every field
@@ -245,12 +246,13 @@ def validate_candidate_identity(value: Mapping[str, Any]) -> dict[str, Any]:
     if value.get("schema") != IDENTITY_SCHEMA:
         raise PreparationError("candidate identity schema differs")
     sealed_by = value.get("sealed_by")
-    if not isinstance(sealed_by, Mapping) or set(sealed_by) != {"role", "commit", "tree", "candidate_sha256"}:
+    if not isinstance(sealed_by, Mapping) or set(sealed_by) != {"role", "commit", "tree", "p1_pin_sha256", "candidate_sha256"}:
         raise PreparationError("candidate identity seal is incomplete")
-    if sealed_by.get("role") != "protocol-P":
-        raise PreparationError("candidate identity must be sealed by protocol P")
+    if sealed_by.get("role") != "protocol-P1":
+        raise PreparationError("candidate identity must be sealed by protocol P1")
     _require_sha(sealed_by.get("commit"), "candidate identity seal commit")
     _require_sha(sealed_by.get("tree"), "candidate identity seal tree")
+    _require_hash(sealed_by.get("p1_pin_sha256"), "candidate identity P1 pin digest")
     sealed_digest = _require_hash(sealed_by.get("candidate_sha256"), "candidate identity seal digest")
     candidate = value.get("candidate")
     if not isinstance(candidate, Mapping) or set(candidate) != {
@@ -305,6 +307,42 @@ def _load_candidate_identity(path: Path, roots: tuple[Path, ...]) -> tuple[dict[
     return identity, hashlib.sha256(raw).hexdigest(), len(raw), path
 
 
+def _load_protocol_p_pin(path: Path, protocol_p_root: Path, roots: tuple[Path, ...]) -> tuple[dict[str, Any], str, int, Path]:
+    path = _resolve(path)
+    if any(_under(path, root) or path == root for root in roots):
+        raise PreparationError("protocol-P1 pin must be outside every source endpoint")
+    if path.is_symlink() or not path.is_file():
+        raise PreparationError(f"protocol-P1 pin must be a regular file: {path}")
+    try:
+        raw = path.read_bytes()
+        value = json.loads(raw)
+    except (OSError, json.JSONDecodeError) as error:
+        raise PreparationError(f"cannot read protocol-P1 pin: {error}") from error
+    if not isinstance(value, Mapping) or set(value) != {"schema", "root", "source_candidate", "p1"}:
+        raise PreparationError("protocol-P1 pin envelope has unexpected fields")
+    if value.get("schema") != PROTOCOL_P_PIN_SCHEMA or value.get("root") != str(protocol_p_root):
+        raise PreparationError("protocol-P1 pin schema or root differs")
+    source_candidate = value.get("source_candidate")
+    p1 = value.get("p1")
+    if not isinstance(source_candidate, Mapping) or set(source_candidate) != {"commit", "tree"}:
+        raise PreparationError("protocol-P1 source candidate pin is incomplete")
+    if not isinstance(p1, Mapping) or set(p1) != {"commit", "tree"}:
+        raise PreparationError("protocol-P1 object pin is incomplete")
+    normalized = {
+        "schema": PROTOCOL_P_PIN_SCHEMA,
+        "root": str(protocol_p_root),
+        "source_candidate": {
+            "commit": _require_sha(source_candidate.get("commit"), "protocol-P1 source candidate commit"),
+            "tree": _require_sha(source_candidate.get("tree"), "protocol-P1 source candidate tree"),
+        },
+        "p1": {
+            "commit": _require_sha(p1.get("commit"), "protocol-P1 commit"),
+            "tree": _require_sha(p1.get("tree"), "protocol-P1 tree"),
+        },
+    }
+    return normalized, hashlib.sha256(raw).hexdigest(), len(raw), path
+
+
 def _require_tracked_regular(root: Path, relative: Path, label: str) -> Path:
     path = _resolve(relative, base=root)
     if path.is_symlink() or not path.is_file():
@@ -315,30 +353,60 @@ def _require_tracked_regular(root: Path, relative: Path, label: str) -> Path:
     return path
 
 
-def _verify_protocol_p_anchor(protocol_p_root: Path, sealed_by: Mapping[str, Any], candidate_commit: str) -> dict[str, str]:
+def _verify_protocol_p_pin(protocol_p_root: Path, pin: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, str]:
     protocol_p_root = _resolve(protocol_p_root)
     top = _resolve(_git(protocol_p_root, "rev-parse", "--show-toplevel").strip())
     if top != protocol_p_root:
-        raise PreparationError("protocol-P anchor is not a worktree top-level")
-    p_commit = _require_sha(sealed_by.get("commit"), "candidate identity seal commit")
-    p_tree = _require_sha(sealed_by.get("tree"), "candidate identity seal tree")
-    if p_commit != PROTOCOL_P_COMMIT or p_tree != PROTOCOL_P_TREE:
-        raise PreparationError("candidate identity seal is not the independently pinned protocol-P object")
-    _git(protocol_p_root, "cat-file", "-e", f"{p_commit}^{{commit}}")
-    actual_tree = _git(protocol_p_root, "rev-parse", f"{p_commit}^{{tree}}").strip()
-    if actual_tree != p_tree:
-        raise PreparationError("protocol-P commit tree differs from the pinned trust anchor")
+        raise PreparationError("protocol-P1 pin root is not a worktree top-level")
+    if pin.get("root") != str(protocol_p_root):
+        raise PreparationError("protocol-P1 pin root differs from the selected endpoint")
+    source_candidate = pin["source_candidate"]
+    p1 = pin["p1"]
+    candidate_commit = _require_sha(candidate.get("commit"), "candidate identity candidate commit")
+    candidate_tree = _require_sha(candidate.get("tree"), "candidate identity candidate tree")
+    if source_candidate["commit"] != candidate_commit or source_candidate["tree"] != candidate_tree:
+        raise PreparationError("protocol-P1 pin source candidate differs from the sealed final-C identity")
+    p1_commit = _require_sha(p1["commit"], "protocol-P1 commit")
+    p1_tree = _require_sha(p1["tree"], "protocol-P1 tree")
+    _git(protocol_p_root, "cat-file", "-e", f"{p1_commit}^{{commit}}")
+    actual_p1_tree = _git(protocol_p_root, "rev-parse", f"{p1_commit}^{{tree}}").strip()
+    if actual_p1_tree != p1_tree:
+        raise PreparationError("protocol-P1 commit tree differs from the supplied pin")
     _git(protocol_p_root, "cat-file", "-e", f"{candidate_commit}^{{commit}}")
+    actual_candidate_tree = _git(protocol_p_root, "rev-parse", f"{candidate_commit}^{{tree}}").strip()
+    if actual_candidate_tree != candidate_tree:
+        raise PreparationError("protocol-P1 source candidate tree differs from the sealed identity")
     ancestry = subprocess.run(
-        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", p_commit, candidate_commit],
+        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", candidate_commit, p1_commit],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     if ancestry.returncode != 0:
-        raise PreparationError("protocol-P trust anchor is not an ancestor of the sealed candidate commit")
-    return {"root": str(protocol_p_root), "commit": p_commit, "tree": p_tree, "candidate_commit": candidate_commit}
+        raise PreparationError("protocol-P1 is not derived from the frozen final-C candidate")
+    current_commit = _require_sha(_git(protocol_p_root, "rev-parse", "HEAD").strip(), "current protocol-P commit")
+    current_tree = _require_sha(_git(protocol_p_root, "rev-parse", "HEAD^{tree}").strip(), "current protocol-P tree")
+    current_ancestry = subprocess.run(
+        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", p1_commit, current_commit],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if current_ancestry.returncode != 0:
+        raise PreparationError("current protocol-P endpoint is not P1 or a descendant P2")
+    if _git(protocol_p_root, "status", "--porcelain=v1", "--untracked-files=all"):
+        raise PreparationError("protocol-P endpoint must be clean and pinned")
+    return {
+        "root": str(protocol_p_root),
+        "p1_commit": p1_commit,
+        "p1_tree": p1_tree,
+        "source_candidate_commit": candidate_commit,
+        "source_candidate_tree": candidate_tree,
+        "current_commit": current_commit,
+        "current_tree": current_tree,
+    }
 
 
 def prepare(
@@ -347,6 +415,7 @@ def prepare(
     candidate_root: Path,
     adapter_root: Path,
     protocol_p_root: Path,
+    protocol_p_pin_path: Path,
     candidate_identity_path: Path,
     baseline_lock: Path,
     output: Path,
@@ -355,13 +424,20 @@ def prepare(
     candidate_root = _resolve(candidate_root)
     adapter_root = _resolve(adapter_root)
     protocol_p_root = _resolve(protocol_p_root)
+    protocol_p_pin, protocol_p_pin_sha256, protocol_p_pin_bytes, protocol_p_pin_path = _load_protocol_p_pin(
+        protocol_p_pin_path,
+        protocol_p_root,
+        (baseline_root, candidate_root, adapter_root, protocol_p_root),
+    )
     output = _external_output(output, (baseline_root, candidate_root, adapter_root, protocol_p_root))
     identity, identity_sha256, identity_bytes, identity_path = _load_candidate_identity(
         candidate_identity_path,
         (baseline_root, candidate_root, adapter_root, protocol_p_root),
     )
     candidate_identity = identity["candidate"]
-    protocol_p_anchor = _verify_protocol_p_anchor(protocol_p_root, identity["sealed_by"], candidate_identity["commit"])
+    if identity["sealed_by"]["p1_pin_sha256"] != protocol_p_pin_sha256:
+        raise PreparationError("candidate identity is sealed against a different protocol-P1 pin")
+    protocol_p_anchor = _verify_protocol_p_pin(protocol_p_root, protocol_p_pin, candidate_identity)
     baseline = _source_state(baseline_root)
     candidate = _source_state(candidate_root)
     adapter = _source_state(adapter_root)
@@ -511,6 +587,12 @@ def prepare(
             "bytes": identity_bytes,
             "value": identity,
         },
+        "protocol_p_pin": {
+            "path": str(protocol_p_pin_path),
+            "sha256": protocol_p_pin_sha256,
+            "bytes": protocol_p_pin_bytes,
+            "value": protocol_p_pin,
+        },
         "protocol_p_anchor": protocol_p_anchor,
         "claim_scope": "source preparation identity only; no native acceptance claim; no build or timing claim",
     }
@@ -524,6 +606,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--adapter-root", type=Path, required=True)
     parser.add_argument("--protocol-p-root", type=Path, required=True)
+    parser.add_argument("--protocol-p-pin", type=Path, required=True)
     parser.add_argument("--candidate-identity", type=Path, required=True)
     parser.add_argument("--baseline-lock", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -534,6 +617,7 @@ def main(argv: list[str] | None = None) -> int:
             candidate_root=args.candidate_root,
             adapter_root=args.adapter_root,
             protocol_p_root=args.protocol_p_root,
+            protocol_p_pin_path=args.protocol_p_pin,
             candidate_identity_path=args.candidate_identity,
             baseline_lock=args.baseline_lock,
             output=args.output,

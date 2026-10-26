@@ -9,8 +9,9 @@ artifacts (baseline/candidate × normal/allocator).  The ABBA phase consumes
 only those hashed artifacts and runs the ten raw-codec routes in the exact
 baseline, candidate, candidate, baseline order.  Receipts are protocol
 evidence only and make no acceptance claim.  Final-C identity is admitted
-from a separate protocol-P-sealed identity envelope; this runner never takes
-a free-standing candidate commit or lock argument.
+from a separate protocol-P1-sealed identity envelope and an independently
+supplied P1 pin; this runner never takes a free-standing candidate commit or
+lock argument.
 """
 
 from __future__ import annotations
@@ -41,11 +42,10 @@ from native_qualification import odf_shared_triad_paired_runner as reviewed  # n
 
 
 SCHEMA = "litchi.odf.raw-codec-qualification.paired-runner.v2"
-PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v3"
-IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v1"
+PREPARATION_SCHEMA = "litchi.odf.raw-codec-qualification.preparation.v4"
+IDENTITY_SCHEMA = "litchi.odf.raw-codec-qualification.candidate-identity.v2"
+PROTOCOL_P_PIN_SCHEMA = "litchi.odf.raw-codec-qualification.protocol-p1-pin.v1"
 CANDIDATE_MODE = "integrated_final_c"
-PROTOCOL_P_COMMIT = "33a0a63d3553712c1276da592f7846a0c7dcabd6"
-PROTOCOL_P_TREE = "656d66603b33aec273d529263aa10b504bd3b7f8"
 ROLES = ("baseline", "candidate")
 VARIANTS = ("normal", "allocator")
 ABBA_ORDER = ("baseline", "candidate", "candidate", "baseline")
@@ -297,12 +297,13 @@ def _validate_candidate_identity(data: Mapping[str, Any], manifest: Mapping[str,
     if data.get("schema") != IDENTITY_SCHEMA or data.get("schema") != manifest["source"]["candidate_identity_schema"]:
         raise RunnerError("candidate identity schema differs")
     sealed_by = data.get("sealed_by")
-    if not isinstance(sealed_by, Mapping) or set(sealed_by) != {"role", "commit", "tree", "candidate_sha256"}:
+    if not isinstance(sealed_by, Mapping) or set(sealed_by) != {"role", "commit", "tree", "p1_pin_sha256", "candidate_sha256"}:
         raise RunnerError("candidate identity seal is incomplete")
-    if sealed_by.get("role") != "protocol-P":
-        raise RunnerError("candidate identity must be sealed by protocol P")
+    if sealed_by.get("role") != "protocol-P1":
+        raise RunnerError("candidate identity must be sealed by protocol P1")
     _require_sha(sealed_by.get("commit"), "candidate identity seal commit", 40)
     _require_sha(sealed_by.get("tree"), "candidate identity seal tree", 40)
+    _require_sha(sealed_by.get("p1_pin_sha256"), "candidate identity P1 pin digest", 64)
     seal = _require_sha(sealed_by.get("candidate_sha256"), "candidate identity seal digest", 64)
     candidate = data.get("candidate")
     required = {"mode", "commit", "tree", "production_source_tree_sha256", "consumer_manifest", "probe", "perf_lock"}
@@ -348,33 +349,93 @@ def _load_candidate_identity(path: Path, *, manifest: Mapping[str, Any], roots: 
     return identity, digest, size, path
 
 
-def _verify_protocol_p_anchor(protocol_p_root: Path, sealed_by: Mapping[str, Any], candidate_commit: str) -> dict[str, str]:
+def _load_protocol_p_pin(path: Path, *, protocol_p_root: Path, roots: tuple[Path, ...]) -> tuple[dict[str, Any], str, int, Path]:
+    path = _resolve(path)
+    if any(path == root or _under(path, root) for root in roots):
+        raise RunnerError("protocol-P1 pin must be outside every source endpoint")
+    data, digest, size = _load_json(path, "protocol-P1 pin")
+    if set(data) != {"schema", "root", "source_candidate", "p1"}:
+        raise RunnerError("protocol-P1 pin envelope has unexpected fields")
+    if data.get("schema") != PROTOCOL_P_PIN_SCHEMA or data.get("root") != str(protocol_p_root):
+        raise RunnerError("protocol-P1 pin schema or root differs")
+    source_candidate = data.get("source_candidate")
+    p1 = data.get("p1")
+    if not isinstance(source_candidate, Mapping) or set(source_candidate) != {"commit", "tree"}:
+        raise RunnerError("protocol-P1 source candidate pin is incomplete")
+    if not isinstance(p1, Mapping) or set(p1) != {"commit", "tree"}:
+        raise RunnerError("protocol-P1 object pin is incomplete")
+    normalized = {
+        "schema": PROTOCOL_P_PIN_SCHEMA,
+        "root": str(protocol_p_root),
+        "source_candidate": {
+            "commit": _require_sha(source_candidate.get("commit"), "protocol-P1 source candidate commit", 40),
+            "tree": _require_sha(source_candidate.get("tree"), "protocol-P1 source candidate tree", 40),
+        },
+        "p1": {
+            "commit": _require_sha(p1.get("commit"), "protocol-P1 commit", 40),
+            "tree": _require_sha(p1.get("tree"), "protocol-P1 tree", 40),
+        },
+    }
+    return normalized, digest, size, path
+
+
+def _verify_protocol_p_pin(protocol_p_root: Path, pin: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, str]:
     protocol_p_root = _resolve(protocol_p_root)
     try:
         top = _resolve(_git(protocol_p_root, "rev-parse", "--show-toplevel").strip())
-        p_commit = _require_sha(sealed_by.get("commit"), "candidate identity seal commit", 40)
-        p_tree = _require_sha(sealed_by.get("tree"), "candidate identity seal tree", 40)
-        if p_commit != PROTOCOL_P_COMMIT or p_tree != PROTOCOL_P_TREE:
-            raise RunnerError("candidate identity seal is not the independently pinned protocol-P object")
         if top != protocol_p_root:
-            raise RunnerError("protocol-P anchor is not a worktree top-level")
-        _git(protocol_p_root, "cat-file", "-e", f"{p_commit}^{{commit}}")
-        actual_tree = _git(protocol_p_root, "rev-parse", f"{p_commit}^{{tree}}").strip()
-        if actual_tree != p_tree:
-            raise RunnerError("protocol-P commit tree differs from the pinned trust anchor")
+            raise RunnerError("protocol-P1 pin root is not a worktree top-level")
+        if pin.get("root") != str(protocol_p_root):
+            raise RunnerError("protocol-P1 pin root differs from the selected endpoint")
+        source_candidate = pin["source_candidate"]
+        p1 = pin["p1"]
+        candidate_commit = _require_sha(candidate.get("commit"), "candidate identity candidate commit", 40)
+        candidate_tree = _require_sha(candidate.get("tree"), "candidate identity candidate tree", 40)
+        if source_candidate["commit"] != candidate_commit or source_candidate["tree"] != candidate_tree:
+            raise RunnerError("protocol-P1 source candidate differs from the sealed final-C identity")
+        p1_commit = _require_sha(p1["commit"], "protocol-P1 commit", 40)
+        p1_tree = _require_sha(p1["tree"], "protocol-P1 tree", 40)
+        _git(protocol_p_root, "cat-file", "-e", f"{p1_commit}^{{commit}}")
+        actual_p1_tree = _git(protocol_p_root, "rev-parse", f"{p1_commit}^{{tree}}").strip()
+        if actual_p1_tree != p1_tree:
+            raise RunnerError("protocol-P1 commit tree differs from the supplied pin")
         _git(protocol_p_root, "cat-file", "-e", f"{candidate_commit}^{{commit}}")
+        actual_candidate_tree = _git(protocol_p_root, "rev-parse", f"{candidate_commit}^{{tree}}").strip()
+        if actual_candidate_tree != candidate_tree:
+            raise RunnerError("protocol-P1 source candidate tree differs from the sealed identity")
     except (reviewed.RunnerError, RunnerError) as error:
         raise RunnerError(str(error)) from error
     ancestry = subprocess.run(
-        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", p_commit, candidate_commit],
+        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", candidate_commit, p1_commit],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
     if ancestry.returncode != 0:
-        raise RunnerError("protocol-P trust anchor is not an ancestor of the sealed candidate commit")
-    return {"root": str(protocol_p_root), "commit": p_commit, "tree": p_tree, "candidate_commit": candidate_commit}
+        raise RunnerError("protocol-P1 is not derived from the frozen final-C candidate")
+    current_commit = _require_sha(_git(protocol_p_root, "rev-parse", "HEAD").strip(), "current protocol-P commit", 40)
+    current_tree = _require_sha(_git(protocol_p_root, "rev-parse", "HEAD^{tree}").strip(), "current protocol-P tree", 40)
+    current_ancestry = subprocess.run(
+        ["git", "-C", str(protocol_p_root), "merge-base", "--is-ancestor", p1_commit, current_commit],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if current_ancestry.returncode != 0:
+        raise RunnerError("current protocol-P endpoint is not P1 or a descendant P2")
+    if _git(protocol_p_root, "status", "--porcelain=v1", "--untracked-files=all"):
+        raise RunnerError("protocol-P endpoint must be clean and pinned")
+    return {
+        "root": str(protocol_p_root),
+        "p1_commit": p1_commit,
+        "p1_tree": p1_tree,
+        "source_candidate_commit": candidate_commit,
+        "source_candidate_tree": candidate_tree,
+        "current_commit": current_commit,
+        "current_tree": current_tree,
+    }
 
 
 def _require_sha(value: Any, label: str, length: int) -> str:
@@ -538,8 +599,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         "candidate_integrated_files": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
         "candidate_mode": CANDIDATE_MODE,
         "candidate_identity_schema": IDENTITY_SCHEMA,
-        "protocol_p_commit": PROTOCOL_P_COMMIT,
-        "protocol_p_tree": PROTOCOL_P_TREE,
+        "protocol_p_pin_schema": PROTOCOL_P_PIN_SCHEMA,
         "adapter_provenance_scope": "three consumer files only; production closure is not equated to final C",
     }
     for key, expected in expected_source.items():
@@ -639,6 +699,10 @@ def _validate_preparation(
     candidate_root: Path,
     adapter_root: Path,
     protocol_p_root: Path,
+    protocol_p_pin: Mapping[str, Any],
+    protocol_p_pin_path: Path,
+    protocol_p_pin_sha256: str,
+    protocol_p_pin_bytes: int,
     candidate_identity: Mapping[str, Any],
     candidate_identity_path: Path,
     candidate_identity_sha256: str,
@@ -651,8 +715,19 @@ def _validate_preparation(
     adapter = data.get("adapter")
     if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping) or not isinstance(adapter, Mapping):
         raise RunnerError("preparation endpoints are missing")
+    protocol_p_pin_record = data.get("protocol_p_pin")
+    expected_pin_record = {
+        "path": str(protocol_p_pin_path),
+        "sha256": protocol_p_pin_sha256,
+        "bytes": protocol_p_pin_bytes,
+        "value": protocol_p_pin,
+    }
+    if protocol_p_pin_record != expected_pin_record:
+        raise RunnerError("preparation protocol-P1 pin handoff differs")
+    if candidate_identity["sealed_by"]["p1_pin_sha256"] != protocol_p_pin_sha256:
+        raise RunnerError("candidate identity is sealed against a different protocol-P1 pin")
     protocol_p_anchor = data.get("protocol_p_anchor")
-    expected_p_anchor = _verify_protocol_p_anchor(protocol_p_root, candidate_identity["sealed_by"], candidate_identity["candidate"]["commit"])
+    expected_p_anchor = _verify_protocol_p_pin(protocol_p_root, protocol_p_pin, candidate_identity["candidate"])
     if protocol_p_anchor != expected_p_anchor:
         raise RunnerError("preparation protocol-P anchor handoff differs")
     identity_record = data.get("candidate_identity")
@@ -869,7 +944,7 @@ def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
 
 
 class PairedRunner:
-    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, protocol_p_root: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
+    def __init__(self, *, manifest_path: Path, preparation_path: Path, baseline_root: Path, candidate_root: Path, adapter_root: Path, protocol_p_root: Path, protocol_p_pin_path: Path, candidate_identity_path: Path, output: Path, target_root: Path, tmp_root: Path, cpu: int, phase: str) -> None:
         if phase not in {"build", "abba"}:
             raise RunnerError("phase must be build or abba")
         if not isinstance(cpu, int) or cpu < 0 or cpu >= (os.cpu_count() or 1):
@@ -881,19 +956,27 @@ class PairedRunner:
         self.candidate_root = _resolve(candidate_root)
         self.adapter_root = _resolve(adapter_root)
         self.protocol_p_root = _resolve(protocol_p_root)
+        self.protocol_p_pin_path = _resolve(protocol_p_pin_path)
         self.candidate_identity_path = _resolve(candidate_identity_path)
         self.output = _resolve(output)
         self.target_root = _resolve(target_root)
         self.tmp_root = _resolve(tmp_root)
         self.cpu = cpu
-        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "protocol_p": self.protocol_p_root, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
+        _disjoint({"baseline": self.baseline_root, "candidate": self.candidate_root, "adapter": self.adapter_root, "protocol_p": self.protocol_p_root, "protocol_p_pin": self.protocol_p_pin_path, "identity": self.candidate_identity_path, "preparation": self.preparation_path, "output": self.output, "target": self.target_root, "tmp": self.tmp_root})
         self.manifest, self.manifest_sha256, _ = _load_json(self.manifest_path, "manifest")
         self.manifest = validate_manifest(self.manifest)
+        self.protocol_p_pin, self.protocol_p_pin_sha256, self.protocol_p_pin_bytes, self.protocol_p_pin_path = _load_protocol_p_pin(
+            self.protocol_p_pin_path,
+            protocol_p_root=self.protocol_p_root,
+            roots=(self.baseline_root, self.candidate_root, self.adapter_root, self.protocol_p_root),
+        )
         self.candidate_identity, self.candidate_identity_sha256, self.candidate_identity_bytes, self.candidate_identity_path = _load_candidate_identity(self.candidate_identity_path, manifest=self.manifest, roots=(self.baseline_root, self.candidate_root, self.adapter_root, self.protocol_p_root))
-        self.protocol_p_anchor = _verify_protocol_p_anchor(self.protocol_p_root, self.candidate_identity["sealed_by"], self.candidate_identity["candidate"]["commit"])
+        if self.candidate_identity["sealed_by"]["p1_pin_sha256"] != self.protocol_p_pin_sha256:
+            raise RunnerError("candidate identity is sealed against a different protocol-P1 pin")
+        self.protocol_p_anchor = _verify_protocol_p_pin(self.protocol_p_root, self.protocol_p_pin, self.candidate_identity["candidate"])
         preparation, prep_sha, _ = _load_json(self.preparation_path, "preparation")
         self.preparation_sha256 = prep_sha
-        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, protocol_p_root=self.protocol_p_root, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
+        self.preparation = _validate_preparation(preparation, prep_sha, manifest=self.manifest, baseline_root=self.baseline_root, candidate_root=self.candidate_root, adapter_root=self.adapter_root, protocol_p_root=self.protocol_p_root, protocol_p_pin=self.protocol_p_pin, protocol_p_pin_path=self.protocol_p_pin_path, protocol_p_pin_sha256=self.protocol_p_pin_sha256, protocol_p_pin_bytes=self.protocol_p_pin_bytes, candidate_identity=self.candidate_identity, candidate_identity_path=self.candidate_identity_path, candidate_identity_sha256=self.candidate_identity_sha256, candidate_identity_bytes=self.candidate_identity_bytes)
         self.runner_sha256, _ = _sha256_file(Path(__file__).resolve())
         self.guard = generic.ProcessGuard()
         self.endpoint_cache: dict[str, dict[str, Any]] = {}
@@ -946,6 +1029,13 @@ class PairedRunner:
         checked_manifest = validate_manifest(manifest)
         if checked_manifest != self.manifest:
             raise RunnerError(f"manifest content changed after initialization before {boundary}")
+        pin, pin_sha, pin_bytes, pin_path = _load_protocol_p_pin(
+            self.protocol_p_pin_path,
+            protocol_p_root=self.protocol_p_root,
+            roots=(self.baseline_root, self.candidate_root, self.adapter_root, self.protocol_p_root),
+        )
+        if pin_path != self.protocol_p_pin_path or pin_sha != self.protocol_p_pin_sha256 or pin_bytes != self.protocol_p_pin_bytes or pin != self.protocol_p_pin:
+            raise RunnerError(f"protocol-P1 pin changed after initialization before {boundary}")
         identity, identity_sha, identity_bytes, identity_path = _load_candidate_identity(
             self.candidate_identity_path,
             manifest=self.manifest,
@@ -953,7 +1043,9 @@ class PairedRunner:
         )
         if identity_path != self.candidate_identity_path or identity_sha != self.candidate_identity_sha256 or identity_bytes != self.candidate_identity_bytes or identity != self.candidate_identity:
             raise RunnerError(f"candidate identity changed after initialization before {boundary}")
-        p_anchor = _verify_protocol_p_anchor(self.protocol_p_root, identity["sealed_by"], identity["candidate"]["commit"])
+        if identity["sealed_by"]["p1_pin_sha256"] != self.protocol_p_pin_sha256:
+            raise RunnerError(f"candidate identity pin binding changed before {boundary}")
+        p_anchor = _verify_protocol_p_pin(self.protocol_p_root, pin, identity["candidate"])
         if p_anchor != self.protocol_p_anchor:
             raise RunnerError(f"protocol-P anchor changed before {boundary}")
         preparation, preparation_sha, _ = _load_json(self.preparation_path, "preparation")
@@ -967,6 +1059,10 @@ class PairedRunner:
             candidate_root=self.candidate_root,
             adapter_root=self.adapter_root,
             protocol_p_root=self.protocol_p_root,
+            protocol_p_pin=self.protocol_p_pin,
+            protocol_p_pin_path=self.protocol_p_pin_path,
+            protocol_p_pin_sha256=self.protocol_p_pin_sha256,
+            protocol_p_pin_bytes=self.protocol_p_pin_bytes,
             candidate_identity=self.candidate_identity,
             candidate_identity_path=self.candidate_identity_path,
             candidate_identity_sha256=self.candidate_identity_sha256,
@@ -979,6 +1075,7 @@ class PairedRunner:
         for path, expected, label in (
             (self.manifest_path, self.manifest_sha256, "manifest"),
             (self.preparation_path, self.preparation_sha256, "preparation"),
+            (self.protocol_p_pin_path, self.protocol_p_pin_sha256, "protocol-P1 pin"),
             (self.candidate_identity_path, self.candidate_identity_sha256, "candidate identity"),
         ):
             observed, _ = _sha256_regular_nofollow(path, label)
@@ -1361,7 +1458,7 @@ class PairedRunner:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "protocol-p-root", "candidate-identity", "output", "target-root", "tmp-root"):
+    for name in ("manifest", "preparation", "baseline-root", "candidate-root", "adapter-root", "protocol-p-root", "protocol-p-pin", "candidate-identity", "output", "target-root", "tmp-root"):
         parser.add_argument(f"--{name}", required=True, type=Path if name.endswith(("manifest", "preparation", "root", "output")) else str)
     parser.add_argument("--cpu", required=True, type=int)
     parser.add_argument("--phase", required=True, choices=("build", "abba"))
@@ -1371,7 +1468,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, protocol_p_root=args.protocol_p_root, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
+        runner = PairedRunner(manifest_path=args.manifest, preparation_path=args.preparation, baseline_root=args.baseline_root, candidate_root=args.candidate_root, adapter_root=args.adapter_root, protocol_p_root=args.protocol_p_root, protocol_p_pin_path=args.protocol_p_pin, candidate_identity_path=args.candidate_identity, output=args.output, target_root=args.target_root, tmp_root=args.tmp_root, cpu=args.cpu, phase=args.phase)
         if args.phase == "build":
             runner.build()
         else:

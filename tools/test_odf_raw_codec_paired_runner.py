@@ -33,8 +33,7 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["source"]["candidate_overlay"], [])
         self.assertEqual(value["source"]["candidate_mode"], runner.CANDIDATE_MODE)
         self.assertEqual(value["source"]["candidate_integrated_files"], [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)])
-        self.assertEqual(value["source"]["protocol_p_commit"], runner.PROTOCOL_P_COMMIT)
-        self.assertEqual(value["source"]["protocol_p_tree"], runner.PROTOCOL_P_TREE)
+        self.assertEqual(value["source"]["protocol_p_pin_schema"], runner.PROTOCOL_P_PIN_SCHEMA)
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
 
     def test_manifest_hashes_match_live_adapter_sources(self) -> None:
