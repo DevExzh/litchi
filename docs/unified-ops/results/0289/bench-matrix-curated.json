@@ -3278,6 +3278,10 @@
   {
    "record": "0362ul79f",
    "reason": "Raw-census tooling-row registration and build-free runner checks only. The tracked runner patch changes command coverage but records no leaf-versus-unified timing or allocation measurement."
+  },
+  {
+   "record": "0366",
+   "reason": "Final API inventory and OfficeCLI corpus census only. The evidence is the rustdoc manifest, the debt inventory and its dispositions; no leaf-versus-unified timing or allocation measurement."
   }
  ]
 }
