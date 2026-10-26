@@ -714,7 +714,7 @@ fn host_link(source: &[u8], change: &LinkChange) -> TestResult<Vec<u8>> {
                 s,
                 d,
                 *range,
-                TextHyperlinkTarget::new(*target)?,
+                TextHyperlinkTarget::new(target)?,
             )?);
         },
         LinkChange::Update(position, range, target) => drop(e.update_sheet_text_box_hyperlink(
@@ -722,7 +722,7 @@ fn host_link(source: &[u8], change: &LinkChange) -> TestResult<Vec<u8>> {
             d,
             links.get(*position).ok_or("host link")?.id,
             *range,
-            TextHyperlinkTarget::new(*target)?,
+            TextHyperlinkTarget::new(target)?,
         )?),
         LinkChange::Remove(position) => drop(e.remove_sheet_text_box_hyperlink(
             s,
@@ -743,10 +743,10 @@ fn link_case(name: &'static str, tier: Tier, input: &Fixture, change: LinkChange
                 package.edit_sheet_drawable_hyperlinks(0, DrawableSelector::text_box(0))?;
             match change {
                 LinkChange::Add(range, target) => {
-                    edit.add(*range, TextHyperlinkTarget::new(*target)?)?;
+                    edit.add(*range, TextHyperlinkTarget::new(target)?)?;
                 },
                 LinkChange::Update(position, range, target) => {
-                    edit.update(*position, *range, TextHyperlinkTarget::new(*target)?)?;
+                    edit.update(*position, *range, TextHyperlinkTarget::new(target)?)?;
                 },
                 LinkChange::Remove(position) => {
                     edit.remove(*position)?;
