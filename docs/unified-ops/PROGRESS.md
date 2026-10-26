@@ -6341,7 +6341,9 @@ See [0063](0063-source-pptx-modern-comments.md).
   The isolated wsdoc rerun passes in 600.75 seconds, followed by the standalone
   PPT check in 97.71 seconds (165n). Root verifies both logs and target traces,
   unchanged source/locks and no resource errors; target usage remains below
-  8 GB. The remaining diagnostic continues, with focused DOCX validation
-  reserved next. W6 v8 repairs and the protocol preview's latest ODF source
-  refresh proceed without Cargo. Final all-65 and all 28 qualification groups
-  remain required; nothing is pushed.
+  8 GB. Core/ops/facade documentation also passes and CLI tests begin, with
+  focused DOCX validation reserved after the diagnostic. Root verifies that
+  protocol v12 carries all 22 changed tooling files, including the five latest
+  ODF files; its signed guard and phase logic are unchanged. W6 v8 repairs
+  continue without Cargo. Final all-65 and all 28 qualification groups remain
+  required; nothing is pushed.
