@@ -6158,3 +6158,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   ordering. Seven Python checks did not cover these seams. The author repairs
   the isolated leaf; it is not merged or execution-ready. C/P remain frozen
   and the same full65 run stays active. No native exception or push.
+
+  iWork constructor/owner preparations pass independent source review (165c);
+  owner fixture provenance needs only one future-P metadata entry repaired.
+  ODF raw-codec follow-ups fix source admission, fidelity and timing seams,
+  then a Rust/Python descriptor mismatch; successor 8e400cbaee passes twelve
+  source-only tests and independent review, with compilation still pending.
+  Sheet v2 is returned for an incompatible e63 allocation consumer. OLE owner
+  preparation runs against the real sources and passes 25 focused tests;
+  its independent review and a new five-lane legacy review remain pending.
+  Root verifies 32 completed gate rows while Ops chunks continue. The census
+  retains 62 worktrees/75 heads, including the active ODF leaf and required
+  qualification inputs; no unused unified leaf remains. C/P stay frozen, all
+  25 actual qualification rows remain open, and nothing is pushed.
