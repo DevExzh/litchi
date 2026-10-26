@@ -2841,6 +2841,23 @@ not an alias (no second name exists).
 | `shape_properties_codec::{decode_shape_properties, rewrite_shape_properties}` | banned donor aliases: use `decode_drawable_archive`, `rewrite_drawable_archive` (never ported) | ✅ 0368 |
 | `{theme_codec, keynote_theme_codec}::ThemeReferenceSnapshot::encode -> Result<Vec<u8>, DecodeError>` | a zero identifier is a typed error; the panicking `encode`/`encode_checked` pair is replaced, `encode_checked` banned | ✅ 0368a |
 
+## Pages body media, shapes and text out of the host (record 0371)
+
+Wave W1-B of record 0363 moves the host's Pages body editors into
+`litchi-pages` families. Host runs of `x()`/`set_x()`/`flip_x()`/`restore_x()`
+collapse into one family with property verbs; selectors carry kind and
+text-flow position, never a native identifier.
+
+| Name | Meaning | Status |
+|---|---|---|
+| `litchi_pages::DrawableSelector::{Image, Movie, Audio, Shape}` (`image`, `movie`, `audio`, `shape`, `position`; also `litchi_pages::drawable::DrawableSelector`) | One body image, movie, audio clip or ordinary shape by kind and zero-based text-flow position among that kind (audio = audio-only movie; live video is neither; text boxes are not shapes) — the 0363 §3.2 Pages drawable selector | ✅ 0371 |
+| `litchi_pages::drawable::{Geometry, GeometryFlags, Properties, Point, Size, FlipAxis, MediaPlaybackSettings, MediaLoopMode, MediaVolume}` | Archive-free drawable frame (optional position, size, layout flags, angle; `Geometry::flipped`), the reflection-bearing flag set, the four shared drawable properties (hyperlink, locked, aspect-ratio locked, accessibility description) and the shared playback values | ✅ 0371 |
+| `litchi_pages::drawable::properties::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Snapshot}` | Registered family in `pages`; `Package::{body_drawable_properties, edit_body_drawable_properties, apply_body_drawable_properties}`; `Edit::{set_geometry, set_position, flip, restore_original_size, set_properties, set_playback}` replace the host's 25 image/movie/audio/shape geometry, flip, Original Size, property, position and playback methods; a verb that does not apply to the kind is `Refusal::UnsupportedOperation` | ✅ 0371 |
+| `litchi_pages::drawable::text::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered family in `pages`; `Package::{body_drawable_text, edit_body_drawable_text, apply_body_drawable_text}` over a `DrawableSelector` (ordinary shapes; other kinds `Refusal::NoText`); `Edit::{replace, insert, delete, set, clear}`, one splice per edit; a splice removing a referenced object is `Refusal::DependentContent` | ✅ 0371 |
+| `litchi_pages::bookmark::{Bookmark, Selector, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextRange, Name, Settings, Visibility}` | Registered family in `pages`; `Package::{body_bookmarks, edit_body_bookmarks, apply_body_bookmarks}`; `Edit::{add(TextRange, Settings), update(selector, TextRange, Settings), remove(selector)}`, one operation per edit; `Selector::{Position, Name}`; `Bookmark::{range, settings}` carries no native identifier | ✅ 0371 |
+| `litchi_pages::date_time::{Field, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextRange, DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan}` | Registered family in `pages`; `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add(TextRange, Settings), insert(TextPosition, DisplayText, Settings), update(position, TextRange, Settings), remove(position)}`, one operation per edit; `Field::{range, settings}` | ✅ 0371 |
+| `litchi_pages::number_attachment::{Attachment, Target, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextNumberAttachmentSettings, TextNumberAttachmentKind, TextNumberAttachmentFormat, TextNumberAttachmentText}` | Registered family in `pages`; `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert(TextPosition, settings), update(position, settings), remove(position)}`; `Attachment::{position, settings}` carries no native identifier (the host's `TextNumberAttachmentId` stays out) | ✅ 0371 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

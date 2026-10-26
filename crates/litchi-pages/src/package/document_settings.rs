@@ -3,7 +3,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{WireLimits, encode_varint_into, varint::encoded_len, wire::WireView};
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::pages_document_settings_codec::{
@@ -529,9 +529,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source =
-            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), catalog.limits())
-                .map_err(map_archive_error)?;
+        let candidate_source = catalog
+            .reopen(Arc::clone(&patch.target))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         verify_candidate(
@@ -733,8 +733,7 @@ fn rewrite_document_settings(
     drop(edits);
     drop(deleted_previews);
     drop(compressed);
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
-        .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     verify_candidate(source, &candidate, after, None, 0)?;
     Ok((candidate, touched_components))

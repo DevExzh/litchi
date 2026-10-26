@@ -591,7 +591,7 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate = reopen_shared(Arc::clone(&patch.target), source.limits(), &mut budget)?;
+        let candidate = reopen_shared(Arc::clone(&patch.target), source, &mut budget)?;
         if body_table_lock_at_target_with_budget(&candidate, &patch.proof, &mut budget)?
             != patch.after
         {
@@ -1795,7 +1795,7 @@ fn rewrite_lock_state(
     }
     drop(compressed);
     let candidate_source: Arc<[u8]> = output.into();
-    let candidate = reopen_shared(candidate_source, physical_limits, budget)?;
+    let candidate = reopen_shared(candidate_source, source_catalog, budget)?;
     if body_table_lock_at_target_with_budget(&candidate, target, budget)? != after {
         return Err(Error::Verification);
     }
@@ -2394,12 +2394,12 @@ fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
 
 fn reopen_shared(
     source: Arc<[u8]>,
-    limits: Limits,
+    previous: &SourceCatalog,
     budget: &mut WireBudget,
 ) -> Result<Package, Error> {
     budget.charge_input_source(source.as_ref())?;
     budget.charge_payload_work(source.len())?;
-    let catalog = SourceCatalog::from_shared_bytes(source, limits).map_err(map_archive_error)?;
+    let catalog = previous.reopen(source).map_err(map_archive_error)?;
     budget.charge_source_catalog(&catalog)?;
     charge_reopen_work(&catalog, budget)?;
     Package::from_source_catalog(catalog).map_err(map_package_error)

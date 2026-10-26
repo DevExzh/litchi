@@ -1280,6 +1280,16 @@ fn discover_slots_with_budget(
     source: &Package,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<SlotRecord>, Error> {
+    discover_slots(source, budget, false)
+}
+
+/// Discover every rooted slot; `allow_markers` admits slot text holding
+/// attachment markers (for the families that own those attachments).
+fn discover_slots(
+    source: &Package,
+    budget: &mut TransactionBudget,
+    allow_markers: bool,
+) -> Result<Vec<SlotRecord>, Error> {
     charge_catalog_census(source, budget)?;
     let section_ids = rooted_section_ids(source, budget)?;
     let mut records = Vec::new();
@@ -1380,7 +1390,9 @@ fn discover_slots_with_budget(
                     }
                     budget.charge_text_validation(payload.len(), decoded.validation())?;
                     let text = decoded.into_storage().text().to_owned();
-                    validate_authored(&text)?;
+                    if !allow_markers {
+                        validate_authored(&text)?;
+                    }
                     let public = HeaderFooterSelector::new(
                         SectionSelector::index(section_index),
                         template,
@@ -2841,4 +2853,24 @@ fn map_section_error(error: pages_section_codec::DecodeError) -> Error {
         observed,
         maximum,
     }
+}
+
+/// The native storage identifier of one rooted header/footer slot, for the
+/// storage-object families (number attachments) that edit its text storage.
+pub(crate) fn header_footer_storage(
+    source: &Package,
+    selector: HeaderFooterSelector<'_>,
+) -> Result<u64, Error> {
+    let mut budget = TransactionBudget::new(source)?;
+    let section_index = resolve_section_index(source, selector.section(), &mut budget)?;
+    let canonical = HeaderFooterSelector::index(
+        section_index,
+        selector.template(),
+        selector.kind(),
+        selector.slot_index(),
+    );
+    let records = discover_slots(source, &mut budget, true)?;
+    Ok(select_record(&records, canonical, &mut budget)?
+        .resolved
+        .storage_id)
 }

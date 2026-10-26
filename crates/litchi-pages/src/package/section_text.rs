@@ -7,7 +7,6 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_text::{TextPosition, TextSpan};
 use thiserror::Error as ThisError;
 
@@ -749,9 +748,9 @@ impl Package {
             .precharge_candidate_reopen(self, patch.target_bytes.len(), Path::Package)
             .map_err(map_transaction_error)?;
 
-        let candidate_source =
-            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
-                .map_err(map_archive_error)?;
+        let candidate_source = source
+            .reopen(Arc::clone(&patch.target_bytes))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         budget
