@@ -127,6 +127,10 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertIn("document_rejects_undeclared_namespace", probe)
         self.assertNotIn("Cursor::new(opaque.to_vec())", probe)
         self.assertNotIn("timed_fragment.clone()", probe)
+        self.assertIn("one owned", probe)
+        self.assertIn("let mut timed_inputs: Vec<Vec<Vec<u8>>> = Vec::with_capacity(iterations);", probe)
+        self.assertIn("open_bytes_with(bytes,", probe)
+        self.assertNotIn("let file = open_bytes_with(bytes.clone(), &OpenOptions::new())", probe)
         self.assertIn("PackageCompression::Stored", probe)
 
 

@@ -1312,13 +1312,14 @@ mod probe {
         )
     }
 
-    fn consumer_route(families: &[(String, Vec<u8>)]) -> (Value, impl FnMut()) {
+    fn consumer_route(families: &[(String, Vec<u8>)], iterations: usize) -> (Value, impl FnMut()) {
         let mut rows = Vec::with_capacity(families.len());
         let mut all_ok = true;
         for (name, bytes) in families {
             let raw = archive(bytes).unwrap_or_else(|error| panic!("raw {name}: {error}"));
             let raw_content = raw.read("content.xml").expect("consumer raw content");
-            let file = open_bytes_with(bytes.clone(), &OpenOptions::new())
+            let consumer_input = bytes.to_vec();
+            let file = open_bytes_with(consumer_input, &OpenOptions::new())
                 .unwrap_or_else(|error| panic!("consumer facade {name}: {error}"));
             let facade_content = file.raw("/content.xml").expect("consumer facade raw");
             let family_ok = raw_content == facade_content.bytes();
@@ -1348,15 +1349,28 @@ mod probe {
                 all_ok,
             ],
         );
+        // `open_bytes_with` takes ownership of its input. Prepare one owned
+        // family batch per measured iteration before the clock starts so the
+        // raw/facade comparison measures reopening and projection, not an
+        // implicit package-byte clone. The batch count is supplied by the
+        // protocol (1 for validation, 128 for timed/allocator), keeping the
+        // preparation bounded and identical for both API eras.
+        let mut timed_inputs: Vec<Vec<Vec<u8>>> = Vec::with_capacity(iterations);
+        for _ in 0..iterations {
+            timed_inputs.push(families.iter().map(|(_, bytes)| bytes.clone()).collect());
+        }
         (json!({ "proof": row_proof, "families": rows }), move || {
-            for (_, bytes) in families {
-                let raw = archive(bytes).expect("timed consumer raw");
-                let raw_content = raw.read("content.xml").expect("timed consumer content");
-                let file = open_bytes_with(bytes.clone(), &OpenOptions::new())
-                    .expect("timed consumer facade");
+            let batch = timed_inputs.pop().expect("prepared consumer family batch");
+            for (index, bytes) in batch.into_iter().enumerate() {
+                let raw_content = {
+                    let raw = archive(&bytes).expect("timed consumer raw");
+                    raw.read("content.xml").expect("timed consumer content")
+                };
+                let file =
+                    open_bytes_with(bytes, &OpenOptions::new()).expect("timed consumer facade");
                 let parts = file.parts().expect("timed consumer parts");
                 let facade_content = file.raw("/content.xml").expect("timed consumer facade raw");
-                black_box((raw_content, parts, facade_content));
+                black_box((index, raw_content, parts, facade_content));
             }
         })
     }
@@ -1379,7 +1393,7 @@ mod probe {
             "raw_split_merge_and_opaque_preservation" => merge_route(package, negative),
             "raw_xml_splice_merge_publication" => splice_route(package, negative),
             "unified_facade_raw_parts_and_publication" => facade_route(package),
-            "consumer_reopen_matrix" => consumer_route(families),
+            "consumer_reopen_matrix" => consumer_route(families, iterations),
             _ => panic!("unknown route {id}"),
         };
         let timing_value = timing(mode, iterations, operation);

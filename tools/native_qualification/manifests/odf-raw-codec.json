@@ -33,7 +33,7 @@
     },
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128,
-    "sha256": "e2a649f8b0bad9e4236d760466711c32eba8bfdd71f21509ffa47fdfca0d316e"
+    "sha256": "a8353f198c3ced1bb3e3856efb3162742daef9f9796fdc37098276ad98f5672a"
   },
   "routes": [
     {
@@ -94,7 +94,7 @@
       "id": "consumer_reopen_matrix",
       "family": "consumers",
       "operations": ["Archive::new", "Archive::read", "open_bytes_with", "File::parts", "File::raw"],
-      "boundary": "each prebuilt ODF family package is reopened through raw and facade consumers inside the clock; package generation is outside"
+      "boundary": "prebuilt owned per-iteration family inputs; raw split and unified facade reopen/projection only; package generation and ownership copies/output comparison are outside the clock"
     }
   ],
   "families": ["odt", "ods", "odp", "odg", "odc", "odi", "odb", "odf-formula", "oth", "odm"],
