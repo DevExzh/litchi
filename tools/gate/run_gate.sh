@@ -90,9 +90,7 @@ fi
 row native-resave-check "cd tools/native-resave && cargo check --locked --all-targets"
 row api-glossary 'RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir "$CARGO_TARGET_DIR"'
 row iwork-leaf-api "python3 -m unittest tools.test_check_iwork_leaf_public_api"
-# Tool tests drive their own cargo targets; an inherited CARGO_TARGET_DIR
-# makes the native-qualification runner refuse its manifests.
-row tooling-unit "env -u CARGO_TARGET_DIR python3 -m unittest $TOOL_MODULES"
+row tooling-unit "python3 -m unittest $TOOL_MODULES"
 row crate-boundaries "python3 tools/check_crate_boundaries.py"
 row non-iwork-gate "python3 tools/non_iwork_gate.py verify"
 row bench-matrix "python3 tools/unified_bench_matrix.py --check"
