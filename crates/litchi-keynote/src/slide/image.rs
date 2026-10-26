@@ -159,6 +159,13 @@ pub mod lifecycle {
     pub use litchi_iwa_common::shape::geometry::{FlipAxis, Size};
 }
 
+/// Title and caption of ordinary slide images (record 0372).
+pub mod text {
+    pub use crate::package::slide_image_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Text,
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;

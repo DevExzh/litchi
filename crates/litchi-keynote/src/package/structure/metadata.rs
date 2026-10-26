@@ -754,6 +754,22 @@ impl Registry {
         Some(found)
     }
 
+    /// Mutably borrow a component without advancing its save token, for a
+    /// registry-only preparation whose following transaction rewrites the
+    /// same component and advances the token once.
+    pub(in crate::package) fn component_mut_untracked(
+        &mut self,
+        identifier: u64,
+    ) -> Option<&mut Component> {
+        self.entries.iter_mut().find_map(|entry| match entry {
+            Entry::Component(component, raw) if component.identifier == identifier => {
+                *raw = None;
+                Some(component.as_mut())
+            },
+            _ => None,
+        })
+    }
+
     /// Append a new component after the last existing one.
     pub(in crate::package) fn add_component(
         &mut self,
