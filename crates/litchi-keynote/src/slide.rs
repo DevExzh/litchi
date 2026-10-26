@@ -1,6 +1,7 @@
 //! Immutable Keynote slide values and detached builders.
 
 pub mod audio;
+pub mod build;
 pub mod comment;
 pub mod creation;
 pub mod delete;

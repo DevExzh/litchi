@@ -29,6 +29,7 @@ mod harness;
 mod known_fields;
 mod media_cases;
 
+mod keynote_build_cases;
 mod keynote_builder_cases;
 mod keynote_cases;
 mod keynote_drawable_cases;
@@ -42,8 +43,10 @@ mod self_test;
 mod shape_cases;
 mod text_annotation_cases;
 mod text_attachment_cases;
+mod text_cost_probes;
 mod text_drop_cap_cases;
 mod text_field_cases;
 mod text_glue;
 mod text_language_cases;
+mod text_list_cases;
 mod text_style_cases;
