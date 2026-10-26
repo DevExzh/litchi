@@ -170,6 +170,51 @@ impl FooterRangeInsertion {
     }
 }
 
+/// A table's `[first column, first row, last column, last row]` extents,
+/// whole and body, before and after an axis insertion (record 0370).
+///
+/// A table formula owner's spanning dependencies carry these extents. An
+/// extent that describes the table before the edit takes the new geometry,
+/// so a header or footer insertion moves the body's near or far edge; any
+/// other extent moves its far edge on the edited axis, as before.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct TableExtents {
+    total: [u32; 4],
+    body: [u32; 4],
+}
+
+impl TableExtents {
+    /// The extents of a table of `rows` by `columns` with the given section
+    /// counts.
+    pub(super) fn of(
+        rows: u32,
+        columns: u32,
+        header_rows: u32,
+        header_columns: u32,
+        footer_rows: u32,
+    ) -> Self {
+        let last_column = columns.saturating_sub(1);
+        Self {
+            total: [0, 0, last_column, rows.saturating_sub(1)],
+            body: [
+                header_columns,
+                header_rows,
+                last_column,
+                rows.saturating_sub(footer_rows).saturating_sub(1),
+            ],
+        }
+    }
+}
+
+fn range_values(range: &tsce::RangeCoordinateArchive) -> [u32; 4] {
+    [
+        range.top_left_column,
+        range.top_left_row,
+        range.bottom_right_column,
+        range.bottom_right_row,
+    ]
+}
+
 impl DependencyAxis {
     fn noun(self) -> &'static str {
         match self {
@@ -523,6 +568,7 @@ pub(super) fn shift_formula_dependencies(
     axis: DependencyAxis,
     insertion: u32,
     footer_range_insertion: FooterRangeInsertion,
+    extents: (TableExtents, TableExtents),
 ) -> Result<()> {
     let retained_hosts = FormulaHostRetentions::default();
     mutate_formula_dependencies(
@@ -533,6 +579,7 @@ pub(super) fn shift_formula_dependencies(
         DependencyMutation::Insert,
         footer_range_insertion.expands_footer_ranges(),
         &retained_hosts,
+        Some(extents),
     )
 }
 
@@ -552,9 +599,14 @@ pub(super) fn delete_formula_dependencies(
         DependencyMutation::Delete,
         false,
         &retained_hosts,
+        None,
     )
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the insertion's table extents join the existing shift parameters"
+)]
 fn mutate_formula_dependencies(
     package: &mut HostPackage,
     table_info_id: u64,
@@ -563,6 +615,7 @@ fn mutate_formula_dependencies(
     mutation: DependencyMutation,
     expand_footer_ranges: bool,
     retained_hosts: &FormulaHostRetentions,
+    extents: Option<(TableExtents, TableExtents)>,
 ) -> Result<()> {
     let Some(component) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
         return Ok(());
@@ -617,11 +670,13 @@ fn mutate_formula_dependencies(
             &mut current.spanning_column_dependencies,
             axis,
             mutation,
+            extents,
         )?;
         mutate_spanning_ranges(
             &mut current.spanning_row_dependencies,
             axis,
             mutation,
+            extents,
         )?;
         mutate_range_dependencies(
             &mut current.range_dependencies,
@@ -1685,17 +1740,30 @@ fn mutate_spanning_ranges(
     dependencies: &mut Option<tsce::SpanningDependenciesExpandedArchive>,
     axis: DependencyAxis,
     mutation: DependencyMutation,
+    extents: Option<(TableExtents, TableExtents)>,
 ) -> Result<()> {
     let Some(dependencies) = dependencies else {
         return Ok(());
     };
-    for range in [
-        dependencies.total_range_for_table.as_mut(),
-        dependencies.body_range_for_table.as_mut(),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    let total: fn(TableExtents) -> [u32; 4] = |extents| extents.total;
+    let body: fn(TableExtents) -> [u32; 4] = |extents| extents.body;
+    for (range, select) in [
+        (dependencies.total_range_for_table.as_mut(), total),
+        (dependencies.body_range_for_table.as_mut(), body),
+    ] {
+        let Some(range) = range else {
+            continue;
+        };
+        if let Some((before, after)) = extents
+            && range_values(range) == select(before)
+        {
+            let [left, top, right, bottom] = select(after);
+            range.top_left_column = left;
+            range.top_left_row = top;
+            range.bottom_right_column = right;
+            range.bottom_right_row = bottom;
+            continue;
+        }
         match axis {
             DependencyAxis::Column => {
                 range.bottom_right_column =

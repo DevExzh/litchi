@@ -101,6 +101,17 @@ pub(super) enum FaultLimit {
 
 pub(super) type FaultResult<T> = Result<T, Fault>;
 
+impl From<litchi_numbers_wire::table_topology::Error> for Fault {
+    fn from(error: litchi_numbers_wire::table_topology::Error) -> Self {
+        use litchi_numbers_wire::table_topology::Error as E;
+        match error {
+            E::Unsupported => Self::Unsupported,
+            E::Allocation { amount } => Self::Allocation { amount },
+            _ => Self::Invalid,
+        }
+    }
+}
+
 pub(super) fn allocation(amount: usize) -> Fault {
     Fault::Allocation { amount }
 }
@@ -314,6 +325,9 @@ pub(super) struct Working<'p> {
     allocated: Option<u64>,
     /// The next identifier to allocate.
     next_identifier: u64,
+    /// Whether [`Self::publish`] keeps the root previews (record 0370: the
+    /// cell-level families keep them, as the host editor does).
+    keep_previews: bool,
 }
 
 impl<'p> Working<'p> {
@@ -337,6 +351,7 @@ impl<'p> Working<'p> {
             removed: BTreeSet::new(),
             allocated: None,
             next_identifier: 0,
+            keep_previews: false,
         };
         let registered = metadata::last_object_identifier(&working)?.unwrap_or(0);
         working.next_identifier = maximum.max(registered).checked_add(1).ok_or(Fault::Limit {
@@ -498,6 +513,14 @@ impl<'p> Working<'p> {
         Ok(removed)
     }
 
+    /// Keep the root previews on [`Self::publish`] instead of deleting them
+    /// as stale: a cell-level edit (topology, record 0370) leaves them in
+    /// place, as the host editor and the native application's own saves
+    /// before it regenerates them do.
+    pub(super) fn keep_previews(&mut self) {
+        self.keep_previews = true;
+    }
+
     /// Re-encode the touched components, rewrite the metadata registry, drop
     /// the stale root previews and reassemble one candidate.
     ///
@@ -506,7 +529,11 @@ impl<'p> Working<'p> {
     /// external references new objects need. Returns the reopened candidate,
     /// the number of rewritten components and the number of deleted previews.
     pub(super) fn publish(mut self, registry: &metadata::Transition) -> FaultResult<Published> {
-        let previews = root_previews(self.catalog)?;
+        let previews = if self.keep_previews {
+            Vec::new()
+        } else {
+            root_previews(self.catalog)?
+        };
         if !previews.is_empty() && previews.len() != ROOT_PREVIEWS.len() {
             return Err(Fault::Unsupported);
         }
