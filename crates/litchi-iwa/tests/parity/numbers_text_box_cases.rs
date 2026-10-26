@@ -662,3 +662,168 @@ fn numbers_sheet_text_box_drop_cap_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- hyperlinks ------------------------------------------------------------
+
+use litchi_numbers::sheet::drawable::hyperlink::{TextHyperlinkTarget, TextRange};
+
+#[derive(Clone, Debug)]
+enum LinkChange {
+    Add(TextRange, &'static str),
+    Update(usize, TextRange, &'static str),
+    Remove(usize),
+}
+
+fn range(start: usize, end: usize) -> TestResult<TextRange> {
+    Ok(TextRange::new(
+        TextPosition::from_utf16_index(start)?,
+        TextPosition::from_utf16_index(end)?,
+    )?)
+}
+
+fn host_links(bytes: &[u8]) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    Ok(format!(
+        "{:?}",
+        e.sheet_text_box_hyperlinks(s, d)?
+            .into_iter()
+            .map(|link| (link.range, link.target))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_links(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:?}",
+        Package::from_bytes(bytes)?
+            .sheet_drawable_hyperlinks(0, DrawableSelector::text_box(0))?
+            .into_iter()
+            .map(|link| (link.range(), link.target().clone()))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn host_link(source: &[u8], change: &LinkChange) -> TestResult<Vec<u8>> {
+    let mut e = numbers::Draft::from_bytes(source)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    let links = e.sheet_text_box_hyperlinks(s, d)?;
+    match change {
+        LinkChange::Add(range, target) => {
+            drop(e.add_sheet_text_box_hyperlink(
+                s,
+                d,
+                *range,
+                TextHyperlinkTarget::new(*target)?,
+            )?);
+        },
+        LinkChange::Update(position, range, target) => drop(e.update_sheet_text_box_hyperlink(
+            s,
+            d,
+            links.get(*position).ok_or("host link")?.id,
+            *range,
+            TextHyperlinkTarget::new(*target)?,
+        )?),
+        LinkChange::Remove(position) => drop(e.remove_sheet_text_box_hyperlink(
+            s,
+            d,
+            links.get(*position).ok_or("host link")?.id,
+        )?),
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn link_case(name: &'static str, tier: Tier, input: &Fixture, change: LinkChange) -> TestResult {
+    let change = &change;
+    let mut case = Case::new(name, Format::Numbers, tier, Evidence::Queued, input)
+        .host(|source| host_link(source, change))
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_hyperlinks(0, DrawableSelector::text_box(0))?;
+            match change {
+                LinkChange::Add(range, target) => {
+                    edit.add(*range, TextHyperlinkTarget::new(*target)?)?;
+                },
+                LinkChange::Update(position, range, target) => {
+                    edit.update(*position, *range, TextHyperlinkTarget::new(*target)?)?;
+                },
+                LinkChange::Remove(position) => {
+                    edit.remove(*position)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_hyperlinks(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host hyperlinks", host_links)
+        .read("leaf hyperlinks", leaf_links);
+    if tier == Tier::B {
+        case = case
+            .known_fields(crate::text_annotation_cases::masked)
+            .leaf_structural_metadata();
+    }
+    case.run()?;
+    Ok(())
+}
+
+fn with_link() -> TestResult<Fixture> {
+    let input = authored_fixture()?;
+    Ok(Fixture {
+        path: "authored + host hyperlink over 0..5",
+        bytes: host_link(
+            &input.bytes,
+            &LinkChange::Add(range(0, 5)?, "https://example.com/litchi"),
+        )?,
+    })
+}
+
+#[test]
+fn numbers_sheet_text_box_hyperlink_add_parity() -> TestResult {
+    link_case(
+        "numbers_sheet_text_box_hyperlink_add_parity",
+        Tier::B,
+        &authored_fixture()?,
+        LinkChange::Add(range(0, 5)?, "https://example.com/litchi"),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_hyperlink_update_parity() -> TestResult {
+    link_case(
+        "numbers_sheet_text_box_hyperlink_update_parity",
+        Tier::A,
+        &with_link()?,
+        LinkChange::Update(0, range(2, 8)?, "mailto:a@example.com"),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_hyperlink_remove_parity() -> TestResult {
+    link_case(
+        "numbers_sheet_text_box_hyperlink_remove_parity",
+        Tier::A,
+        &with_link()?,
+        LinkChange::Remove(0),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_hyperlink_read_parity() -> TestResult {
+    for input in [authored_fixture()?, with_link()?] {
+        assert_eq!(host_links(&input.bytes)?, leaf_links(&input.bytes)?);
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

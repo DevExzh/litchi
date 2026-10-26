@@ -70,7 +70,7 @@ fn masked_bookmark(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     Ok(decoded)
 }
 
-fn masked(known: KnownFields) -> KnownFields {
+pub(crate) fn masked(known: KnownFields) -> KnownFields {
     known
         .with(
             smart_field::HYPERLINK_MESSAGE_TYPE,
