@@ -714,7 +714,37 @@ impl CaptureBudget {
         sheets: &BTreeMap<usize, SheetActions>,
         added: &[Added],
     ) -> Result<Self> {
-        let mut budget = Self::new(base, maximum);
+        Self::from_staged_onto(Self::new(base, maximum), base, sheets, added)
+    }
+
+    /// [`Self::from_staged`] for a ledger rebuilt over the same `base` as
+    /// `previous`: the two immutable endpoint charges are a function of
+    /// `base` alone, so they are taken from `previous` instead of walking
+    /// the workbook again (record 0377).
+    fn rebuilt(
+        previous: &Self,
+        base: &Workbook,
+        sheets: &BTreeMap<usize, SheetActions>,
+        added: &[Added],
+    ) -> Result<Self> {
+        let empty = Self {
+            maximum: previous.maximum,
+            base_reserved: previous.base_reserved,
+            reserved: previous.base_reserved,
+            worksheets: BTreeMap::new(),
+            cells: BTreeMap::new(),
+            added_sheets: BTreeMap::new(),
+            added_cells: BTreeMap::new(),
+        };
+        Self::from_staged_onto(empty, base, sheets, added)
+    }
+
+    fn from_staged_onto(
+        mut budget: Self,
+        base: &Workbook,
+        sheets: &BTreeMap<usize, SheetActions>,
+        added: &[Added],
+    ) -> Result<Self> {
         for (position, actions) in sheets {
             let mut addresses = BTreeSet::new();
             addresses.extend(actions.cells.keys().copied());
@@ -3432,8 +3462,7 @@ impl Edit {
         let previous_capture_budget = self.capture_budget.take();
         let mut undo_capture_budget = None;
         if let Some(previous) = previous_capture_budget {
-            let maximum = previous.maximum;
-            match CaptureBudget::from_staged(&self.base, maximum, &self.sheets, &self.added) {
+            match CaptureBudget::rebuilt(&previous, &self.base, &self.sheets, &self.added) {
                 Ok(budget) => {
                     self.capture_budget = Some(budget);
                     if retain_undo {
@@ -3962,6 +3991,7 @@ impl Edit {
         let mut drawing_graph = Vec::new();
         let mut svg_parts = Vec::new();
         let mut content_types = None;
+        let lowering_changed_sheets = sheets.values().any(SheetActions::has_typed_style_requests);
         let (styles_part_changed, projected_style_count) =
             lower_style_requests(&base, &mut sheets, &mut parts)?;
 
@@ -3971,13 +4001,14 @@ impl Edit {
         // replacement does not retain a stale pre-lowering charge. This is
         // only paid by bounded edits and is still metadata-only for deferred
         // worksheet parts.
-        if let Some(previous) = capture_budget.take() {
-            capture_budget = Some(CaptureBudget::from_staged(
-                &base,
-                previous.maximum,
-                &sheets,
-                &added,
-            )?);
+        //
+        // `commit` normalized the edit (and rebuilt the ledger from the same
+        // `base`, `sheets` and `added`) just before lowering. Lowering only
+        // changes `sheets` when some worksheet staged a typed style request;
+        // without one, the rebuild here would reproduce the ledger it
+        // already holds, so it is skipped (record 0377).
+        if lowering_changed_sheets && let Some(previous) = capture_budget.take() {
+            capture_budget = Some(CaptureBudget::rebuilt(&previous, &base, &sheets, &added)?);
         }
 
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
