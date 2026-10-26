@@ -48,26 +48,10 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
-/// Ranged bookmarks of the body text.
-pub mod bookmark {
-    pub use crate::package::body_bookmarks::{
-        Bookmark, Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Selector,
-    };
-    pub use litchi_iwa_text::TextRange;
-    pub use litchi_iwa_text::bookmark::{Name, Settings, Visibility};
-}
+pub mod bookmark;
 pub mod builder;
-/// Date & Time smart fields of the body text.
-pub mod date_time {
-    pub use crate::package::body_date_time_fields::{
-        Commit, Diagnostics, Edit, Error, Field, LimitKind, Patch, Refusal,
-    };
-    pub use litchi_iwa_text::TextRange;
-    pub use litchi_iwa_text::date_time::{
-        DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
-    };
-}
 pub mod chart;
+pub mod date_time;
 mod document;
 pub mod document_options;
 /// Combined document and footnote formatter settings.
@@ -86,17 +70,7 @@ pub mod metadata {
 }
 mod limits;
 pub mod movie;
-/// Page-number and page-count attachments of the body and of header/footer
-/// slots.
-pub mod number_attachment {
-    pub use crate::package::body_number_attachments::{
-        Attachment, Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Target,
-    };
-    pub use litchi_iwa_text::number_attachment::{
-        TextNumberAttachmentFormat, TextNumberAttachmentKind, TextNumberAttachmentSettings,
-        TextNumberAttachmentText,
-    };
-}
+pub mod number_attachment;
 mod package;
 pub mod page_layout;
 pub mod section;

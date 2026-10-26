@@ -36,6 +36,13 @@ pub(crate) mod footnote_text;
 pub(crate) mod header_footer_text;
 pub(crate) mod image_adjustments;
 pub(crate) mod metadata_edit;
+#[cfg(feature = "internal-iwork-source")]
+mod movie_playback;
+// The drawable-properties family reads and rewrites movie playback through
+// the same owner module, so it is compiled without the host seam feature as
+// well; only the hidden `__*` re-exports stay behind the feature.
+#[cfg(not(feature = "internal-iwork-source"))]
+#[path = "package/movie_playback.rs"]
 mod movie_playback;
 pub(crate) mod page_layout;
 mod save;
