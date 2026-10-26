@@ -534,7 +534,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--preparation", type=Path)
     parser.add_argument("--build-receipt", type=Path)
     parser.add_argument("--input", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--target-dir", type=Path)
     parser.add_argument("--build-output", type=Path)
     parser.add_argument("--tmpdir", type=Path)
@@ -547,7 +547,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.prepare:
             required = (args.binder, args.target_dir, args.build_output, args.tmpdir)
-            if any(value is None for value in required):
+            if args.output is None or any(value is None for value in required):
                 parser.error("--prepare requires --binder, --target-dir, --build-output, and --tmpdir")
             prepare(args.binder, target_dir=args.target_dir, build_output=args.build_output, tmpdir=args.tmpdir, cpu=args.cpu, output=args.output)
         elif args.build:
@@ -555,7 +555,7 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error("--build requires --preparation")
             build(args.preparation)
         else:
-            if args.preparation is None or args.build_receipt is None or args.input is None:
+            if args.preparation is None or args.build_receipt is None or args.input is None or args.output is None:
                 parser.error("--seal requires --preparation, --build-receipt, and --input")
             seal(args.preparation, args.build_receipt, args.input, args.output)
     except (RunFailure, OSError, ValueError) as error:
