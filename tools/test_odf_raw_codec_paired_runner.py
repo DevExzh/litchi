@@ -32,7 +32,7 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         self.assertEqual(value["paired"]["probe_iterations"], runner.PROBE_ITERATIONS)
         self.assertEqual(
             value["source"]["candidate_overlay"],
-            [str(runner.CONSUMER_MANIFEST), str(runner.PROBE_PATH)],
+            [str(runner.CONSUMER_MANIFEST), str(runner.LOCK_PATH), str(runner.PROBE_PATH)],
         )
         self.assertIn(runner.NON_ACCEPTANCE, value["claim_scope"])
 
@@ -49,6 +49,8 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
         )
         self.assertEqual(value["source"]["candidate_lock_sha256"], digest(str(runner.LOCK_PATH)))
         self.assertEqual(value["source"]["candidate_lock_bytes"], (ROOT / runner.LOCK_PATH).stat().st_size)
+        self.assertEqual(value["source"]["candidate_lock_before_sha256"], runner.CANDIDATE_LOCK_BEFORE_SHA256)
+        self.assertEqual(value["source"]["candidate_lock_before_bytes"], runner.CANDIDATE_LOCK_BEFORE_BYTES)
         self.assertEqual(value["build"], runner.EXPECTED_BUILD)
 
     def test_rust_route_descriptors_match_manifest(self) -> None:
@@ -82,6 +84,10 @@ class OdfRawCodecRunnerTests(unittest.TestCase):
             runner.validate_manifest(value)
         value = manifest()
         value["source"]["candidate_lock_bytes"] += 1
+        with self.assertRaises(runner.RunnerError):
+            runner.validate_manifest(value)
+        value = manifest()
+        value["source"]["candidate_lock_before_bytes"] += 1
         with self.assertRaises(runner.RunnerError):
             runner.validate_manifest(value)
         value = manifest()

@@ -8,6 +8,8 @@
     "production_manifest": "crates/litchi-ops/Cargo.toml",
     "lock_path": "tools/perf-baseline/Cargo.lock",
     "candidate_consumer_manifest_sha256": "f18a17d5ca2bb0848e73c53ace39550ba38dbd7a75fab76c5a0b0af4f435984a",
+    "candidate_lock_before_sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
+    "candidate_lock_before_bytes": 56941,
     "candidate_lock_sha256": "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4",
     "candidate_lock_bytes": 57961,
     "baseline_overlay": [
@@ -17,6 +19,7 @@
     ],
     "candidate_overlay": [
       "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/Cargo.lock",
       "tools/perf-baseline/examples/odf_raw_codec_qualification.rs"
     ]
   },
@@ -34,7 +37,7 @@
     },
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128,
-    "sha256": "cf39dfd20b3867cc0031acd371612c94ca83b0ead8cdcc1569c1e009bcf41179"
+    "sha256": "4f385bc98aeb7e01969382c3c70f1435410f81bd661c83af3b9980239eeff036"
   },
   "build": {
     "profile": "release",

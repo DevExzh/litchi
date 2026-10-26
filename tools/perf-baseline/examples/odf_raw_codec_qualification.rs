@@ -110,7 +110,7 @@ mod probe {
     use std::collections::BTreeMap;
     use std::fmt::Write as _;
     use std::hint::black_box;
-    use std::io::{self, Cursor, Read, Write};
+    use std::io::{self, Cursor, Read};
     use std::time::Instant;
 
     use super::allocation;
@@ -128,6 +128,7 @@ mod probe {
     };
     use litchi_ops::{OpenOptions, create, open_bytes_with};
     use quick_xml::events::Event;
+    #[cfg(all(feature = "raw-codec-original", not(feature = "raw-codec-current")))]
     use quick_xml::name::ResolveResult;
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
@@ -778,7 +779,7 @@ mod probe {
             .map(str::to_owned)
             .collect::<Vec<_>>();
         let input_names_again = input_names.clone();
-        let mut reader = archive(package).expect("archive");
+        let reader = archive(package).expect("archive");
         let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
         assert_eq!(names, input_names);
         assert!(reader.contains("content.xml"));
@@ -887,11 +888,14 @@ mod probe {
         let mut buffer = Vec::new();
         let mut events = 0usize;
         loop {
-            let (_, event) = reader
-                .read_resolved_event_into(&mut buffer)
-                .expect("resolved event");
-            events += 1;
-            if matches!(event, Event::Eof) {
+            let eof = {
+                let (_, event) = reader
+                    .read_resolved_event_into(&mut buffer)
+                    .expect("resolved event");
+                events += 1;
+                matches!(event, Event::Eof)
+            };
+            if eof {
                 break;
             }
             buffer.clear();
@@ -926,14 +930,17 @@ mod probe {
             let mut reader = resolved_document(META_XML, timed_limits).expect("timed reader");
             let mut timed_events = 0usize;
             loop {
-                let (_, event) = reader
-                    .read_resolved_event_into(&mut timed_buffer)
-                    .expect("timed resolved event");
-                timed_events += 1;
-                timed_buffer.clear();
-                if matches!(event, Event::Eof) {
+                let eof = {
+                    let (_, event) = reader
+                        .read_resolved_event_into(&mut timed_buffer)
+                        .expect("timed resolved event");
+                    timed_events += 1;
+                    matches!(event, Event::Eof)
+                };
+                if eof {
                     break;
                 }
+                timed_buffer.clear();
             }
             black_box((metadata, timed_events));
         })
@@ -1386,29 +1393,56 @@ mod probe {
         families: &[(String, Vec<u8>)],
         negative: &BTreeMap<String, bool>,
     ) -> Value {
-        let (details, operation) = match id {
-            "archive_catalog_and_raw_split" => archive_route(package),
-            "manifest_xml_stream_and_parse" => manifest_route(package),
-            "metadata_xml_and_namespace_resolution" => metadata_route(),
-            "writer_memory_publication" => memory_route(package),
-            "writer_stream_publication" => stream_route(),
-            "writer_bounded_policy" => bounded_route(),
-            "raw_split_merge_and_opaque_preservation" => merge_route(package, negative),
-            "raw_xml_splice_merge_publication" => splice_route(package, negative),
-            "unified_facade_raw_parts_and_publication" => facade_route(package),
-            "consumer_reopen_matrix" => consumer_route(families, iterations),
+        macro_rules! finish_route {
+            ($route_id:literal, $route:expr) => {{
+                let (details, operation) = $route;
+                let timing_value = timing(mode, iterations, operation);
+                json!({
+                    "route": $route_id,
+                    "family": descriptor($route_id)["family"],
+                    "descriptor": descriptor($route_id),
+                    "mode": mode,
+                    "iterations": iterations,
+                    "details": details,
+                    "timing": timing_value,
+                })
+            }};
+        }
+        match id {
+            "archive_catalog_and_raw_split" => {
+                finish_route!("archive_catalog_and_raw_split", archive_route(package))
+            },
+            "manifest_xml_stream_and_parse" => {
+                finish_route!("manifest_xml_stream_and_parse", manifest_route(package))
+            },
+            "metadata_xml_and_namespace_resolution" => {
+                finish_route!("metadata_xml_and_namespace_resolution", metadata_route())
+            },
+            "writer_memory_publication" => {
+                finish_route!("writer_memory_publication", memory_route(package))
+            },
+            "writer_stream_publication" => {
+                finish_route!("writer_stream_publication", stream_route())
+            },
+            "writer_bounded_policy" => finish_route!("writer_bounded_policy", bounded_route()),
+            "raw_split_merge_and_opaque_preservation" => finish_route!(
+                "raw_split_merge_and_opaque_preservation",
+                merge_route(package, negative)
+            ),
+            "raw_xml_splice_merge_publication" => finish_route!(
+                "raw_xml_splice_merge_publication",
+                splice_route(package, negative)
+            ),
+            "unified_facade_raw_parts_and_publication" => finish_route!(
+                "unified_facade_raw_parts_and_publication",
+                facade_route(package)
+            ),
+            "consumer_reopen_matrix" => finish_route!(
+                "consumer_reopen_matrix",
+                consumer_route(families, iterations)
+            ),
             _ => panic!("unknown route {id}"),
-        };
-        let timing_value = timing(mode, iterations, operation);
-        json!({
-            "route": id,
-            "family": descriptor(id)["family"],
-            "descriptor": descriptor(id),
-            "mode": mode,
-            "iterations": iterations,
-            "details": details,
-            "timing": timing_value,
-        })
+        }
     }
 
     fn parse_args() -> (String, String, usize) {

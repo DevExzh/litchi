@@ -56,6 +56,8 @@ PRODUCTION_MANIFEST = Path("crates/litchi-ops/Cargo.toml")
 LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
 CANDIDATE_LOCK_SHA256 = "89ee807d671d102c215e9067cb19814f67c81794cd250c4a94253bac329506a4"
 CANDIDATE_LOCK_BYTES = 57961
+CANDIDATE_LOCK_BEFORE_SHA256 = "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea"
+CANDIDATE_LOCK_BEFORE_BYTES = 56941
 BUILD_PROFILE = "release"
 BUILD_FLAG = "--release"
 BUILD_BINARY_DIRECTORY = "release"
@@ -393,7 +395,7 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         "production_manifest": str(PRODUCTION_MANIFEST),
         "lock_path": str(LOCK_PATH),
         "baseline_overlay": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
-        "candidate_overlay": [str(CONSUMER_MANIFEST), str(PROBE_PATH)],
+        "candidate_overlay": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
     }
     for key, expected in expected_source.items():
         if source.get(key) != expected:
@@ -405,6 +407,12 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
         raise RunnerError("source.candidate_lock_bytes must be a positive integer")
     if lock_sha != CANDIDATE_LOCK_SHA256 or lock_bytes != CANDIDATE_LOCK_BYTES:
         raise RunnerError("manifest candidate lock identity is not the reviewed repaired lock")
+    lock_before_sha = _require_sha(source.get("candidate_lock_before_sha256"), "source.candidate_lock_before_sha256", 64)
+    lock_before_bytes = source.get("candidate_lock_before_bytes")
+    if isinstance(lock_before_bytes, bool) or not isinstance(lock_before_bytes, int) or lock_before_bytes <= 0:
+        raise RunnerError("source.candidate_lock_before_bytes must be a positive integer")
+    if lock_before_sha != CANDIDATE_LOCK_BEFORE_SHA256 or lock_before_bytes != CANDIDATE_LOCK_BEFORE_BYTES:
+        raise RunnerError("manifest candidate pre-overlay lock identity is not the pinned C33 lock")
     probe = data.get("probe")
     if not isinstance(probe, Mapping) or probe.get("path") != str(PROBE_PATH):
         raise RunnerError("manifest probe path differs")
@@ -465,6 +473,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     normalized["routes"] = routes
     normalized["candidate_lock_sha256"] = lock_sha
     normalized["candidate_lock_bytes"] = lock_bytes
+    normalized["candidate_lock_before_sha256"] = lock_before_sha
+    normalized["candidate_lock_before_bytes"] = lock_before_bytes
     normalized["candidate_consumer_manifest_sha256"] = consumer_sha
     normalized["probe_sha256"] = probe_sha
     normalized["candidate_commit"] = candidate
@@ -501,8 +511,10 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
         raise RunnerError("preparation candidate source states are missing")
     if _resolve(str(candidate_before.get("root"))) != candidate_root or candidate_before.get("head") != manifest["candidate_commit"] or candidate_before.get("clean") is not True:
         raise RunnerError("preparation candidate production before-state differs")
-    if _resolve(str(candidate_after.get("root"))) != candidate_root or candidate_after.get("tree") != candidate_before.get("tree") or sorted(_status_paths(str(candidate_after.get("status", "")))) != sorted([str(CONSUMER_MANIFEST), str(PROBE_PATH)]) or sorted(candidate.get("overlay_paths") or []) != sorted([str(CONSUMER_MANIFEST), str(PROBE_PATH)]):
+    if _resolve(str(candidate_after.get("root"))) != candidate_root or candidate_after.get("tree") != candidate_before.get("tree") or sorted(_status_paths(str(candidate_after.get("status", "")))) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]) or sorted(candidate.get("overlay_paths") or []) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]):
         raise RunnerError("preparation candidate overlay differs")
+    if candidate.get("production_source_tree_before_sha256") != candidate.get("production_source_tree_sha256"):
+        raise RunnerError("candidate consumer overlay changed the recorded production source tree")
     if candidate.get("production_tree_sha256") != reviewed._production_tree(candidate_root):
         raise RunnerError("preparation candidate production tree differs")
     adapter = data.get("adapter")
@@ -522,16 +534,17 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
     candidate_consumer = candidate.get("consumer_manifest")
     candidate_probe = candidate.get("probe")
     candidate_lock = candidate.get("lock")
+    candidate_lock_before = candidate.get("lock_before_overlay")
     baseline_probe = baseline.get("probe")
     baseline_lock = baseline.get("lock")
     baseline_consumer = baseline.get("consumer_manifest")
-    for value, label in ((candidate_consumer, "candidate consumer manifest"), (candidate_probe, "candidate probe"), (candidate_lock, "candidate lock"), (baseline_consumer, "baseline consumer manifest"), (baseline_probe, "baseline probe"), (baseline_lock, "baseline lock")):
+    for value, label in ((candidate_consumer, "candidate consumer manifest"), (candidate_probe, "candidate probe"), (candidate_lock, "candidate lock"), (candidate_lock_before, "candidate pre-overlay lock"), (baseline_consumer, "baseline consumer manifest"), (baseline_probe, "baseline probe"), (baseline_lock, "baseline lock")):
         if not isinstance(value, Mapping):
             raise RunnerError(f"preparation {label} identity is missing")
         _require_sha(value.get("sha256"), f"preparation {label} SHA", 64)
         if not isinstance(value.get("bytes"), int) or value["bytes"] <= 0:
             raise RunnerError(f"preparation {label} size is invalid")
-    if candidate_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or candidate_probe["sha256"] != manifest["probe_sha256"] or candidate_lock["sha256"] != candidate_lock_sha256 or candidate_lock["bytes"] != manifest["candidate_lock_bytes"] or baseline_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or baseline_probe["sha256"] != manifest["probe_sha256"]:
+    if candidate_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or candidate_probe["sha256"] != manifest["probe_sha256"] or candidate_lock["sha256"] != candidate_lock_sha256 or candidate_lock["bytes"] != manifest["candidate_lock_bytes"] or candidate_lock_before["sha256"] != manifest["candidate_lock_before_sha256"] or candidate_lock_before["bytes"] != manifest["candidate_lock_before_bytes"] or baseline_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or baseline_probe["sha256"] != manifest["probe_sha256"]:
         raise RunnerError("preparation adapter/lock does not match selected manifest")
     if _resolve(str(candidate_consumer.get("path"))) != _resolve(CONSUMER_MANIFEST, base=candidate_root):
         raise RunnerError("preparation candidate consumer manifest path is not canonical")
@@ -541,19 +554,22 @@ def _validate_preparation(data: Mapping[str, Any], digest: str, *, manifest: Map
         raise RunnerError("preparation candidate probe path is not canonical")
     if _resolve(str(candidate_lock.get("path"))) != _resolve(LOCK_PATH, base=candidate_root):
         raise RunnerError("preparation candidate lock path is not canonical")
+    if _resolve(str(candidate_lock_before.get("path"))) != _resolve(LOCK_PATH, base=candidate_root):
+        raise RunnerError("preparation candidate pre-overlay lock path is not canonical")
     if _resolve(str(baseline_probe.get("source_path"))) != _resolve(str(adapter["probe"]["path"])):
         raise RunnerError("preparation baseline probe source is not the selected adapter probe")
     adapter_consumer = adapter.get("consumer_manifest")
     adapter_probe = adapter.get("probe")
-    for value, label in ((adapter_consumer, "adapter consumer manifest"), (adapter_probe, "adapter probe")):
+    adapter_lock = adapter.get("lock")
+    for value, label in ((adapter_consumer, "adapter consumer manifest"), (adapter_probe, "adapter probe"), (adapter_lock, "adapter lock")):
         if not isinstance(value, Mapping) or _resolve(str(value.get("path"))).is_symlink():
             raise RunnerError(f"preparation {label} identity is missing or symlinked")
         observed, size = _sha256_file(_resolve(str(value["path"])))
         if observed != value.get("sha256") or size != value.get("bytes"):
             raise RunnerError(f"preparation {label} bytes differ")
-    if adapter_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or adapter_probe["sha256"] != manifest["probe_sha256"]:
+    if adapter_consumer["sha256"] != manifest["candidate_consumer_manifest_sha256"] or adapter_probe["sha256"] != manifest["probe_sha256"] or adapter_lock["sha256"] != manifest["candidate_lock_sha256"] or adapter_lock["bytes"] != manifest["candidate_lock_bytes"]:
         raise RunnerError("adapter overlay bytes differ from the manifest")
-    if _resolve(str(candidate_consumer.get("source_path"))) != _resolve(str(adapter_consumer["path"])) or _resolve(str(candidate_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])):
+    if _resolve(str(candidate_consumer.get("source_path"))) != _resolve(str(adapter_consumer["path"])) or _resolve(str(candidate_probe.get("source_path"))) != _resolve(str(adapter_probe["path"])) or _resolve(str(candidate_lock.get("source_path"))) != _resolve(str(adapter_lock["path"])):
         raise RunnerError("candidate overlay source is not the selected adapter")
     baseline_lock_source = _resolve(str(baseline_lock.get("source_path")))
     if _under(baseline_lock_source, baseline_root) or _under(baseline_lock_source, candidate_root) or _under(baseline_lock_source, adapter_root):

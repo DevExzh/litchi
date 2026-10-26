@@ -3,8 +3,9 @@
 
 This is source preparation only.  It never invokes Cargo, Rust, a probe, or
 timing code.  The baseline is the exact pre-migration commit; its only
-overlay is the reviewed consumer adapter and a separately hashed lockfile.
-The candidate remains pinned to C33 and receives only that adapter overlay;
+overlay is the reviewed consumer adapter and a separately hashed baseline
+lockfile.  The candidate remains pinned to C33 and receives only that
+adapter's consumer manifest, probe, and separately hashed consumer lock;
 production files are never copied from the adapter endpoint.
 """
 
@@ -33,6 +34,8 @@ LOCK_PATH = Path("tools/perf-baseline/Cargo.lock")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 UPSTREAM_COMPONENT = "3rd" + "party"
+CANDIDATE_LOCK_BEFORE_SHA256 = "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea"
+CANDIDATE_LOCK_BEFORE_BYTES = 56941
 
 
 class PreparationError(RuntimeError):
@@ -244,6 +247,7 @@ def prepare(
 
     adapter_probe = _resolve(PROBE_PATH, base=adapter_root)
     adapter_consumer = _resolve(CONSUMER_MANIFEST, base=adapter_root)
+    adapter_lock = _resolve(LOCK_PATH, base=adapter_root)
     candidate_probe = _resolve(PROBE_PATH, base=candidate_root)
     candidate_consumer = _resolve(CONSUMER_MANIFEST, base=candidate_root)
     candidate_lock = _resolve(LOCK_PATH, base=candidate_root)
@@ -255,18 +259,25 @@ def prepare(
         raise PreparationError("baseline lock source must be external to every source endpoint")
     adapter_probe_sha, adapter_probe_bytes = _sha256(adapter_probe)
     adapter_consumer_sha, adapter_consumer_bytes = _sha256(adapter_consumer)
-    observed_candidate_lock_sha, candidate_lock_bytes = _sha256(candidate_lock)
-    if observed_candidate_lock_sha != candidate_lock_sha256:
-        raise PreparationError("candidate Cargo.lock hash does not match supplied identity")
+    adapter_lock_sha, adapter_lock_bytes = _sha256(adapter_lock)
+    candidate_lock_before_sha, candidate_lock_before_bytes = _sha256(candidate_lock)
+    candidate_production_source_tree_before = _production_source_tree(candidate_root)
+    if (candidate_lock_before_sha, candidate_lock_before_bytes) != (
+        CANDIDATE_LOCK_BEFORE_SHA256,
+        CANDIDATE_LOCK_BEFORE_BYTES,
+    ):
+        raise PreparationError("candidate Cargo.lock before-overlay identity differs from pinned C33")
+    if adapter_lock_sha != candidate_lock_sha256:
+        raise PreparationError("adapter candidate Cargo.lock does not match supplied identity")
     if candidate_probe.exists() or candidate_probe.is_symlink():
         raise PreparationError(f"candidate probe destination must be absent: {candidate_probe}")
     baseline_lock_sha, baseline_lock_bytes = _sha256(external_lock)
     if baseline_probe.exists() or baseline_probe.is_symlink():
         raise PreparationError(f"baseline probe destination must be absent: {baseline_probe}")
-    if candidate_consumer.is_symlink() or baseline_consumer.is_symlink() or baseline_lock_destination.is_symlink():
+    if candidate_consumer.is_symlink() or baseline_consumer.is_symlink() or candidate_lock.is_symlink() or baseline_lock_destination.is_symlink():
         raise PreparationError("consumer/lock overlay destination may not be a symlink")
 
-    destinations = (baseline_probe, baseline_consumer, baseline_lock_destination, candidate_probe, candidate_consumer)
+    destinations = (baseline_probe, baseline_consumer, baseline_lock_destination, candidate_probe, candidate_consumer, candidate_lock)
     for destination in destinations:
         if destination.exists() and not destination.is_file():
             raise PreparationError(f"overlay destination must be a regular file or absent: {destination}")
@@ -283,6 +294,7 @@ def prepare(
         shutil.copyfile(adapter_probe, candidate_probe)
         shutil.copyfile(adapter_consumer, baseline_consumer)
         shutil.copyfile(adapter_consumer, candidate_consumer)
+        shutil.copyfile(adapter_lock, candidate_lock)
         shutil.copyfile(external_lock, baseline_lock_destination)
     except BaseException:
         for path, content in backups.items():
@@ -293,23 +305,29 @@ def prepare(
         raise
     prepared_probe_sha, prepared_probe_bytes = _sha256(baseline_probe)
     prepared_consumer_sha, prepared_consumer_bytes = _sha256(baseline_consumer)
+    prepared_candidate_lock_sha, prepared_candidate_lock_bytes = _sha256(candidate_lock)
     prepared_lock_sha, prepared_lock_size = _sha256(baseline_lock_destination)
     if (prepared_probe_sha, prepared_probe_bytes) != (adapter_probe_sha, adapter_probe_bytes):
         raise PreparationError("baseline adapter differs from the reviewed adapter probe")
     if (prepared_consumer_sha, prepared_consumer_bytes) != (adapter_consumer_sha, adapter_consumer_bytes):
         raise PreparationError("baseline consumer manifest differs from the reviewed adapter")
+    if (prepared_candidate_lock_sha, prepared_candidate_lock_bytes) != (adapter_lock_sha, adapter_lock_bytes):
+        raise PreparationError("candidate Cargo.lock differs from the reviewed adapter lock")
     if (prepared_lock_sha, prepared_lock_size) != (baseline_lock_sha, baseline_lock_bytes):
         raise PreparationError("baseline Cargo.lock differs from pinned external lock")
 
     after = _source_state(baseline_root)
     candidate_after = _source_state(candidate_root)
+    candidate_production_source_tree_after = _production_source_tree(candidate_root)
     allowed_status = [str(CONSUMER_MANIFEST), str(PROBE_PATH)]
     if str(LOCK_PATH) in _status_paths(after["status"]):
         allowed_status.append(str(LOCK_PATH))
     if sorted(_status_paths(after["status"])) != sorted(allowed_status):
         raise PreparationError(f"baseline overlay changed unexpected paths: {_status_paths(after['status'])!r}")
-    if sorted(_status_paths(candidate_after["status"])) != sorted([str(CONSUMER_MANIFEST), str(PROBE_PATH)]):
+    if sorted(_status_paths(candidate_after["status"])) != sorted([str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)]):
         raise PreparationError(f"candidate overlay changed unexpected paths: {_status_paths(candidate_after['status'])!r}")
+    if candidate_production_source_tree_after != candidate_production_source_tree_before:
+        raise PreparationError("candidate consumer overlay changed the production source tree")
     if after["tree"] != baseline["tree"]:
         raise PreparationError("baseline tracked production tree changed during overlay")
     preparation = {
@@ -331,11 +349,13 @@ def prepare(
             "before": candidate,
             "after_overlay": candidate_after,
             "production_tree_sha256": _production_tree(candidate_root),
-            "production_source_tree_sha256": _production_source_tree(candidate_root),
-            "overlay_paths": [str(CONSUMER_MANIFEST), str(PROBE_PATH)],
+            "production_source_tree_before_sha256": candidate_production_source_tree_before,
+            "production_source_tree_sha256": candidate_production_source_tree_after,
+            "overlay_paths": [str(CONSUMER_MANIFEST), str(LOCK_PATH), str(PROBE_PATH)],
             "consumer_manifest": {"source_path": str(adapter_consumer), "path": str(candidate_consumer), "sha256": adapter_consumer_sha, "bytes": adapter_consumer_bytes},
             "probe": {"source_path": str(adapter_probe), "path": str(candidate_probe), "sha256": adapter_probe_sha, "bytes": adapter_probe_bytes},
-            "lock": {"path": str(candidate_lock), "sha256": observed_candidate_lock_sha, "bytes": candidate_lock_bytes},
+            "lock_before_overlay": {"path": str(candidate_lock), "sha256": candidate_lock_before_sha, "bytes": candidate_lock_before_bytes},
+            "lock": {"source_path": str(adapter_lock), "path": str(candidate_lock), "sha256": prepared_candidate_lock_sha, "bytes": prepared_candidate_lock_bytes},
         },
         "adapter": {
             "root": str(adapter_root),
@@ -344,6 +364,7 @@ def prepare(
             "production_source_tree_sha256": _production_source_tree(adapter_root),
             "consumer_manifest": {"path": str(adapter_consumer), "sha256": adapter_consumer_sha, "bytes": adapter_consumer_bytes},
             "probe": {"path": str(adapter_probe), "sha256": adapter_probe_sha, "bytes": adapter_probe_bytes},
+            "lock": {"path": str(adapter_lock), "sha256": adapter_lock_sha, "bytes": adapter_lock_bytes},
         },
         "claim_scope": "source preparation identity only; no native acceptance claim; no build or timing claim",
     }

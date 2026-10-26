@@ -60,15 +60,19 @@ class OdfRawPreparationTests(unittest.TestCase):
             candidate = root / "candidate"
             adapter = root / "adapter"
             baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
-            candidate_ref = repository(candidate, probe=None, lock=b"candidate lock\n", consumer=True)
-            repository(adapter, probe=b"reviewed raw adapter\n", lock=None, consumer=True)
+            candidate_ref = repository(candidate, probe=None, lock=b"candidate old lock\n", consumer=True)
+            repository(adapter, probe=b"reviewed raw adapter\n", lock=b"candidate lock\n", consumer=True)
             external_lock = root / "baseline.lock"
             external_lock.write_bytes(b"baseline lock\n")
             output = root / "preparation.json"
             old = prep.BASELINE_COMMIT
             old_candidate = prep.CANDIDATE_COMMIT
+            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
+            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
             prep.BASELINE_COMMIT = baseline_ref
             prep.CANDIDATE_COMMIT = candidate_ref
+            prep.CANDIDATE_LOCK_BEFORE_SHA256 = hashlib.sha256(b"candidate old lock\n").hexdigest()
+            prep.CANDIDATE_LOCK_BEFORE_BYTES = len(b"candidate old lock\n")
             try:
                 value = prep.prepare(
                     baseline_root=baseline,
@@ -82,6 +86,8 @@ class OdfRawPreparationTests(unittest.TestCase):
             finally:
                 prep.BASELINE_COMMIT = old
                 prep.CANDIDATE_COMMIT = old_candidate
+                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
+                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
             self.assertEqual(value["lane"], prep.LANE)
             self.assertEqual(
                 sorted(prep._status_paths(value["baseline"]["after_overlay"]["status"])),
@@ -89,6 +95,23 @@ class OdfRawPreparationTests(unittest.TestCase):
             )
             self.assertEqual((baseline / prep.PROBE_PATH).read_bytes(), b"reviewed raw adapter\n")
             self.assertEqual((baseline / prep.LOCK_PATH).read_bytes(), b"baseline lock\n")
+            self.assertEqual((candidate / prep.LOCK_PATH).read_bytes(), b"candidate lock\n")
+            self.assertEqual(
+                sorted(prep._status_paths(value["candidate"]["after_overlay"]["status"])),
+                sorted([str(prep.CONSUMER_MANIFEST), str(prep.LOCK_PATH), str(prep.PROBE_PATH)]),
+            )
+            self.assertEqual(
+                value["candidate"]["lock_before_overlay"]["sha256"],
+                hashlib.sha256(b"candidate old lock\n").hexdigest(),
+            )
+            self.assertEqual(
+                value["candidate"]["lock"]["source_path"],
+                str(adapter / prep.LOCK_PATH),
+            )
+            self.assertEqual(
+                value["candidate"]["production_source_tree_before_sha256"],
+                value["candidate"]["production_source_tree_sha256"],
+            )
             self.assertIn("no build", value["claim_scope"])
             manifest = json.loads(
                 (Path(__file__).resolve().parents[1] / "tools/native_qualification/manifests/odf-raw-codec.json").read_text(encoding="utf-8")
@@ -96,21 +119,29 @@ class OdfRawPreparationTests(unittest.TestCase):
             manifest["baseline_commit"] = baseline_ref
             manifest["candidate_commit"] = candidate_ref
             manifest["source"]["candidate_consumer_manifest_sha256"] = value["candidate"]["consumer_manifest"]["sha256"]
+            manifest["source"]["candidate_lock_before_sha256"] = value["candidate"]["lock_before_overlay"]["sha256"]
+            manifest["source"]["candidate_lock_before_bytes"] = value["candidate"]["lock_before_overlay"]["bytes"]
             manifest["source"]["candidate_lock_sha256"] = value["candidate"]["lock"]["sha256"]
             manifest["source"]["candidate_lock_bytes"] = value["candidate"]["lock"]["bytes"]
             manifest["probe"]["sha256"] = value["candidate"]["probe"]["sha256"]
             old_runner_candidate = runner.CANDIDATE_COMMIT
             old_runner_lock_sha = runner.CANDIDATE_LOCK_SHA256
             old_runner_lock_bytes = runner.CANDIDATE_LOCK_BYTES
+            old_runner_lock_before_sha = runner.CANDIDATE_LOCK_BEFORE_SHA256
+            old_runner_lock_before_bytes = runner.CANDIDATE_LOCK_BEFORE_BYTES
             runner.CANDIDATE_COMMIT = candidate_ref
             runner.CANDIDATE_LOCK_SHA256 = value["candidate"]["lock"]["sha256"]
             runner.CANDIDATE_LOCK_BYTES = value["candidate"]["lock"]["bytes"]
+            runner.CANDIDATE_LOCK_BEFORE_SHA256 = value["candidate"]["lock_before_overlay"]["sha256"]
+            runner.CANDIDATE_LOCK_BEFORE_BYTES = value["candidate"]["lock_before_overlay"]["bytes"]
             try:
                 manifest = runner.validate_manifest(manifest)
             finally:
                 runner.CANDIDATE_COMMIT = old_runner_candidate
                 runner.CANDIDATE_LOCK_SHA256 = old_runner_lock_sha
                 runner.CANDIDATE_LOCK_BYTES = old_runner_lock_bytes
+                runner.CANDIDATE_LOCK_BEFORE_SHA256 = old_runner_lock_before_sha
+                runner.CANDIDATE_LOCK_BEFORE_BYTES = old_runner_lock_before_bytes
             checked = runner._validate_preparation(
                 value,
                 hashlib.sha256(output.read_bytes()).hexdigest(),
@@ -135,6 +166,19 @@ class OdfRawPreparationTests(unittest.TestCase):
                     candidate_commit=candidate_ref,
                     candidate_lock_sha256=value["candidate"]["lock"]["sha256"],
                 )
+            mutated = json.loads(json.dumps(value))
+            mutated["candidate"]["lock_before_overlay"]["sha256"] = "0" * 64
+            with self.assertRaises(runner.RunnerError):
+                runner._validate_preparation(
+                    mutated,
+                    hashlib.sha256(json.dumps(mutated, sort_keys=True).encode()).hexdigest(),
+                    manifest=manifest,
+                    baseline_root=baseline.resolve(),
+                    candidate_root=candidate.resolve(),
+                    adapter_root=adapter.resolve(),
+                    candidate_commit=candidate_ref,
+                    candidate_lock_sha256=value["candidate"]["lock"]["sha256"],
+                )
 
     def test_rejects_historical_candidate_and_dirty_baseline(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-prep-guard-") as directory:
@@ -144,13 +188,17 @@ class OdfRawPreparationTests(unittest.TestCase):
             adapter = root / "adapter"
             baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
             candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
-            repository(adapter, probe=b"adapter\n", lock=None, consumer=True)
+            repository(adapter, probe=b"adapter\n", lock=b"candidate overlay\n", consumer=True)
             external_lock = root / "baseline.lock"
             external_lock.write_bytes(b"baseline\n")
             old = prep.BASELINE_COMMIT
             old_candidate = prep.CANDIDATE_COMMIT
+            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
+            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
             prep.BASELINE_COMMIT = baseline_ref
             prep.CANDIDATE_COMMIT = candidate_ref
+            prep.CANDIDATE_LOCK_BEFORE_SHA256 = hashlib.sha256(b"candidate\n").hexdigest()
+            prep.CANDIDATE_LOCK_BEFORE_BYTES = len(b"candidate\n")
             try:
                 (baseline / "dirty.txt").write_text("dirty", encoding="utf-8")
                 with self.assertRaisesRegex(prep.PreparationError, "clean"):
@@ -177,6 +225,8 @@ class OdfRawPreparationTests(unittest.TestCase):
             finally:
                 prep.BASELINE_COMMIT = old
                 prep.CANDIDATE_COMMIT = old_candidate
+                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
+                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
 
     def test_output_path_is_rejected_before_any_overlay(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-raw-prep-output-guard-") as directory:
@@ -186,7 +236,7 @@ class OdfRawPreparationTests(unittest.TestCase):
             adapter = root / "adapter"
             baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
             candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
-            repository(adapter, probe=b"adapter\n", lock=None, consumer=True)
+            repository(adapter, probe=b"adapter\n", lock=b"candidate\n", consumer=True)
             external_lock = root / "baseline.lock"
             external_lock.write_bytes(b"baseline\n")
             before_candidate = {
@@ -194,8 +244,12 @@ class OdfRawPreparationTests(unittest.TestCase):
             }
             old = prep.BASELINE_COMMIT
             old_candidate = prep.CANDIDATE_COMMIT
+            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
+            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
             prep.BASELINE_COMMIT = baseline_ref
             prep.CANDIDATE_COMMIT = candidate_ref
+            prep.CANDIDATE_LOCK_BEFORE_SHA256 = hashlib.sha256(b"candidate\n").hexdigest()
+            prep.CANDIDATE_LOCK_BEFORE_BYTES = len(b"candidate\n")
             try:
                 with self.assertRaisesRegex(prep.PreparationError, "outside source roots"):
                     prep.prepare(
@@ -210,6 +264,8 @@ class OdfRawPreparationTests(unittest.TestCase):
             finally:
                 prep.BASELINE_COMMIT = old
                 prep.CANDIDATE_COMMIT = old_candidate
+                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
+                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
             self.assertEqual(before_candidate, {path: path.read_bytes() for path in before_candidate})
             self.assertFalse((baseline / prep.PROBE_PATH).exists())
 
@@ -221,7 +277,7 @@ class OdfRawPreparationTests(unittest.TestCase):
             adapter = root / "adapter"
             baseline_ref = repository(baseline, probe=None, lock=None, consumer=False)
             candidate_ref = repository(candidate, probe=None, lock=b"candidate\n", consumer=True)
-            repository(adapter, probe=b"adapter\n", lock=None, consumer=True)
+            repository(adapter, probe=b"adapter\n", lock=b"candidate overlay\n", consumer=True)
             external_lock = root / "baseline.lock"
             external_lock.write_bytes(b"baseline\n")
             manifest = json.loads(
@@ -232,8 +288,10 @@ class OdfRawPreparationTests(unittest.TestCase):
             manifest["source"]["candidate_consumer_manifest_sha256"] = hashlib.sha256(
                 (adapter / prep.CONSUMER_MANIFEST).read_bytes()
             ).hexdigest()
-            manifest["source"]["candidate_lock_sha256"] = hashlib.sha256(b"candidate\n").hexdigest()
-            manifest["source"]["candidate_lock_bytes"] = len(b"candidate\n")
+            manifest["source"]["candidate_lock_before_sha256"] = hashlib.sha256(b"candidate\n").hexdigest()
+            manifest["source"]["candidate_lock_before_bytes"] = len(b"candidate\n")
+            manifest["source"]["candidate_lock_sha256"] = hashlib.sha256(b"candidate overlay\n").hexdigest()
+            manifest["source"]["candidate_lock_bytes"] = len(b"candidate overlay\n")
             manifest["probe"]["sha256"] = hashlib.sha256(
                 (adapter / prep.PROBE_PATH).read_bytes()
             ).hexdigest()
@@ -242,15 +300,23 @@ class OdfRawPreparationTests(unittest.TestCase):
             preparation_path = root / "preparation.json"
             old_baseline = prep.BASELINE_COMMIT
             old_candidate = prep.CANDIDATE_COMMIT
+            old_candidate_lock_before_sha = prep.CANDIDATE_LOCK_BEFORE_SHA256
+            old_candidate_lock_before_bytes = prep.CANDIDATE_LOCK_BEFORE_BYTES
             old_runner_candidate = runner.CANDIDATE_COMMIT
             old_runner_lock_sha = runner.CANDIDATE_LOCK_SHA256
             old_runner_lock_bytes = runner.CANDIDATE_LOCK_BYTES
+            old_runner_lock_before_sha = runner.CANDIDATE_LOCK_BEFORE_SHA256
+            old_runner_lock_before_bytes = runner.CANDIDATE_LOCK_BEFORE_BYTES
             old_build = runner.PairedRunner.build
             prep.BASELINE_COMMIT = baseline_ref
             prep.CANDIDATE_COMMIT = candidate_ref
+            prep.CANDIDATE_LOCK_BEFORE_SHA256 = manifest["source"]["candidate_lock_before_sha256"]
+            prep.CANDIDATE_LOCK_BEFORE_BYTES = manifest["source"]["candidate_lock_before_bytes"]
             runner.CANDIDATE_COMMIT = candidate_ref
             runner.CANDIDATE_LOCK_SHA256 = manifest["source"]["candidate_lock_sha256"]
             runner.CANDIDATE_LOCK_BYTES = manifest["source"]["candidate_lock_bytes"]
+            runner.CANDIDATE_LOCK_BEFORE_SHA256 = manifest["source"]["candidate_lock_before_sha256"]
+            runner.CANDIDATE_LOCK_BEFORE_BYTES = manifest["source"]["candidate_lock_before_bytes"]
 
             def admit_endpoints(instance: runner.PairedRunner) -> None:
                 instance._endpoint("baseline", full=True)
@@ -321,8 +387,12 @@ class OdfRawPreparationTests(unittest.TestCase):
                 runner.CANDIDATE_COMMIT = old_runner_candidate
                 runner.CANDIDATE_LOCK_SHA256 = old_runner_lock_sha
                 runner.CANDIDATE_LOCK_BYTES = old_runner_lock_bytes
+                runner.CANDIDATE_LOCK_BEFORE_SHA256 = old_runner_lock_before_sha
+                runner.CANDIDATE_LOCK_BEFORE_BYTES = old_runner_lock_before_bytes
                 prep.BASELINE_COMMIT = old_baseline
                 prep.CANDIDATE_COMMIT = old_candidate
+                prep.CANDIDATE_LOCK_BEFORE_SHA256 = old_candidate_lock_before_sha
+                prep.CANDIDATE_LOCK_BEFORE_BYTES = old_candidate_lock_before_bytes
 
 
 if __name__ == "__main__":
