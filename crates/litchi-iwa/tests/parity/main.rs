@@ -40,6 +40,7 @@ mod keynote_slide_cases;
 mod keynote_table_cases;
 mod keynote_w1c_cost;
 mod numbers_cases;
+mod numbers_cell_list_cases;
 mod numbers_cell_text_cases;
 mod numbers_owner_allocation;
 mod pages_caption_cases;

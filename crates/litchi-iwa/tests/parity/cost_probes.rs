@@ -197,3 +197,49 @@ fn numbers_cell_text_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+#[inline(never)]
+fn host_cell_list(source: &[u8], numbered: bool) -> TestResult<Vec<u8>> {
+    use litchi_iwa_text::paragraph::list::ParagraphList;
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let list = if numbered {
+        ParagraphList::Numbered
+    } else {
+        ParagraphList::Bullet
+    };
+    editor.set_table_cell_paragraph_list(id, 1, 1, list)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_cell_list(source: &[u8], numbered: bool) -> TestResult<Vec<u8>> {
+    use litchi_numbers::cell::list::ParagraphList;
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let list = if numbered {
+        ParagraphList::Numbered
+    } else {
+        ParagraphList::Bullet
+    };
+    let commit = package
+        .edit_table_cell_lists(0usize, 0usize)?
+        .set_list(litchi_numbers::table::At::new(1, 1), list)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Cell paragraph list on `basic.numbers` B2: a bullet list on the plain
+/// cell (promotion), then a numbered list on the host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_cell_list_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let listed = host_cell_list(&input.bytes, false)?;
+    for (bytes, numbered) in [(&input.bytes, false), (&listed, true)] {
+        black_box(host_cell_list(bytes, numbered)?);
+        black_box(leaf_cell_list(bytes, numbered)?);
+        black_box(leaf_cell_list(bytes, numbered)?);
+        black_box(host_cell_list(bytes, numbered)?);
+    }
+    Ok(())
+}
