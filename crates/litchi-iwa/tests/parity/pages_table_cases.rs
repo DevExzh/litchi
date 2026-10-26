@@ -161,3 +161,76 @@ fn pages_body_table_cells_read_parity() -> TestResult {
     }
     Ok(())
 }
+
+const COMMENTS: &str = "iwork/pages/body-table-comment-hidden-native-saved.pages";
+
+/// The table list, merges and cell comments read the same through the host
+/// (`tables`, `Table::{merges, get_comment, iter_comments, comment_count}`,
+/// `table_cell_comment[_replies]`) and the leaf (`body_tables`,
+/// `body_table_merges`, `body_table_cells`) on native fixtures.
+#[test]
+fn pages_body_table_reads_parity() -> TestResult {
+    let input = fixture(COMMENTS)?;
+    Case::new(
+        "pages_body_table_reads_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Native(
+            "test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json",
+        ),
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("leaf body_table_cells", leaf_cells)
+    .run()?;
+    for path in [
+        COMMENTS,
+        CELLS,
+        CATALOG,
+        "iwork/pages/body-table-merges-native.pages",
+    ] {
+        let input = fixture(path)?;
+        let host = pages::Draft::from_bytes(&input.bytes)?;
+        let package = Package::from_bytes(&input.bytes)?;
+        let catalog = package.body_tables()?;
+        let tables = host.tables()?;
+        assert_eq!(tables.len(), catalog.len(), "{path}");
+        for (index, info) in tables.iter().enumerate() {
+            let entry = catalog.get(index).ok_or("catalog entry")?;
+            assert_eq!(entry.name(), info.name, "{path}");
+            let host_table = host.table(info.model_object_id)?;
+            let leaf_read = package.body_table_cells(index)?;
+            assert_eq!(
+                host_table.comment_count(),
+                leaf_read.comment_count(),
+                "{path}"
+            );
+            for ((row, column), comment) in host_table.iter_comments() {
+                let at = litchi_iwa_common::table::coordinate::At::new(
+                    u32::try_from(row)?,
+                    u32::try_from(column)?,
+                );
+                assert_eq!(leaf_read.get_comment(at), Some(comment), "{path}");
+                assert_eq!(host_table.get_comment(row, column), Some(comment));
+                let native = host
+                    .table_cell_comment(info.model_object_id, row, column)?
+                    .ok_or("host cell comment")?;
+                assert_eq!(native.comment.text, comment.text(), "{path}");
+                assert_eq!(
+                    host.table_cell_comment_replies(info.model_object_id, row, column)?
+                        .len(),
+                    comment.reply_count(),
+                    "{path}"
+                );
+            }
+            assert_eq!(
+                host_table.merges(),
+                package.body_table_merges(index)?.as_slice(),
+                "{path}"
+            );
+        }
+    }
+    Ok(())
+}
