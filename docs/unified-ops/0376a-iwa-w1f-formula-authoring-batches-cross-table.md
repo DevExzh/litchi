@@ -123,7 +123,7 @@ size dimension as one, as the source decode does. Numbers refused both
 shapes before, so these are capabilities the Numbers formula path gains;
 every `litchi-numbers` test passes unchanged (1,025).
 
-Follow-up `ed…` (this record's last code commit): the Pages SUM-table
+Follow-up `948d0010e6`: the Pages SUM-table
 authoring case, refused in the first 0376a slice, now passes tier B.
 
 ## 5. Performance
