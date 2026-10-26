@@ -7,7 +7,8 @@ shim first on PATH):
 
     python3 tools/final_api_inventory.py --output <dir outside the checkout>
 
-The capture is sequential (one rustdoc at a time). Each package's JSON is
+The capture is sequential (one rustdoc at a time) and offline; the root
+``Cargo.lock`` is untracked, so it is not passed ``--locked``. Each package's JSON is
 copied to ``<output>/inventory/<package>.json`` and listed in
 ``<output>/manifest.tsv`` with its size and SHA-256. A rerun on the same clean
 source commit reuses a JSON whose manifest row still matches; any other commit
@@ -83,7 +84,7 @@ def enumerate_packages(root: Path) -> list[Package]:
 def rustdoc_command(package: Package, target: Path, cargo: str = "cargo") -> list[str]:
     return [
         cargo, "rustdoc", "--package", package.name, "--lib", "--all-features",
-        "--offline", "--locked", "--target-dir", str(target), "--",
+        "--offline", "--target-dir", str(target), "--",
         "-Zunstable-options", "--output-format", "json", "--document-hidden-items",
     ]
 
