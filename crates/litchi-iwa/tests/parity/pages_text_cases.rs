@@ -897,3 +897,41 @@ fn text_number_attachment_remove_cost_abba() -> TestResult {
         },
     )
 }
+
+/// `body_storage` and `body_text` against the leaf reads of the same names,
+/// on native fixtures with sections, tables, media and footnote markers.
+#[test]
+fn pages_body_storage_read_parity() -> TestResult {
+    let input = fixture(BASIC)?;
+    Case::new(
+        "pages_body_storage_read_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host body text", |bytes: &[u8]| {
+        Ok(pages::Draft::from_bytes(bytes)?.body_text()?)
+    })
+    .read("leaf body_text", |bytes: &[u8]| {
+        Ok(Package::from_bytes(bytes)?.body_text()?)
+    })
+    .run()?;
+    for path in [
+        BASIC,
+        "iwork/pages/body-sections-unicode.pages",
+        "iwork/pages/body-table-catalog-native.pages",
+        "iwork/pages/image-adjustments-native.pages",
+        "iwork/pages/chart-data-native.pages",
+    ] {
+        let document = fixture(path)?;
+        let host = pages::Draft::from_bytes(&document.bytes)?;
+        let leaf = Package::from_bytes(&document.bytes)?;
+        assert_eq!(host.body_text()?, leaf.body_text()?, "{path}");
+        assert_eq!(host.body_storage()?.storage, leaf.body_storage()?, "{path}");
+    }
+    Ok(())
+}
