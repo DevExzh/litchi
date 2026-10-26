@@ -21,8 +21,13 @@ use litchi_numbers_wire::{
 use thiserror::Error as ThisError;
 
 use super::section_text_style::{component_name_of, parse_member};
+
+mod formulas;
+
 use super::{Package, find_object, table_lock};
 use crate::BodyTableSelector;
+/// Formula vocabulary of [`Edit::set_formula_cached`].
+pub(crate) use litchi_iwa_common::formula;
 
 const TABLE_MODEL: u32 = 6_001;
 const TILE: u32 = 6_002;
@@ -279,6 +284,9 @@ pub struct Edit<'a> {
     selector: table_lock::OwnedBodyTableSelector,
     target: Option<table_lock::BodyTableTarget>,
     cells: Vec<(u32, u32, Value)>,
+    /// The formulas staged with `set_formula_cached`; their cached values
+    /// are in `cells` (record 0376a).
+    formulas: Vec<(u32, u32, formula::FormulaExpression)>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -319,10 +327,49 @@ impl Edit<'_> {
             return Err(Error::Refused(Refusal::InvalidCell));
         }
         self.cells.retain(|(r, c, _)| (*r, *c) != (row, column));
+        self.formulas.retain(|(r, c, _)| (*r, *c) != (row, column));
         self.cells
             .try_reserve(1)
             .map_err(|_error| Error::Allocation { amount: 1 })?;
         self.cells.push((row, column, value));
+        Ok(self)
+    }
+
+    /// Stage the formula of a cell, with `cached` as its displayed result
+    /// until the next native recalculation; any formula the cell holds is
+    /// replaced (record 0376a). A later stage of the same cell replaces this
+    /// one; [`Edit::set`] clears the formula.
+    ///
+    /// The formula reads cells of its own table: a reference to another
+    /// table (named by native identifier) or a pivot category is refused at
+    /// commit, and so are a date or duration cache and a table whose
+    /// dependency records the shared engine cannot place. Formulas that read
+    /// the cell keep their caches, as in the native unrecalculated state.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidCell`] outside the table or for a non-finite
+    /// number; [`Refusal::Formulas`] for a date or duration cache.
+    pub fn set_formula_cached(
+        &mut self,
+        row: u32,
+        column: u32,
+        expression: formula::FormulaExpression,
+        cached: formula::FormulaCachedValue,
+    ) -> Result<&mut Self, Error> {
+        let value = match cached {
+            formula::FormulaCachedValue::Number(number) => Value::Number(number.get()),
+            formula::FormulaCachedValue::Text(text) => Value::Text(text),
+            formula::FormulaCachedValue::Boolean(flag) => Value::Boolean(flag),
+            formula::FormulaCachedValue::Date(_) | formula::FormulaCachedValue::Duration(_) => {
+                return Err(Error::Refused(Refusal::Formulas));
+            },
+        };
+        self.set(row, column, value)?;
+        self.formulas
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation { amount: 1 })?;
+        self.formulas.push((row, column, expression));
         Ok(self)
     }
 
@@ -354,7 +401,12 @@ impl Edit<'_> {
                 .table()
                 .get(litchi_iwa_common::table::coordinate::At::new(*row, *column));
             use litchi_iwa_common::table::cell::value::Value as Read;
+            let formula = edit
+                .formulas
+                .iter()
+                .any(|(r, c, _)| (*r, *c) == (*row, *column));
             let ok = match value {
+                _ if formula => matches!(stored, Some(Read::Formula(_))),
                 Value::Text(text) => stored == Some(&Read::Text(text.clone())),
                 Value::Number(number) => {
                     matches!(stored, Some(Read::Number(stored)) if stored.get() == *number)
@@ -475,6 +527,11 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let limits = package
         .numbers_wire_limits()
         .map_err(|_| Error::InvalidSource)?;
+    // A formula to author or to remove takes the structural path, which can
+    // create and delete dependency tiles (record 0376a).
+    if formulas::involved(edit, &limits)? {
+        return formulas::publish(edit);
+    }
     // The calculation graph: plan the refresh of the formula caches that
     // read the written cells (record 0376) before any payload changes.
     let mut engine = None;
@@ -733,6 +790,7 @@ impl Package {
                 .map_err(map_target_error)?,
             target: None,
             cells: Vec::new(),
+            formulas: Vec::new(),
         })
     }
 
