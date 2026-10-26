@@ -301,9 +301,10 @@ pub enum Unsupported {
     ImageFormat,
     /// A character style that sets nothing ([`Edit::set_text_style`]).
     TextStyling,
-    /// The table holds formulas, or a formula or chart elsewhere reads it,
-    /// so a value change would need a recalculation
-    /// ([`Edit::set_table_cell`]).
+    /// The write replaces a formula cell, or a formula that reads the cell
+    /// is outside the shared cache refresh (record 0376: a direct text
+    /// reference, an unsupported function, a volatile, spanning or
+    /// UUID-referenced dependency) ([`Edit::set_table_cell`]).
     TableFormulas,
     /// The table's cell storage is outside the shared cell writer (a legacy
     /// tile, a missing tile, a rich-text, formula or commented cell).
