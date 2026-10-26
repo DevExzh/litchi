@@ -6171,3 +6171,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   retains 62 worktrees/75 heads, including the active ODF leaf and required
   qualification inputs; no unused unified leaf remains. C/P stay frozen, all
   25 actual qualification rows remain open, and nothing is pushed.
+
+  The complete Ops suite passes all 132 chunks (165d), including 1,022 library
+  tests and 217 doctests; root verifies 33 completed gate rows while facade
+  tests run. Sheet v3 is returned for changed allocator controls; v4 reuses
+  the exact preserved e63 adapter and awaits independent review. Legacy v2
+  is returned because its tracked test consumer was not migrated. OLE owner
+  source review passes. ODG/ODF/ODP require concrete final-C2a binders, and
+  OPC preparation is returned for an outdated runner and missing proof
+  checks. A rewritten three-lane review receipt is disclosed as unrecovered;
+  its readiness claim is withdrawn. Root rechecks 75 heads/62 worktrees;
+  required controls/baselines and the ODF leaf remain in use. C/P stay frozen,
+  full qualification remains open, and nothing is pushed.
