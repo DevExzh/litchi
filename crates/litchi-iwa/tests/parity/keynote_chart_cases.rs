@@ -342,3 +342,77 @@ fn keynote_slide_chart_read_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+/// Source-free chart creation on `basic.key` (every concrete kind family is
+/// exercised by the host's own tests; this case covers a two-series line
+/// chart and a scatter chart).
+#[test]
+fn keynote_slide_chart_add_parity() -> TestResult {
+    let input = fixture("iwork/keynote/basic.key")?;
+    let data = || {
+        litchi_iwa_common::chart::data::ChartData::new(
+            vec!["X".into(), "Y".into()],
+            vec!["Q1".into(), "Q2".into(), "Q3".into()],
+            vec![
+                vec![Some(1.0), Some(2.0), Some(3.0)],
+                vec![Some(5.0), None, Some(7.5)],
+            ],
+        )
+    };
+    let (line, scatter) = (data()?, data()?);
+    let (host_line, host_scatter) = (line.clone(), scatter.clone());
+    Case::new(
+        "keynote_slide_chart_add_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        editor.add_slide_chart(
+            SLIDE,
+            Kind::Line2d,
+            host_line,
+            DrawablePoint { x: 60.0, y: 120.0 },
+            DrawableSize {
+                width: 480.0,
+                height: 300.0,
+            },
+        )?;
+        editor.add_slide_chart(
+            SLIDE,
+            Kind::Scatter2d,
+            host_scatter,
+            DrawablePoint { x: 400.0, y: 200.0 },
+            DrawableSize {
+                width: 300.0,
+                height: 240.0,
+            },
+        )?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        leaf_run(source, |edit| {
+            edit.add(
+                SlideSelector::index(SLIDE),
+                Kind::Line2d,
+                line,
+                Geometry::new(60.0, 120.0, 480.0, 300.0),
+            )?;
+            edit.add(
+                SlideSelector::index(SLIDE),
+                Kind::Scatter2d,
+                scatter,
+                Geometry::new(400.0, 200.0, 300.0, 240.0),
+            )?;
+            Ok(())
+        })
+    })
+    .leaf_invalidates_root_previews()
+    .leaf_structural_metadata()
+    .read("host charts", host_charts)
+    .read("leaf charts", leaf_charts)
+    .run()?;
+    Ok(())
+}

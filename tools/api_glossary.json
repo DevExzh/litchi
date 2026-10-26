@@ -26486,32 +26486,32 @@
         {
           "name": "SlideMediaPropertiesCommit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Commit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesDiagnostics",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesEdit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Edit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesError",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Error (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesLimitKind",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesPatch",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Patch (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMovieCaptionCommit",
@@ -27370,7 +27370,7 @@
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_properties",
-          "ok": "litchi_keynote::slide::drawable::properties::Commit"
+          "ok": "litchi_keynote::slide::media::properties::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_movie_caption",
@@ -28096,32 +28096,32 @@
         {
           "name": "SlideMediaPropertiesCommit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Commit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesDiagnostics",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesEdit",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Edit (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesError",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Error (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesLimitKind",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMediaPropertiesPatch",
           "scope": "litchi_keynote",
-          "replacement": "use litchi_keynote::slide::drawable::properties::Patch (ADR 0034 \u00a72, record 0298)"
+          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 \u00a72, record 0298)"
         },
         {
           "name": "SlideMovieCaptionCommit",
@@ -28980,7 +28980,7 @@
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_properties",
-          "ok": "litchi_keynote::slide::drawable::properties::Commit"
+          "ok": "litchi_keynote::slide::media::properties::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_movie_caption",
