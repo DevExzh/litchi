@@ -75,7 +75,7 @@
 //!     &chart,
 //!     &litchi_drawingml::chart::Limits::DEFAULT,
 //! )?;
-//! # Ok::<(), std::io::Error>(())
+//! # Ok::<(), litchi_drawingml::Error>(())
 //! ```
 
 pub mod authoring;
