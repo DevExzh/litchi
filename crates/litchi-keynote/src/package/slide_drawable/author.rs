@@ -301,7 +301,7 @@ fn path(elements: &[Writer]) -> Writer {
     path
 }
 
-/// The host's `shape_path_source` for the supported presets.
+/// The host's `shape_path_source` for every preset.
 fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error> {
     let size = point(width, height);
     let source = Writer::new().boolean(1, false).boolean(2, false);
@@ -354,7 +354,47 @@ fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error>
                 ),
             )
         },
+        Preset::LeftArrow => {
+            source.message(3, &arrow(0, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
+        },
+        Preset::RightArrow => {
+            source.message(3, &arrow(1, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
+        },
+        Preset::DoubleArrow => {
+            source.message(3, &arrow(10, DOUBLE_ARROW_HEAD_END_RATIO, width, &size))
+        },
+        Preset::RegularPolygon { sides } => source.message(
+            4,
+            &Writer::new()
+                .varint(1, 1)
+                .float(2, f32::from(sides.count()))
+                .message(3, &size)
+                .boolean(4, false),
+        ),
+        Preset::Star {
+            points,
+            inner_radius,
+        } => source.message(
+            3,
+            &Writer::new()
+                .varint(1, 100)
+                .message(2, &point(f32::from(points.count()), inner_radius.ratio()))
+                .message(3, &size),
+        ),
     })
+}
+
+/// The host's native arrow proportions (`TSD.PointPathSourceArchive`).
+const SINGLE_ARROW_HEAD_START_RATIO: f32 = 0.64;
+const DOUBLE_ARROW_HEAD_END_RATIO: f32 = 0.40;
+const ARROW_SHAFT_RATIO: f32 = 0.34;
+
+/// A `TSD.PointPathSourceArchive` arrow of native `kind`.
+fn arrow(kind: u64, head_ratio: f32, width: f32, size: &Writer) -> Writer {
+    Writer::new()
+        .varint(1, kind)
+        .message(2, &point(width * head_ratio, ARROW_SHAFT_RATIO))
+        .message(3, size)
 }
 
 fn native_object(

@@ -129,6 +129,33 @@ impl Draft {
             Some(ids.drawable),
         )?;
         add_component_object_uuids(&mut staged, context.slide_id, &ids.all())?;
+        // Host defect fixed in wave W1-C (record 0372): register the text
+        // box's cross-component style reference, as `add_slide_shape` does;
+        // the host used to leave it out of the slide component's external
+        // references.
+        let component_id = component_identifier_for_entry(self.package(), &archive_name)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote slide component {archive_name} is not registered"
+                ))
+            })?;
+        let stylesheet_archive = graph.archive_name(context.stylesheet_id)?;
+        let stylesheet_component_id =
+            component_identifier_for_entry(self.package(), stylesheet_archive)?.ok_or_else(
+                || {
+                    Error::InvalidFormat(format!(
+                        "Keynote stylesheet component {stylesheet_archive} is not registered"
+                    ))
+                },
+            )?;
+        if stylesheet_component_id != component_id {
+            add_component_external_reference(
+                &mut staged,
+                component_id,
+                stylesheet_component_id,
+                styles.shape,
+            )?;
+        }
         set_package_last_object_identifier(&mut staged, ids.last())?;
 
         let verified = Self::from_package(staged)?;

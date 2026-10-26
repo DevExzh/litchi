@@ -32,6 +32,7 @@ use super::{Package, PhysicalSource, ReadError};
 use crate::{DrawableSelector, SlideSelector, SlideSelectorError};
 
 pub use self::text::{Style, TextRun, TextSpan};
+use litchi_iwa_common::shape::path::{InnerRadiusRatio, PolygonSides, StarPoints};
 
 /// What a slide drawable is.
 ///
@@ -186,6 +187,25 @@ pub enum Preset {
     },
     /// An ellipse inscribed in the frame.
     Ellipse,
+    /// Keynote's left-facing single arrow (native head and shaft
+    /// proportions).
+    LeftArrow,
+    /// Keynote's right-facing single arrow.
+    RightArrow,
+    /// Keynote's double-headed arrow.
+    DoubleArrow,
+    /// A regular polygon (Keynote's Pentagon has five sides).
+    RegularPolygon {
+        /// The side count.
+        sides: PolygonSides,
+    },
+    /// A star (Keynote's default has five points).
+    Star {
+        /// The point count.
+        points: StarPoints,
+        /// The inner radius as a ratio of the outer radius.
+        inner_radius: InnerRadiusRatio,
+    },
 }
 
 /// The raster formats [`Edit::add_image`] accepts (sniffed from the bytes).
@@ -874,7 +894,10 @@ impl<'a> Edit<'a> {
     /// Stage the removal of one text box, shape, line or image with its
     /// private objects (storage, stand-in captions, masks, comments).
     ///
-    /// Data items stay in the package. Tables, charts, groups, movies, audio
+    /// A data item whose final owner was the removed drawable is culled with
+    /// its `Data/` member, and the package object watermark is lowered when
+    /// the removal takes out the object holding it, as the legacy host does;
+    /// shared data stays. Tables, charts, groups, movies, audio
     /// and placeholders are refused (movies and audio have
     /// `slide::media::lifecycle`); drawables referenced by builds or other
     /// objects are refused by [`Self::commit`].
@@ -1723,6 +1746,7 @@ pub struct Diagnostics {
     created_drawables: usize,
     removed_drawables: usize,
     removed_objects: usize,
+    removed_data: usize,
     touched_components: usize,
     full_reparse_performed: bool,
 }
@@ -1756,6 +1780,13 @@ impl Diagnostics {
     #[must_use]
     pub const fn removed_objects(self) -> usize {
         self.removed_objects
+    }
+
+    /// Return how many data items (`Data/` members with their records) the
+    /// removals culled because the removed drawable was their final owner.
+    #[must_use]
+    pub const fn removed_data(self) -> usize {
+        self.removed_data
     }
 
     /// Return how many package members were created or rewritten.
@@ -2113,6 +2144,7 @@ fn commit_operations(
                 let removal = stage::remove(&mut workspace, *slide, *drawable)?;
                 diagnostics.removed_drawables += 1;
                 diagnostics.removed_objects += removal.objects;
+                diagnostics.removed_data += removal.data;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::Move {
@@ -2318,6 +2350,9 @@ fn commit_operations(
         expected.push(staged);
     }
     diagnostics.touched_components = workspace.touched_members();
+    if diagnostics.removed_drawables > 0 {
+        workspace.release_removed_identifier_suffix();
+    }
     let bytes = workspace.publish().map_err(lift)?;
     let candidate = source.structure_reopen(bytes).map_err(map_read_error)?;
     for staged in &expected {

@@ -46,3 +46,6 @@ pub use crate::package::slide_drawable::{
     Commit, Created, Diagnostics, Drawable, Edit, Error, Geometry, ImageFormat, Kind, LimitKind,
     NewTable, Patch, Preset, Refusal, Style, TableCellValue, TextRun, TextSpan, Unsupported,
 };
+/// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
+/// the shared iWork shape vocabulary.
+pub use litchi_iwa_common::shape::path::{InnerRadiusRatio, PolygonSides, StarPoints};

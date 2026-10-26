@@ -226,3 +226,46 @@ fn slide_creation_works_on_a_fresh_package() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn builder_writes_language_and_locale() -> Result<(), Box<dyn std::error::Error>> {
+    use prost::Message as _;
+    let package = Builder::new()
+        .identity(Identity::BLANK)
+        .language("fr")
+        .locale("fr_FR")
+        .build()?;
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&bytes, Default::default())?;
+    let document = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Document.iwa")
+        .ok_or("document member")?;
+    let stream = litchi_iwa_core::SnappyStream::decompress(document.data(), Default::default())?;
+    let archive = litchi_iwa_core::Archive::parse(&stream.into_bytes(), Default::default())?;
+    let root = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find(|message| message.type_ == 1)
+        .ok_or("document archive")?;
+    #[allow(deprecated, reason = "native locale fields")]
+    {
+        let decoded = litchi_iwa_protos::kn::DocumentArchive::decode(root.data.as_slice())?;
+        assert_eq!(decoded.super_.document_language.as_deref(), Some("fr"));
+        assert_eq!(
+            decoded.super_.super_.locale_identifier.as_deref(),
+            Some("fr_FR")
+        );
+        assert_eq!(
+            decoded.super_.super_.creation_locale_identifier.as_deref(),
+            Some("fr_FR")
+        );
+    }
+    assert!(matches!(
+        Builder::new().identity(Identity::BLANK).locale(" ").build(),
+        Err(litchi_keynote::builder::Error::InvalidLocale)
+    ));
+    Ok(())
+}

@@ -28,7 +28,11 @@ mod cost_probes;
 mod harness;
 mod known_fields;
 
+mod keynote_builder_cases;
 mod keynote_cases;
+mod keynote_drawable_cases;
+mod keynote_slide_cases;
+mod keynote_w1c_cost;
 mod numbers_cases;
 mod numbers_owner_allocation;
 mod pages_cases;
