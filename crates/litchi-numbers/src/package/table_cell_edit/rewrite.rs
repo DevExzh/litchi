@@ -766,7 +766,8 @@ pub(super) fn rewrite_with_evidence_authorization(
         source_reopen,
         target_reopen,
     )?;
-    let package = Package::from_shared_profile(output.into(), source.state.options)
+    let package = source
+        .reopen_candidate(output.into())
         .map_err(|_error| RewriteError::Candidate)?;
     Ok(RewriteOutcome {
         package,
@@ -879,7 +880,8 @@ pub(super) fn rewrite_staged_with_evidence_authorization(
         source_reopen,
         target_reopen,
     )?;
-    let package = Package::from_shared_profile(output.into(), source.state.options)
+    let package = source
+        .reopen_candidate(output.into())
         .map_err(|_error| RewriteError::Candidate)?;
     let touched_components = components.len();
     Ok(RewriteOutcome {

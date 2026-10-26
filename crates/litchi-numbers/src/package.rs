@@ -747,6 +747,18 @@ impl Package {
         Self::from_components_with_options(components, options)
     }
 
+    /// Reopen `candidate`, an edited reassembly of this package, under this
+    /// package's profile. Unchanged IWA members reuse this package's parsed
+    /// archives; the ZIP and every budget are still checked in full
+    /// (`SourceCatalog::reopen`).
+    pub(crate) fn reopen_candidate(&self, candidate: Arc<[u8]>) -> Result<Self> {
+        let components = match self.state.components.physical() {
+            Some(catalog) => Components::PhysicalShared(Box::new(catalog.reopen(candidate)?)),
+            None => Components::from_shared_bytes(candidate, self.state.options.archive())?,
+        };
+        Self::from_components_with_options(components, self.state.options)
+    }
+
     pub(crate) fn from_owned_bytes_with_options(source: Vec<u8>, options: Profile) -> Result<Self> {
         let components = Components::from_owned_bytes(source, options.archive())?;
         Self::from_components_with_options(components, options)

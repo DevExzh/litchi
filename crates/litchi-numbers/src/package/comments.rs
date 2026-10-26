@@ -2763,7 +2763,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             .map_err(|_| Error::InvalidSource {
                 path: edit.target.path,
             })?;
-        let package = Package::from_shared_profile(output.into(), edit.source.state.options)
+        let package = edit
+            .source
+            .reopen_candidate(output.into())
             .map_err(|_| Error::Verification)?;
         let position = cell_position_for_path(edit.target.path)?;
         if package
@@ -2935,7 +2937,8 @@ fn rewrite_existing(
         .map_err(|_| Error::InvalidSource {
             path: located.target.path,
         })?;
-    let package = Package::from_shared_profile(output.into(), source.state.options)
+    let package = source
+        .reopen_candidate(output.into())
         .map_err(|_| Error::Verification)?;
     Ok((package, Arc::clone(cell), touched, deleted.len()))
 }

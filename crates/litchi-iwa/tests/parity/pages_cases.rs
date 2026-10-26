@@ -133,3 +133,135 @@ fn pages_body_table_merge_parity() -> TestResult {
         MergeOp::Merge(Region::new(1, 0, 2, 1)?),
     )
 }
+
+/// Body-table cell writes (record 0370): the host's `set_table_cell` and
+/// `clear_table_cell` against the leaf's `edit_body_table_values`, both over
+/// the shared `litchi_numbers_wire::table_write` cell writer. For each body
+/// table of each fixture: replace and clear every stored cell (at most 24),
+/// and fill up to six empty cells; plus W1-B's case, clearing a row's only
+/// unstyled cell after the host stored it (`body-table-catalog-native.pages`
+/// D2).
+#[test]
+fn pages_body_table_cell_write_corpus_parity() -> TestResult {
+    use litchi_numbers::cell::{FiniteF64, Value};
+    let fixtures = [
+        "iwork/pages/body-table-catalog-native.pages",
+        "iwork/pages/body-table-cells-native.pages",
+        "iwork/pages/body-table-merges-native.pages",
+        "iwork/pages/body-table-read-native.pages",
+        "iwork/pages/body-table-visible.pages",
+    ];
+    let mut inputs = Vec::new();
+    for path in fixtures {
+        inputs.push((path.to_owned(), fixture(path)?.bytes));
+    }
+    {
+        // W1-B's pinned case: the host stores D2, then both routes clear it.
+        let source = fixture("iwork/pages/body-table-catalog-native.pages")?;
+        let mut editor = pages::Draft::from_bytes(&source.bytes)?;
+        let model = editor
+            .tables()?
+            .first()
+            .ok_or("no body table")?
+            .model_object_id;
+        editor.set_table_cell(model, 1, 3, Value::Text("Zürich".to_owned()))?;
+        inputs.push((
+            "iwork/pages/body-table-catalog-native.pages + host D2".to_owned(),
+            editor.to_bytes()?,
+        ));
+    }
+    let mut failures = Vec::new();
+    let mut compared = 0_usize;
+    for (path, bytes) in &inputs {
+        let editor = pages::Draft::from_bytes(bytes)?;
+        for (table_index, info) in editor.tables()?.into_iter().enumerate() {
+            let table = editor.table(info.model_object_id)?;
+            let stored: Vec<(usize, usize)> = table
+                .iter_cells()
+                .map(|(position, _)| position)
+                .take(24)
+                .collect();
+            let mut empty = Vec::new();
+            for row in 0..info.rows {
+                for column in 0..info.columns {
+                    if empty.len() < 6 && table.get_cell(row, column).is_none() {
+                        empty.push((row, column));
+                    }
+                }
+            }
+            let mut ops = Vec::new();
+            for cell in stored {
+                ops.push(("replace", cell, Value::Text("parity".into())));
+                ops.push(("clear", cell, Value::Empty));
+            }
+            for cell in empty {
+                ops.push(("fill", cell, Value::Number(FiniteF64::new(7.0)?)));
+            }
+            for (label, (row, column), value) in ops {
+                let host = (|| -> TestResult<Vec<u8>> {
+                    let mut editor = pages::Draft::from_bytes(bytes)?;
+                    if value == Value::Empty {
+                        editor.clear_table_cell(info.model_object_id, row, column)?;
+                    } else {
+                        editor.set_table_cell(info.model_object_id, row, column, value.clone())?;
+                    }
+                    Ok(editor.to_bytes()?)
+                })();
+                let leaf = (|| -> TestResult<Vec<u8>> {
+                    let package = litchi_pages::Package::from_bytes(bytes)?;
+                    let mut edit = package.edit_body_table_values(table_index)?;
+                    let leaf_value = match &value {
+                        Value::Text(text) => litchi_pages::table::values::Value::Text(text.clone()),
+                        Value::Number(number) => {
+                            litchi_pages::table::values::Value::Number(number.get())
+                        },
+                        _ => litchi_pages::table::values::Value::Empty,
+                    };
+                    edit.set(u32::try_from(row)?, u32::try_from(column)?, leaf_value)?;
+                    Ok(leaf_bytes!(edit.commit()?.package()))
+                })();
+                let label = format!("{path} table {table_index} {label} ({row}, {column})");
+                match (host, leaf) {
+                    (Ok(host), Ok(leaf)) => {
+                        compared += 1;
+                        if host == leaf {
+                            continue;
+                        }
+                        let diff = crate::archive_diff::compare_with_policies(
+                            bytes,
+                            &host,
+                            &leaf,
+                            &crate::known_fields::KnownFields::for_format(Format::Pages),
+                            &[],
+                            crate::archive_diff::MetadataPolicy::default(),
+                        )?;
+                        if !diff.violations.is_empty() {
+                            failures.push(format!("{label}: tier B violations\n{}", diff.render()));
+                        }
+                    },
+                    // Listed refusal (record 0370 §5): cells of a table with
+                    // formulas wait for W1-F's shared formula planner
+                    // (record 0376).
+                    (Ok(_), Err(error)) if error.to_string().contains("formula graph") => {
+                        eprintln!("{label}: listed refusal: {error}");
+                    },
+                    (Ok(_), Err(error)) => failures.push(format!(
+                        "{label}: the leaf refuses what the host edits: {error}"
+                    )),
+                    (Err(host), Ok(_)) => {
+                        eprintln!("{label}: host refuses ({host}); the leaf edits")
+                    },
+                    (Err(host), Err(leaf)) => {
+                        eprintln!("{label}: both refuse (host {host}; leaf {leaf})");
+                    },
+                }
+            }
+        }
+    }
+    eprintln!("body-table cell writes compared: {compared}");
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("\n").into())
+    }
+}

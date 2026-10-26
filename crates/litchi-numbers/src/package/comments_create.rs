@@ -383,7 +383,8 @@ pub(super) fn create_root_comment(
         .package()
         .reassemble_with_deletions_to_bytes(&edits, &deleted, physical.limits())
         .map_err(|_| Error::InvalidSource { path })?;
-    let package = Package::from_shared_profile(output.into(), source.state.options)
+    let package = source
+        .reopen_candidate(output.into())
         .map_err(|_| Error::Verification)?;
     let position = cell_position_for_path(path)?;
     let expected_author = if author_fresh.is_some() {

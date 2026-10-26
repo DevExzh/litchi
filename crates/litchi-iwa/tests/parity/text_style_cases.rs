@@ -67,10 +67,16 @@ fn engine(error: paragraph_style::Error) -> litchi_iwa::Error {
 /// The leaf route: plan with the engine, publish through the glue.
 pub fn leaf_change(source: &[u8], storage: u64, change: &Change) -> TestResult<Vec<u8>> {
     let mut workspace = Workspace::open(source)?;
+    apply_change(&mut workspace, storage, change)?;
+    workspace.into_bytes()
+}
+
+/// Plan `change` with the engine and publish it into `workspace`.
+pub fn apply_change(workspace: &mut Workspace, storage: u64, change: &Change) -> TestResult {
     let located = workspace.storage(storage)?;
     let style = paragraph_style::uniform_style(&located.payload, LIMITS)?;
-    let (styles, entries) = paragraph_styles(&workspace)?;
-    let target = Target::new(style, exclusive(&workspace, style)?);
+    let (styles, entries) = paragraph_styles(workspace)?;
+    let target = Target::new(style, exclusive(workspace, style)?);
     let plan = paragraph_style::plan(&styles, target, change, LIMITS)?;
     let style_entry = entries.get(&style).ok_or("style entry")?.clone();
     match plan {
@@ -204,7 +210,7 @@ pub fn leaf_change(source: &[u8], storage: u64, change: &Change) -> TestResult<V
         },
         other => return Err(format!("unmapped plan {other:?}").into()),
     }
-    workspace.into_bytes()
+    Ok(())
 }
 
 /// The host route for one change.
