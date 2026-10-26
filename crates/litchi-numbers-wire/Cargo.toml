@@ -13,5 +13,8 @@ litchi-iwa-common = { workspace = true }
 litchi-iwa-protos = { workspace = true }
 ryu = { workspace = true }
 
+[dev-dependencies]
+prost = { workspace = true }
+
 [lints]
 workspace = true
