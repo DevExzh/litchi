@@ -16,7 +16,7 @@ use litchi_pages::{DrawableSelector, Package};
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
 use crate::leaf_bytes;
 
-const IMAGES: &str = "iwork/pages/image-adjustments-native.pages";
+pub(crate) const IMAGES: &str = "iwork/pages/image-adjustments-native.pages";
 const AUDIO: &str = "iwork/pages/audio-playback-native.pages";
 
 const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
@@ -43,7 +43,7 @@ fn audio_fixture() -> TestResult<Fixture> {
 
 /// A source-built document with one body movie, written by the host
 /// builder (`Draft::create_with_text` + `add_body_movie`).
-fn movie_fixture() -> TestResult<Fixture> {
+pub(crate) fn movie_fixture() -> TestResult<Fixture> {
     let mut editor = pages::Draft::create_with_text("Quarterly report")?;
     let anchor = "Quarterly report".encode_utf16().count();
     let options = litchi_pages::movie::Options::new(
@@ -66,7 +66,7 @@ fn movie_fixture() -> TestResult<Fixture> {
 }
 
 /// A source-built document with one body rectangle (`add_body_rectangle`).
-fn shape_fixture() -> TestResult<Fixture> {
+pub(crate) fn shape_fixture() -> TestResult<Fixture> {
     let mut editor = pages::Draft::create_with_text("Quarterly report")?;
     let anchor = "Quarterly report".encode_utf16().count();
     editor.add_body_rectangle(

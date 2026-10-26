@@ -641,25 +641,17 @@ fn pages_body_number_attachment_update_parity() -> TestResult {
     )
 }
 
-/// Removal is not at parity: the host deletes the U+FFFC and its table
-/// entry but keeps the attachment object and the storage's header reference
-/// to it, because its pruning proof fails when the storage header lists
-/// references the payload does not count; the leaf proves the object is the
-/// storage's alone and deletes it with its metadata. The route stays
-/// host-only (record 0371).
+/// Removal deletes the U+FFFC, its table entry, the storage's header
+/// reference and the attachment object with its metadata on both routes
+/// (the host's pruning gap was fixed in record 0371).
 #[test]
-fn pages_body_number_attachment_remove_divergence_is_reported() -> TestResult {
-    let Err(error) = attachment_case(
-        "pages_body_number_attachment_remove_divergence_is_reported",
-        Tier::B,
+fn pages_body_number_attachment_remove_parity() -> TestResult {
+    attachment_case(
+        "pages_body_number_attachment_remove_parity",
+        Tier::A,
         Evidence::Queued,
         AttachmentOp::Remove,
-    ) else {
-        return Err("number-attachment removal is now at parity; migrate the route".into());
-    };
-    let report = error.to_string();
-    assert!(report.contains("only in host [1732732]"), "{report}");
-    Ok(())
+    )
 }
 
 fn first_header() -> litchi_pages::HeaderFooterSelector<'static> {
@@ -675,11 +667,11 @@ fn header_attachment_case(
     name: &'static str,
     tier: Tier,
     evidence: Evidence,
-    update: bool,
+    op: AttachmentOp,
 ) -> TestResult {
     use litchi_pages::number_attachment::Target;
     let mut input = fixture(BASIC)?;
-    if update {
+    if !matches!(op, AttachmentOp::Insert(_)) {
         let mut editor = pages::Draft::from_bytes(&input.bytes)?;
         editor.insert_header_footer_number_attachment(
             first_header(),
@@ -715,17 +707,21 @@ fn header_attachment_case(
     Case::new(name, Format::Pages, tier, evidence, &input)
         .host(|source| {
             let mut editor = pages::Draft::from_bytes(source)?;
-            if update {
+            if !matches!(op, AttachmentOp::Insert(_)) {
                 let id = editor
                     .header_footer_number_attachments(first_header())?
                     .first()
                     .ok_or("none")?
                     .id;
-                drop(editor.update_header_footer_number_attachment(
-                    first_header(),
-                    id,
-                    page_count(),
-                )?);
+                if matches!(op, AttachmentOp::Remove) {
+                    drop(editor.remove_header_footer_number_attachment(first_header(), id)?);
+                } else {
+                    drop(editor.update_header_footer_number_attachment(
+                        first_header(),
+                        id,
+                        page_count(),
+                    )?);
+                }
             } else {
                 drop(editor.insert_header_footer_number_attachment(
                     first_header(),
@@ -738,7 +734,9 @@ fn header_attachment_case(
         .leaf(|source| {
             let package = Package::from_bytes(source)?;
             let mut edit = package.edit_number_attachments(Target::HeaderFooter(first_header()))?;
-            if update {
+            if matches!(op, AttachmentOp::Remove) {
+                edit.remove(litchi_core::Position::new(0))?;
+            } else if matches!(op, AttachmentOp::Update) {
                 edit.update(litchi_core::Position::new(0), page_count())?;
             } else {
                 edit.insert(
@@ -767,7 +765,7 @@ fn pages_header_number_attachment_insert_parity() -> TestResult {
         "pages_header_number_attachment_insert_parity",
         Tier::A,
         Evidence::Queued,
-        false,
+        AttachmentOp::Insert(0),
     )
 }
 
@@ -777,7 +775,17 @@ fn pages_header_number_attachment_update_parity() -> TestResult {
         "pages_header_number_attachment_update_parity",
         Tier::A,
         Evidence::Queued,
-        true,
+        AttachmentOp::Update,
+    )
+}
+
+#[test]
+fn pages_header_number_attachment_remove_parity() -> TestResult {
+    header_attachment_case(
+        "pages_header_number_attachment_remove_parity",
+        Tier::A,
+        Evidence::Queued,
+        AttachmentOp::Remove,
     )
 }
 
@@ -855,6 +863,36 @@ fn text_number_attachment_insert_cost_abba() -> TestResult {
                 litchi_pages::TextPosition::from_utf16_index(3)?,
                 page_count(),
             )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn text_number_attachment_remove_cost_abba() -> TestResult {
+    let mut editor = pages::Draft::from_bytes(&fixture(BASIC)?.bytes)?;
+    editor.insert_body_number_attachment(
+        litchi_pages::TextPosition::from_utf16_index(3)?,
+        page_count(),
+    )?;
+    let input = crate::harness::Fixture {
+        path: "iwork/pages/basic.pages + host page count at 3",
+        bytes: editor.to_bytes()?,
+    };
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let id = editor.body_number_attachments()?.first().ok_or("none")?.id;
+            drop(editor.remove_body_number_attachment(id)?);
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_number_attachments(litchi_pages::number_attachment::Target::Body)?;
+            edit.remove(litchi_core::Position::new(0))?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
     )
