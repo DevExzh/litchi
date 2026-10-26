@@ -24700,7 +24700,8 @@
         "litchi_pages::table::deletion",
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
-        "litchi_pages::bookmark"
+        "litchi_pages::bookmark",
+        "litchi_pages::date_time"
       ],
       "immutable_owners": [
         "litchi_pages::Package",

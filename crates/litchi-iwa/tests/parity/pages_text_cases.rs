@@ -308,3 +308,198 @@ fn pages_body_bookmark_remove_parity() -> TestResult {
         BookmarkOp::Remove,
     )
 }
+
+/// `TSWP.DateTimeSmartFieldArchive` with its random text-attribute UUID
+/// replaced by a fixed placeholder (see [`bookmark_without_uuid`]).
+fn date_time_without_uuid(data: &[u8]) -> Result<crate::known_fields::Decoded, prost::DecodeError> {
+    use prost::Message as _;
+    let mut field = litchi_iwa_protos::tswp::DateTimeSmartFieldArchive::decode(data)?;
+    if let Some(smart) = field.super_.as_mut()
+        && let Some(uuid) = smart.text_attribute_uuid_string.as_mut()
+    {
+        assert_eq!(uuid.len(), 36, "text-attribute UUID form");
+        *uuid = "00000000-0000-0000-0000-000000000000".to_owned();
+    }
+    crate::known_fields::decode_as::<litchi_iwa_protos::tswp::DateTimeSmartFieldArchive>(
+        &field.encode_to_vec(),
+    )
+}
+
+fn date_settings(seconds: f64) -> TestResult<litchi_pages::date_time::Settings> {
+    use litchi_pages::date_time::{Format, Instant, LocaleIdentifier, Settings};
+    Ok(Settings::fixed(
+        Format::new("yyyy-MM-dd")?,
+        LocaleIdentifier::new("en_US")?,
+        Instant::from_reference_date_seconds(seconds)?,
+    ))
+}
+
+fn host_fields(bytes: &[u8]) -> TestResult<String> {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    Ok(format!(
+        "{:#?}",
+        editor
+            .body_date_time_fields()?
+            .into_iter()
+            .map(|field| (field.range, field.settings))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_fields(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:#?}",
+        Package::from_bytes(bytes)?
+            .body_date_time_fields()?
+            .into_iter()
+            .map(|field| (field.range(), field.settings().clone()))
+            .collect::<Vec<_>>()
+    ))
+}
+
+/// `basic.pages` with one host-authored date field over UTF-16 0..4.
+fn dated_fixture() -> TestResult<crate::harness::Fixture> {
+    let input = fixture(BASIC)?;
+    let mut editor = pages::Draft::from_bytes(&input.bytes)?;
+    editor.add_body_date_time_field(
+        litchi_pages::date_time::TextRange::from_utf16_indexes(0, 4)?,
+        date_settings(800_000_000.0)?,
+    )?;
+    Ok(crate::harness::Fixture {
+        path: "iwork/pages/basic.pages + host date field 0..4",
+        bytes: editor.to_bytes()?,
+    })
+}
+
+enum FieldOp {
+    Add(usize, usize),
+    Insert(usize, &'static str),
+    Update(usize, usize),
+    Remove,
+}
+
+fn date_time_case(name: &'static str, tier: Tier, evidence: Evidence, op: FieldOp) -> TestResult {
+    use litchi_pages::date_time::{DisplayText, TextRange};
+    let input = match op {
+        FieldOp::Add(..) | FieldOp::Insert(..) => fixture(BASIC)?,
+        _ => dated_fixture()?,
+    };
+    let op = &op;
+    Case::new(name, Format::Pages, tier, evidence, &input)
+        .known_fields(|known| {
+            known.with(
+                2_034,
+                "TSWP.DateTimeSmartFieldArchive",
+                date_time_without_uuid,
+            )
+        })
+        .host(|source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            match *op {
+                FieldOp::Add(start, end) => drop(editor.add_body_date_time_field(
+                    TextRange::from_utf16_indexes(start, end)?,
+                    date_settings(820_000_000.0)?,
+                )?),
+                FieldOp::Insert(at, text) => drop(editor.insert_body_date_time_field(
+                    litchi_pages::TextPosition::from_utf16_index(at)?,
+                    DisplayText::new(text)?,
+                    date_settings(820_000_000.0)?,
+                )?),
+                FieldOp::Update(start, end) => {
+                    let id = editor
+                        .body_date_time_fields()?
+                        .first()
+                        .ok_or("no field")?
+                        .id;
+                    drop(editor.update_body_date_time_field(
+                        id,
+                        TextRange::from_utf16_indexes(start, end)?,
+                        date_settings(830_000_000.0)?,
+                    )?);
+                },
+                FieldOp::Remove => {
+                    let id = editor
+                        .body_date_time_fields()?
+                        .first()
+                        .ok_or("no field")?
+                        .id;
+                    drop(editor.remove_body_date_time_field(id)?);
+                },
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_date_time_fields()?;
+            match *op {
+                FieldOp::Add(start, end) => drop(edit.add(
+                    TextRange::from_utf16_indexes(start, end)?,
+                    date_settings(820_000_000.0)?,
+                )?),
+                FieldOp::Insert(at, text) => drop(edit.insert(
+                    litchi_pages::TextPosition::from_utf16_index(at)?,
+                    DisplayText::new(text)?,
+                    date_settings(820_000_000.0)?,
+                )?),
+                FieldOp::Update(start, end) => drop(edit.update(
+                    litchi_core::Position::new(0),
+                    TextRange::from_utf16_indexes(start, end)?,
+                    date_settings(830_000_000.0)?,
+                )?),
+                FieldOp::Remove => drop(edit.remove(litchi_core::Position::new(0))?),
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_date_time_fields(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host body_date_time_fields", host_fields)
+        .read("leaf body_date_time_fields", leaf_fields)
+        .read("leaf text", |bytes| Ok(Package::from_bytes(bytes)?.text()?))
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_date_time_add_parity() -> TestResult {
+    date_time_case(
+        "pages_body_date_time_add_parity",
+        Tier::B,
+        Evidence::Queued,
+        FieldOp::Add(2, 7),
+    )
+}
+
+#[test]
+fn pages_body_date_time_insert_parity() -> TestResult {
+    date_time_case(
+        "pages_body_date_time_insert_parity",
+        Tier::B,
+        Evidence::Queued,
+        FieldOp::Insert(3, "2026-10-26"),
+    )
+}
+
+#[test]
+fn pages_body_date_time_update_parity() -> TestResult {
+    date_time_case(
+        "pages_body_date_time_update_parity",
+        Tier::A,
+        Evidence::Queued,
+        FieldOp::Update(1, 6),
+    )
+}
+
+#[test]
+fn pages_body_date_time_remove_parity() -> TestResult {
+    date_time_case(
+        "pages_body_date_time_remove_parity",
+        Tier::A,
+        Evidence::Queued,
+        FieldOp::Remove,
+    )
+}
