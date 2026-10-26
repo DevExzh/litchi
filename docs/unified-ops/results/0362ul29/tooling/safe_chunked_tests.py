@@ -409,6 +409,16 @@ def _quarantine_namespace(scope: str) -> str:
     return hashlib.sha256(scope.encode("utf-8")).hexdigest()[:24]
 
 
+def _reject_symlink_components(path: Path, label: str) -> None:
+    """Reject lexical symlinks before any canonicalization can follow them."""
+    lexical = path.absolute()
+    current = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        current /= component
+        if current.is_symlink():
+            raise RuntimeError(f"{label} may not contain a symlink component: {current}")
+
+
 def _retire_artifacts(
     artifacts: set[Path],
     target: Path,
@@ -457,7 +467,9 @@ def _retire_artifacts(
         source_stat = path.stat()
         source_digest = digest(path)
         relative = path.relative_to(target.resolve())
-        destination = (destination_root / relative).resolve()
+        destination_lexical = destination_root / relative
+        _reject_symlink_components(destination_lexical, "quarantine destination")
+        destination = destination_lexical.resolve()
         if destination == quarantine or not destination.is_relative_to(quarantine.resolve()):
             raise RuntimeError(f"quarantine destination escaped quarantine root: {destination}")
         mode = stat.S_IMODE(source_stat.st_mode)

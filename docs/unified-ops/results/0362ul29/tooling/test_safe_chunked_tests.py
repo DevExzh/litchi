@@ -150,6 +150,23 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             rows = (quarantine / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(rows), 2)
 
+    def test_internal_symlink_destination_is_rejected_before_reuse(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-symlink-destination-") as raw:
+            directory = Path(raw)
+            command, target, artifact, marker, quarantine, log = self._command(directory, FAKE_COMMAND)
+            safe.MIN_FREE = 0
+            namespace = safe._quarantine_namespace("suite")
+            destination = quarantine / namespace / "0000" / "debug" / "examples" / "fake-example"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            equal_file = directory / "equal-destination"
+            equal_file.write_bytes(b"\x7fELFfake executable bytes")
+            equal_file.chmod(0o751)
+            destination.symlink_to(equal_file)
+            with self.assertRaisesRegex(RuntimeError, "symlink component"):
+                safe.execute(command, target, log, quarantine, 0, quarantine_scope="suite")
+            self.assertTrue(artifact.exists())
+            self.assertFalse((quarantine / "manifest.jsonl").exists())
+
     def test_nonzero_child_keeps_artifact_in_target(self) -> None:
         script = FAKE_COMMAND + "\nsys.exit(7)\n"
         with tempfile.TemporaryDirectory(prefix="safe-chunked-failure-") as raw:
