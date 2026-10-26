@@ -14,7 +14,7 @@ use litchi_iwa_archive::{
     FrozenDirectoryBundle, LogicalEntryLimits, LogicalSourceCatalog, SemanticMetadataSidecars,
     SemanticProfile, SemanticProjection, SourceCatalog,
 };
-use litchi_iwa_common::wire::{WireField, parse_wire_fields};
+use litchi_iwa_common::wire::{WireField, visit_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
 use litchi_iwa_package::FrozenEntryStore;
 use std::{
@@ -1715,26 +1715,26 @@ pub fn __classify_application_payload(payload: &[u8]) -> Result<Option<Format>> 
 }
 
 fn classify_application_payload(payload: &[u8]) -> Result<Option<Format>> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let pages = match unique_field(payload, &fields, 15, 2)? {
+    let fields = CanonicalFieldSet::parse(payload)?;
+    let pages = match fields.unique(15, 2)? {
         Some(shared) => valid_shared_document(shared)?,
         None => false,
     };
     let mut numbers = true;
     for field in [4, 5, 6] {
-        numbers &= match unique_field(payload, &fields, field, 2)? {
+        numbers &= match fields.unique(field, 2)? {
             Some(reference) => valid_reference(reference)?,
             None => false,
         };
     }
-    numbers &= match unique_field(payload, &fields, 8, 2)? {
+    numbers &= match fields.unique(8, 2)? {
         Some(shared) => valid_shared_document(shared)?,
         None => false,
     };
-    let keynote = match unique_field(payload, &fields, 2, 2)? {
+    let keynote = match fields.unique(2, 2)? {
         Some(reference) => valid_reference(reference)?,
         None => false,
-    } && match unique_field(payload, &fields, 3, 2)? {
+    } && match fields.unique(3, 2)? {
         Some(shared) => valid_shared_document(shared)?,
         None => false,
     };
@@ -1746,30 +1746,105 @@ fn classify_application_payload(payload: &[u8]) -> Result<Option<Format>> {
         _ => None,
     };
     if resolved.is_none() && !pages && !numbers && !keynote {
-        validate_malformed_application_authority(payload, &fields)?;
+        validate_malformed_application_authority(&fields)?;
     }
     Ok(resolved)
 }
 
-fn unique_field<'a>(
-    payload: &'a [u8],
-    fields: &[WireField],
-    number: u32,
-    wire_type: u8,
-) -> Result<Option<&'a [u8]>> {
-    let mut matches = fields.iter().filter(|field| field.number() == number);
-    let Some(field) = matches.next() else {
-        return Ok(None);
-    };
-    if matches.next().is_some() || field.wire_type() != wire_type {
-        return Ok(None);
+/// Borrowed canonical field slots for application-authority classification.
+///
+/// Only field numbers 1..=15 participate in an application authority, so the
+/// classifier keeps one borrowed descriptor per slot plus a duplicate bit set
+/// instead of an input-sized field vector. Every field of the payload is
+/// still parsed and checked for canonical framing in one pass, with the same
+/// error precedence as the former collected parse (every parse error before
+/// any framing error, framing errors in field order).
+struct CanonicalFieldSet<'source> {
+    payload: &'source [u8],
+    slots: [Option<WireField>; 16],
+    duplicates: u16,
+}
+
+impl<'source> CanonicalFieldSet<'source> {
+    fn parse(payload: &'source [u8]) -> Result<Self> {
+        let mut result = Self {
+            payload,
+            slots: [None; 16],
+            duplicates: 0,
+        };
+        // A parse error anywhere outranks a noncanonical field, and the first
+        // noncanonical field in order outranks later ones: remember the first
+        // framing error and report it only once the whole payload parsed.
+        let mut framing = None;
+        visit_wire_fields(payload, litchi_iwa_common::WireLimits::DEFAULT, |field| {
+            if framing.is_none()
+                && let Err(error) = field.validate_canonical_framing(payload)
+            {
+                framing = Some(error);
+            }
+            if let Some(slot) = usize::try_from(field.number())
+                .ok()
+                .and_then(|index| result.slots.get_mut(index))
+            {
+                if slot.is_some() {
+                    result.duplicates |= 1 << field.number();
+                } else {
+                    *slot = Some(field);
+                }
+            }
+            Ok(())
+        })?;
+        if let Some(error) = framing {
+            return Err(error.into());
+        }
+        Ok(result)
     }
-    Ok(Some(field.checked_payload(payload)?))
+
+    fn present(&self, number: u32) -> bool {
+        self.field(number).is_some()
+    }
+
+    fn field(&self, number: u32) -> Option<WireField> {
+        usize::try_from(number)
+            .ok()
+            .and_then(|index| self.slots.get(index))
+            .copied()
+            .flatten()
+    }
+
+    fn duplicated(&self, number: u32) -> bool {
+        number < 16 && self.duplicates & (1 << number) != 0
+    }
+
+    fn unique(&self, number: u32, wire_type: u8) -> Result<Option<&'source [u8]>> {
+        let Some(field) = self.field(number) else {
+            return Ok(None);
+        };
+        if self.duplicated(number) || field.wire_type() != wire_type {
+            return Ok(None);
+        }
+        Ok(Some(field.checked_payload(self.payload)?))
+    }
+
+    fn strict(&self, number: u32, wire_type: u8) -> Result<&'source [u8]> {
+        let Some(field) = self.field(number) else {
+            return Err(invalid_application_authority(number, "is missing"));
+        };
+        if self.duplicated(number) {
+            return Err(invalid_application_authority(number, "is duplicated"));
+        }
+        if field.wire_type() != wire_type {
+            return Err(invalid_application_authority(
+                number,
+                "has the wrong wire type",
+            ));
+        }
+        Ok(field.checked_payload(self.payload)?)
+    }
 }
 
 fn valid_reference(payload: &[u8]) -> Result<bool> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let Some(identifier) = unique_field(payload, &fields, 1, 0)? else {
+    let Some(identifier) = CanonicalFieldSet::parse(payload)?.unique(1, 0)? else {
         return Ok(false);
     };
     Ok(is_canonical_reference_identifier(identifier))
@@ -1783,73 +1858,37 @@ fn is_canonical_reference_identifier(payload: &[u8]) -> bool {
 }
 
 fn valid_shared_document(payload: &[u8]) -> Result<bool> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let Some(document) = unique_field(payload, &fields, 1, 2)? else {
+    let Some(document) = CanonicalFieldSet::parse(payload)?.unique(1, 2)? else {
         return Ok(false);
     };
-    let _fields = parse_canonical_wire_fields(document)?;
+    CanonicalFieldSet::parse(document)?;
     Ok(true)
 }
 
-fn parse_canonical_wire_fields(payload: &[u8]) -> Result<Vec<WireField>> {
-    let fields = parse_wire_fields(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
-    for field in &fields {
-        field.validate_canonical_framing(payload)?;
-    }
-    Ok(fields)
-}
-
-fn validate_malformed_application_authority(payload: &[u8], fields: &[WireField]) -> Result<()> {
-    if fields.iter().any(|field| field.number() == 15) {
-        let shared = strict_unique_field(payload, fields, 15, 2)?;
-        validate_strict_shared_document(shared)?;
+fn validate_malformed_application_authority(fields: &CanonicalFieldSet<'_>) -> Result<()> {
+    if fields.present(15) {
+        validate_strict_shared_document(fields.strict(15, 2)?)?;
         return Ok(());
     }
     if [4, 5, 6, 8]
-        .iter()
-        .all(|number| fields.iter().any(|field| field.number() == *number))
+        .into_iter()
+        .all(|number| fields.present(number))
     {
         for number in [4, 5, 6] {
-            validate_strict_reference(strict_unique_field(payload, fields, number, 2)?)?;
+            validate_strict_reference(fields.strict(number, 2)?)?;
         }
-        validate_strict_shared_document(strict_unique_field(payload, fields, 8, 2)?)?;
+        validate_strict_shared_document(fields.strict(8, 2)?)?;
         return Ok(());
     }
-    if [2, 3]
-        .iter()
-        .all(|number| fields.iter().any(|field| field.number() == *number))
-    {
-        validate_strict_reference(strict_unique_field(payload, fields, 2, 2)?)?;
-        validate_strict_shared_document(strict_unique_field(payload, fields, 3, 2)?)?;
+    if fields.present(2) && fields.present(3) {
+        validate_strict_reference(fields.strict(2, 2)?)?;
+        validate_strict_shared_document(fields.strict(3, 2)?)?;
     }
     Ok(())
 }
 
-fn strict_unique_field<'a>(
-    payload: &'a [u8],
-    fields: &[WireField],
-    number: u32,
-    wire_type: u8,
-) -> Result<&'a [u8]> {
-    let mut matches = fields.iter().filter(|field| field.number() == number);
-    let Some(field) = matches.next() else {
-        return Err(invalid_application_authority(number, "is missing"));
-    };
-    if matches.next().is_some() {
-        return Err(invalid_application_authority(number, "is duplicated"));
-    }
-    if field.wire_type() != wire_type {
-        return Err(invalid_application_authority(
-            number,
-            "has the wrong wire type",
-        ));
-    }
-    Ok(field.checked_payload(payload)?)
-}
-
 fn validate_strict_reference(payload: &[u8]) -> Result<()> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let identifier = strict_unique_field(payload, &fields, 1, 0)?;
+    let identifier = CanonicalFieldSet::parse(payload)?.strict(1, 0)?;
     if !is_canonical_reference_identifier(identifier) {
         return Err(invalid_application_authority(
             1,
@@ -1860,9 +1899,8 @@ fn validate_strict_reference(payload: &[u8]) -> Result<()> {
 }
 
 fn validate_strict_shared_document(payload: &[u8]) -> Result<()> {
-    let fields = parse_canonical_wire_fields(payload)?;
-    let document = strict_unique_field(payload, &fields, 1, 2)?;
-    let _document_fields = parse_canonical_wire_fields(document)?;
+    let document = CanonicalFieldSet::parse(payload)?.strict(1, 2)?;
+    CanonicalFieldSet::parse(document)?;
     Ok(())
 }
 
