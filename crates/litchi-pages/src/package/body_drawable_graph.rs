@@ -582,7 +582,9 @@ pub(crate) fn publish_archives(
     archives: Vec<(Arc<str>, Archive)>,
 ) -> GraphResult<Package> {
     let limits = source.state.source.limits();
-    let archive_limits = limits.effective_archive_limits().map_err(map_archive_error)?;
+    let archive_limits = limits
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
     let snappy_limits = limits.snappy_limits().map_err(map_archive_error)?;
     let mut payloads = Vec::with_capacity(archives.len());
     for (name, archive) in archives {
