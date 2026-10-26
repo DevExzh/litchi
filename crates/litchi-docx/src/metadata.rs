@@ -127,18 +127,25 @@ pub enum Error {
 /// A replayable document-properties change: the core-properties value the
 /// edit started from and the value it published (`None` is an absent
 /// core-properties part), and the exact part changes of the application and
-/// custom properties. The exact composed package-properties delta is retained
-/// privately for byte-faithful replay and inversion; [`Patch::parts`] remains
-/// the public application/custom-properties scope.
+/// custom properties. The exact core delta and the exact application/custom
+/// delta planned over the post-core graph are retained privately for
+/// byte-faithful replay and inversion; [`Patch::parts`] remains a separate
+/// application/custom-properties projection over the original source graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     base: Option<Metadata>,
     target: Option<Metadata>,
     parts: families::Patch,
-    /// The exact composed shared-codec patch for all changed property
-    /// families. `parts` deliberately remains the public
-    /// application/custom-properties scope.
-    whole: families::Patch,
+    /// The exact shared-codec core patch over the original source graph.
+    core: families::Patch,
+    /// The exact shared-codec application/custom patch over the package after
+    /// `core` has been applied. Keeping this separate preserves error-family
+    /// classification and avoids allocating a second composed descriptor.
+    replay_parts: families::Patch,
+    /// Whether replay must apply the private parts patch before the core
+    /// patch. Forward edits are core-first; inverses are parts-first so a
+    /// no-op scope remains anchored to its intermediate graph.
+    parts_first: bool,
 }
 
 impl Patch {
@@ -154,20 +161,29 @@ impl Patch {
         self.target.as_ref()
     }
 
-    /// The exact part changes of the application and custom properties.
+    /// The exact application/custom part changes planned over the source
+    /// package, independent of any core transition in this patch.
     #[must_use]
     pub const fn parts(&self) -> &families::Patch {
         &self.parts
     }
 
-    pub(crate) const fn whole(&self) -> &families::Patch {
-        &self.whole
+    pub(crate) const fn core_patch(&self) -> &families::Patch {
+        &self.core
+    }
+
+    pub(crate) const fn replay_parts(&self) -> &families::Patch {
+        &self.replay_parts
+    }
+
+    pub(crate) const fn parts_first(&self) -> bool {
+        self.parts_first
     }
 
     /// Whether applying the patch leaves every package byte unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.base == self.target && self.whole.is_noop()
+        self.base == self.target && self.core.is_noop() && self.replay_parts.is_noop()
     }
 
     /// The patch that restores the base value.
@@ -177,7 +193,9 @@ impl Patch {
             base: self.target.clone(),
             target: self.base.clone(),
             parts: self.parts.inverse(),
-            whole: self.whole.inverse(),
+            core: self.core.inverse(),
+            replay_parts: self.replay_parts.inverse(),
+            parts_first: !self.parts_first,
         }
     }
 }
@@ -308,13 +326,15 @@ impl Edit {
             custom,
             remove_custom,
         } = self;
-        let (package, changed, parts, whole) =
+        let (package, changed, parts, core, replay_parts) =
             source.publish_metadata(staged.as_ref(), app, custom, remove_custom)?;
         let patch = Patch {
             base,
             target: staged,
             parts,
-            whole,
+            core,
+            replay_parts,
+            parts_first: false,
         };
         Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
@@ -375,6 +395,8 @@ pub(crate) fn admit(props: &Metadata) -> Result<()> {
 mod tests {
     use super::*;
     use litchi_opc::PackURI;
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    use litchi_opc::part::BlobPart;
 
     fn package_with_opaque_app() -> Result<Package> {
         let package = Package::new()?;
@@ -411,14 +433,10 @@ mod tests {
         Ok(Package::from_opc_package(opc)?)
     }
 
-    fn package_without_property_parts() -> Result<Package> {
+    fn package_without_parts(names: &[&str]) -> Result<Package> {
         let package = Package::new()?;
         let mut opc = package.opc_package().clone();
-        for name in [
-            "/docProps/core.xml",
-            "/docProps/app.xml",
-            "/docProps/custom.xml",
-        ] {
+        for name in names {
             let part = PackURI::new(name).expect("static property URI");
             let relationship_ids: Vec<_> = opc
                 .rels()
@@ -431,6 +449,35 @@ mod tests {
             }
             opc.remove_part(&part);
         }
+        Ok(Package::from_opc_package(opc)?)
+    }
+
+    fn package_without_property_parts() -> Result<Package> {
+        package_without_parts(&[
+            "/docProps/core.xml",
+            "/docProps/app.xml",
+            "/docProps/custom.xml",
+        ])
+    }
+
+    fn package_without_app_part() -> Result<Package> {
+        package_without_parts(&["/docProps/app.xml"])
+    }
+
+    fn signed_package(package: &Package) -> Result<Package> {
+        let mut opc = package.opc_package().clone();
+        opc.try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").expect("static signature URI"),
+            ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            Vec::new(),
+        )))
+        .map_err(crate::Error::from)?;
+        opc.rels_mut().add_relationship(
+            rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
+            "rSignature".to_owned(),
+            false,
+        );
         Ok(Package::from_opc_package(opc)?)
     }
 
@@ -563,11 +610,12 @@ mod tests {
         let (next, patch) = edit.commit()?.into_parts();
         assert!(
             patch
-                .whole
+                .core
                 .changes()
                 .iter()
                 .any(|change| change.family() == families::Family::Core)
         );
+        patch.parts().check(package.opc_package())?;
         assert_ne!(core_bytes(&next), original_core);
         assert_eq!(app_bytes(&next), original_app);
 
@@ -607,7 +655,7 @@ mod tests {
         let next_bytes = next.clone().to_bytes()?;
         assert!(
             patch
-                .whole
+                .core
                 .changes()
                 .iter()
                 .any(|change| { change.family() == families::Family::Core })
@@ -626,6 +674,18 @@ mod tests {
         );
         assert_eq!(
             next.custom_props().get("Reviewed"),
+            Some(&litchi_ooxml_common::custom::Value::Bool(true))
+        );
+
+        let projected = patch.parts().apply(package.opc_package())?.into_package();
+        let projected = Package::from_opc_package(projected)?;
+        assert!(projected.metadata().is_none());
+        assert_eq!(
+            projected.app_props()?.and_then(|props| props.company),
+            Some("Acme".to_owned())
+        );
+        assert_eq!(
+            projected.custom_props().get("Reviewed"),
             Some(&litchi_ooxml_common::custom::Value::Bool(true))
         );
 
@@ -665,6 +725,35 @@ mod tests {
     }
 
     #[test]
+    fn replay_reports_property_graph_refusal_as_properties() -> Result<()> {
+        let source = Package::new()?;
+        let mut edit = source.edit_metadata();
+        let mut app = edit.app_props()?.expect("app properties");
+        app.company = Some("Acme".to_owned());
+        edit.set_app_props(Some(app));
+        let patch = edit.commit()?.patch().clone();
+
+        let target = package_without_app_part()?;
+        assert_eq!(target.metadata(), source.metadata());
+        assert!(matches!(
+            target.apply_metadata(&patch),
+            Err(Error::Properties(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn replay_refuses_a_changed_signed_package_with_metadata_error() -> Result<()> {
+        let source = Package::new()?;
+        let mut edit = source.edit_metadata();
+        edit.update(|props| props.title = Some("Signed replay".to_owned()));
+        let patch = edit.commit()?.patch().clone();
+        let signed = signed_package(&source)?;
+        assert!(matches!(signed.apply_metadata(&patch), Err(Error::Signed)));
+        Ok(())
+    }
+
+    #[test]
     fn app_and_custom_props_publish_replay_and_invert() -> Result<()> {
         let package = package_with_opaque_app()?;
         let original = package.clone().to_bytes()?;
@@ -687,7 +776,7 @@ mod tests {
         let (next, patch) = commit.into_parts();
         assert!(
             patch
-                .whole
+                .core
                 .changes()
                 .iter()
                 .any(|change| change.family() == families::Family::Core)

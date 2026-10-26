@@ -67,19 +67,49 @@ impl Package {
         }
         if patch.is_noop() {
             self.ensure_opc_current("apply_metadata")?;
-            patch.whole().check(&self.opc).map_err(Error::Properties)?;
+            patch
+                .core_patch()
+                .check(&self.opc)
+                .map_err(crate::Error::from)?;
+            patch
+                .replay_parts()
+                .check(&self.opc)
+                .map_err(Error::Properties)?;
             return Ok(crate::metadata::Commit::new(
                 self.clone(),
                 patch.clone(),
                 litchi_core::edit::Diagnostics::new(false),
             ));
         }
+        if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
+            return Err(Error::Signed);
+        }
         let mut package = self.clone();
-        package.edit_semantic_opc("apply_metadata", |opc| {
-            let commit = patch.whole().apply(opc).map_err(crate::Error::from)?;
-            *opc = commit.into_package();
+        let mut parts_failure = None;
+        let published = package.edit_semantic_opc("apply_metadata", |opc| {
+            if patch.parts_first() {
+                if let Err(error) = apply_metadata_parts(opc, patch.replay_parts()) {
+                    parts_failure = Some(error);
+                    return Err(crate::Error::InvalidFormat(
+                        "document-property parts refused the patch".to_owned(),
+                    ));
+                }
+                apply_metadata_core(opc, patch.core_patch())?;
+            } else {
+                apply_metadata_core(opc, patch.core_patch())?;
+                if let Err(error) = apply_metadata_parts(opc, patch.replay_parts()) {
+                    parts_failure = Some(error);
+                    return Err(crate::Error::InvalidFormat(
+                        "document-property parts refused the patch".to_owned(),
+                    ));
+                }
+            }
             Ok(())
-        })?;
+        });
+        if let Some(error) = parts_failure {
+            return Err(Error::Properties(error));
+        }
+        published?;
         Ok(crate::metadata::Commit::new(
             package,
             patch.clone(),
@@ -131,17 +161,22 @@ impl Package {
     }
 
     /// Publish the staged core, application and custom properties as one
-    /// atomic package edit. The core family is planned first; the application
-    /// and custom families are then planned against that intermediate graph so
-    /// package relationship IDs cannot collide. The returned private patch is
-    /// the composition of those exact family patches.
+    /// atomic package edit. The public application/custom projection is
+    /// planned over the source graph; the private replay parts are planned
+    /// after the core family so package relationship IDs cannot collide.
     pub(crate) fn publish_metadata(
         &self,
         target: Option<&Props>,
         app: Option<Option<app::Props>>,
         custom: Option<CustomProps>,
         remove_custom: bool,
-    ) -> Result<(Self, bool, families::Patch, families::Patch)> {
+    ) -> Result<(
+        Self,
+        bool,
+        families::Patch,
+        families::Patch,
+        families::Patch,
+    )> {
         let core = self.metadata() != target;
         let has_parts = app.is_some() || custom.is_some() || remove_custom;
         if !core && !has_parts {
@@ -150,24 +185,33 @@ impl Package {
                 false,
                 families::Patch::default(),
                 families::Patch::default(),
+                families::Patch::default(),
             ));
         }
         if core && let Some(props) = target {
             admit(props)?;
         }
 
-        // An application/custom-only edit can use the existing source plan.
-        // This both preserves signed no-op behavior and avoids planning the
-        // same graph twice. A core edit must defer this plan until after the
-        // core family has been applied to the candidate.
+        // Always retain a source-scoped public projection. A core edit also
+        // gets a second, private parts patch below because a core creation or
+        // removal can change which relationship IDs are available.
+        let source_parts = if has_parts {
+            self.property_parts_patch(app.clone(), custom.clone(), remove_custom)?
+        } else {
+            families::Patch::default()
+        };
+
+        // An application/custom-only edit can use the source plan directly.
         if !core {
-            let parts = if has_parts {
-                self.property_parts_patch(app.clone(), custom.clone(), remove_custom)?
-            } else {
-                families::Patch::default()
-            };
+            let parts = source_parts;
             if parts.is_noop() {
-                return Ok((self.clone(), false, parts.clone(), parts));
+                return Ok((
+                    self.clone(),
+                    false,
+                    parts.clone(),
+                    families::Patch::default(),
+                    parts,
+                ));
             }
             if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
                 return Err(Error::Signed);
@@ -191,7 +235,13 @@ impl Package {
                 return Err(Error::Properties(error));
             }
             published?;
-            return Ok((package, true, parts.clone(), parts));
+            return Ok((
+                package,
+                true,
+                parts.clone(),
+                families::Patch::default(),
+                parts,
+            ));
         }
 
         if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
@@ -200,9 +250,8 @@ impl Package {
 
         let mut package = self.clone();
         let mut parts_failure = None;
-        let mut compose_failure = None;
-        let mut public_parts = families::Patch::default();
-        let mut whole = families::Patch::default();
+        let mut core_patch = families::Patch::default();
+        let mut replay_parts = families::Patch::default();
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
             let mut core_edit = families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
             match target {
@@ -216,61 +265,93 @@ impl Package {
                 },
             }
             let core_commit = core_edit.commit().map_err(crate::Error::from)?;
-            let (core_package, core_patch) = core_commit.into_parts();
+            let (core_package, committed_core_patch) = core_commit.into_parts();
             *opc = core_package;
+            core_patch = committed_core_patch;
 
-            let parts_patch = if has_parts {
-                let mut parts_edit =
-                    families::Edit::new(opc, Host::Word).map_err(crate::Error::from)?;
-                if let Some(app) = app {
-                    parts_edit.set_app_props(app);
-                }
-                if let Some(custom) = custom {
-                    if remove_custom {
-                        parts_edit.remove_custom_props();
-                    } else {
-                        parts_edit.set_custom_props(custom);
-                    }
-                }
-                match parts_edit.commit() {
-                    Ok(commit) => {
-                        let (parts_package, parts_patch) = commit.into_parts();
-                        *opc = parts_package;
-                        Some(parts_patch)
-                    },
+            if has_parts {
+                let snapshot = match families::Snapshot::read(opc, Host::Word) {
+                    Ok(snapshot) => snapshot,
                     Err(error) => {
                         parts_failure = Some(error);
                         return Err(crate::Error::InvalidFormat(
                             "document-property parts refused the patch".to_owned(),
                         ));
                     },
+                };
+                let mut parts_plan = snapshot.plan();
+                if let Some(app) = app {
+                    parts_plan.set_app_props(app);
                 }
-            } else {
-                None
-            };
-            public_parts = parts_patch.clone().unwrap_or_default();
-            whole = if let Some(parts_patch) = parts_patch {
-                match core_patch.compose(&parts_patch) {
-                    Ok(composed) => composed,
+                if let Some(custom) = custom {
+                    if remove_custom {
+                        parts_plan.remove_custom_props();
+                    } else {
+                        parts_plan.set_custom_props(custom);
+                    }
+                }
+                let committed_parts_patch = match parts_plan.finish() {
+                    Ok((_, patch, _)) => patch,
                     Err(error) => {
-                        compose_failure = Some(error);
+                        parts_failure = Some(error);
                         return Err(crate::Error::InvalidFormat(
-                            "document-property family patches could not be composed".to_owned(),
+                            "document-property parts refused the patch".to_owned(),
                         ));
                     },
+                };
+                if !committed_parts_patch.is_noop() {
+                    match committed_parts_patch.apply(opc) {
+                        Ok(commit) => {
+                            *opc = commit.into_package();
+                        },
+                        Err(error) => {
+                            parts_failure = Some(error);
+                            return Err(crate::Error::InvalidFormat(
+                                "document-property parts refused the patch".to_owned(),
+                            ));
+                        },
+                    }
                 }
-            } else {
-                core_patch
-            };
+                replay_parts = committed_parts_patch;
+            }
             Ok(())
         });
         if let Some(error) = parts_failure {
             return Err(Error::Properties(error));
         }
-        if let Some(error) = compose_failure {
-            return Err(Error::Properties(error));
-        }
         published?;
-        Ok((package, !whole.is_noop(), public_parts, whole))
+        Ok((
+            package,
+            !core_patch.is_noop() || !replay_parts.is_noop(),
+            source_parts,
+            core_patch,
+            replay_parts,
+        ))
+    }
+}
+
+fn apply_metadata_core(
+    opc: &mut litchi_opc::OpcPackage,
+    patch: &families::Patch,
+) -> std::result::Result<(), crate::Error> {
+    if patch.is_noop() {
+        patch.check(opc).map_err(crate::Error::from)
+    } else {
+        let commit = patch.apply(opc).map_err(crate::Error::from)?;
+        *opc = commit.into_package();
+        Ok(())
+    }
+}
+
+fn apply_metadata_parts(
+    opc: &mut litchi_opc::OpcPackage,
+    patch: &families::Patch,
+) -> std::result::Result<(), families::Error> {
+    if patch.is_noop() {
+        patch.check(opc)
+    } else {
+        let commit = patch.apply(opc)?;
+        *opc = commit.into_package();
+        Ok(())
     }
 }
