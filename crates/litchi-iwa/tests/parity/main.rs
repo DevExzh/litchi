@@ -44,6 +44,7 @@ mod pages_caption_cases;
 mod pages_cases;
 mod pages_cost_probes;
 mod pages_drawable_cases;
+mod pages_lifecycle_cases;
 mod pages_table_cases;
 mod pages_text_cases;
 mod physical_cases;

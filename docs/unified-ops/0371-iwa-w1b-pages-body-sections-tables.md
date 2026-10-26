@@ -28,6 +28,7 @@
 | `a9d2af35ca`, `de1dbad71e` | `litchi_pages::number_attachment` — `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert, update, remove}`; on W1-D's `number_attachment` engine | 6 |
 | (caption commit, below) | `litchi_pages::drawable::caption` — `Package::{body_drawable_caption, edit_body_drawable_caption, apply_body_drawable_caption}` over `DrawableSelector` + `Kind::{Title, Caption}`; `Edit::{set, clear}`. A present label's storage text is rewritten; an absent label gets the native inline graph from the shared `keynote_chart_caption_graph_codec` (style, CaptionInfo, storage, placement; the payloads the host writes); clearing points the drawable at a fresh stand-in and keeps the old graph. New objects get deterministic UUIDs in the document component and raise the watermark (`body_storage_objects::Metadata::registered`) | 15 |
 | (number-attachment host fix commit, below) | **host defect fix**: Pages number-attachment removal deletes the removed object (§3, item 3); body and header/footer removal → `Package::edit_number_attachments` `Edit::remove` | 2 |
+| (lifecycle commit, below) | parity for existing leaf families: host `append_section`, `remove_section`, `sections` → `Package::{edit_section_lifecycle, sections}` (tier B); host `remove_table` (already delegating) → `Package::edit_body_table_deletion` (tier A) | 4 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -62,6 +63,8 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | Date & Time fields | add (B), insert (B), update (A), remove (A) | A/B | queued |
 | number attachments | body insert/update/remove, first-header insert/update/remove | A | queued |
 | titles and captions (image, movie, shape × title, caption) | set: create on an unlabelled drawable, then replace on a host-labelled one; remove on a host-labelled one | B (fresh UUIDs; the replace runs are byte-identical) | queued |
+| section append/remove, sections read | 2 | B (UUIDs, save token) | queued |
+| body-table remove | 1 | A | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -132,6 +135,9 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | number attachment remove (`basic` + host page count) | 159,628,677 | — | 52,679,103 | −67.0% |
 | image title create (`image-adjustments-native`) | 546,895,891 | — | 85,626,043 | −84.3% |
 | image caption remove (host-labelled image) | 710,021,022 | — | 85,975,944 | −87.9% |
+| section append (`body-sections-unicode`) | 589,774,024 | — | 127,211,178 | −78.4% |
+| section remove | 498,795,655 | — | 137,862,844 | −72.4% |
+| body-table remove (`body-table-catalog-native`) | 2,246,224,218 | — | 170,815,958 | −92.4% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -172,6 +178,7 @@ Both pre-commit size checks printed nothing for every commit.
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
 | text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
+| `insert_section` (split at a body position) and `add_table` | 2 | the leaf section add appends an empty section after the selected one (no split); the leaf table creation (record 0329) writes a different graph from the host's `add_table` (random table UUID, its own identifier order, formula-owner type 6267 against the host's 4008), so both stay host-only until one side is aligned |
 | media lifecycle (add, duplicate, remove, replace data/poster) | 16 | next; donor `refactor/pages-media-lifecycle-admission-20261024` |
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
 | table cell formats, rich text, appearance, conditional highlights, formulas, topology, duplicate/resize, sort execution, comment writes | ~150 | W1-A engines (topology engine landed; formats/styles follow), W1-F formula caches, W1-D paragraph/list engines |
