@@ -76,6 +76,7 @@ impl ComponentCatalog {
             components.push(Component {
                 name: owned_name.into_boxed_str(),
                 archive: ComponentArchive::Shared(archive),
+                decompressed_bytes: 0,
             });
         }
         components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
