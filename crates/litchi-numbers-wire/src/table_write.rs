@@ -152,7 +152,7 @@ fn fixed32_field(output: &mut Vec<u8>, number: u32, value: u32, limits: &Limits)
 pub(crate) struct Field<'a> {
     pub(crate) number: u32,
     pub(crate) wire_type: u8,
-    raw: &'a [u8],
+    pub(crate) raw: &'a [u8],
     pub(crate) payload: &'a [u8],
 }
 
@@ -497,6 +497,35 @@ pub fn tile_cell(
         return Ok(Some(copy));
     }
     Ok(None)
+}
+
+/// `previous` without its formula: the formula reference, the cached result
+/// and every other value field go, the cell's metadata stays (the
+/// formula-removal half of a write into a formula cell, record 0376a).
+///
+/// # Errors
+///
+/// [`WriteError::Unsupported`] for a formula with a formula-error entry;
+/// [`WriteError::Invalid`] for malformed BNC.
+pub fn formula_free(previous: &[u8], limits: &Limits) -> Result<Vec<u8>> {
+    let mut cell = BncCell::parse(previous, limits).map_err(map_bnc_error)?;
+    if cell.formula_error_identifier().is_some() {
+        return Err(WriteError::Unsupported);
+    }
+    cell.clear_value_preserving_metadata();
+    cell.encode(limits).map_err(map_bnc_error)
+}
+
+/// `cell`, holding a formula's cached result, with the formula-list key
+/// `key` attached (the host's order: cached value first, then the formula).
+///
+/// # Errors
+///
+/// [`WriteError::Invalid`] for malformed BNC.
+pub fn with_formula(cell: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
+    let mut cell = BncCell::parse(cell, limits).map_err(map_bnc_error)?;
+    cell.set_formula_reference(key);
+    cell.encode(limits).map_err(map_bnc_error)
 }
 
 /// Every stored BNC cell of a modern tile, as `(local row, column, bytes)`

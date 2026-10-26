@@ -84,6 +84,7 @@ litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-numbers-wire = { workspace = true }
 plist           = { workspace = true }
+sha1            = { workspace = true }
 thiserror       = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

@@ -20,6 +20,7 @@ pub(crate) mod comments_metadata;
     reason = "The private native reply transition is reached through package::comments."
 )]
 pub(crate) mod comments_reply_native;
+pub(crate) mod conditional_highlight;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
