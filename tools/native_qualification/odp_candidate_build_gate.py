@@ -34,6 +34,7 @@ for _path in (str(_REPO_ROOT), str(_TOOLS_ROOT)):
 try:
     from tools.odg_joined_qualification_builder import (
         _environment_identity,
+        _check_worktree_shape,
         _identity,
         _quiet_guard,
         _safe_path,
@@ -44,6 +45,7 @@ try:
 except ImportError:  # pragma: no cover
     from odg_joined_qualification_builder import (  # type: ignore[no-redef]
         _environment_identity,
+        _check_worktree_shape,
         _identity,
         _quiet_guard,
         _safe_path,
@@ -158,6 +160,7 @@ def _source_files(root: Path) -> dict[str, dict[str, Any]]:
 
 def _source_state(root: Path, expected_ref: str, expected_tree: str, expected_files: Mapping[str, Any] | None = None) -> dict[str, Any]:
     root = _safe_path(root.absolute(), "candidate source root", must_exist=True)
+    shape = _check_worktree_shape(root, "candidate")
     head = _git(root, "rev-parse", "--verify", "HEAD")
     tree = _git(root, "rev-parse", "--verify", "HEAD^{tree}")
     status = _git(root, "status", "--porcelain", "--untracked-files=all")
@@ -171,6 +174,7 @@ def _source_state(root: Path, expected_ref: str, expected_tree: str, expected_fi
                 raise RunFailure(f"candidate source file changed: {name}")
     return {
         "root": str(root), "ref": head, "tree": tree, "status": status,
+        "source_shape": shape,
         "status_sha256": hashlib.sha256(status.encode()).hexdigest(),
         "source_manifest": _tree_manifest(root, head), "files": files,
     }

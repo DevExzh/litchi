@@ -29,7 +29,7 @@ import time
 from typing import Any, Mapping
 
 try:
-    from odp_native_qualification import (
+    from tools.odp_native_qualification import (
         MAX_CHILD_OUTPUT,
         Protocol,
         RunFailure,
@@ -48,7 +48,7 @@ try:
         binary_identity,
         quiet_guard,
     )
-    from odg_joined_qualification_bindings import (
+    from tools.odg_joined_qualification_bindings import (
         REVIEWED_FIXTURE_IDENTITY,
         REVIEWED_FIXTURE_PROVENANCE,
         REVIEWED_FIXTURE_RELATIVE,
@@ -57,7 +57,7 @@ try:
         REVIEWED_REPO_ROOT,
     )
 except ImportError:  # pragma: no cover - supports direct test-module loading.
-    from tools.odp_native_qualification import (  # type: ignore[no-redef]
+    from odp_native_qualification import (  # type: ignore[no-redef]
         MAX_CHILD_OUTPUT,
         Protocol,
         RunFailure,
@@ -76,7 +76,7 @@ except ImportError:  # pragma: no cover - supports direct test-module loading.
         binary_identity,
         quiet_guard,
     )
-    from tools.odg_joined_qualification_bindings import (  # type: ignore[no-redef]
+    from odg_joined_qualification_bindings import (  # type: ignore[no-redef]
         REVIEWED_FIXTURE_IDENTITY,
         REVIEWED_FIXTURE_PROVENANCE,
         REVIEWED_FIXTURE_RELATIVE,
