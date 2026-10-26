@@ -14,6 +14,7 @@
 mod arrange;
 mod author;
 mod inventory;
+mod named_styles;
 mod stage;
 mod table;
 mod text;
@@ -663,6 +664,12 @@ enum Operation {
         storage: u64,
         change: text_lists::ListChange,
     },
+    NamedStyle {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: named_styles::NamedChange,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1058,6 +1065,7 @@ impl<'a> Edit<'a> {
             | Operation::LineSegment { .. }
             | Operation::TextProperty { .. }
             | Operation::TextList { .. }
+            | Operation::NamedStyle { .. }
             | Operation::TableCell { .. }
             | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
@@ -1325,6 +1333,144 @@ impl<'a> Edit<'a> {
             change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
         });
         Ok(self)
+    }
+
+    fn stage_named(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: named_styles::NamedChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::NamedStyle {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage applying the named paragraph style `style` to the whole text of
+    /// a text box or shape, dropping the text's exclusive overrides (host
+    /// `apply_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a style the text's stylesheet does not name
+    /// ([`Unsupported::TextStyling`]).
+    pub fn apply_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Apply(style),
+        )
+    }
+
+    /// Stage a new named paragraph style copied from `source` under `name`
+    /// and listed in the themes that list `source` (host
+    /// `create_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_named_style`]; a taken name is refused.
+    pub fn create_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        source: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+        name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Create(source, name),
+        )
+    }
+
+    /// Stage renaming the named paragraph style `style` (host
+    /// `rename_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::create_named_style`].
+    pub fn rename_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+        name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Rename(style, name),
+        )
+    }
+
+    /// Stage deleting an unused named paragraph style (host
+    /// `delete_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_named_style`]; a style still in use or the last
+    /// named style is refused.
+    pub fn delete_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Delete(style),
+        )
+    }
+
+    /// Stage deleting the text's applied named style after applying
+    /// `replacement` (host
+    /// `delete_applied_slide_text_box_named_paragraph_style_with_replacement`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::delete_named_style`].
+    pub fn delete_applied_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+        replacement: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::DeleteApplied(style, replacement),
+        )
+    }
+
+    /// Stage folding the text's overrides into its applied named style
+    /// (host `redefine_applied_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_named_style`]; text without overrides is refused.
+    pub fn redefine_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Redefine,
+        )
     }
 
     fn stage_list(
@@ -2452,6 +2598,36 @@ impl Package {
             }))
     }
 
+    /// Read the named paragraph styles of the text's stylesheet, in theme
+    /// preset order (host `slide_text_box_named_paragraph_styles`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_named_styles<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::paragraph::style::NamedParagraphStyle>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        named_styles::catalog(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read the text's applied named paragraph style and whether the text
+    /// overrides it (host `slide_text_box_applied_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_named_styles`].
+    pub fn slide_drawable_applied_named_style<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<(litchi_iwa_text::paragraph::style::NamedParagraphStyle, bool), Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        named_styles::applied(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
     /// Read the list preset of the whole, uniformly listed text of one text
     /// box or shape (host `slide_text_box_paragraph_list`).
     ///
@@ -3151,6 +3327,15 @@ fn commit_operations(
                 {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::NamedStyle {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                named_styles::change(&mut workspace, *storage, change)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::TextList {

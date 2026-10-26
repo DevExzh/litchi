@@ -56,6 +56,13 @@ pub use litchi_iwa_common::shape::geometry::FlipAxis;
 pub mod text_property {
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
+/// Named paragraph-style vocabulary ([`Edit::apply_named_style`] and the
+/// named-style reads).
+pub mod named_style {
+    pub use litchi_iwa_text::paragraph::style::{
+        NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    };
+}
 /// Paragraph-list vocabulary ([`Edit::set_list`], [`Edit::set_list_property`]
 /// and the list reads), shared with the W1-D list engine.
 pub mod list {

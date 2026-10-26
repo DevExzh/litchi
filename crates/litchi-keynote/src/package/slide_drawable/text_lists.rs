@@ -104,7 +104,7 @@ fn exclusive(workspace: &Workspace<'_>, style: u64, limits: WireLimits) -> bool 
     references == 1
 }
 
-fn component_of(workspace: &Workspace<'_>, object: u64) -> Result<u64, Error> {
+pub(super) fn component_of(workspace: &Workspace<'_>, object: u64) -> Result<u64, Error> {
     let member = workspace.component_of(object).ok_or(Error::InvalidSource)?;
     Ok(workspace
         .registry
@@ -170,7 +170,7 @@ fn replace_storage(
     Ok(())
 }
 
-fn replace_stylesheet(
+pub(super) fn replace_stylesheet(
     workspace: &mut Workspace<'_>,
     stylesheet: u64,
     data: Vec<u8>,
@@ -242,7 +242,12 @@ fn new_style(
     Ok(object)
 }
 
-fn add_edge(workspace: &mut Workspace<'_>, from: u64, to: u64, object: u64) -> Result<(), Error> {
+pub(super) fn add_edge(
+    workspace: &mut Workspace<'_>,
+    from: u64,
+    to: u64,
+    object: u64,
+) -> Result<(), Error> {
     if from == to {
         return Ok(());
     }
@@ -260,7 +265,7 @@ fn add_edge(workspace: &mut Workspace<'_>, from: u64, to: u64, object: u64) -> R
 
 /// The host's `register_private_style`: a UUID in the style's component
 /// and an owner edge to it.
-fn register_private_style(
+pub(super) fn register_private_style(
     workspace: &mut Workspace<'_>,
     owner: u64,
     style_component: u64,
@@ -276,7 +281,7 @@ fn register_private_style(
 }
 
 /// The host's `unregister_private_style`.
-fn unregister_private_style(
+pub(super) fn unregister_private_style(
     workspace: &mut Workspace<'_>,
     owner: u64,
     style_component: u64,
@@ -297,7 +302,7 @@ fn unregister_private_style(
 
 /// Remove the external references to (`component`, `object`), from every
 /// component or only from `from`.
-fn remove_edges_to(
+pub(super) fn remove_edges_to(
     workspace: &mut Workspace<'_>,
     component: u64,
     object: u64,
@@ -334,7 +339,7 @@ fn remove_edges_to(
 
 /// The host's `unregister_owner_reference_if_unused`: drop the owner's
 /// edge to `style` when no object of the owner still references it.
-fn unregister_if_unused(
+pub(super) fn unregister_if_unused(
     workspace: &mut Workspace<'_>,
     owner: u64,
     style_component: u64,
