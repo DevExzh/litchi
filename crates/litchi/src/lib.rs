@@ -29,7 +29,7 @@
 //! let document = file.document()?;
 //! assert_eq!(document.paragraph_count()?, 1);
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! A view refuses a file of another family, and names the format it found:
@@ -46,7 +46,7 @@
 //! assert_eq!(error.code(), litchi::Code::UnsupportedFormat);
 //! assert_eq!(error.detected(), Some(litchi::FileFormat::Docx));
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! Format-specific reads live on the handle a variant carries;
@@ -68,7 +68,7 @@
 //!     assert_eq!(pptx.slide_catalog()?.len(), 1);
 //! }
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! With the `markdown` feature a document or presentation converts to
@@ -86,7 +86,7 @@
 //! let file = litchi::open(path)?;
 //! assert_eq!(file.to_markdown()?, "Hello World\\!\n\n");
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! # Encrypted and signed files
@@ -120,7 +120,7 @@
 //! };
 //! assert!(!file.text()?.is_empty());
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! A signed OOXML or legacy binary input opens as [`File::Signed`]. It reads
@@ -146,7 +146,7 @@
 //!     assert!(!unsigned.is_signed());
 //! }
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! # Errors
@@ -201,7 +201,7 @@
 //! let file = added.file.set(&added.path, props! { "text" => "Hello, world" })?;
 //! assert_eq!(file.text()?.trim(), "Hello, world");
 //! # }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! Not every element supports every verb in every format. [`File::capabilities`]

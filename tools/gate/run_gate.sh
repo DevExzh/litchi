@@ -64,7 +64,7 @@ for f in "${SUBS[@]}"; do
     row "clippy-ops-${f:-none}" "cargo clippy -q -p litchi-ops --no-default-features ${f:+--features $f} --all-targets -- -D warnings"
 done
 row tests-ops "$CHUNKED -p litchi-ops --all-features"
-row tests-facade "$CHUNKED -p litchi --all-features"
+row tests-facade "$CHUNKED -p litchi --all-features && cargo test -q -p litchi --doc"
 row tests-core "$CHUNKED -p litchi-core --all-features"
 row clippy-leaves "cargo clippy -q $LEAF --all-targets --all-features -- -D warnings"
 row clippy-ods "cargo clippy -q -p litchi-ods --all-targets --all-features -- -D warnings"
