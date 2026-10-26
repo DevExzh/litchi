@@ -20425,6 +20425,61 @@
           ],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::drop_cap::placements",
+          "inputs": [
+            "storage",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::drop_cap::model",
+          "inputs": [
+            "style",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::drop_cap::variation",
+          "inputs": [
+            "parent",
+            "stylesheet",
+            "drop_cap",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::drop_cap::plan",
+          "inputs": [
+            "storage",
+            "paragraph",
+            "base",
+            "style",
+            "exclusive",
+            "change",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
+          "method": "litchi_iwa_text_wire::drop_cap::point",
+          "inputs": [
+            "storage",
+            "paragraph",
+            "previous",
+            "next",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
         }
       ]
     },
@@ -20597,6 +20652,31 @@
           "name": "Chart3dSeriesGap",
           "scope": "litchi_iwa_common",
           "replacement": "use chart3d::SeriesGap; the shared chart values carry no host `Chart` prefix (record 0375)"
+        },
+        {
+          "name": "MediaAsset",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::Asset; no host `Media` prefix (record 0375)"
+        },
+        {
+          "name": "MediaStats",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::Stats; no host `Media` prefix (record 0375)"
+        },
+        {
+          "name": "MediaLimits",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::asset::Limits; no host `Media` prefix (record 0375)"
+        },
+        {
+          "name": "LineSegment",
+          "scope": "litchi_iwa_common",
+          "replacement": "use shape::line::Segment (record 0375)"
+        },
+        {
+          "name": "MediaManager",
+          "scope": "litchi_iwa_common",
+          "replacement": "use media::Catalog (discovery); per-format package families own extraction and replacement; no host `Media` prefix (record 0375)"
         }
       ],
       "families": []
@@ -28758,6 +28838,18 @@
         {
           "method": "litchi_iwa_protos::chart_style_codec::references",
           "inputs": ["chart_drawable", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::line",
+          "inputs": ["shape_info", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
+        },
+        {
+          "method": "litchi_iwa_protos::shape_style_codec::rewrite_line",
+          "inputs": ["shape_info", "replacement", "width", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_iwa_protos::chart_style_codec::Limits"
         }

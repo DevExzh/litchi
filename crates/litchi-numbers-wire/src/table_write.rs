@@ -530,9 +530,17 @@ pub fn tile_set_cell(
         .map_err(|_| WriteError::Allocation {
             requested: row_count,
         })?;
+    // A new row's offset table takes the widest existing row's capacity
+    // (native rows keep spare slots), as the Numbers host writer sizes it
+    // (record 0370).
+    let mut capacity = columns_usize;
     for field in tile_fields.iter().filter(|field| field.number == 5) {
         rows.push(single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?);
+        if let Some(offsets) = single_bytes(field.payload, 7, limits)? {
+            capacity = capacity.max(offsets.len() / 2);
+        }
     }
+    limits.check_items(capacity).map_err(map_limits)?;
     limits.check_items(rows.len()).map_err(map_limits)?;
     let numrows = single_varint(tile, 4, limits)?.ok_or(WriteError::Invalid)?;
     let counts_rows = numrows == rows.len() as u64;
@@ -609,11 +617,11 @@ pub fn tile_set_cell(
         limits.check_items(columns_usize).map_err(map_limits)?;
         let mut cells = Vec::new();
         cells
-            .try_reserve_exact(columns_usize)
+            .try_reserve_exact(capacity)
             .map_err(|_| WriteError::Allocation {
-                requested: columns_usize,
+                requested: capacity,
             })?;
-        cells.resize(columns_usize, None);
+        cells.resize(capacity, None);
         cells[column] = Some(cell);
         let (storage, offsets) = encode(&cells, 1, limits)?;
         let mut row = Vec::new();
@@ -839,7 +847,8 @@ pub fn list_intern(list: &[u8], text: &str, limits: &Limits) -> Result<(Vec<u8>,
 }
 
 /// Drop one reference to string entry `key`; an entry left without
-/// references goes.
+/// references goes, and when it held the list's last key, `next_list_id`
+/// takes that key back.
 ///
 /// # Errors
 ///
@@ -847,7 +856,7 @@ pub fn list_intern(list: &[u8], text: &str, limits: &Limits) -> Result<(Vec<u8>,
 /// a key the list does not hold.
 pub fn list_release(list: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
     let mut done = false;
-    let output = rebuild(list, limits, |field| {
+    let mut output = rebuild(list, limits, |field| {
         if field.number != 3 || single_varint(field.payload, 1, limits)? != Some(u64::from(key)) {
             return Ok(None);
         }
@@ -873,6 +882,23 @@ pub fn list_release(list: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
     })?;
     if !done {
         return Err(WriteError::Unsupported);
+    }
+    // A removed last key is handed back, as the Numbers cell writers do
+    // (record 0370).
+    if single_varint(&output, 2, limits)? == Some(u64::from(key) + 1)
+        && !fields(&output, limits)?.iter().any(|field| {
+            field.number == 3
+                && single_varint(field.payload, 1, limits).ok().flatten() == Some(u64::from(key))
+        })
+    {
+        output = rebuild(&output, limits, |field| {
+            if field.number != 2 {
+                return Ok(None);
+            }
+            let mut replacement = Vec::new();
+            varint_field(&mut replacement, 2, u64::from(key), limits)?;
+            Ok(Some(replacement))
+        })?;
     }
     Ok(output)
 }
