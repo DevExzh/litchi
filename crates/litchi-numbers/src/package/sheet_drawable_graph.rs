@@ -447,3 +447,43 @@ pub(super) fn publish_in_place(
         deleted_previews: 0,
     })
 }
+
+/// What a selector names for a text family.
+pub(super) enum TextTarget {
+    /// The storage the text box or shape owns, and its storage message.
+    Storage {
+        /// The storage object.
+        storage: u64,
+    },
+    /// The drawable owns no text.
+    NoText(Kind),
+    /// No drawable matches.
+    NotFound,
+}
+
+/// The storage the text box or shape `selector` names owns.
+pub(super) fn text_storage(
+    package: &Package,
+    sheet: usize,
+    selector: DrawableSelector,
+) -> FaultResult<TextTarget> {
+    let drawables = sheet_drawables(package, sheet)?;
+    let Some(entry) = drawables.select(selector) else {
+        return Ok(TextTarget::NotFound);
+    };
+    if !entry.kind.has_text() {
+        return Ok(TextTarget::NoText(entry.kind));
+    }
+    let (index, message_type) = entry.message.ok_or(Fault::Invalid)?;
+    if message_type != SHAPE_INFO_MESSAGE_TYPE {
+        return Err(Fault::Invalid);
+    }
+    let shape = object(package, entry.identifier)?;
+    let records = references::records(&shape.messages[index].data, &[4])?;
+    let [record] = records.as_slice() else {
+        return Err(Fault::Invalid);
+    };
+    let storage = references::reference_identifier(record)?;
+    structure::unique_message(object(package, storage)?, &[2_001])?;
+    Ok(TextTarget::Storage { storage })
+}

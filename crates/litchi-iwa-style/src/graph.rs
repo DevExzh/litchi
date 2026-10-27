@@ -740,7 +740,11 @@ impl<'s> Workspace<'s> {
         Ok(uuids)
     }
 
-    fn fresh_uuid(&mut self, identifier: u64, existing: &mut HashSet<(u64, u64)>) -> (u64, u64) {
+    pub(crate) fn fresh_uuid(
+        &mut self,
+        identifier: u64,
+        existing: &mut HashSet<(u64, u64)>,
+    ) -> (u64, u64) {
         loop {
             self.uuid_seed = self.uuid_seed.wrapping_add(1);
             let lower = mix(identifier ^ 0x6c69_7463_6869_7374, self.uuid_seed);

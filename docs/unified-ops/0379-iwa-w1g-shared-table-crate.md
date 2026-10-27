@@ -131,6 +131,80 @@ the five decimal families, `set_table_cell_data_format`,
 without Number, plus the two generic rows). Six macOS queue rows cover the
 routes; none has native evidence.
 
+### 2.3 The structural working set
+
+The Numbers structural workspace (`package/structure.rs` and
+`structure/{budget,collect,formula,metadata,plan,references}.rs`) moves to
+`litchi_iwa_table::structure` as `Working<'p, P: TableLeaf>`. `TableLeaf`
+is `TableSource` plus the leaf's strict `reopen_candidate`. Numbers keeps
+its sheet and document helpers, the patch `Artifacts` and the
+`structural_family!` macro, and aliases `type Working<'p> =
+litchi_iwa_table::structure::Working<'p, Package>` and `type Published =
+Published<Package>`, so its call sites are unchanged. Every Numbers test
+(1,044 with the crate's) and the 151 Numbers parity cases pass; callgrind,
+same probes as 0370/0370a (A before, B after, A B B A):
+
+| Route | Before | After | Δ |
+|---|---:|---:|---:|
+| leaf topology insertion (`cost_probes::numbers_topology_insert_cost_abba`) | 415,361,948 | 415,363,167 | +0.0003% |
+| leaf whole-cell text style (`cost_probes::numbers_text_style_cost_abba`) | 323,242,772 | 323,187,077 | −0.02% |
+
+## 2a. Group 6: hidden axes
+
+Ordered before rich text because W1-C waits on the Keynote family.
+
+### 2a.1 The engine lift and the Pages facade
+
+`litchi-pages` `package/body_table_hidden_axes.rs` (graph proof, profile
+classification, extent and filter validation) and
+`body_table_hidden_axes/rewrite.rs` (owner creation, UID-map and metadata
+rewrite, git mv) move to `litchi_iwa_table::hidden_axes`. The engine is
+generic over a `Leaf` (its selector type, its wire `Budget`, its target
+resolution and strict reopen); its `Error`, `Refusal` and `LimitKind` keep
+the Pages shapes, so the Pages owner converts both ways losslessly. The
+page-layout and table-lock helpers the engine called (exact source,
+editable component, recompression, selected-message metadata checks,
+fingerprint, compressed bounds) are copied into `hidden_axes::support`
+with the same error mapping; the Pages originals stay for their other users.
+
+Pages keeps `table::hidden_axes::transaction::{Edit, Patch, Commit,
+Diagnostics, Error, LimitKind, Path, Refusal}` and the three `Package`
+methods unchanged, and implements the engine over a private `Leaf(Package)`
+wrapper (its `table_lock::WireBudget` stays crate-private), so resolution,
+proof and rewrite still share one budget. Every `litchi-pages` test passes
+unchanged (754 with the crate's). Callgrind,
+`native_hidden_axes::hidden_axes_cost_probe` (set then clear on
+`body-table-hidden-axes-native.pages`, A B B A): 34,109,338 before,
+34,112,098 after, +0.008%.
+
+### 2a.2 Keynote
+
+`litchi_keynote::slide::table::hidden_axes` (values re-exported from
+`litchi_iwa_common::table::axis`, transactions in `transaction`) with
+`Package::{slide_table_hidden_axes, edit_slide_table_hidden_axes,
+apply_slide_table_hidden_axes}`. The facade resolves the slide and table
+through `slide_table_core::select_table` into the engine `Target` (its new
+`scope` is the slide position), runs the engine over a private
+`Leaf(Package)` wrapper with the engine's own `hidden_axes::WireBudget`
+(the Pages table-lock ledger, now a crate type), and keeps root previews
+(`Leaf::DELETES_ROOT_PREVIEWS = false`), as the host does.
+
+Parity (`crates/litchi-iwa/tests/parity/keynote_hidden_axes_cases.rs`), on
+the first slide table of `table-discovery.key` and
+`slide-table-merges-native.key`:
+
+| Test | Route | Tier |
+|---|---|---|
+| `keynote_slide_table_hidden_axes_set_parity` | hide row 1 and column 0 (owner creation) | B |
+| `keynote_slide_table_hidden_axes_read_parity` | reads on the source and on the host's output | A |
+| `keynote_slide_table_hidden_axes_clear_divergence_is_reported` | clear on the host's output: the engine keeps the cleared state records with no user-hidden flag, the host drops them; both outputs read as unhidden | pinned |
+
+Ledger: `set_slide_table_hidden_axes` (B) and `slide_table_hidden_axes`
+(A) migrate, with two macOS queue rows. The engine refuses
+`slide-table-read-native.key`'s table as an invalid source (§5).
+Callgrind (`keynote_hidden_axes_cost_abba`, host A B B A leaf): host
+852,289,662, leaf 337,487,517, **−60.4%**.
+
 ## 3. Tools and docs
 
 - `tools/crate_boundaries.json`: the package with six edges (archive, core,
@@ -184,6 +258,8 @@ inventory; it stays inside the 5% bar.
 | Date and Time, Duration, Text on number cells | the host writes a number under a date or duration kind, which the engine reads as an invalid cell; the host refuses Text on a number cell (pinned by `*_divergence_is_reported`) | decide with the macOS run which shape native files store |
 | Custom, numeral system, controls, Pop-Up Menu for Pages and Keynote | read only; writes need the metadata transition and the control facade's publication | lift the Numbers control/Pop-Up Menu publication (`rewrite_transaction`, save tokens, preview policy) into the crate |
 | empty cells | the engine edits stored cells only (`CellNotFound` on an empty slot); the host first stores the cell | reuse `table_write` to store a style-only cell first |
+| Keynote hidden axes on `slide-table-read-native.key` | the engine's graph profiles (Pages-calibrated version tuples) refuse its table as an invalid source; the host edits it | classify the Keynote native profile with that fixture |
+| clearing hidden axes | the engine keeps cleared state records, the host drops them (pinned) | macOS run decides |
 | groups 2–5 | cell comments (coordinator addition), cell rich text, topology orchestration and conditional highlights are not started | next W1-G slices, in that order |
 
 ## 6. Verification

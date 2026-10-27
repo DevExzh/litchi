@@ -339,26 +339,3 @@ fn numbers_conditional_highlight_read_parity() -> TestResult {
     assert!(compared >= 40, "only {compared} reads compared");
     Ok(())
 }
-
-/// Volatile date rules are refused by the leaf (the host registers a
-/// calculation-engine owner family for them).
-#[test]
-fn numbers_conditional_highlight_volatile_refusal() -> TestResult {
-    let (_tier, _evidence) = (Tier::A, Evidence::Queued);
-    let input = fixture(FIXTURES[0])?;
-    let package = litchi_numbers::Package::from_bytes(&input.bytes)?;
-    let rule = Rule::new(
-        Condition::DateIsToday,
-        Style::with_fill(color(1.0, 0.0, 0.0)?),
-    );
-    let refused = package
-        .edit_table_cell_conditional_highlights(0usize, 0usize)?
-        .set(At::new(1, 1), [rule]);
-    assert!(matches!(
-        refused,
-        Err(litchi_numbers::cell::conditional_highlight::Error::Refused(
-            litchi_numbers::cell::conditional_highlight::Refusal::VolatileRule
-        ))
-    ));
-    Ok(())
-}

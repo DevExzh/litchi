@@ -19,7 +19,7 @@
 use std::fmt;
 
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
-use litchi_iwa_common::chart::{corner, donut, legend, pie, radar};
+use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
 use litchi_iwa_common::chart3d::{self, Scale};
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::chart_style_codec::{
@@ -55,6 +55,29 @@ pub enum Property {
     RoundedCorners(corner::Rounding),
     /// Placement of the legend (automatic or an explicit frame).
     LegendFrame(legend::Frame),
+    /// Whether the legend shows.
+    LegendVisible(bool),
+    /// Whether the chart area shows its border.
+    BorderVisible(bool),
+    /// Whether data in hidden table rows and columns is plotted.
+    IncludesHiddenData(bool),
+    /// The bar shape of a 3D bar or column chart.
+    BarShape3d(chart3d::BarShape),
+    /// The radius gridlines of a radar chart.
+    RadarGridShape(RadarGridShape),
+    /// The gaps between bars or columns and between their sets.
+    GapSpacing(gaps::Spacing),
+}
+
+/// The radius gridlines of a radar chart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum RadarGridShape {
+    /// Straight segments forming a polygon (the native default).
+    #[default]
+    Straight,
+    /// Circular arcs.
+    Curved,
 }
 
 /// The property a [`Property`] value sets, for reads and resets.
@@ -77,6 +100,18 @@ pub enum PropertyKind {
     RoundedCorners,
     /// [`Property::LegendFrame`].
     LegendFrame,
+    /// [`Property::LegendVisible`].
+    LegendVisible,
+    /// [`Property::BorderVisible`].
+    BorderVisible,
+    /// [`Property::IncludesHiddenData`].
+    IncludesHiddenData,
+    /// [`Property::BarShape3d`].
+    BarShape3d,
+    /// [`Property::RadarGridShape`].
+    RadarGridShape,
+    /// [`Property::GapSpacing`].
+    GapSpacing,
 }
 
 impl Property {
@@ -92,6 +127,12 @@ impl Property {
             Self::Depth3d(_) => PropertyKind::Depth3d,
             Self::RoundedCorners(_) => PropertyKind::RoundedCorners,
             Self::LegendFrame(_) => PropertyKind::LegendFrame,
+            Self::LegendVisible(_) => PropertyKind::LegendVisible,
+            Self::BorderVisible(_) => PropertyKind::BorderVisible,
+            Self::IncludesHiddenData(_) => PropertyKind::IncludesHiddenData,
+            Self::BarShape3d(_) => PropertyKind::BarShape3d,
+            Self::RadarGridShape(_) => PropertyKind::RadarGridShape,
+            Self::GapSpacing(_) => PropertyKind::GapSpacing,
         }
     }
 }
@@ -109,12 +150,21 @@ impl PropertyKind {
             Self::Depth3d => Property::Depth3d(chart3d::Depth::DEFAULT),
             Self::RoundedCorners => Property::RoundedCorners(corner::Rounding::NONE),
             Self::LegendFrame => Property::LegendFrame(legend::Frame::Automatic),
+            Self::LegendVisible => Property::LegendVisible(false),
+            Self::BorderVisible => Property::BorderVisible(false),
+            Self::IncludesHiddenData => Property::IncludesHiddenData(true),
+            Self::BarShape3d => Property::BarShape3d(chart3d::BarShape::Rectangle),
+            Self::RadarGridShape => Property::RadarGridShape(RadarGridShape::Straight),
+            Self::GapSpacing => Property::GapSpacing(gaps::Spacing::DEFAULT),
         }
     }
 
     const fn archive(self) -> Archive {
         match self {
-            Self::RoundedCorners => Archive::ChartStyle,
+            Self::RoundedCorners
+            | Self::BorderVisible
+            | Self::RadarGridShape
+            | Self::GapSpacing => Archive::ChartStyle,
             _ => Archive::ChartNonStyle,
         }
     }
@@ -127,7 +177,14 @@ impl PropertyKind {
             Self::SeriesGap3d => kind.supports_3d_series_gap(),
             Self::Rotation3d => kind.supports_3d_scene(),
             Self::Depth3d => kind.supports_3d_depth(),
-            Self::RoundedCorners | Self::LegendFrame => true,
+            Self::BarShape3d => kind.supports_3d_bar_shape(),
+            Self::RadarGridShape => kind.supports_radar_grid_shape(),
+            Self::RoundedCorners
+            | Self::LegendFrame
+            | Self::LegendVisible
+            | Self::BorderVisible
+            | Self::IncludesHiddenData
+            | Self::GapSpacing => true,
         }
     }
 }
@@ -508,7 +565,122 @@ fn read_value(
                 .bool(style::ROUNDED_CORNER_OUTER_END_ONLY)?
                 .unwrap_or(false),
         )),
+        PropertyKind::LegendVisible => {
+            Property::LegendVisible(properties.bool(scalar::LEGEND_VISIBLE)?.unwrap_or(false))
+        },
+        PropertyKind::BorderVisible => {
+            Property::BorderVisible(properties.bool(scalar::BORDER_VISIBLE)?.unwrap_or(false))
+        },
+        PropertyKind::IncludesHiddenData => Property::IncludesHiddenData(
+            !properties.bool(scalar::SKIP_HIDDEN_DATA)?.unwrap_or(false),
+        ),
+        PropertyKind::BarShape3d => Property::BarShape3d(
+            properties
+                .int32(scalar::BAR_SHAPE_3D)?
+                .map_or(chart3d::BarShape::Rectangle, chart3d::BarShape::from_native),
+        ),
+        PropertyKind::RadarGridShape => Property::RadarGridShape(
+            if properties.bool(scalar::RADAR_GRID_CURVE)? == Some(true) {
+                RadarGridShape::Curved
+            } else {
+                RadarGridShape::Straight
+            },
+        ),
+        PropertyKind::GapSpacing => {
+            let gap = |field: u32, default: gaps::Percentage| -> Result<gaps::Percentage, Error> {
+                Ok(match properties.float(field)? {
+                    Some(value) => gaps::Percentage::new(value).map_err(invalid)?,
+                    None => default,
+                })
+            };
+            Property::GapSpacing(gaps::Spacing::new(
+                gap(
+                    scalar::GAP_BETWEEN_ITEMS,
+                    gaps::Spacing::DEFAULT.between_items(),
+                )?,
+                gap(
+                    scalar::GAP_BETWEEN_SETS,
+                    gaps::Spacing::DEFAULT.between_sets(),
+                )?,
+            ))
+        },
         PropertyKind::LegendFrame => return Err(Error::InvalidSource),
+    })
+}
+
+/// The extension fields of the chart-level scalar properties (the host's
+/// `charts::{options, border, hidden_data, bar_shape_3d, radar_grid_shape,
+/// gaps}` constants).
+mod scalar {
+    /// `tschchartinfodefaultshowlegend` (chart non-style).
+    pub(super) const LEGEND_VISIBLE: u32 = 20;
+    /// `tschchartinfodefaultskiphiddendata` (chart non-style).
+    pub(super) const SKIP_HIDDEN_DATA: u32 = 22;
+    /// `tschchartinfodefault3dbarshape` (chart non-style).
+    pub(super) const BAR_SHAPE_3D: u32 = 1;
+    /// `tschchartinfodefaultshowborder` (chart style).
+    pub(super) const BORDER_VISIBLE: u32 = 18;
+    /// `tschchartinfodefaultradarradiusgridlinecurve` (chart style).
+    pub(super) const RADAR_GRID_CURVE: u32 = 29;
+    /// `tschchartinfodefaultinterbargap` and `…intersetgap` (chart style).
+    pub(super) const GAP_BETWEEN_ITEMS: u32 = 16;
+    pub(super) const GAP_BETWEEN_SETS: u32 = 17;
+}
+
+/// The writes of a chart-level scalar property, as the host patches it.
+fn scalar_writes(value: Property) -> Option<Vec<codec::Write<'static>>> {
+    use codec::Write;
+    Some(match value {
+        Property::LegendVisible(visible) => vec![Write::Bool {
+            field: scalar::LEGEND_VISIBLE,
+            value: Some(visible),
+        }],
+        Property::BorderVisible(visible) => vec![Write::BoolUnlessAbsentDefault {
+            field: scalar::BORDER_VISIBLE,
+            value: visible,
+            default: false,
+        }],
+        Property::IncludesHiddenData(included) => vec![Write::BoolUnlessAbsentDefault {
+            field: scalar::SKIP_HIDDEN_DATA,
+            value: !included,
+            default: false,
+        }],
+        Property::BarShape3d(shape) => vec![Write::Int32 {
+            field: scalar::BAR_SHAPE_3D,
+            value: (shape != chart3d::BarShape::Rectangle).then_some(shape.native_value()),
+        }],
+        Property::RadarGridShape(shape) => vec![Write::Bool {
+            field: scalar::RADAR_GRID_CURVE,
+            value: (shape == RadarGridShape::Curved).then_some(true),
+        }],
+        Property::GapSpacing(spacing) => {
+            if spacing == gaps::Spacing::DEFAULT {
+                vec![
+                    Write::Float {
+                        field: scalar::GAP_BETWEEN_ITEMS,
+                        value: None,
+                    },
+                    Write::Float {
+                        field: scalar::GAP_BETWEEN_SETS,
+                        value: None,
+                    },
+                ]
+            } else {
+                vec![
+                    Write::FloatUnlessAbsentDefault {
+                        field: scalar::GAP_BETWEEN_ITEMS,
+                        value: spacing.between_items().percent(),
+                        default: gaps::Spacing::DEFAULT.between_items().percent(),
+                    },
+                    Write::FloatUnlessAbsentDefault {
+                        field: scalar::GAP_BETWEEN_SETS,
+                        value: spacing.between_sets().percent(),
+                        default: gaps::Spacing::DEFAULT.between_sets().percent(),
+                    },
+                ]
+            }
+        },
+        _ => return None,
     })
 }
 
@@ -536,7 +708,7 @@ fn write_for(value: Property, chart: ChartKind) -> Result<property::PropertyWrit
             rounding.radius().native_fraction(),
             rounding.outside_corners_only(),
         ),
-        Property::LegendFrame(_) => return Err(Error::InvalidSource),
+        _ => return Err(Error::InvalidSource),
     })
 }
 
@@ -584,14 +756,24 @@ fn apply_one(
     if read_value(&properties, kind, target.kind)? == value {
         return Ok(None);
     }
-    let write = write_for(value, target.kind)?;
-    let rewritten = codec::rewrite(
-        payload,
-        archive,
-        write.writes(),
-        write.empty(),
-        Limits::DEFAULT,
-    )?;
+    let rewritten = if let Some(writes) = scalar_writes(value) {
+        codec::rewrite(
+            payload,
+            archive,
+            &writes,
+            codec::EmptyExtension::Keep,
+            Limits::DEFAULT,
+        )?
+    } else {
+        let write = write_for(value, target.kind)?;
+        codec::rewrite(
+            payload,
+            archive,
+            write.writes(),
+            write.empty(),
+            Limits::DEFAULT,
+        )?
+    };
     if !rewritten.changed() {
         return Ok(None);
     }

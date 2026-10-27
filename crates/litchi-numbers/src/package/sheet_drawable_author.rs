@@ -38,10 +38,10 @@ const ARROW_SHAFT_RATIO: f32 = 0.34;
 
 /// A minimal canonical protobuf writer (fields in call order).
 #[derive(Default)]
-struct Writer(Vec<u8>);
+pub(super) struct Writer(Vec<u8>);
 
 impl Writer {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::default()
     }
 
@@ -65,38 +65,38 @@ impl Writer {
         }
     }
 
-    fn varint(mut self, number: u32, value: u64) -> Self {
+    pub(super) fn varint(mut self, number: u32, value: u64) -> Self {
         self.key(number, 0);
         self.raw_varint(value);
         self
     }
 
-    fn boolean(self, number: u32, value: bool) -> Self {
+    pub(super) fn boolean(self, number: u32, value: bool) -> Self {
         self.varint(number, u64::from(value))
     }
 
-    fn float(mut self, number: u32, value: f32) -> Self {
+    pub(super) fn float(mut self, number: u32, value: f32) -> Self {
         self.key(number, 5);
         self.0.extend_from_slice(&value.to_le_bytes());
         self
     }
 
-    fn bytes(mut self, number: u32, payload: &[u8]) -> Self {
+    pub(super) fn bytes(mut self, number: u32, payload: &[u8]) -> Self {
         self.key(number, 2);
         self.raw_varint(payload.len() as u64);
         self.0.extend_from_slice(payload);
         self
     }
 
-    fn message(self, number: u32, inner: &Self) -> Self {
+    pub(super) fn message(self, number: u32, inner: &Self) -> Self {
         self.bytes(number, &inner.0)
     }
 
-    fn reference(self, number: u32, identifier: u64) -> Self {
+    pub(super) fn reference(self, number: u32, identifier: u64) -> Self {
         self.message(number, &Self::new().varint(1, identifier))
     }
 
-    fn finish(self) -> Vec<u8> {
+    pub(super) fn finish(self) -> Vec<u8> {
         self.0
     }
 }

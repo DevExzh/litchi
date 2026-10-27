@@ -5,6 +5,7 @@
 //! every state verb; [`crate::Workbook`] is its read-only semantic
 //! projection (ADR 0034 §2).
 
+pub(crate) mod builder_synthesis;
 mod chart_arrangement;
 mod chart_data;
 mod chart_data_edit;
@@ -51,18 +52,33 @@ mod save;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_chart_axis;
+pub(crate) mod sheet_chart_series;
+mod sheet_chart_series_style;
 pub(crate) mod sheet_chart_style;
 pub(crate) mod sheet_drawable;
+pub(crate) mod sheet_drawable_annotation;
 mod sheet_drawable_author;
+pub(crate) mod sheet_drawable_comment;
+mod sheet_drawable_comment_graph;
+pub(crate) mod sheet_drawable_date_time;
+pub(crate) mod sheet_drawable_drop_cap;
+mod sheet_drawable_duplicate;
 mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_hyperlink;
 pub(crate) mod sheet_drawable_language;
+pub(crate) mod sheet_drawable_list;
+mod sheet_drawable_media;
+pub(crate) mod sheet_drawable_named_style;
 pub(crate) mod sheet_drawable_plain_text;
 pub(crate) mod sheet_drawable_properties;
 pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
+pub(crate) mod sheet_media;
 pub(crate) mod sheet_order;
 mod storage_list;
 mod structure;
+mod style_graph;
 #[allow(
     dead_code,
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."

@@ -204,3 +204,224 @@ fn numbers_w2a_route_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+/// The routes of the second W2-A slice (record 0378a): text-box lists,
+/// highlights, named styles, drawable comments, media lifecycle and chart
+/// series properties.
+const ROUTES_2: &[&str] = &[
+    "text_box_list",
+    "text_box_highlight",
+    "named_style_apply",
+    "drawable_comment",
+    "image_remove",
+    "image_replace",
+    "image_duplicate",
+    "image_add",
+    "chart_error_bars",
+    "chart_series_fills",
+    "chart_border",
+    "chart_axis_line",
+];
+
+fn png() -> TestResult<Vec<u8>> {
+    Ok(fixture("officecli/examples/ppt/ole/thumb-xlsx.png")?.bytes)
+}
+
+fn error_bars() -> TestResult<Vec<litchi_iwa_common::chart::error_bar::Series>> {
+    use litchi_iwa_common::chart::error_bar::{Direction, FixedValue, Series};
+    Ok(vec![
+        Series::FixedValue {
+            direction: Direction::PositiveAndNegative,
+            value: FixedValue::new(2.5)?,
+        },
+        Series::None,
+    ])
+}
+
+fn series_fills() -> TestResult<Vec<litchi_iwa_common::shape::fill::Fill>> {
+    use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    use litchi_iwa_common::shape::fill::Fill;
+    Ok(vec![
+        Fill::Solid(Rgba::new(0.1, 0.4, 0.9, 1.0, RgbColorSpace::Srgb)?),
+        Fill::Solid(Rgba::new(0.7, 0.1, 0.1, 1.0, RgbColorSpace::Srgb)?),
+    ])
+}
+
+#[inline(never)]
+fn w2a_host_route_2(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult<Vec<u8>> {
+    use litchi_iwa_text::position::{TextPosition, TextRange};
+    let mut e = numbers::Draft::from_bytes(source)?;
+    match route {
+        "text_box_list" => e.set_sheet_text_box_paragraph_list(
+            sheet,
+            id,
+            litchi_numbers::sheet::drawable::list::ParagraphList::Bullet,
+        )?,
+        "text_box_highlight" => drop(e.add_sheet_text_box_highlight(
+            sheet,
+            id,
+            TextRange::new(
+                TextPosition::from_utf16_index(0)?,
+                TextPosition::from_utf16_index(5)?,
+            )?,
+        )?),
+        "named_style_apply" => {
+            let styles = e.sheet_text_box_named_paragraph_styles(sheet, id)?;
+            let target = styles.get(1).ok_or("styles")?.id();
+            drop(e.apply_sheet_text_box_named_paragraph_style(sheet, id, target)?);
+        },
+        "drawable_comment" => e.set_sheet_drawable_comment(sheet, id, "Cost comment")?,
+        "image_remove" => drop(e.remove_sheet_image(sheet, id)?),
+        "image_replace" => drop(e.replace_sheet_image_data(
+            litchi_iwa_index::ObjectId::try_from(sheet)?,
+            litchi_iwa_common::comment::DrawableId::from_raw(id)?,
+            &png()?,
+        )?),
+        "image_duplicate" => drop(e.duplicate_sheet_image(sheet, id)?),
+        "image_add" => drop(e.add_sheet_image(
+            sheet,
+            "picture.png",
+            &png()?,
+            numbers::SheetImageOptions::new(POINT, SIZE),
+        )?),
+        "chart_error_bars" => e.set_sheet_chart_series_error_bars(sheet, id, &error_bars()?)?,
+        "chart_series_fills" => e.set_sheet_chart_series_fills(
+            sheet,
+            id,
+            &series_fills()?
+                .iter()
+                .map(|fill| match fill {
+                    litchi_iwa_common::shape::fill::Fill::Solid(color) => {
+                        litchi_iwa::shapes::ShapeFill::Solid(*color)
+                    },
+                    _ => litchi_iwa::shapes::ShapeFill::None,
+                })
+                .collect::<Vec<_>>(),
+        )?,
+        "chart_border" => e.set_sheet_chart_border_visible(sheet, id, true)?,
+        "chart_axis_line" => e.set_sheet_chart_axis_line_visible(
+            sheet,
+            id,
+            litchi_iwa_common::chart::axis::Axis::Category,
+            litchi_iwa_common::chart::axis::style::Visibility::Visible,
+        )?,
+        _ => return Err(format!("unknown route {route}").into()),
+    }
+    Ok(e.to_bytes()?)
+}
+
+#[inline(never)]
+fn w2a_leaf_route_2(route: &str, source: &[u8], selector: DrawableSelector) -> TestResult<Vec<u8>> {
+    use litchi_iwa_text::position::{TextPosition, TextRange};
+    use litchi_numbers::sheet::chart::series::Property as Series;
+    use litchi_numbers::sheet::drawable::ImageOptions;
+    let package = Package::from_bytes(source)?;
+    let committed = match route {
+        "text_box_list" => {
+            let mut edit = package.edit_sheet_text_box_lists(0, selector)?;
+            edit.set_list(litchi_numbers::sheet::drawable::list::ParagraphList::Bullet)?;
+            edit.commit()?.into_package()
+        },
+        "text_box_highlight" => {
+            let mut edit = package.edit_sheet_drawable_annotations(0, selector)?;
+            edit.add_highlight(TextRange::new(
+                TextPosition::from_utf16_index(0)?,
+                TextPosition::from_utf16_index(5)?,
+            )?)?;
+            edit.commit()?.into_package()
+        },
+        "named_style_apply" => {
+            let styles = package.sheet_text_box_named_styles(0, selector)?;
+            let target = styles.get(1).ok_or("styles")?.id();
+            let mut edit = package.edit_sheet_text_box_named_styles(0, selector)?;
+            edit.apply(target)?;
+            edit.commit()?.into_package()
+        },
+        "drawable_comment" => {
+            let mut edit = package.edit_sheet_drawable_comment(0, selector)?;
+            edit.set("Cost comment")?;
+            edit.commit()?.into_package()
+        },
+        "image_remove" | "image_duplicate" | "image_add" => {
+            let mut edit = package.edit_sheet_drawables(0)?;
+            match route {
+                "image_remove" => drop(edit.remove(selector)?),
+                "image_duplicate" => drop(edit.duplicate(selector)?),
+                _ => drop(edit.add_image(
+                    "picture.png",
+                    &png()?,
+                    ImageOptions::new(Point { x: 120.0, y: 140.0 }, FRAME.size.ok_or("size")?),
+                )?),
+            }
+            edit.commit()?.into_package()
+        },
+        "image_replace" => {
+            let mut edit = package.edit_media();
+            edit.replace_data(0, selector, &png()?)?;
+            edit.commit()?.into_package()
+        },
+        "chart_error_bars" | "chart_series_fills" => {
+            let mut edit = package.edit_sheet_chart_series(0, 0)?;
+            edit.set(if route == "chart_error_bars" {
+                Series::ErrorBars(error_bars()?)
+            } else {
+                Series::Fills(series_fills()?)
+            })?;
+            edit.commit()?.into_package()
+        },
+        "chart_border" => {
+            use litchi_numbers::sheet::chart::style::Property as Style;
+            let mut edit = package.edit_sheet_chart_style(0, 0)?;
+            edit.set(Style::BorderVisible(true))?;
+            edit.commit()?.into_package()
+        },
+        "chart_axis_line" => {
+            use litchi_numbers::sheet::chart::axis::{Axis, Property as AxisProperty, Visibility};
+            let mut edit = package.edit_sheet_chart_axis(0, 0)?;
+            edit.set(Axis::Category, AxisProperty::Line(Visibility::Visible))?;
+            edit.commit()?.into_package()
+        },
+        _ => return Err(format!("unknown route {route}").into()),
+    };
+    let mut output = Vec::new();
+    committed
+        .write_to(&mut output)
+        .map_err(|error| format!("{error:?}"))?;
+    Ok(output)
+}
+
+/// Paired cost probe (ABBA) for the second slice's routes, selected by
+/// `W2A_ROUTE` (all when unset).
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn numbers_w2a_route_cost_abba_2() -> TestResult {
+    let selected = std::env::var("W2A_ROUTE").ok();
+    let authored = authored_fixture()?.bytes;
+    let charts = chart_fixture()?.bytes;
+    for route in ROUTES_2 {
+        if selected
+            .as_deref()
+            .is_some_and(|selected| selected != *route)
+        {
+            continue;
+        }
+        let (input, kind) = match *route {
+            "image_remove" | "image_replace" | "image_duplicate" => {
+                (fixture(IMAGES)?.bytes, Kind::Image)
+            },
+            "image_add" => (fixture(IMAGES)?.bytes, Kind::Image),
+            "chart_error_bars" | "chart_series_fills" | "chart_border" | "chart_axis_line" => {
+                (charts.clone(), Kind::Chart)
+            },
+            _ => (authored.clone(), Kind::TextBox),
+        };
+        let (sheet, id) = host_drawable(&numbers::Draft::from_bytes(&input)?, kind, 0)?;
+        let selector = DrawableSelector::of(kind, 0);
+        let a1 = black_box(w2a_host_route_2(route, &input, sheet, id)?);
+        let b1 = black_box(w2a_leaf_route_2(route, &input, selector)?);
+        let b2 = black_box(w2a_leaf_route_2(route, &input, selector)?);
+        let a2 = black_box(w2a_host_route_2(route, &input, sheet, id)?);
+        assert!(!a1.is_empty() && !a2.is_empty() && !b1.is_empty() && !b2.is_empty());
+    }
+    Ok(())
+}

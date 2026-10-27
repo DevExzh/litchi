@@ -563,3 +563,30 @@ fn export_native_hidden_axes_focus_candidates_when_requested() -> TestResult {
     export_candidate("body-table-hidden-axes-native-reset.pages", &reset_bytes)?;
     Ok(())
 }
+
+/// Callgrind probe (record 0379): set, then clear, the native document's
+/// hidden axes, serializing each output. Measured before and after the
+/// engine moved to `litchi-iwa-table` with
+/// `--toggle-collect=*native_hidden_axes::hidden_axes_probe_routes*`.
+#[inline(never)]
+fn hidden_axes_probe_routes(source: &[u8]) -> TestResult<usize> {
+    let package = Package::from_bytes(source)?;
+    let set = package
+        .edit_body_table_hidden_axes(0usize)?
+        .set(changed_axes()?)
+        .commit()?;
+    let cleared = set
+        .package()
+        .edit_body_table_hidden_axes(0usize)?
+        .clear()
+        .commit()?;
+    Ok(exact_bytes(set.package())?.len() + exact_bytes(cleared.package())?.len())
+}
+
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn hidden_axes_cost_probe() -> TestResult {
+    let source = source_bytes(NATIVE_HIDDEN_SOURCE)?;
+    assert!(hidden_axes_probe_routes(&source)? > 0);
+    Ok(())
+}

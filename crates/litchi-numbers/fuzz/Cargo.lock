@@ -66,6 +66,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
 dependencies = [
  "hybrid-array",
+ "zeroize",
 ]
 
 [[package]]
@@ -289,6 +290,7 @@ dependencies = [
  "block-buffer 0.12.1",
  "const-oid",
  "crypto-common 0.2.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -595,6 +597,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-iwa-style"
+version = "0.0.1"
+dependencies = [
+ "litchi-iwa-archive",
+ "litchi-iwa-common",
+ "litchi-iwa-core",
+ "litchi-iwa-protos",
+ "litchi-iwa-text",
+ "litchi-iwa-text-wire",
+ "thiserror",
+]
+
+[[package]]
 name = "litchi-iwa-table"
 version = "0.0.1"
 dependencies = [
@@ -603,6 +618,7 @@ dependencies = [
  "litchi-iwa-common",
  "litchi-iwa-core",
  "litchi-iwa-protos",
+ "litchi-iwa-style",
  "litchi-numbers-wire",
  "thiserror",
 ]
@@ -636,6 +652,7 @@ dependencies = [
  "litchi-iwa-core",
  "litchi-iwa-detect",
  "litchi-iwa-protos",
+ "litchi-iwa-style",
  "litchi-iwa-table",
  "litchi-iwa-text",
  "litchi-iwa-text-wire",
@@ -643,6 +660,7 @@ dependencies = [
  "phf",
  "plist",
  "ryu",
+ "sha1",
  "thiserror",
 ]
 
@@ -1016,6 +1034,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -1488,6 +1517,12 @@ dependencies = [
  "quote",
  "syn 2.0.114",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"
 
 [[package]]
 name = "zlib-rs"

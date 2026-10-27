@@ -165,6 +165,8 @@ enum Operation {
     Add(String),
     /// Remove the sheet at this position.
     Remove(usize),
+    /// Copy the sheet at this position, with its tables, under this name.
+    Duplicate(usize, String),
 }
 
 /// One immutable edit that stages exactly one sheet addition or removal.
@@ -182,6 +184,7 @@ impl fmt::Debug for Edit<'_> {
                 &self.operation.as_ref().map(|operation| match operation {
                     Operation::Add(_) => "add",
                     Operation::Remove(_) => "remove",
+                    Operation::Duplicate(..) => "duplicate",
                 }),
             )
             .finish()
@@ -259,6 +262,42 @@ impl Edit<'_> {
         Ok(self)
     }
 
+    /// Stage a copy of the selected sheet, inserted right after it and named
+    /// `"<name>-1"` (then `"<name>-2"`, …), as the host editor names it. The
+    /// copy takes the sheet's settings and a populated copy of each of its
+    /// tables, at the same positions and under the same names (record
+    /// 0370j).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SheetNotFound`], [`Refusal::OperationAlreadyStaged`]. At
+    /// commit: [`Refusal::SheetNotEmpty`] for a sheet holding drawables
+    /// other than tables; [`Refusal::UnsupportedDependency`] when a table's
+    /// formulas read another table; [`Refusal::UnsupportedSource`] for a
+    /// form-based sheet.
+    pub fn duplicate<'selector>(
+        mut self,
+        selector: impl Into<SheetSelector<'selector>>,
+    ) -> Result<Self, Error> {
+        if self.operation.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        let workbook = self.source.workbook_ref();
+        let sheet = workbook
+            .sheet(selector)
+            .map_err(|_error| Error::InvalidSource)?
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
+        let names: Vec<&str> = workbook.sheets().iter().map(crate::Sheet::name).collect();
+        let name = (1_u32..=u32::MAX)
+            .map(|suffix| format!("{}-{suffix}", sheet.name()))
+            .find(|candidate| !names.contains(&candidate.as_str()))
+            .ok_or(Error::Refused(Refusal::InvalidName {
+                reason: InvalidName::Duplicate,
+            }))?;
+        self.operation = Some(Operation::Duplicate(sheet.index(), name));
+        Ok(self)
+    }
+
     /// Validate and atomically publish the staged candidate.
     ///
     /// # Errors
@@ -274,6 +313,7 @@ impl Edit<'_> {
         let (published, sheets) = match &operation {
             Operation::Add(name) => add_sheet(source, name)?,
             Operation::Remove(position) => remove_sheet(source, *position)?,
+            Operation::Duplicate(position, name) => duplicate_sheet(source, *position, name)?,
         };
         let names: Vec<&str> = published
             .package
@@ -473,6 +513,184 @@ fn add_sheet(source: &Package, name: &str) -> Result<(structure::Published, Vec<
         .map(|sheet| sheet.name().to_owned())
         .collect();
     sheets.push(name.to_owned());
+    Ok((published, sheets))
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "one sheet copy: the record, its lists, its tables and the registry"
+)]
+fn duplicate_sheet(
+    source: &Package,
+    position: usize,
+    name: &str,
+) -> Result<(structure::Published, Vec<String>), Error> {
+    // The root previews go, as the host editor's copy drops them (the app
+    // regenerates them).
+    let mut working = Working::new(source)?;
+    let roots = roots(&working)?;
+    let sheet = *roots
+        .sheets
+        .get(position)
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
+    if working.locate(sheet)?.as_deref() != Some(DOCUMENT_COMPONENT) {
+        return Err(Error::Refused(Refusal::UnsupportedSource));
+    }
+    let sheet_object = working.object(sheet)?.clone();
+    let (index, path) = structure::sheet_message(&sheet_object)?;
+    let message = &sheet_object.messages[index];
+    if message.type_ != SHEET_MESSAGE_TYPE {
+        return Err(Error::Refused(Refusal::UnsupportedSource));
+    }
+    // The copy keeps addressing the source's header, footer and guide
+    // storages, as the host editor's copy does (record 0370j gap).
+    let drawables = references::identifiers(&message.data, path)?;
+    for drawable in &drawables {
+        if structure::table_info_message(working.object(*drawable)?).is_err() {
+            return Err(Error::Refused(Refusal::SheetNotEmpty));
+        }
+        if !super::table_lifecycle::duplicate::self_contained(&working, *drawable)? {
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
+        }
+    }
+    let table_names: Vec<String> = source
+        .workbook_ref()
+        .sheets()
+        .get(position)
+        .ok_or(Error::InvalidSource)?
+        .tables()
+        .map(|table| table.name().to_owned())
+        .collect();
+    if table_names.len() != drawables.len() {
+        return Err(Error::InvalidSource);
+    }
+
+    // The new sheet record: the source's settings, renamed, without its
+    // drawables.
+    let new_sheet = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
+    let renamed =
+        patch_length_delimited_field(&message.data, SHEET_NAME_FIELD, true, Some(name.as_bytes()))
+            .map_err(|error| structure::map_wire(&error))?;
+    let emptied = references::rewrite(&renamed, path, &[])?;
+    let references: Vec<u64> = sheet_object.archive_info.message_infos[index]
+        .object_references
+        .iter()
+        .copied()
+        .filter(|identifier| !drawables.contains(identifier))
+        .collect();
+    let mut sheet_copy = structure::new_object(
+        new_sheet,
+        Some(&sheet_object),
+        SHEET_MESSAGE_TYPE,
+        emptied,
+        references.clone(),
+        working.archive_limits(),
+    )?;
+    sheet_copy.archive_info.message_infos[0].versions = sheet_object.archive_info.message_infos
+        [index]
+        .versions
+        .clone();
+    sheet_copy.archive_info.message_infos[0].field_infos = sheet_object.archive_info.message_infos
+        [index]
+        .field_infos
+        .iter()
+        .filter(|field| field.path.as_slice() != path)
+        .cloned()
+        .collect();
+    working.insert(DOCUMENT_COMPONENT, sheet_copy)?;
+
+    // The document's sheet list, right after the source.
+    let document_index = structure::document_message(working.object(1)?)?;
+    let mut after = roots.sheets.clone();
+    after.insert(position + 1, new_sheet);
+    rewrite_list(
+        &mut working,
+        1,
+        document_index,
+        &[DOCUMENT_SHEETS_FIELD],
+        &roots.sheets,
+        &after,
+    )?;
+
+    // The sidebar order: a node for the copy, right after the source's.
+    let mut node = None;
+    if let Some(root) = roots.sidebar {
+        let (children, source_node) = sidebar_node(&working, root, sheet)?;
+        let new_node = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
+        let mut data = Vec::new();
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut data,
+            TREE_OBJECT_FIELD,
+            &references::reference_payload(new_sheet)?,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|error| structure::map_wire(&error))?;
+        let node_object = structure::new_object(
+            new_node,
+            Some(working.object(root)?),
+            TREE_NODE_MESSAGE_TYPE,
+            data,
+            vec![new_sheet],
+            working.archive_limits(),
+        )?;
+        working.insert(DOCUMENT_COMPONENT, node_object)?;
+        let root_index =
+            structure::unique_message(working.object(root)?, &[TREE_NODE_MESSAGE_TYPE])?;
+        let at = children
+            .iter()
+            .position(|child| *child == source_node)
+            .ok_or(Error::InvalidSource)?;
+        let mut after = children.clone();
+        after.insert(at + 1, new_node);
+        rewrite_list(
+            &mut working,
+            root,
+            root_index,
+            &[TREE_CHILDREN_FIELD],
+            &children,
+            &after,
+        )?;
+        node = Some(new_node);
+    }
+
+    // Its tables, at their sources' positions and under their names.
+    let mut transition = Transition::default();
+    for (drawable, table_name) in drawables.iter().zip(&table_names) {
+        super::table_lifecycle::duplicate::clone_table(
+            &mut working,
+            &mut transition,
+            *drawable,
+            super::table_lifecycle::duplicate::Placement {
+                sheet: new_sheet,
+                source_sheet: sheet,
+                offset: 0.0,
+            },
+            table_name,
+        )?;
+    }
+
+    // The sheet's registry records: its UUID when the source has one, and
+    // its references across components.
+    if let Some(registry) = metadata::registry(&working)? {
+        let document = registry.component_for_entry(DOCUMENT_COMPONENT)?.identifier;
+        if registry.uuids.iter().any(|binding| binding.object == sheet) {
+            let seed = metadata::identity_seed(&working, new_sheet)?;
+            transition.register_uuid(&registry, document, new_sheet, seed)?;
+        }
+        for target in references.iter().chain(node.iter()) {
+            let component = working.locate(*target)?.ok_or(Error::InvalidSource)?;
+            let target_component = registry.component_for_entry(&component)?.identifier;
+            transition.reference(&registry, document, target_component, *target)?;
+        }
+    }
+    let published = working.publish(&transition)?;
+    let mut sheets: Vec<String> = source
+        .workbook_ref()
+        .sheets()
+        .iter()
+        .map(|sheet| sheet.name().to_owned())
+        .collect();
+    sheets.insert(position + 1, name.to_owned());
     Ok((published, sheets))
 }
 

@@ -23,48 +23,75 @@ use litchi_iwa_protos::package_metadata_codec::{
     rewrite_package_metadata_save_tokens,
 };
 
-use super::super::metadata::{ENTRY_NAME, MESSAGE_TYPE, normalized_locator};
-use super::{Fault, FaultLimit, FaultResult, Working, allocation, reserve};
+use litchi_iwa_protos::package_metadata_media_codec::{
+    self as media, DataInfoRemoval, DataInfoSnapshot, MediaRewriteBatch,
+    PackageMetadataMediaVisitor,
+};
+
+use super::{Fault, FaultLimit, FaultResult, TableLeaf, Working, allocation, reserve};
+use crate::cell_format::metadata::{ENTRY_NAME, MESSAGE_TYPE, normalized_locator};
 
 /// One current component registration.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::package) struct Component {
-    pub(in crate::package) identifier: u64,
-    pub(in crate::package) locator: String,
+pub struct Component {
+    pub identifier: u64,
+    pub locator: String,
 }
 
 /// One object UUID binding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::package) struct Uuid {
-    pub(in crate::package) component: u64,
-    pub(in crate::package) object: u64,
-    pub(in crate::package) uuid: UuidBits,
+pub struct Uuid {
+    pub component: u64,
+    pub object: u64,
+    pub uuid: UuidBits,
 }
 
 /// One cross-component object reference record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::package) struct External {
-    pub(in crate::package) source: u64,
-    pub(in crate::package) target: u64,
-    pub(in crate::package) object: u64,
-    pub(in crate::package) weak: Option<bool>,
+pub struct External {
+    pub source: u64,
+    pub target: u64,
+    pub object: u64,
+    pub weak: Option<bool>,
+}
+
+/// One component data-reference owner record: `object` of `component`
+/// owns `count` references to embedded data `data`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataOwner {
+    pub component: u64,
+    pub data: u64,
+    pub object: u64,
+    pub count: u32,
+}
+
+/// One new embedded asset: its `DataInfo` record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataAddition {
+    pub identifier: u64,
+    pub digest: Vec<u8>,
+    pub preferred: String,
+    pub file: String,
+    pub length: u64,
 }
 
 /// The registry facts of one metadata payload.
 #[derive(Debug, Default)]
-pub(in crate::package) struct Registry {
-    pub(in crate::package) components: Vec<Component>,
-    pub(in crate::package) uuids: Vec<Uuid>,
-    pub(in crate::package) externals: Vec<External>,
+pub struct Registry {
+    pub components: Vec<Component>,
+    pub uuids: Vec<Uuid>,
+    pub externals: Vec<External>,
     /// Objects that own a data (media) reference.
-    pub(in crate::package) data_owners: Vec<u64>,
-    pub(in crate::package) last_object_identifier: u64,
+    pub data_owners: Vec<u64>,
+    /// Every component data-reference owner record.
+    pub data_references: Vec<DataOwner>,
+    pub last_object_identifier: u64,
     unknown: bool,
 }
 
 impl Registry {
     /// The current component registered for member `name`.
-    pub(in crate::package) fn component_for_entry(&self, name: &str) -> FaultResult<&Component> {
+    pub fn component_for_entry(&self, name: &str) -> FaultResult<&Component> {
         let locator = normalized_locator(name);
         let mut found = None;
         for component in &self.components {
@@ -153,6 +180,15 @@ impl PackageMetadataVisitor for Visitor {
         &mut self,
         owner: DataReferenceOwnerDescriptor<'_>,
     ) -> Result<(), RewriteError> {
+        remember(
+            &mut self.registry.data_references,
+            DataOwner {
+                component: owner.component().identifier(),
+                data: owner.data_identifier(),
+                object: owner.object_identifier(),
+                count: owner.count(),
+            },
+        )?;
         remember(&mut self.registry.data_owners, owner.object_identifier())
     }
 }
@@ -186,7 +222,7 @@ fn map_rewrite(error: &RewriteError) -> Fault {
 
 /// The metadata object and message in the working set, if the package has
 /// a registry.
-fn route(working: &Working<'_>) -> FaultResult<Option<(u64, usize)>> {
+fn route(working: &Working<'_, impl TableLeaf>) -> FaultResult<Option<(u64, usize)>> {
     let Ok(archive) = working.archive(ENTRY_NAME) else {
         return Ok(None);
     };
@@ -204,7 +240,10 @@ fn route(working: &Working<'_>) -> FaultResult<Option<(u64, usize)>> {
     found.map(Some).ok_or(Fault::Invalid)
 }
 
-fn payload<'w>(working: &'w Working<'_>, (object, message): (u64, usize)) -> FaultResult<&'w [u8]> {
+fn payload<'w>(
+    working: &'w Working<'_, impl TableLeaf>,
+    (object, message): (u64, usize),
+) -> FaultResult<&'w [u8]> {
     working
         .archive(ENTRY_NAME)?
         .object(object)
@@ -214,7 +253,7 @@ fn payload<'w>(working: &'w Working<'_>, (object, message): (u64, usize)) -> Fau
 }
 
 /// The package save token (`TSP.PackageMetadata.save_token`).
-pub(super) fn save_token(working: &Working<'_>) -> FaultResult<Option<u64>> {
+pub fn save_token(working: &Working<'_, impl TableLeaf>) -> FaultResult<Option<u64>> {
     let Some(route) = route(working)? else {
         return Ok(None);
     };
@@ -258,15 +297,12 @@ fn with_save_token(data: &[u8], token: u64) -> FaultResult<Vec<u8>> {
     patch_varint_field(&output, 8, true, Some(token)).map_err(|error| super::map_wire(&error))
 }
 
-fn options(working: &Working<'_>, payload: usize, additions: usize) -> RewriteOptions {
-    let components = working
-        .source()
-        .state
-        .components
-        .catalog()
-        .len()
-        .max(payload)
-        .max(1);
+fn options(
+    working: &Working<'_, impl TableLeaf>,
+    payload: usize,
+    additions: usize,
+) -> RewriteOptions {
+    let components = working.source().catalog().len().max(payload).max(1);
     let output = payload.saturating_mul(2).saturating_add(4_096);
     RewriteOptions::new(
         payload.max(1),
@@ -285,19 +321,13 @@ fn options(working: &Working<'_>, payload: usize, additions: usize) -> RewriteOp
             .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
         64,
         components.saturating_add(additions),
-        working
-            .source()
-            .state
-            .options
-            .semantic()
-            .max_references()
-            .max(1),
+        working.source().max_references().max(1),
         additions.max(1),
     )
 }
 
 /// The registry of the package, or `None` without `Index/Metadata.iwa`.
-pub(in crate::package) fn registry(working: &Working<'_>) -> FaultResult<Option<Registry>> {
+pub fn registry(working: &Working<'_, impl TableLeaf>) -> FaultResult<Option<Registry>> {
     let Some(route) = route(working)? else {
         return Ok(None);
     };
@@ -317,31 +347,45 @@ pub(in crate::package) fn registry(working: &Working<'_>) -> FaultResult<Option<
 }
 
 /// The issued-identifier watermark, or `None` without a registry.
-pub(super) fn last_object_identifier(working: &Working<'_>) -> FaultResult<Option<u64>> {
+pub fn last_object_identifier(working: &Working<'_, impl TableLeaf>) -> FaultResult<Option<u64>> {
     Ok(registry(working)?.map(|registry| registry.last_object_identifier))
 }
 
 /// The registry records one transaction adds and removes.
 #[derive(Debug, Default)]
-pub(in crate::package) struct Transition {
-    pub(in crate::package) uuid_additions: Vec<Uuid>,
-    pub(in crate::package) uuid_removals: Vec<Uuid>,
-    pub(in crate::package) external_removals: Vec<External>,
-    pub(in crate::package) external_additions: Vec<External>,
+pub struct Transition {
+    pub uuid_additions: Vec<Uuid>,
+    pub uuid_removals: Vec<Uuid>,
+    pub external_removals: Vec<External>,
+    pub external_additions: Vec<External>,
     /// Removed objects whose identifiers may lower the watermark when they
     /// are its suffix (the host editor's `release_package_identifier_suffix`).
-    pub(in crate::package) released: Vec<u64>,
+    pub released: Vec<u64>,
     /// Components whose save token advances although their registry
     /// records do not change (the host's `advance_save_tokens_for_entries`
     /// over the components a route rewrites).
-    pub(in crate::package) stamps: Vec<u64>,
+    pub stamps: Vec<u64>,
+    /// Data-reference owner records of removed objects.
+    pub data_owner_removals: Vec<DataOwner>,
+    /// Embedded data no surviving object references: its `DataInfo` record
+    /// leaves the registry and its package entry is deleted.
+    pub data_removals: Vec<(u64, String)>,
+    /// Data-reference owner records of new objects (a duplicate sharing its
+    /// source's embedded data).
+    pub data_owner_additions: Vec<DataOwner>,
+    /// New embedded assets (their `DataInfo` records).
+    pub data_additions: Vec<DataAddition>,
+    /// New non-IWA package members (embedded data).
+    pub entry_insertions: Vec<(String, Vec<u8>)>,
+    /// Non-IWA package members (embedded data) this transaction rewrites.
+    pub entry_writes: Vec<(String, Vec<u8>)>,
 }
 
 impl Transition {
     /// Record that component `source` no longer references `object` in
     /// component `target` (a no-op without that registry edge); an edge
     /// this transition added is withdrawn.
-    pub(in crate::package) fn remove_reference(
+    pub fn remove_reference(
         &mut self,
         registry: &Registry,
         source: u64,
@@ -366,14 +410,14 @@ impl Transition {
 
     /// Lower the watermark over `objects` when the last registered
     /// identifier is one of them (record 0370).
-    pub(in crate::package) fn release_suffix(&mut self, objects: &[u64]) -> FaultResult<()> {
+    pub fn release_suffix(&mut self, objects: &[u64]) -> FaultResult<()> {
         reserve(&mut self.released, objects.len())?;
         self.released.extend_from_slice(objects);
         Ok(())
     }
 
     /// Advance the save token of `component` (record 0370d).
-    pub(in crate::package) fn stamp(&mut self, component: u64) -> FaultResult<()> {
+    pub fn stamp(&mut self, component: u64) -> FaultResult<()> {
         if !self.stamps.contains(&component) {
             reserve(&mut self.stamps, 1)?;
             self.stamps.push(component);
@@ -382,6 +426,19 @@ impl Transition {
     }
 
     fn is_empty(&self) -> bool {
+        self.registry_is_empty()
+            && self.data_owner_removals.is_empty()
+            && self.data_owner_additions.is_empty()
+            && self.data_additions.is_empty()
+            && self.data_removals.is_empty()
+    }
+
+    /// The package entries this transition deletes (unreferenced data).
+    pub fn deleted_entries(&self) -> impl Iterator<Item = &str> {
+        self.data_removals.iter().map(|(_, entry)| entry.as_str())
+    }
+
+    fn registry_is_empty(&self) -> bool {
         self.stamps.is_empty()
             && self.uuid_additions.is_empty()
             && self.uuid_removals.is_empty()
@@ -391,11 +448,7 @@ impl Transition {
 
     /// Record the registry consequences of removing `objects`: their UUID
     /// bindings and every external reference that addresses them.
-    pub(in crate::package) fn remove_objects(
-        &mut self,
-        registry: &Registry,
-        objects: &[u64],
-    ) -> FaultResult<()> {
+    pub fn remove_objects(&mut self, registry: &Registry, objects: &[u64]) -> FaultResult<()> {
         for binding in &registry.uuids {
             if objects.contains(&binding.object) {
                 reserve(&mut self.uuid_removals, 1)?;
@@ -408,13 +461,86 @@ impl Transition {
                 self.external_removals.push(*external);
             }
         }
-        if registry
-            .data_owners
-            .iter()
-            .any(|owner| objects.contains(owner))
-        {
-            // Media ownership would need its data member collected too.
+        for owner in &registry.data_references {
+            if objects.contains(&owner.object) && !self.data_owner_removals.contains(owner) {
+                reserve(&mut self.data_owner_removals, 1)?;
+                self.data_owner_removals.push(*owner);
+            }
+        }
+        Ok(())
+    }
+
+    /// Record the removal of every embedded data whose owners this
+    /// transition removed and that nothing in `working` (after its object
+    /// removals) or the registry still references: the host's
+    /// `remove_unreferenced` over the media assets of a removed drawable.
+    /// Data the package's `DataMetadataMap` may describe is refused.
+    pub fn release_unreferenced_data(
+        &mut self,
+        working: &Working<'_, impl TableLeaf>,
+        registry: &Registry,
+    ) -> FaultResult<()> {
+        let mut candidates: Vec<u64> = Vec::new();
+        for owner in &self.data_owner_removals {
+            if !candidates.contains(&owner.data) {
+                reserve(&mut candidates, 1)?;
+                candidates.push(owner.data);
+            }
+        }
+        candidates.retain(|data| {
+            !registry
+                .data_references
+                .iter()
+                .any(|owner| owner.data == *data && !self.data_owner_removals.contains(owner))
+        });
+        if candidates.is_empty() {
+            return Ok(());
+        }
+        for name in working.component_names() {
+            for object in &working.archive(&name)?.objects {
+                for info in &object.archive_info.message_infos {
+                    candidates.retain(|data| !info.data_references.contains(data));
+                }
+            }
+        }
+        if candidates.is_empty() {
+            return Ok(());
+        }
+        let Some(route) = route(working)? else {
             return Err(Fault::Unsupported);
+        };
+        let source = payload(working, route)?;
+        let mut files = DataFiles::default();
+        let report = media::visit_package_metadata_media(
+            source,
+            media::DecodeOptions::for_source(source),
+            &mut files,
+        )
+        .map_err(|_error| Fault::Invalid)?;
+        let map = data_metadata_map(working, report)?;
+        if let Some(map) = map {
+            let options = media::DecodeOptions::for_source(map.payload());
+            let mut kept = Vec::new();
+            for data in &candidates {
+                if !map
+                    .contains_data_identifier(*data, options)
+                    .map_err(|_error| Fault::Invalid)?
+                {
+                    reserve(&mut kept, 1)?;
+                    kept.push(*data);
+                }
+            }
+            candidates = kept;
+        }
+        for data in candidates {
+            let (_, file) = files
+                .records
+                .iter()
+                .find(|(identifier, _)| *identifier == data)
+                .ok_or(Fault::Invalid)?;
+            let entry = data_entry_name(file)?;
+            reserve(&mut self.data_removals, 1)?;
+            self.data_removals.push((data, entry));
         }
         Ok(())
     }
@@ -422,7 +548,7 @@ impl Transition {
     /// Register a fresh UUID for new object `object` of component
     /// `component`, derived from `seed` and distinct from every registered
     /// UUID (no clock or randomness is consulted).
-    pub(in crate::package) fn register_uuid(
+    pub fn register_uuid(
         &mut self,
         registry: &Registry,
         component: u64,
@@ -454,7 +580,7 @@ impl Transition {
 
     /// Record that component `source` now references `object` in component
     /// `target`, unless the registry already holds that edge.
-    pub(in crate::package) fn reference(
+    pub fn reference(
         &mut self,
         registry: &Registry,
         source: u64,
@@ -482,8 +608,8 @@ impl Transition {
 }
 
 /// Apply `transition` and raise the watermark to `allocated`.
-pub(super) fn apply(
-    working: &mut Working<'_>,
+pub fn apply(
+    working: &mut Working<'_, impl TableLeaf>,
     transition: &Transition,
     allocated: Option<u64>,
     emptied: &[String],
@@ -507,7 +633,19 @@ pub(super) fn apply(
     {
         return Ok(());
     }
-    let source = payload(working, route)?;
+    // Data owners and unreferenced data leave first: the registry codec
+    // refuses to drop the UUID of an object that still owns data.
+    let staged;
+    let source = if transition.data_owner_removals.is_empty()
+        && transition.data_owner_additions.is_empty()
+        && transition.data_additions.is_empty()
+        && transition.data_removals.is_empty()
+    {
+        payload(working, route)?
+    } else {
+        staged = rewrite_media(working, payload(working, route)?, &registry, transition)?;
+        staged.as_slice()
+    };
     let additions = transition
         .uuid_removals
         .len()
@@ -516,14 +654,15 @@ pub(super) fn apply(
         .saturating_add(transition.external_additions.len());
     let options = options(working, source.len(), additions);
     let mut restore = None;
-    let output = if transition.is_empty() && last == current {
+    let output = if transition.registry_is_empty() && last == current {
         None
-    } else if transition.is_empty() && last < current {
-        // A released suffix alone lowers the watermark (record 0370g); the
-        // addition batch only raises it.
+    } else if transition.registry_is_empty() && last < current {
+        // Only the watermark goes down (the last issued object was removed
+        // and nothing else changes in the registry): a field patch, as the
+        // host editor's `release_package_identifier_suffix` writes it.
         restore = Some(last);
         None
-    } else if transition.is_empty() {
+    } else if transition.registry_is_empty() {
         Some(
             rewrite_package_metadata(source, Batch::new(current, last, &[], &[]), options)
                 .map_err(|error| map_rewrite(&error))?,
@@ -721,8 +860,159 @@ pub(super) fn apply(
     Ok(())
 }
 
+/// The next embedded-data identifier: one above every `DataInfo` record
+/// and every asset this transition adds (the host's
+/// `insert_unreferenced`).
+pub fn next_data_identifier(
+    working: &Working<'_, impl TableLeaf>,
+    transition: &Transition,
+) -> FaultResult<u64> {
+    let Some(route) = route(working)? else {
+        return Err(Fault::Unsupported);
+    };
+    let source = payload(working, route)?;
+    let mut files = DataFiles::default();
+    media::visit_package_metadata_media(
+        source,
+        media::DecodeOptions::for_source(source),
+        &mut files,
+    )
+    .map_err(|_error| Fault::Invalid)?;
+    let maximum = files
+        .records
+        .iter()
+        .map(|(identifier, _)| *identifier)
+        .chain(transition.data_additions.iter().map(|data| data.identifier))
+        .max()
+        .unwrap_or(0);
+    maximum.checked_add(1).ok_or(Fault::Invalid)
+}
+
+/// The `DataInfo` file names of a metadata payload.
+#[derive(Default)]
+struct DataFiles {
+    records: Vec<(u64, String)>,
+}
+
+impl PackageMetadataMediaVisitor for DataFiles {
+    fn visit_data_info(
+        &mut self,
+        data_info: DataInfoSnapshot<'_>,
+    ) -> Result<(), media::DecodeError> {
+        let name = data_info
+            .file_name()
+            .unwrap_or_else(|| data_info.preferred_file_name());
+        self.records.push((data_info.identifier(), name.to_owned()));
+        Ok(())
+    }
+}
+
+/// The package's `DataMetadataMap`, when the registry names one.
+fn data_metadata_map<'w>(
+    working: &'w Working<'_, impl TableLeaf>,
+    report: media::DecodeReport,
+) -> FaultResult<Option<media::DataMetadataMapSource<'w>>> {
+    if !report.data_metadata_map_present() {
+        return Ok(None);
+    }
+    let identifier = report
+        .data_metadata_map_identifier()
+        .ok_or(Fault::Unsupported)?;
+    let object = working.object(identifier)?;
+    let [message] = object.messages.as_slice() else {
+        return Err(Fault::Unsupported);
+    };
+    let options = media::DecodeOptions::for_source(&message.data);
+    media::DataMetadataMapSource::from_source(identifier, &message.data, options)
+        .map(Some)
+        .map_err(|_error| Fault::Invalid)
+}
+
+/// The package entry of a `DataInfo` file name (the host's
+/// `data_entry_name`), refusing names that leave `Data/`.
+fn data_entry_name(file: &str) -> FaultResult<String> {
+    if file.is_empty()
+        || file.contains(['\0', '\\'])
+        || file.starts_with('/')
+        || file
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(Fault::Invalid);
+    }
+    Ok(format!("Data/{file}"))
+}
+
+/// Apply the transition's data-owner and data removals to `source`.
+fn rewrite_media(
+    working: &Working<'_, impl TableLeaf>,
+    source: &[u8],
+    registry: &Registry,
+    transition: &Transition,
+) -> FaultResult<Vec<u8>> {
+    let mut owners = Vec::new();
+    reserve(&mut owners, transition.data_owner_removals.len())?;
+    for owner in &transition.data_owner_removals {
+        let component = registry.component(owner.component)?;
+        owners.push(media::DataReferenceOwnerRemoval::new(
+            media::ComponentSelector::new(component.identifier, component.locator.as_str()),
+            owner.data,
+            owner.object,
+            owner.count,
+        ));
+    }
+    let mut additions = Vec::new();
+    reserve(&mut additions, transition.data_owner_additions.len())?;
+    for owner in &transition.data_owner_additions {
+        let component = registry.component(owner.component)?;
+        additions.push(media::DataReferenceOwnerAddition::new(
+            media::ComponentSelector::new(component.identifier, component.locator.as_str()),
+            owner.data,
+            owner.object,
+            owner.count,
+        ));
+    }
+    let mut data_additions = Vec::new();
+    reserve(&mut data_additions, transition.data_additions.len())?;
+    for data in &transition.data_additions {
+        data_additions.push(
+            media::DataInfoAddition::new(data.identifier, &data.digest, &data.preferred)
+                .with_file_name(&data.file)
+                .with_materialized_length(data.length),
+        );
+    }
+    let mut removals = Vec::new();
+    reserve(&mut removals, transition.data_removals.len())?;
+    for (data, _) in &transition.data_removals {
+        removals.push(DataInfoRemoval::new(*data));
+    }
+    // The owner and DataInfo planner walks every record of the source per
+    // removal; scale the work ceiling to the batch.
+    let options = media::DecodeOptions::for_source(source).with_max_work_bytes(
+        source.len().max(1).saturating_mul(64).saturating_mul(
+            owners
+                .len()
+                .saturating_add(additions.len())
+                .saturating_add(data_additions.len())
+                .saturating_add(removals.len())
+                .saturating_add(1),
+        ),
+    );
+    let report =
+        media::inspect_package_metadata_media(source, options).map_err(|_error| Fault::Invalid)?;
+    let mut batch = MediaRewriteBatch::new(&data_additions, &removals, &additions, &owners);
+    if !removals.is_empty()
+        && let Some(map) = data_metadata_map(working, report)?
+    {
+        batch = batch.with_data_metadata_map_source(map);
+    }
+    let output = media::rewrite_package_metadata_media(source, batch, options)
+        .map_err(|_error| Fault::Invalid)?;
+    Ok(output.into_bytes())
+}
+
 /// A 64-bit finalizer (SplitMix64) for deterministic identity derivation.
-pub(in crate::package) const fn mix(mut value: u64) -> u64 {
+pub const fn mix(mut value: u64) -> u64 {
     value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
     value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
@@ -732,7 +1022,7 @@ pub(in crate::package) const fn mix(mut value: u64) -> u64 {
 /// A deterministic seed for the fresh identities of one transaction: the
 /// registry payload (which carries the document's own identity) and the
 /// first identifier the transaction allocates.
-pub(in crate::package) fn identity_seed(working: &Working<'_>, first: u64) -> FaultResult<u64> {
+pub fn identity_seed(working: &Working<'_, impl TableLeaf>, first: u64) -> FaultResult<u64> {
     let mut seed = mix(first);
     if let Some(route) = route(working)? {
         for chunk in payload(working, route)?.chunks(8) {

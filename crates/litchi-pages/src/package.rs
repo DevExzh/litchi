@@ -12,6 +12,7 @@ pub(crate) mod body_date_time_fields;
 pub(crate) mod body_drawable_caption;
 pub(crate) mod body_drawable_graph;
 pub(crate) mod body_drawable_properties;
+pub(crate) mod body_drawable_style;
 pub(crate) mod body_drawable_text;
 pub(crate) mod body_footnote;
 pub(crate) mod body_media_lifecycle;
@@ -20,6 +21,7 @@ pub(crate) mod body_storage_objects;
 mod body_story;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
+pub(crate) mod body_table_cell_appearance;
 pub(crate) mod body_table_cell_format;
 pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
@@ -47,6 +49,7 @@ mod movie_playback;
 // The drawable-properties family reads and rewrites movie playback through
 // the same owner module, so it is compiled without the host seam feature as
 // well; only the hidden `__*` re-exports stay behind the feature.
+mod locale;
 #[cfg(not(feature = "internal-iwork-source"))]
 #[path = "package/movie_playback.rs"]
 mod movie_playback;
@@ -244,6 +247,14 @@ pub enum PackageError {
     /// ([`crate::builder::Identity`]).
     #[error("a fresh Pages document needs an explicit identity")]
     MissingIdentity,
+    /// A fresh document's language is not a valid language tag
+    /// ([`crate::builder::Builder::language`]).
+    #[error("invalid Pages document language: {0}")]
+    InvalidLanguage(#[source] litchi_iwa_text::LanguageError),
+    /// A fresh document's locale is empty or holds a NUL character
+    /// ([`crate::builder::Builder::locale`]).
+    #[error("a Pages document locale must be non-empty text without NUL")]
+    InvalidLocale,
     /// A limit profile was built with a value outside `1..=maximum`.
     #[error("invalid Pages {kind} limit {value} (allowed 1..={maximum})")]
     InvalidLimit {
