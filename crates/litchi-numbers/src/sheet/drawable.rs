@@ -401,6 +401,87 @@ impl GeometryFlags {
     }
 }
 
+/// The placement of a new sheet image (Numbers' Insert ▸ Image).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageOptions {
+    /// Top-left position on the sheet, in points.
+    pub position: Point,
+    /// Displayed size, in points.
+    pub size: Size,
+    /// Untransformed media dimensions, in points.
+    pub natural_size: Size,
+}
+
+impl ImageOptions {
+    /// Options whose displayed and natural sizes are equal.
+    #[must_use]
+    pub const fn new(position: Point, size: Size) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+        }
+    }
+
+    /// Set the media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: Size) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
+}
+
+/// The placement and timing of a new sheet movie.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MovieOptions {
+    /// Top-left position on the sheet, in points.
+    pub position: Point,
+    /// Displayed size, in points.
+    pub size: Size,
+    /// Untransformed media dimensions, in points.
+    pub natural_size: Size,
+    /// Playable duration of the movie.
+    pub duration: std::time::Duration,
+}
+
+impl MovieOptions {
+    /// Options whose displayed and natural sizes are equal.
+    #[must_use]
+    pub const fn new(position: Point, size: Size, duration: std::time::Duration) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+            duration,
+        }
+    }
+
+    /// Set the media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: Size) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
+}
+
+/// The placement and timing of a new sheet audio clip (a zero-size
+/// control).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AudioOptions {
+    /// Position of the audio control, in points.
+    pub position: Point,
+    /// Playable duration of the clip.
+    pub duration: std::time::Duration,
+}
+
+impl AudioOptions {
+    /// Options for a clip at `position` lasting `duration`.
+    #[must_use]
+    pub const fn new(position: Point, duration: std::time::Duration) -> Self {
+        Self { position, duration }
+    }
+}
+
 /// The frame of one drawable in sheet points (`TSD.GeometryArchive`).
 ///
 /// Each part is optional because Numbers may omit it; reading a drawable

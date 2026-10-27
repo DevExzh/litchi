@@ -447,3 +447,43 @@ fn a_duplicate_shares_its_media_and_only_text_boxes_take_new_text() -> TestResul
     };
     Ok(())
 }
+
+#[test]
+fn a_new_image_embeds_its_data_and_bad_media_is_refused() -> TestResult {
+    use litchi_numbers::sheet::drawable::{ImageOptions, Size};
+
+    let package = open("basic.numbers")?;
+    let png = b"\x89PNG\r\n\x1a\nlitchi".as_slice();
+    let options = ImageOptions::new(
+        Point { x: 10.0, y: 20.0 },
+        Size {
+            width: 30.0,
+            height: 40.0,
+        },
+    );
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_image("dot.png", png, options)?;
+    let created = edit.commit()?.into_package();
+    let list = created.sheet_drawable_list(0)?;
+    assert_eq!(list.last().map(drawable::Drawable::kind), Some(Kind::Image));
+    let asset = created
+        .media_assets()?
+        .into_iter()
+        .find(|asset| asset.preferred_file_name() == "dot.png")
+        .ok_or("no asset")?;
+    assert_eq!(created.extract_media(asset.data())?, png);
+
+    let mut edit = package.edit_sheet_drawables(0)?;
+    for (name, data) in [
+        ("dot.mov", png),
+        ("dot.png", b"".as_slice()),
+        ("../dot.png", png),
+    ] {
+        let Err(drawable::Error::Refused(drawable::Refusal::InvalidMedia)) =
+            edit.add_image(name, data, options)
+        else {
+            return Err(format!("{name} must be refused").into());
+        };
+    }
+    Ok(())
+}

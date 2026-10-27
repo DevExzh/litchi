@@ -63,6 +63,7 @@ mod sheet_drawable_graph;
 pub(crate) mod sheet_drawable_hyperlink;
 pub(crate) mod sheet_drawable_language;
 pub(crate) mod sheet_drawable_list;
+mod sheet_drawable_media;
 pub(crate) mod sheet_drawable_named_style;
 pub(crate) mod sheet_drawable_plain_text;
 pub(crate) mod sheet_drawable_properties;

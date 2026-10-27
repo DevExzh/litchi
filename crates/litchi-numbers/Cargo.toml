@@ -121,6 +121,7 @@ litchi-iwa-text-wire = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-numbers-wire = { workspace = true }
 phf                = { workspace = true }
+prost              = { workspace = true }
 plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
 ryu                = { workspace = true }
 sha1               = { workspace = true }

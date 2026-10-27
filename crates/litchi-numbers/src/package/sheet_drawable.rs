@@ -30,6 +30,7 @@ use super::sheet_drawable_comment as comment;
 use super::sheet_drawable_comment_graph::Graph;
 use super::sheet_drawable_duplicate as duplicate;
 use super::sheet_drawable_graph::{self as graph, SheetDrawables};
+use super::sheet_drawable_media as media;
 use super::structure::{
     self, Working,
     collect::{Census, verify_removed},
@@ -37,7 +38,9 @@ use super::structure::{
     references,
 };
 use crate::selector::SheetSelector;
-use crate::sheet::drawable::{Drawable, DrawableSelector, Geometry, Kind};
+use crate::sheet::drawable::{
+    AudioOptions, Drawable, DrawableSelector, Geometry, ImageOptions, Kind, MovieOptions,
+};
 use litchi_iwa_common::shape::path::Preset;
 
 use super::sheet_drawable_author::{self as author, Context};
@@ -105,11 +108,16 @@ pub enum Refusal {
     /// (and a rounded-rectangle radius at most half the shorter side).
     #[error("invalid frame for a new drawable")]
     InvalidGeometry,
+    /// A new media drawable's file name, media type or data does not fit
+    /// (an empty or unsafe name, a type other than the drawable's, or a
+    /// signature contradicting the extension).
+    #[error("invalid media for a new drawable")]
+    InvalidMedia,
     /// The drawable was already removed by an earlier operation of this edit.
     #[error("the drawable was removed earlier in this edit")]
     AlreadyRemoved,
-    /// The operation does not apply to the selected kind (removing a table,
-    /// image, movie, audio clip or chart through this family).
+    /// The operation does not apply to the selected kind (removing a table
+    /// or chart, or duplicating a shape or table, through this family).
     #[error("{operation} does not apply to a Numbers sheet {kind}")]
     UnsupportedOperation {
         /// The refused verb.
@@ -137,7 +145,9 @@ impl Refusal {
             Self::SheetNotFound | Self::DrawableNotFound { .. } | Self::AlreadyRemoved => {
                 RefusalKind::NotFound
             },
-            Self::ZPositionOutOfRange { .. } | Self::InvalidGeometry => RefusalKind::InvalidValue,
+            Self::ZPositionOutOfRange { .. } | Self::InvalidGeometry | Self::InvalidMedia => {
+                RefusalKind::InvalidValue
+            },
             Self::UnsupportedOperation { .. } | Self::NoStagedOperation => {
                 RefusalKind::UnsupportedOperation
             },
@@ -165,6 +175,7 @@ enum Operation {
         position: usize,
     },
     Add(Box<NewShape>),
+    AddMedia(Box<media::NewMedia>),
     Duplicate {
         drawable: u64,
         /// The copy's text (a text box duplicate).
@@ -223,7 +234,10 @@ impl Edit<'_> {
             .operations
             .iter()
             .filter(|operation| {
-                matches!(operation, Operation::Add(_) | Operation::Duplicate { .. })
+                matches!(
+                    operation,
+                    Operation::Add(_) | Operation::AddMedia(_) | Operation::Duplicate { .. }
+                )
             })
             .count();
         self.base.entries.len() - removed + added
@@ -313,6 +327,77 @@ impl Edit<'_> {
             drawable: identifier,
         });
         Ok(self)
+    }
+
+    fn stage_media(&mut self, media: media::NewMedia) -> Result<&mut Self, Error> {
+        media.validate().map_err(|invalid| match invalid {
+            media::Invalid::Media => Error::Refused(Refusal::InvalidMedia),
+            media::Invalid::Placement => Error::Refused(Refusal::InvalidGeometry),
+        })?;
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::AddMedia(Box::new(media)));
+        Ok(self)
+    }
+
+    /// Stage a new image from a file name (a safe basename whose extension
+    /// names an image type) and its bytes, placed by `options`, styled by
+    /// the theme's first image style; the bytes become a new embedded asset.
+    /// It joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidMedia`], [`Refusal::InvalidGeometry`],
+    /// [`Error::Allocation`].
+    pub fn add_image(
+        &mut self,
+        file_name: &str,
+        data: &[u8],
+        options: ImageOptions,
+    ) -> Result<&mut Self, Error> {
+        self.stage_media(media::NewMedia::Image {
+            file_name: owned(file_name)?,
+            data: structure::copy_bytes(data)?,
+            options,
+        })
+    }
+
+    /// Stage a new movie with its poster image (each a file name and its
+    /// bytes), placed and timed by `options`, styled by the theme's first
+    /// movie style. It joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_image`].
+    pub fn add_movie(
+        &mut self,
+        (file_name, data): (&str, &[u8]),
+        (poster_name, poster): (&str, &[u8]),
+        options: MovieOptions,
+    ) -> Result<&mut Self, Error> {
+        self.stage_media(media::NewMedia::Movie {
+            movie: (owned(file_name)?, structure::copy_bytes(data)?),
+            poster: (owned(poster_name)?, structure::copy_bytes(poster)?),
+            options,
+        })
+    }
+
+    /// Stage a new audio clip from a file name and its bytes. It joins the
+    /// front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_image`].
+    pub fn add_audio(
+        &mut self,
+        file_name: &str,
+        data: &[u8],
+        options: AudioOptions,
+    ) -> Result<&mut Self, Error> {
+        self.stage_media(media::NewMedia::Audio {
+            file_name: owned(file_name)?,
+            data: structure::copy_bytes(data)?,
+            options,
+        })
     }
 
     /// Stage a copy of an image, movie or audio clip: its graph (the
@@ -460,7 +545,9 @@ impl Edit<'_> {
         let base = self.base.identifiers();
         let mut copies = order.iter().filter(|identifier| !base.contains(identifier));
         for operation in &self.operations {
-            let (Operation::Add(_) | Operation::Duplicate { .. }) = operation else {
+            let (Operation::Add(_) | Operation::AddMedia(_) | Operation::Duplicate { .. }) =
+                operation
+            else {
                 continue;
             };
             let copy = *copies.next().ok_or(Error::InvalidSource)?;
@@ -492,6 +579,15 @@ impl Edit<'_> {
         }
         Ok(published)
     }
+}
+
+fn owned(text: &str) -> Result<String, Error> {
+    let mut value = String::new();
+    value
+        .try_reserve_exact(text.len())
+        .map_err(|_error| Error::Allocation { amount: text.len() })?;
+    value.push_str(text);
+    Ok(value)
 }
 
 fn from_plain_text(error: super::sheet_drawable_plain_text::Error) -> Error {
@@ -621,6 +717,20 @@ fn publish_structural(
                 }
                 order.push(authored.identifiers[0]);
                 created.push(authored.identifiers[0]);
+            },
+            Operation::AddMedia(new) => {
+                let registry = registry
+                    .as_ref()
+                    .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+                let created_id = media::author(
+                    &mut working,
+                    registry,
+                    &mut transition,
+                    (sheet.identifier, &sheet_member),
+                    new,
+                )?;
+                order.push(created_id);
+                created.push(created_id);
             },
             Operation::Duplicate { drawable, .. } => {
                 let entry = base
