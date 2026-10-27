@@ -6548,3 +6548,23 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Full coordinator gate on `c4f00f3a35`: `DONE failed=0`, finished 2026-10-27T06:23:48Z (`.coord/gates/full-c4f00f3a35/`).
 - More merges: W1-G Working move (`fb5f393205`); W1-A builder one-pass synthesis, +2.4% Ir against the host where it had been +275% (`e658e4676e`); W1-B shared `litchi_iwa_table::cell_appearance` engine and Pages facade (`e83c53c5fc`), with a fuzz-lock repair (`715b987097`); W1-G hidden-axes engine lift into `litchi_iwa_table::hidden_axes` (`3916c2e5d0`); W1-C Keynote shape styles, columns, layout and captions, 35 rows (`f45c927836`); W1-A sheet duplicate (`debf91e97c`).
 - W2-A 0378a (169 Numbers drawable rows) is sent back to rebase its structure-transition additions onto the moved `litchi-iwa-table` structure. `merge.sh` now also checks every fuzz lock (`--locked --offline`) and the crate boundaries after each merge. A full gate on `debf91e97c` is running.
+
+## Coordinator handover (2026-10-27 afternoon)
+- At about 09:17 UTC an API spend limit stopped the coordinator and all eight agents mid-slice. Nothing was lost: commits are on the WP branches and unfinished edits are still in the worktrees. A new coordinator resumes the program under the same protocol. Briefs, agent IDs and the queue are in `.coord/coordinator-state-20261027.md`.
+- Full coordinator gate on `debf91e97c`: `DONE failed=0`, finished 2026-10-27T09:20:06Z.
+- Merges since `bc01d0e790`:
+  - W1-E 0375a slice 6 (`2c97520d97`): reference-line, chart-font and dual chart-number-format engines in `litchi-iwa-style`, plus the edge `litchi-iwa-style → litchi-iwa-text-wire`. Parity is Tier A or B on all three formats. Engines cost 77–81% less than the host.
+  - W2-A 0378a (`c9fd1baf87`): 169 Numbers drawable rows, covering text-box lists, drop caps, hyperlinks, date-time fields, annotations and named styles; drawable comments; media add, remove, duplicate and replace; chart series, options and axes. The parity module list conflict was resolved as a union.
+- Post-merge checks on `c9fd1baf87` all pass:
+  - workspace check, ledger, every fuzz lock and crate boundaries;
+  - parity harness: 707 passed, 0 failed;
+  - `litchi-numbers`: 1,035 passed.
+- Ledger at `c9fd1baf87`: 1,122 migrated, 38 retired, 1,068 host-only (Pages 507, Keynote 312, Numbers 180, shared 69). The macOS queue has 441 routes pending.
+- Agents resumed:
+  - W1-A: 0370k numeral systems, which must close a +60% Ir gap without weakening admission;
+  - W1-B: Pages `duplicate_table` on the shared duplicate core, and the line-endpoint record;
+  - W1-C: Keynote table duplicate, lifecycle and cell reads;
+  - W1-F: 0376c, three Numbers cell-writer defects (column-axis header counts on every cell write, an empty range-dependency archive, formula-list key reuse) and `set_formula` parity;
+  - W1-G: landing the gate-green Numbers hidden axes;
+  - 0377a: the F1–F5 performance fixes.
+- Queued for the next free slot: W1-E's chart-lifecycle clone, caption graph and remaining chart-style codecs; W1-G group 2 (cell comments); W2-A sheet shape styles. A full gate on `c9fd1baf87` is running. Nothing pushed.
