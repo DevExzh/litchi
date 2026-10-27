@@ -1,7 +1,7 @@
 //! Embedded media reachable from a Keynote document or one slide (record
 //! 0372; a port of the host's `media_assets`, `slide_media_assets` and
 //! `extract_media`), on the W1-E embedded-media inventory
-//! (`litchi_iwa_common::media::embedded`).
+//! (`litchi_iwa_style::media`).
 //!
 //! An asset is reachable when an object reachable from the roots (through
 //! archive-header object references) names it in a header data reference
@@ -184,7 +184,7 @@ fn embedded(package: &Package) -> Result<Vec<Embedded>, Error> {
         .iter()
         .flat_map(|component| component.archive().objects.iter())
         .collect::<Vec<_>>();
-    crate::media_native::embedded_assets(&metadata.data, objects.iter().copied(), |name| {
+    litchi_iwa_style::media::embedded_assets(&metadata.data, objects.iter().copied(), |name| {
         package
             .structure_member_bytes(name)
             .map(|bytes| bytes.len() as u64)
