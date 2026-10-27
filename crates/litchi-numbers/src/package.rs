@@ -58,6 +58,7 @@ pub(crate) mod sheet_drawable_comment;
 mod sheet_drawable_comment_graph;
 pub(crate) mod sheet_drawable_date_time;
 pub(crate) mod sheet_drawable_drop_cap;
+mod sheet_drawable_duplicate;
 mod sheet_drawable_graph;
 pub(crate) mod sheet_drawable_hyperlink;
 pub(crate) mod sheet_drawable_language;

@@ -415,3 +415,35 @@ fn a_sheet_image_takes_new_data_and_its_inverse_restores_the_asset() -> TestResu
     };
     Ok(())
 }
+
+#[test]
+fn a_duplicate_shares_its_media_and_only_text_boxes_take_new_text() -> TestResult {
+    let package = open("image-adjustments-native.numbers")?;
+    let before = package.sheet_drawable_list(0)?.len();
+    let assets = package.media_assets()?;
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.duplicate(DrawableSelector::image(0))?;
+    let duplicated = edit.commit()?;
+    let list = duplicated.package().sheet_drawable_list(0)?;
+    assert_eq!(list.len(), before + 1);
+    assert_eq!(list[before].kind(), Kind::Image);
+    let shared = |assets: &[drawable::media::Embedded]| {
+        assets.iter().map(|asset| asset.data()).collect::<Vec<_>>()
+    };
+    assert_eq!(
+        shared(&duplicated.package().media_assets()?),
+        shared(&assets)
+    );
+    let restored = duplicated
+        .package()
+        .apply_sheet_drawables(&duplicated.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+
+    let mut edit = package.edit_sheet_drawables(0)?;
+    let Err(drawable::Error::Refused(drawable::Refusal::UnsupportedOperation { .. })) =
+        edit.duplicate_text_box(DrawableSelector::image(0), "x")
+    else {
+        return Err("an image is not a text box".into());
+    };
+    Ok(())
+}
