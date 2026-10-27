@@ -14,9 +14,16 @@
 mod arrange;
 mod author;
 mod inventory;
+mod named_styles;
 mod stage;
 mod table;
 mod text;
+mod text_comments;
+mod text_date_time;
+mod text_drop_caps;
+mod text_hyperlinks;
+mod text_lists;
+mod text_properties;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
@@ -587,6 +594,14 @@ enum Operation {
         column: u32,
         value: TableCellValue,
     },
+    TableFormula {
+        slide: u64,
+        drawable: u64,
+        row: u32,
+        column: u32,
+        expression: crate::slide::table::formula::FormulaExpression,
+        cached: TableCellValue,
+    },
     AddTable {
         slide: u64,
         slide_position: Position,
@@ -635,6 +650,63 @@ enum Operation {
         message_index: usize,
         message_type: u32,
         segment: litchi_iwa_common::shape::line::Segment,
+    },
+    AddLine {
+        slide: u64,
+        slide_position: Position,
+        segment: litchi_iwa_common::shape::line::Segment,
+    },
+    TextProperty {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: litchi_iwa_text_wire::paragraph_style::Change,
+    },
+    TextList {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_lists::ListChange,
+    },
+    NamedStyle {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: named_styles::NamedChange,
+    },
+    Hyperlink {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_hyperlinks::HyperlinkChange,
+    },
+    Comment {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_comments::CommentChange,
+    },
+    Language {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: litchi_iwa_text_wire::language::Change,
+    },
+    DropCap {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        drop_cap: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+    },
+    DateTime {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_date_time::DateTimeChange,
+        /// Display text inserted at the field's start first (host
+        /// `insert_slide_text_box_date_time_field`).
+        insert: Option<Box<str>>,
     },
 }
 
@@ -1029,10 +1101,20 @@ impl<'a> Edit<'a> {
             | Operation::Properties { .. }
             | Operation::Preset { .. }
             | Operation::LineSegment { .. }
-            | Operation::TableCell { .. } => false,
+            | Operation::TextProperty { .. }
+            | Operation::TextList { .. }
+            | Operation::NamedStyle { .. }
+            | Operation::Hyperlink { .. }
+            | Operation::Comment { .. }
+            | Operation::DateTime { .. }
+            | Operation::DropCap { .. }
+            | Operation::Language { .. }
+            | Operation::TableCell { .. }
+            | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::Duplicate { slide, .. }
+            | Operation::AddLine { slide, .. }
             | Operation::AddText { slide, .. }
             | Operation::AddImage { slide, .. }
             | Operation::AddTable { slide, .. } => *slide == selected.identifier,
@@ -1225,6 +1307,808 @@ impl<'a> Edit<'a> {
             message_type: item.message_type,
             preset,
             geometry,
+        });
+        Ok(self)
+    }
+
+    fn text_storage(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+    ) -> Result<(SelectedSlide, inventory::Item, u64), Error> {
+        let (selected, item) = self.drawable(slide, drawable)?;
+        let storage = item
+            .storage
+            .filter(|_| matches!(item.kind, Kind::TextBox | Kind::Shape))
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))?;
+        Ok((selected, item, storage))
+    }
+
+    /// Stage `property` as the effective character or paragraph property of
+    /// the whole text of one text box or shape (host
+    /// `set_slide_text_box_text_*` / `set_slide_text_box_paragraph_*`). The
+    /// text must be uniformly styled by one paragraph style; the change is
+    /// published on the shared paragraph-style engine (rewrite of an
+    /// exclusive variation, a derived child variation, or a collapse back to
+    /// the parent).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
+    /// drawables without text; [`Self::commit`] refuses text that is not
+    /// uniformly styled ([`Unsupported::TextStyling`]).
+    pub fn set_text_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        property: litchi_iwa_text_wire::paragraph_style::Property,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::TextProperty {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change: litchi_iwa_text_wire::paragraph_style::Change::Set(property),
+        });
+        Ok(self)
+    }
+
+    /// Stage removing the text's own override of `kind`, so the value is
+    /// inherited again (host `reset_slide_text_box_text_*` /
+    /// `reset_slide_text_box_paragraph_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_text_property`].
+    pub fn reset_text_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        kind: litchi_iwa_text_wire::paragraph_style::PropertyKind,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::TextProperty {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
+        });
+        Ok(self)
+    }
+
+    /// Stage one language-run change of the text of a text box or shape:
+    /// set a language from a position, remove a boundary, or reset every
+    /// explicit language (host `set_slide_text_box_text_language`,
+    /// `remove_slide_text_box_text_language_boundary`,
+    /// `reset_slide_text_box_text_languages`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a position that is not a text boundary.
+    pub fn set_text_language<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        change: litchi_iwa_text_wire::language::Change,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::Language {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage `drop_cap` for the paragraph starting at `paragraph` of the text
+    /// of a text box or shape; `None` removes it (host
+    /// `set_slide_text_box_paragraph_drop_cap`,
+    /// `remove_slide_text_box_paragraph_drop_cap`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a stylesheet without a Drop Cap base.
+    pub fn set_drop_cap<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        drop_cap: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::DropCap {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            paragraph,
+            drop_cap,
+        });
+        Ok(self)
+    }
+
+    fn stage_date_time(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_date_time::DateTimeChange,
+        insert: Option<Box<str>>,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::DateTime {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+            insert,
+        });
+        Ok(self)
+    }
+
+    /// Stage a Date & Time field over `range` (UTF-16 code units) of the
+    /// text of a text box or shape (host
+    /// `add_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a range another field occupies.
+    pub fn add_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        settings: litchi_iwa_text::date_time::Settings,
+    ) -> Result<&mut Self, Error> {
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Add(range, settings),
+            None,
+        )
+    }
+
+    /// Stage inserting `display` at `position` of the text and a Date &
+    /// Time field over it (host `insert_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_date_time_field`].
+    pub fn insert_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: litchi_iwa_text::position::TextPosition,
+        display: &litchi_iwa_text::date_time::DisplayText,
+        settings: litchi_iwa_text::date_time::Settings,
+    ) -> Result<&mut Self, Error> {
+        let start = position.utf16_index();
+        let length = u32::try_from(display.as_str().encode_utf16().count())
+            .map_err(|_| Error::Refused(Refusal::InvalidSpan))?;
+        let range = litchi_iwa_text::position::TextRange::new(
+            position,
+            litchi_iwa_text::position::TextPosition::from_utf16_code_units(start + length),
+        )
+        .map_err(|_| Error::Refused(Refusal::InvalidSpan))?;
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Add(range, settings),
+            Some(display.as_str().into()),
+        )
+    }
+
+    /// Stage moving the text's date-time field at `field` (in text order)
+    /// onto `range` with new `settings` (host
+    /// `update_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_date_time_field`]; a missing field is refused.
+    pub fn update_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        field: Position,
+        range: litchi_iwa_text::position::TextRange,
+        settings: litchi_iwa_text::date_time::Settings,
+    ) -> Result<&mut Self, Error> {
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Update(field.get(), range, settings),
+            None,
+        )
+    }
+
+    /// Stage removing the text's date-time field at `field` (host
+    /// `remove_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_date_time_field`].
+    pub fn remove_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        field: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Remove(field.get()),
+            None,
+        )
+    }
+
+    fn stage_comment(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_comments::CommentChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::Comment {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage a highlight over `range` (UTF-16 code units) of the text of a
+    /// text box or shape, created at `created`, by the document's generated
+    /// annotation author (host `add_slide_text_box_highlight`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a range another annotation occupies.
+    pub fn add_highlight<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        created: litchi_iwa_text::date_time::Instant,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::AddHighlight(range, created),
+        )
+    }
+
+    /// Stage moving the text's highlight at `position` (in text order) onto
+    /// `range` (host `update_slide_text_box_highlight`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_highlight`]; a missing highlight is refused.
+    pub fn update_highlight<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+        range: litchi_iwa_text::position::TextRange,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::UpdateHighlight(position.get(), range),
+        )
+    }
+
+    /// Stage removing the text's highlight at `position` (host
+    /// `remove_slide_text_box_highlight`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_highlight`].
+    pub fn remove_highlight<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::RemoveHighlight(position.get()),
+        )
+    }
+
+    /// Stage a comment with a non-empty `body` over `range` of the text,
+    /// created at `created` (host `add_slide_text_box_comment`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_highlight`]; an empty body is refused.
+    pub fn add_comment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        body: &str,
+        created: litchi_iwa_text::date_time::Instant,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::AddComment(range, body.to_owned(), created),
+        )
+    }
+
+    /// Stage moving the text's comment at `position` onto `range` with a
+    /// new `body` (host `update_slide_text_box_comment`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_comment`]; a missing comment is refused.
+    pub fn update_comment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+        range: litchi_iwa_text::position::TextRange,
+        body: &str,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::UpdateComment(position.get(), range, body.to_owned()),
+        )
+    }
+
+    /// Stage removing the text's comment at `position` with its replies
+    /// (host `remove_slide_text_box_comment`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment`].
+    pub fn remove_comment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::RemoveComment(position.get()),
+        )
+    }
+
+    /// Stage a reply to the text's comment at `comment` (host
+    /// `add_slide_text_box_comment_reply`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment`].
+    pub fn add_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+        body: &str,
+        created: litchi_iwa_text::date_time::Instant,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::AddReply(comment.get(), body.to_owned(), created),
+        )
+    }
+
+    /// Stage a new body for reply `reply` of comment `comment` (host
+    /// `update_slide_text_box_comment_reply`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment`]; a missing reply is refused.
+    pub fn update_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+        reply: Position,
+        body: &str,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::UpdateReply(comment.get(), reply.get(), body.to_owned()),
+        )
+    }
+
+    /// Stage removing reply `reply` of comment `comment` (host
+    /// `remove_slide_text_box_comment_reply`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment_reply`].
+    pub fn remove_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+        reply: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::RemoveReply(comment.get(), reply.get()),
+        )
+    }
+
+    fn stage_hyperlink(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_hyperlinks::HyperlinkChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::Hyperlink {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage a hyperlink to `target` over `range` of the text (UTF-16 code
+    /// units) of a text box or shape (host `add_slide_text_box_hyperlink`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a range another field occupies.
+    pub fn add_hyperlink<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        target: litchi_iwa_text::hyperlink::TextHyperlinkTarget,
+    ) -> Result<&mut Self, Error> {
+        self.stage_hyperlink(
+            slide.into(),
+            drawable.into(),
+            text_hyperlinks::HyperlinkChange::Add(range, target),
+        )
+    }
+
+    /// Stage moving the text's hyperlink at `position` (in text order) onto
+    /// `range` and pointing it at `target` (host
+    /// `update_slide_text_box_hyperlink`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_hyperlink`]; a missing hyperlink is refused.
+    pub fn update_hyperlink<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+        range: litchi_iwa_text::position::TextRange,
+        target: litchi_iwa_text::hyperlink::TextHyperlinkTarget,
+    ) -> Result<&mut Self, Error> {
+        self.stage_hyperlink(
+            slide.into(),
+            drawable.into(),
+            text_hyperlinks::HyperlinkChange::Update(position.get(), range, target),
+        )
+    }
+
+    /// Stage removing the text's hyperlink at `position` (host
+    /// `remove_slide_text_box_hyperlink`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_hyperlink`].
+    pub fn remove_hyperlink<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_hyperlink(
+            slide.into(),
+            drawable.into(),
+            text_hyperlinks::HyperlinkChange::Remove(position.get()),
+        )
+    }
+
+    fn stage_named(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: named_styles::NamedChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::NamedStyle {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage applying the named paragraph style `style` to the whole text of
+    /// a text box or shape, dropping the text's exclusive overrides (host
+    /// `apply_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a style the text's stylesheet does not name
+    /// ([`Unsupported::TextStyling`]).
+    pub fn apply_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Apply(style),
+        )
+    }
+
+    /// Stage a new named paragraph style copied from `source` under `name`
+    /// and listed in the themes that list `source` (host
+    /// `create_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_named_style`]; a taken name is refused.
+    pub fn create_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        source: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+        name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Create(source, name),
+        )
+    }
+
+    /// Stage renaming the named paragraph style `style` (host
+    /// `rename_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::create_named_style`].
+    pub fn rename_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+        name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Rename(style, name),
+        )
+    }
+
+    /// Stage deleting an unused named paragraph style (host
+    /// `delete_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_named_style`]; a style still in use or the last
+    /// named style is refused.
+    pub fn delete_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Delete(style),
+        )
+    }
+
+    /// Stage deleting the text's applied named style after applying
+    /// `replacement` (host
+    /// `delete_applied_slide_text_box_named_paragraph_style_with_replacement`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::delete_named_style`].
+    pub fn delete_applied_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        style: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+        replacement: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::DeleteApplied(style, replacement),
+        )
+    }
+
+    /// Stage folding the text's overrides into its applied named style
+    /// (host `redefine_applied_slide_text_box_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_named_style`]; text without overrides is refused.
+    pub fn redefine_named_style<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_named(
+            slide.into(),
+            drawable.into(),
+            named_styles::NamedChange::Redefine,
+        )
+    }
+
+    fn stage_list(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_lists::ListChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::TextList {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage one list preset for the whole, uniformly listed text of a text
+    /// box or shape (host `set_slide_text_box_paragraph_list`;
+    /// `ParagraphList::None` is the host's reset). The stylesheet's preset
+    /// is reused or created.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
+    /// drawables without text; [`Self::commit`] refuses text whose list
+    /// styles it does not rewrite ([`Unsupported::TextStyling`]).
+    pub fn set_list<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        list: litchi_iwa_text::paragraph::list::ParagraphList,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::List(list),
+        )
+    }
+
+    /// Stage the list level of the paragraph starting at `paragraph` (host
+    /// `set_slide_text_box_paragraph_list_level`; level zero is the host's
+    /// reset).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn set_list_level<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        level: litchi_iwa_text::paragraph::list::ParagraphListLevel,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Level(paragraph, level),
+        )
+    }
+
+    /// Stage whether the paragraph starting at `paragraph` continues or
+    /// restarts its list numbering (host
+    /// `set_slide_text_box_paragraph_list_numbering`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn set_list_numbering<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        numbering: litchi_iwa_text::paragraph::list::ParagraphListNumbering,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Numbering(paragraph, numbering),
+        )
+    }
+
+    /// Stage one list property (bullet, bullet geometry, indentation, label
+    /// color, number format, scale or tiering) of the paragraph's level
+    /// (host `set_slide_text_box_paragraph_list_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn set_list_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        property: litchi_iwa_text_wire::list::Property,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Property(
+                paragraph,
+                litchi_iwa_text_wire::list::Change::Set(property),
+            ),
+        )
+    }
+
+    /// Stage restoring one list property of the paragraph's level to its
+    /// standard value (host `reset_slide_text_box_paragraph_list_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_list`].
+    pub fn reset_list_property<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        kind: litchi_iwa_text_wire::list::PropertyKind,
+    ) -> Result<&mut Self, Error> {
+        self.stage_list(
+            slide.into(),
+            drawable.into(),
+            text_lists::ListChange::Property(
+                paragraph,
+                litchi_iwa_text_wire::list::Change::Reset(kind),
+            ),
+        )
+    }
+
+    /// Stage a new straight line along `segment` in front of the slide's
+    /// drawables, with the theme's text-box style and empty text (host
+    /// `add_slide_line`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Error::Limit`] past the drawable
+    /// limit.
+    pub fn add_line<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        segment: litchi_iwa_common::shape::line::Segment,
+    ) -> Result<&mut Self, Error> {
+        let selected = self.slide(slide.into())?;
+        self.check_drawable_limit(selected.identifier)?;
+        *self.deltas.entry(selected.identifier).or_default() += 1;
+        self.operations.push(Operation::AddLine {
+            slide: selected.identifier,
+            slide_position: selected.position,
+            segment,
         });
         Ok(self)
     }
@@ -1886,6 +2770,59 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// Stage the formula of the cell `row`/`column` of a table drawable, with
+    /// `cached` as its displayed result until the next native
+    /// recalculation; any formula the cell holds is replaced (record 0376a).
+    ///
+    /// The formula reads cells of its own table: a reference to another
+    /// table (`TableCell`, `TableRange`, `TableRows`, `TableColumns`, which
+    /// name it by native identifier) or a pivot category is refused. Formulas
+    /// that read the cell keep their caches, as in the native application's
+    /// unrecalculated state. Clear a formula with [`Edit::set_table_cell`].
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::Unsupported`] for a drawable that is not a table, and with
+    /// [`Unsupported::TableFormulas`] at commit for a reference outside the
+    /// table, an unknown function, a date or duration cache, or a table
+    /// whose dependency records would need a new tile.
+    pub fn set_table_formula_cached<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        row: u32,
+        column: u32,
+        expression: crate::slide::table::formula::FormulaExpression,
+        cached: crate::slide::table::formula::FormulaCachedValue,
+    ) -> Result<&mut Self, Error> {
+        use crate::slide::table::formula::FormulaCachedValue as Cached;
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        if item.kind != Kind::Table {
+            return Err(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }));
+        }
+        let cached = match cached {
+            Cached::Number(number) => TableCellValue::Number(number.get()),
+            Cached::Text(text) => TableCellValue::Text(text),
+            Cached::Boolean(flag) => TableCellValue::Boolean(flag),
+            Cached::Date(_) | Cached::Duration(_) => {
+                return Err(Error::Refused(Refusal::Unsupported {
+                    reason: Unsupported::TableFormulas,
+                }));
+            },
+        };
+        self.operations.push(Operation::TableFormula {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            row,
+            column,
+            expression,
+            cached,
+        });
+        Ok(self)
+    }
+
     /// Apply every staged operation in one workspace, publish one candidate,
     /// reopen, validate and read it back.
     ///
@@ -2127,6 +3064,351 @@ impl Package {
         let selected = select_slide(self, slide.into())?;
         let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
         Ok(public_list(&inventory))
+    }
+
+    fn text_storage_of(
+        &self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+    ) -> Result<u64, Error> {
+        let selected = select_slide(self, slide)?;
+        let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
+        let item = inventory
+            .items
+            .get(drawable.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: drawable.as_position(),
+            }))?;
+        item.storage
+            .filter(|_| matches!(item.kind, Kind::TextBox | Kind::Shape))
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))
+    }
+
+    /// Read the language runs of the text of one text box or shape (host
+    /// `slide_text_box_text_languages`, `slide_text_box_text_language`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_text_languages<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::language::TextLanguageRun>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        let workspace = Workspace::new(self).map_err(lift)?;
+        let (_, payload) = text_properties::storage_payload(&workspace, storage)?;
+        litchi_iwa_text_wire::language::runs(&payload, workspace.wire).map_err(|_| {
+            Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            })
+        })
+    }
+
+    /// Read the language effective at `position` of the text of one text box
+    /// or shape (host `slide_text_box_text_language`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_text_languages`]; a position that is not a
+    /// text boundary is refused.
+    pub fn slide_drawable_text_language<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: litchi_iwa_text::position::TextPosition,
+    ) -> Result<litchi_iwa_text::language::TextLanguage, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        let workspace = Workspace::new(self).map_err(lift)?;
+        let (_, payload) = text_properties::storage_payload(&workspace, storage)?;
+        litchi_iwa_text_wire::language::at(&payload, position, workspace.wire).map_err(|_| {
+            Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            })
+        })
+    }
+
+    /// Read the paragraph Drop Caps of the text of one text box or shape
+    /// (host `slide_text_box_paragraph_drop_caps`,
+    /// `slide_text_box_paragraph_drop_cap`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_drop_caps<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<
+        Vec<(
+            litchi_iwa_text::position::TextPosition,
+            litchi_iwa_text::paragraph::drop_cap::DropCap,
+        )>,
+        Error,
+    > {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_drop_caps::drop_caps(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read the Date & Time fields of the text of one text box or shape, in
+    /// text order: their ranges and settings (host
+    /// `slide_text_box_date_time_fields`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_date_time_fields<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<
+        Vec<(
+            litchi_iwa_text::position::TextRange,
+            litchi_iwa_text::date_time::Settings,
+        )>,
+        Error,
+    > {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        Ok(
+            text_date_time::fields(&Workspace::new(self).map_err(lift)?, storage)?
+                .into_iter()
+                .map(|(_, range, settings)| (range, settings))
+                .collect(),
+        )
+    }
+
+    /// Read the highlights of the text of one text box or shape, in text
+    /// order (host `slide_text_box_highlights`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_text_highlights<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::highlight::TextHighlight>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_comments::annotations(&Workspace::new(self).map_err(lift)?, storage, true)?
+            .iter()
+            .map(|item| item.highlight().map_err(|_| Error::InvalidSource))
+            .collect()
+    }
+
+    /// Read the comments of the text of one text box or shape, in text
+    /// order (host `slide_text_box_comments`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_text_highlights`].
+    pub fn slide_drawable_text_comments<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::comment::TextComment>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_comments::annotations(&Workspace::new(self).map_err(lift)?, storage, false)?
+            .iter()
+            .map(|item| item.comment().map_err(|_| Error::InvalidSource))
+            .collect()
+    }
+
+    /// Read the replies of the text's comment at `comment` (host
+    /// `slide_text_box_comment_replies`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_text_highlights`]; a missing comment is refused.
+    pub fn slide_drawable_text_comment_replies<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+    ) -> Result<Vec<litchi_iwa_text::comment::TextCommentReply>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_comments::annotations(&Workspace::new(self).map_err(lift)?, storage, false)?
+            .get(comment.get())
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            }))?
+            .comment_replies()
+            .map_err(|_| Error::InvalidSource)
+    }
+
+    /// Read the hyperlinks of the text of one text box or shape, in text
+    /// order: their ranges (UTF-16 code units) and targets (host
+    /// `slide_text_box_hyperlinks`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_hyperlinks<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<
+        Vec<(
+            litchi_iwa_text::position::TextRange,
+            litchi_iwa_text::hyperlink::TextHyperlinkTarget,
+        )>,
+        Error,
+    > {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        Ok(
+            text_hyperlinks::hyperlinks(&Workspace::new(self).map_err(lift)?, storage)?
+                .into_iter()
+                .map(|(_, range, target)| (range, target))
+                .collect(),
+        )
+    }
+
+    /// Read the named paragraph styles of the text's stylesheet, in theme
+    /// preset order (host `slide_text_box_named_paragraph_styles`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_named_styles<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::paragraph::style::NamedParagraphStyle>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        named_styles::catalog(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read the text's applied named paragraph style and whether the text
+    /// overrides it (host `slide_text_box_applied_named_paragraph_style`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_named_styles`].
+    pub fn slide_drawable_applied_named_style<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<(litchi_iwa_text::paragraph::style::NamedParagraphStyle, bool), Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        named_styles::applied(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read the list preset of the whole, uniformly listed text of one text
+    /// box or shape (host `slide_text_box_paragraph_list`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_paragraph_list<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<litchi_iwa_text::paragraph::list::ParagraphList, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::list(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read every paragraph's list level (host
+    /// `slide_text_box_paragraph_list_levels`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_levels<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::paragraph::list::ParagraphListLevelPlacement>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::levels(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read one paragraph's list level (host
+    /// `slide_text_box_paragraph_list_level`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_level<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+    ) -> Result<litchi_iwa_text::paragraph::list::ParagraphListLevel, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::level(&Workspace::new(self).map_err(lift)?, storage, paragraph)
+    }
+
+    /// Read one paragraph's list numbering (host
+    /// `slide_text_box_paragraph_list_numbering`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_numbering<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+    ) -> Result<litchi_iwa_text::paragraph::list::ParagraphListNumbering, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::numbering(&Workspace::new(self).map_err(lift)?, storage, paragraph)
+    }
+
+    /// Read one effective list property of the paragraph's level (host
+    /// `slide_text_box_paragraph_list_*`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_paragraph_list`].
+    pub fn slide_drawable_list_property<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        kind: litchi_iwa_text_wire::list::PropertyKind,
+    ) -> Result<litchi_iwa_text_wire::list::Property, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_lists::property(
+            &Workspace::new(self).map_err(lift)?,
+            storage,
+            paragraph,
+            kind,
+        )
+    }
+
+    /// Read the effective character or paragraph property `kind` of the
+    /// whole, uniformly styled text of one text box or shape (host
+    /// `slide_text_box_text_*` / `slide_text_box_paragraph_*`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
+    /// drawables without uniformly styled text.
+    pub fn slide_drawable_text_property<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        kind: litchi_iwa_text_wire::paragraph_style::PropertyKind,
+    ) -> Result<litchi_iwa_text_wire::paragraph_style::Property, Error> {
+        let selected = select_slide(self, slide.into())?;
+        let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
+        let drawable = drawable.into();
+        let item = inventory
+            .items
+            .get(drawable.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: drawable.as_position(),
+            }))?;
+        let storage = item
+            .storage
+            .filter(|_| matches!(item.kind, Kind::TextBox | Kind::Shape))
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            }))?;
+        let workspace = Workspace::new(self).map_err(lift)?;
+        text_properties::effective(&workspace, storage, kind)
     }
 
     /// Read the segment one straight line draws (host `slide_line_segment`).
@@ -2560,6 +3842,24 @@ fn commit_operations(
                 stage::set_table_cell(&mut workspace, *drawable, *row, *column, value)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
+            Operation::TableFormula {
+                slide,
+                drawable,
+                row,
+                column,
+                expression,
+                cached,
+            } => {
+                stage::set_table_formula(
+                    &mut workspace,
+                    *drawable,
+                    *row,
+                    *column,
+                    expression,
+                    cached,
+                )?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
             Operation::NotesStyle {
                 slide,
                 note,
@@ -2694,6 +3994,144 @@ fn commit_operations(
                     return Err(Error::Verification);
                 }
                 touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Language {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                let wire = workspace.wire;
+                let (index, payload) = text_properties::storage_payload(&workspace, *storage)?;
+                if let Some(rewritten) = litchi_iwa_text_wire::language::rewrite(
+                    &payload, change, wire,
+                )
+                .map_err(|_| {
+                    Error::Refused(Refusal::Unsupported {
+                        reason: Unsupported::TextStyling,
+                    })
+                })? {
+                    stage::replace_payload(&mut workspace, *storage, index, 2_001, rewritten)
+                        .map_err(lift)?;
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::DropCap {
+                slide,
+                drawable,
+                storage,
+                paragraph,
+                drop_cap,
+            } => {
+                let change = match drop_cap {
+                    Some(value) => litchi_iwa_text_wire::drop_cap::Change::Set(*value),
+                    None => litchi_iwa_text_wire::drop_cap::Change::Remove,
+                };
+                text_drop_caps::apply(&mut workspace, *storage, *paragraph, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::DateTime {
+                slide,
+                drawable,
+                storage,
+                change,
+                insert,
+            } => {
+                if let (Some(display), text_date_time::DateTimeChange::Add(range, _)) =
+                    (insert, change)
+                {
+                    let wire = workspace.wire;
+                    let before =
+                        inventory::storage_text(&workspace, *storage, wire).map_err(lift)?;
+                    let at = usize::try_from(range.start().utf16_index())
+                        .map_err(|_| Error::Refused(Refusal::InvalidSpan))?;
+                    let mut units = 0;
+                    let mut split = None;
+                    for (offset, character) in before.char_indices() {
+                        if units == at {
+                            split = Some(offset);
+                            break;
+                        }
+                        units += character.len_utf16();
+                    }
+                    let split = match split {
+                        Some(split) => split,
+                        None if units == at => before.len(),
+                        None => return Err(Error::Refused(Refusal::InvalidSpan)),
+                    };
+                    let text = format!("{}{display}{}", &before[..split], &before[split..]);
+                    stage::set_text(&mut workspace, *slide, *drawable, *storage, &text, source)?;
+                }
+                text_date_time::apply(&mut workspace, *storage, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Comment {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_comments::apply(&mut workspace, *storage, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Hyperlink {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_hyperlinks::apply(&mut workspace, *storage, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::NamedStyle {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                named_styles::change(&mut workspace, *storage, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TextList {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_lists::apply(&mut workspace, *storage, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::TextProperty {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_properties::apply(&mut workspace, *storage, change)?;
+                if let litchi_iwa_text_wire::paragraph_style::Change::Set(property) = change
+                    && text_properties::effective(&workspace, *storage, property.kind())?
+                        != *property
+                {
+                    return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::AddLine {
+                slide,
+                slide_position,
+                segment,
+            } => {
+                if context.is_none() {
+                    context = Some(author::Context::read(&workspace).map_err(lift)?);
+                }
+                let context = context.as_ref().ok_or(Error::InvalidSource)?;
+                let drawable = author::add_line(&mut workspace, context, *slide, *segment)?;
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                if staged.item(drawable).map(|item| item.kind) != Some(Kind::Line) {
+                    return Err(Error::Verification);
+                }
+                created.push((*slide_position, *slide, drawable));
+                touched.entry(*slide).or_default().insert(drawable);
             },
             Operation::LineSegment {
                 slide,

@@ -11,6 +11,7 @@ pub(crate) mod edit;
 mod identity;
 pub(crate) mod image_adjustments;
 mod locale;
+pub(crate) mod media_assets;
 mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;

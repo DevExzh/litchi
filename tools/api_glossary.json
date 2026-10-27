@@ -20157,6 +20157,31 @@
       "families": []
     },
     {
+      "id": "iwa-style",
+      "package": "litchi-iwa-style",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_style",
+          "replacement": "limits are a required argument of every entry point that reads untrusted bytes (record 0351, record 0375a)",
+          "match": "suffix"
+        },
+        {
+          "name": "drawing_native",
+          "scope": "litchi_iwa_style",
+          "replacement": "use litchi_iwa_style::drawing; the per-leaf copies are folded into this crate (record 0375a)"
+        },
+        {
+          "name": "media_native",
+          "scope": "litchi_iwa_style",
+          "replacement": "use litchi_iwa_style::media; the per-leaf copies are folded into this crate (record 0375a)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "iwa-text-wire",
       "package": "litchi-iwa-text-wire",
       "default_features": true,
@@ -22415,6 +22440,36 @@
           "limits_type": "litchi_numbers_wire::formula_cache::CacheLimits"
         },
         {
+          "method": "litchi_numbers_wire::formula_cache::author::plan",
+          "inputs": ["source", "row", "column", "change", "next_identifier", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::author::encode",
+          "inputs": ["expression", "owner", "row", "column", "rows", "columns", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::formula_cache::author::table_owner",
+          "inputs": ["source", "object", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::formula_free",
+          "inputs": ["previous", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::with_formula",
+          "inputs": ["cell", "key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
           "method": "litchi_numbers_wire::formula_cache::refresh::plan",
           "inputs": ["source", "writes", "object", "limits"],
           "limits_argument": "limits",
@@ -22422,7 +22477,7 @@
         },
         {
           "method": "litchi_numbers_wire::formula_cache::refresh::TileCaches::apply",
-          "inputs": ["self", "tile", "columns", "limits"],
+          "inputs": ["self", "tile", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_numbers_wire::Limits"
         },
@@ -23255,6 +23310,7 @@
       "families": [
         "litchi_numbers::cell::comment",
         "litchi_numbers::cell::comment::transaction",
+        "litchi_numbers::cell::conditional_highlight",
         "litchi_numbers::cell::data_format::control::transaction",
         "litchi_numbers::cell::data_format::currency::transaction",
         "litchi_numbers::cell::data_format::custom::transaction",
@@ -23271,6 +23327,12 @@
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
+        "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::drawable::properties",
+        "litchi_numbers::sheet::drawable::text",
+        "litchi_numbers::sheet::drawable::plain_text",
+        "litchi_numbers::sheet::drawable::language",
+        "litchi_numbers::sheet::chart::style",
         "litchi_numbers::sheet::order",
         "litchi_numbers::sheet::chart::arrangement",
         "litchi_numbers::sheet::chart::data",
@@ -23284,6 +23346,7 @@
         "litchi_numbers::table::merge::transaction",
         "litchi_numbers::table::order",
         "litchi_numbers::table::relocation",
+        "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology"
@@ -23313,6 +23376,30 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_lifecycle",
           "ok": "litchi_numbers::sheet::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawables",
+          "ok": "litchi_numbers::sheet::drawable::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_properties",
+          "ok": "litchi_numbers::sheet::drawable::properties::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_text_box_text",
+          "ok": "litchi_numbers::sheet::drawable::text::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_plain_text",
+          "ok": "litchi_numbers::sheet::drawable::plain_text::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_text_languages",
+          "ok": "litchi_numbers::sheet::drawable::language::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_style",
+          "ok": "litchi_numbers::sheet::chart::style::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_order",
@@ -23375,6 +23462,10 @@
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
         },
         {
+          "method": "litchi_numbers::Package::apply_table_cell_conditional_highlights",
+          "ok": "litchi_numbers::cell::conditional_highlight::Commit"
+        },
+        {
           "method": "litchi_numbers::Package::apply_table_cell_lists",
           "ok": "litchi_numbers::cell::list::Commit"
         },
@@ -23417,6 +23508,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_relocation",
           "ok": "litchi_numbers::table::relocation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_resize",
+          "ok": "litchi_numbers::table::resize::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_sort_order",
@@ -24066,6 +24161,7 @@
       "families": [
         "litchi_numbers::cell::comment",
         "litchi_numbers::cell::comment::transaction",
+        "litchi_numbers::cell::conditional_highlight",
         "litchi_numbers::cell::data_format::control::transaction",
         "litchi_numbers::cell::data_format::currency::transaction",
         "litchi_numbers::cell::data_format::custom::transaction",
@@ -24082,6 +24178,12 @@
         "litchi_numbers::cell::text_style",
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
+        "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::drawable::properties",
+        "litchi_numbers::sheet::drawable::text",
+        "litchi_numbers::sheet::drawable::plain_text",
+        "litchi_numbers::sheet::drawable::language",
+        "litchi_numbers::sheet::chart::style",
         "litchi_numbers::sheet::order",
         "litchi_numbers::sheet::chart::arrangement",
         "litchi_numbers::sheet::chart::data",
@@ -24095,6 +24197,7 @@
         "litchi_numbers::table::merge::transaction",
         "litchi_numbers::table::order",
         "litchi_numbers::table::relocation",
+        "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology"
@@ -24124,6 +24227,30 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_lifecycle",
           "ok": "litchi_numbers::sheet::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawables",
+          "ok": "litchi_numbers::sheet::drawable::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_properties",
+          "ok": "litchi_numbers::sheet::drawable::properties::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_text_box_text",
+          "ok": "litchi_numbers::sheet::drawable::text::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_plain_text",
+          "ok": "litchi_numbers::sheet::drawable::plain_text::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_text_languages",
+          "ok": "litchi_numbers::sheet::drawable::language::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_style",
+          "ok": "litchi_numbers::sheet::chart::style::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_order",
@@ -24186,6 +24313,10 @@
           "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
         },
         {
+          "method": "litchi_numbers::Package::apply_table_cell_conditional_highlights",
+          "ok": "litchi_numbers::cell::conditional_highlight::Commit"
+        },
+        {
           "method": "litchi_numbers::Package::apply_table_cell_lists",
           "ok": "litchi_numbers::cell::list::Commit"
         },
@@ -24228,6 +24359,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_relocation",
           "ok": "litchi_numbers::table::relocation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_resize",
+          "ok": "litchi_numbers::table::resize::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_sort_order",
@@ -25743,6 +25878,8 @@
         "litchi_pages::section::paragraphs",
         "litchi_pages::table::creation",
         "litchi_pages::table::deletion",
+        "litchi_pages::table::sort::execution",
+        "litchi_pages::table::size",
         "litchi_pages::drawable::caption",
         "litchi_pages::drawable::lifecycle",
         "litchi_pages::drawable::properties",

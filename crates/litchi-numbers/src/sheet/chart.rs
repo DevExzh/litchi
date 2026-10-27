@@ -22,3 +22,13 @@ pub mod data {
 pub mod metadata {
     pub use crate::package::families::chart_metadata::{Error, LimitKind};
 }
+
+/// Selector-first exact-source chart-level style transactions on the
+/// shared chart style engine: [`crate::Package::edit_sheet_chart_style`].
+pub mod style {
+    pub use crate::package::sheet_chart_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
+    };
+    pub use litchi_iwa_common::chart::{corner, donut, legend, pie, radar};
+    pub use litchi_iwa_common::chart3d;
+}

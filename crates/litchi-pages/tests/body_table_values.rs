@@ -118,3 +118,55 @@ fn refusals_are_typed() -> TestResult {
     ));
     Ok(())
 }
+
+/// A formula authored into a body table reads back as its source and is
+/// removed again by a value write (record 0376a).
+#[test]
+fn body_table_formulas_author_and_clear() -> TestResult {
+    use litchi_pages::table::formula::{
+        FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference, FormulaExpression,
+    };
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/pages/body-table-catalog-native.pages");
+    let package = Package::open(&path)?;
+    let mut edit = package.edit_body_table_values(BodyTableSelector::index(0))?;
+    edit.set_formula_cached(
+        2,
+        2,
+        FormulaExpression::binary(
+            FormulaBinaryOperator::Add,
+            FormulaExpression::Cell(FormulaCellReference::relative(2, 1)),
+            FormulaExpression::Number(1.0),
+        ),
+        FormulaCachedValue::number(3.0)?,
+    )?;
+    let authored = edit.commit()?.into_package();
+    let reopened = Package::from_bytes(&bytes(&authored)?)?;
+    let read = reopened.body_table_cells(BodyTableSelector::index(0))?;
+    assert_eq!(
+        read.table().get(At::new(2, 2)),
+        Some(&Read::Formula("=(B3+1)".into()))
+    );
+    let mut edit = reopened.edit_body_table_values(BodyTableSelector::index(0))?;
+    edit.set(2, 2, Value::Empty)?;
+    let cleared = edit.commit()?.into_package();
+    let read = cleared.body_table_cells(BodyTableSelector::index(0))?;
+    assert!(!matches!(
+        read.table().get(At::new(2, 2)),
+        Some(Read::Formula(_))
+    ));
+    // A date cache is refused at staging.
+    let mut edit = cleared.edit_body_table_values(BodyTableSelector::index(0))?;
+    assert!(matches!(
+        edit.set_formula_cached(
+            2,
+            2,
+            FormulaExpression::Number(1.0),
+            FormulaCachedValue::date(1.0)?,
+        ),
+        Err(Error::Refused(
+            litchi_pages::table::values::Refusal::Formulas
+        ))
+    ));
+    Ok(())
+}

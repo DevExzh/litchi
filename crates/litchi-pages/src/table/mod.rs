@@ -8,6 +8,14 @@ pub mod catalog {
 pub mod cells {
     pub use crate::package::table_cells::{Error, LimitKind};
 }
+/// Formula values of [`values::Edit::set_formula_cached`] (record 0376a).
+pub mod formula {
+    pub use litchi_iwa_common::formula::{
+        FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
+        FormulaExpression,
+    };
+}
+
 /// Cell values of one body table (record 0309).
 pub mod values {
     pub use crate::package::body_table_values::{
@@ -29,6 +37,13 @@ pub mod format {
     };
     pub use litchi_iwa_common::table::cell::data_format::DataFormat;
     pub use litchi_iwa_common::table::coordinate::At;
+}
+/// Exact-source resize of one rooted body table to a new row and column
+/// count (record 0371).
+pub mod size {
+    pub use crate::package::body_table_resize::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }
 /// Exact-source deletion of one rooted body table.
 pub mod deletion {

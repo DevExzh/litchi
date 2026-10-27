@@ -29,7 +29,7 @@ use litchi_iwa_common::shape::path::Preset;
 use litchi_iwa_common::shape::stroke::Width;
 use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits, Properties};
 use litchi_iwa_protos::shape_style_codec::{self as shape_codec, native as stored};
-use litchi_keynote::drawing_native as plumbing;
+use litchi_iwa_style::drawing as plumbing;
 
 use crate::chart_style_cases::{Components, Target, input};
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier};

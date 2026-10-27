@@ -123,6 +123,12 @@
       "litchi-numbers",
       "litchi-pages"
     ],
+    "litchi-iwa-style": [
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos"
+    ],
     "litchi-iwa-table": [
       "litchi-core",
       "litchi-iwa-archive",
@@ -146,6 +152,7 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-style",
       "litchi-iwa-table",
       "litchi-iwa-text",
       "litchi-iwa-text-wire",
@@ -311,6 +318,7 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-style",
       "litchi-iwa-table",
       "litchi-iwa-text",
       "litchi-iwa-text-wire",
@@ -511,6 +519,13 @@
       "exit": "Replace those adapters with private bounded format codecs and delete litchi-iwa."
     },
     {
+      "order": 11,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-style",
+      "reason": "The exit parity harness drives the shared style and media engines against the legacy host routes (dev-only).",
+      "exit": "Delete litchi-iwa with its parity harness in W3."
+    },
+    {
       "order": 12,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-text",
@@ -572,6 +587,7 @@
     "litchi-iwa-package",
     "litchi-iwa-protos",
     "litchi-iwa-structured",
+    "litchi-iwa-style",
     "litchi-iwa-table",
     "litchi-iwa-text",
     "litchi-iwa-text-wire",

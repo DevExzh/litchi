@@ -295,3 +295,202 @@ fn numbers_topology_remove_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+fn highlight_rules() -> TestResult<Vec<litchi_numbers::cell::conditional_highlight::Rule>> {
+    use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    use litchi_numbers::cell::conditional_highlight::{Condition, Number, Rule, Style, Text};
+    let fill = Rgba::new(1.0, 0.8, 0.2, 1.0, RgbColorSpace::Srgb)?;
+    Ok(vec![
+        Rule::new(
+            Condition::GreaterThan(Number::new(2.5)?),
+            Style::with_fill(fill),
+        ),
+        Rule::new(
+            Condition::TextContains(Text::new("ot")?),
+            Style::with_fill(fill),
+        ),
+    ])
+}
+
+#[inline(never)]
+fn host_highlight(source: &[u8], clear: bool) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    if clear {
+        editor.clear_cell_conditional_highlighting(id, 1, 1)?;
+    } else {
+        editor.set_cell_conditional_highlighting(id, 1, 1, &highlight_rules()?)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_highlight(source: &[u8], clear: bool) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let at = litchi_numbers::table::At::new(1, 1);
+    let edit = package.edit_table_cell_conditional_highlights(0usize, 0usize)?;
+    let edit = if clear {
+        edit.clear(at)?
+    } else {
+        edit.set(at, highlight_rules()?)?
+    };
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Conditional highlighting on `basic.numbers` B2: two rules, then a clear
+/// on the host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_conditional_highlight_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let set = host_highlight(&input.bytes, false)?;
+    for (bytes, clear) in [(&input.bytes, false), (&set, true)] {
+        black_box(host_highlight(bytes, clear)?);
+        black_box(leaf_highlight(bytes, clear)?);
+        black_box(leaf_highlight(bytes, clear)?);
+        black_box(host_highlight(bytes, clear)?);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn host_resize(source: &[u8], rows: usize, columns: usize) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.resize_table(litchi_numbers::TableSelector::index(0), rows, columns)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_resize(source: &[u8], rows: u32, columns: u32) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let commit = package
+        .edit_table_resize(0usize, 0usize)?
+        .resize(rows, columns)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Growing the first table of `basic.numbers` by five rows and four columns.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_resize_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    Ok(())
+}
+
+#[inline(never)]
+fn host_table_add(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.add_empty_table(litchi_numbers::SheetSelector::index(0), "Added Table", 4, 3)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_table_add(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let commit = package
+        .edit_table_lifecycle(0)?
+        .add("Added Table", 4, 3)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Adding a 4×3 table to the first sheet of `basic.numbers`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_add_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_table_add(&input.bytes)?);
+    black_box(leaf_table_add(&input.bytes)?);
+    black_box(leaf_table_add(&input.bytes)?);
+    black_box(host_table_add(&input.bytes)?);
+    Ok(())
+}
+
+#[inline(never)]
+fn host_lifecycle(source: &[u8], operation: u8) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    match operation {
+        0 => {
+            editor.add_empty_sheet("Added Sheet")?;
+        },
+        1 => {
+            editor.remove_table(litchi_numbers::TableSelector::index(0))?;
+        },
+        3 => {
+            editor.duplicate_table(litchi_numbers::TableSelector::index(0))?;
+        },
+        _ => {
+            editor.remove_sheet(litchi_numbers::SheetSelector::index(1))?;
+        },
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_lifecycle(source: &[u8], operation: u8) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let bytes = match operation {
+        0 => {
+            let commit = package
+                .edit_sheet_lifecycle()
+                .add("Added Sheet")?
+                .commit()?;
+            leaf_bytes!(commit.package())
+        },
+        1 => {
+            let commit = package.edit_table_lifecycle(0)?.remove(0)?.commit()?;
+            leaf_bytes!(commit.package())
+        },
+        3 => {
+            let commit = package.edit_table_lifecycle(0)?.duplicate(0)?.commit()?;
+            leaf_bytes!(commit.package())
+        },
+        _ => {
+            let commit = package.edit_sheet_lifecycle().remove(1)?.commit()?;
+            leaf_bytes!(commit.package())
+        },
+    };
+    Ok(bytes)
+}
+
+/// Adding a sheet to `basic.numbers`, removing its first table, and
+/// removing a second sheet holding a 4×3 table.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_lifecycle_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let two = litchi_numbers::Package::from_bytes(&input.bytes)?
+        .edit_sheet_lifecycle()
+        .add("Second")?
+        .commit()?
+        .into_package()
+        .edit_table_lifecycle(1)?
+        .add("Second Table", 4, 3)?
+        .commit()?
+        .into_package();
+    let two = leaf_bytes!(&two);
+    for (source, operation) in [(&input.bytes, 0), (&input.bytes, 1), (&two, 2)] {
+        black_box(host_lifecycle(source, operation)?);
+        black_box(leaf_lifecycle(source, operation)?);
+        black_box(leaf_lifecycle(source, operation)?);
+        black_box(host_lifecycle(source, operation)?);
+    }
+    Ok(())
+}
+
+/// Duplicating the first table of `basic.numbers`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_duplicate_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_lifecycle(&input.bytes, 3)?);
+    black_box(leaf_lifecycle(&input.bytes, 3)?);
+    black_box(leaf_lifecycle(&input.bytes, 3)?);
+    black_box(host_lifecycle(&input.bytes, 3)?);
+    Ok(())
+}

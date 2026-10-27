@@ -4,6 +4,11 @@ use std::time::Duration;
 
 pub mod properties;
 
+/// Embedded media reachable from the document or a slide (record 0372).
+pub mod assets {
+    pub use crate::package::media_assets::{Error, Kind, MediaAsset};
+}
+
 use geometry::MovieTransform;
 
 pub use properties::MediaProperties;

@@ -69,7 +69,24 @@ pub(super) fn create_empty_table_formula_graph(
     calculation_engine_location(&archive)?;
     let internal_owner_id = next_internal_owner_id(&archive)?;
     let owner_id = next_object_identifier(package)?;
-    let owner = empty_table_formula_owner(&table_uuid, table_info_id, internal_owner_id);
+    let mut owner = empty_table_formula_owner(&table_uuid, table_info_id, internal_owner_id);
+    // Host defect fixed with record 0370f: a new table's owner carried no
+    // table or body extents; native table owners record both in their
+    // spanning dependencies.
+    if let Some(model) = table_model_of_info(package, table_info_id)? {
+        let settings = table_headers::settings_from_model(&model)?;
+        let count = |value: usize| u32::try_from(value).unwrap_or(u32::MAX);
+        let extents = super::formula_dependency_shift::TableExtents::of(
+            model.number_of_rows,
+            model.number_of_columns,
+            count(settings.header_row_count()),
+            count(settings.header_column_count()),
+            count(settings.footer_row_count()),
+        );
+        let spanning = extents.spanning_dependencies();
+        owner.spanning_column_dependencies = Some(spanning.clone());
+        owner.spanning_row_dependencies = Some(spanning);
+    }
     let owner_map_entry = tsce::owner_id_map_archive::OwnerIdMapArchiveEntry {
         internal_owner_id,
         owner_id: uuid_as_cfuuid(&owner.formula_owner_uid),
@@ -117,6 +134,36 @@ pub(super) fn create_empty_table_formula_graph(
         add_component_object_uuids(package, component, &[owner_id])?;
     }
     Ok(Some((calculation_engine_entry, owner_id)))
+}
+
+/// The table model a table drawable names, decoded.
+fn table_model_of_info(package: &HostPackage, info: u64) -> Result<Option<TableModelArchive>> {
+    let locations = object_locations(package)?;
+    let Some(info_archive) = locations.get(&info) else {
+        return Ok(None);
+    };
+    let archive = package.archive(info_archive)?;
+    let Some(model_id) = archive
+        .object(info)
+        .and_then(|object| object.messages.first())
+        .and_then(|message| tst::TableInfoArchive::decode(message.data.as_slice()).ok())
+        .map(|table_info| table_info.table_model.identifier)
+    else {
+        return Ok(None);
+    };
+    let Some(model_archive) = locations.get(&model_id) else {
+        return Ok(None);
+    };
+    let archive = package.archive(model_archive)?;
+    Ok(archive
+        .object(model_id)
+        .and_then(|object| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 6_001)
+        })
+        .and_then(|message| TableModelArchive::decode(message.data.as_slice()).ok()))
 }
 
 /// Clone the CalculationEngine owner family associated with one table.
@@ -331,6 +378,10 @@ pub(super) fn clone_table_formula_graph(
                 .then_some(*replacement)
         })
         .collect::<Vec<_>>();
+    // Host defect fixed with record 0370h: the registrations followed hash
+    // order; they now follow the new identifiers.
+    let mut new_uuid_ids = new_uuid_ids;
+    new_uuid_ids.sort_unstable();
 
     package.update_archive(&calculation_engine_entry, |archive| {
         let (engine_id, engine_message_index) = calculation_engine_location(archive)?;

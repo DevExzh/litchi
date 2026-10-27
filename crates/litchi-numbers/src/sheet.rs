@@ -22,6 +22,10 @@ pub mod order;
 /// Sheet-chart transaction families.
 pub mod chart;
 
+/// The drawables a sheet owns, their selector and values, and the
+/// transactions that edit them.
+pub mod drawable;
+
 /// Exact-source transactions that add an empty sheet or remove a sheet and
 /// its private graph. Start with [`crate::Package::edit_sheet_lifecycle`].
 pub mod lifecycle;

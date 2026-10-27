@@ -17,6 +17,7 @@ pub(crate) mod body_footnote;
 pub(crate) mod body_media_lifecycle;
 pub(crate) mod body_number_attachments;
 pub(crate) mod body_storage_objects;
+mod body_story;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
 pub(crate) mod body_table_cell_format;
@@ -27,7 +28,9 @@ pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
 pub(crate) mod body_table_merges;
 pub(crate) mod body_table_name;
+pub(crate) mod body_table_resize;
 pub(crate) mod body_table_sort;
+pub(crate) mod body_table_sort_execution;
 pub(crate) mod body_table_title;
 pub(crate) mod body_table_values;
 #[cfg(feature = "internal-iwork-source")]

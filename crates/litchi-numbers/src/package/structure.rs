@@ -328,6 +328,9 @@ pub(super) struct Working<'p> {
     /// Whether [`Self::publish`] keeps the root previews (record 0370: the
     /// cell-level families keep them, as the host editor does).
     keep_previews: bool,
+    /// The package save token the publication writes, for a transaction
+    /// composed of several publications (record 0370g).
+    save_token: Option<u64>,
 }
 
 impl<'p> Working<'p> {
@@ -352,6 +355,7 @@ impl<'p> Working<'p> {
             allocated: None,
             next_identifier: 0,
             keep_previews: false,
+            save_token: None,
         };
         let registered = metadata::last_object_identifier(&working)?.unwrap_or(0);
         working.next_identifier = maximum.max(registered).checked_add(1).ok_or(Fault::Limit {
@@ -510,6 +514,23 @@ impl<'p> Working<'p> {
         Ok(())
     }
 
+    /// Replace object `identifier` in place in component `name`, or insert
+    /// it there when the component does not hold it.
+    pub(super) fn upsert(&mut self, name: &str, object: ArchiveObject) -> FaultResult<()> {
+        let identifier = object.archive_info.identifier.ok_or(Fault::Invalid)?;
+        match self.locate(identifier)? {
+            Some(current) if current == name => {
+                let limits = self.archive_limits;
+                self.archive_mut(name)?
+                    .upsert_object(object, limits)
+                    .map_err(|error| map_core(&error))?;
+                Ok(())
+            },
+            Some(_) => Err(Fault::Invalid),
+            None => self.insert(name, object),
+        }
+    }
+
     /// Remove object `identifier` from the component holding it.
     pub(super) fn remove(&mut self, identifier: u64) -> FaultResult<ArchiveObject> {
         let name = self.locate(identifier)?.ok_or(Fault::Invalid)?;
@@ -543,6 +564,18 @@ impl<'p> Working<'p> {
     /// as stale: a cell-level edit (topology, record 0370) leaves them in
     /// place, as the host editor and the native application's own saves
     /// before it regenerates them do.
+    /// Write `token` as the package save token on publication: a
+    /// transaction composed of several publications advances its source's
+    /// token once (record 0370g).
+    pub(super) fn set_save_token(&mut self, token: u64) {
+        self.save_token = Some(token);
+    }
+
+    /// The source package's save token, when it has package metadata.
+    pub(super) fn save_token(&self) -> FaultResult<Option<u64>> {
+        metadata::save_token(self)
+    }
+
     pub(super) fn keep_previews(&mut self) {
         self.keep_previews = true;
     }

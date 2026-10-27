@@ -11,14 +11,16 @@
 
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::package_metadata_codec::{
-    Batch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor, ComponentRemovalBatch,
-    ComponentSelector, DataReferenceOwnerDescriptor, ExternalReferenceAddition,
-    ExternalReferenceDescriptor, ExternalReferenceRemoval, ObjectUuidAddition,
-    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor, RemovalBatch,
-    RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions, SaveTokenBatch, UuidBits,
-    inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    AdditionSaveTokenBatch, Batch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor,
+    ComponentRemovalBatch, ComponentSelector, DataReferenceOwnerDescriptor,
+    ExternalReferenceAddition, ExternalReferenceDescriptor, ExternalReferenceRemoval,
+    ObjectUuidAddition, ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor,
+    RemovalBatch, RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions,
+    SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    rewrite_package_metadata_additions_and_save_tokens,
     rewrite_package_metadata_combined_additions_and_removals_and_save_tokens,
     rewrite_package_metadata_component_removals, rewrite_package_metadata_removals_and_save_tokens,
+    rewrite_package_metadata_save_tokens,
 };
 
 use super::super::metadata::{ENTRY_NAME, MESSAGE_TYPE, normalized_locator};
@@ -211,6 +213,51 @@ fn payload<'w>(working: &'w Working<'_>, (object, message): (u64, usize)) -> Fau
         .ok_or(Fault::Invalid)
 }
 
+/// The package save token (`TSP.PackageMetadata.save_token`).
+pub(super) fn save_token(working: &Working<'_>) -> FaultResult<Option<u64>> {
+    let Some(route) = route(working)? else {
+        return Ok(None);
+    };
+    let values = litchi_iwa_common::wire::repeated_varint_values(payload(working, route)?, 8)
+        .map_err(|error| super::map_wire(&error))?;
+    Ok(values.last().copied())
+}
+
+/// `data` (a `TSP.PackageMetadata`) with the package save token `token`, and
+/// every component record that a composed transaction advanced past it
+/// brought back to it: the transaction is one save.
+fn with_save_token(data: &[u8], token: u64) -> FaultResult<Vec<u8>> {
+    use litchi_iwa_common::WireLimits;
+    use litchi_iwa_common::wire::{
+        append_length_delimited_field, parse_wire_view, patch_varint_field, repeated_varint_values,
+    };
+    let view =
+        parse_wire_view(data, WireLimits::DEFAULT).map_err(|error| super::map_wire(&error))?;
+    let mut output = Vec::new();
+    reserve(&mut output, data.len())?;
+    for field in view.fields() {
+        if matches!(field.number(), 3 | 11) {
+            let record = field.payload();
+            let current =
+                repeated_varint_values(record, 12).map_err(|error| super::map_wire(&error))?;
+            if current.last().is_some_and(|value| *value > token) {
+                let patched = patch_varint_field(record, 12, true, Some(token))
+                    .map_err(|error| super::map_wire(&error))?;
+                append_length_delimited_field(
+                    &mut output,
+                    field.number(),
+                    &patched,
+                    WireLimits::DEFAULT,
+                )
+                .map_err(|error| super::map_wire(&error))?;
+                continue;
+            }
+        }
+        output.extend_from_slice(field.raw());
+    }
+    patch_varint_field(&output, 8, true, Some(token)).map_err(|error| super::map_wire(&error))
+}
+
 fn options(working: &Working<'_>, payload: usize, additions: usize) -> RewriteOptions {
     let components = working
         .source()
@@ -284,6 +331,10 @@ pub(in crate::package) struct Transition {
     /// Removed objects whose identifiers may lower the watermark when they
     /// are its suffix (the host editor's `release_package_identifier_suffix`).
     pub(in crate::package) released: Vec<u64>,
+    /// Components whose save token advances although their registry
+    /// records do not change (the host's `advance_save_tokens_for_entries`
+    /// over the components a route rewrites).
+    pub(in crate::package) stamps: Vec<u64>,
 }
 
 impl Transition {
@@ -321,8 +372,18 @@ impl Transition {
         Ok(())
     }
 
+    /// Advance the save token of `component` (record 0370d).
+    pub(in crate::package) fn stamp(&mut self, component: u64) -> FaultResult<()> {
+        if !self.stamps.contains(&component) {
+            reserve(&mut self.stamps, 1)?;
+            self.stamps.push(component);
+        }
+        Ok(())
+    }
+
     fn is_empty(&self) -> bool {
-        self.uuid_additions.is_empty()
+        self.stamps.is_empty()
+            && self.uuid_additions.is_empty()
             && self.uuid_removals.is_empty()
             && self.external_removals.is_empty()
             && self.external_additions.is_empty()
@@ -439,7 +500,11 @@ pub(super) fn apply(
     if allocated.is_none() && transition.released.contains(&current) {
         last = working.maximum_identifier();
     }
-    if transition.is_empty() && last == current && emptied.is_empty() {
+    if transition.is_empty()
+        && last == current
+        && emptied.is_empty()
+        && working.save_token.is_none()
+    {
         return Ok(());
     }
     let source = payload(working, route)?;
@@ -452,6 +517,11 @@ pub(super) fn apply(
     let options = options(working, source.len(), additions);
     let mut restore = None;
     let output = if transition.is_empty() && last == current {
+        None
+    } else if transition.is_empty() && last < current {
+        // A released suffix alone lowers the watermark (record 0370g); the
+        // addition batch only raises it.
+        restore = Some(last);
         None
     } else if transition.is_empty() {
         Some(
@@ -518,7 +588,8 @@ pub(super) fn apply(
                     .iter()
                     .chain(&transition.external_additions)
                     .flat_map(|external| [external.source, external.target]),
-            );
+            )
+            .chain(transition.stamps.iter().copied());
         for identifier in touched {
             let selector = selector(identifier)?;
             if !tokens.contains(&selector) {
@@ -545,12 +616,33 @@ pub(super) fn apply(
         } else {
             last
         };
-        let output = if removes && !adds && last <= current {
+        let stamped = !transition.stamps.is_empty();
+        let output = if !removes && !adds && last == current {
+            rewrite_package_metadata_save_tokens(source, SaveTokenBatch::new(&tokens), options)
+        } else if !removes && !adds && last > current {
+            rewrite_package_metadata_additions_and_save_tokens(
+                source,
+                AdditionSaveTokenBatch::new(
+                    Batch::new(current, last, &[], &[]),
+                    SaveTokenBatch::new(&tokens),
+                ),
+                options,
+            )
+        } else if !adds && last <= current {
             rewrite_package_metadata_removals_and_save_tokens(
                 source,
                 RemovalSaveTokenBatch::new(
                     RemovalBatch::new(current, &uuid_removals, &external_removals, &[])
                         .with_new_last_object_identifier(last),
+                    SaveTokenBatch::new(&tokens),
+                ),
+                options,
+            )
+        } else if adds && !removes && stamped {
+            rewrite_package_metadata_additions_and_save_tokens(
+                source,
+                AdditionSaveTokenBatch::new(
+                    Batch::new(current, last, &uuid_additions, &external_additions),
                     SaveTokenBatch::new(&tokens),
                 ),
                 options,
@@ -588,6 +680,9 @@ pub(super) fn apply(
     if let Some(last) = restore {
         data = litchi_iwa_common::wire::patch_varint_field(&data, 1, true, Some(last))
             .map_err(|error| super::map_wire(&error))?;
+    }
+    if let Some(token) = working.save_token {
+        data = with_save_token(&data, token)?;
     }
     if !emptied.is_empty() {
         let mut selectors = Vec::new();
