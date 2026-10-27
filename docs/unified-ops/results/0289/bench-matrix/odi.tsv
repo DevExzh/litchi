@@ -1,5 +1,9 @@
 format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
 odi	batch	every independent frame property (default owner; one File::batch vs one leaf edit, one frame)	6 ops	unified/leaf		181.29	189.22	µs	1.044	1.038–1.044	2.0 (batch vs one leaf edit)	meets	0337	parsed:0337/abba/batch-C-before-1.json (+2 more)	
+odi	batch	odi_default_frame_property_set_batch6 (instructions)		unified/leaf (callgrind Ir; budgets judged on wall)		10238242.0	10302295.0	Ir	1.006		none	no-budget	0377	parsed:0377/callgrind.tsv	
+odi	batch	odi_default_frame_property_set_batch6 (leaf leg, candidate vs pre-program baseline)		after/before (callgrind Ir)		10098302.0	10238242.0	Ir	1.014		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/callgrind.tsv	
+odi	batch	odi_default_frame_property_set_batch6 (unified leg, candidate vs pre-program baseline)		after/before (callgrind Ir)		10170266.0	10302295.0	Ir	1.013		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/callgrind.tsv	
+odi	batch	odi_default_frame_property_set_batch6 (wall)		unified/leaf (wall, ABBA blocks)		171.17	175.58	µs	1.026		scaling (no ratio budget)	no-budget	0377	parsed:0377/abba.json	
 odi	open	open_first_get		unified/leaf		56.86	57.91	µs	1.018	1.016–1.018	1.05 or +20 µs (open)	meets	0282	parsed:0282/odf_leaves_bench.json	
 odi	set	geometry set (fresh image)		unified/leaf		161.50	162.70	µs	1.007		1.10 (single-op write)	meets	0288	parsed:0288/odf_gaps_bench.txt	
 odi	set	geometry set (fresh image)		unified/leaf		162.35	163.85	µs	1.011	1.008–1.011	1.10 (single-op write)	meets	0291	parsed:0291/odf_gaps_bench-after-1.txt (+1 more)	

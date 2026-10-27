@@ -1,0 +1,47 @@
+profile	case	corpus	base_p50_ns_per_run	candidate_p50_ns_per_run
+release (16 CGU, fat LTO)	opc_source_open	tiny-compressible	14080,14120,14010,14220	14570,14650,14720,14700
+release (16 CGU, fat LTO)	opc_open_owned	tiny-compressible	16700,16690,16630,16710	17180,17270,17100,17140
+release (16 CGU, fat LTO)	opc_source_cached_main_read	tiny-compressible	510,510,520,530	500,520,510,530
+release (16 CGU, fat LTO)	opc_source_open	tiny-incompressible	13811,13800,13800,13940	14260,14600,14350,14320
+release (16 CGU, fat LTO)	opc_open_owned	tiny-incompressible	16570,16581,16600,16830	17040,17430,17020,17000
+release (16 CGU, fat LTO)	opc_source_cached_main_read	tiny-incompressible	530,530,530,520	500,530,500,500
+release (16 CGU, fat LTO)	opc_source_open	many-small-compressible	425272,426533,427003,432913	468272,467713,463633,462203
+release (16 CGU, fat LTO)	opc_open_owned	many-small-compressible	584844,585554,586384,592104	641344,632904,626634,628994
+release (16 CGU, fat LTO)	opc_source_cached_main_read	many-small-compressible	570,570,570,590	570,550,530,530
+release (16 CGU, fat LTO)	opc_source_open	many-small-incompressible	432882,426083,430503,435643	487753,465653,465613,463412
+release (16 CGU, fat LTO)	opc_open_owned	many-small-incompressible	587024,586963,590323,593293	679364,649704,630284,628003
+release (16 CGU, fat LTO)	opc_source_cached_main_read	many-small-incompressible	560,550,600,550	550,600,490,540
+release (16 CGU, fat LTO)	opc_source_open	few-large-compressible	18140,18400,18310,18360	21151,19720,18940,19000
+release (16 CGU, fat LTO)	opc_open_owned	few-large-compressible	18910,19190,18990,19341	19670,20460,19540,19740
+release (16 CGU, fat LTO)	opc_source_cached_main_read	few-large-compressible	61230,61060,61580,61391	61471,83680,60970,61080
+release (16 CGU, fat LTO)	opc_source_open	few-large-incompressible	42180,54491,55870,55190	54530,55040,54030,59140
+release (16 CGU, fat LTO)	opc_open_owned	few-large-incompressible	45570,48311,47450,52471	49131,53470,46300,55231
+release (16 CGU, fat LTO)	opc_source_cached_main_read	few-large-incompressible	75220,69461,75971,68760	74820,68571,75760,67280
+release (16 CGU, fat LTO)	opc_source_open	wide-root-compressible	5320842,5155371,5664484,5218841	5559623,5473684,5607633,5448192
+release (16 CGU, fat LTO)	opc_open_owned	wide-root-compressible	5498823,4686708,4692298,4705358	5287022,5062041,5215741,5025140
+release (16 CGU, fat LTO)	opc_source_cached_main_read	wide-root-compressible	710,680,590,630	800,560,680,590
+release (16 CGU, fat LTO)	opc_source_open	wide-root-incompressible	5310012,5170201,5238161,5238361	5465803,5496133,5533682,5611253
+release (16 CGU, fat LTO)	opc_open_owned	wide-root-incompressible	5209702,4664718,4733388,4747098	5102311,5087761,5061830,5143530
+release (16 CGU, fat LTO)	opc_source_cached_main_read	wide-root-incompressible	870,620,900,620	610,570,590,600
+release (16 CGU, fat LTO)	xls_fresh_write_to	xls-tiny	17601,17440,17840,17171	18951,17980,18110,17630
+release (16 CGU, fat LTO)	xls_fresh_write_to	xls-large	2477295,2459705,2417665,2429945	2794117,2686756,2649036,2660025
+release (16 CGU, fat LTO)	xls_fresh_write_to	xls-payload-heavy	5910745,6012027,6547789,5831025	5862455,5862636,5898965,5499813
+release, codegen-units=1	opc_source_open	tiny-compressible	14220,14360,14250,14280	14540,14780,14670,14500
+release, codegen-units=1	opc_open_owned	tiny-compressible	16920,17160,17030,17130	17390,17600,17430,17040
+release, codegen-units=1	opc_source_open	tiny-incompressible	13940,14030,14190,14030	14400,14640,14490,14290
+release, codegen-units=1	opc_open_owned	tiny-incompressible	17130,17130,17240,17240	17300,17520,17611,17040
+release, codegen-units=1	opc_source_open	many-small-compressible	464282,452133,455102,453472	455753,457913,455932,458373
+release, codegen-units=1	opc_open_owned	many-small-compressible	641124,631084,632834,631644	627603,628504,629224,629254
+release, codegen-units=1	opc_source_open	many-small-incompressible	457813,457313,458463,453493	468823,461742,458132,460642
+release, codegen-units=1	opc_open_owned	many-small-incompressible	643984,633994,636974,631164	637574,635714,635624,629504
+release, codegen-units=1	opc_source_open	few-large-compressible	18980,18890,18490,18630	19501,19580,19500,19030
+release, codegen-units=1	opc_open_owned	few-large-compressible	19890,19800,19550,19880	20131,20170,20010,19660
+release, codegen-units=1	opc_source_open	few-large-incompressible	50070,53700,53990,51490	66051,59351,56760,59941
+release, codegen-units=1	opc_open_owned	few-large-incompressible	46961,51580,38231,44551	70181,34650,52731,33731
+release, codegen-units=1	opc_source_open	wide-root-compressible	5468063,5563414,5569474,5421624	5574243,5453063,5555594,5430453
+release, codegen-units=1	opc_open_owned	wide-root-compressible	5196621,5025891,5041270,5075551	5150441,5062731,5086601,5138561
+release, codegen-units=1	opc_source_open	wide-root-incompressible	5563994,5479073,5555744,5547834	5557894,5454913,5595834,5583274
+release, codegen-units=1	opc_open_owned	wide-root-incompressible	5250262,5056711,5056561,5115481	5361853,5082471,5114351,5125511
+release, codegen-units=1	xls_fresh_write_to	xls-tiny	16900,17201,16870,17560	18020,16980,17130,17510
+release, codegen-units=1	xls_fresh_write_to	xls-large	2431685,2460165,2440355,2422994	2483155,2411184,2394975,2453604
+release, codegen-units=1	xls_fresh_write_to	xls-payload-heavy	5937856,5257082,5236202,5785485	5690795,5540364,5303992,5538694
