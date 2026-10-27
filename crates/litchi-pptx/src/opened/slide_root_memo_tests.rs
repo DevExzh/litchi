@@ -1376,11 +1376,13 @@ fn a_planted_wrong_classification_is_caught_by_the_re_derivation() {
     let _ = edit.commit();
 }
 
-/// The facade publishes snapshots but keeps no slide-root memo of its own, so
-/// its adoption condition is vacuous: once every snapshot is dropped, each
-/// slide payload is held only by the facade's package and its digest memo.
+/// The facade's only slide-root memo is the one its package memo carries
+/// (record 0377), whose entries name allocations the facade's package holds:
+/// once every snapshot is dropped, each slide payload is held only by the
+/// facade's package, its digest memo and that memo's slide-root entries, so
+/// the memo pins no payload the package does not own.
 #[test]
-fn the_facade_retains_no_slide_root_memo() -> Result<()> {
+fn the_facade_slide_root_memo_pins_only_package_payloads() -> Result<()> {
     let mut package = text_box_package(3, 1)?;
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
@@ -1403,8 +1405,9 @@ fn the_facade_retains_no_slide_root_memo() -> Result<()> {
     assert!(package.part_digest_memo().is_some());
     for name in &names {
         let blob = package.opc.get_part(name)?.blob_arc();
-        // The facade's package, its digest memo and the `blob` handle above.
-        assert_eq!(Arc::strong_count(&blob), 3, "{name}");
+        // The facade's package, its digest memo, that memo's slide-root
+        // entry and the `blob` handle above.
+        assert_eq!(Arc::strong_count(&blob), 4, "{name}");
     }
     Ok(())
 }
