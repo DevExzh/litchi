@@ -39,6 +39,7 @@
 | `b5af407b34` | `table::sort::execution` — `Package::{edit_body_table_sort_execution, apply_body_table_sort_execution}`; `Edit::{apply, apply_to_rows}`: the host's scalar executor at wire level (stable permutation by the shared planner; tile row records, row header buckets, row UID map and stroke layers move; user-hidden rows restored to their positions in the active hidden-state extent). The payload rewrites take only payloads and a permutation, for the shared table crate | 2 |
 | `8da58dfbfe` | `table::size` — `Package::{edit_body_table_size, apply_body_table_size}`; `Edit::set(rows, columns)`: the host's resize (tiles trimmed, header buckets kept inside the extent and rewritten with explicit cell counts, UID-map identities appended or dropped, stroke-sidecar and model counts); after W1-A's host fix (record 0370e) also the table's own formula-owner table and body extents (`3d59e7cbc8`) | 1 |
 | `01ebb98c65` | `table::creation` (record 0329) at host parity, on W1-A's aligned `litchi_numbers_wire::table_create` (record 0370f): the host's identifier order (drawable, model, owned storage in source order, formula owner, attachment), UID maps seeded with the new model's identifier, sorted model references (the host's `table_model_references`), the drawable declaring its parent and model, the template drawable's frame kept, the formula owner's UUID registered, registrations in identifier order. Host `add_table` → `Package::edit_body_table_creation` (tier B) | 1 |
+| `45734adda6`, `b24c0c46c2` | `table::cell_appearance` — `Package::{body_table_cell_appearance, edit_body_table_cell_appearance, apply_body_table_cell_appearance}`; `Edit::{set_fill, reset_fill, set_layout, reset_layout}`; `Appearance { fill, layout }`. The format-neutral engine is the new `litchi_iwa_table::cell_appearance` module (the host's copy-on-write cell-style graph: private variations in the stylesheet, the style list's key allocation and refcounts, in-place rewrites of a cell's own variation, removal of a variation that becomes empty); the Pages owner applies its `Plan` and the registry changes. Image fills are refused (data-reference bookkeeping not ported) | 6 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -78,6 +79,9 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | body-table remove | 1 | A | queued |
 | table sort execution (keys; borders; hidden axes; selected rows) | 2 | A | queued |
 | table resize (grow, shrink) | 1 | A | queued |
+| cell fill and layout set (new variation; two cells in one edit) | 3 | B (the variation's fresh registry UUID) | queued |
+| cell fill and layout reset, in-place rewrite, variation removal | 4 | A | queued |
+| cell fill and layout reads (every cell of four native fixtures and a host-styled one) | 1 | A | queued |
 | table add (3×4 at offset 0) | 1 | B (the table UUID, and the owner UUID and owner-map entry derived from it, by form; fresh metadata UUIDs) | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
@@ -180,6 +184,8 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | table resize (`body-table-catalog-native` table 0 to 7×6) | 2,531,579,334 | — | 50,760,582 | −98.0% |
 | table resize, after the owner-extents fix (both sides) | 2,541,546,946 | — | 51,157,126 | −98.0% |
 | table add (`body-table-catalog-native`, 3×4 at offset 0) | 3,262,277,019 | — | 147,383,467 | −95.5% |
+| cell fill set (table 0, cell 1,1) | 3,555,552,959 | — | 130,637,922 | −96.3% |
+| cell layout reset (host-styled cell 1,1) | 2,813,295,373 | — | 209,686,265 | −92.5% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -229,7 +235,8 @@ Both pre-commit size checks printed nothing for every commit.
 | text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
 | shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
 | table cell formats, rich text, topology, comment writes, conditional highlights | ~120 | cores in `litchi-iwa-table` (W1-G, record 0379); W1-B adds the Pages facades when each group lands |
-| table cell appearance (fill, layout, border) | 9 | module `cell_appearance` in `litchi-iwa-table` plus Pages facade, after the crate lands on trunk |
+| table cell borders (`set_table_cell_border`, `clear_table_cell_border`, `table_cell_borders`) | 3 | the stroke-layer engine (host `stroke_layers`), next in `litchi_iwa_table::cell_appearance` |
+| image cell fills | — | data-reference registry bookkeeping for a style variation (host `register_style_object` with a data identifier) |
 | `duplicate_table` | 1 | format-neutral core in `litchi-iwa-table` over `litchi_numbers_wire::{table_lifecycle, formula_graph}`, after the crate lands |
 | table formulas | — | W1-F formula engine (record 0376) |
 | Builder `language`, `locale`, `body_table` | 6 | next (W1-C did the Keynote pair) |
