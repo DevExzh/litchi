@@ -80,6 +80,16 @@ pub mod comment {
     };
 }
 
+/// The embedded media assets of the document and its sheets, and
+/// exact-source replacement of their bytes: [`crate::Package::edit_media`].
+pub mod media {
+    pub use crate::package::sheet_media::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::media::Type;
+    pub use litchi_iwa_common::media::embedded::{AssetId, Embedded};
+}
+
 /// Exact-source highlight, comment and reply transactions for the text a
 /// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_annotations`].
 pub mod annotation {

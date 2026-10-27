@@ -67,6 +67,7 @@ pub(crate) mod sheet_drawable_plain_text;
 pub(crate) mod sheet_drawable_properties;
 pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
+pub(crate) mod sheet_media;
 pub(crate) mod sheet_order;
 mod storage_list;
 mod structure;

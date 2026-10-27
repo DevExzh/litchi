@@ -274,8 +274,10 @@ impl Edit<'_> {
         self.stage_shape(preset, geometry, text, false)
     }
 
-    /// Stage the removal of a text box or ordinary shape and the objects
-    /// only it references (its text storage, title and caption stand-ins).
+    /// Stage the removal of a text box, ordinary shape, image, movie or
+    /// audio clip and the objects only it references (its text storage,
+    /// title and caption stand-ins, direct comment graph), with the embedded
+    /// data nothing else references.
     ///
     /// # Errors
     ///

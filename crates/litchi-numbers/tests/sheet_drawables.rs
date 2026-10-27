@@ -366,3 +366,52 @@ fn a_drawable_comment_thread_is_written_and_cleared() -> TestResult {
     };
     Ok(())
 }
+
+#[test]
+fn a_sheet_image_takes_new_data_and_its_inverse_restores_the_asset() -> TestResult {
+    use litchi_numbers::sheet::drawable::media::{self, Refusal};
+
+    let package = open("image-adjustments-native.numbers")?;
+    let assets = package.media_assets()?;
+    assert!(!assets.is_empty());
+    assert!(
+        package
+            .sheet_media_assets(0)?
+            .iter()
+            .all(|asset| assets.contains(asset))
+    );
+    let mut edit = package.edit_media();
+    edit.replace_data(0, DrawableSelector::image(0), b"litchi replacement")?;
+    let replaced = edit.commit()?;
+    let changed: Vec<_> = replaced
+        .package()
+        .media_assets()?
+        .into_iter()
+        .filter(|asset| !assets.contains(asset))
+        .collect();
+    let [asset] = changed.as_slice() else {
+        return Err("exactly one asset changes".into());
+    };
+    assert_eq!(
+        replaced.package().extract_media(asset.data())?,
+        b"litchi replacement"
+    );
+    let restored = replaced
+        .package()
+        .apply_media(&replaced.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+
+    let mut edit = package.edit_media();
+    let Err(media::Error::Refused(Refusal::EmptyData)) =
+        edit.replace_data(0, DrawableSelector::image(0), b"")
+    else {
+        return Err("empty data must be refused".into());
+    };
+    let created = open("basic.numbers")?;
+    let mut edit = created.edit_media();
+    edit.replace_poster(0, DrawableSelector::of(Kind::Table, 0), b"x")?;
+    let Err(media::Error::Refused(Refusal::NoMedia { .. })) = edit.commit() else {
+        return Err("a table has no poster".into());
+    };
+    Ok(())
+}
