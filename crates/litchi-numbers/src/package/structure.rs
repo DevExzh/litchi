@@ -478,6 +478,11 @@ impl<'p> Working<'p> {
             .ok_or(Fault::Invalid)
     }
 
+    /// The identifier the next [`Self::allocate`] returns first.
+    pub(super) const fn next_identifier(&self) -> u64 {
+        self.next_identifier
+    }
+
     /// Allocate `count` fresh consecutive identifiers above every identifier
     /// the source holds or its registry has issued.
     pub(super) fn allocate(&mut self, count: usize) -> FaultResult<Vec<u64>> {
