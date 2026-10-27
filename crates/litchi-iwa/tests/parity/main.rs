@@ -67,6 +67,7 @@ mod series_graph_cases;
 mod series_style_cases;
 mod series_write_cases;
 mod shape_cases;
+mod shape_style_cases;
 mod text_annotation_cases;
 mod text_attachment_cases;
 mod text_comment_cases;
