@@ -41,6 +41,8 @@
 | `01ebb98c65` | `table::creation` (record 0329) at host parity, on W1-A's aligned `litchi_numbers_wire::table_create` (record 0370f): the host's identifier order (drawable, model, owned storage in source order, formula owner, attachment), UID maps seeded with the new model's identifier, sorted model references (the host's `table_model_references`), the drawable declaring its parent and model, the template drawable's frame kept, the formula owner's UUID registered, registrations in identifier order. Host `add_table` → `Package::edit_body_table_creation` (tier B) | 1 |
 | `45734adda6`, `b24c0c46c2` | `table::cell_appearance` — `Package::{body_table_cell_appearance, edit_body_table_cell_appearance, apply_body_table_cell_appearance}`; `Edit::{set_fill, reset_fill, set_layout, reset_layout}`; `Appearance { fill, layout }`. The format-neutral engine is the new `litchi_iwa_table::cell_appearance` module (the host's copy-on-write cell-style graph: private variations in the stylesheet, the style list's key allocation and refcounts, in-place rewrites of a cell's own variation, removal of a variation that becomes empty); the Pages owner applies its `Plan` and the registry changes. Image fills are refused (data-reference bookkeeping not ported) | 6 |
 | `613d5e28c9`, `287c252b4a` | cell borders: `litchi_iwa_table::cell_appearance::{borders, plan_border}` (the host's stroke layers: the highest-order run covering the cell on each side; a set restrokes the cell's own one-cell run in place, appends a run to the side's layer at the cell's index or creates that layer, with the next order); `Edit::{set_border, clear_border}` and `Appearance::borders` replace `{set,clear}_table_cell_border` and `table_cell_borders` | 3 |
+| `689b1cd6d6` | `litchi_pages::builder::Builder::{language, locale}` (the host's fields: the document language and locales, the settings' language and creation/last locales, every storage language table; `PackageError::{InvalidLanguage, InvalidLocale}`); `Identity` gains its version UUID (`from_parts`, `version_uuid`), written to `versionUUID`, the properties' `revision` and the package metadata revision, as the host does — before, every leaf-built document carried the template's version UUID. Identity, revision, language, locale and the body text are one publication (the body-text transaction only validates) | 5 (`new`, `body_text`, `language`, `locale`, `build`) |
+| `923ee3148b` | `drawable::style` — `Package::{body_drawable_style, edit_body_drawable_style, apply_body_drawable_style}`; `Edit::{set, reset}` over `Property::{Fill, Stroke, Shadow, Effects, TextLayout}`: the shared `litchi_iwa_style::shape` engine (W1-E, record 0375a) on a workspace over this package's parsed components, one publication per edit | 15 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -84,6 +86,8 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | cell fill and layout reset, in-place rewrite, variation removal | 4 | A | queued |
 | cell fill, layout and border reads (every cell of four native fixtures and a host-styled one) | 1 | A | queued |
 | cell borders (new layer, second run, restroke, cleared edges) | 2 | A | queued |
+| body shape styles: set (six values), rewrite (two), reset (five), reads | 4 | set B (fresh registry UUID); rewrite, reset, reads A | queued |
+| builder language and locale with body text (fr, ja, de-CH; empty and multi-paragraph bodies) | 1 | B (the registry's object UUIDs by form; the leaf build takes the host output's identity) | queued |
 | table add (3×4 at offset 0) | 1 | B (the table UUID, and the owner UUID and owner-map entry derived from it, by form; fresh metadata UUIDs) | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
@@ -186,9 +190,12 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | table resize (`body-table-catalog-native` table 0 to 7×6) | 2,531,579,334 | — | 50,760,582 | −98.0% |
 | table resize, after the owner-extents fix (both sides) | 2,541,546,946 | — | 51,157,126 | −98.0% |
 | table add (`body-table-catalog-native`, 3×4 at offset 0) | 3,262,277,019 | — | 147,383,467 | −95.5% |
+| table add, after W1-A's one-pass UID-map encoder (trunk `e658e4676e`; parity re-run, tier B) | 3,262,401,911 | — | 147,276,483 | −95.5% |
 | cell fill set (table 0, cell 1,1) | 3,555,552,959 | — | 130,637,922 | −96.3% |
 | cell layout reset (host-styled cell 1,1) | 2,813,295,373 | — | 209,686,265 | −92.5% |
 | cell border set (table 0, top edge of cell 1,1) | 3,381,823,315 | — | 89,096,263 | −97.4% |
+| body shape fill set (host rectangle on `chart-data-native`) | 416,949,768 | — | 142,213,368 | −65.9% |
+| builder: body `Bonjour`, `fr`/`fr_FR` | 3,565,170 | 7,061,105 (four publications) → 5,489,195 (two) | 3,499,471 (one) | −1.8% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -241,4 +248,4 @@ Both pre-commit size checks printed nothing for every commit.
 | image cell fills | — | data-reference registry bookkeeping for a style variation (host `register_style_object` with a data identifier) |
 | `duplicate_table` | 1 | format-neutral core in `litchi-iwa-table` over `litchi_numbers_wire::{table_lifecycle, formula_graph}`, after the crate lands |
 | table formulas | — | W1-F formula engine (record 0376) |
-| Builder `language`, `locale`, `body_table` | 6 | next (W1-C did the Keynote pair) |
+| Builder `body_table` | 1 | the host bootstraps the first table graph from its Numbers builder; the leaf `table::creation` needs a template table, so a table-less document needs that bootstrap first |

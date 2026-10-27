@@ -581,6 +581,15 @@ pub(crate) struct MessageRewrite {
 /// Publish a candidate in which only the given messages changed, and reopen
 /// it under the source's limits.
 pub(crate) fn publish(source: &Package, rewrites: Vec<MessageRewrite>) -> GraphResult<Package> {
+    publish_with_replacements(source, rewrites, &[])
+}
+
+/// [`publish`], also replacing the given non-IWA members (name, bytes).
+pub(crate) fn publish_with_replacements(
+    source: &Package,
+    rewrites: Vec<MessageRewrite>,
+    replacements: &[(&str, &[u8])],
+) -> GraphResult<Package> {
     let archive_limits = source
         .state
         .source
@@ -616,7 +625,7 @@ pub(crate) fn publish(source: &Package, rewrites: Vec<MessageRewrite>) -> GraphR
             )
             .map_err(map_core_error)?;
     }
-    publish_archives(source, archives)
+    publish_changes(source, archives, &[], replacements, &[])
 }
 
 /// A clone of one component's archive for staging.

@@ -53,6 +53,66 @@ pub mod caption {
     };
 }
 
+/// Drawing styles of body shapes: fill, stroke, shadow, effects and text
+/// layout, over the shared shape-style variation engine (record 0371).
+pub mod style {
+    pub use crate::package::body_drawable_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::shape::effects::Effects;
+    pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::shadow::Shadow;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_common::text::layout::Layout;
+
+    /// One drawing property of a body shape.
+    #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
+    pub enum Property {
+        /// The fill (none, a color, a gradient; image fills read back but are
+        /// not written by this family).
+        Fill(Fill),
+        /// The stroke (`None`: the hidden stroke).
+        Stroke(Option<Stroke>),
+        /// The shadow.
+        Shadow(Shadow),
+        /// Opacity and reflection.
+        Effects(Effects),
+        /// Vertical alignment, insets and autosizing of the text frame.
+        TextLayout(Layout),
+    }
+
+    /// Which [`Property`] a read or reset addresses.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum PropertyKind {
+        /// The fill.
+        Fill,
+        /// The stroke.
+        Stroke,
+        /// The shadow.
+        Shadow,
+        /// Opacity and reflection.
+        Effects,
+        /// The text-frame layout.
+        TextLayout,
+    }
+
+    impl Property {
+        /// The kind of this property.
+        #[must_use]
+        pub const fn kind(&self) -> PropertyKind {
+            match self {
+                Self::Fill(_) => PropertyKind::Fill,
+                Self::Stroke(_) => PropertyKind::Stroke,
+                Self::Shadow(_) => PropertyKind::Shadow,
+                Self::Effects(_) => PropertyKind::Effects,
+                Self::TextLayout(_) => PropertyKind::TextLayout,
+            }
+        }
+    }
+}
+
 /// Exact-source plain-text transactions for the storage a body drawable
 /// owns (ordinary shapes).
 pub mod text {

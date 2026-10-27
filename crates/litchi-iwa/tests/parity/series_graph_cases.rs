@@ -22,6 +22,9 @@ use litchi_iwa_common::chart::error_bar::{
     CustomValues, Direction as ErrorBarDirection, FixedValue, Percentage, Series as ErrorBarSeries,
 };
 use litchi_iwa_common::chart::kind::Kind;
+use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
+};
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
 use litchi_iwa_common::chart::series::{
     ConnectionLine, ConnectionLineFamily, MovingAveragePeriod, PolynomialOrder, Symbol,
@@ -32,8 +35,8 @@ use litchi_iwa_style::graph::{Changes, Workspace};
 use litchi_iwa_style::series::{
     self,
     property::{
-        ConnectionLines, ErrorBars, LabelDistances, PieLabels, Trendlines, ValueLabels,
-        WedgeExplosions,
+        ConnectionLines, ErrorBars, LabelDistances, PieLabels, Trendlines, ValueLabelAffixes,
+        ValueLabelNumberFormats, ValueLabels, WedgeExplosions,
     },
 };
 
@@ -54,6 +57,8 @@ enum Values {
     ErrorBars(Vec<ErrorBarSeries>),
     PieLabels(Vec<LabelVisibility>),
     ValueLabels(Kind, Vec<Visibility>),
+    Affixes(Kind, Vec<LabelAffixes>),
+    NumberFormats(Kind, Vec<NumberFormat>),
 }
 
 /// A trendline configuration, spelled once for both vocabularies.
@@ -114,7 +119,11 @@ const fn host_shape(shape: SymbolShape) -> ChartSeriesSymbolShape {
 impl Values {
     const fn kind(&self) -> Kind {
         match self {
-            Self::Lines(kind, _) | Self::Symbols(kind, _) | Self::ValueLabels(kind, _) => *kind,
+            Self::Lines(kind, _)
+            | Self::Symbols(kind, _)
+            | Self::ValueLabels(kind, _)
+            | Self::Affixes(kind, _)
+            | Self::NumberFormats(kind, _) => *kind,
             Self::Wedges(_) | Self::Labels(_) | Self::PieLabels(_) => Kind::Pie2d,
             Self::Trendlines(_) => Kind::Scatter2d,
             Self::ErrorBars(_) => Kind::Column2d,
@@ -165,7 +174,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
         values.iter().map(|trend| trend.host()).collect()
     };
     macro_rules! write {
-        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident, $errors:ident, $pies:ident, $values:ident) => {{
+        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident, $errors:ident, $pies:ident, $values:ident, $affixes:ident, $formats:ident) => {{
             let mut editor = $editor;
             match values {
                 Values::Lines(_, values) => editor.$lines($($scope,)? chart, &lines(values))?,
@@ -176,6 +185,8 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
                 Values::ErrorBars(values) => editor.$errors($($scope,)? chart, values)?,
                 Values::PieLabels(values) => editor.$pies($($scope,)? chart, values)?,
                 Values::ValueLabels(_, values) => editor.$values($($scope,)? chart, values)?,
+                Values::Affixes(_, values) => editor.$affixes($($scope,)? chart, values)?,
+                Values::NumberFormats(_, values) => editor.$formats($($scope,)? chart, values)?,
             }
             editor.to_bytes()?
         }};
@@ -186,21 +197,24 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
             set_slide_chart_series_connection_lines, set_slide_chart_pie_wedge_explosions,
             set_slide_chart_pie_label_distances, set_slide_chart_series_symbols,
             set_slide_chart_series_trendlines, set_slide_chart_series_error_bars,
-            set_slide_chart_pie_label_visibilities, set_slide_chart_series_value_label_visibilities
+            set_slide_chart_pie_label_visibilities, set_slide_chart_series_value_label_visibilities,
+            set_slide_chart_series_value_label_affixes, set_slide_chart_series_value_label_number_formats
         ),
         Target::Numbers { sheet } => write!(
             numbers::Draft::from_bytes(source)?, sheet, ;
             set_sheet_chart_series_connection_lines, set_sheet_chart_pie_wedge_explosions,
             set_sheet_chart_pie_label_distances, set_sheet_chart_series_symbols,
             set_sheet_chart_series_trendlines, set_sheet_chart_series_error_bars,
-            set_sheet_chart_pie_label_visibilities, set_sheet_chart_series_value_label_visibilities
+            set_sheet_chart_pie_label_visibilities, set_sheet_chart_series_value_label_visibilities,
+            set_sheet_chart_series_value_label_affixes, set_sheet_chart_series_value_label_number_formats
         ),
         Target::Pages => write!(
             pages::Draft::from_bytes(source)?, ;
             set_body_chart_series_connection_lines, set_body_chart_pie_wedge_explosions,
             set_body_chart_pie_label_distances, set_body_chart_series_symbols,
             set_body_chart_series_trendlines, set_body_chart_series_error_bars,
-            set_body_chart_pie_label_visibilities, set_body_chart_series_value_label_visibilities
+            set_body_chart_pie_label_visibilities, set_body_chart_series_value_label_visibilities,
+            set_body_chart_series_value_label_affixes, set_body_chart_series_value_label_number_formats
         ),
     })
 }
@@ -208,7 +222,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
 /// The host's read of the same property, as comparable text.
 fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestResult<String> {
     macro_rules! read {
-        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident, $errors:ident, $pies:ident, $values:ident) => {{
+        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident, $errors:ident, $pies:ident, $values:ident, $affixes:ident, $formats:ident) => {{
             let editor = $editor;
             match values {
                 Values::Lines(..) => format!("{:?}", editor.$lines($($scope,)? chart)?),
@@ -219,6 +233,8 @@ fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestR
                 Values::ErrorBars(_) => format!("{:?}", editor.$errors($($scope,)? chart)?),
                 Values::PieLabels(_) => format!("{:?}", editor.$pies($($scope,)? chart)?),
                 Values::ValueLabels(..) => format!("{:?}", editor.$values($($scope,)? chart)?),
+                Values::Affixes(..) => format!("{:?}", editor.$affixes($($scope,)? chart)?),
+                Values::NumberFormats(..) => format!("{:?}", editor.$formats($($scope,)? chart)?),
             }
         }};
     }
@@ -228,21 +244,24 @@ fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestR
             slide_chart_series_connection_lines, slide_chart_pie_wedge_explosions,
             slide_chart_pie_label_distances, slide_chart_series_symbols,
             slide_chart_series_trendlines, slide_chart_series_error_bars,
-            slide_chart_pie_label_visibilities, slide_chart_series_value_label_visibilities
+            slide_chart_pie_label_visibilities, slide_chart_series_value_label_visibilities,
+            slide_chart_series_value_label_affixes, slide_chart_series_value_label_number_formats
         ),
         Target::Numbers { sheet } => read!(
             numbers::Draft::from_bytes(bytes)?, sheet, ;
             sheet_chart_series_connection_lines, sheet_chart_pie_wedge_explosions,
             sheet_chart_pie_label_distances, sheet_chart_series_symbols,
             sheet_chart_series_trendlines, sheet_chart_series_error_bars,
-            sheet_chart_pie_label_visibilities, sheet_chart_series_value_label_visibilities
+            sheet_chart_pie_label_visibilities, sheet_chart_series_value_label_visibilities,
+            sheet_chart_series_value_label_affixes, sheet_chart_series_value_label_number_formats
         ),
         Target::Pages => read!(
             pages::Draft::from_bytes(bytes)?, ;
             body_chart_series_connection_lines, body_chart_pie_wedge_explosions,
             body_chart_pie_label_distances, body_chart_series_symbols,
             body_chart_series_trendlines, body_chart_series_error_bars,
-            body_chart_pie_label_visibilities, body_chart_series_value_label_visibilities
+            body_chart_pie_label_visibilities, body_chart_series_value_label_visibilities,
+            body_chart_series_value_label_affixes, body_chart_series_value_label_number_formats
         ),
     })
 }
@@ -366,6 +385,15 @@ fn engine_write(source: &[u8], chart: u64, values: &Values) -> TestResult<Vec<u8
         Values::PieLabels(values) => {
             series::set_values(&mut workspace, chart, &PieLabels, values)?;
         },
+        Values::Affixes(kind, values) => {
+            let property = ValueLabelAffixes::for_chart_kind(*kind).ok_or("no value labels")?;
+            series::set_values(&mut workspace, chart, &property, values)?;
+        },
+        Values::NumberFormats(kind, values) => {
+            let property =
+                ValueLabelNumberFormats::for_chart_kind(*kind).ok_or("no value labels")?;
+            series::set_values(&mut workspace, chart, &property, values)?;
+        },
         Values::ValueLabels(kind, values) => {
             let property = ValueLabels::for_chart_kind(*kind).ok_or("no value labels")?;
             series::set_values(&mut workspace, chart, &property, values)?;
@@ -451,6 +479,30 @@ fn errors_none() -> Values {
     Values::ErrorBars(vec![ErrorBarSeries::None, ErrorBarSeries::None])
 }
 
+fn affixes(values: &[(&str, &str)]) -> TestResult<Values> {
+    Ok(Values::Affixes(
+        Kind::Column2d,
+        values
+            .iter()
+            .map(|(prefix, suffix)| LabelAffixes::new(prefix, suffix))
+            .collect::<Result<_, _>>()?,
+    ))
+}
+
+fn formats(places: u8) -> TestResult<Values> {
+    Ok(Values::NumberFormats(
+        Kind::Column2d,
+        vec![
+            NumberFormat::new(
+                DecimalPlaces::fixed(places)?,
+                NegativeStyle::Parentheses,
+                false,
+            ),
+            NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+        ],
+    ))
+}
+
 const NO_SYMBOLS: [Option<(SymbolShape, Option<f32>)>; 2] = [None, None];
 
 macro_rules! graph_cases {
@@ -505,6 +557,12 @@ graph_cases! {
     pages_chart_series_value_labels_allocate_parity: Pages, B, [], Values::ValueLabels(Kind::Column2d, vec![Visibility::Visible, Visibility::Hidden]);
     keynote_chart_series_value_labels_remove_parity: Keynote, A, [Values::ValueLabels(Kind::Column2d, vec![Visibility::Visible, Visibility::Visible])], Values::ValueLabels(Kind::Column2d, vec![Visibility::Hidden, Visibility::Hidden]);
     numbers_chart_series_value_labels_pie_parity: Numbers, B, [], Values::ValueLabels(Kind::Pie2d, vec![Visibility::Hidden, Visibility::Visible, Visibility::Visible]);
+    keynote_chart_series_value_label_affixes_allocate_parity: Keynote, B, [], affixes(&[("$", ""), ("", " net")])?;
+    numbers_chart_series_value_label_affixes_patch_parity: Numbers, A, [affixes(&[("$", ""), ("", " net")])?], affixes(&[("€", " k"), ("", " net")])?;
+    pages_chart_series_value_label_affixes_remove_parity: Pages, A, [affixes(&[("$", ""), ("", " net")])?], affixes(&[("", ""), ("", "")])?;
+    keynote_chart_series_value_label_number_formats_allocate_parity: Keynote, B, [], formats(2)?;
+    numbers_chart_series_value_label_number_formats_patch_parity: Numbers, A, [formats(2)?], formats(4)?;
+    pages_chart_series_value_label_number_formats_allocate_parity: Pages, B, [], formats(1)?;
     pages_chart_series_trendlines_remove_parity: Pages, A, [Values::Trendlines(vec![Trend::NamedLinear])], Values::Trendlines(vec![Trend::None]);
 }
 

@@ -1635,12 +1635,10 @@ fn validate_owner_id_map(
                     match entry_field.number() {
                         1 if entry_field.wire_type() == 0 && internal.is_none() => {
                             let value = canonical_varint_from_field(entry_source, entry_field)?;
-                            internal = Some(
-                                u32::try_from(value)
-                                    .ok()
-                                    .filter(|value| *value != 0)
-                                    .ok_or(Error::InvalidSource)?,
-                            );
+                            // Internal owner identifier 0 is valid: native
+                            // Pages owner maps start at 0.
+                            internal =
+                                Some(u32::try_from(value).map_err(|_| Error::InvalidSource)?);
                         },
                         2 if entry_field.wire_type() == 2 && uuid.is_none() => {
                             entry_field
@@ -1661,9 +1659,7 @@ fn validate_owner_id_map(
             },
             2 if field.wire_type() == 0 => {
                 let value = u32::try_from(canonical_varint_from_field(source, field)?)
-                    .ok()
-                    .filter(|value| *value != 0)
-                    .ok_or(Error::InvalidSource)?;
+                    .map_err(|_| Error::InvalidSource)?;
                 unregistered.push(value);
             },
             _ => return Err(Error::UnsupportedDependency),
@@ -2678,10 +2674,9 @@ fn validate_u64_map(map: &[(u64, u64)], budget: &mut RewriteBudget) -> Result<()
 }
 
 fn validate_u32_map(map: &[(u32, u32)], budget: &mut RewriteBudget) -> Result<(), Error> {
-    if map
-        .iter()
-        .any(|(source, target)| *source == 0 || *target == 0)
-    {
+    // A source internal owner identifier may be 0 (native Pages owner maps
+    // start at 0); a target is allocated above every existing identifier.
+    if map.iter().any(|(_, target)| *target == 0) {
         return Err(Error::InvalidRemap);
     }
     if map.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
@@ -3557,5 +3552,60 @@ mod tests {
             next_owner_id(&engine, &[&[0xff][..]], &Limits::default()),
             Err(Error::InvalidSource)
         );
+    }
+
+    /// Native Pages engines (`body-table-catalog-native.pages`,
+    /// `body-table-cells-native.pages`) map their first owner to internal
+    /// identifier 0: the map is valid, allocation stays above the maximum,
+    /// and the map can be extended.
+    #[test]
+    fn owner_maps_with_internal_identifier_zero_are_valid() {
+        let mut budget = RewriteBudget::new(Limits::default());
+        let zero =
+            encode_owner_map_entry(0, FormulaOwnerUuid::new(0x101, 0x202), &mut budget, 0).unwrap();
+        let one =
+            encode_owner_map_entry(1, FormulaOwnerUuid::new(0x303, 0x404), &mut budget, 0).unwrap();
+        let mut owner_map = Vec::new();
+        bytes_field(&mut owner_map, 1, &zero);
+        bytes_field(&mut owner_map, 1, &one);
+        let engine = engine_with_owner_map(&owner_map);
+        assert_eq!(next_owner_id(&engine, &[], &Limits::default()), Ok(2));
+
+        let mut only_zero = Vec::new();
+        bytes_field(&mut only_zero, 1, &zero);
+        assert_eq!(
+            next_owner_id(&engine_with_owner_map(&only_zero), &[], &Limits::default()),
+            Ok(1)
+        );
+
+        // An unregistered identifier 0 is valid too, but not beside a map
+        // entry 0.
+        let mut unregistered = Vec::new();
+        bytes_field(&mut unregistered, 1, &one);
+        varint_field(&mut unregistered, 2, 0);
+        assert_eq!(
+            next_owner_id(
+                &engine_with_owner_map(&unregistered),
+                &[],
+                &Limits::default()
+            ),
+            Ok(2)
+        );
+        let mut duplicate = owner_map.clone();
+        varint_field(&mut duplicate, 2, 0);
+        assert_eq!(
+            next_owner_id(&engine_with_owner_map(&duplicate), &[], &Limits::default()),
+            Err(Error::InvalidSource)
+        );
+
+        let appended = append_owners_to_engine(
+            &engine,
+            &[200],
+            &[(2, FormulaOwnerUuid::new(0x505, 0x606))],
+            1,
+            &Limits::default(),
+        )
+        .unwrap();
+        assert_eq!(next_owner_id(&appended, &[], &Limits::default()), Ok(3));
     }
 }

@@ -1627,6 +1627,8 @@ fn map_package_error(error: PackageError) -> Error {
         | PackageError::UnexpectedFormat { .. }
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
         | PackageError::InvalidLimit { .. }
         | PackageError::Limit { .. }
         | PackageError::InvalidFormat(_)

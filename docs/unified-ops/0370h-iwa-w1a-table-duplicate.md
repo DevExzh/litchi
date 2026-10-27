@@ -102,3 +102,24 @@ leaf derives them; this is the documented UUID policy.
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-numbers` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile numbers-minimal` / `numbers-full` | 0 / 0 |
 | `python3 tools/iwa_exit_ledger.py --check` | 0 |
+
+## 6. Lift into `litchi-iwa-table` (2026-10-27)
+
+The format-neutral copy now lives in the shared table engine as
+`litchi_iwa_table::structure::duplicate::clone_graph`, so the Pages and
+Keynote table owners can wrap it. It covers the drawable, the model, the
+owned storage, the CalculationEngine owner family, the formula-list UUID
+rewrites and the clones' registry records. Both owners store the same TST
+graph:
+
+- A Pages `TST.WPTableInfoArchive` passes `info_path: &[1]`.
+- A Numbers or Keynote table info passes `&[]`.
+
+`litchi_numbers::package::table_lifecycle::duplicate` keeps only the
+Numbers attachment:
+
+- the sheet's drawable list;
+- the sidebar node;
+- the sheet's, the engine's and the moved drawable's references.
+
+The parity results are unchanged.

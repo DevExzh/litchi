@@ -1215,6 +1215,7 @@ pub mod property {
         Series as ErrorBarSeries, StandardDeviationCount,
     };
     use litchi_iwa_common::chart::kind::Kind;
+    use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
     use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
     use litchi_iwa_common::chart::series::{
         ConnectionLine, ConnectionLineFamily, SymbolFamily, SymbolShape, SymbolSize, Trendline,
@@ -1228,6 +1229,7 @@ pub mod property {
 
     use super::{Base, Property, StyleProperty};
     use crate::graph::{Error, Result};
+    use crate::number_format::{self, Fields};
 
     fn extension(payload: &[u8]) -> Result<Option<&[u8]>> {
         Ok(codec::decode(payload, Archive::SeriesNonStyle, CodecLimits::DEFAULT)?.extension())
@@ -2050,6 +2052,126 @@ pub mod property {
             )?;
             if self.read(&patched)? != *value {
                 return Err(Error::Invalid("a value-label write does not read back"));
+            }
+            Ok(patched)
+        }
+    }
+
+    fn supported(kind: Kind) -> bool {
+        kind != Kind::Undefined && !kind.is_unsupported()
+    }
+
+    fn store_extension(
+        payload: &[u8],
+        existing: Option<&[u8]>,
+        extension: Option<Vec<u8>>,
+    ) -> Result<Vec<u8>> {
+        let Some(extension) = extension else {
+            return Ok(payload.to_vec());
+        };
+        Ok(wire::patch_length_delimited_field(
+            payload,
+            codec::EXTENSION_FIELD,
+            existing.is_some(),
+            Some(extension.as_slice()),
+        )?)
+    }
+
+    /// The value-label prefix and suffix of each series.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct ValueLabelAffixes(());
+
+    impl ValueLabelAffixes {
+        /// The property for a chart kind with value labels.
+        #[must_use]
+        pub fn for_chart_kind(kind: Kind) -> Option<Self> {
+            supported(kind).then_some(Self(()))
+        }
+    }
+
+    impl Property for ValueLabelAffixes {
+        type Value = LabelAffixes;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> LabelAffixes {
+            LabelAffixes::default()
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<LabelAffixes> {
+            number_format::affixes(extension(payload)?, Fields::SERIES_VALUE_LABEL)
+        }
+
+        fn patch(&self, payload: &[u8], value: &LabelAffixes) -> Result<Vec<u8>> {
+            let existing = extension(payload)?;
+            if existing.is_none() && value.is_empty() {
+                return Ok(payload.to_vec());
+            }
+            let next = number_format::patch_affixes(
+                existing.unwrap_or_default(),
+                Fields::SERIES_VALUE_LABEL,
+                value,
+                NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+            )?;
+            let patched = store_extension(payload, existing, next)?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid(
+                    "a value-label affix write does not read back",
+                ));
+            }
+            Ok(patched)
+        }
+    }
+
+    /// The value-label number format of each series.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct ValueLabelNumberFormats(());
+
+    impl ValueLabelNumberFormats {
+        /// The property for a chart kind with value labels.
+        #[must_use]
+        pub fn for_chart_kind(kind: Kind) -> Option<Self> {
+            supported(kind).then_some(Self(()))
+        }
+    }
+
+    impl Property for ValueLabelNumberFormats {
+        type Value = NumberFormat;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> NumberFormat {
+            NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<NumberFormat> {
+            number_format::number_format(
+                extension(payload)?,
+                Fields::SERIES_VALUE_LABEL,
+                NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+            )
+        }
+
+        fn patch(&self, payload: &[u8], value: &NumberFormat) -> Result<Vec<u8>> {
+            let existing = extension(payload)?;
+            if existing.is_none() && *value == NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT {
+                return Ok(payload.to_vec());
+            }
+            let next = number_format::patch_number_format(
+                existing.unwrap_or_default(),
+                Fields::SERIES_VALUE_LABEL,
+                *value,
+                NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+            )?;
+            let patched = store_extension(payload, existing, next)?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid(
+                    "a value-label number-format write does not read back",
+                ));
             }
             Ok(patched)
         }

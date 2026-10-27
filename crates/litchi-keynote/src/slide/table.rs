@@ -35,6 +35,32 @@ pub mod format {
     pub use litchi_iwa_common::table::cell::data_format::DataFormat;
     pub use litchi_iwa_common::table::coordinate::At;
 }
+/// Fill, text layout and edge strokes of slide-table cells, over the shared
+/// cell-appearance engine (record 0372).
+pub mod cell_appearance {
+    pub use crate::package::slide_table_cell_appearance::{
+        Commit, Diagnostics, Edit, Error, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_common::table::cell::layout::{
+        Inset, Insets, Layout, TextWrap, VerticalAlignment,
+    };
+    pub use litchi_iwa_common::table::cell::{BorderSide, Borders};
+
+    /// One cell's effective appearance.
+    #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
+    pub struct Appearance {
+        /// The fill the cell shows (`Fill::None` when no style sets one).
+        pub fill: Fill,
+        /// Text wrapping, vertical alignment and insets.
+        pub layout: Layout,
+        /// The explicit edge strokes (`None`: the table style's edge, or an
+        /// explicitly cleared one).
+        pub borders: Borders,
+    }
+}
 /// Decimal number display formats for existing table cells.
 pub mod number_format;
 /// Physical row-sort transaction values for a Keynote slide table.

@@ -51,7 +51,7 @@ pub(crate) fn properties(package: &Package) -> PackageResult<Option<plist::Dicti
 }
 
 /// Encode `dictionary` as the binary property list Pages writes.
-fn encode(dictionary: &plist::Dictionary) -> PackageResult<Vec<u8>> {
+pub(crate) fn encode(dictionary: &plist::Dictionary) -> PackageResult<Vec<u8>> {
     let mut bytes = Vec::new();
     plist::Value::Dictionary(dictionary.clone())
         .to_writer_binary(&mut bytes)

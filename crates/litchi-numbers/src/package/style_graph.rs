@@ -1,0 +1,123 @@
+//! The bridge between a Numbers package and W1-E's shared style-variation
+//! graph engine (`litchi_iwa_style::graph`, record 0375a), for the chart
+//! series families of record 0378: the package's parsed components as the
+//! engine's [`Components`], and a finished workspace's [`Changes`]
+//! republished through exact-source reassembly and a strict reopen.
+
+use std::sync::Arc;
+
+use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
+use litchi_iwa_core::{Archive, SnappyStream};
+use litchi_iwa_style::graph::{Changes, Components, Error as GraphError};
+
+use super::Package;
+use super::structure::{self, Fault, FaultResult, Published};
+
+/// The package's parsed components, in package order.
+pub(super) struct LeafComponents<'p> {
+    components: Vec<(&'p str, &'p Archive)>,
+}
+
+impl<'p> LeafComponents<'p> {
+    pub(super) fn new(package: &'p Package) -> FaultResult<Self> {
+        structure::exact_source(package)?;
+        let mut components = Vec::new();
+        for component in package.state.components.catalog().iter() {
+            structure::reserve(&mut components, 1)?;
+            components.push((component.name(), component.archive()));
+        }
+        Ok(Self { components })
+    }
+}
+
+impl Components for LeafComponents<'_> {
+    fn count(&self) -> usize {
+        self.components.len()
+    }
+
+    fn component(&self, index: usize) -> Option<(&str, &Archive)> {
+        self.components
+            .get(index)
+            .map(|(name, archive)| (*name, *archive))
+    }
+}
+
+/// The fault a graph-engine failure maps to.
+pub(super) fn fault(error: &GraphError) -> Fault {
+    match error {
+        GraphError::Archive(error) => structure::map_core(error),
+        GraphError::Wire(error) => structure::map_wire(error),
+        GraphError::IdentifierOverflow => Fault::Limit {
+            kind: structure::FaultLimit::Identifiers,
+            observed: u64::MAX,
+            maximum: u64::MAX,
+        },
+        _ => Fault::Invalid,
+    }
+}
+
+/// Republish `changes` over `package` once and reopen the candidate.
+pub(super) fn publish(package: &Package, changes: Changes) -> FaultResult<Published> {
+    let catalog = structure::exact_source(package)?;
+    let limits = catalog.limits();
+    let archive_limits = limits
+        .effective_archive_limits()
+        .map_err(|error| structure::map_archive(&error))?;
+    let snappy = limits
+        .snappy_limits()
+        .map_err(|error| structure::map_archive(&error))?;
+    let compress = |archive: &Archive| -> FaultResult<Vec<u8>> {
+        let bytes = archive
+            .to_bytes(archive_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        SnappyStream::compress(&bytes, snappy).map_err(|error| structure::map_core(&error))
+    };
+    let mut edited = Vec::new();
+    for (name, archive) in &changes.edits {
+        structure::reserve(&mut edited, 1)?;
+        edited.push((name.as_str(), compress(archive)?));
+    }
+    let names: Vec<&str> = catalog.package().iter().map(|entry| entry.name()).collect();
+    let mut inserted = Vec::new();
+    for insertion in &changes.insertions {
+        let position = match &insertion.before {
+            Some(before) => Some(
+                names
+                    .iter()
+                    .position(|name| name == before)
+                    .ok_or(Fault::Invalid)?,
+            ),
+            None => None,
+        };
+        structure::reserve(&mut inserted, 1)?;
+        inserted.push((
+            insertion.name.as_str(),
+            compress(&insertion.archive)?,
+            position,
+        ));
+    }
+    let edits: Vec<EntryEdit<'_>> = edited
+        .iter()
+        .map(|(name, data)| EntryEdit::new(name, data))
+        .collect();
+    let insertions: Vec<EntryInsertion<'_>> = inserted
+        .iter()
+        .map(|(name, data, position)| match position {
+            Some(position) => EntryInsertion::at(*position, name, data),
+            None => EntryInsertion::new(name, data),
+        })
+        .collect();
+    let deletions: Vec<&str> = changes.deletions.iter().map(String::as_str).collect();
+    let output = catalog
+        .package()
+        .reassemble_with_changes_to_bytes(&insertions, &edits, &deletions, limits)
+        .map_err(|error| structure::map_archive(&error))?;
+    let candidate = package
+        .reopen_candidate(Arc::from(output))
+        .map_err(|_error| Fault::Verification)?;
+    Ok(Published {
+        package: candidate,
+        touched_components: edits.len() + insertions.len() + deletions.len(),
+        deleted_previews: 0,
+    })
+}
