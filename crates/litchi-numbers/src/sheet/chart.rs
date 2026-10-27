@@ -32,10 +32,11 @@ pub mod series {
     pub use litchi_iwa_common::chart::error_bar;
     pub use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
     pub use litchi_iwa_common::chart::series::{
-        ConnectionLine, MovingAveragePeriod, PolynomialOrder, Symbol, SymbolShape, SymbolSize,
-        Trendline, TrendlineType,
+        ConnectionLine, MovingAveragePeriod, PolynomialOrder, Stroke, StrokePattern, Symbol,
+        SymbolFill, SymbolShape, SymbolSize, Trendline, TrendlineType,
     };
     pub use litchi_iwa_common::chart::series_labels::Visibility;
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
 }
 
 /// Selector-first exact-source chart-level style transactions on the

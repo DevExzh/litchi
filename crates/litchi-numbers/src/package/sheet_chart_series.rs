@@ -22,9 +22,10 @@ use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
 use litchi_iwa_common::chart::series::{
-    ConnectionLine, ConnectionLineFamily, Symbol, SymbolFamily, Trendline,
+    ConnectionLine, ConnectionLineFamily, Stroke, Symbol, SymbolFamily, SymbolFill, Trendline,
 };
 use litchi_iwa_common::chart::series_labels::Visibility;
+use litchi_iwa_common::shape::fill::Fill;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::series::{
     self as engine,
@@ -36,6 +37,7 @@ use litchi_iwa_style::series::{
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::sheet_chart_series_style as style;
 use super::sheet_drawable_graph::{self as graph, CHART_MESSAGE_TYPE};
 use super::structure::{self, Published, references};
 use super::style_graph::{self, LeafComponents};
@@ -73,6 +75,14 @@ pub enum Property {
     PieLabels(Vec<LabelVisibility>),
     /// The value-label visibility of each series.
     ValueLabels(Vec<Visibility>),
+    /// The stroke of each series (`None`: no stroke).
+    Strokes(Vec<Option<Stroke>>),
+    /// The fill of each series.
+    Fills(Vec<Fill>),
+    /// The fill of each series' data symbols.
+    SymbolFills(Vec<SymbolFill>),
+    /// The outline of each series' data symbols (`None`: no outline).
+    SymbolOutlines(Vec<Option<Stroke>>),
 }
 
 /// The property a [`Property`] value sets, for reads.
@@ -95,6 +105,28 @@ pub enum PropertyKind {
     PieLabels,
     /// [`Property::ValueLabels`].
     ValueLabels,
+    /// [`Property::Strokes`].
+    Strokes,
+    /// [`Property::Fills`].
+    Fills,
+    /// [`Property::SymbolFills`].
+    SymbolFills,
+    /// [`Property::SymbolOutlines`].
+    SymbolOutlines,
+}
+
+impl PropertyKind {
+    /// The series-style property this kind names, if it is one (the
+    /// properties [`Edit::reset`] applies to).
+    const fn style(self) -> Option<style::Kind> {
+        match self {
+            Self::Strokes => Some(style::Kind::Strokes),
+            Self::Fills => Some(style::Kind::Fills),
+            Self::SymbolFills => Some(style::Kind::SymbolFills),
+            Self::SymbolOutlines => Some(style::Kind::SymbolOutlines),
+            _ => None,
+        }
+    }
 }
 
 impl Property {
@@ -110,7 +142,27 @@ impl Property {
             Self::ErrorBars(_) => PropertyKind::ErrorBars,
             Self::PieLabels(_) => PropertyKind::PieLabels,
             Self::ValueLabels(_) => PropertyKind::ValueLabels,
+            Self::Strokes(_) => PropertyKind::Strokes,
+            Self::Fills(_) => PropertyKind::Fills,
+            Self::SymbolFills(_) => PropertyKind::SymbolFills,
+            Self::SymbolOutlines(_) => PropertyKind::SymbolOutlines,
         }
+    }
+
+    /// The per-series style values of a series-style property.
+    fn style_values(&self) -> Option<Vec<style::Value>> {
+        Some(match self {
+            Self::Strokes(values) | Self::SymbolOutlines(values) => {
+                values.iter().copied().map(style::Value::Stroke).collect()
+            },
+            Self::Fills(values) => values.iter().cloned().map(style::Value::Fill).collect(),
+            Self::SymbolFills(values) => values
+                .iter()
+                .cloned()
+                .map(style::Value::SymbolFill)
+                .collect(),
+            _ => return None,
+        })
     }
 
     /// The number of series the value names.
@@ -125,6 +177,9 @@ impl Property {
             Self::ErrorBars(values) => values.len(),
             Self::PieLabels(values) => values.len(),
             Self::ValueLabels(values) => values.len(),
+            Self::Strokes(values) | Self::SymbolOutlines(values) => values.len(),
+            Self::Fills(values) => values.len(),
+            Self::SymbolFills(values) => values.len(),
         }
     }
 
@@ -193,6 +248,23 @@ pub enum Refusal {
         /// The number of values given.
         given: usize,
     },
+    /// The series is past the chart's series.
+    #[error("the chart has no series {series}")]
+    SeriesNotFound {
+        /// The requested zero-based series.
+        series: usize,
+    },
+    /// The property has no reset (only the series-style properties do).
+    #[error("the property cannot be reset")]
+    NotResettable,
+    /// The series style is shared with another chart, which the write would
+    /// change too.
+    #[error("the series style is shared with another chart")]
+    SharedStyle,
+    /// An image fill needs the embedded-data graph this family does not
+    /// write.
+    #[error("image fills are not written by this family")]
+    ImageFill,
     /// Commit was requested before staging a change.
     #[error("no chart-series change is staged")]
     NoStagedOperation,
@@ -211,8 +283,11 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::SheetNotFound | Self::ChartNotFound => RefusalKind::NotFound,
-            Self::UnsupportedKind => RefusalKind::UnsupportedTarget,
+            Self::SheetNotFound | Self::ChartNotFound | Self::SeriesNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::UnsupportedKind | Self::NotResettable => RefusalKind::UnsupportedTarget,
+            Self::SharedStyle | Self::ImageFill => RefusalKind::UnsupportedContent,
             Self::SeriesCount { .. } => RefusalKind::InvalidValue,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::UnsupportedDependency | Self::UnsupportedSource => {
@@ -245,7 +320,14 @@ pub struct Edit<'a> {
     source: &'a Package,
     sheet: usize,
     chart: ChartSelector,
-    changes: Vec<Property>,
+    changes: Vec<Staged>,
+}
+
+/// One staged change.
+#[derive(Debug, Clone, PartialEq)]
+enum Staged {
+    Set(Property),
+    Reset(PropertyKind, usize),
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -268,7 +350,24 @@ impl Edit<'_> {
     /// [`Error::Allocation`].
     pub fn set(&mut self, property: Property) -> Result<&mut Self, Error> {
         structure::reserve(&mut self.changes, 1)?;
-        self.changes.push(property);
+        self.changes.push(Staged::Set(property));
+        Ok(self)
+    }
+
+    /// Stage removing series `series`' own value of a series-style property
+    /// (strokes, fills, symbol fills, symbol outlines), so it inherits its
+    /// theme style's again (the host's `reset_sheet_chart_series_*`).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NotResettable`] for the other properties,
+    /// [`Error::Allocation`].
+    pub fn reset(&mut self, kind: PropertyKind, series: usize) -> Result<&mut Self, Error> {
+        if kind.style().is_none() {
+            return Err(Refusal::NotResettable.into());
+        }
+        structure::reserve(&mut self.changes, 1)?;
+        self.changes.push(Staged::Reset(kind, series));
         Ok(self)
     }
 
@@ -286,10 +385,19 @@ impl Edit<'_> {
         }
         let mut current: Option<Package> = None;
         let mut touched = 0_usize;
-        for property in &self.changes {
+        for change in &self.changes {
             let base = current.as_ref().unwrap_or(self.source);
-            if let Some(published) = apply_one(base, self.sheet, self.chart, property)? {
-                if read(&published.package, self.sheet, self.chart, property.kind())? != *property {
+            let published = match change {
+                Staged::Set(property) => apply_one(base, self.sheet, self.chart, property)?,
+                Staged::Reset(kind, series) => {
+                    reset_one(base, self.sheet, self.chart, *kind, *series)?
+                },
+            };
+            if let Some(published) = published {
+                if let Staged::Set(property) = change
+                    && read(&published.package, self.sheet, self.chart, property.kind())?
+                        != *property
+                {
                     return Err(Error::Verification);
                 }
                 touched = touched.saturating_add(published.touched_components);
@@ -393,6 +501,17 @@ fn read(
     kind: PropertyKind,
 ) -> Result<Property, Error> {
     let target = target(package, sheet, chart)?;
+    if let Some(style_kind) = kind.style() {
+        let values = style::read(
+            package,
+            target.chart,
+            target.kind,
+            target.series,
+            style_kind,
+        )
+        .map_err(from_style)?;
+        return from_style_values(kind, values);
+    }
     let components = LeafComponents::new(package)?;
     let limits = structure::exact_source(package)?
         .limits()
@@ -434,6 +553,10 @@ fn read(
             count,
             &value_labels(target.kind)?,
         )?),
+        PropertyKind::Strokes
+        | PropertyKind::Fills
+        | PropertyKind::SymbolFills
+        | PropertyKind::SymbolOutlines => return Err(Error::InvalidSource),
     })
 }
 
@@ -450,6 +573,11 @@ fn apply_one(
             given: property.len(),
         }
         .into());
+    }
+    if let (Some(style_kind), Some(values)) = (property.kind().style(), property.style_values()) {
+        let values: Vec<Option<style::Value>> = values.into_iter().map(Some).collect();
+        return style::write(source, target.chart, target.kind, style_kind, &values)
+            .map_err(from_style);
     }
     let components = LeafComponents::new(source)?;
     let limits = structure::exact_source(source)?
@@ -483,12 +611,83 @@ fn apply_one(
         Property::ValueLabels(values) => {
             engine::set_values(&mut workspace, chart, &value_labels(target.kind)?, values)?
         },
+        Property::Strokes(_)
+        | Property::Fills(_)
+        | Property::SymbolFills(_)
+        | Property::SymbolOutlines(_) => return Err(Error::InvalidSource),
     };
     let changes = workspace.finish();
     if !changed || changes.is_empty() {
         return Ok(None);
     }
     Ok(Some(style_graph::publish(source, changes)?))
+}
+
+/// Reset series `series`' own value of a series-style property.
+fn reset_one(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    kind: PropertyKind,
+    series: usize,
+) -> Result<Option<Published>, Error> {
+    let style_kind = kind.style().ok_or(Refusal::NotResettable)?;
+    let target = target(source, sheet, chart)?;
+    if series >= target.series {
+        return Err(Refusal::SeriesNotFound { series }.into());
+    }
+    let current = style::read(source, target.chart, target.kind, target.series, style_kind)
+        .map_err(from_style)?;
+    let values: Vec<Option<style::Value>> = current
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| (index != series).then_some(value))
+        .collect();
+    style::write(source, target.chart, target.kind, style_kind, &values).map_err(from_style)
+}
+
+fn from_style(failure: style::Failure) -> Error {
+    match failure {
+        style::Failure::Refused(style::Refused::Kind) => Refusal::UnsupportedKind.into(),
+        style::Failure::Refused(style::Refused::Shared) => Refusal::SharedStyle.into(),
+        style::Failure::Refused(style::Refused::ImageFill) => Refusal::ImageFill.into(),
+        style::Failure::Fault(fault) => fault.into(),
+    }
+}
+
+fn from_style_values(kind: PropertyKind, values: Vec<style::Value>) -> Result<Property, Error> {
+    let strokes = |values: Vec<style::Value>| -> Result<Vec<Option<Stroke>>, Error> {
+        values
+            .into_iter()
+            .map(|value| match value {
+                style::Value::Stroke(stroke) => Ok(stroke),
+                _ => Err(Error::InvalidSource),
+            })
+            .collect()
+    };
+    Ok(match kind {
+        PropertyKind::Strokes => Property::Strokes(strokes(values)?),
+        PropertyKind::SymbolOutlines => Property::SymbolOutlines(strokes(values)?),
+        PropertyKind::Fills => Property::Fills(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style::Value::Fill(fill) => Ok(fill),
+                    _ => Err(Error::InvalidSource),
+                })
+                .collect::<Result<_, _>>()?,
+        ),
+        PropertyKind::SymbolFills => Property::SymbolFills(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style::Value::SymbolFill(fill) => Ok(fill),
+                    _ => Err(Error::InvalidSource),
+                })
+                .collect::<Result<_, _>>()?,
+        ),
+        _ => return Err(Error::InvalidSource),
+    })
 }
 
 fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {
