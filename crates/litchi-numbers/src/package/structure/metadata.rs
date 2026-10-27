@@ -366,6 +366,9 @@ pub(in crate::package) struct Transition {
     /// Embedded data no surviving object references: its `DataInfo` record
     /// leaves the registry and its package entry is deleted.
     pub(in crate::package) data_removals: Vec<(u64, String)>,
+    /// Data-reference owner records of new objects (a duplicate sharing its
+    /// source's embedded data).
+    pub(in crate::package) data_owner_additions: Vec<DataOwner>,
     /// Non-IWA package members (embedded data) this transaction rewrites.
     pub(in crate::package) entry_writes: Vec<(String, Vec<u8>)>,
 }
@@ -417,6 +420,7 @@ impl Transition {
     fn is_empty(&self) -> bool {
         self.registry_is_empty()
             && self.data_owner_removals.is_empty()
+            && self.data_owner_additions.is_empty()
             && self.data_removals.is_empty()
     }
 
@@ -627,7 +631,9 @@ pub(super) fn apply(
     // Data owners and unreferenced data leave first: the registry codec
     // refuses to drop the UUID of an object that still owns data.
     let staged;
-    let source = if transition.data_owner_removals.is_empty() && transition.data_removals.is_empty()
+    let source = if transition.data_owner_removals.is_empty()
+        && transition.data_owner_additions.is_empty()
+        && transition.data_removals.is_empty()
     {
         payload(working, route)?
     } else {
@@ -921,6 +927,17 @@ fn rewrite_media(
             owner.count,
         ));
     }
+    let mut additions = Vec::new();
+    reserve(&mut additions, transition.data_owner_additions.len())?;
+    for owner in &transition.data_owner_additions {
+        let component = registry.component(owner.component)?;
+        additions.push(media::DataReferenceOwnerAddition::new(
+            media::ComponentSelector::new(component.identifier, component.locator.as_str()),
+            owner.data,
+            owner.object,
+            owner.count,
+        ));
+    }
     let mut removals = Vec::new();
     reserve(&mut removals, transition.data_removals.len())?;
     for (data, _) in &transition.data_removals {
@@ -932,13 +949,14 @@ fn rewrite_media(
         source.len().max(1).saturating_mul(64).saturating_mul(
             owners
                 .len()
+                .saturating_add(additions.len())
                 .saturating_add(removals.len())
                 .saturating_add(1),
         ),
     );
     let report =
         media::inspect_package_metadata_media(source, options).map_err(|_error| Fault::Invalid)?;
-    let mut batch = MediaRewriteBatch::new(&[], &removals, &[], &owners);
+    let mut batch = MediaRewriteBatch::new(&[], &removals, &additions, &owners);
     if !removals.is_empty()
         && let Some(map) = data_metadata_map(working, report)?
     {
