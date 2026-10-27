@@ -1888,7 +1888,7 @@ pages/editor/tables/conditional_highlight.rs	table_cell_conditional_highlighting
 pages/editor/tables/formula.rs	clear_table_formula	1	pages	table.formula	migrated	litchi_pages::table::values::Edit::set	pages_body_table_formula_clear_parity	B	-	-
 pages/editor/tables/formula.rs	set_table_formula	1	pages	table.formula	migrated	litchi_pages::table::values::Edit::set_formula_cached	pages_body_table_formula_author_parity	B	-	-
 pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	migrated	litchi_pages::Package::body_table_cells	pages_body_table_formula_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
-pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	migrated	litchi_pages::Package::edit_body_table_creation	pages_body_table_add_parity	B	-	-
 pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_clear_parity	A	-	-
 pages/editor/tables/semantic.rs	clear_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-

@@ -9,7 +9,9 @@ use litchi_pages::table::creation::NewTable;
 use litchi_pages::{BodyTableSelector, Package, SectionSelector};
 
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
+use crate::known_fields::{Decoded, decode_as, decoded};
 use crate::leaf_bytes;
+use prost::Message as _;
 
 const SECTIONS: &str = "iwork/pages/body-sections-unicode.pages";
 const TABLES: &str = "iwork/pages/body-table-catalog-native.pages";
@@ -121,21 +123,82 @@ fn leaf_tables(bytes: &[u8]) -> TestResult<Vec<Option<String>>> {
         .collect())
 }
 
-/// Table creation is not at parity: the leaf `table::creation` family
-/// (record 0329) writes a different graph from the host's `add_table` (a
-/// random table UUID, its own identifier order, a formula owner of type
-/// 6267 where the host writes 4008). `add_table` stays host-only (record
-/// 0371).
+/// `TST.TableModelArchive` without its table UUID: a new table's UUID is
+/// a fresh version-4 identity on the leaf and a model-derived one on the
+/// host (record 0370f, a documented policy: compared by form).
+fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut model = litchi_iwa_protos::tst::TableModelArchive::decode(data)?;
+    assert_eq!(model.table_id.len(), 36, "table UUID form");
+    model.table_id.clear();
+    Ok(decoded(model, data))
+}
+
+/// `TSCE.FormulaOwnerDependenciesArchive` without its owner UUID (derived
+/// from the table UUID).
+fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut owner = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(data)?;
+    owner.formula_owner_uid = Default::default();
+    Ok(decoded(owner, data))
+}
+
+/// `TSCE.CalculationEngineArchive` without its owner map's UUIDs (one is
+/// derived from the new table UUID).
+fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut engine = litchi_iwa_protos::tsce::CalculationEngineArchive::decode(data)?;
+    if let Some(map) = engine.dependency_tracker.owner_id_map.as_mut() {
+        for entry in &mut map.map_entry {
+            entry.owner_id = Default::default();
+        }
+    }
+    Ok(decoded(engine, data))
+}
+
+/// Adding a 3×4 table at the start of the body (record 0371; the shared
+/// `table_create` follows the host graph since record 0370f).
 #[test]
-fn pages_body_table_add_divergence_is_reported() -> TestResult {
+fn pages_body_table_add_parity() -> TestResult {
     let input = fixture(TABLES)?;
-    let outcome = Case::new(
-        "pages_body_table_add_divergence_is_reported",
+    Case::new(
+        "pages_body_table_add_parity",
         Format::Pages,
-        Tier::A,
+        Tier::B,
         Evidence::Queued,
         &input,
     )
+    .leaf_structural_metadata()
+    .known_fields(|known| {
+        known
+            .with(
+                6_001,
+                "TST.TableModelArchive (table UUID by form)",
+                model_without_table_uuid,
+            )
+            .with(
+                4_008,
+                "TSCE.FormulaOwnerDependenciesArchive (owner UUID by form)",
+                owner_without_uuid,
+            )
+            .with(
+                4_000,
+                "TSCE.CalculationEngineArchive (owner-map UUIDs by form)",
+                engine_without_owner_uuids,
+            )
+            .with(
+                6_000,
+                "TST.TableInfoArchive",
+                decode_as::<litchi_iwa_protos::tst::TableInfoArchive>,
+            )
+            .with(
+                6_267,
+                "TST.ColumnRowUIDMapArchive",
+                decode_as::<litchi_iwa_protos::tst::ColumnRowUidMapArchive>,
+            )
+            .with(
+                6_305,
+                "TST.StrokeSidecarArchive",
+                decode_as::<litchi_iwa_protos::tst::StrokeSidecarArchive>,
+            )
+    })
     .host(|source| {
         let mut editor = pages::Draft::from_bytes(source)?;
         drop(editor.add_table(0, "Litchi table", 3, 4)?);
@@ -160,12 +223,7 @@ fn pages_body_table_add_divergence_is_reported() -> TestResult {
     })
     .read("host tables", host_tables)
     .read("leaf body_tables", leaf_tables)
-    .run();
-    let Err(error) = outcome else {
-        return Err("body-table creation is now at parity; migrate add_table".into());
-    };
-    let report = error.to_string();
-    assert!(report.contains("leaf [(6267"), "{report}");
+    .run()?;
     Ok(())
 }
 
@@ -252,6 +310,30 @@ fn section_remove_cost_abba() -> TestResult {
             let commit = package
                 .edit_section_lifecycle()
                 .remove(SectionSelector::index(1))?
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn table_add_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(TABLES)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            drop(editor.add_table(0, "Litchi table", 3, 4)?);
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_body_table_creation()
+                .insert(
+                    Position::new(0),
+                    NewTable::new(3, 4).with_name("Litchi table"),
+                )?
                 .commit()?;
             Ok(leaf_bytes!(commit.package()))
         },
