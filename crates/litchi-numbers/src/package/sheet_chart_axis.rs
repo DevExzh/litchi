@@ -48,6 +48,11 @@ pub enum Property {
     TickMarkLocation(TickMarkLocation),
     /// Whether the value axis shows its minimum label (value axis only).
     MinimumLabel(Visibility),
+    /// Whether the axis labels show.
+    Labels(Visibility),
+    /// Whether the category axis shows the series names (category axis
+    /// only).
+    SeriesNames(Visibility),
 }
 
 /// The property a [`Property`] value sets, for reads.
@@ -66,6 +71,10 @@ pub enum PropertyKind {
     TickMarkLocation,
     /// [`Property::MinimumLabel`].
     MinimumLabel,
+    /// [`Property::Labels`].
+    Labels,
+    /// [`Property::SeriesNames`].
+    SeriesNames,
 }
 
 impl Property {
@@ -79,6 +88,8 @@ impl Property {
             Self::MinorTickMarks(_) => PropertyKind::MinorTickMarks,
             Self::TickMarkLocation(_) => PropertyKind::TickMarkLocation,
             Self::MinimumLabel(_) => PropertyKind::MinimumLabel,
+            Self::Labels(_) => PropertyKind::Labels,
+            Self::SeriesNames(_) => PropertyKind::SeriesNames,
         }
     }
 }
@@ -99,13 +110,27 @@ impl PropertyKind {
             (Self::TickMarkLocation, Axis::Category) => 36,
             (Self::TickMarkLocation, Axis::Value) => 37,
             (Self::MinimumLabel, Axis::Value) => 31,
+            (Self::Labels, Axis::Category) => 9,
+            (Self::Labels, Axis::Value) => 11,
+            (Self::SeriesNames, Axis::Category) => 12,
             _ => return None,
         })
     }
 
     /// The value of a switch the style does not store.
     const fn default_visible(self) -> bool {
-        matches!(self, Self::MinimumLabel | Self::MinorTickMarks)
+        matches!(
+            self,
+            Self::MinimumLabel | Self::MinorTickMarks | Self::Labels
+        )
+    }
+
+    /// The axis archive storing the property.
+    const fn archive(self) -> Archive {
+        match self {
+            Self::Labels | Self::SeriesNames => Archive::AxisNonStyle,
+            _ => Archive::AxisStyle,
+        }
     }
 }
 
@@ -291,6 +316,7 @@ fn axis_style(
     sheet: usize,
     chart: ChartSelector,
     axis: Axis,
+    archive: Archive,
 ) -> Result<(u64, usize), Error> {
     let drawables = graph::sheet_drawables(package, sheet)?;
     let entry = drawables
@@ -302,20 +328,26 @@ fn axis_style(
     }
     let object = graph::object(package, entry.identifier)?;
     let references = codec::references(&object.messages[index].data, Limits::DEFAULT)?;
-    let styles = match axis {
-        Axis::Value => references.value_axis_styles(),
-        _ => references.category_axis_styles(),
-    };
+    let styles = axis_objects(&references, axis, archive);
     let style = *styles.first().ok_or(Refusal::UnsupportedAxis)?;
     let style_object = graph::object(package, style)?;
-    let style_index =
-        structure::unique_message(style_object, &[Archive::AxisStyle.message_type()])?;
+    let style_index = structure::unique_message(style_object, &[archive.message_type()])?;
     Ok((style, style_index))
+}
+
+/// The chart's style or non-style objects of `axis`.
+fn axis_objects(references: &codec::StyleReferences, axis: Axis, archive: Archive) -> &[u64] {
+    match (axis, archive) {
+        (Axis::Value, Archive::AxisNonStyle) => references.value_axis_non_styles(),
+        (_, Archive::AxisNonStyle) => references.category_axis_non_styles(),
+        (Axis::Value, _) => references.value_axis_styles(),
+        _ => references.category_axis_styles(),
+    }
 }
 
 /// Whether only one chart axis references `style` (the host's
 /// `ensure_exclusive`).
-fn exclusive(package: &Package, style: u64) -> Result<bool, Error> {
+fn exclusive(package: &Package, style: u64, archive: Archive) -> Result<bool, Error> {
     let mut owners = 0_usize;
     for object in package.state.components.iter_objects() {
         for message in &object.messages {
@@ -323,10 +355,9 @@ fn exclusive(package: &Package, style: u64) -> Result<bool, Error> {
                 continue;
             }
             let references = codec::references(&message.data, Limits::DEFAULT)?;
-            owners += references
-                .value_axis_styles()
+            owners += axis_objects(&references, Axis::Value, archive)
                 .iter()
-                .chain(references.category_axis_styles())
+                .chain(axis_objects(&references, Axis::Category, archive))
                 .filter(|identifier| **identifier == style)
                 .count();
         }
@@ -350,13 +381,10 @@ fn read(
     kind: PropertyKind,
 ) -> Result<Property, Error> {
     let field = kind.field(axis).ok_or(Refusal::UnsupportedAxis)?;
-    let (style, index) = axis_style(package, sheet, chart, axis)?;
+    let archive = kind.archive();
+    let (style, index) = axis_style(package, sheet, chart, axis, archive)?;
     let object = graph::object(package, style)?;
-    let properties = codec::decode(
-        &object.messages[index].data,
-        Archive::AxisStyle,
-        Limits::DEFAULT,
-    )?;
+    let properties = codec::decode(&object.messages[index].data, archive, Limits::DEFAULT)?;
     if kind == PropertyKind::TickMarkLocation {
         return Ok(Property::TickMarkLocation(
             properties
@@ -371,6 +399,8 @@ fn read(
         PropertyKind::MajorGridlines => Property::MajorGridlines(visible),
         PropertyKind::MinorGridlines => Property::MinorGridlines(visible),
         PropertyKind::MinorTickMarks => Property::MinorTickMarks(visible),
+        PropertyKind::Labels => Property::Labels(visible),
+        PropertyKind::SeriesNames => Property::SeriesNames(visible),
         _ => Property::MinimumLabel(visible),
     })
 }
@@ -387,8 +417,9 @@ fn apply_one(
     if read(source, sheet, chart, axis, kind)? == value {
         return Ok(None);
     }
-    let (style, index) = axis_style(source, sheet, chart, axis)?;
-    if !exclusive(source, style)? {
+    let archive = kind.archive();
+    let (style, index) = axis_style(source, sheet, chart, axis, archive)?;
+    if !exclusive(source, style, archive)? {
         return Err(Refusal::SharedStyle.into());
     }
     let write = match value {
@@ -400,7 +431,9 @@ fn apply_one(
         | Property::MajorGridlines(visible)
         | Property::MinorGridlines(visible)
         | Property::MinorTickMarks(visible)
-        | Property::MinimumLabel(visible) => Write::Bool {
+        | Property::MinimumLabel(visible)
+        | Property::Labels(visible)
+        | Property::SeriesNames(visible) => Write::Bool {
             field,
             value: Some(visible.is_visible()),
         },
@@ -408,7 +441,7 @@ fn apply_one(
     let object = graph::object(source, style)?;
     let rewritten = codec::rewrite(
         &object.messages[index].data,
-        Archive::AxisStyle,
+        archive,
         &[write],
         codec::EmptyExtension::Keep,
         Limits::DEFAULT,
@@ -417,7 +450,7 @@ fn apply_one(
         return Ok(None);
     }
     let mut data = Some(rewritten.into_bytes().into_owned());
-    let message_type = Archive::AxisStyle.message_type();
+    let message_type = archive.message_type();
     let mut replace = |object: &mut litchi_iwa_core::ArchiveObject,
                        limits: litchi_iwa_core::Limits| {
         object
