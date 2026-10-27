@@ -530,3 +530,89 @@ fn table_sort_apply_cost_abba() -> TestResult {
         },
     )
 }
+
+fn resize_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &crate::harness::Fixture,
+    table: usize,
+    size: (usize, usize),
+) -> TestResult {
+    Case::new(name, Format::Pages, tier, evidence, input)
+        .host(|source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = editor.tables()?[table].model_object_id;
+            editor.resize_table(model, size.0, size.1)?;
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_table_size(table)?;
+            edit.set(size.0, size.1)?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_table_size(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host tables", host_tables)
+        .read("leaf body_tables", leaf_tables)
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_table_resize_parity() -> TestResult {
+    let input = fixture(TABLES)?;
+    for (table, size) in [(0, (7, 6)), (1, (8, 5))] {
+        resize_case(
+            "pages_body_table_resize_parity",
+            Tier::A,
+            Evidence::Queued,
+            &input,
+            table,
+            size,
+        )?;
+    }
+    // Grow, then shrink back to the original size.
+    let mut editor = pages::Draft::from_bytes(&input.bytes)?;
+    let model = editor.tables()?[0].model_object_id;
+    let (rows, columns) = (editor.tables()?[0].rows, editor.tables()?[0].columns);
+    editor.resize_table(model, rows + 3, columns + 2)?;
+    let grown = crate::harness::Fixture {
+        path: "iwork/pages/body-table-catalog-native.pages table 0 grown by the host",
+        bytes: editor.to_bytes()?,
+    };
+    resize_case(
+        "pages_body_table_resize_parity",
+        Tier::A,
+        Evidence::Queued,
+        &grown,
+        0,
+        (rows, columns),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn table_resize_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &fixture(TABLES)?,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = editor.tables()?[0].model_object_id;
+            editor.resize_table(model, 7, 6)?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_table_size(0)?;
+            edit.set(7, 6)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

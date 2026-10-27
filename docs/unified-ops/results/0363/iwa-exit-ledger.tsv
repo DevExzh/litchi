@@ -1944,7 +1944,7 @@ pages/editor/tables/semantic.rs	reset_table_cell_text_outline	1	pages	table.cell
 pages/editor/tables/semantic.rs	reset_table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	migrated	litchi_pages::Package::edit_body_table_size	pages_body_table_resize_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-

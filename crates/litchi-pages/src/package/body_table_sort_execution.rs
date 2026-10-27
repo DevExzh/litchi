@@ -492,30 +492,30 @@ impl Package {
 }
 
 /// A single varint field of `payload`, if present.
-fn varint(view: &WireView<'_>, number: u32) -> Result<Option<u64>, Error> {
+pub(super) fn varint(view: &WireView<'_>, number: u32) -> Result<Option<u64>, GraphError> {
     graph::unique_field(view, number, 0)?
         .map(|field| graph::canonical_varint(field.payload()))
         .transpose()
-        .map_err(Error::from)
 }
 
 /// A single `TSP.Reference` field's identifier, if present.
-fn reference(
+pub(super) fn reference(
     view: &WireView<'_>,
     number: u32,
     budget: &mut Budget,
-) -> Result<Option<NonZeroU64>, Error> {
+) -> Result<Option<NonZeroU64>, GraphError> {
     graph::unique_field(view, number, 2)?
         .map(|field| graph::parse_reference(field.payload(), budget))
         .transpose()
-        .map_err(Error::from)
 }
 
-fn located_message<'a>(
+/// The single message of one of `types` in object `identifier`: its
+/// component, index, type and payload.
+pub(super) fn located_message<'a>(
     index: &ObjectIndex<'a>,
     identifier: NonZeroU64,
     types: &[u32],
-) -> Result<(Arc<str>, usize, u32, &'a [u8]), Error> {
+) -> Result<(Arc<str>, usize, u32, &'a [u8]), GraphError> {
     let located = index.get(identifier)?;
     let mut found = None;
     for (message_index, message) in located.object.messages.iter().enumerate() {
@@ -524,10 +524,10 @@ fn located_message<'a>(
                 .replace((message_index, message.type_, message.data.as_slice()))
                 .is_some()
         {
-            return Err(Error::InvalidSource);
+            return Err(GraphError::InvalidSource);
         }
     }
-    let (message_index, message_type, payload) = found.ok_or(Error::InvalidSource)?;
+    let (message_index, message_type, payload) = found.ok_or(GraphError::InvalidSource)?;
     graph::validate_message_metadata(located.object, message_index)?;
     Ok((
         index.component_name(located.component_index)?,
@@ -543,14 +543,18 @@ struct TileRow<'a> {
     raw: &'a [u8],
 }
 
-/// The BNC cells of one row record, by column.
-fn row_cells<'a>(row: &'a [u8], budget: &mut Budget) -> Result<Vec<Option<&'a [u8]>>, Error> {
+/// The BNC cells of one row record, by column; `None` for a legacy
+/// (pre-BNC) row.
+pub(super) fn row_cells<'a>(
+    row: &'a [u8],
+    budget: &mut Budget,
+) -> Result<Option<Vec<Option<&'a [u8]>>>, GraphError> {
     let view = budget.parse(row, 4)?;
     let (Some(storage), Some(offsets)) = (
         graph::unique_field(&view, ROW_STORAGE_FIELD, 2)?,
         graph::unique_field(&view, ROW_OFFSETS_FIELD, 2)?,
     ) else {
-        return Err(Unsupported::Layout.into());
+        return Ok(None);
     };
     let (storage, offsets) = (storage.payload(), offsets.payload());
     let unit = if varint(&view, ROW_WIDE_OFFSETS_FIELD)?.unwrap_or(0) != 0 {
@@ -559,7 +563,7 @@ fn row_cells<'a>(row: &'a [u8], budget: &mut Budget) -> Result<Vec<Option<&'a [u
         1
     };
     if offsets.len() % 2 != 0 {
-        return Err(Error::InvalidSource);
+        return Err(GraphError::InvalidSource);
     }
     let starts = offsets
         .chunks_exact(2)
@@ -572,7 +576,7 @@ fn row_cells<'a>(row: &'a [u8], budget: &mut Budget) -> Result<Vec<Option<&'a [u
     if present.windows(2).any(|pair| pair[0] >= pair[1])
         || present.last().is_some_and(|last| *last >= storage.len())
     {
-        return Err(Error::InvalidSource);
+        return Err(GraphError::InvalidSource);
     }
     present.push(storage.len());
     let mut cells = Vec::with_capacity(starts.len());
@@ -586,7 +590,7 @@ fn row_cells<'a>(row: &'a [u8], budget: &mut Budget) -> Result<Vec<Option<&'a [u
             &storage[start..end]
         }));
     }
-    Ok(cells)
+    Ok(Some(cells))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -940,7 +944,7 @@ fn execute(
                 return Err(Error::InvalidSource);
             }
             if (start..end).contains(&global) {
-                let cells = row_cells(raw, &mut budget)?;
+                let cells = row_cells(raw, &mut budget)?.ok_or(Unsupported::Layout)?;
                 if cells.len() > columns {
                     return Err(Error::InvalidSource);
                 }

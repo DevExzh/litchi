@@ -26,6 +26,7 @@ pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
 pub(crate) mod body_table_merges;
 pub(crate) mod body_table_name;
+pub(crate) mod body_table_resize;
 pub(crate) mod body_table_sort;
 pub(crate) mod body_table_sort_execution;
 pub(crate) mod body_table_title;
