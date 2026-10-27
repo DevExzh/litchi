@@ -904,6 +904,36 @@ fn apply_one(
     Ok(Some(working.publish(&transition)?))
 }
 
+/// Detach and remove the comment graph of `drawable` inside `graph`'s
+/// transaction (the host's `clear_comment` step of a drawable removal); a
+/// no-op without a comment.
+pub(super) fn clear_in(graph: &mut Graph<'_, '_>, drawable: u64) -> FaultResult<()> {
+    let object = graph.working.object(drawable)?;
+    let mut found = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        if let Some(path) = route(message.type_)
+            && found
+                .replace(Target {
+                    drawable,
+                    index,
+                    path,
+                })
+                .is_some()
+        {
+            return Err(Fault::Invalid);
+        }
+    }
+    let target = found.ok_or(Fault::Invalid)?;
+    let Some(storage) = current_comment(graph.working, &target)? else {
+        return Ok(());
+    };
+    replies_of(graph.working, storage)?;
+    repoint(graph.working, &target, Some(storage), None)?;
+    let member = graph.working.locate(drawable)?.ok_or(Fault::Invalid)?;
+    graph.stamp(&member)?;
+    graph.remove_unreferenced(storage)
+}
+
 fn allocate(working: &mut Working<'_>) -> FaultResult<u64> {
     working.allocate(1)?.first().copied().ok_or(Fault::Invalid)
 }

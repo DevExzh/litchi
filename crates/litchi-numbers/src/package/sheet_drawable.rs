@@ -26,6 +26,8 @@ use litchi_core::Position;
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::sheet_drawable_comment as comment;
+use super::sheet_drawable_comment_graph::Graph;
 use super::sheet_drawable_graph::{self as graph, SheetDrawables};
 use super::structure::{
     self, Working,
@@ -281,7 +283,10 @@ impl Edit<'_> {
     /// [`Refusal::UnsupportedOperation`] for the other kinds.
     pub fn remove(&mut self, drawable: impl Into<DrawableSelector>) -> Result<&mut Self, Error> {
         let (identifier, kind) = self.resolve(drawable.into())?;
-        if !matches!(kind, Kind::TextBox | Kind::Shape) {
+        if !matches!(
+            kind,
+            Kind::TextBox | Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio
+        ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "remove",
                 kind: kind.name(),
@@ -424,7 +429,7 @@ fn publish_structural(
 ) -> Result<(structure::Published, Vec<u64>), Error> {
     let sheet = &base.sheet;
     let mut working = Working::new(source)?;
-    let registry = metadata::registry(&working)?;
+    let mut registry = metadata::registry(&working)?;
     let sheet_member = working
         .locate(sheet.identifier)?
         .ok_or(Error::InvalidSource)?;
@@ -485,10 +490,34 @@ fn publish_structural(
             },
         }
     }
+    if !removed.is_empty() {
+        // The host clears a removed drawable's direct comment first.
+        let taken = registry
+            .take()
+            .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+        let mut graph = Graph {
+            working: &mut working,
+            registry: taken,
+            transition: std::mem::take(&mut transition),
+        };
+        for drawable in &removed {
+            comment::clear_in(&mut graph, *drawable)?;
+        }
+        let Graph {
+            registry: restored,
+            transition: cleared,
+            ..
+        } = graph;
+        registry = Some(restored);
+        transition = cleared;
+    }
     let mut closure = BTreeSet::new();
     if !removed.is_empty() {
         let census = Census::new(&working)?;
         closure = census.private_closure(&working, &removed)?;
+        // The census reads the source graph: the comment storages the clear
+        // above already removed leave the closure.
+        closure.retain(|identifier| matches!(working.locate(*identifier), Ok(Some(_))));
         let detached: Vec<(u64, u64)> = removed
             .iter()
             .map(|drawable| (sheet.identifier, *drawable))
