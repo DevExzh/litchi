@@ -28,6 +28,9 @@ pub mod merge;
 pub mod order;
 /// Exact-source transactions for moving a rooted table between sheets.
 pub mod relocation;
+/// Resizing a table at its trailing edges, started by
+/// [`crate::Package::edit_table_resize`].
+pub mod resize;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
 /// Compact, presence-preserving table title semantics.

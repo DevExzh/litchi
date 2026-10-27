@@ -352,3 +352,32 @@ fn numbers_conditional_highlight_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+#[inline(never)]
+fn host_resize(source: &[u8], rows: usize, columns: usize) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.resize_table(litchi_numbers::TableSelector::index(0), rows, columns)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_resize(source: &[u8], rows: u32, columns: u32) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let commit = package
+        .edit_table_resize(0usize, 0usize)?
+        .resize(rows, columns)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Growing the first table of `basic.numbers` by five rows and four columns.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_resize_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    Ok(())
+}

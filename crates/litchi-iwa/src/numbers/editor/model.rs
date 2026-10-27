@@ -3716,6 +3716,7 @@ pub(super) fn resize_attached_table_in_package(
             columns_u32,
         )?;
     }
+    resize_formula_owner_extents(package, &descriptor, rows_u32, columns_u32)?;
     let table_archive = locations.get(&table_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
     })?;
@@ -3742,6 +3743,76 @@ pub(super) fn resize_attached_table_in_package(
             },
             Default::default(),
         )?;
+        Ok(())
+    })
+}
+
+/// Move the table's own formula owner's table and body extents to the new
+/// size (host defect fixed with record 0370e: a resize left them at the old
+/// size).
+fn resize_formula_owner_extents(
+    package: &mut HostPackage,
+    descriptor: &TableDescriptor,
+    rows: u32,
+    columns: u32,
+) -> Result<()> {
+    use litchi_numbers_wire::table_topology::extents::{Extents, resize_extents};
+    let Some(entry) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
+        return Ok(());
+    };
+    let settings = table_headers::settings_from_model(&descriptor.model)?;
+    let count = |value: usize| u32::try_from(value).unwrap_or(u32::MAX);
+    let extents = |rows: u32, columns: u32| {
+        Extents::of(
+            rows,
+            columns,
+            count(settings.header_row_count()),
+            count(settings.header_column_count()),
+            count(settings.footer_row_count()),
+        )
+    };
+    let before = extents(
+        descriptor.model.number_of_rows,
+        descriptor.model.number_of_columns,
+    );
+    let after = extents(rows, columns);
+    let info = descriptor.table_info_id;
+    package.update_archive(&entry, |archive| {
+        for object in &mut archive.objects {
+            for index in 0..object.messages.len() {
+                if object.messages[index].type_ != 4_008 {
+                    continue;
+                }
+                let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+                    object.messages[index].data.as_slice(),
+                )?;
+                if owner
+                    .formula_owner
+                    .as_ref()
+                    .map(|reference| reference.identifier)
+                    != Some(info)
+                {
+                    continue;
+                }
+                if let Some(data) = resize_extents(&object.messages[index].data, before, after)
+                    .map_err(|_| {
+                        Error::InvalidFormat(
+                            "Numbers formula-owner extents are malformed".to_owned(),
+                        )
+                    })?
+                {
+                    let message_type = object.messages[index].type_;
+                    object.replace_message(
+                        index,
+                        RawMessage {
+                            type_: message_type,
+                            data,
+                        },
+                        Default::default(),
+                    )?;
+                }
+            }
+        }
         Ok(())
     })
 }

@@ -55,7 +55,10 @@ fn from_engine(error: engine::Error) -> Error {
     }
 }
 
-fn storage_payload(workspace: &Workspace<'_>, storage: u64) -> Result<(usize, Vec<u8>), Error> {
+pub(super) fn storage_payload(
+    workspace: &Workspace<'_>,
+    storage: u64,
+) -> Result<(usize, Vec<u8>), Error> {
     let object = workspace.require(storage).map_err(lift)?;
     object
         .messages
@@ -68,7 +71,7 @@ fn storage_payload(workspace: &Workspace<'_>, storage: u64) -> Result<(usize, Ve
 
 /// Whether `storage` is the only storage whose table names `style` and no
 /// paragraph style names it as parent (the host's exclusivity rule).
-fn exclusive(
+pub(super) fn exclusive(
     workspace: &Workspace<'_>,
     storage: u64,
     style: u64,
@@ -108,7 +111,7 @@ fn exclusive(
     Ok(true)
 }
 
-fn sync_managed(
+pub(super) fn sync_managed(
     infos: &mut Vec<FieldInfo>,
     managed: [bool; 4],
     limits: litchi_iwa_core::Limits,
@@ -157,7 +160,7 @@ fn component_of(workspace: &Workspace<'_>, object: u64) -> Result<u64, Error> {
 }
 
 /// Replace the storage's payload, repointing its header reference.
-fn repoint_storage(
+pub(super) fn repoint_storage(
     workspace: &mut Workspace<'_>,
     storage: u64,
     index: usize,
