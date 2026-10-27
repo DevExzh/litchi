@@ -524,6 +524,19 @@ impl Registry {
         self.last_object_identifier
     }
 
+    /// The document save token (`TSP.PackageMetadata.save_token`).
+    pub(in crate::package) const fn save_token(&self) -> Option<u64> {
+        self.save_token
+    }
+
+    /// Advance from `token` rather than the read token on [`Self::encode`]:
+    /// a transaction that publishes several intermediate candidates advances
+    /// the source document's token once, stamping every component it touched
+    /// with the same new token.
+    pub(in crate::package) const fn advance_from(&mut self, token: Option<u64>) {
+        self.save_token = token;
+    }
+
     /// Raise the object watermark to at least `value`.
     pub(in crate::package) fn set_last_object_identifier(&mut self, value: u64) {
         if value > self.last_object_identifier {

@@ -914,3 +914,35 @@ fn series_non_styles_match_the_generated_encoder() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn reference_lines_rewrite_in_place_and_in_field_order() -> TestResult {
+    let chart = tsch::ChartArchive {
+        series_theme_styles: vec![tsp::Reference {
+            identifier: 40,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let mut drawable = tsch::ChartDrawableArchive::default().encode_to_vec();
+    let mut chart_bytes = chart.encode_to_vec();
+    // A later chart extension the insertion must precede.
+    chart_bytes.extend(varint_field(10_006, 1));
+    drawable.extend(length_delimited(EXTENSION_FIELD, &chart_bytes));
+    assert_eq!(super::reference_lines(&drawable, Limits::DEFAULT)?, None);
+    let payload = [0x0a, 0x02, 0x08, 0x02];
+    let added = super::rewrite_reference_lines(&drawable, Some(&payload), Limits::DEFAULT)?;
+    let mut expected_chart = chart.encode_to_vec();
+    expected_chart.extend(length_delimited(super::REFERENCE_LINES_FIELD, &payload));
+    expected_chart.extend(varint_field(10_006, 1));
+    let mut expected = tsch::ChartDrawableArchive::default().encode_to_vec();
+    expected.extend(length_delimited(EXTENSION_FIELD, &expected_chart));
+    assert_eq!(added.as_bytes(), expected.as_slice());
+    assert_eq!(
+        super::reference_lines(added.as_bytes(), Limits::DEFAULT)?,
+        Some(payload.as_slice())
+    );
+    let removed = super::rewrite_reference_lines(added.as_bytes(), None, Limits::DEFAULT)?;
+    assert_eq!(removed.as_bytes(), drawable.as_slice());
+    Ok(())
+}
