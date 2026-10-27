@@ -19,14 +19,18 @@
     reason = "the focused transaction keeps its public types beside the staged rewrite"
 )]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 
 use litchi_core::Position;
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::sheet_drawable_comment as comment;
+use super::sheet_drawable_comment_graph::Graph;
+use super::sheet_drawable_duplicate as duplicate;
 use super::sheet_drawable_graph::{self as graph, SheetDrawables};
+use super::sheet_drawable_media as media;
 use super::structure::{
     self, Working,
     collect::{Census, verify_removed},
@@ -34,7 +38,9 @@ use super::structure::{
     references,
 };
 use crate::selector::SheetSelector;
-use crate::sheet::drawable::{Drawable, DrawableSelector, Geometry, Kind};
+use crate::sheet::drawable::{
+    AudioOptions, Drawable, DrawableSelector, Geometry, ImageOptions, Kind, MovieOptions,
+};
 use litchi_iwa_common::shape::path::Preset;
 
 use super::sheet_drawable_author::{self as author, Context};
@@ -102,11 +108,16 @@ pub enum Refusal {
     /// (and a rounded-rectangle radius at most half the shorter side).
     #[error("invalid frame for a new drawable")]
     InvalidGeometry,
+    /// A new media drawable's file name, media type or data does not fit
+    /// (an empty or unsafe name, a type other than the drawable's, or a
+    /// signature contradicting the extension).
+    #[error("invalid media for a new drawable")]
+    InvalidMedia,
     /// The drawable was already removed by an earlier operation of this edit.
     #[error("the drawable was removed earlier in this edit")]
     AlreadyRemoved,
-    /// The operation does not apply to the selected kind (removing a table,
-    /// image, movie, audio clip or chart through this family).
+    /// The operation does not apply to the selected kind (removing a table
+    /// or chart, or duplicating a shape or table, through this family).
     #[error("{operation} does not apply to a Numbers sheet {kind}")]
     UnsupportedOperation {
         /// The refused verb.
@@ -134,7 +145,9 @@ impl Refusal {
             Self::SheetNotFound | Self::DrawableNotFound { .. } | Self::AlreadyRemoved => {
                 RefusalKind::NotFound
             },
-            Self::ZPositionOutOfRange { .. } | Self::InvalidGeometry => RefusalKind::InvalidValue,
+            Self::ZPositionOutOfRange { .. } | Self::InvalidGeometry | Self::InvalidMedia => {
+                RefusalKind::InvalidValue
+            },
             Self::UnsupportedOperation { .. } | Self::NoStagedOperation => {
                 RefusalKind::UnsupportedOperation
             },
@@ -154,9 +167,20 @@ impl From<Refusal> for Error {
 /// One staged operation, with the native identity resolved from the base.
 #[derive(Debug, Clone, PartialEq)]
 enum Operation {
-    Remove { drawable: u64 },
-    MoveTo { drawable: u64, position: usize },
+    Remove {
+        drawable: u64,
+    },
+    MoveTo {
+        drawable: u64,
+        position: usize,
+    },
     Add(Box<NewShape>),
+    AddMedia(Box<media::NewMedia>),
+    Duplicate {
+        drawable: u64,
+        /// The copy's text (a text box duplicate).
+        text: Option<String>,
+    },
 }
 
 /// One staged text box or preset shape.
@@ -209,7 +233,12 @@ impl Edit<'_> {
         let added = self
             .operations
             .iter()
-            .filter(|operation| matches!(operation, Operation::Add(_)))
+            .filter(|operation| {
+                matches!(
+                    operation,
+                    Operation::Add(_) | Operation::AddMedia(_) | Operation::Duplicate { .. }
+                )
+            })
             .count();
         self.base.entries.len() - removed + added
     }
@@ -272,8 +301,10 @@ impl Edit<'_> {
         self.stage_shape(preset, geometry, text, false)
     }
 
-    /// Stage the removal of a text box or ordinary shape and the objects
-    /// only it references (its text storage, title and caption stand-ins).
+    /// Stage the removal of a text box, ordinary shape, image, movie or
+    /// audio clip and the objects only it references (its text storage,
+    /// title and caption stand-ins, direct comment graph), with the embedded
+    /// data nothing else references.
     ///
     /// # Errors
     ///
@@ -281,7 +312,10 @@ impl Edit<'_> {
     /// [`Refusal::UnsupportedOperation`] for the other kinds.
     pub fn remove(&mut self, drawable: impl Into<DrawableSelector>) -> Result<&mut Self, Error> {
         let (identifier, kind) = self.resolve(drawable.into())?;
-        if !matches!(kind, Kind::TextBox | Kind::Shape) {
+        if !matches!(
+            kind,
+            Kind::TextBox | Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio
+        ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "remove",
                 kind: kind.name(),
@@ -291,6 +325,141 @@ impl Edit<'_> {
         structure::reserve(&mut self.operations, 1)?;
         self.operations.push(Operation::Remove {
             drawable: identifier,
+        });
+        Ok(self)
+    }
+
+    fn stage_media(&mut self, media: media::NewMedia) -> Result<&mut Self, Error> {
+        media.validate().map_err(|invalid| match invalid {
+            media::Invalid::Media => Error::Refused(Refusal::InvalidMedia),
+            media::Invalid::Placement => Error::Refused(Refusal::InvalidGeometry),
+        })?;
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::AddMedia(Box::new(media)));
+        Ok(self)
+    }
+
+    /// Stage a new image from a file name (a safe basename whose extension
+    /// names an image type) and its bytes, placed by `options`, styled by
+    /// the theme's first image style; the bytes become a new embedded asset.
+    /// It joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidMedia`], [`Refusal::InvalidGeometry`],
+    /// [`Error::Allocation`].
+    pub fn add_image(
+        &mut self,
+        file_name: &str,
+        data: &[u8],
+        options: ImageOptions,
+    ) -> Result<&mut Self, Error> {
+        self.stage_media(media::NewMedia::Image {
+            file_name: owned(file_name)?,
+            data: structure::copy_bytes(data)?,
+            options,
+        })
+    }
+
+    /// Stage a new movie with its poster image (each a file name and its
+    /// bytes), placed and timed by `options`, styled by the theme's first
+    /// movie style. It joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_image`].
+    pub fn add_movie(
+        &mut self,
+        (file_name, data): (&str, &[u8]),
+        (poster_name, poster): (&str, &[u8]),
+        options: MovieOptions,
+    ) -> Result<&mut Self, Error> {
+        self.stage_media(media::NewMedia::Movie {
+            movie: (owned(file_name)?, structure::copy_bytes(data)?),
+            poster: (owned(poster_name)?, structure::copy_bytes(poster)?),
+            options,
+        })
+    }
+
+    /// Stage a new audio clip from a file name and its bytes. It joins the
+    /// front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_image`].
+    pub fn add_audio(
+        &mut self,
+        file_name: &str,
+        data: &[u8],
+        options: AudioOptions,
+    ) -> Result<&mut Self, Error> {
+        self.stage_media(media::NewMedia::Audio {
+            file_name: owned(file_name)?,
+            data: structure::copy_bytes(data)?,
+            options,
+        })
+    }
+
+    /// Stage a copy of an image, movie or audio clip: its graph (the
+    /// drawable and its title and caption stand-ins) under fresh
+    /// identifiers, offset by 10 points on both axes as Numbers places a
+    /// duplicate, sharing its style, comment and embedded data. The copy
+    /// joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::DrawableNotFound`], [`Refusal::AlreadyRemoved`], and
+    /// [`Refusal::UnsupportedOperation`] for the other kinds.
+    pub fn duplicate(&mut self, drawable: impl Into<DrawableSelector>) -> Result<&mut Self, Error> {
+        let (identifier, kind) = self.resolve(drawable.into())?;
+        if !matches!(kind, Kind::Image | Kind::Movie | Kind::Audio) {
+            return Err(Refusal::UnsupportedOperation {
+                operation: "duplicate",
+                kind: kind.name(),
+            }
+            .into());
+        }
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::Duplicate {
+            drawable: identifier,
+            text: None,
+        });
+        Ok(self)
+    }
+
+    /// Stage a copy of a text box holding `text`: its shape, caption and
+    /// title stand-ins and storage under fresh identifiers, offset by 10
+    /// points on both axes, sharing its styles; the copy's text is then
+    /// replaced as Numbers' Duplicate followed by typing does. The copy
+    /// joins the front of the sheet's list.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::DrawableNotFound`], [`Refusal::AlreadyRemoved`],
+    /// [`Refusal::UnsupportedOperation`] for the other kinds,
+    /// [`Error::Allocation`].
+    pub fn duplicate_text_box(
+        &mut self,
+        drawable: impl Into<DrawableSelector>,
+        text: &str,
+    ) -> Result<&mut Self, Error> {
+        let (identifier, kind) = self.resolve(drawable.into())?;
+        if kind != Kind::TextBox {
+            return Err(Refusal::UnsupportedOperation {
+                operation: "duplicate_text_box",
+                kind: kind.name(),
+            }
+            .into());
+        }
+        let mut owned = String::new();
+        owned
+            .try_reserve_exact(text.len())
+            .map_err(|_error| Error::Allocation { amount: text.len() })?;
+        owned.push_str(text);
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::Duplicate {
+            drawable: identifier,
+            text: Some(owned),
         });
         Ok(self)
     }
@@ -343,6 +512,7 @@ impl Edit<'_> {
             if reopened.identifiers() != order {
                 return Err(Error::Verification);
             }
+            let published = self.retext_duplicates(published, &order)?;
             return Commit::new(self.source, published);
         }
         let before = self.base.identifiers();
@@ -361,6 +531,71 @@ impl Edit<'_> {
             return Err(Error::Verification);
         }
         Commit::new(self.source, published)
+    }
+}
+
+impl Edit<'_> {
+    /// Replace the text of every text-box duplicate in `published` (the
+    /// host's `set_text` on the copy's storage after the graph clone).
+    fn retext_duplicates(
+        &self,
+        mut published: structure::Published,
+        order: &[u64],
+    ) -> Result<structure::Published, Error> {
+        let base = self.base.identifiers();
+        let mut copies = order.iter().filter(|identifier| !base.contains(identifier));
+        for operation in &self.operations {
+            let (Operation::Add(_) | Operation::AddMedia(_) | Operation::Duplicate { .. }) =
+                operation
+            else {
+                continue;
+            };
+            let copy = *copies.next().ok_or(Error::InvalidSource)?;
+            let Operation::Duplicate {
+                text: Some(text), ..
+            } = operation
+            else {
+                continue;
+            };
+            let position = order
+                .iter()
+                .position(|identifier| *identifier == copy)
+                .ok_or(Error::InvalidSource)?;
+            let mut edit = published
+                .package
+                .edit_sheet_drawable_plain_text(
+                    self.base.sheet.position,
+                    DrawableSelector::index(position),
+                )
+                .map_err(from_plain_text)?;
+            edit.set(text).map_err(from_plain_text)?;
+            let commit = edit.commit().map_err(from_plain_text)?;
+            let touched = published.touched_components;
+            published = structure::Published {
+                package: commit.into_package(),
+                touched_components: touched,
+                deleted_previews: published.deleted_previews,
+            };
+        }
+        Ok(published)
+    }
+}
+
+fn owned(text: &str) -> Result<String, Error> {
+    let mut value = String::new();
+    value
+        .try_reserve_exact(text.len())
+        .map_err(|_error| Error::Allocation { amount: text.len() })?;
+    value.push_str(text);
+    Ok(value)
+}
+
+fn from_plain_text(error: super::sheet_drawable_plain_text::Error) -> Error {
+    use super::sheet_drawable_plain_text::Error as E;
+    match error {
+        E::Allocation { amount } => Error::Allocation { amount },
+        E::Verification => Error::Verification,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -424,7 +659,7 @@ fn publish_structural(
 ) -> Result<(structure::Published, Vec<u64>), Error> {
     let sheet = &base.sheet;
     let mut working = Working::new(source)?;
-    let registry = metadata::registry(&working)?;
+    let mut registry = metadata::registry(&working)?;
     let sheet_member = working
         .locate(sheet.identifier)?
         .ok_or(Error::InvalidSource)?;
@@ -483,12 +718,67 @@ fn publish_structural(
                 order.push(authored.identifiers[0]);
                 created.push(authored.identifiers[0]);
             },
+            Operation::AddMedia(new) => {
+                let registry = registry
+                    .as_ref()
+                    .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+                let created_id = media::author(
+                    &mut working,
+                    registry,
+                    &mut transition,
+                    (sheet.identifier, &sheet_member),
+                    new,
+                )?;
+                order.push(created_id);
+                created.push(created_id);
+            },
+            Operation::Duplicate { drawable, .. } => {
+                let entry = base
+                    .entries
+                    .iter()
+                    .find(|entry| entry.identifier == *drawable)
+                    .ok_or(Error::InvalidSource)?;
+                let (index, message_type) = entry.message.ok_or(Error::InvalidSource)?;
+                let copy = duplicate_graph(
+                    &mut working,
+                    registry.as_ref(),
+                    &mut transition,
+                    &sheet_member,
+                    (*drawable, index, message_type),
+                )?;
+                order.push(copy);
+                created.push(copy);
+            },
         }
+    }
+    if !removed.is_empty() {
+        // The host clears a removed drawable's direct comment first.
+        let taken = registry
+            .take()
+            .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+        let mut graph = Graph {
+            working: &mut working,
+            registry: taken,
+            transition: std::mem::take(&mut transition),
+        };
+        for drawable in &removed {
+            comment::clear_in(&mut graph, *drawable)?;
+        }
+        let Graph {
+            registry: restored,
+            transition: cleared,
+            ..
+        } = graph;
+        registry = Some(restored);
+        transition = cleared;
     }
     let mut closure = BTreeSet::new();
     if !removed.is_empty() {
         let census = Census::new(&working)?;
         closure = census.private_closure(&working, &removed)?;
+        // The census reads the source graph: the comment storages the clear
+        // above already removed leave the closure.
+        closure.retain(|identifier| matches!(working.locate(*identifier), Ok(Some(_))));
         let detached: Vec<(u64, u64)> = removed
             .iter()
             .map(|drawable| (sheet.identifier, *drawable))
@@ -520,10 +810,98 @@ fn publish_structural(
         for identifier in &list {
             working.remove(*identifier)?;
         }
+        if let Some(registry) = &registry {
+            transition.release_unreferenced_data(&working, registry)?;
+        }
     }
     let published = working.publish(&transition)?;
     verify_removed(&published.package, &closure)?;
     Ok((published, order))
+}
+
+/// Copy the graph of `drawable` into the sheet's member under fresh
+/// identifiers (the host's `clone_sheet_image` / `clone_sheet_movie`):
+/// clones in graph order, the copy offset, UUIDs of the registered objects
+/// and the copy's data-reference owners. Returns the copy's identifier.
+fn duplicate_graph(
+    working: &mut Working<'_>,
+    registry: Option<&metadata::Registry>,
+    transition: &mut Transition,
+    sheet_member: &str,
+    (drawable, index, message_type): (u64, usize, u32),
+) -> Result<u64, Error> {
+    if working.locate(drawable)?.as_deref() != Some(sheet_member) {
+        return Err(Refusal::UnsupportedDependency.into());
+    }
+    let objects = duplicate::graph_objects(working, drawable, index, message_type)?;
+    for object in &objects {
+        if working.locate(*object)?.as_deref() != Some(sheet_member) {
+            return Err(Refusal::UnsupportedDependency.into());
+        }
+    }
+    let identifiers = working.allocate(objects.len())?;
+    let remap: HashMap<u64, u64> = objects
+        .iter()
+        .copied()
+        .zip(identifiers.iter().copied())
+        .collect();
+    let limits = working.archive_limits();
+    for object in &objects {
+        let mut copy = duplicate::clone_object(working.object(*object)?, &remap, limits)?;
+        if *object == drawable {
+            let data =
+                duplicate::offset(&copy.messages[index].data, message_type, duplicate::OFFSET)?;
+            copy.replace_message_preserving_header(
+                index,
+                litchi_iwa_core::RawMessage {
+                    type_: message_type,
+                    data,
+                },
+                limits,
+            )
+            .map_err(|error| structure::map_core(&error))?;
+        }
+        working.insert(sheet_member, copy)?;
+    }
+    let copy = *remap.get(&drawable).ok_or(Error::InvalidSource)?;
+    if let Some(registry) = registry {
+        let component = registry.component_for_entry(sheet_member)?.identifier;
+        for object in &objects {
+            if registry
+                .uuids
+                .iter()
+                .any(|binding| binding.component == component && binding.object == *object)
+            {
+                let new = remap[object];
+                let seed = metadata::identity_seed(working, new)?;
+                transition.register_uuid(registry, component, new, seed)?;
+            }
+        }
+        let mut data: Vec<u64> = Vec::new();
+        for info in &working.object(drawable)?.archive_info.message_infos {
+            for identifier in info.data_references.iter().chain(
+                info.field_infos
+                    .iter()
+                    .flat_map(|field| &field.data_references),
+            ) {
+                if !data.contains(identifier) {
+                    structure::reserve(&mut data, 1)?;
+                    data.push(*identifier);
+                }
+            }
+        }
+        data.sort_unstable();
+        for identifier in data {
+            structure::reserve(&mut transition.data_owner_additions, 1)?;
+            transition.data_owner_additions.push(metadata::DataOwner {
+                component,
+                data: identifier,
+                object: copy,
+                count: 1,
+            });
+        }
+    }
+    Ok(copy)
 }
 
 fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {

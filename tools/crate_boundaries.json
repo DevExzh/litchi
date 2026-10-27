@@ -171,6 +171,7 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-style",
       "litchi-iwa-table",
       "litchi-iwa-text",
       "litchi-iwa-text-wire",

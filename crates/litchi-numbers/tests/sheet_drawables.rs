@@ -225,3 +225,293 @@ fn a_created_text_box_takes_text_properties_and_can_be_removed() -> TestResult {
     assert_eq!(removed.sheet_drawable_list(0)?.len(), before);
     Ok(())
 }
+
+#[test]
+fn a_text_box_named_style_is_created_applied_renamed_and_deleted() -> TestResult {
+    use litchi_numbers::sheet::drawable::named_style::{ParagraphStyleName, Refusal};
+    use litchi_numbers::sheet::drawable::{Geometry, Size, named_style};
+
+    let package = open("basic.numbers")?;
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_text_box(
+        Geometry::new(
+            Point { x: 40.0, y: 60.0 },
+            Size {
+                width: 200.0,
+                height: 50.0,
+            },
+        ),
+        "Named",
+    )?;
+    let created = edit.commit()?.into_package();
+    let text_box = DrawableSelector::text_box(0);
+    let styles = created.sheet_text_box_named_styles(0, text_box)?;
+    let (applied, overridden) = created.sheet_text_box_applied_named_style(0, text_box)?;
+    assert!(!overridden);
+    assert!(styles.contains(&applied));
+
+    let mut edit = created.edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.create(applied.id(), ParagraphStyleName::new("Leaf Copy")?)?;
+    let copied = edit.commit()?;
+    let copy = copied
+        .package()
+        .sheet_text_box_named_styles(0, text_box)?
+        .into_iter()
+        .find(|style| style.name().as_str() == "Leaf Copy")
+        .ok_or("no copy")?;
+    let restored = copied
+        .package()
+        .apply_sheet_text_box_named_styles(&copied.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&created)?);
+
+    let mut edit = copied
+        .package()
+        .edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.apply(copy.id())?
+        .rename_style(copy.id(), ParagraphStyleName::new("Leaf Renamed")?)?;
+    let renamed = edit.commit()?;
+    let (now, _) = renamed
+        .package()
+        .sheet_text_box_applied_named_style(0, text_box)?;
+    assert_eq!(now.id(), copy.id());
+    assert_eq!(now.name().as_str(), "Leaf Renamed");
+
+    let mut edit = renamed
+        .package()
+        .edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.delete(copy.id())?;
+    let Err(named_style::Error::Refused(refusal)) = edit.commit() else {
+        return Err("deleting an applied style must be refused".into());
+    };
+    assert_eq!(refusal, Refusal::StyleInUse);
+    assert_eq!(refusal.kind(), RefusalKind::UnsupportedContent);
+
+    let mut edit = renamed
+        .package()
+        .edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.delete_applied(copy.id(), applied.id())?;
+    let deleted = edit.commit()?.into_package();
+    assert_eq!(deleted.sheet_text_box_named_styles(0, text_box)?, styles);
+    assert_eq!(
+        deleted.sheet_text_box_applied_named_style(0, text_box)?,
+        (applied, false)
+    );
+
+    let mut edit = deleted.edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.redefine()?;
+    let Err(named_style::Error::Refused(Refusal::NoOverrides)) = edit.commit() else {
+        return Err("redefining without overrides must be refused".into());
+    };
+    Ok(())
+}
+
+#[test]
+fn a_drawable_comment_thread_is_written_and_cleared() -> TestResult {
+    use litchi_numbers::sheet::drawable::comment::{self, Refusal};
+    use litchi_numbers::sheet::drawable::{Geometry, Size};
+
+    let package = open("basic.numbers")?;
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_text_box(
+        Geometry::new(
+            Point { x: 40.0, y: 60.0 },
+            Size {
+                width: 200.0,
+                height: 50.0,
+            },
+        ),
+        "Commented",
+    )?;
+    let created = edit.commit()?.into_package();
+    let text_box = DrawableSelector::text_box(0);
+    assert_eq!(created.sheet_drawable_comment(0, text_box)?, None);
+
+    let mut edit = created.edit_sheet_drawable_comment(0, text_box)?;
+    edit.add_reply("orphan")?;
+    let Err(comment::Error::Refused(refusal)) = edit.commit() else {
+        return Err("a reply without a comment must be refused".into());
+    };
+    assert_eq!(refusal, Refusal::NoComment);
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+
+    let mut edit = created.edit_sheet_drawable_comment(0, text_box)?;
+    edit.set("Root")?
+        .add_reply("First")?
+        .add_reply("Second")?
+        .set_reply(0, "Edited")?
+        .remove_reply(1)?;
+    let threaded = edit.commit()?;
+    let comment = threaded
+        .package()
+        .sheet_drawable_comment(0, text_box)?
+        .ok_or("no comment")?;
+    assert_eq!(comment.body(), "Root");
+    assert_eq!(comment.replies(), ["Edited".to_owned()]);
+    let restored = threaded
+        .package()
+        .apply_sheet_drawable_comment(&threaded.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&created)?);
+
+    let mut edit = threaded
+        .package()
+        .edit_sheet_drawable_comment(0, text_box)?;
+    edit.clear()?;
+    let cleared = edit.commit()?.into_package();
+    assert_eq!(cleared.sheet_drawable_comment(0, text_box)?, None);
+
+    let Err(comment::Error::Refused(Refusal::NotCommentable { .. })) =
+        created.edit_sheet_drawable_comment(0, DrawableSelector::of(Kind::Table, 0))
+    else {
+        return Err("a table takes no direct comment".into());
+    };
+    Ok(())
+}
+
+#[test]
+fn a_sheet_image_takes_new_data_and_its_inverse_restores_the_asset() -> TestResult {
+    use litchi_numbers::sheet::drawable::media::{self, Refusal};
+
+    let package = open("image-adjustments-native.numbers")?;
+    let assets = package.media_assets()?;
+    assert!(!assets.is_empty());
+    assert!(
+        package
+            .sheet_media_assets(0)?
+            .iter()
+            .all(|asset| assets.contains(asset))
+    );
+    let mut edit = package.edit_media();
+    edit.replace_data(0, DrawableSelector::image(0), b"litchi replacement")?;
+    let replaced = edit.commit()?;
+    let changed: Vec<_> = replaced
+        .package()
+        .media_assets()?
+        .into_iter()
+        .filter(|asset| !assets.contains(asset))
+        .collect();
+    let [asset] = changed.as_slice() else {
+        return Err("exactly one asset changes".into());
+    };
+    assert_eq!(
+        replaced.package().extract_media(asset.data())?,
+        b"litchi replacement"
+    );
+    let restored = replaced
+        .package()
+        .apply_media(&replaced.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+
+    let mut edit = package.edit_media();
+    let Err(media::Error::Refused(Refusal::EmptyData)) =
+        edit.replace_data(0, DrawableSelector::image(0), b"")
+    else {
+        return Err("empty data must be refused".into());
+    };
+    let created = open("basic.numbers")?;
+    let mut edit = created.edit_media();
+    edit.replace_poster(0, DrawableSelector::of(Kind::Table, 0), b"x")?;
+    let Err(media::Error::Refused(Refusal::NoMedia { .. })) = edit.commit() else {
+        return Err("a table has no poster".into());
+    };
+    Ok(())
+}
+
+#[test]
+fn a_duplicate_shares_its_media_and_only_text_boxes_take_new_text() -> TestResult {
+    let package = open("image-adjustments-native.numbers")?;
+    let before = package.sheet_drawable_list(0)?.len();
+    let assets = package.media_assets()?;
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.duplicate(DrawableSelector::image(0))?;
+    let duplicated = edit.commit()?;
+    let list = duplicated.package().sheet_drawable_list(0)?;
+    assert_eq!(list.len(), before + 1);
+    assert_eq!(list[before].kind(), Kind::Image);
+    let shared = |assets: &[drawable::media::Embedded]| {
+        assets.iter().map(|asset| asset.data()).collect::<Vec<_>>()
+    };
+    assert_eq!(
+        shared(&duplicated.package().media_assets()?),
+        shared(&assets)
+    );
+    let restored = duplicated
+        .package()
+        .apply_sheet_drawables(&duplicated.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+
+    let mut edit = package.edit_sheet_drawables(0)?;
+    let Err(drawable::Error::Refused(drawable::Refusal::UnsupportedOperation { .. })) =
+        edit.duplicate_text_box(DrawableSelector::image(0), "x")
+    else {
+        return Err("an image is not a text box".into());
+    };
+    Ok(())
+}
+
+#[test]
+fn a_new_image_embeds_its_data_and_bad_media_is_refused() -> TestResult {
+    use litchi_numbers::sheet::drawable::{ImageOptions, Size};
+
+    let package = open("basic.numbers")?;
+    let png = b"\x89PNG\r\n\x1a\nlitchi".as_slice();
+    let options = ImageOptions::new(
+        Point { x: 10.0, y: 20.0 },
+        Size {
+            width: 30.0,
+            height: 40.0,
+        },
+    );
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_image("dot.png", png, options)?;
+    let created = edit.commit()?.into_package();
+    let list = created.sheet_drawable_list(0)?;
+    assert_eq!(list.last().map(drawable::Drawable::kind), Some(Kind::Image));
+    let asset = created
+        .media_assets()?
+        .into_iter()
+        .find(|asset| asset.preferred_file_name() == "dot.png")
+        .ok_or("no asset")?;
+    assert_eq!(created.extract_media(asset.data())?, png);
+
+    let mut edit = package.edit_sheet_drawables(0)?;
+    for (name, data) in [
+        ("dot.mov", png),
+        ("dot.png", b"".as_slice()),
+        ("../dot.png", png),
+    ] {
+        let Err(drawable::Error::Refused(drawable::Refusal::InvalidMedia)) =
+            edit.add_image(name, data, options)
+        else {
+            return Err(format!("{name} must be refused").into());
+        };
+    }
+    Ok(())
+}
+
+#[test]
+fn chart_series_values_round_trip_and_name_every_series() -> TestResult {
+    use litchi_numbers::sheet::chart::series::{Property, PropertyKind, Refusal, error_bar};
+
+    let package = open("chart-data-native.numbers")?;
+    let Property::ErrorBars(bars) = package.sheet_chart_series(0, 0, PropertyKind::ErrorBars)?
+    else {
+        return Err("error bars".into());
+    };
+    let mut edit = package.edit_sheet_chart_series(0, 0)?;
+    edit.set(Property::ErrorBars(bars.clone()))?;
+    assert!(!edit.commit()?.diagnostics().changed());
+
+    let mut wrong = bars.clone();
+    wrong.push(error_bar::Series::None);
+    let mut edit = package.edit_sheet_chart_series(0, 0)?;
+    edit.set(Property::ErrorBars(wrong))?;
+    let Err(litchi_numbers::sheet::chart::series::Error::Refused(Refusal::SeriesCount {
+        expected,
+        given,
+    })) = edit.commit()
+    else {
+        return Err("a value for another series count must be refused".into());
+    };
+    assert_eq!((expected, given), (bars.len(), bars.len() + 1));
+    Ok(())
+}

@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use litchi_iwa_archive::SourceCatalog;
-use litchi_iwa_archive::package::{EntryEdit, SharedBytes};
+use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, SharedBytes};
 use litchi_iwa_core::{Archive, ArchiveObject, SnappyStream};
 
 use crate::TableSource;
@@ -594,8 +594,21 @@ impl<'p, P: TableLeaf> Working<'p, P> {
                 SnappyStream::compress(&bytes, snappy_limits).map_err(|error| map_core(&error))?;
             encoded.push((name.clone(), compressed));
         }
+        for (name, data) in &registry.entry_writes {
+            if encoded.iter().any(|(existing, _)| existing == name) {
+                return Err(Fault::Invalid);
+            }
+            reserve(&mut encoded, 1)?;
+            encoded.push((name.clone(), copy_bytes(data)?));
+        }
         let mut deleted: Vec<&str> = previews.clone();
         deleted.extend(emptied.iter().map(String::as_str));
+        deleted.extend(registry.deleted_entries());
+        let insertions: Vec<EntryInsertion<'_>> = registry
+            .entry_insertions
+            .iter()
+            .map(|(name, data)| EntryInsertion::new(name, data))
+            .collect();
         let edits: Vec<EntryEdit<'_>> = encoded
             .iter()
             .map(|(name, data)| EntryEdit::new(name, data))
@@ -603,14 +616,19 @@ impl<'p, P: TableLeaf> Working<'p, P> {
         let output = self
             .catalog
             .package()
-            .reassemble_with_changes_to_bytes(&[], &edits, &deleted, self.catalog.limits())
+            .reassemble_with_changes_to_bytes(&insertions, &edits, &deleted, self.catalog.limits())
             .map_err(|error| map_archive(&error))?;
         let bytes: Arc<[u8]> = output.into();
         let candidate = self
             .source
             .reopen_candidate(Arc::clone(&bytes))
             .map_err(|ReopenError| Fault::Verification)?;
-        verify_locality(self.catalog, &candidate, &encoded, &deleted)?;
+        let inserted: Vec<&str> = registry
+            .entry_insertions
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
+        verify_locality(self.catalog, &candidate, &encoded, &deleted, &inserted)?;
         Ok(Published {
             package: candidate,
             touched_components: encoded.len() + emptied.len(),
@@ -633,13 +651,19 @@ fn verify_locality(
     candidate: &dyn TableSource,
     rewritten: &[(String, Vec<u8>)],
     deleted: &[&str],
+    inserted: &[&str],
 ) -> FaultResult<()> {
     let after = candidate.physical().ok_or(Fault::Verification)?.package();
     let mut retained = source
         .package()
         .iter()
         .filter(|entry| !deleted.contains(&entry.name()));
+    let mut found = 0_usize;
     for entry in after.iter() {
+        if inserted.contains(&entry.name()) {
+            found += 1;
+            continue;
+        }
         let before = retained.next().ok_or(Fault::Verification)?;
         if before.name() != entry.name() {
             return Err(Fault::Verification);
@@ -649,7 +673,7 @@ fn verify_locality(
             return Err(Fault::Verification);
         }
     }
-    if retained.next().is_some() {
+    if retained.next().is_some() || found != inserted.len() {
         return Err(Fault::Verification);
     }
     Ok(())

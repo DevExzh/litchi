@@ -46,7 +46,7 @@ fn masked_date_time(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     Ok(decoded)
 }
 
-fn masked(known: KnownFields) -> KnownFields {
+pub(crate) fn masked(known: KnownFields) -> KnownFields {
     known.with(
         smart_field::DATE_TIME_MESSAGE_TYPE,
         "TSWP.DateTimeSmartFieldArchive (text-attribute UUID masked)",
@@ -249,7 +249,7 @@ fn run(
     Ok(())
 }
 
-fn settings() -> TestResult<[Settings; 2]> {
+pub(crate) fn settings() -> TestResult<[Settings; 2]> {
     Ok([
         Settings::fixed(
             Format::new("yyyy-MM-dd")?,

@@ -115,6 +115,7 @@ litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
 litchi-iwa-detect  = { workspace = true }
 litchi-iwa-protos  = { workspace = true }
+litchi-iwa-style   = { workspace = true }
 litchi-iwa-table   = { workspace = true }
 litchi-iwa-text    = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
@@ -123,6 +124,7 @@ litchi-numbers-wire = { workspace = true }
 phf                = { workspace = true }
 plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
 ryu                = { workspace = true }
+sha1               = { workspace = true }
 thiserror          = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

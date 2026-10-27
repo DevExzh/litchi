@@ -13,7 +13,7 @@ use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_numbers::Package;
 use litchi_numbers::sheet::chart::style::{
-    Property, PropertyKind, chart3d, corner, donut, legend, pie, radar,
+    Property, PropertyKind, RadarGridShape, chart3d, corner, donut, gaps, legend, pie, radar,
 };
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -114,6 +114,21 @@ fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestRes
             };
             e.set_sheet_chart_legend_frame(sheet, chart, frame)?;
         },
+        Property::LegendVisible(v) => e.set_sheet_chart_legend_visible(sheet, chart, v)?,
+        Property::BorderVisible(v) => e.set_sheet_chart_border_visible(sheet, chart, v)?,
+        Property::IncludesHiddenData(v) => {
+            e.set_sheet_chart_includes_hidden_data(sheet, chart, v)?;
+        },
+        Property::BarShape3d(v) => e.set_sheet_chart_3d_bar_shape(sheet, chart, v)?,
+        Property::RadarGridShape(v) => e.set_sheet_chart_radar_grid_shape(
+            sheet,
+            chart,
+            match v {
+                RadarGridShape::Curved => litchi_iwa::charts::ChartRadarGridShape::Curved,
+                _ => litchi_iwa::charts::ChartRadarGridShape::Straight,
+            },
+        )?,
+        Property::GapSpacing(v) => e.set_sheet_chart_gap_spacing(sheet, chart, v)?,
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -170,6 +185,18 @@ fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestRe
                 ),
             }
         },
+        PropertyKind::LegendVisible => format!("{:?}", e.sheet_chart_legend_visible(sheet, chart)?),
+        PropertyKind::BorderVisible => format!("{:?}", e.sheet_chart_border_visible(sheet, chart)?),
+        PropertyKind::IncludesHiddenData => {
+            format!("{:?}", e.sheet_chart_includes_hidden_data(sheet, chart)?)
+        },
+        PropertyKind::BarShape3d => format!("{:?}", e.sheet_chart_3d_bar_shape(sheet, chart)?),
+        PropertyKind::RadarGridShape => format!(
+            "{:?}",
+            e.sheet_chart_radar_grid_shape(sheet, chart)?
+                == litchi_iwa::charts::ChartRadarGridShape::Curved
+        ),
+        PropertyKind::GapSpacing => format!("{:?}", e.sheet_chart_gap_spacing(sheet, chart)?),
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -188,6 +215,14 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
             format!("{:?}", (v.radius().percent(), v.outside_corners_only()))
         },
         Property::LegendFrame(frame) => format!("{frame:?}"),
+        Property::LegendVisible(v)
+        | Property::BorderVisible(v)
+        | Property::IncludesHiddenData(v) => {
+            format!("{v:?}")
+        },
+        Property::BarShape3d(v) => format!("{v:?}"),
+        Property::RadarGridShape(v) => format!("{:?}", v == RadarGridShape::Curved),
+        Property::GapSpacing(v) => format!("{v:?}"),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -290,6 +325,66 @@ fn numbers_sheet_chart_style_reset_parity() -> TestResult {
 #[test]
 fn numbers_sheet_chart_style_read_parity() -> TestResult {
     for (kind, value) in cases()? {
+        let (input, sheet, chart) = input(kind)?;
+        for bytes in [
+            input.bytes.clone(),
+            host_write(&input.bytes, sheet, chart, value)?,
+        ] {
+            assert_eq!(
+                host_read(&bytes, sheet, chart, value.kind())?,
+                leaf_read(&bytes, value.kind())?,
+                "{kind:?} {value:?}"
+            );
+        }
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
+
+/// The chart-level option switches and values (legend, border, hidden data,
+/// 3D bar shape, radar grid, gaps).
+fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
+    Ok(vec![
+        (Kind::Column2d, Property::LegendVisible(false)),
+        (Kind::Column2d, Property::BorderVisible(true)),
+        (Kind::Column2d, Property::IncludesHiddenData(false)),
+        (
+            Kind::Column3d,
+            Property::BarShape3d(chart3d::BarShape::Cylinder),
+        ),
+        (
+            Kind::Radar2d,
+            Property::RadarGridShape(RadarGridShape::Curved),
+        ),
+        (
+            Kind::Column2d,
+            Property::GapSpacing(gaps::Spacing::new(
+                gaps::Percentage::new(25.0)?,
+                gaps::Percentage::new(80.0)?,
+            )),
+        ),
+    ])
+}
+
+#[test]
+fn numbers_sheet_chart_options_set_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    for (kind, value) in option_cases()? {
+        style_case("numbers_sheet_chart_options_set_parity", kind, value, false)
+            .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
+        // A host-added chart shows its legend, the native default hides it:
+        // the reset of a hidden legend is a no-op.
+        if value.kind() != PropertyKind::LegendVisible {
+            style_case("numbers_sheet_chart_options_set_parity", kind, value, true)
+                .map_err(|error| format!("{kind:?} {value:?} reset: {error}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_options_read_parity() -> TestResult {
+    for (kind, value) in option_cases()? {
         let (input, sheet, chart) = input(kind)?;
         for bytes in [
             input.bytes.clone(),
