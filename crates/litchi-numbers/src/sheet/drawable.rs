@@ -61,6 +61,15 @@ pub mod drop_cap {
     };
 }
 
+/// Exact-source highlight, comment and reply transactions for the text a
+/// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_annotations`].
+pub mod annotation {
+    pub use crate::package::sheet_drawable_annotation::{
+        Comment, Commit, Diagnostics, Edit, Error, Highlight, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
 /// Exact-source Date & Time field transactions for the text a sheet text
 /// box or shape owns: [`crate::Package::edit_sheet_drawable_date_time_fields`].
 pub mod date_time {

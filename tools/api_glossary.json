@@ -23283,6 +23283,7 @@
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::drawable::annotation",
         "litchi_numbers::sheet::drawable::date_time",
         "litchi_numbers::sheet::drawable::hyperlink",
         "litchi_numbers::sheet::drawable::drop_cap",
@@ -23350,6 +23351,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_drawable_date_time_fields",
           "ok": "litchi_numbers::sheet::drawable::date_time::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_annotations",
+          "ok": "litchi_numbers::sheet::drawable::annotation::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
@@ -24149,6 +24154,7 @@
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::drawable::annotation",
         "litchi_numbers::sheet::drawable::date_time",
         "litchi_numbers::sheet::drawable::hyperlink",
         "litchi_numbers::sheet::drawable::drop_cap",
@@ -24216,6 +24222,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_drawable_date_time_fields",
           "ok": "litchi_numbers::sheet::drawable::date_time::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_annotations",
+          "ok": "litchi_numbers::sheet::drawable::annotation::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
