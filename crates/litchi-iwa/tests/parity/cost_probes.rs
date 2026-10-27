@@ -295,3 +295,89 @@ fn numbers_topology_remove_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+fn highlight_rules() -> TestResult<Vec<litchi_numbers::cell::conditional_highlight::Rule>> {
+    use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    use litchi_numbers::cell::conditional_highlight::{Condition, Number, Rule, Style, Text};
+    let fill = Rgba::new(1.0, 0.8, 0.2, 1.0, RgbColorSpace::Srgb)?;
+    Ok(vec![
+        Rule::new(
+            Condition::GreaterThan(Number::new(2.5)?),
+            Style::with_fill(fill),
+        ),
+        Rule::new(
+            Condition::TextContains(Text::new("ot")?),
+            Style::with_fill(fill),
+        ),
+    ])
+}
+
+#[inline(never)]
+fn host_highlight(source: &[u8], clear: bool) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    if clear {
+        editor.clear_cell_conditional_highlighting(id, 1, 1)?;
+    } else {
+        editor.set_cell_conditional_highlighting(id, 1, 1, &highlight_rules()?)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_highlight(source: &[u8], clear: bool) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let at = litchi_numbers::table::At::new(1, 1);
+    let edit = package.edit_table_cell_conditional_highlights(0usize, 0usize)?;
+    let edit = if clear {
+        edit.clear(at)?
+    } else {
+        edit.set(at, highlight_rules()?)?
+    };
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Conditional highlighting on `basic.numbers` B2: two rules, then a clear
+/// on the host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_conditional_highlight_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let set = host_highlight(&input.bytes, false)?;
+    for (bytes, clear) in [(&input.bytes, false), (&set, true)] {
+        black_box(host_highlight(bytes, clear)?);
+        black_box(leaf_highlight(bytes, clear)?);
+        black_box(leaf_highlight(bytes, clear)?);
+        black_box(host_highlight(bytes, clear)?);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn host_resize(source: &[u8], rows: usize, columns: usize) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.resize_table(litchi_numbers::TableSelector::index(0), rows, columns)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_resize(source: &[u8], rows: u32, columns: u32) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let commit = package
+        .edit_table_resize(0usize, 0usize)?
+        .resize(rows, columns)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Growing the first table of `basic.numbers` by five rows and four columns.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_resize_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    Ok(())
+}

@@ -46,6 +46,39 @@ pub use crate::package::slide_drawable::{
     Commit, Created, Diagnostics, Drawable, Edit, Error, Geometry, ImageFormat, Kind, LimitKind,
     NewTable, Patch, Preset, Refusal, Style, TableCellValue, TextRun, TextSpan, Unsupported,
 };
+/// Hyperlink, lock and accessibility properties ([`Edit::set_properties`]).
+pub use crate::slide::media::MediaProperties;
+/// The axis of an Arrange Flip ([`Edit::flip`]).
+pub use litchi_iwa_common::shape::geometry::FlipAxis;
+/// Whole-text character and paragraph properties
+/// ([`Edit::set_text_property`], [`Edit::reset_text_property`]), the shared
+/// W1-D paragraph-style vocabulary.
+pub mod text_property {
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+/// Named paragraph-style vocabulary ([`Edit::apply_named_style`] and the
+/// named-style reads).
+pub mod named_style {
+    pub use litchi_iwa_text::paragraph::style::{
+        NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    };
+}
+/// Paragraph-list vocabulary ([`Edit::set_list`], [`Edit::set_list_property`]
+/// and the list reads), shared with the W1-D list engine.
+pub mod list {
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+/// A straight line's segment ([`Edit::set_line_segment`]).
+pub use litchi_iwa_common::shape::line::Segment;
 /// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
 /// the shared iWork shape vocabulary.
 pub use litchi_iwa_common::shape::path::{InnerRadiusRatio, PolygonSides, StarPoints};

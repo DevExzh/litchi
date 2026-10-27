@@ -119,3 +119,37 @@ pub fn rewrite_extents(
     })?;
     Ok(changed.then_some(output))
 }
+
+/// Rewrite the own owner's table extents that describe the table before a
+/// resize from `before` to `after`; an unset (sentinel) or unrelated extent
+/// stays (record 0370e).
+///
+/// # Errors
+///
+/// [`Error::Invalid`] for a malformed range.
+pub fn resize_extents(owner: &[u8], before: Extents, after: Extents) -> Result<Option<Vec<u8>>> {
+    let mut changed = false;
+    let output = rebuild(owner, |field| {
+        if field.number != 7 && field.number != 8 {
+            return Ok(None);
+        }
+        let spanning = rebuild(field.payload, |inner| {
+            let (old, new) = match inner.number {
+                2 => (before.total, after.total),
+                3 => (before.body, after.body),
+                _ => return Ok(None),
+            };
+            let values = range(inner.payload)?;
+            if is_sentinel(values) || values != old || values == new {
+                return Ok(None);
+            }
+            changed = true;
+            bytes_field(inner.number, &encode_range(new)?).map(Some)
+        })?;
+        if spanning == field.payload {
+            return Ok(None);
+        }
+        bytes_field(field.number, &spanning).map(Some)
+    })?;
+    Ok(changed.then_some(output))
+}
