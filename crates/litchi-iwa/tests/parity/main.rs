@@ -42,6 +42,7 @@ mod keynote_table_cases;
 mod keynote_text_annotation_cases;
 mod keynote_text_list_cases;
 mod keynote_text_property_cases;
+mod keynote_text_storage_cases;
 mod keynote_w1c_cost;
 mod numbers_cases;
 mod numbers_cell_list_cases;
