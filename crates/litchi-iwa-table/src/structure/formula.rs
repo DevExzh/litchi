@@ -27,7 +27,7 @@ use super::plan::{
     DeletionObjectLocation, FormulaPlan, GraphPlan, MessageEdit, ObjectRemoval, RemovalPlan,
 };
 use super::{Fault, FaultLimit};
-use crate::package::Package;
+use crate::TableSource;
 
 type Error = Fault;
 
@@ -47,8 +47,8 @@ const RANGE_PRECEDENTS_TILE_MESSAGE_TYPE: u32 = 4_010;
 /// family, private dependency tiles, global dependency rewrites, and the
 /// CalculationEngine replacement to a fresh removal plan.  No source archive
 /// is changed here, and all allocations happen before the plan is returned.
-pub(in crate::package) fn prepare(
-    package: &Package,
+pub fn prepare(
+    package: &dyn TableSource,
     graph: &GraphPlan,
     budget: &mut WireBudget,
 ) -> Result<FormulaPlan, Error> {
@@ -59,7 +59,7 @@ pub(in crate::package) fn prepare(
         });
     }
 
-    let components = package.state.components.catalog();
+    let components = package.catalog();
     let already_removed = object_removal_set(&graph.removals.object_removals)?;
     let Some(engine_component_index) = calculation_engine_component_index(components)? else {
         return Ok(FormulaPlan {

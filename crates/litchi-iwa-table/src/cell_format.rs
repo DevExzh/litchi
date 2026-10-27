@@ -25,7 +25,7 @@ pub mod control;
 pub mod data_format;
 /// The display-format families of an existing cell.
 pub mod display;
-mod metadata;
+pub(crate) mod metadata;
 /// The Pop-Up Menu reads, native graph rewrite and metadata transition.
 pub mod pop_up_menu;
 /// The package metadata registry facts and transitions a Pop-Up Menu edit
