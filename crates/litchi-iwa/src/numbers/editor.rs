@@ -202,6 +202,7 @@ mod sheet_duplicate;
 mod sheet_images;
 mod sheet_movies;
 mod sheet_shapes;
+mod sidebar;
 mod storage;
 mod stroke_layers;
 mod table_bootstrap;

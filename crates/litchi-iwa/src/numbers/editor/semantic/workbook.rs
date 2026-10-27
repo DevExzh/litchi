@@ -495,6 +495,10 @@ impl Draft {
         }
         removed_identifiers.extend([owner.table_info_id, table_id]);
         removed_identifiers.extend(private_owned_ids);
+        removed_identifiers.extend(super::super::sidebar::remove_node(
+            &mut staged,
+            owner.table_info_id,
+        )?);
         release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
 
         let source_built = !self.package.source_is_exact();
@@ -650,6 +654,7 @@ impl Draft {
             Ok(())
         })?;
 
+        super::super::sidebar::append_node(&mut staged, Some(sheet_id), new_info_id)?;
         let source_built = !self.package.source_is_exact();
         let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified

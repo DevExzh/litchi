@@ -4,8 +4,10 @@
 //! `edit_table_lifecycle`.
 
 use litchi_iwa::numbers;
+use prost::Message;
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
+use crate::known_fields::{Decoded, decode_as, decoded};
 use crate::leaf_bytes;
 
 #[derive(Clone, Copy, Debug)]
@@ -229,6 +231,150 @@ fn numbers_table_resize_corpus_parity() -> TestResult {
     eprintln!("resize routes compared: {compared}");
     if failures.is_empty() {
         assert!(compared >= 60, "only {compared} routes compared");
+        Ok(())
+    } else {
+        Err(failures.join("\n").into())
+    }
+}
+
+/// `TST.TableModelArchive` without its table UUID: a new table's UUID is
+/// a fresh version-4 identity on the leaf and a model-derived one on the
+/// host (record 0370f, a documented policy: compared by form, below).
+fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut model = litchi_iwa_protos::tst::TableModelArchive::decode(data)?;
+    assert_eq!(model.table_id.len(), 36, "table UUID form");
+    model.table_id.clear();
+    Ok(decoded(model, data))
+}
+
+/// `TSCE.FormulaOwnerDependenciesArchive` without its owner UUID (derived
+/// from the table UUID).
+fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut owner = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(data)?;
+    owner.formula_owner_uid = Default::default();
+    Ok(decoded(owner, data))
+}
+
+/// `TSCE.CalculationEngineArchive` without its owner map's UUIDs (one is
+/// derived from the new table UUID).
+fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut engine = litchi_iwa_protos::tsce::CalculationEngineArchive::decode(data)?;
+    if let Some(map) = engine.dependency_tracker.owner_id_map.as_mut() {
+        for entry in &mut map.map_entry {
+            entry.owner_id = Default::default();
+        }
+    }
+    Ok(decoded(engine, data))
+}
+
+/// The fixtures whose owner map holds internal identifiers above every
+/// owner object: the host allocates a colliding internal identifier there,
+/// the leaf one above the map (record 0368a, a documented difference).
+const OWNER_MAP_COLLISIONS: [&str; 2] = [
+    "iwork/numbers/chart-arrangement-native.numbers",
+    "iwork/numbers/shared-model-native.numbers",
+];
+
+fn owner_without_identities(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut owner = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(data)?;
+    owner.formula_owner_uid = Default::default();
+    owner.internal_formula_owner_id = 0;
+    Ok(decoded(owner, data))
+}
+
+fn engine_without_owner_identities(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut engine = litchi_iwa_protos::tsce::CalculationEngineArchive::decode(data)?;
+    if let Some(map) = engine.dependency_tracker.owner_id_map.as_mut() {
+        for entry in &mut map.map_entry {
+            entry.owner_id = Default::default();
+            entry.internal_owner_id = 0;
+        }
+    }
+    Ok(decoded(engine, data))
+}
+
+fn run_table_add(name: &'static str, tier: Tier, input: &Fixture, sheet: usize) -> TestResult {
+    let collides = OWNER_MAP_COLLISIONS.contains(&input.path);
+    Case::new(name, Format::Numbers, tier, Evidence::Queued, input)
+        .leaf_structural_metadata()
+        .known_fields(|known| {
+            known
+                .with(
+                    6_001,
+                    "TST.TableModelArchive (table UUID by form)",
+                    model_without_table_uuid,
+                )
+                .with(
+                    4_008,
+                    "TSCE.FormulaOwnerDependenciesArchive (owner UUID by form)",
+                    if collides {
+                        owner_without_identities
+                    } else {
+                        owner_without_uuid
+                    },
+                )
+                .with(
+                    4_000,
+                    "TSCE.CalculationEngineArchive (owner-map UUIDs by form)",
+                    if collides {
+                        engine_without_owner_identities
+                    } else {
+                        engine_without_owner_uuids
+                    },
+                )
+                .with(
+                    6_267,
+                    "TST.ColumnRowUIDMapArchive",
+                    decode_as::<litchi_iwa_protos::tst::ColumnRowUidMapArchive>,
+                )
+                .with(
+                    6_305,
+                    "TST.StrokeSidecarArchive",
+                    decode_as::<litchi_iwa_protos::tst::StrokeSidecarArchive>,
+                )
+        })
+        .host(|source| host_route(source, Operation::AddTable(sheet)))
+        .leaf(|source| leaf_route(source, Operation::AddTable(sheet)))
+        .read("leaf shape", leaf_shape)
+        .run()?;
+    Ok(())
+}
+
+/// Adding a table to the first sheet of `basic.numbers`.
+#[test]
+fn numbers_table_add_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    run_table_add("numbers_table_add_parity", Tier::B, &input, 0)
+}
+
+/// Adding a table to each corpus fixture's first sheet.
+#[test]
+fn numbers_table_add_corpus_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let mut failures = Vec::new();
+    let mut compared = 0;
+    for path in crate::numbers_cases::NUMBERS_CORPUS {
+        let input = fixture(path)?;
+        match (
+            host_route(&input.bytes, Operation::AddTable(0)),
+            leaf_route(&input.bytes, Operation::AddTable(0)),
+        ) {
+            (Ok(_), Ok(_)) => {
+                compared += 1;
+                if let Err(error) =
+                    run_table_add("numbers_table_add_corpus_parity", Tier::B, &input, 0)
+                {
+                    failures.push(format!("{path}: {error}"));
+                }
+            },
+            (Ok(_), Err(error)) => failures.push(format!("{path}: leaf refuses: {error}")),
+            (Err(host), Ok(_)) => eprintln!("{path}: host refuses ({host}); the leaf edits"),
+            (Err(_), Err(_)) => {},
+        }
+    }
+    eprintln!("table-add routes compared: {compared}");
+    if failures.is_empty() {
         Ok(())
     } else {
         Err(failures.join("\n").into())
