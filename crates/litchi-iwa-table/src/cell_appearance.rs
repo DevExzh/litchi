@@ -21,7 +21,9 @@ use std::fmt;
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_common::shape::stroke::Stroke;
 use litchi_iwa_common::table::cell::layout::{Inset, Insets, TextWrap, VerticalAlignment};
+use litchi_iwa_common::table::cell::{BorderSide, Borders};
 use litchi_iwa_common::wire::{
     WireView, append_repeated_length_delimited_field, patch_varint_field,
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
@@ -269,17 +271,36 @@ pub struct Rewrite {
     pub remove_references: Vec<u64>,
 }
 
-/// A new cell-style variation object.
+/// A new single-message object: a cell-style variation or a stroke layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NewStyle {
+pub struct NewObject {
     /// Its identifier (the caller's).
     pub identifier: u64,
-    /// The stylesheet object whose component receives the object (appended).
-    pub stylesheet: u64,
-    /// The `TST.CellStyleArchive` payload.
+    /// The object whose component receives the new object (appended): the
+    /// stylesheet of a variation, the stroke sidecar of a layer.
+    pub beside: u64,
+    /// The message type.
+    pub message_type: u32,
+    /// The message versions to record (`None`: the archive default).
+    pub versions: Option<[u32; 3]>,
+    /// The payload.
     pub data: Vec<u8>,
-    /// Its message's object references (the parent style).
+    /// Its message's object references.
     pub object_references: Vec<u64>,
+}
+
+/// A reference added to every field record of a message header that
+/// already lists `sibling` (the host's `add_message_object_reference`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldReference {
+    /// The object.
+    pub object: u64,
+    /// Its message type.
+    pub message_type: u32,
+    /// The existing reference whose field records gain `reference`.
+    pub sibling: u64,
+    /// The added reference.
+    pub reference: u64,
 }
 
 /// One package-metadata registry change.
@@ -314,13 +335,15 @@ pub struct Plan {
     /// Payload rewrites, in application order (one per object and type; a
     /// later rewrite of the same message replaces an earlier one).
     pub rewrites: Vec<Rewrite>,
-    /// A new style variation.
-    pub insertion: Option<NewStyle>,
+    /// A new object.
+    pub insertion: Option<NewObject>,
     /// A style variation to delete (with its stylesheet entries, already in
     /// [`Self::rewrites`]).
     pub removal: Option<u64>,
     /// Registry changes, in host order.
     pub registrations: Vec<Registration>,
+    /// Field-level header references to add.
+    pub field_references: Vec<FieldReference>,
 }
 
 // ----------------------------------------------------------------------------
@@ -1217,9 +1240,11 @@ pub fn plan_set(
     });
     Ok(Some(Plan {
         rewrites,
-        insertion: Some(NewStyle {
+        insertion: Some(NewObject {
             identifier: fresh,
-            stylesheet,
+            beside: stylesheet,
+            message_type: CELL_STYLE_MESSAGE_TYPE,
+            versions: Some(CELL_STYLE_VERSIONS),
             data,
             object_references: vec![parent],
         }),
@@ -1232,6 +1257,7 @@ pub fn plan_set(
             },
             Registration::Watermark(fresh),
         ],
+        field_references: Vec::new(),
     }))
 }
 
@@ -1360,6 +1386,7 @@ pub fn plan_reset(
             insertion: None,
             removal,
             registrations,
+            field_references: Vec::new(),
         }));
     }
 
@@ -1371,4 +1398,327 @@ pub fn plan_reset(
         fresh,
         limits,
     )
+}
+
+// ----------------------------------------------------------------------------
+// Cell borders (the host's `stroke_layers::{cell_borders, set_cell_border}`)
+
+const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
+const STROKE_LAYER_MESSAGE_TYPE: u32 = 6_306;
+const MODEL_STROKE_SIDECAR: u32 = 49;
+const SIDECAR_MAX_ORDER: u32 = 1;
+const SIDECAR_COLUMN_COUNT: u32 = 2;
+const SIDECAR_ROW_COUNT: u32 = 3;
+const LAYER_INDEX: u32 = 1;
+const LAYER_RUNS: u32 = 2;
+const RUN_ORIGIN: u32 = 1;
+const RUN_LENGTH: u32 = 2;
+const RUN_STROKE: u32 = 3;
+const RUN_ORDER: u32 = 4;
+
+/// The sidecar field listing one side's layers; whether the side's layers
+/// are indexed by row (top and bottom) or by column (left and right).
+const fn side_field(side: BorderSide) -> (u32, bool) {
+    match side {
+        BorderSide::Left => (4, false),
+        BorderSide::Right => (5, false),
+        BorderSide::Top => (6, true),
+        BorderSide::Bottom => (7, true),
+    }
+}
+
+/// One decoded stroke run.
+#[derive(Debug, Clone, Copy)]
+struct Run {
+    origin: u32,
+    length: u32,
+    order: u32,
+}
+
+fn decode_run(raw: &[u8], axis_length: u32) -> Result<Run> {
+    let origin = varint(raw, RUN_ORIGIN)?.ok_or(invalid("a stroke run has no origin"))?;
+    let origin =
+        u32::try_from(origin).map_err(|_error| invalid("a stroke run origin is negative"))?;
+    let length =
+        u32::try_from(varint(raw, RUN_LENGTH)?.ok_or(invalid("a stroke run has no length"))?)
+            .map_err(|_error| invalid("a stroke run length exceeds u32"))?;
+    if length == 0
+        || origin
+            .checked_add(length)
+            .is_none_or(|end| end > axis_length)
+    {
+        return Err(invalid("a stroke run leaves its axis"));
+    }
+    let order = u32::try_from(varint(raw, RUN_ORDER)?.unwrap_or(0))
+        .map_err(|_error| invalid("a stroke run order exceeds u32"))?;
+    Ok(Run {
+        origin,
+        length,
+        order,
+    })
+}
+
+fn decode_stroke(raw: &[u8]) -> Result<Option<Stroke>> {
+    let stroke = message(raw, RUN_STROKE)?.ok_or(invalid("a stroke run has no stroke"))?;
+    let stored = litchi_iwa_protos::shape_style_codec::native::stroke(
+        stroke,
+        litchi_iwa_protos::chart_style_codec::Limits::DEFAULT,
+    )
+    .map_err(wire("malformed cell border"))?;
+    litchi_iwa_style::drawing::stroke(&stored).map_err(wire("unsupported cell border"))
+}
+
+struct Sidecar<'a> {
+    identifier: u64,
+    message_type: u32,
+    payload: &'a [u8],
+}
+
+fn sidecar<'a>(source: &'a dyn TableSource, target: Target, table: &Table) -> Result<Sidecar<'a>> {
+    let (_, model) = unique_payload(source, target.model_identifier, &[TABLE_MODEL_MESSAGE_TYPE])?;
+    let identifier = reference(model, MODEL_STROKE_SIDECAR)?
+        .ok_or(invalid("the table has no stroke sidecar"))?;
+    let (message_type, payload) =
+        unique_payload(source, identifier, &[STROKE_SIDECAR_MESSAGE_TYPE])?;
+    if varint(payload, SIDECAR_COLUMN_COUNT)? != Some(u64::from(table.columns))
+        || varint(payload, SIDECAR_ROW_COUNT)? != Some(u64::from(table.rows))
+    {
+        return Err(invalid("the stroke sidecar disagrees with the table size"));
+    }
+    Ok(Sidecar {
+        identifier,
+        message_type,
+        payload,
+    })
+}
+
+fn layer_references(sidecar: &[u8], side: BorderSide) -> Result<Vec<u64>> {
+    messages(sidecar, side_field(side).0)?
+        .into_iter()
+        .map(|reference| varint(reference, 1)?.ok_or(invalid("a layer reference is empty")))
+        .collect()
+}
+
+/// (fixed index, traversal index, traversal axis length) of a cell side.
+const fn side_coordinate(side: BorderSide, target: Target, table: &Table) -> (u32, u32, u32) {
+    if side_field(side).1 {
+        (target.row, target.column, table.columns)
+    } else {
+        (target.column, target.row, table.rows)
+    }
+}
+
+/// The explicit borders of one cell: on each side, the highest-order run
+/// covering the cell in the side's layer at the cell's index.
+///
+/// # Errors
+///
+/// [`Error::Refused`] for a cell outside the table; [`Error::InvalidSource`]
+/// for a malformed sidecar or layer.
+pub fn borders(source: &dyn TableSource, target: Target) -> Result<Borders> {
+    let table = Table::read(source, target.model_identifier)?;
+    table.check(target)?;
+    let sidecar = sidecar(source, target, &table)?;
+    let mut borders = Borders::default();
+    let mut seen = HashSet::new();
+    for side in BorderSide::ALL {
+        let (fixed, traversal, axis_length) = side_coordinate(side, target, &table);
+        let mut selected: Option<(u32, usize, &[u8])> = None;
+        let mut encounter = 0;
+        for layer in layer_references(sidecar.payload, side)? {
+            if !seen.insert(layer) {
+                return Err(invalid("the stroke sidecar repeats a layer"));
+            }
+            let (_, payload) = unique_payload(source, layer, &[STROKE_LAYER_MESSAGE_TYPE])?;
+            if varint(payload, LAYER_INDEX)? != Some(u64::from(fixed)) {
+                continue;
+            }
+            for raw in messages(payload, LAYER_RUNS)? {
+                encounter += 1;
+                let run = decode_run(raw, axis_length)?;
+                if !(run.origin..run.origin + run.length).contains(&traversal) {
+                    continue;
+                }
+                if selected.is_none_or(|(order, index, _)| (run.order, encounter) > (order, index))
+                {
+                    selected = Some((run.order, encounter, raw));
+                }
+            }
+        }
+        if let Some((_, _, raw)) = selected {
+            borders.set(side, decode_stroke(raw)?);
+        }
+    }
+    Ok(borders)
+}
+
+fn encode_run(origin: u32, stroke: Option<Stroke>, order: u32) -> Vec<u8> {
+    let mut output = Vec::new();
+    push_varint_field(&mut output, RUN_ORIGIN, u64::from(origin));
+    push_varint_field(&mut output, RUN_LENGTH, 1);
+    push_message(
+        &mut output,
+        RUN_STROKE,
+        &litchi_iwa_style::drawing::encode_stroke(stroke),
+    );
+    push_varint_field(&mut output, RUN_ORDER, u64::from(order));
+    output
+}
+
+/// Plan giving one cell side an explicit stroke (`None`: an explicitly
+/// cleared edge, the host's empty-pattern stroke). `fresh` is the
+/// identifier a new layer gets.
+///
+/// # Errors
+///
+/// As [`borders`].
+pub fn plan_border(
+    source: &dyn TableSource,
+    target: Target,
+    side: BorderSide,
+    stroke: Option<Stroke>,
+    fresh: u64,
+) -> Result<Plan> {
+    let table = Table::read(source, target.model_identifier)?;
+    table.check(target)?;
+    let sidecar = sidecar(source, target, &table)?;
+    let (fixed, traversal, axis_length) = side_coordinate(side, target, &table);
+
+    // The next order: one above every run and the sidecar's maximum.
+    let mut highest = 0;
+    let mut seen = HashSet::new();
+    for each in BorderSide::ALL {
+        for layer in layer_references(sidecar.payload, each)? {
+            if !seen.insert(layer) {
+                return Err(invalid("the stroke sidecar repeats a layer"));
+            }
+            let (_, payload) = unique_payload(source, layer, &[STROKE_LAYER_MESSAGE_TYPE])?;
+            for raw in messages(payload, LAYER_RUNS)? {
+                highest = highest.max(
+                    u32::try_from(varint(raw, RUN_ORDER)?.unwrap_or(0))
+                        .map_err(|_error| invalid("a stroke run order exceeds u32"))?,
+                );
+            }
+        }
+    }
+    let previous_max = varint(sidecar.payload, SIDECAR_MAX_ORDER)?;
+    let next = highest
+        .max(
+            u32::try_from(previous_max.unwrap_or(0))
+                .map_err(|_error| invalid("the stroke order exceeds u32"))?,
+        )
+        .checked_add(1)
+        .ok_or(invalid("the stroke order overflows"))?;
+
+    let mut rewrites = Vec::new();
+    let mut insertion = None;
+    let mut registrations = Vec::new();
+    let mut field_references = Vec::new();
+    let side_layers = layer_references(sidecar.payload, side)?;
+    let mut existing = None;
+    for layer in &side_layers {
+        let (layer_type, payload) = unique_payload(source, *layer, &[STROKE_LAYER_MESSAGE_TYPE])?;
+        if varint(payload, LAYER_INDEX)? == Some(u64::from(fixed)) {
+            if existing.is_some() {
+                return Err(invalid("a border side has two layers at one index"));
+            }
+            existing = Some((*layer, layer_type, payload));
+        }
+    }
+    let mut sidecar_data = patch_varint_field(
+        sidecar.payload,
+        SIDECAR_MAX_ORDER,
+        previous_max.is_some(),
+        Some(u64::from(next)),
+    )
+    .map_err(wire("stroke sidecar order"))?;
+    if let Some((layer, layer_type, payload)) = existing {
+        let raws = messages(payload, LAYER_RUNS)?;
+        let mut effective: Option<(u32, usize)> = None;
+        for (index, raw) in raws.iter().enumerate() {
+            let run = decode_run(raw, axis_length)?;
+            if (run.origin..run.origin + run.length).contains(&traversal) {
+                effective = effective.max(Some((run.order, index)));
+            }
+        }
+        let mut runs = raws.iter().map(|raw| raw.to_vec()).collect::<Vec<_>>();
+        let replace = effective.and_then(|(_, index)| {
+            decode_run(raws[index], axis_length)
+                .ok()
+                .filter(|run| run.origin == traversal && run.length == 1)
+                .map(|_| index)
+        });
+        if let Some(index) = replace {
+            let raw = raws[index];
+            let data = litchi_iwa_common::wire::patch_length_delimited_field(
+                raw,
+                RUN_STROKE,
+                true,
+                Some(&litchi_iwa_style::drawing::encode_stroke(stroke)),
+            )
+            .map_err(wire("stroke run"))?;
+            runs[index] = patch_varint_field(
+                &data,
+                RUN_ORDER,
+                varint(raw, RUN_ORDER)?.is_some(),
+                Some(u64::from(next)),
+            )
+            .map_err(wire("stroke run order"))?;
+        } else {
+            runs.push(encode_run(traversal, stroke, next));
+        }
+        rewrites.push(Rewrite {
+            identifier: layer,
+            message_type: layer_type,
+            data: rewrite_repeated_length_delimited_fields(payload, LAYER_RUNS, &runs)
+                .map_err(wire("stroke layer"))?,
+            add_references: Vec::new(),
+            remove_references: Vec::new(),
+        });
+    } else {
+        let mut layer = Vec::new();
+        push_varint_field(&mut layer, LAYER_INDEX, u64::from(fixed));
+        push_message(&mut layer, LAYER_RUNS, &encode_run(traversal, stroke, next));
+        insertion = Some(NewObject {
+            identifier: fresh,
+            beside: sidecar.identifier,
+            message_type: STROKE_LAYER_MESSAGE_TYPE,
+            versions: None,
+            data: layer,
+            object_references: Vec::new(),
+        });
+        let field = side_field(side).0;
+        let mut references = messages(&sidecar_data, field)?
+            .into_iter()
+            .map(<[u8]>::to_vec)
+            .collect::<Vec<_>>();
+        references.push(reference_payload(fresh));
+        sidecar_data = rewrite_repeated_length_delimited_fields(&sidecar_data, field, &references)
+            .map_err(wire("stroke sidecar layers"))?;
+        field_references.push(FieldReference {
+            object: sidecar.identifier,
+            message_type: sidecar.message_type,
+            sibling: side_layers.first().copied().unwrap_or(fresh),
+            reference: fresh,
+        });
+        registrations.push(Registration::Watermark(fresh));
+    }
+    rewrites.push(Rewrite {
+        identifier: sidecar.identifier,
+        message_type: sidecar.message_type,
+        data: sidecar_data,
+        add_references: insertion
+            .as_ref()
+            .map(|new: &NewObject| new.identifier)
+            .into_iter()
+            .collect(),
+        remove_references: Vec::new(),
+    });
+    Ok(Plan {
+        rewrites,
+        insertion,
+        removal: None,
+        registrations,
+        field_references,
+    })
 }
