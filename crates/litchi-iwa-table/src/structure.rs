@@ -19,6 +19,7 @@
 
 pub mod budget;
 pub mod collect;
+pub mod duplicate;
 pub mod formula;
 pub mod metadata;
 pub mod plan;

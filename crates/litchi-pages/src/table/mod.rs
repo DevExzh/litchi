@@ -53,6 +53,8 @@ pub mod deletion {
 }
 /// Effective style, gridline, banding, and row-sizing settings for a body table.
 pub mod appearance;
+/// Cell fill and text layout of one body-table cell (record 0371).
+pub mod cell_appearance;
 /// Checked, archive-free row and column dimension values.
 pub mod dimension;
 /// Lossless header, footer, freeze, and print-repetition settings.
