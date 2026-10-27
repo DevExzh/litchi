@@ -19,6 +19,8 @@ enum Operation {
     /// Duplicate table `.1` of sheet `.0` (the host's selector counts
     /// tables across the workbook; the cases use the first sheet).
     DuplicateTable(usize, usize),
+    /// Duplicate sheet `.0`.
+    DuplicateSheet(usize),
 }
 
 fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
@@ -41,6 +43,9 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
         Operation::DuplicateTable(_sheet, table) => {
             editor.duplicate_table(litchi_numbers::TableSelector::index(table))?;
         },
+        Operation::DuplicateSheet(sheet) => {
+            editor.duplicate_sheet(litchi_numbers::SheetSelector::index(sheet))?;
+        },
         Operation::RemoveTable(_sheet, table) => {
             // The host's selector counts tables across the workbook; the
             // cases remove a table of the first sheet.
@@ -53,11 +58,12 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
 fn leaf_route(source: &[u8], operation: Operation) -> TestResult<LeafRun> {
     let package = litchi_numbers::Package::from_bytes(source)?;
     let (output, restored) = match operation {
-        Operation::AddSheet | Operation::RemoveSheet(_) => {
+        Operation::AddSheet | Operation::RemoveSheet(_) | Operation::DuplicateSheet(_) => {
             let edit = package.edit_sheet_lifecycle();
             let edit = match operation {
                 Operation::AddSheet => edit.add("Added Sheet")?,
                 Operation::RemoveSheet(sheet) => edit.remove(sheet)?,
+                Operation::DuplicateSheet(sheet) => edit.duplicate(sheet)?,
                 _ => unreachable!(),
             };
             let commit = edit.commit()?;
@@ -137,9 +143,11 @@ fn corpus(name: &'static str, tier: Tier, operation: Operation) -> TestResult {
                 }
             },
             (Ok(_), Err(error)) => {
-                if !(matches!(operation, Operation::RemoveSheet(_))
-                    && SHEET_REMOVAL_REFUSALS.contains(path))
-                {
+                let drawables_refused = matches!(operation, Operation::DuplicateSheet(_))
+                    && error.to_string() == "the sheet holds drawables other than tables";
+                let removal_refused = matches!(operation, Operation::RemoveSheet(_))
+                    && SHEET_REMOVAL_REFUSALS.contains(path);
+                if !(drawables_refused || removal_refused) {
                     failures.push(format!("{path} {operation:?}: leaf refuses: {error}"));
                 }
             },
@@ -602,4 +610,39 @@ fn run_owner_collision(
         .read("leaf shape", leaf_shape)
         .run()?;
     Ok(())
+}
+
+/// Duplicating the first sheet of `basic.numbers`, and of a two-sheet
+/// workbook whose second sheet holds a table.
+#[test]
+fn numbers_sheet_duplicate_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    run(
+        "numbers_sheet_duplicate_parity",
+        Tier::B,
+        &input,
+        Operation::DuplicateSheet(0),
+    )?;
+    for sheet in [0, 1] {
+        run(
+            "numbers_sheet_duplicate_parity",
+            Tier::B,
+            &two_sheets(true)?,
+            Operation::DuplicateSheet(sheet),
+        )
+        .map_err(|error| format!("sheet {sheet}: {error}"))?;
+    }
+    Ok(())
+}
+
+/// Duplicating the first sheet of each corpus fixture.
+#[test]
+fn numbers_sheet_duplicate_corpus_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    corpus(
+        "numbers_sheet_duplicate_corpus_parity",
+        Tier::B,
+        Operation::DuplicateSheet(0),
+    )
 }

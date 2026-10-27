@@ -2771,7 +2771,7 @@ canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
 
 - `sheet::lifecycle` — `Package::{edit_sheet_lifecycle,
   apply_sheet_lifecycle}`; `Edit::{add, remove}` (one operation per edit),
-  plus `sheet::lifecycle::InvalidName`.
+  plus `sheet::lifecycle::InvalidName`; `Edit::duplicate` since record 0370j.
 - `table::lifecycle` — `Package::{edit_table_lifecycle,
   apply_table_lifecycle}` over one sheet selector; `Edit::{add, remove,
   duplicate}` (`duplicate` since record 0370h).

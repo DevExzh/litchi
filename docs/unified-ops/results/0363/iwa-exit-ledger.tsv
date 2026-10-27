@@ -1252,7 +1252,7 @@ numbers/editor/sheet_charts/title.rs	remove_sheet_chart_title	1	numbers	chart.te
 numbers/editor/sheet_charts/title.rs	set_sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_delete.rs	remove_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_remove_parity	B	-	-
-numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_duplicate_parity	B	-	-
 numbers/editor/sheet_images.rs	add_sheet_image	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_images.rs	duplicate_sheet_image	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_images.rs	flip_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_image_flip_parity	A	-	-
