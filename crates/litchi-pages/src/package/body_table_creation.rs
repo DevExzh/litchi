@@ -10,7 +10,10 @@
 //! story at the requested UTF-16 position, shifting later text attributes
 //! as a native text insertion does. The table gets its own formula owner in
 //! the calculation engine, the clones of registered objects get registry
-//! UUIDs and every new cross-member reference is registered. Seeded cell
+//! UUIDs and every new cross-member reference is registered. The graph is
+//! the host editor's `add_table` graph (records 0370f and 0371): the
+//! same identifier order, model references, kept drawable frame and
+//! registration order; only the table UUID differs in value. Seeded cell
 //! values are then written by the body-table value transaction
 //! ([`crate::table::values`]); the patch covers both. No clock or
 //! randomness is consulted: the same insertion into the same source
@@ -576,6 +579,47 @@ fn declared(template: &ArchiveObject, data: &[u8], remap: &dyn Fn(u64) -> Option
     output
 }
 
+/// The objects a model payload references, sorted, as the host editor's
+/// `table_model_references` lists them (record 0370f): its style and owner
+/// references, and its data store's headers, tiles and lists.
+fn model_references(model: &[u8]) -> Result<Vec<u64>, Error> {
+    const MODEL_FIELDS: [u32; 43] = [
+        3, 24, 25, 26, 27, 18, 19, 20, 21, 30, 36, 48, 5, 34, 35, 38, 46, 49, 60, 61, 62, 63, 64,
+        65, 66, 67, 68, 69, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 85, 86, 87, 88, 89,
+    ];
+    const STORE_FIELDS: [u32; 15] = [2, 4, 5, 6, 11, 12, 16, 13, 15, 17, 18, 19, 20, 21, 22];
+    fn at(data: &[u8], path: &[u32], output: &mut Vec<u64>) -> Result<(), Error> {
+        match path {
+            [] => Ok(()),
+            [last] => {
+                output.extend(table_create::references(data, *last).map_err(storage)?);
+                Ok(())
+            },
+            [first, rest @ ..] => {
+                for payload in repeated_length_delimited_payloads(data, *first)
+                    .map_err(|_error| Error::InvalidSource)?
+                {
+                    at(payload, rest, output)?;
+                }
+                Ok(())
+            },
+        }
+    }
+    let mut output = Vec::new();
+    for field in MODEL_FIELDS {
+        at(model, &[field], &mut output)?;
+    }
+    at(model, &[4, 1, 2], &mut output)?;
+    at(model, &[4, 3, 1, 2], &mut output)?;
+    for field in STORE_FIELDS {
+        at(model, &[4, field], &mut output)?;
+    }
+    output.retain(|identifier| *identifier != 0);
+    output.sort_unstable();
+    output.dedup();
+    Ok(output)
+}
+
 /// The calculation engine (identifier, message index), when the document
 /// has one.
 fn engine(source: &Package) -> Result<Option<(u64, usize)>, Error> {
@@ -606,10 +650,11 @@ fn double(data: &[u8], number: u32) -> Option<f64> {
 }
 
 /// The template drawable's position, when it records one.
-fn template_position(info: &[u8]) -> Option<(f32, f32)> {
+/// The template drawable's geometry pair `member` (1 position, 2 size).
+fn template_geometry(info: &[u8], member: u32) -> Option<(f32, f32)> {
     let drawable = repeated_length_delimited_payloads(info, 1).ok()?;
     let geometry = repeated_length_delimited_payloads(drawable.first()?, 1).ok()?;
-    let position = repeated_length_delimited_payloads(geometry.first()?, 1).ok()?;
+    let position = repeated_length_delimited_payloads(geometry.first()?, member).ok()?;
     let view =
         litchi_iwa_common::wire::parse_wire_view(position.first()?, WireLimits::DEFAULT).ok()?;
     let mut point = (0.0_f32, 0.0_f32);
@@ -822,18 +867,21 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
         return Err(Error::Refused(Refusal::Unsupported));
     }
 
-    // Fresh identities.
-    let fresh_identifiers = working.allocate(owned.len() + 4)?;
-    let (info, new_model, attachment, owner) = (
-        fresh_identifiers[0],
-        fresh_identifiers[1],
-        fresh_identifiers[2],
-        fresh_identifiers[3],
-    );
+    // Fresh identities, in the host editor's order (record 0370f): the
+    // drawable, the model, the owned storage in source-identifier order,
+    // the formula owner (when the document has an engine), then the
+    // attachment.
+    let engine_root = engine(source)?;
+    let storage_count = owned.len();
+    let fresh_identifiers =
+        working.allocate(storage_count + 3 + usize::from(engine_root.is_some()))?;
+    let (info, new_model) = (fresh_identifiers[0], fresh_identifiers[1]);
+    let owner = fresh_identifiers[2 + storage_count];
+    let attachment = fresh_identifiers[fresh_identifiers.len() - 1];
     let remap: HashMap<u64, u64> = owned
         .keys()
         .copied()
-        .zip(fresh_identifiers[4..].iter().copied())
+        .zip(fresh_identifiers[2..2 + storage_count].iter().copied())
         .collect();
     let seed = working.identity_seed(info)?;
     let uuid = TableUuid::derive(seed);
@@ -846,14 +894,9 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
             return Err(Error::Refused(Refusal::Unsupported));
         };
         let member = working.locate(*identifier)?.ok_or(Error::InvalidSource)?;
-        let data = table_create::empty_storage(
-            *role,
-            &message.data,
-            table.rows,
-            table.columns,
-            table_create::mix(seed ^ remap[identifier]),
-        )
-        .map_err(storage)?;
+        let data =
+            table_create::empty_storage(*role, &message.data, table.rows, table.columns, new_model)
+                .map_err(storage)?;
         let clone = fresh(
             &working,
             remap[identifier],
@@ -888,9 +931,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     let column_width = double(&model_data, 17)
         .filter(|value| *value > 0.0)
         .ok_or(Error::Refused(Refusal::Unsupported))?;
-    let model_references = declared(&model_object, &model_data, &|identifier| {
-        remap.get(&identifier).copied()
-    });
+    let model_references = model_references(&model_data)?;
     let model_member = working
         .locate(template_model)?
         .ok_or(Error::InvalidSource)?;
@@ -905,25 +946,30 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     working.insert(&model_member, clone)?;
     inserted.push((new_model, template_model));
 
-    // The drawable, parented to the body story, sized by the defaults.
+    // The drawable, parented to the body story.
+    // The host editor keeps the template drawable's geometry; a template
+    // without a size gets the default row and column extents.
     #[expect(
         clippy::cast_possible_truncation,
         reason = "native drawable geometry is single precision"
     )]
     let frame = {
-        let (x, y) = template_position(&info_template).unwrap_or((0.0, 0.0));
+        let (x, y) = template_geometry(&info_template, 1).unwrap_or((0.0, 0.0));
+        let (width, height) = template_geometry(&info_template, 2).unwrap_or((
+            (column_width * f64::from(table.columns)) as f32,
+            (row_height * f64::from(table.rows)) as f32,
+        ));
         Frame {
             x,
             y,
-            width: (column_width * f64::from(table.columns)) as f32,
-            height: (row_height * f64::from(table.rows)) as f32,
+            width,
+            height,
         }
     };
     let info_data =
         table_create::info_payload(&info_template, body, new_model, frame).map_err(storage)?;
-    let info_references = declared(&info_object, &info_data, &|identifier| {
-        (identifier == template_model).then_some(new_model)
-    });
+    // The parent and the model, as the host editor declares them.
+    let info_references = vec![body, new_model];
     let info_member = working.locate(template_info)?.ok_or(Error::InvalidSource)?;
     let clone = fresh(
         &working,
@@ -981,7 +1027,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
 
     // The table's own formula owner, when the document has an engine.
     let mut references = References::default();
-    if let Some((engine_id, engine_index)) = engine(source)? {
+    if let Some((engine_id, engine_index)) = engine_root {
         let engine_member = working.locate(engine_id)?.ok_or(Error::InvalidSource)?;
         let engine_data = working.object(engine_id)?.messages[engine_index]
             .data
@@ -1028,18 +1074,24 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
             limits,
         )?;
         references.add(&working, &registry, owner, info)?;
+        // The host registers the new owner's UUID; it has no template, so
+        // it is listed as its own.
+        inserted.push((owner, owner));
     }
 
     // Registry: UUIDs for the clones of registered objects, and every new
     // cross-member reference.
     let mut transition = Transition::default();
+    // In identifier order, as the host editor registers them.
+    inserted.sort_by_key(|(clone, _)| *clone);
     for (clone, template) in &inserted {
         let member = working.locate(*clone)?.ok_or(Error::InvalidSource)?;
         let component = registry.component_for_member(&member)?.identifier;
-        if registry
-            .uuids
-            .iter()
-            .any(|binding| binding.object == *template)
+        if clone == template
+            || registry
+                .uuids
+                .iter()
+                .any(|binding| binding.object == *template)
         {
             transition.register_uuid(&registry, component, *clone, seed)?;
         }
@@ -1052,7 +1104,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     }
     references.add(&working, &registry, body, attachment)?;
     transition.external_additions = references.additions;
-    let created_objects = inserted.len() + 1;
+    let created_objects = inserted.len();
     let (candidate, touched_components) = working.publish(&transition)?;
 
     // Read the new table back through the catalog and the cell reader.

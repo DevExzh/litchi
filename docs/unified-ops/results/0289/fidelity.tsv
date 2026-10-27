@@ -97,7 +97,7 @@ iwork/numbers/image-adjustments-retirement-resaved.numbers	numbers	exact		value-
 iwork/numbers/shared-model-native.numbers	numbers	exact		value-exact	/sheet[1] name: 105105 -> 78707 bytes, first difference at 57685	value-exact	table add+remove, row add+remove: 105105 -> 78725 bytes, first difference at 7914
 iwork/numbers/table-data-list-native.numbers	numbers	exact		value-exact	/sheet[1] name: 134196 -> 80787 bytes, first difference at 59718	value-exact	table add+remove, row add+remove: 134196 -> 80783 bytes, first difference at 13309
 iwork/numbers/table-merges-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136130 -> 81278 bytes, first difference at 60132	value-exact	table add+remove, row add+remove: 136130 -> 81276 bytes, first difference at 13643
-iwork/numbers/table-relocation-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 427012 -> 305386 bytes, first difference at 280493	value-exact	table add+remove, row add+remove: 427012 -> 305389 bytes, first difference at 280493
+iwork/numbers/table-relocation-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 427012 -> 305386 bytes, first difference at 280493	value-exact	table add+remove, row add+remove: 427012 -> 427015 bytes, first difference at 280493
 iwork/numbers/table-relocation-native.numbers	numbers	exact		value-exact	/sheet[1] name: 415992 -> 305312 bytes, first difference at 280396	value-exact	table add+remove, row add+remove: 415992 -> 305332 bytes, first difference at 215882
 iwork/pages/audio-playback-native-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/pages/audio-playback-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
