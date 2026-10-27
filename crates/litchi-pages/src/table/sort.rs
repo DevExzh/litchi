@@ -13,6 +13,14 @@ pub mod transaction {
     };
 }
 
+/// Exact-source execution of a body table's persisted sort order (the
+/// body rows move; record 0371).
+pub mod execution {
+    pub use crate::package::body_table_sort_execution::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Unsupported,
+    };
+}
+
 pub use litchi_iwa_common::table::sort::{
     ColumnIndex, Direction, Error, Order, Result, RowRange, Rule, Scope,
 };

@@ -29,6 +29,22 @@ pub mod creation {
         Commit, Diagnostics, Edit, Error, LimitKind, NewTable, Patch, Refusal,
     };
 }
+/// Display formats of stored body-table cells: one family over the neutral
+/// `DataFormat` (record 0379).
+pub mod format {
+    pub use crate::package::body_table_cell_format::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::data_format::DataFormat;
+    pub use litchi_iwa_common::table::coordinate::At;
+}
+/// Exact-source resize of one rooted body table to a new row and column
+/// count (record 0371).
+pub mod size {
+    pub use crate::package::body_table_resize::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
 /// Exact-source deletion of one rooted body table.
 pub mod deletion {
     pub use crate::package::body_table_deletion::{

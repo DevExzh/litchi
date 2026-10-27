@@ -262,12 +262,15 @@ impl Edit {
     }
 
     fn ensure_prepared(&mut self) -> Result<()> {
-        let worksheet = self
-            .resolve_selector()?
-            .ok_or_else(|| self.worksheet_not_found())?;
+        // A prepared draft implies a resolved worksheet; return before
+        // `resolve_selector` clones its part name, since every staged
+        // operation passes through here (record 0377).
         if self.raw.is_some() {
             return Ok(());
         }
+        let worksheet = self
+            .resolve_selector()?
+            .ok_or_else(|| self.worksheet_not_found())?;
         let snapshot = workbook::read_with_limits_and_leniency(
             self.base.opc_package(),
             &worksheet,

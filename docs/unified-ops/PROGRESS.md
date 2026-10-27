@@ -6532,3 +6532,16 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Every migrated route is cheaper than its host route; host defects found by the parity harness are fixed and macOS-queued (`0363-mac-queue.md`).
 - Coordinator decisions: Keynote/Pages/Numbers drawing/media plumbing moves into `litchi-iwa-style`; ledger conflicts resolve to the most advanced row.
 - Trunk at the point of this entry has all 53 gate rows green on `ac0d111c4c`; a full gate on `3ab7df643a` is running. API-debt performance qualification (0377) in progress. Nothing pushed.
+
+## Merges 2026-10-27
+- W1-A 0370i (`8c2b44e22e`); the +275% builder-with-options cost goes back to W1-A as its next fix.
+- W1-G group 1 (`c7ead673ab`): new `litchi-iwa-table` crate (record 0379) with cell formats and the Pages/Keynote DataFormat families on it.
+- W1-C second landing (`8a639eec23`, record 0372): Keynote media assets, slide text storages and drawables. Keynote ledger: 262 migrated, 5 retired, 372 host-only, every one of them waiting on W1-E, W1-G or the builder harness. Leaf routes are 34–82% cheaper than the host's.
+- 0377 API-debt performance qualification (`18b0168cd2`):
+  - 98 paired routes over 21 formats against `839212fa9d`;
+  - the 1k batch is within 2× on every format, and a second save is never slower;
+  - fixes for PPTX, XLSX, XLSB, PPT, DOC and ODF regressions.
+  - ODT/ODP regressions are deferred by the owner.
+  - Still open: OOXML metadata commit (F2), XLSX snapshot-limit cost (F3), ODC raw-XML admission (F4/F5) and DOC set instruction/wall disagreement (F1).
+- W1-E 0375a (`faf2ed2d76`): the shape-style variation engine with a plan API in `litchi_iwa_style::shape`, plus series error-bar, pie-label and value-label properties. Engine routes cost 42–90% less than the host's. W1-C now builds the Keynote shape-style facades on it.
+- Every post-merge workspace check, ledger check and boundary check passes. Nothing pushed.

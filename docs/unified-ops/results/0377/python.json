@@ -1,0 +1,83 @@
+{
+ "schema": "litchi.unified-fin-perf.python-summary.v1",
+ "record": "0377",
+ "rows": [
+  {
+   "scenario": "xlsx open_bytes",
+   "base_median_us_per_run": [
+    25.376305,
+    25.6629
+   ],
+   "candidate_median_us_per_run": [
+    26.678105,
+    26.3251
+   ]
+  },
+  {
+   "scenario": "xlsx set one cell",
+   "base_median_us_per_run": [
+    3243.574965,
+    3157.380315
+   ],
+   "candidate_median_us_per_run": [
+    3057.627885,
+    2994.82252
+   ]
+  },
+  {
+   "scenario": "xlsx batch 1k cell sets",
+   "base_median_us_per_run": [
+    3258.0838,
+    2996.3714
+   ],
+   "candidate_median_us_per_run": [
+    3405.6237,
+    3367.2855
+   ]
+  },
+  {
+   "scenario": "xlsx get one cell",
+   "base_median_us_per_run": [
+    1.76207,
+    1.64181
+   ],
+   "candidate_median_us_per_run": [
+    1.703908,
+    1.7039900000000001
+   ]
+  },
+  {
+   "scenario": "docx open_bytes",
+   "base_median_us_per_run": [
+    39.926480000000005,
+    38.788725
+   ],
+   "candidate_median_us_per_run": [
+    40.23643,
+    39.24268
+   ]
+  },
+  {
+   "scenario": "docx set paragraph text",
+   "base_median_us_per_run": [
+    59.68134,
+    58.84514
+   ],
+   "candidate_median_us_per_run": [
+    60.34415,
+    59.64904
+   ]
+  },
+  {
+   "scenario": "docx to_bytes",
+   "base_median_us_per_run": [
+    0.716955,
+    0.701105
+   ],
+   "candidate_median_us_per_run": [
+    0.826055,
+    0.724255
+   ]
+  }
+ ]
+}

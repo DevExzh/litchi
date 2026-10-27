@@ -60,6 +60,25 @@ pub struct TransactionBudget {
     pub(crate) remaining_candidate_input_bytes: usize,
     pub(crate) remaining_transaction_work: usize,
     pub(crate) remaining_allocations: usize,
+    pub(crate) list_keys: ListKeys,
+}
+
+/// How a format or control list (`TST.TableDataList`) allocates and
+/// releases entry keys.
+///
+/// The Numbers owners reuse the lowest free key below the allocation
+/// watermark (`next_list_id`) and keep the watermark on release. The Pages
+/// and Keynote owners follow the shared cell writer
+/// (`litchi_numbers_wire::table_write`) and the legacy host format writer:
+/// a new entry takes the watermark, and a removed last key is handed back
+/// (record 0379).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ListKeys {
+    /// Reuse free keys; keep the watermark on release.
+    #[default]
+    Reuse,
+    /// Append at the watermark; hand a removed last key back.
+    Append,
 }
 
 impl TransactionBudget {
@@ -146,7 +165,15 @@ impl TransactionBudget {
             remaining_candidate_input_bytes: max_candidate_input_bytes,
             remaining_transaction_work: max_transaction_work,
             remaining_allocations: max_allocations,
+            list_keys: ListKeys::Reuse,
         }
+    }
+
+    /// Select how list entry keys are allocated and released.
+    #[must_use]
+    pub const fn with_list_keys(mut self, policy: ListKeys) -> Self {
+        self.list_keys = policy;
+        self
     }
 
     /// Construct the aggregate ledger used by the unified scalar-control

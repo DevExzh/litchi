@@ -39,6 +39,7 @@ use litchi_iwa_common::wire::{
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
 use litchi_iwa_core::RawMessage;
+use litchi_iwa_text::TextPosition;
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -148,6 +149,10 @@ pub enum Refusal {
     /// The selector did not resolve one section.
     #[error("section selector did not resolve")]
     SectionNotFound,
+    /// The break position is 0, beyond the body, right after a section
+    /// break, or where a section already starts.
+    #[error("the section break position is invalid")]
+    InvalidBreak,
     /// The requested section name contains NUL.
     #[error("Pages section names cannot contain NUL")]
     InvalidName,
@@ -183,7 +188,7 @@ impl Refusal {
         use litchi_core::edit::RefusalKind;
         match self {
             Self::SectionNotFound { .. } => RefusalKind::NotFound,
-            Self::InvalidName { .. } => RefusalKind::InvalidValue,
+            Self::InvalidName { .. } | Self::InvalidBreak => RefusalKind::InvalidValue,
             Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
                 RefusalKind::UnsupportedOperation
             },
@@ -230,8 +235,14 @@ impl From<Fault> for Error {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
-    /// Add a section after the section at this position.
-    Add { after: usize, name: Option<String> },
+    /// Add a section after the section at this position, or, with `at`,
+    /// break the body at that UTF-16 position into a new section copying
+    /// the section at `after`.
+    Add {
+        after: usize,
+        at: Option<usize>,
+        name: Option<String>,
+    },
     /// Remove the section at this position.
     Remove(usize),
 }
@@ -394,7 +405,57 @@ impl Edit<'_> {
             },
             None => None,
         };
-        self.operation = Some(Operation::Add { after, name });
+        self.operation = Some(Operation::Add {
+            after,
+            at: None,
+            name,
+        });
+        Ok(self)
+    }
+
+    /// Stage a section break at UTF-16 position `at` of the body (counted
+    /// over the whole body text, section breaks included): the text after
+    /// `at` starts a new section that copies the page masters, headers and
+    /// footers of the `source` section. `name` names it (`None`: unnamed).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SectionNotFound`] when the selector resolves no section,
+    /// [`Refusal::InvalidName`] for a name containing NUL,
+    /// [`Refusal::InvalidBreak`] for position 0, a position beyond the body,
+    /// one right after a section break or one where a section already
+    /// starts, [`Refusal::OperationAlreadyStaged`] after one operation.
+    pub fn insert<'selector>(
+        mut self,
+        source: impl Into<SectionSelector<'selector>>,
+        at: TextPosition,
+        name: Option<&str>,
+    ) -> Result<Self, Error> {
+        if self.operation.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        if name.is_some_and(|name| name.contains('\0')) {
+            return Err(Error::Refused(Refusal::InvalidName));
+        }
+        let after = resolve(self.source, source.into())?;
+        let at = at.utf16_index() as usize;
+        let body = native_body(self.source).map_err(|_error| Error::InvalidSource)?;
+        let (storage, _) = super::body_storage_objects::body_storage(self.source)
+            .map_err(|_error| Error::InvalidSource)?;
+        let units = storage.text.encode_utf16().collect::<Vec<_>>();
+        if at == 0
+            || at > units.len()
+            || units.get(at - 1) == Some(&0x0004)
+            || (0..self.source.sections().len())
+                .any(|position| body.section_boundary(position) == Some(at))
+        {
+            return Err(Error::Refused(Refusal::InvalidBreak));
+        }
+        self.operation = Some(Operation::Add {
+            after,
+            at: Some(at),
+            name: name.map(str::to_owned),
+        });
         Ok(self)
     }
 
@@ -434,7 +495,9 @@ impl Edit<'_> {
             .operation
             .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let (package, touched_components, objects) = match &operation {
-            Operation::Add { after, name } => add_section(self.source, *after, name.as_deref())?,
+            Operation::Add { after, at, name } => {
+                add_section(self.source, *after, *at, name.as_deref())?
+            },
             Operation::Remove(position) => remove_section(self.source, *position)?,
         };
         Ok(Commit {
@@ -571,14 +634,16 @@ fn body_storage(working: &Working<'_>, identifier: u64) -> Result<(String, usize
 fn add_section(
     source: &Package,
     after: usize,
+    at: Option<usize>,
     name: Option<&str>,
 ) -> Result<(Package, usize, usize), Error> {
     let body = native_body(source).map_err(|_error| Error::InvalidSource)?;
     let range = native_section_range(source, &body, Position::new(after))
         .map_err(|_error| Error::InvalidSource)?;
-    if range.is_empty() {
+    if at.is_none() && range.is_empty() {
         return Err(Error::Refused(Refusal::EmptySection));
     }
+    let break_at = at.unwrap_or(range.end);
     let section = body
         .section_identifier(after)
         .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
@@ -770,8 +835,8 @@ fn add_section(
 
     // The break at the end of the source section and the new boundary.
     let payload = copy_bytes(&working.object(body.identifier.get())?.messages[storage_index].data)?;
-    let payload = rewrite_body_text(source, &payload, range.end..range.end, SECTION_BREAK)?;
-    let boundary = u64::try_from(range.end + 1).map_err(|_error| Error::InvalidSource)?;
+    let payload = rewrite_body_text(source, &payload, break_at..break_at, SECTION_BREAK)?;
+    let boundary = u64::try_from(break_at + 1).map_err(|_error| Error::InvalidSource)?;
     let mut entries: Vec<(u64, Vec<u8>)> = section_entries(&payload)?
         .into_iter()
         .map(|(index, _, record)| (index, record))
@@ -779,11 +844,14 @@ fn add_section(
     if entries.iter().any(|(index, _)| *index == boundary) {
         return Err(Error::InvalidSource);
     }
-    let position = entries
+    let entry_position = entries
         .iter()
         .position(|(index, _)| *index > boundary)
         .unwrap_or(entries.len());
-    entries.insert(position, (boundary, section_entry(boundary, created)?));
+    entries.insert(
+        entry_position,
+        (boundary, section_entry(boundary, created)?),
+    );
     let records: Vec<Vec<u8>> = entries.into_iter().map(|(_, record)| record).collect();
     let payload = with_section_entries(&payload, &records)?;
     structure::replace(
@@ -817,6 +885,24 @@ fn add_section(
     let now = candidate.sections();
     if now.len() != before.len() + 1 {
         return Err(Error::Verification);
+    }
+    if at.is_some() {
+        // A split: the new section starts after the break and is named; the
+        // sections' text, read in order, is unchanged.
+        let joined = |sections: &[crate::Section]| {
+            sections
+                .iter()
+                .map(|section| section.body_text().unwrap_or_default())
+                .collect::<String>()
+        };
+        let body = native_body(&candidate).map_err(|_error| Error::Verification)?;
+        let position = (0..now.len())
+            .find(|position| body.section_identifier(*position) == Some(remap[&section]))
+            .ok_or(Error::Verification)?;
+        if now[position].name() != name || joined(now) != joined(before) {
+            return Err(Error::Verification);
+        }
+        return Ok((candidate, touched, members.len()));
     }
     let added = &now[after + 1];
     if !added.body_text().unwrap_or_default().is_empty() || added.name() != name {

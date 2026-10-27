@@ -544,12 +544,7 @@ fn build_candidate(
             return Err(invalid("slide-removal dependent part disappeared"));
         }
     }
-    let captured = super::model::capture_with_provenance_and_semantic_limits(
-        &candidate,
-        snapshot.limits,
-        snapshot.physical_source_provenance,
-        snapshot.owner_state.semantic_limits.clone(),
-    )?;
+    let captured = super::model::capture_with_parent_snapshot(&candidate, snapshot)?;
     if captured.slides.len() + 1 != snapshot.slides.len()
         || captured
             .slides
