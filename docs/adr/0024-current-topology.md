@@ -5007,6 +5007,41 @@ counts it among its bulk packages (46 to 47). `tools/check_crate_boundaries.py`
 reports 68 workspace packages and 286 internal dependency declarations, with
 the same 11 migration debts.
 
+## 2026-10-26 amendment: `litchi-iwa-style` shared drawing-style engine (record 0375a)
+
+Unified-ops record 0375a adds the focused package `litchi-iwa-style`, the
+shared drawing-style and media engine of the Pages, Numbers and Keynote
+owners. It joins the archive-free values of `litchi-iwa-common`, the bounded
+codecs of `litchi-iwa-protos` and the IWA objects of `litchi-iwa-core`, which
+no existing crate can: `litchi-iwa-common` and `litchi-iwa-protos` have no
+dependencies, and the style-variation graph engine (allocating and
+registering series non-style and shape-style objects, package-metadata
+object UUIDs, identifier bookkeeping) is shared logic that must not be
+copied into three leaves. It also absorbs the `drawing_native` and
+`media_native` field passes record 0375 had placed, identically, in each
+leaf. Decision D6 of record 0363 (no media crate for values that fit existing
+crates) does not apply: this crate carries shared graph logic.
+
+Edges, all downward:
+
+- `litchi-iwa-style -> litchi-iwa-archive`, `-> litchi-iwa-common`,
+  `-> litchi-iwa-core`, `-> litchi-iwa-protos`;
+- `litchi-iwa -> litchi-iwa-style` as migration debt (order 11): the exit
+  parity harness drives the engines against the legacy host routes; it goes
+  with the host in W3.
+
+The leaves consume the crate privately when their families adopt it
+(`litchi-pages -> litchi-iwa-style` first, 2026-10-26: the W1-B body-media
+lifecycle reads its embedded-media inventory through
+`litchi_iwa_style::media`, which replaced the per-leaf `media_native` copy);
+no facade re-exports it (ADR 0028's rule for focused low-level crates). The
+package is runtime-neutral and iWork-only, so the non-iWork release gate
+counts it among the iWork and excluded packages (17 to 18, 20 to 21).
+`tools/check_crate_boundaries.py` reports 69 workspace packages with 12
+migration debts. Reconciled with `litchi-iwa-table` (record 0379, below),
+which landed in parallel: 70 workspace packages, 19 iWork and 22 excluded
+packages for the non-iWork gate.
+
 ## 2026-10-26 amendment: `litchi-iwa-table` shared table-family engines (record 0379)
 
 Unified-ops record [0379](../unified-ops/0379-iwa-w1g-shared-table-crate.md)

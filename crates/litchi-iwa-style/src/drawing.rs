@@ -3,11 +3,6 @@
 //! `stroke`, `fill`; encoders `encode_stroke`, `encode_fill`) and their
 //! semantic form in `litchi_iwa_common::shape::native` (`color`, `stroke`,
 //! `stop`, `gradient`, `image`, `fill`; `stored_stroke`, `stored_fill`).
-//!
-//! The crate graph keeps the two crates apart, so this plain 1:1 pass is
-//! repeated, identically, in `litchi-pages`, `litchi-numbers` and
-//! `litchi-keynote` (record 0375; W3 may fold it). The unit test compares the
-//! three copies.
 
 use litchi_iwa_common::color::Rgba;
 use litchi_iwa_common::shape::fill::{Fill, Gradient, Image};
@@ -157,18 +152,6 @@ mod tests {
     use litchi_iwa_common::shape::fill::Fill;
     use litchi_iwa_protos::chart_style_codec::Limits;
     use litchi_iwa_protos::shape_style_codec::native as stored;
-
-    const COPIES: [&str; 3] = [
-        include_str!("../../litchi-pages/src/drawing_native.rs"),
-        include_str!("../../litchi-numbers/src/drawing_native.rs"),
-        include_str!("../../litchi-keynote/src/drawing_native.rs"),
-    ];
-
-    #[test]
-    fn the_three_copies_are_identical() {
-        assert_eq!(COPIES[0], COPIES[1]);
-        assert_eq!(COPIES[1], COPIES[2]);
-    }
 
     #[test]
     fn a_stored_color_fill_round_trips() {
