@@ -521,10 +521,14 @@ fn verify_patch_contract(
         .as_bytes()
         == source.as_bytes();
     let stale = litchi_odp::authoring::edit::Package::from_bytes(stale_bytes)?;
+    // Record 0358 made a stale source a typed patch conflict (it was an
+    // `InvalidFormat` message before); record 0377 updates this oracle.
     let stale_refused = matches!(
         stale.apply(commit.patch()),
-        Err(litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)))
-            if message == "stale ODP presentation patch source"
+        Err(litchi_odf_common::Error::PatchConflict {
+            operation: "odp.apply",
+            ..
+        })
     );
 
     let no_op = source.edit()?.commit()?;

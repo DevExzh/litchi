@@ -1651,6 +1651,17 @@ impl Edit {
         address: Address,
         authored_bytes: usize,
     ) -> Result<()> {
+        // The reservation exists to admit the worksheet before-image before
+        // a projected read can decode it. Once that worksheet is charged, a
+        // read decodes nothing unadmitted, and the setter that follows
+        // charges the cell's final payload itself (record 0377).
+        if self
+            .capture_budget
+            .as_ref()
+            .is_some_and(|budget| budget.worksheets.contains_key(&position))
+        {
+            return Ok(());
+        }
         self.preflight_cell_capture(position, address, authored_bytes)
             .map(drop)
     }
