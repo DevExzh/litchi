@@ -95,6 +95,12 @@ fn to_stored_color(value: StoredColor) -> stored::Color {
     }
 }
 
+/// The encoded `TSP.Color` of a color.
+#[must_use]
+pub fn encode_color(value: Rgba) -> Vec<u8> {
+    stored::encode_color(&to_stored_color(rules::stored_color(value)))
+}
+
 /// The encoded `TSD.StrokeArchive` of a stroke (`None`: the hidden stroke).
 pub fn encode_stroke(value: Option<Stroke>) -> Vec<u8> {
     let value = rules::stored_stroke(value);
