@@ -1906,9 +1906,9 @@ pages/editor/tables/semantic.rs	reset_table_cell_currency_format	1	pages	table.c
 pages/editor/tables/semantic.rs	reset_table_cell_custom_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_date_time_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_duration_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_fill	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_fill	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_fill_reset_parity	A	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_fraction_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_layout	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_layout	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_layout_reset_parity	A	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_number_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_numeral_system_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_paragraph_indents	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
@@ -1953,9 +1953,9 @@ pages/editor/tables/semantic.rs	set_table_cell_custom_format	1	pages	table.cell_
 pages/editor/tables/semantic.rs	set_table_cell_data_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_date_time_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_duration_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_fill	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell_fill	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_fill_set_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_fraction_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_layout	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell_layout	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_layout_set_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_number_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_numeral_system_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_paragraph_indents	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
@@ -2002,9 +2002,9 @@ pages/editor/tables/semantic.rs	table_cell_custom_format	1	pages	table.cell_form
 pages/editor/tables/semantic.rs	table_cell_data_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_date_time_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_duration_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_fill	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_fill	1	pages	table.cell_appearance	migrated	litchi_pages::Package::body_table_cell_appearance	pages_body_table_cell_appearance_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_fraction_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_layout	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_layout	1	pages	table.cell_appearance	migrated	litchi_pages::Package::body_table_cell_appearance	pages_body_table_cell_appearance_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_merges	1	pages	table.merge	migrated	litchi_pages::Package::body_table_merges	pages_body_table_merges_read_parity	A	test-data/iwork/pages/body-table-merges-native-receipt.json	-
 pages/editor/tables/semantic.rs	table_cell_number_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_numeral_system_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-

@@ -624,6 +624,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-iwa-table"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-iwa-archive",
+ "litchi-iwa-common",
+ "litchi-iwa-core",
+ "litchi-iwa-protos",
+ "litchi-iwa-style",
+ "litchi-numbers-wire",
+ "thiserror",
+]
+
+[[package]]
 name = "litchi-iwa-text"
 version = "0.0.1"
 dependencies = [
@@ -662,6 +676,7 @@ dependencies = [
  "litchi-iwa-detect",
  "litchi-iwa-protos",
  "litchi-iwa-style",
+ "litchi-iwa-table",
  "litchi-iwa-text",
  "litchi-iwa-text-wire",
  "litchi-numbers-wire",
