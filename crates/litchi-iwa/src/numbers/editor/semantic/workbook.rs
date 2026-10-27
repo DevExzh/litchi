@@ -776,6 +776,13 @@ impl Draft {
             }
             Ok(())
         })?;
+        // Host defect fixed with record 0370h: the copy had no sidebar node
+        // under its sheet's node.
+        super::super::sidebar::append_node(
+            &mut staged,
+            Some(owner.sheet_id),
+            cloned.info_object_id,
+        )?;
 
         let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified

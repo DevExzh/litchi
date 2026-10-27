@@ -2773,7 +2773,8 @@ canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
   apply_sheet_lifecycle}`; `Edit::{add, remove}` (one operation per edit),
   plus `sheet::lifecycle::InvalidName`.
 - `table::lifecycle` — `Package::{edit_table_lifecycle,
-  apply_table_lifecycle}` over one sheet selector; `Edit::{add, remove}`.
+  apply_table_lifecycle}` over one sheet selector; `Edit::{add, remove,
+  duplicate}` (`duplicate` since record 0370h).
 - `table::order` — `Package::{edit_table_order, apply_table_order}` over one
   sheet selector; `Edit::move_table(selector, destination)` with a final
   zero-based `destination`, as `sheet::order` does.
