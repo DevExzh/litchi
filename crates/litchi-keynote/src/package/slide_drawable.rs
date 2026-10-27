@@ -15,6 +15,7 @@ mod arrange;
 mod author;
 mod inventory;
 mod named_styles;
+mod preset;
 pub(crate) mod shape_style;
 mod stage;
 mod table;
