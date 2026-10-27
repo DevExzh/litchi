@@ -25749,7 +25749,8 @@
         "litchi_pages::drawable::text",
         "litchi_pages::bookmark",
         "litchi_pages::date_time",
-        "litchi_pages::number_attachment"
+        "litchi_pages::number_attachment",
+        "litchi_pages::table::format"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
@@ -25875,6 +25876,10 @@
         {
           "method": "litchi_pages::Package::apply_section_text_style",
           "ok": "litchi_pages::section::text_style::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_cell_format",
+          "ok": "litchi_pages::table::format::Commit"
         }
       ],
       "family_methods": true,
@@ -27295,7 +27300,8 @@
         "litchi_keynote::slide::placeholder",
         "litchi_keynote::slide::audio::creation",
         "litchi_keynote::slide::movie::creation",
-        "litchi_keynote::slide::media::lifecycle"
+        "litchi_keynote::slide::media::lifecycle",
+        "litchi_keynote::slide::table::format"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -27494,6 +27500,10 @@
         {
           "method": "litchi_keynote::Package::apply_soundtrack_settings",
           "ok": "litchi_keynote::soundtrack::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_format",
+          "ok": "litchi_keynote::slide::table::format::Commit"
         }
       ]
     },
@@ -28905,7 +28915,8 @@
         "litchi_keynote::slide::placeholder",
         "litchi_keynote::slide::audio::creation",
         "litchi_keynote::slide::movie::creation",
-        "litchi_keynote::slide::media::lifecycle"
+        "litchi_keynote::slide::media::lifecycle",
+        "litchi_keynote::slide::table::format"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29104,6 +29115,10 @@
         {
           "method": "litchi_keynote::Package::apply_soundtrack_settings",
           "ok": "litchi_keynote::soundtrack::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_format",
+          "ok": "litchi_keynote::slide::table::format::Commit"
         }
       ]
     },

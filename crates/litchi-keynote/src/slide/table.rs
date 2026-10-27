@@ -24,6 +24,15 @@ pub mod lock;
 pub mod merge;
 /// Validated display names for a table.
 pub mod name;
+/// Display formats of stored slide-table cells: one family over the neutral
+/// `DataFormat` (record 0379).
+pub mod format {
+    pub use crate::package::slide_table_cell_format::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::data_format::DataFormat;
+    pub use litchi_iwa_common::table::coordinate::At;
+}
 /// Decimal number display formats for existing table cells.
 pub mod number_format;
 /// Physical row-sort transaction values for a Keynote slide table.
