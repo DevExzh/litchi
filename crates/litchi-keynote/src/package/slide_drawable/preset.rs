@@ -303,3 +303,34 @@ impl super::Package {
         preset(payload, wire)
     }
 }
+
+/// The position of the selected shape or line among the slide's owned
+/// `TSWP.ShapeInfoArchive` drawables (text boxes included), the selector of
+/// the shared caption seam.
+pub(in crate::package) fn shape_info_position(
+    package: &super::Package,
+    slide: crate::SlideSelector<'_>,
+    drawable: crate::DrawableSelector,
+) -> Result<litchi_core::Position, Error> {
+    const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+    let selected = super::select_slide(package, slide)?;
+    let inventory =
+        super::read_inventory(package, selected.identifier, super::read_limits(package)?)?;
+    let item = inventory
+        .items
+        .get(drawable.as_index())
+        .ok_or(Error::Refused(super::Refusal::DrawablePositionNotFound {
+            position: drawable.as_position(),
+        }))?;
+    if !matches!(item.kind, super::Kind::Shape | super::Kind::Line) {
+        return Err(Error::Refused(super::Refusal::Unsupported {
+            reason: super::Unsupported::Kind { kind: item.kind },
+        }));
+    }
+    Ok(litchi_core::Position::new(
+        inventory.items[..drawable.as_index()]
+            .iter()
+            .filter(|item| item.message_type == SHAPE_INFO_MESSAGE_TYPE)
+            .count(),
+    ))
+}

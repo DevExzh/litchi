@@ -80,6 +80,8 @@ pub(super) enum CaptionEdgeKind {
     MovieTitle,
     Image,
     ImageTitle,
+    Shape,
+    ShapeTitle,
 }
 
 impl CaptionEdgeKind {
@@ -90,7 +92,7 @@ impl CaptionEdgeKind {
 
     /// Whether the edge is a title rather than a caption.
     const fn is_title(self) -> bool {
-        matches!(self, Self::MovieTitle | Self::ImageTitle)
+        matches!(self, Self::MovieTitle | Self::ImageTitle | Self::ShapeTitle)
     }
 
     /// Whether the drawable's header also lists the new graph's style
@@ -106,6 +108,7 @@ impl CaptionEdgeKind {
             Self::Chart => CHART_MESSAGE_TYPE,
             Self::Movie | Self::MovieTitle => 3_007,
             Self::Image | Self::ImageTitle => 3_005,
+            Self::Shape | Self::ShapeTitle => 2_011,
         }
     }
 }
@@ -2985,9 +2988,15 @@ fn caption_drawable_width(package: &Package, drawable_identifier: u64) -> Result
     let object = package
         .object(drawable_identifier)
         .ok_or(Error::InvalidSource)?;
-    let payload = &object.messages.first().ok_or(Error::InvalidSource)?.data;
-    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
-    let drawable = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
+    let message = object.messages.first().ok_or(Error::InvalidSource)?;
+    let outer = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
+    let mut drawable = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
+    // A shape's drawable is its ShapeArchive's super (ShapeInfo.super.super).
+    let nested;
+    if message.type_ == CaptionEdgeKind::Shape.drawable_message_type() {
+        nested = WireView::parse(drawable, limits).map_err(map_wire_error)?;
+        drawable = unique_payload_field(&nested, 1)?.ok_or(Error::InvalidSource)?;
+    }
     let drawable_view = WireView::parse(drawable, limits).map_err(map_wire_error)?;
     let geometry = unique_payload_field(&drawable_view, 1)?.ok_or(Error::InvalidSource)?;
     let geometry_view = WireView::parse(geometry, limits).map_err(map_wire_error)?;
@@ -3023,7 +3032,14 @@ fn patch_caption_edge(
     edge_kind: CaptionEdgeKind,
     graph_style_identifier: Option<u64>,
 ) -> Result<(), Error> {
-    let missing_movie_edge = expected_identifier.is_none() && edge_kind.is_media();
+    let missing_movie_edge = expected_identifier.is_none()
+        && matches!(
+            edge_kind,
+            CaptionEdgeKind::Movie
+                | CaptionEdgeKind::MovieTitle
+                | CaptionEdgeKind::Image
+                | CaptionEdgeKind::ImageTitle
+        );
     let mut expected_identifier = expected_identifier;
     if replacement_identifier == 0 {
         return Err(Error::InvalidSource);
@@ -3195,7 +3211,18 @@ fn patch_caption_edge(
             )
         },
         _ => {
-            let options = movie_caption_rewrite_options(package, &payload, budget)?;
+            let shape = matches!(
+                edge_kind,
+                CaptionEdgeKind::Shape | CaptionEdgeKind::ShapeTitle
+            );
+            let limits = package.wire_limits().map_err(map_wire_error)?;
+            let outer = WireView::parse(&payload, limits).map_err(map_wire_error)?;
+            let edge = if shape {
+                unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?
+            } else {
+                payload.as_slice()
+            };
+            let options = movie_caption_rewrite_options(package, edge, budget)?;
             let write = if edge_kind.is_title() {
                 keynote_movie_caption_codec::MovieCaptionWrite::title(replacement_identifier)
             } else {
@@ -3203,9 +3230,20 @@ fn patch_caption_edge(
             };
             let (rewritten, report) =
                 keynote_movie_caption_codec::rewrite_movie_caption_with_report(
-                    &payload, write, options,
+                    edge, write, options,
                 )
                 .map_err(map_movie_caption_codec_error)?;
+            // A shape's drawable is nested one level deeper (ShapeInfo.super).
+            let rewritten = if shape {
+                litchi_iwa_common::wire::transform_length_delimited_field(
+                    &payload,
+                    1,
+                    |_| -> Result<Vec<u8>, litchi_iwa_common::Error> { Ok(rewritten) },
+                )
+                .map_err(map_wire_error)?
+            } else {
+                rewritten
+            };
             (
                 rewritten,
                 report.input_bytes(),
@@ -3234,7 +3272,10 @@ fn patch_caption_edge(
     // header slot.
     let in_place = matches!(
         edge_kind,
-        CaptionEdgeKind::Image | CaptionEdgeKind::ImageTitle
+        CaptionEdgeKind::Image
+            | CaptionEdgeKind::ImageTitle
+            | CaptionEdgeKind::Shape
+            | CaptionEdgeKind::ShapeTitle
     )
     .then(|| {
         aggregate_before

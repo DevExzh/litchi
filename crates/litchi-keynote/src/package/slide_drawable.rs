@@ -16,6 +16,7 @@ mod author;
 mod inventory;
 mod named_styles;
 mod preset;
+pub(super) use preset::shape_info_position;
 pub(crate) mod shape_style;
 mod stage;
 mod table;
