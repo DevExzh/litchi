@@ -59,6 +59,7 @@ mod numbers_owner_allocation;
 mod numbers_text_box_cases;
 mod numbers_volatile_highlight_cases;
 mod numbers_w2a_cost;
+mod pages_builder_cases;
 mod pages_caption_cases;
 mod pages_cases;
 mod pages_cell_appearance_cases;
