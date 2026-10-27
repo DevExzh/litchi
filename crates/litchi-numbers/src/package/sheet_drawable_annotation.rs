@@ -20,9 +20,8 @@
 use std::fmt;
 
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::comment::{AuthorId, Uuid};
-use litchi_iwa_core::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
-use litchi_iwa_text::date_time::Instant;
+use litchi_iwa_common::comment::AuthorId;
+use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_text::position::TextRange;
 use litchi_iwa_text_wire::annotation::{
     self as engine, Annotation, COMMENT_STORAGE_MESSAGE_TYPE, HIGHLIGHT_MESSAGE_TYPE, Objects,
@@ -33,11 +32,11 @@ use litchi_iwa_text_wire::smart_field::TextAttributeUuid;
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::sheet_drawable_comment_graph::{Graph, replace};
 use super::sheet_drawable_graph::{self as graph, TextTarget};
 use super::structure::{
-    self, Fault, FaultResult, Published, Working,
-    metadata::{self, Registry, Transition},
-    references,
+    self, Published, Working,
+    metadata::{self, Transition},
 };
 use crate::selector::SheetSelector;
 use crate::sheet::drawable::DrawableSelector;
@@ -46,14 +45,6 @@ structure::structural_family!("text annotation", Wire(litchi_iwa_common::LimitKi
 
 /// `TSWP.StorageArchive`.
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
-/// `TSK.AnnotationAuthorArchive`.
-const AUTHOR_MESSAGE_TYPE: u32 = 212;
-/// `TSK.AnnotationAuthorStorageArchive`.
-const AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
-/// The generated author's name and public identifier (the host editor's).
-const AUTHOR_NAME: &str = "litchi-iwa";
-const AUTHOR_PUBLIC_ID: &str = "4C495443-4849-4957-8100-000000000001:058e44481db1c6fdeeac88af010136d7f8949f54bde61ef9af3e078562b968b6";
-const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 
 /// A typed, content-redacted annotation failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
@@ -452,345 +443,10 @@ fn annotations_of(working: &Working<'_>, storage: u64) -> Result<Vec<Annotation>
     .map_err(from_engine)
 }
 
-/// The generated author's `TSK.AnnotationAuthorArchive` payload (the host
-/// editor's `generated_author`, in its encoder's field order).
-fn generated_author(public: bool) -> Vec<u8> {
-    let mut color = Vec::new();
-    let float = |out: &mut Vec<u8>, number: u8, value: f32| {
-        out.push(number << 3 | 5);
-        out.extend_from_slice(&value.to_le_bytes());
-    };
-    color.extend_from_slice(&[0x08, 0x01]);
-    float(&mut color, 3, 0.368_627_46);
-    float(&mut color, 4, 0.568_627_5);
-    float(&mut color, 5, 0.937_254_9);
-    float(&mut color, 6, 1.0);
-    color.extend_from_slice(&[0x60, 0x01]);
-    let mut output = Vec::new();
-    let bytes = |out: &mut Vec<u8>, number: u8, payload: &[u8]| {
-        out.push(number << 3 | 2);
-        let mut length = payload.len();
-        loop {
-            #[allow(clippy::cast_possible_truncation, reason = "seven-bit groups")]
-            let byte = (length & 0x7f) as u8;
-            length >>= 7;
-            if length == 0 {
-                out.push(byte);
-                break;
-            }
-            out.push(byte | 0x80);
-        }
-        out.extend_from_slice(payload);
-    };
-    bytes(&mut output, 1, AUTHOR_NAME.as_bytes());
-    bytes(&mut output, 2, &color);
-    if public {
-        bytes(&mut output, 3, AUTHOR_PUBLIC_ID.as_bytes());
-    }
-    output.extend_from_slice(&[0x20, 0x00]);
-    if public {
-        bytes(&mut output, 5, AUTHOR_PUBLIC_ID.as_bytes());
-    }
-    output
-}
-
-/// The document's author storage, if any.
-fn author_storage(working: &Working<'_>) -> Result<Option<u64>, Error> {
-    let mut found = None;
-    for object in working.source().state.components.iter_objects() {
-        if object
-            .messages
-            .iter()
-            .any(|message| message.type_ == AUTHOR_STORAGE_MESSAGE_TYPE)
-            && found
-                .replace(object.archive_info.identifier.ok_or(Error::InvalidSource)?)
-                .is_some()
-        {
-            return Err(Error::InvalidSource);
-        }
-    }
-    Ok(found)
-}
-
-fn author_payload(working: &Working<'_>, author: u64) -> Result<Vec<u8>, Error> {
-    let object = working.object(author)?;
-    let index = structure::unique_message(object, &[AUTHOR_MESSAGE_TYPE])?;
-    Ok(object.messages[index].data.clone())
-}
-
-fn is_generated(working: &Working<'_>, author: u64) -> Result<bool, Error> {
-    let payload = author_payload(working, author)?;
-    Ok(payload == generated_author(true) || payload == generated_author(false))
-}
-
-/// Replace message `index` of `identifier` canonically and adjust its
-/// aggregate references.
-fn replace(
-    working: &mut Working<'_>,
-    identifier: u64,
-    index: usize,
-    data: Vec<u8>,
-    added: Option<u64>,
-    removed: Option<u64>,
-) -> FaultResult<()> {
-    let limits = working.archive_limits();
-    let object = working.object_mut(identifier)?;
-    let message_type = object.messages.get(index).ok_or(Fault::Invalid)?.type_;
-    let mut staged = object.clone();
-    staged
-        .replace_message(
-            index,
-            RawMessage {
-                type_: message_type,
-                data,
-            },
-            limits,
-        )
-        .map_err(|error| structure::map_core(&error))?;
-    let info = staged
-        .archive_info
-        .message_infos
-        .get_mut(index)
-        .ok_or(Fault::Invalid)?;
-    if let Some(new) = added {
-        if info.object_references.contains(&new) {
-            return Err(Fault::Invalid);
-        }
-        structure::reserve(&mut info.object_references, 1)?;
-        info.object_references.push(new);
-    }
-    if let Some(old) = removed {
-        if info
-            .object_references
-            .iter()
-            .filter(|reference| **reference == old)
-            .count()
-            != 1
-        {
-            return Err(Fault::Invalid);
-        }
-        info.object_references.retain(|reference| *reference != old);
-        for field in &mut info.field_infos {
-            field
-                .object_references
-                .retain(|reference| *reference != old);
-        }
-    }
-    staged
-        .validate(limits)
-        .map_err(|error| structure::map_core(&error))?;
-    *working.object_mut(identifier)? = staged;
-    Ok(())
-}
-
-/// One transaction's context.
-struct Context<'w, 'p> {
-    working: &'w mut Working<'p>,
-    registry: Registry,
-    transition: Transition,
-    storage: u64,
-    member: String,
-}
-
-impl Context<'_, '_> {
-    fn component(&self, member: &str) -> Result<u64, Error> {
-        Ok(self.registry.component_for_entry(member)?.identifier)
-    }
-
-    fn register_uuid(&mut self, member: &str, object: u64) -> Result<(), Error> {
-        let component = self.component(member)?;
-        let seed = metadata::identity_seed(self.working, object)?;
-        self.transition
-            .register_uuid(&self.registry, component, object, seed)?;
-        Ok(())
-    }
-
-    /// The host's `ensure_annotation_author` (public generated author).
-    fn ensure_author(&mut self) -> Result<Option<u64>, Error> {
-        let Some(storage) = author_storage(self.working)? else {
-            return Ok(None);
-        };
-        let object = self.working.object(storage)?;
-        let index = structure::unique_message(object, &[AUTHOR_STORAGE_MESSAGE_TYPE])?;
-        let payload = object.messages[index].data.clone();
-        for record in references::records(&payload, &[1])? {
-            let author = references::reference_identifier(record)?;
-            if author_payload(self.working, author)? == generated_author(true) {
-                return Ok(Some(author));
-            }
-        }
-        let author = *self
-            .working
-            .allocate(1)?
-            .first()
-            .ok_or(Error::InvalidSource)?;
-        let mut data = payload;
-        data.extend_from_slice(&[0x0a]);
-        let reference = references::reference_payload(author)?;
-        data.push(u8::try_from(reference.len()).map_err(|_error| Error::InvalidSource)?);
-        data.extend_from_slice(&reference);
-        replace(self.working, storage, index, data, None, None)?;
-        let limits = self.working.archive_limits();
-        let mut created = ArchiveObject::new(
-            author,
-            vec![RawMessage {
-                type_: AUTHOR_MESSAGE_TYPE,
-                data: generated_author(true),
-            }],
-            limits,
-        )
-        .map_err(|error| structure::map_core(&error))?;
-        for field in [4_u32, 3] {
-            let mut info = FieldInfo::new(
-                FieldPath::new(vec![field], limits).map_err(|_| Error::InvalidSource)?,
-                limits,
-            )
-            .map_err(|_| Error::InvalidSource)?;
-            info.unknown_field_rule = Some(UnknownFieldRule::IgnoreAndPreserve);
-            created.archive_info.message_infos[0].field_infos.push(info);
-        }
-        let member = self.working.locate(storage)?.ok_or(Error::InvalidSource)?;
-        self.working.insert(&member, created)?;
-        self.register_uuid(&member, author)?;
-        Ok(Some(author))
-    }
-
-    fn add_author_reference(&mut self, author: Option<u64>) -> Result<(), Error> {
-        let Some(author) = author else {
-            return Ok(());
-        };
-        let author_member = self.working.locate(author)?.ok_or(Error::InvalidSource)?;
-        let source = self.component(&self.member.clone())?;
-        let target = self.component(&author_member)?;
-        self.transition
-            .reference(&self.registry, source, target, author)?;
-        Ok(())
-    }
-
-    /// Remove object `identifier` with its registrations (the host's
-    /// `remove_registered_object` and `remove_object`).
-    fn forget(&mut self, identifier: u64) -> Result<(), Error> {
-        self.transition
-            .remove_objects(&self.registry, &[identifier])?;
-        self.transition.release_suffix(&[identifier])?;
-        self.working.remove(identifier)?;
-        Ok(())
-    }
-
-    /// The host's `remove_generated_annotation_author_if_unused`.
-    fn remove_author_if_unused(&mut self, author: u64) -> Result<(), Error> {
-        if !is_generated(self.working, author)? {
-            return Ok(());
-        }
-        for object in self.working.source().state.components.iter_objects() {
-            let identifier = object.archive_info.identifier.unwrap_or_default();
-            if self.working.object(identifier).is_err() {
-                continue;
-            }
-            for message in &object.messages {
-                if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE
-                    && engine::comment_storage(&message.data, WireLimits::DEFAULT)
-                        .map_err(from_engine)?
-                        .metadata()
-                        .author()
-                        .map(AuthorId::get)
-                        == Some(author)
-                {
-                    return Ok(());
-                }
-            }
-        }
-        let storage = author_storage(self.working)?.ok_or(Error::InvalidSource)?;
-        let object = self.working.object(storage)?;
-        let index = structure::unique_message(object, &[AUTHOR_STORAGE_MESSAGE_TYPE])?;
-        let data = litchi_iwa_common::wire::remove_repeated_length_delimited_field_where(
-            &object.messages[index].data,
-            1,
-            |payload| {
-                Ok::<bool, litchi_iwa_common::Error>(
-                    references::reference_identifier(payload).is_ok_and(|id| id == author),
-                )
-            },
-        )?;
-        replace(self.working, storage, index, data, None, None)?;
-        self.forget(author)
-    }
-
-    fn storage_payload(&self) -> Result<(usize, Vec<u8>), Error> {
-        let object = self.working.object(self.storage)?;
-        let index = structure::unique_message(object, &[STORAGE_MESSAGE_TYPE])?;
-        Ok((index, object.messages[index].data.clone()))
-    }
-
-    fn insert_comment_storage(
-        &mut self,
-        identifier: u64,
-        body: &str,
-        author: Option<u64>,
-    ) -> Result<(), Error> {
-        let uuid = self.fresh_uuid(identifier)?;
-        let payload = engine::encode_comment_storage(
-            body,
-            now()?,
-            author
-                .map(AuthorId::from_raw)
-                .transpose()
-                .map_err(|_| Error::InvalidSource)?,
-            uuid,
-            WireLimits::DEFAULT,
-        )
-        .map_err(from_engine)?;
-        let limits = self.working.archive_limits();
-        let mut object = ArchiveObject::new(
-            identifier,
-            vec![RawMessage {
-                type_: COMMENT_STORAGE_MESSAGE_TYPE,
-                data: payload,
-            }],
-            limits,
-        )
-        .map_err(|error| structure::map_core(&error))?;
-        if let Some(author) = author {
-            object.archive_info.message_infos[0]
-                .object_references
-                .push(author);
-        }
-        let member = self.member.clone();
-        self.working.insert(&member, object)?;
-        self.register_uuid(&member, identifier)
-    }
-
-    /// A deterministic comment-storage UUID no comment storage uses yet.
-    fn fresh_uuid(&self, seed: u64) -> Result<Uuid, Error> {
-        let mut used = Vec::new();
-        for object in self.working.source().state.components.iter_objects() {
-            for message in &object.messages {
-                if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE
-                    && let Ok(decoded) = engine::comment_storage(&message.data, WireLimits::DEFAULT)
-                {
-                    used.push(decoded.metadata().storage_uuid());
-                }
-            }
-        }
-        let mut lower = metadata::mix(seed ^ 0x6c69_7463_6869_0378);
-        loop {
-            let uuid = Uuid::from_parts(lower, 0x6c69_7463_6869_7577)
-                .map_err(|_error| Error::InvalidSource)?;
-            if !used.contains(&uuid) {
-                return Ok(uuid);
-            }
-            lower = lower.wrapping_add(1);
-        }
-    }
-}
-
-fn now() -> Result<Instant, Error> {
-    let unix = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_error| Error::InvalidSource)?
-        .as_secs_f64();
-    Instant::from_reference_date_seconds(unix - APPLE_EPOCH_UNIX_OFFSET_SECONDS)
-        .map_err(|_error| Error::InvalidSource)
+fn storage_payload(working: &Working<'_>, storage: u64) -> Result<(usize, Vec<u8>), Error> {
+    let object = working.object(storage)?;
+    let index = structure::unique_message(object, &[STORAGE_MESSAGE_TYPE])?;
+    Ok((index, object.messages[index].data.clone()))
 }
 
 /// A deterministic text-attribute UUID for a new highlight.
@@ -830,12 +486,10 @@ fn apply_one(
     let member = working.locate(storage)?.ok_or(Error::InvalidSource)?;
     let (highlights, comments) = split(annotations_of(&working, storage)?);
     let limits = WireLimits::DEFAULT;
-    let mut context = Context {
+    let mut context = Graph {
         working: &mut working,
         registry,
         transition: Transition::default(),
-        storage,
-        member,
     };
     match change {
         Staged::AddHighlight(range) | Staged::AddComment(range, _) => {
@@ -843,10 +497,10 @@ fn apply_one(
                 Staged::AddComment(_, body) => body.as_str(),
                 _ => "",
             };
-            let author = context.ensure_author()?;
+            let author = context.ensure_author()?.map(|(author, _)| author);
             let ids = context.working.allocate(2)?;
             let (object, comment_storage) = (ids[0], ids[1]);
-            let (index, payload) = context.storage_payload()?;
+            let (index, payload) = storage_payload(context.working, storage)?;
             let rewrite = ranged::rewrite(
                 &payload,
                 Table::Highlight,
@@ -884,10 +538,9 @@ fn apply_one(
             highlight.archive_info.message_infos[0]
                 .object_references
                 .push(comment_storage);
-            let member = context.member.clone();
             context.working.insert(&member, highlight)?;
-            context.insert_comment_storage(comment_storage, body, author)?;
-            context.add_author_reference(author)?;
+            context.insert_comment_storage(&member, comment_storage, body, author)?;
+            context.add_author_reference(&member, author)?;
         },
         Staged::UpdateHighlight(position, range) | Staged::UpdateComment(position, range, _) => {
             let (current, body) = match change {
@@ -896,7 +549,7 @@ fn apply_one(
             };
             let mut changed = false;
             if current.range() != *range {
-                let (index, payload) = context.storage_payload()?;
+                let (index, payload) = storage_payload(context.working, storage)?;
                 let rewrite = ranged::rewrite(
                     &payload,
                     Table::Highlight,
@@ -936,7 +589,7 @@ fn apply_one(
                 Staged::RemoveComment(_) => pick(&comments, *position)?,
                 _ => pick(&highlights, *position)?,
             };
-            let (index, payload) = context.storage_payload()?;
+            let (index, payload) = storage_payload(context.working, storage)?;
             let rewrite = ranged::rewrite(
                 &payload,
                 Table::Highlight,
@@ -969,13 +622,13 @@ fn apply_one(
         },
         Staged::AddReply(comment, body) => {
             let current = pick(&comments, *comment)?;
-            let author = context.ensure_author()?;
+            let author = context.ensure_author()?.map(|(author, _)| author);
             let reply = *context
                 .working
                 .allocate(1)?
                 .first()
                 .ok_or(Error::InvalidSource)?;
-            context.insert_comment_storage(reply, body, author)?;
+            context.insert_comment_storage(&member, reply, body, author)?;
             let root = current.root().storage();
             let object = context.working.object(root)?;
             let index = structure::unique_message(object, &[COMMENT_STORAGE_MESSAGE_TYPE])?;
@@ -986,7 +639,7 @@ fn apply_one(
             )
             .map_err(from_engine)?;
             replace(context.working, root, index, payload, Some(reply), None)?;
-            context.add_author_reference(author)?;
+            context.add_author_reference(&member, author)?;
         },
         Staged::UpdateReply(comment, reply, body) => {
             let current = pick(&comments, *comment)?;

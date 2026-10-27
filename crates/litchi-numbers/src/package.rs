@@ -54,6 +54,8 @@ pub(crate) mod sheet_chart_style;
 pub(crate) mod sheet_drawable;
 pub(crate) mod sheet_drawable_annotation;
 mod sheet_drawable_author;
+pub(crate) mod sheet_drawable_comment;
+mod sheet_drawable_comment_graph;
 pub(crate) mod sheet_drawable_date_time;
 pub(crate) mod sheet_drawable_drop_cap;
 mod sheet_drawable_graph;

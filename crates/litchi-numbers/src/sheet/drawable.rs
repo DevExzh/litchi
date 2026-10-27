@@ -72,6 +72,14 @@ pub mod named_style {
     };
 }
 
+/// Exact-source transactions for the comment attached directly to a sheet
+/// drawable and its replies: [`crate::Package::edit_sheet_drawable_comment`].
+pub mod comment {
+    pub use crate::package::sheet_drawable_comment::{
+        Commit, Diagnostics, DrawableComment, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
 /// Exact-source highlight, comment and reply transactions for the text a
 /// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_annotations`].
 pub mod annotation {

@@ -304,3 +304,65 @@ fn a_text_box_named_style_is_created_applied_renamed_and_deleted() -> TestResult
     };
     Ok(())
 }
+
+#[test]
+fn a_drawable_comment_thread_is_written_and_cleared() -> TestResult {
+    use litchi_numbers::sheet::drawable::comment::{self, Refusal};
+    use litchi_numbers::sheet::drawable::{Geometry, Size};
+
+    let package = open("basic.numbers")?;
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_text_box(
+        Geometry::new(
+            Point { x: 40.0, y: 60.0 },
+            Size {
+                width: 200.0,
+                height: 50.0,
+            },
+        ),
+        "Commented",
+    )?;
+    let created = edit.commit()?.into_package();
+    let text_box = DrawableSelector::text_box(0);
+    assert_eq!(created.sheet_drawable_comment(0, text_box)?, None);
+
+    let mut edit = created.edit_sheet_drawable_comment(0, text_box)?;
+    edit.add_reply("orphan")?;
+    let Err(comment::Error::Refused(refusal)) = edit.commit() else {
+        return Err("a reply without a comment must be refused".into());
+    };
+    assert_eq!(refusal, Refusal::NoComment);
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+
+    let mut edit = created.edit_sheet_drawable_comment(0, text_box)?;
+    edit.set("Root")?
+        .add_reply("First")?
+        .add_reply("Second")?
+        .set_reply(0, "Edited")?
+        .remove_reply(1)?;
+    let threaded = edit.commit()?;
+    let comment = threaded
+        .package()
+        .sheet_drawable_comment(0, text_box)?
+        .ok_or("no comment")?;
+    assert_eq!(comment.body(), "Root");
+    assert_eq!(comment.replies(), ["Edited".to_owned()]);
+    let restored = threaded
+        .package()
+        .apply_sheet_drawable_comment(&threaded.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&created)?);
+
+    let mut edit = threaded
+        .package()
+        .edit_sheet_drawable_comment(0, text_box)?;
+    edit.clear()?;
+    let cleared = edit.commit()?.into_package();
+    assert_eq!(cleared.sheet_drawable_comment(0, text_box)?, None);
+
+    let Err(comment::Error::Refused(Refusal::NotCommentable { .. })) =
+        created.edit_sheet_drawable_comment(0, DrawableSelector::of(Kind::Table, 0))
+    else {
+        return Err("a table takes no direct comment".into());
+    };
+    Ok(())
+}
