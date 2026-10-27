@@ -41,6 +41,12 @@ fn host_write(
         Property::MinimumLabel(v) => {
             e.set_sheet_chart_value_axis_minimum_label_visible(sheet, chart, v)?;
         },
+        Property::Labels(v) => {
+            e.set_sheet_chart_axis_labels_visible(sheet, chart, axis, v.is_visible())?;
+        },
+        Property::SeriesNames(v) => {
+            e.set_sheet_chart_category_axis_series_names_visible(sheet, chart, v.is_visible())?;
+        },
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -76,6 +82,14 @@ fn host_read(
             "{:?}",
             e.sheet_chart_value_axis_minimum_label_visible(sheet, chart)?
         ),
+        PropertyKind::Labels => format!(
+            "{:?}",
+            Visibility::from(e.sheet_chart_axis_labels_visible(sheet, chart, axis)?)
+        ),
+        PropertyKind::SeriesNames => format!(
+            "{:?}",
+            Visibility::from(e.sheet_chart_category_axis_series_names_visible(sheet, chart)?)
+        ),
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -87,7 +101,9 @@ fn leaf_read(bytes: &[u8], axis: Axis, kind: PropertyKind) -> TestResult<String>
         | Property::MajorGridlines(v)
         | Property::MinorGridlines(v)
         | Property::MinorTickMarks(v)
-        | Property::MinimumLabel(v) => format!("{v:?}"),
+        | Property::MinimumLabel(v)
+        | Property::Labels(v)
+        | Property::SeriesNames(v) => format!("{v:?}"),
         Property::TickMarkLocation(v) => format!("{v:?}"),
         _ => return Err("unmapped property".into()),
     })
@@ -127,6 +143,9 @@ fn cases() -> Vec<(Axis, Property)> {
             Property::TickMarkLocation(TickMarkLocation::Inside),
         ),
         (Axis::Value, Property::MinimumLabel(Visibility::Hidden)),
+        (Axis::Value, Property::Labels(Visibility::Hidden)),
+        (Axis::Category, Property::Labels(Visibility::Hidden)),
+        (Axis::Category, Property::SeriesNames(Visibility::Visible)),
     ]
 }
 
@@ -150,6 +169,8 @@ fn changed(bytes: &[u8], axis: Axis, value: Property) -> TestResult<Property> {
         Property::MinorGridlines(v) => Property::MinorGridlines(flip(v)),
         Property::MinorTickMarks(v) => Property::MinorTickMarks(flip(v)),
         Property::MinimumLabel(v) => Property::MinimumLabel(flip(v)),
+        Property::Labels(v) => Property::Labels(flip(v)),
+        Property::SeriesNames(v) => Property::SeriesNames(flip(v)),
         Property::TickMarkLocation(_) => Property::TickMarkLocation(TickMarkLocation::Centered),
         _ => return Err("unmapped property".into()),
     })
