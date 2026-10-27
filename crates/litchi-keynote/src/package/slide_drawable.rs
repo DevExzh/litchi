@@ -15,6 +15,7 @@ mod arrange;
 mod author;
 mod inventory;
 mod named_styles;
+pub(crate) mod shape_style;
 mod stage;
 mod table;
 mod text;
@@ -329,6 +330,10 @@ pub enum Unsupported {
     /// The deck holds no slide table whose structure a new table can copy
     /// ([`Edit::add_table`]).
     TableTemplate,
+    /// A drawing or frame style the shared shape-style engine cannot
+    /// rewrite (an unmodelled style shape, an image fill where a standard
+    /// fill is expected) ([`Edit::set_shape_style`]).
+    ShapeStyle,
 }
 
 impl fmt::Display for Unsupported {
@@ -346,6 +351,7 @@ impl fmt::Display for Unsupported {
             Self::RegistryShape => f.write_str("an unmodelled package-registry shape"),
             Self::InlineObjects => f.write_str("text with inline object markers"),
             Self::TableTemplate => f.write_str("a deck without a slide table to copy"),
+            Self::ShapeStyle => f.write_str("a shape style outside the shared engine"),
         }
     }
 }
@@ -685,6 +691,13 @@ enum Operation {
         drawable: u64,
         storage: u64,
         change: text_comments::CommentChange,
+    },
+    ShapeStyle {
+        slide: u64,
+        /// `None`: the drawable the previous add operation created.
+        drawable: Option<u64>,
+        fill_size: Option<litchi_iwa_common::shape::geometry::Size>,
+        change: shape_style::Change,
     },
     Language {
         slide: u64,
@@ -1109,6 +1122,7 @@ impl<'a> Edit<'a> {
             | Operation::DateTime { .. }
             | Operation::DropCap { .. }
             | Operation::Language { .. }
+            | Operation::ShapeStyle { .. }
             | Operation::TableCell { .. }
             | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
@@ -4115,6 +4129,19 @@ fn commit_operations(
                     return Err(Error::Verification);
                 }
                 touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::ShapeStyle {
+                slide,
+                drawable,
+                fill_size,
+                change,
+            } => {
+                let drawable = match drawable {
+                    Some(drawable) => *drawable,
+                    None => created.last().ok_or(Error::InvalidSource)?.2,
+                };
+                shape_style::stage(&mut workspace, drawable, *fill_size, change)?;
+                touched.entry(*slide).or_default().insert(drawable);
             },
             Operation::AddLine {
                 slide,
