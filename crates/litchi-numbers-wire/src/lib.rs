@@ -48,6 +48,9 @@ pub mod table_lifecycle;
 /// three table owners (record 0370).
 pub mod table_topology;
 
+/// The calculation-engine owner family of volatile conditional-highlight
+/// rules (record 0376a).
+pub mod conditional_volatile;
 /// Final-state formula dependency and dependent-cache refresh planning,
 /// with the strict scalar evaluator, shared by the three table owners
 /// (record 0376).
