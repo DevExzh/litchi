@@ -1023,8 +1023,8 @@ impl engine::Leaf for Leaf {
     type Selector<'s> = BodyTableSelector<'s>;
     type Budget = table_lock::WireBudget;
 
-    fn position_selector(position: usize) -> Self::Selector<'static> {
-        BodyTableSelector::index(position)
+    fn position_selector(_scope: usize, table: usize) -> Self::Selector<'static> {
+        BodyTableSelector::index(table)
     }
 
     fn resolve_target(
@@ -1038,6 +1038,7 @@ impl engine::Leaf for Leaf {
             .map_err(lock)?;
         table_lock::validate_body_table_target(&self.0, &target, budget).map_err(lock)?;
         Ok(engine::Target {
+            scope: 0,
             table_position: target.table_position,
             model_identifier: target.model_identifier,
             model_component_index: target.model_component_index,

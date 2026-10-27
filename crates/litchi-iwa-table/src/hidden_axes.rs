@@ -37,7 +37,10 @@ use litchi_iwa_common::wire::WireView;
 
 use crate::TableSource;
 
+mod budget;
 mod rewrite;
+
+pub use budget::WireBudget;
 pub mod support;
 
 /// The root previews a changed table makes stale.
@@ -46,6 +49,9 @@ const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "pre
 /// The resolved native route of one rooted table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Target {
+    /// Leaf-defined container position (a Keynote slide; zero for a Pages
+    /// body), used with `table_position` to re-resolve the candidate.
+    pub scope: usize,
     /// Leaf-defined table position, used to re-resolve the candidate.
     pub table_position: usize,
     /// Object identifier of the `TST.TableModelArchive`.
@@ -125,8 +131,13 @@ pub trait Leaf: TableSource + Sized {
     /// The leaf's wire budget.
     type Budget: Budget;
 
-    /// The selector of the table at `position`.
-    fn position_selector(position: usize) -> Self::Selector<'static>;
+    /// Whether a changed publication deletes the stale root previews (the
+    /// Pages owner) or keeps them (the Keynote owner, as its host editor
+    /// does).
+    const DELETES_ROOT_PREVIEWS: bool = true;
+
+    /// The selector of the table at `table` inside container `scope`.
+    fn position_selector(scope: usize, table: usize) -> Self::Selector<'static>;
 
     /// Resolve and revalidate one rooted table.
     ///
@@ -4487,14 +4498,19 @@ pub fn publish<L: Leaf>(
         rewrite::run(source, graph, axes, budget)?;
     let verified = resolve_graph(
         &candidate,
-        L::position_selector(graph.target.table_position),
+        L::position_selector(graph.target.scope, graph.target.table_position),
         budget,
     )?;
     if verified.target.model_identifier != graph.target.model_identifier || verified.before != *axes
     {
         return Err(Error::Verification);
     }
-    if preview_count(&candidate) != 0 {
+    let expected_previews = if L::DELETES_ROOT_PREVIEWS {
+        0
+    } else {
+        preview_count(source)
+    };
+    if preview_count(&candidate) != expected_previews {
         return Err(Error::Verification);
     }
     verify_locality(
