@@ -126,6 +126,15 @@ impl Component {
         before - self.object_uuids.len()
     }
 
+    /// The objects that own data item `data`.
+    pub(in crate::package) fn data_owned_objects(&self, data: u64) -> Vec<u64> {
+        self.data_references
+            .iter()
+            .filter(|entry| entry.data == data)
+            .flat_map(|entry| entry.owners.iter().map(|(object, _)| *object))
+            .collect()
+    }
+
     /// The data items any of `objects` owns, ascending and unique.
     pub(in crate::package) fn data_owned_by(&self, objects: &[u64]) -> Vec<u64> {
         let mut data = self

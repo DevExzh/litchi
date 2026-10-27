@@ -354,6 +354,7 @@ fn rewrite_list(
 
 fn add_sheet(source: &Package, name: &str) -> Result<(structure::Published, Vec<String>), Error> {
     let mut working = Working::new(source)?;
+    working.keep_previews();
     let roots = roots(&working)?;
     let template = *roots.sheets.first().ok_or(Error::InvalidSource)?;
     if working.locate(1)?.as_deref() != Some(DOCUMENT_COMPONENT)
@@ -486,6 +487,8 @@ fn remove_sheet(
         .get(position)
         .ok_or(Error::Refused(Refusal::SheetNotFound))?
         .table_count();
+    // The composed removal advances the source's save token once.
+    let token = Working::new(source)?.save_token()?;
     let mut current = source.clone();
     for _ in 0..tables {
         current = super::table_lifecycle::remove_table(&current, position, 0)
@@ -511,7 +514,12 @@ fn remove_sheet(
             })?
             .package;
     }
-    let mut published = remove_empty_sheet(&current, position)?;
+    let token = if tables > 0 {
+        token.and_then(|token| token.checked_add(1))
+    } else {
+        None
+    };
+    let mut published = remove_empty_sheet(&current, position, token)?;
     if tables > 0 {
         // The patch spans every step; report the touched components of the
         // last one only when nothing else changed.
@@ -528,8 +536,16 @@ fn remove_sheet(
     Ok((published, sheets))
 }
 
-fn remove_empty_sheet(source: &Package, position: usize) -> Result<structure::Published, Error> {
+fn remove_empty_sheet(
+    source: &Package,
+    position: usize,
+    save_token: Option<u64>,
+) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
+    working.keep_previews();
+    if let Some(token) = save_token {
+        working.set_save_token(token);
+    }
     let roots = roots(&working)?;
     let sheet = *roots
         .sheets
@@ -597,6 +613,9 @@ fn remove_empty_sheet(source: &Package, position: usize) -> Result<structure::Pu
     if let Some(registry) = metadata::registry(&working)? {
         transition.remove_objects(&registry, &removed)?;
     }
+    // A removed suffix of the identifier space lowers the watermark, as the
+    // host editor releases it (record 0370g).
+    transition.release_suffix(&removed)?;
     for identifier in &removed {
         working.remove(*identifier)?;
     }

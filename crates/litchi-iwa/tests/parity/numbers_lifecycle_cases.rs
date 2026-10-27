@@ -98,50 +98,144 @@ fn run(name: &'static str, tier: Tier, input: &Fixture, operation: Operation) ->
     Ok(())
 }
 
-/// Every lifecycle operation on the corpus (exploratory: the failures list
-/// the remaining divergences, record 0370e §3).
-#[test]
-#[ignore = "exploratory: sheet and table add/remove are not at parity yet (record 0370e)"]
-fn numbers_lifecycle_corpus_parity() -> TestResult {
-    let _ = Evidence::Queued;
+/// The sheet removals the leaf refuses where the host removes: a sheet
+/// holding drawables other than tables (record 0370g gap; the drawable
+/// deletion engines are W2-A's).
+const SHEET_REMOVAL_REFUSALS: [&str; 1] = ["iwork/numbers/table-relocation-native-resaved.numbers"];
+
+/// One lifecycle operation on every corpus fixture: each route both sides
+/// edit is a parity case at `tier`.
+fn corpus(name: &'static str, tier: Tier, operation: Operation) -> TestResult {
     let mut failures = Vec::new();
     let mut cases = 0;
     for path in crate::numbers_cases::NUMBERS_CORPUS {
         let input = fixture(path)?;
-        for operation in [
-            Operation::AddSheet,
-            Operation::AddTable(0),
-            Operation::RemoveTable(0, 0),
-            Operation::RemoveSheet(0),
-        ] {
-            let host = host_route(&input.bytes, operation);
-            let leaf = leaf_route(&input.bytes, operation);
-            match (host, leaf) {
-                (Ok(_), Ok(_)) => {
-                    cases += 1;
-                    if let Err(error) = run(
-                        "numbers_lifecycle_corpus_parity",
-                        Tier::B,
-                        &input,
-                        operation,
-                    ) {
-                        failures.push(format!("{path} {operation:?}: {error}"));
-                    }
-                },
-                (Ok(_), Err(error)) => {
+        match (
+            host_route(&input.bytes, operation),
+            leaf_route(&input.bytes, operation),
+        ) {
+            (Ok(_), Ok(_)) => {
+                cases += 1;
+                if let Err(error) = run(name, tier, &input, operation) {
+                    failures.push(format!("{path} {operation:?}: {error}"));
+                }
+            },
+            (Ok(_), Err(error)) => {
+                if !(matches!(operation, Operation::RemoveSheet(_))
+                    && SHEET_REMOVAL_REFUSALS.contains(path))
+                {
                     failures.push(format!("{path} {operation:?}: leaf refuses: {error}"));
-                },
-                (Err(host), Ok(_)) => eprintln!("{path} {operation:?}: host refuses ({host})"),
-                (Err(_), Err(_)) => {},
-            }
+                }
+            },
+            (Err(host), Ok(_)) => eprintln!("{path} {operation:?}: host refuses ({host})"),
+            (Err(_), Err(_)) => {},
         }
     }
-    eprintln!("lifecycle routes compared: {cases}");
+    eprintln!("{name}: {cases} routes compared");
+    if cases == 0 {
+        failures.push("no route compared".to_owned());
+    }
     if failures.is_empty() {
         Ok(())
     } else {
         Err(failures.join("\n").into())
     }
+}
+
+/// Adding a sheet to each corpus fixture.
+#[test]
+fn numbers_sheet_add_corpus_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    corpus(
+        "numbers_sheet_add_corpus_parity",
+        Tier::A,
+        Operation::AddSheet,
+    )
+}
+
+/// Removing the first sheet of each corpus fixture with two or more.
+#[test]
+fn numbers_sheet_remove_corpus_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    corpus(
+        "numbers_sheet_remove_corpus_parity",
+        Tier::B,
+        Operation::RemoveSheet(0),
+    )
+    .or_else(|error| {
+        // The corpus has one multi-sheet fixture, which the leaf refuses.
+        if error.to_string() == "no route compared" {
+            Ok(())
+        } else {
+            Err(error)
+        }
+    })
+}
+
+/// `basic.numbers` with a second sheet (added by the leaf), holding a
+/// 4×3 table when `table`.
+fn two_sheets(table: bool) -> TestResult<Fixture> {
+    let base = fixture("iwork/numbers/basic.numbers")?;
+    let package = litchi_numbers::Package::from_bytes(&base.bytes)?
+        .edit_sheet_lifecycle()
+        .add("Second")?
+        .commit()?
+        .into_package();
+    let package = if table {
+        package
+            .edit_table_lifecycle(1)?
+            .add("Second Table", 4, 3)?
+            .commit()?
+            .into_package()
+    } else {
+        package
+    };
+    Ok(Fixture {
+        path: base.path,
+        bytes: leaf_bytes!(&package),
+    })
+}
+
+/// Removing a sheet: the empty added sheet, the added sheet with its table,
+/// and the original sheet with its tables.
+#[test]
+fn numbers_sheet_remove_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    for (table, sheet) in [(false, 1), (true, 1), (false, 0), (true, 0)] {
+        let input = two_sheets(table)?;
+        run(
+            "numbers_sheet_remove_parity",
+            Tier::B,
+            &input,
+            Operation::RemoveSheet(sheet),
+        )
+        .map_err(|error| format!("table {table}, sheet {sheet}: {error}"))?;
+    }
+    Ok(())
+}
+
+/// Removing the first table of `basic.numbers`.
+#[test]
+fn numbers_table_remove_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    run(
+        "numbers_table_remove_parity",
+        Tier::B,
+        &input,
+        Operation::RemoveTable(0, 0),
+    )
+}
+
+/// Removing the first table of each corpus fixture.
+#[test]
+fn numbers_table_remove_corpus_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    corpus(
+        "numbers_table_remove_corpus_parity",
+        Tier::B,
+        Operation::RemoveTable(0, 0),
+    )
 }
 
 /// One resize route: grow or shrink the first table by `rows` × `columns`.
@@ -379,4 +473,17 @@ fn numbers_table_add_corpus_parity() -> TestResult {
     } else {
         Err(failures.join("\n").into())
     }
+}
+
+/// Adding a sheet to `basic.numbers`.
+#[test]
+fn numbers_sheet_add_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    run(
+        "numbers_sheet_add_parity",
+        Tier::A,
+        &input,
+        Operation::AddSheet,
+    )
 }

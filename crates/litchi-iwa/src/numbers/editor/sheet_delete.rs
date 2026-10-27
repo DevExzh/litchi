@@ -225,7 +225,37 @@ fn detach_empty_sheet(editor: &mut Draft, sheet_id: u64) -> Result<()> {
     {
         remove_component_registration(&mut staged, component_id)?;
     }
-    release_package_identifier_suffix(&mut staged, &[sheet_id])?;
+    // Host defect fixed with record 0370g: the sheet's private objects (its
+    // header and footer storages, guides and other records only it
+    // addresses) stayed behind.
+    let closure = super::object_closure::private_closure(editor.package(), &[sheet_id])?;
+    let mut released = vec![sheet_id];
+    let mut affected = HashMap::<String, u64>::new();
+    for &identifier in closure.iter().filter(|identifier| **identifier != sheet_id) {
+        let entry = locations.get(&identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers sheet object {identifier} is missing"))
+        })?;
+        if let Some(component) = component_identifier_for_entry(&staged, entry)? {
+            affected.insert(entry.clone(), component);
+            remove_component_external_references_to_object(&mut staged, component, identifier)?;
+            if component_uuid_identifiers(&staged, component)?
+                .is_some_and(|identifiers| identifiers.contains(&identifier))
+            {
+                remove_component_object_uuids(&mut staged, component, &[identifier])?;
+            }
+        }
+        remove_object_or_empty_entry(&mut staged, &locations, identifier)?;
+        released.push(identifier);
+    }
+    for (entry, component) in affected {
+        if !staged.contains_entry(&entry) {
+            remove_component_registration(&mut staged, component)?;
+        }
+    }
+    // Host defect fixed with record 0370g: the sheet's sidebar node stayed
+    // behind, addressing the removed sheet.
+    released.extend(super::sidebar::remove_node(&mut staged, sheet_id)?);
+    release_package_identifier_suffix(&mut staged, &released)?;
     editor.package = staged;
     Ok(())
 }
