@@ -18,6 +18,8 @@
 //! - [`series`]: the style-variation graph engine of per-series chart
 //!   overrides (allocating, registering and releasing the override objects
 //!   a property write needs) and the per-series properties;
+//! - [`number_format`]: the dual chart number-format codec (axis and
+//!   value-label formatters);
 //! - [`reference_line`]: the reference-line graph engine of a chart's
 //!   primary value axis;
 //! - [`shape`]: the shape-style variation graph engine (copy-on-write
@@ -31,6 +33,7 @@ pub mod chart_font;
 pub mod drawing;
 pub mod graph;
 pub mod media;
+pub mod number_format;
 pub mod reference_line;
 pub mod series;
 pub mod shape;
