@@ -25,7 +25,7 @@ use std::num::NonZeroU64;
 use thiserror::Error as ThisError;
 
 mod add;
-mod duplicate;
+pub(in crate::package) mod duplicate;
 
 use super::Package;
 use super::structure::{
