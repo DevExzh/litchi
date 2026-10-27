@@ -19,6 +19,7 @@
 
 pub mod budget;
 pub mod collect;
+pub mod duplicate;
 pub mod formula;
 pub mod metadata;
 pub mod plan;
@@ -443,6 +444,14 @@ impl<'p, P: TableLeaf> Working<'p, P> {
         self.archive_mut(&name)?
             .object_mut(identifier)
             .ok_or(Fault::Invalid)
+    }
+
+    /// The identifier the next [`Self::allocate`] returns first (a planner
+    /// that names the objects it creates before they are allocated, record
+    /// 0376b).
+    #[must_use]
+    pub const fn next_identifier(&self) -> u64 {
+        self.next_identifier
     }
 
     /// Allocate `count` fresh consecutive identifiers above every identifier

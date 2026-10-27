@@ -32,6 +32,7 @@ mod graph;
 mod native;
 mod proto;
 mod read;
+mod volatile;
 
 use std::fmt;
 
@@ -154,10 +155,6 @@ pub enum Refusal {
     /// A rule set must hold between one and fifteen rules.
     #[error("conditional highlighting takes one to fifteen rules")]
     InvalidRuleCount,
-    /// A volatile date rule, or a table whose rules already use the
-    /// calculation engine's volatile owner.
-    #[error("volatile date rules are not written by this route")]
-    VolatileRule,
     /// An object outside the rule graph references the graph's styles.
     #[error("a surviving object depends on the conditional-highlight graph")]
     UnsupportedDependency,
@@ -175,7 +172,7 @@ impl Refusal {
             Self::SheetNotFound | Self::TableNotFound | Self::CellNotFound => RefusalKind::NotFound,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::InvalidRuleCount => RefusalKind::InvalidValue,
-            Self::VolatileRule | Self::UnsupportedDependency | Self::UnsupportedSource => {
+            Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
         }
@@ -375,7 +372,9 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// [`Refusal::CellNotFound`], [`Refusal::InvalidRuleCount`] for no rule
-    /// or more than fifteen, [`Refusal::VolatileRule`], [`Error::Allocation`].
+    /// or more than fifteen, [`Error::Allocation`]. A volatile date rule
+    /// registers the cell with the calculation engine's volatile owner
+    /// family (record 0376a).
     pub fn set(self, position: At, rules: impl IntoIterator<Item = Rule>) -> Result<Self> {
         let mut staged = Vec::new();
         for rule in rules {
@@ -386,12 +385,6 @@ impl Edit<'_> {
         }
         if staged.is_empty() || staged.len() > MAX_CONDITIONAL_HIGHLIGHT_RULES {
             return Err(Error::Refused(Refusal::InvalidRuleCount));
-        }
-        if staged
-            .iter()
-            .any(|rule| is_volatile_date_condition(&rule.condition))
-        {
-            return Err(Error::Refused(Refusal::VolatileRule));
         }
         self.stage(position, Staged::Set(staged))
     }
@@ -449,6 +442,7 @@ impl Edit<'_> {
 
 /// The cell's table: its model, data store and geometry.
 struct Table {
+    info: u64,
     model: u64,
     model_data: Vec<u8>,
     store: Vec<u8>,
@@ -463,6 +457,7 @@ fn table(working: &Working<'_>, sheet: usize, table: usize) -> Result<Table> {
         .ok_or(Error::InvalidSource)?
         .to_vec();
     Ok(Table {
+        info: target.info,
         model: target.model,
         model_data: model.to_vec(),
         store,
@@ -574,38 +569,6 @@ fn conditional_owner(model: &[u8]) -> Result<Option<tsp::Uuid>> {
         return Ok(None);
     };
     Ok(cfuuid_as_uuid(&tsp::CfuuidArchive::decode(owner)?))
-}
-
-/// Whether the calculation engine's owner `uid` (the table's volatile
-/// conditional-style owner) holds a dependency record of the cell at
-/// `position`: the cell hosts a volatile rule (the host's
-/// `remove_volatile_host` target).
-fn volatile_host(working: &Working<'_>, uid: tsp::Uuid, position: At) -> Result<bool> {
-    for object in working.source().state.components.iter_objects() {
-        for message in &object.messages {
-            if message.type_ != FORMULA_OWNER_MESSAGE_TYPE {
-                continue;
-            }
-            let Some(owner) = single_bytes(&message.data, 1)? else {
-                continue;
-            };
-            if tsp::Uuid::decode(owner)? != uid {
-                continue;
-            }
-            let Some(dependencies) = single_bytes(&message.data, 4)? else {
-                return Ok(false);
-            };
-            for record in repeated_bytes(dependencies, 1)? {
-                if single_varint(record, 1)? == Some(u64::from(position.column()))
-                    && single_varint(record, 2)? == Some(u64::from(position.row()))
-                {
-                    return Ok(true);
-                }
-            }
-            return Ok(false);
-        }
-    }
-    Ok(false)
 }
 
 /// The style identifiers a style set names, pre-pivot rules first.
@@ -1326,11 +1289,6 @@ fn apply_one(
     if position.row() >= table.geometry.rows || position.column() >= table.geometry.columns {
         return Err(Error::Refused(Refusal::CellNotFound));
     }
-    if let Some(owner) = conditional_owner(&table.model_data)?
-        && volatile_host(&working, owner, position)?
-    {
-        return Err(Error::Refused(Refusal::VolatileRule));
-    }
     let registry =
         metadata::registry(&working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let mut transition = Transition::default();
@@ -1341,12 +1299,21 @@ fn apply_one(
     };
     match staged {
         Staged::Clear => {
+            // The host unregisters a volatile cell before it clears it.
+            if entry(change.working, &table, position)?.is_some() {
+                volatile::remove(&mut change, &table, position)?;
+            }
             if !clear(&mut change, &table, position)? {
                 return Ok(None);
             }
         },
         Staged::Set(rules) => {
             let current = entry(change.working, &table, position)?;
+            // The host unregisters a volatile cell before it rewrites it,
+            // and registers it again for volatile rules (record 0376a).
+            if current.is_some() {
+                volatile::remove(&mut change, &table, position)?;
+            }
             match current {
                 Some(entry) if entry.refcount > 1 => {
                     // A shared entry: release this cell's reference, then
@@ -1361,6 +1328,12 @@ fn apply_one(
                     }
                 },
                 None => create(&mut change, &table, position, rules)?,
+            }
+            if rules
+                .iter()
+                .any(|rule| is_volatile_date_condition(&rule.condition))
+            {
+                volatile::ensure(&mut change, &table, position)?;
             }
         },
     }

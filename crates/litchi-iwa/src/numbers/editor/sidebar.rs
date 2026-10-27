@@ -19,6 +19,19 @@ pub(super) fn append_node(
     parent: Option<u64>,
     target: u64,
 ) -> Result<()> {
+    insert_node(package, parent, target, None, None)
+}
+
+/// Add a sidebar node for `target` under `parent`'s node (the root when
+/// `None`): right after the child addressing `after` when given, else
+/// last. `existing` reuses a detached node instead of creating one.
+pub(super) fn insert_node(
+    package: &mut HostPackage,
+    parent: Option<u64>,
+    target: u64,
+    after: Option<u64>,
+    existing: Option<u64>,
+) -> Result<()> {
     let document = numbers_document(package)?;
     let root = document.sidebar_order.identifier;
     if root == 0 {
@@ -62,7 +75,30 @@ pub(super) fn append_node(
         .get(&parent_id)
         .cloned()
         .ok_or_else(|| Error::InvalidFormat("Numbers sidebar node is missing".to_owned()))?;
-    let node_id = next_object_identifier(package)?;
+    // The child to insert after, by the object it addresses.
+    let after_node = match after {
+        Some(after) => {
+            let parent_node = node_of(package, parent_id)?.ok_or_else(|| {
+                Error::InvalidFormat("Numbers sidebar node is missing".to_owned())
+            })?;
+            let mut found = None;
+            for child in &parent_node.children {
+                if node_of(package, child.identifier)?
+                    .and_then(|node| node.object)
+                    .map(|object| object.identifier)
+                    == Some(after)
+                {
+                    found = Some(child.identifier);
+                }
+            }
+            found
+        },
+        None => None,
+    };
+    let node_id = match existing {
+        Some(node) => node,
+        None => next_object_identifier(package)?,
+    };
     let mut data = Vec::new();
     crate::wire::append_length_delimited_field(
         &mut data,
@@ -77,20 +113,22 @@ pub(super) fn append_node(
         let parent_object = archive
             .object(parent_id)
             .ok_or_else(|| Error::InvalidFormat("Numbers sidebar node is missing".to_owned()))?;
-        let mut node = ArchiveObject::new(
-            node_id,
-            vec![RawMessage {
-                type_: TREE_NODE_MESSAGE_TYPE,
-                data,
-            }],
-            Default::default(),
-        )?;
-        node.archive_info.should_merge = parent_object.archive_info.should_merge;
-        if let Some(info) = parent_object.archive_info.message_infos.first() {
-            node.archive_info.message_infos[0].versions = info.versions.clone();
+        if existing.is_none() {
+            let mut node = ArchiveObject::new(
+                node_id,
+                vec![RawMessage {
+                    type_: TREE_NODE_MESSAGE_TYPE,
+                    data,
+                }],
+                Default::default(),
+            )?;
+            node.archive_info.should_merge = parent_object.archive_info.should_merge;
+            if let Some(info) = parent_object.archive_info.message_infos.first() {
+                node.archive_info.message_infos[0].versions = info.versions.clone();
+            }
+            node.archive_info.message_infos[0].object_references = vec![target];
+            archive.insert_object(node, Default::default())?;
         }
-        node.archive_info.message_infos[0].object_references = vec![target];
-        archive.insert_object(node, Default::default())?;
         let parent_object = archive
             .object_mut(parent_id)
             .ok_or_else(|| Error::InvalidFormat("Numbers sidebar node is missing".to_owned()))?;
@@ -101,7 +139,10 @@ pub(super) fn append_node(
             .map(|reference| reference.identifier)
             .collect::<Vec<_>>();
         let mut current = previous.clone();
-        current.push(node_id);
+        match after_node.and_then(|after| current.iter().position(|child| *child == after)) {
+            Some(at) => current.insert(at + 1, node_id),
+            None => current.push(node_id),
+        }
         let rewritten = model::rewrite_reference_list(&original, 2, &previous, &current)?;
         parent_object.replace_message_preserving_header(
             0,
@@ -122,7 +163,9 @@ pub(super) fn append_node(
         }
         Ok(())
     })?;
-    set_package_last_object_identifier(package, node_id)?;
+    if existing.is_none() {
+        set_package_last_object_identifier(package, node_id)?;
+    }
     if let Some(target_archive) = locations.get(&target) {
         table_duplicate::register_numbers_component_reference(
             package,
@@ -137,6 +180,26 @@ pub(super) fn append_node(
 /// Remove the sidebar node addressing `target` (a table under its sheet's
 /// node, or a sheet under the root); returns the removed node.
 pub(super) fn remove_node(package: &mut HostPackage, target: u64) -> Result<Option<u64>> {
+    let locations = object_locations(package)?;
+    let node = detach_node(package, target)?;
+    if let Some(node) = node {
+        remove_object_or_empty_entry(package, &locations, node)?;
+    }
+    Ok(node)
+}
+
+/// Move the sidebar node addressing table `target` under `sheet`'s node, as
+/// a table moved to another sheet is listed (record 0370j).
+pub(super) fn move_node(package: &mut HostPackage, target: u64, sheet: u64) -> Result<()> {
+    if let Some(node) = detach_node(package, target)? {
+        insert_node(package, Some(sheet), target, None, Some(node))?;
+    }
+    Ok(())
+}
+
+/// Detach the sidebar node addressing `target` from its parent's children;
+/// returns it.
+fn detach_node(package: &mut HostPackage, target: u64) -> Result<Option<u64>> {
     let document = numbers_document(package)?;
     let root = document.sidebar_order.identifier;
     if root == 0 {
@@ -212,6 +275,5 @@ pub(super) fn remove_node(package: &mut HostPackage, target: u64) -> Result<Opti
         }
         Ok(())
     })?;
-    remove_object_or_empty_entry(package, &locations, node)?;
     Ok(Some(node))
 }
