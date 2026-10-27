@@ -268,7 +268,7 @@ fn a_text_box_named_style_is_created_applied_renamed_and_deleted() -> TestResult
         .package()
         .edit_sheet_text_box_named_styles(0, text_box)?;
     edit.apply(copy.id())?
-        .rename(copy.id(), ParagraphStyleName::new("Leaf Renamed")?)?;
+        .rename_style(copy.id(), ParagraphStyleName::new("Leaf Renamed")?)?;
     let renamed = edit.commit()?;
     let (now, _) = renamed
         .package()

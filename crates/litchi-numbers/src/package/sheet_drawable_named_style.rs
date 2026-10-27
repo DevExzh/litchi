@@ -275,7 +275,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// [`Error::Allocation`].
-    pub fn rename(
+    pub fn rename_style(
         &mut self,
         style: ParagraphStyleId,
         name: ParagraphStyleName,
@@ -770,7 +770,7 @@ fn create(
     Ok(())
 }
 
-fn rename(
+fn rename_style(
     working: &mut Working<'_>,
     storage: u64,
     target: ParagraphStyleId,
@@ -917,7 +917,7 @@ fn apply_one(source: &Package, storage: u64, change: &Change) -> Result<Option<P
             )?;
             true
         },
-        Change::Rename(target, name) => rename(&mut working, storage, *target, name)?,
+        Change::Rename(target, name) => rename_style(&mut working, storage, *target, name)?,
         Change::Delete(target) => {
             delete(&mut working, &registry, &mut transition, storage, *target)?;
             true

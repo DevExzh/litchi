@@ -67,7 +67,7 @@ fn leaf_route(source: &[u8], operation: &Operation) -> TestResult<LeafRun> {
     match operation {
         Operation::Apply(target) => edit.apply(*target)?,
         Operation::Create(source, text) => edit.create(*source, name(text)?)?,
-        Operation::Rename(target, text) => edit.rename(*target, name(text)?)?,
+        Operation::Rename(target, text) => edit.rename_style(*target, name(text)?)?,
         Operation::Delete(target) => edit.delete(*target)?,
         Operation::DeleteApplied(target, replacement) => {
             edit.delete_applied(*target, *replacement)?
