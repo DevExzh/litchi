@@ -396,17 +396,37 @@ impl Cell {
     /// Render this address in relative A1 notation.
     #[must_use]
     pub fn a1(self) -> String {
+        let mut value = Vec::with_capacity(10);
+        self.append_a1(&mut value);
+        // The label is ASCII letters and digits only.
+        String::from_utf8(value).unwrap_or_default()
+    }
+
+    /// Append this address in relative A1 notation to `output` without an
+    /// intermediate allocation; the bytes [`Self::a1`] returns.
+    pub fn append_a1(self, output: &mut Vec<u8>) {
+        let mut letters = [0u8; 3];
+        let mut count = 0;
         let mut column = self.column.get() + 1;
-        let mut reversed = String::with_capacity(3);
-        while column != 0 {
+        while column != 0 && count < letters.len() {
             column -= 1;
-            reversed.push(char::from(b'A' + (column % 26) as u8));
+            letters[count] = b'A' + (column % 26) as u8;
+            count += 1;
             column /= 26;
         }
-        let mut value = String::with_capacity(reversed.len() + 7);
-        value.extend(reversed.chars().rev());
-        value.push_str(&(self.row.get() + 1).to_string());
-        value
+        output.extend(letters[..count].iter().rev());
+        let mut digits = [0u8; 10];
+        let mut start = digits.len();
+        let mut row = self.row.get() + 1;
+        loop {
+            start -= 1;
+            digits[start] = b'0' + (row % 10) as u8;
+            row /= 10;
+            if row == 0 {
+                break;
+            }
+        }
+        output.extend_from_slice(&digits[start..]);
     }
 
     /// Zero-based row coordinate.
