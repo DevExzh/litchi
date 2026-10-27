@@ -68,7 +68,7 @@ pub(super) fn hyperlinks(
     Ok(found)
 }
 
-fn replace_storage(
+pub(super) fn replace_storage(
     workspace: &mut Workspace<'_>,
     storage: u64,
     index: usize,

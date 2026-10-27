@@ -9368,9 +9368,33 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_SOURCE = Path(
 NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/numbers_table_cell_display_format_codec.rs"
 )
+# Record 0379 moved the shared display-format core into `litchi-iwa-table`;
+# the Numbers facades reach it through the `table_cell_display_format_native`
+# alias of `package.rs`.
 NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE = Path(
-    "crates/litchi-numbers/src/package/table_cell_display_format_native.rs"
+    "crates/litchi-iwa-table/src/cell_format/display.rs"
 )
+# The format-neutral cell-format engine (record 0379). The Numbers popup and
+# cell-control audits read its markers together with the Numbers facades.
+IWA_TABLE_CELL_FORMAT_ENGINE_SOURCES = (
+    Path("crates/litchi-iwa-table/src/cell_format.rs"),
+    Path("crates/litchi-iwa-table/src/cell_format/budget.rs"),
+    Path("crates/litchi-iwa-table/src/cell_format/control.rs"),
+    Path("crates/litchi-iwa-table/src/cell_format/display.rs"),
+    Path("crates/litchi-iwa-table/src/cell_format/pop_up_menu.rs"),
+    Path("crates/litchi-iwa-table/src/cell_format/pop_up_menu_native.rs"),
+    Path("crates/litchi-iwa-table/src/cell_format/pop_up_menu_metadata.rs"),
+)
+
+
+def _iwa_table_cell_format_engine_code(root: Path) -> str:
+    """Masked code of the shared cell-format engine (record 0379)."""
+
+    return "\n".join(
+        _mask_rust_non_code(_mask_rust_cfg_test_items(path.read_text(encoding="utf-8")))
+        for path in (root / relative for relative in IWA_TABLE_CELL_FORMAT_ENGINE_SOURCES)
+        if path.is_file()
+    )
 NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/lib.rs"
 )
@@ -10385,7 +10409,7 @@ NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_HELPER_ROOT = Path(
     "crates/litchi-numbers/src/package/table_cell_custom_format"
 )
 NUMBERS_TABLE_CELL_CUSTOM_FORMAT_NATIVE_SOURCE = Path(
-    "crates/litchi-numbers/src/package/table_cell_display_format_native.rs"
+    "crates/litchi-iwa-table/src/cell_format/display.rs"
 )
 NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/numbers_table_cell_custom_format_codec.rs"
@@ -12061,7 +12085,7 @@ NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CORE_APIS = {
 # existing private control-native module.  That module only re-exports the
 # typed Number wrappers; it must not become a second implementation owner.
 NUMBERS_TABLE_CELL_DISPLAY_FORMAT_FORWARDING_SOURCE = (
-    Path("crates/litchi-numbers/src/package/table_cell_control_native.rs")
+    Path("crates/litchi-iwa-table/src/cell_format/control.rs")
 )
 NUMBERS_TABLE_CELL_DISPLAY_FORMAT_FORWARDING_MODULE = (
     "table_cell_control_native"
@@ -29513,8 +29537,9 @@ def audit_numbers_table_cell_pop_up_menu_facade_source_topology(
                         f"{NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}"
                     )
 
+    owner_marker_code = owner_code + "\n" + _iwa_table_cell_format_engine_code(root)
     for label, marker in NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_REQUIRED_MARKERS.items():
-        if marker.search(owner_code) is None:
+        if marker.search(owner_marker_code) is None:
             violations.append(
                 "focused litchi-numbers popup-menu owner is missing "
                 f"{label} transaction marker: {NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}"
@@ -33242,7 +33267,10 @@ def _numbers_table_cell_display_format_owner_core_route(
         exported: set[str] = set()
         for match in re.finditer(
             r"\bpub(?:[ \t]*\([^()]*\))?[ \t\r\n]+use\b[^;]*"
-            r"\btable_cell_display_format_native\s*::\s*\{(?P<items>[^}]*)\}",
+            # Record 0379: the seam is the shared engine's `control` module,
+            # which re-exports its sibling `display` core.
+            r"\b(?:table_cell_display_format_native|super\s*::\s*display)\s*::\s*"
+            r"\{(?P<items>[^}]*)\}",
             forwarding_code,
         ):
             exported.update(
@@ -33322,6 +33350,11 @@ def _numbers_table_cell_display_format_writer_definitions(
     )
     source_root = root / NUMBERS_SOURCE_ROOT / "package"
     files = sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
+    # Record 0379: the shared core lives in `litchi-iwa-table`; index it too
+    # so a second implementation beside it stays a duplicate.
+    core_path = root / NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE
+    if core_path.is_file() and core_path not in files:
+        files.append(core_path)
     indexed: dict[str, list[tuple[Path, int]]] = {}
     for path in files:
         production = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
@@ -38550,7 +38583,7 @@ def audit_numbers_table_cell_control_facade_source_topology(
         )
         for path in sorted(owner_graph_paths)
         if path.is_file()
-    )
+    ) + "\n" + _iwa_table_cell_format_engine_code(root)
     owner_exports = _rust_canonical_exports(
         owner_source, frozenset(NUMBERS_TABLE_CELL_CONTROL_TRANSACTION_TYPES)
     )
@@ -38609,8 +38642,9 @@ def audit_numbers_table_cell_control_facade_source_topology(
                 f"{NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}:{line_number}"
             )
 
+    owner_marker_code = owner_code + "\n" + _iwa_table_cell_format_engine_code(root)
     for label, marker in NUMBERS_TABLE_CELL_CONTROL_OWNER_REQUIRED_MARKERS.items():
-        if marker.search(owner_code) is None:
+        if marker.search(owner_marker_code) is None:
             violations.append(
                 "focused litchi-numbers cell-control owner is missing "
                 f"{label} transaction marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
@@ -38847,8 +38881,7 @@ def audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
     graph_paths: set[Path] = {
         owner_path,
         root / NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE,
-        root / "crates/litchi-numbers/src/package/table_cell_pop_up_menu_native.rs",
-        root / "crates/litchi-numbers/src/package/table_cell_pop_up_menu_metadata.rs",
+        *(root / relative for relative in IWA_TABLE_CELL_FORMAT_ENGINE_SOURCES),
     }
     graph_paths.update(owner_path.parent.glob("table_cell_control*.rs"))
     graph_paths.update(owner_path.parent.glob("table_cell_pop_up_menu*.rs"))

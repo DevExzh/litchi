@@ -21,6 +21,7 @@ pub(crate) mod comments_metadata;
 )]
 pub(crate) mod comments_reply_native;
 pub(crate) mod conditional_highlight;
+mod document_locale;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
@@ -69,11 +70,11 @@ mod structure;
 mod table;
 pub(crate) mod table_appearance;
 pub(crate) mod table_cell_control;
-pub(crate) mod table_cell_control_native;
+pub(crate) use litchi_iwa_table::cell_format::control as table_cell_control_native;
 pub(crate) mod table_cell_currency_format;
 pub(crate) mod table_cell_custom_format;
 pub(crate) mod table_cell_date_time_format;
-pub(crate) mod table_cell_display_format_native;
+pub(crate) use litchi_iwa_table::cell_format::display as table_cell_display_format_native;
 pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;
@@ -81,8 +82,8 @@ pub(crate) mod table_cell_list;
 pub(crate) mod table_cell_number_format;
 pub(crate) mod table_cell_percentage_format;
 pub(crate) mod table_cell_pop_up_menu;
-pub(crate) mod table_cell_pop_up_menu_metadata;
-pub(crate) mod table_cell_pop_up_menu_native;
+pub(crate) use litchi_iwa_table::cell_format::pop_up_menu_metadata as table_cell_pop_up_menu_metadata;
+pub(crate) use litchi_iwa_table::cell_format::pop_up_menu_native as table_cell_pop_up_menu_native;
 pub(crate) mod table_cell_scientific_format;
 pub(crate) mod table_cell_text;
 pub(crate) mod table_cell_text_format;
@@ -541,6 +542,54 @@ impl Components {
     fn iter_objects(&self) -> impl Iterator<Item = &litchi_iwa_core::ArchiveObject> {
         self.iter_archives()
             .flat_map(|(_name, archive)| archive.objects.iter())
+    }
+}
+
+/// The shared table engines (`litchi-iwa-table`, record 0379) read the
+/// package through its catalog, physical source, object index and limits.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.components.catalog()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        self.state.components.physical()
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> core::result::Result<
+        Option<litchi_iwa_table::ResolvedObject<'_>>,
+        litchi_iwa_table::ResolveError,
+    > {
+        self.state
+            .index
+            .resolve_ref_id(&self.state.components, identifier)
+            .map(|resolved| {
+                resolved.map(|resolved| litchi_iwa_table::ResolvedObject {
+                    messages: resolved.messages,
+                    component_index: resolved.component_index,
+                    object_index: resolved.object_index,
+                })
+            })
+            .map_err(|_| litchi_iwa_table::ResolveError)
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        self.state.source.as_ref()
+    }
+
+    fn archive_limits(&self) -> Limits {
+        self.state.options.archive()
+    }
+
+    fn max_objects(&self) -> usize {
+        self.state.options.semantic().max_objects()
+    }
+
+    fn max_references(&self) -> usize {
+        self.state.options.semantic().max_references()
     }
 }
 

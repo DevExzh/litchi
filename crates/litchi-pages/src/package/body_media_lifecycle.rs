@@ -1999,16 +1999,17 @@ fn media_assets(package: &Package, root: u64) -> Result<Vec<Embedded>, Error> {
         .flat_map(|component| component.archive().objects.iter())
         .collect::<Vec<_>>();
     let objects_iter = || all.iter().copied();
-    let assets = crate::media_native::embedded_assets(&metadata.payload, objects_iter(), |path| {
-        package
-            .state
-            .source
-            .package()
-            .iter()
-            .find(|entry| entry.name() == path)
-            .map(|entry| entry.data().len() as u64)
-    })
-    .map_err(|_| Error::InvalidSource)?;
+    let assets =
+        litchi_iwa_style::media::embedded_assets(&metadata.payload, objects_iter(), |path| {
+            package
+                .state
+                .source
+                .package()
+                .iter()
+                .find(|entry| entry.name() == path)
+                .map(|entry| entry.data().len() as u64)
+        })
+        .map_err(|_| Error::InvalidSource)?;
     let mut outgoing = std::collections::HashMap::<u64, Vec<u64>>::new();
     let mut message_data = std::collections::HashMap::<u64, Vec<u64>>::new();
     for object in objects_iter() {

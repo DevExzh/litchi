@@ -25,6 +25,7 @@ use std::num::NonZeroU64;
 use thiserror::Error as ThisError;
 
 mod add;
+mod duplicate;
 
 use super::Package;
 use super::structure::{
@@ -154,6 +155,8 @@ enum Operation {
     },
     /// Remove the table at this position of the sheet.
     Remove(usize),
+    /// Copy the table at this position of the sheet, under this name.
+    Duplicate { position: usize, name: String },
 }
 
 /// One immutable edit that stages exactly one table addition or removal in
@@ -273,6 +276,37 @@ impl Edit<'_> {
         Ok(self)
     }
 
+    /// Stage a populated copy of the selected table, named `"<name> copy"`
+    /// (then `"<name> copy 2"`, …), at the end of the sheet's drawables,
+    /// offset by ten points. The copy gets its own storage, a table UUID
+    /// derived from its model and a clone of the table's CalculationEngine
+    /// owner family; styles stay shared, and a formula that reads another
+    /// table keeps reading it (record 0370h).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::TableNotFound`], [`Refusal::OperationAlreadyStaged`].
+    pub fn duplicate<'selector>(
+        mut self,
+        selector: impl Into<TableSelector<'selector>>,
+    ) -> Result<Self, Error> {
+        if self.operation.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        let position = table_position(self.source, self.sheet, selector.into())?;
+        let sheet = &self.source.workbook_ref().sheets()[self.sheet];
+        let names: Vec<&str> = sheet.tables().map(crate::Table::name).collect();
+        let source = names
+            .get(position)
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
+        let name =
+            duplicate::copy_name(source, &names).ok_or(Error::Refused(Refusal::InvalidName {
+                reason: crate::sheet::lifecycle::InvalidName::Duplicate,
+            }))?;
+        self.operation = Some(Operation::Duplicate { position, name });
+        Ok(self)
+    }
+
     /// Validate and atomically publish the staged candidate.
     ///
     /// # Errors
@@ -312,6 +346,10 @@ impl Edit<'_> {
                 expected.remove(position);
                 remove_table(self.source, self.sheet, position)?
             },
+            Operation::Duplicate { position, name } => {
+                expected.push(name.clone());
+                duplicate::duplicate_table(self.source, self.sheet, *position, name)?
+            },
         };
         let candidate = published
             .package
@@ -329,6 +367,15 @@ impl Edit<'_> {
         if let Operation::Add { rows, columns, .. } = operation {
             let added = candidate.tables().last().ok_or(Error::Verification)?;
             if (added.row_count(), added.column_count()) != (rows, columns) {
+                return Err(Error::Verification);
+            }
+        }
+        if let Operation::Duplicate { position, .. } = operation {
+            let copy = candidate.tables().last().ok_or(Error::Verification)?;
+            let source = sheet.tables().nth(position).ok_or(Error::Verification)?;
+            if (copy.row_count(), copy.column_count())
+                != (source.row_count(), source.column_count())
+            {
                 return Err(Error::Verification);
             }
         }
@@ -437,6 +484,7 @@ pub(super) fn remove_table(
     position: usize,
 ) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
+    working.keep_previews();
     let located = locate(&working, sheet_position, position)?;
     let mut roots = vec![located.table];
     let mut detached = vec![(located.sheet, located.table)];
@@ -545,6 +593,9 @@ pub(super) fn remove_table(
     if let Some(registry) = metadata::registry(&working)? {
         transition.remove_objects(&registry, &removed_list)?;
     }
+    // A removed suffix of the identifier space lowers the watermark, as the
+    // host editor releases it (record 0370g).
+    transition.release_suffix(&removed_list)?;
     for identifier in &removed_list {
         working.remove(*identifier)?;
     }

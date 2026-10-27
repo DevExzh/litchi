@@ -24,7 +24,8 @@ use litchi_iwa_protos::package_metadata_codec::{
     prepare_package_metadata_removals_and_save_tokens, prepare_package_metadata_save_tokens,
 };
 
-use super::{Package, metadata};
+use super::metadata;
+use crate::TableSource;
 
 const METADATA_MESSAGE_TYPE: u32 = 11_006;
 
@@ -34,7 +35,7 @@ const METADATA_MESSAGE_TYPE: u32 = 11_006;
 /// limit type.  No generated metadata or native object type crosses the
 /// Numbers semantic boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum FailureKind {
+pub enum FailureKind {
     MissingRoute,
     AmbiguousRoute,
     InvalidSource,
@@ -47,11 +48,11 @@ pub(super) enum FailureKind {
 
 /// A redacted metadata failure returned to the Pop-Up Menu owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct MetadataError {
-    pub(super) kind: FailureKind,
-    pub(super) observed: usize,
-    pub(super) maximum: usize,
-    pub(super) allocation: usize,
+pub struct MetadataError {
+    pub kind: FailureKind,
+    pub observed: usize,
+    pub maximum: usize,
+    pub allocation: usize,
 }
 
 impl MetadataError {
@@ -97,15 +98,15 @@ type Result<T> = core::result::Result<T, MetadataError>;
 /// Codec-owned atomic transition aliases kept private to the Numbers
 /// package owner.  The facade uses these aliases rather than exposing the
 /// generated-free metadata wire vocabulary through its semantic API.
-pub(super) type CombinedTransition<'source> = CombinedBatch<'source>;
-pub(super) type PreparedCombinedTransition<'source, 'batch> =
+pub type CombinedTransition<'source> = CombinedBatch<'source>;
+pub type PreparedCombinedTransition<'source, 'batch> =
     PreparedPackageMetadataCombinedSaveTokenRewrite<'source, 'batch>;
 
 /// The unique metadata payload and its native archive route.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct MetadataSource<'source> {
-    pub(super) route: metadata::MessageRoute,
-    pub(super) payload: &'source [u8],
+pub struct MetadataSource<'source> {
+    pub route: metadata::MessageRoute,
+    pub payload: &'source [u8],
 }
 
 /// Locate exactly one current `Metadata.iwa` object carrying type 11006.
@@ -114,11 +115,9 @@ pub(super) struct MetadataSource<'source> {
 /// with the right type in any member other than `Index/Metadata.iwa`.  The
 /// extra payload check here keeps this helper strict if the route helper is
 /// ever widened.
-pub(super) fn strict_source(source: &Package) -> Result<MetadataSource<'_>> {
+pub fn strict_source(source: &dyn TableSource) -> Result<MetadataSource<'_>> {
     let route = metadata::unique_message_route(source).ok_or_else(MetadataError::kind_missing)?;
     let payload = source
-        .state
-        .components
         .catalog()
         .get_index(route.component_index)
         .and_then(|component| component.archive().objects.get(route.object_index))
@@ -138,12 +137,12 @@ impl MetadataError {
 /// A current or versioned component descriptor, retaining the exact effective
 /// locator borrowed from the metadata payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ComponentFact {
-    pub(super) component_index: Option<usize>,
-    pub(super) identifier: u64,
-    pub(super) preferred_locator: String,
-    pub(super) effective_locator: String,
-    pub(super) current: bool,
+pub struct ComponentFact {
+    pub component_index: Option<usize>,
+    pub identifier: u64,
+    pub preferred_locator: String,
+    pub effective_locator: String,
+    pub current: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,15 +172,15 @@ struct ExternalFact {
 /// the caller.  Keeping the request typed here prevents callers from
 /// accidentally treating a weak/deprecated edge as an exact popup owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct ExternalEdge {
-    pub(super) source_component_index: usize,
-    pub(super) target_component_index: usize,
-    pub(super) object_identifier: u64,
-    pub(super) is_weak: Option<bool>,
+pub struct ExternalEdge {
+    pub source_component_index: usize,
+    pub target_component_index: usize,
+    pub object_identifier: u64,
+    pub is_weak: Option<bool>,
 }
 
 impl ExternalEdge {
-    pub(super) const fn new(
+    pub const fn new(
         source_component_index: usize,
         target_component_index: usize,
         object_identifier: u64,
@@ -208,7 +207,7 @@ struct DataOwnerFact {
 /// facts can therefore be retained through a prepared codec transition
 /// without reconstructing a normalized locator from a ZIP member name.
 #[derive(Debug)]
-pub(super) struct RegistryFacts<'source> {
+pub struct RegistryFacts<'source> {
     source: MetadataSource<'source>,
     components: Vec<ComponentFact>,
     uuids: Vec<UuidFact>,
@@ -225,22 +224,22 @@ pub(super) struct RegistryFacts<'source> {
 
 impl<'source> RegistryFacts<'source> {
     #[must_use]
-    pub(super) const fn payload(&self) -> &'source [u8] {
+    pub const fn payload(&self) -> &'source [u8] {
         self.source.payload
     }
 
     #[must_use]
-    pub(super) const fn route(&self) -> metadata::MessageRoute {
+    pub const fn route(&self) -> metadata::MessageRoute {
         self.source.route
     }
 
     #[must_use]
-    pub(super) const fn last_object_identifier(&self) -> u64 {
+    pub const fn last_object_identifier(&self) -> u64 {
         self.last_object_identifier
     }
 
     #[must_use]
-    pub(super) const fn report(&self) -> RewriteReport {
+    pub const fn report(&self) -> RewriteReport {
         self.report
     }
 
@@ -248,12 +247,12 @@ impl<'source> RegistryFacts<'source> {
     /// alias.  A popup mutation should reject this unless it rewrites every
     /// alias, which the first owner slice does not do.
     #[must_use]
-    pub(super) const fn has_physical_alias(&self) -> bool {
+    pub const fn has_physical_alias(&self) -> bool {
         self.physical_alias
     }
 
     /// Return the one current metadata selector for a physical component.
-    pub(super) fn selector(&self, component_index: usize) -> Result<ComponentSelector<'_>> {
+    pub fn selector(&self, component_index: usize) -> Result<ComponentSelector<'_>> {
         let mut found = None;
         for component in &self.components {
             if !component.current || component.component_index != Some(component_index) {
@@ -273,7 +272,7 @@ impl<'source> RegistryFacts<'source> {
     /// Build exact current selectors for a deduplicated set of component
     /// indices.  The caller can pass the result directly to
     /// `SaveTokenBatch`; its locators remain borrowed from this census.
-    pub(super) fn selectors_for_components(
+    pub fn selectors_for_components(
         &self,
         component_indices: &[usize],
     ) -> Result<Vec<ComponentSelector<'_>>> {
@@ -304,7 +303,7 @@ impl<'source> RegistryFacts<'source> {
     /// effective locators disagree with the physical route discovered by the
     /// census.  The returned vector is deduplicated by component identifier,
     /// which is the unit used by save-token publication.
-    pub(super) fn touched_selectors(
+    pub fn touched_selectors(
         &self,
         component_indices: &[usize],
     ) -> Result<Vec<ComponentSelector<'_>>> {
@@ -341,10 +340,7 @@ impl<'source> RegistryFacts<'source> {
     /// rejecting an index that cannot resolve to one current/effective
     /// metadata selector.  Keeping this helper here makes the caller's save
     /// token set and its native member edit set derive from the same census.
-    pub(super) fn dedupe_touched_components(
-        &self,
-        component_indices: &[usize],
-    ) -> Result<Vec<usize>> {
+    pub fn dedupe_touched_components(&self, component_indices: &[usize]) -> Result<Vec<usize>> {
         if component_indices.is_empty() {
             return Err(MetadataError::invalid());
         }
@@ -369,7 +365,7 @@ impl<'source> RegistryFacts<'source> {
     /// check during prepare; keeping the cheap preflight here lets the owner
     /// reject a stale or preferred-locator selector before staging a native
     /// candidate.
-    pub(super) fn validate_save_tokens(&self, batch: SaveTokenBatch<'_>) -> Result<()> {
+    pub fn validate_save_tokens(&self, batch: SaveTokenBatch<'_>) -> Result<()> {
         if batch.selectors().is_empty() {
             return Err(MetadataError::invalid());
         }
@@ -403,10 +399,7 @@ impl<'source> RegistryFacts<'source> {
 
     /// Require that every component participating in the initial owner slice
     /// is the same current component.
-    pub(super) fn require_single_current_component(
-        &self,
-        component_indices: &[usize],
-    ) -> Result<usize> {
+    pub fn require_single_current_component(&self, component_indices: &[usize]) -> Result<usize> {
         let first = *component_indices
             .first()
             .ok_or_else(MetadataError::invalid)?;
@@ -421,7 +414,7 @@ impl<'source> RegistryFacts<'source> {
 
     /// Require one exact current UUID owner and no hostile alternate registry
     /// namespace for the same native object.
-    pub(super) fn require_current_uuid(
+    pub fn require_current_uuid(
         &self,
         component_index: usize,
         object_identifier: u64,
@@ -458,7 +451,7 @@ impl<'source> RegistryFacts<'source> {
     /// valid legacy-compatible ownership shape.  Any present alternate owner,
     /// versioned-only record, cross-component binding, or metadata namespace
     /// collision remains a hard failure.
-    pub(super) fn current_uuid_if_registered(
+    pub fn current_uuid_if_registered(
         &self,
         component_index: usize,
         object_identifier: u64,
@@ -495,7 +488,7 @@ impl<'source> RegistryFacts<'source> {
     /// Batch form of [`Self::current_uuid_if_registered`], preserving input
     /// order so callers can associate an optional UUID with each native
     /// object route without exposing metadata internals.
-    pub(super) fn current_uuids_if_registered(
+    pub fn current_uuids_if_registered(
         &self,
         owners: &[(usize, u64)],
     ) -> Result<Vec<Option<UuidBits>>> {
@@ -534,7 +527,7 @@ impl<'source> RegistryFacts<'source> {
     /// Native producers encode non-weak as either an absent optional value or
     /// an explicit `false`; those forms are semantically equivalent, while a
     /// duplicate pair or any `true` record still fails closed.
-    pub(super) fn require_external_edge(
+    pub fn require_external_edge(
         &self,
         source_component_index: usize,
         target_component_index: usize,
@@ -592,7 +585,7 @@ impl<'source> RegistryFacts<'source> {
     /// Strict object-edge variant used for the control-to-popup ownership
     /// tuple.  Unlike the compatibility-aware component graph helper above,
     /// a component-only record never satisfies an object-specific request.
-    pub(super) fn require_external_edge_exact(&self, edge: ExternalEdge) -> Result<()> {
+    pub fn require_external_edge_exact(&self, edge: ExternalEdge) -> Result<()> {
         let source = self.selector(edge.source_component_index)?;
         let target = self.selector(edge.target_component_index)?;
         let mut exact = 0usize;
@@ -625,7 +618,7 @@ impl<'source> RegistryFacts<'source> {
     /// current, versioned, weak, or object-mismatched edge is hostile: it
     /// would make the new edge an ambiguous ownership record after the
     /// metadata codec appends it.
-    pub(super) fn require_external_edge_absent(&self, edge: ExternalEdge) -> Result<()> {
+    pub fn require_external_edge_absent(&self, edge: ExternalEdge) -> Result<()> {
         let source = self.selector(edge.source_component_index)?;
         let target = self.selector(edge.target_component_index)?;
         for reference in &self.external_references {
@@ -650,10 +643,7 @@ impl<'source> RegistryFacts<'source> {
 
     /// Construct one exact external-reference addition after proving both
     /// selectors are current/effective and the edge has no existing owner.
-    pub(super) fn external_addition(
-        &self,
-        edge: ExternalEdge,
-    ) -> Result<ExternalReferenceAddition<'_>> {
+    pub fn external_addition(&self, edge: ExternalEdge) -> Result<ExternalReferenceAddition<'_>> {
         if edge.object_identifier == 0 {
             return Err(MetadataError::invalid());
         }
@@ -670,10 +660,7 @@ impl<'source> RegistryFacts<'source> {
     /// current/effective source and target selectors and the expected edge
     /// shape.  The metadata codec then verifies the same tuple again during
     /// its prepared execution.
-    pub(super) fn external_removal(
-        &self,
-        edge: ExternalEdge,
-    ) -> Result<ExternalReferenceRemoval<'_>> {
+    pub fn external_removal(&self, edge: ExternalEdge) -> Result<ExternalReferenceRemoval<'_>> {
         if edge.object_identifier == 0 {
             return Err(MetadataError::invalid());
         }
@@ -706,7 +693,7 @@ impl<'source> RegistryFacts<'source> {
     /// additions.  Duplicate edge tuples are rejected before a metadata
     /// candidate is staged; callers can append the returned slice directly to
     /// a metadata `Batch`.
-    pub(super) fn external_additions(
+    pub fn external_additions(
         &self,
         edges: &[ExternalEdge],
     ) -> Result<Vec<ExternalReferenceAddition<'_>>> {
@@ -732,7 +719,7 @@ impl<'source> RegistryFacts<'source> {
     /// Construct a fallibly allocated, deduplicated set of exact external
     /// removals.  Each tuple must be present exactly once in the current
     /// metadata registry.
-    pub(super) fn external_removals(
+    pub fn external_removals(
         &self,
         edges: &[ExternalEdge],
     ) -> Result<Vec<ExternalReferenceRemoval<'_>>> {
@@ -756,7 +743,7 @@ impl<'source> RegistryFacts<'source> {
     }
 
     /// Reject any existing ownership record before appending a fresh UUID.
-    pub(super) fn require_uuid_absent(&self, object_identifier: u64) -> Result<()> {
+    pub fn require_uuid_absent(&self, object_identifier: u64) -> Result<()> {
         if self.physical_identifiers.contains(&object_identifier)
             || self
                 .uuids
@@ -770,7 +757,7 @@ impl<'source> RegistryFacts<'source> {
     }
 
     /// Prepare the exact UUID addition record for a selected current component.
-    pub(super) fn uuid_addition(
+    pub fn uuid_addition(
         &self,
         component_index: usize,
         identifier: FreshIdentifier,
@@ -788,7 +775,7 @@ impl<'source> RegistryFacts<'source> {
     /// object is checked against the complete physical and metadata
     /// reservation census, and duplicate component/object requests are
     /// rejected before the codec allocates a candidate.
-    pub(super) fn uuid_additions(
+    pub fn uuid_additions(
         &self,
         entries: &[(usize, FreshIdentifier)],
     ) -> Result<Vec<ObjectUuidAddition<'_>>> {
@@ -810,7 +797,7 @@ impl<'source> RegistryFacts<'source> {
 
     /// Prepare the exact current UUID removal record and prove that no known
     /// metadata namespace still points at the object.
-    pub(super) fn uuid_removal(
+    pub fn uuid_removal(
         &self,
         component_index: usize,
         object_identifier: u64,
@@ -826,7 +813,7 @@ impl<'source> RegistryFacts<'source> {
     /// Allocate fresh object identifiers and deterministic nonzero UUID pairs.
     /// The starting point is above physical objects and all metadata-owned
     /// identifiers, not merely the advisory root watermark.
-    pub(super) fn allocate_identifiers(&self, count: usize) -> Result<Vec<FreshIdentifier>> {
+    pub fn allocate_identifiers(&self, count: usize) -> Result<Vec<FreshIdentifier>> {
         let mut identifiers = Vec::new();
         identifiers
             .try_reserve_exact(count)
@@ -883,15 +870,15 @@ impl<'source> RegistryFacts<'source> {
 
 /// A new native object identifier plus its metadata UUID pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct FreshIdentifier {
-    pub(super) identifier: u64,
-    pub(super) uuid: UuidBits,
+pub struct FreshIdentifier {
+    pub identifier: u64,
+    pub uuid: UuidBits,
 }
 
 /// Inspect the unique metadata payload with one caller-supplied aggregate
 /// budget.  The returned report is the exact codec inspection report and must
 /// be merged into the owner transaction budget once.
-pub(super) fn inspect(source: &Package, options: RewriteOptions) -> Result<RegistryFacts<'_>> {
+pub fn inspect(source: &dyn TableSource, options: RewriteOptions) -> Result<RegistryFacts<'_>> {
     inspect_with_policy(source, options, false)
 }
 
@@ -900,15 +887,15 @@ pub(super) fn inspect(source: &Package, options: RewriteOptions) -> Result<Regis
 /// IWA members; retain them in the collision census without treating their
 /// absence as mutation authority. Every component selected by an actual edge
 /// is still required to resolve through `RegistryFacts::selector`.
-pub(super) fn inspect_cross_component_read(
-    source: &Package,
+pub fn inspect_cross_component_read(
+    source: &dyn TableSource,
     options: RewriteOptions,
 ) -> Result<RegistryFacts<'_>> {
     inspect_with_policy(source, options, true)
 }
 
 fn inspect_with_policy(
-    source: &Package,
+    source: &dyn TableSource,
     options: RewriteOptions,
     allow_unmapped_current: bool,
 ) -> Result<RegistryFacts<'_>> {
@@ -927,10 +914,10 @@ struct PhysicalFacts {
     identifiers: Vec<u64>,
 }
 
-fn physical_identifiers(source: &Package) -> Result<PhysicalFacts> {
+fn physical_identifiers(source: &dyn TableSource) -> Result<PhysicalFacts> {
     let mut seen = Vec::new();
     let mut facts = PhysicalFacts::default();
-    for component in source.state.components.catalog().iter() {
+    for component in source.catalog().iter() {
         for object in &component.archive().objects {
             let identifier = object
                 .archive_info
@@ -955,7 +942,7 @@ fn physical_identifiers(source: &Package) -> Result<PhysicalFacts> {
 }
 
 struct RegistryVisitor<'source> {
-    source: &'source Package,
+    source: &'source dyn TableSource,
     components: Vec<ComponentFact>,
     uuids: Vec<UuidFact>,
     external_references: Vec<ExternalFact>,
@@ -968,7 +955,7 @@ struct RegistryVisitor<'source> {
 }
 
 impl<'source> RegistryVisitor<'source> {
-    fn new(source: &'source Package, allow_unmapped_current: bool) -> Self {
+    fn new(source: &'source dyn TableSource, allow_unmapped_current: bool) -> Self {
         Self {
             source,
             components: Vec::new(),
@@ -1182,9 +1169,9 @@ impl PackageMetadataVisitor for RegistryVisitor<'_> {
     }
 }
 
-fn find_physical_component(source: &Package, locator: &str) -> Option<usize> {
+fn find_physical_component(source: &dyn TableSource, locator: &str) -> Option<usize> {
     let mut found = None;
-    for (index, component) in source.state.components.catalog().iter().enumerate() {
+    for (index, component) in source.catalog().iter().enumerate() {
         if metadata::normalized_locator(component.name()) != locator {
             continue;
         }
@@ -1197,7 +1184,7 @@ fn find_physical_component(source: &Package, locator: &str) -> Option<usize> {
 }
 
 fn find_physical_descriptor(
-    source: &Package,
+    source: &dyn TableSource,
     preferred_locator: &str,
     effective_locator: &str,
 ) -> Option<usize> {
@@ -1216,7 +1203,7 @@ fn find_physical_descriptor(
 /// Prepare a strict addition + root/save-token transition.  The returned
 /// codec object is output-free until its `execute` method is called with the
 /// exact execution requirements.
-pub(super) fn prepare_additions<'source, 'batch>(
+pub fn prepare_additions<'source, 'batch>(
     facts: &RegistryFacts<'source>,
     batch: AdditionSaveTokenBatch<'batch>,
     options: RewriteOptions,
@@ -1227,7 +1214,7 @@ pub(super) fn prepare_additions<'source, 'batch>(
 }
 
 /// Prepare a strict UUID-removal + root/save-token transition.
-pub(super) fn prepare_removals<'source, 'batch>(
+pub fn prepare_removals<'source, 'batch>(
     facts: &RegistryFacts<'source>,
     batch: RemovalSaveTokenBatch<'batch>,
     options: RewriteOptions,
@@ -1243,7 +1230,7 @@ pub(super) fn prepare_removals<'source, 'batch>(
 /// model: executing the existing addition and removal helpers separately
 /// would advance the metadata root/token twice and expose an intermediate
 /// ownership state that never existed in the source package.
-pub(super) fn prepare_combined<'source, 'batch>(
+pub fn prepare_combined<'source, 'batch>(
     facts: &RegistryFacts<'source>,
     batch: CombinedSaveTokenBatch<'batch>,
     options: RewriteOptions,
@@ -1259,7 +1246,7 @@ pub(super) fn prepare_combined<'source, 'batch>(
 
 /// Prepare a root + selected current-component save-token transition with no
 /// registry change.
-pub(super) fn prepare_save_tokens<'source, 'batch>(
+pub fn prepare_save_tokens<'source, 'batch>(
     facts: &RegistryFacts<'source>,
     batch: SaveTokenBatch<'batch>,
     options: RewriteOptions,
@@ -1270,7 +1257,7 @@ pub(super) fn prepare_save_tokens<'source, 'batch>(
 
 /// Map a prepared codec failure without leaking the codec's generated/error
 /// vocabulary through the package owner.
-pub(super) fn map_rewrite_error(error: RewriteError) -> MetadataError {
+pub fn map_rewrite_error(error: RewriteError) -> MetadataError {
     if let Some(amount) = error.allocation_request() {
         return MetadataError::allocation(amount);
     }
