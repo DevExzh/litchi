@@ -754,11 +754,11 @@ media/package.rs	videos	1	shared	media.asset	retired	-	-	-	-	merged into `litchi
 numbers/creation.rs	build	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	builder	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	create	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/creation.rs	language	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/creation.rs	locale	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
+numbers/creation.rs	language	1	numbers	builder	migrated	litchi_numbers::Builder::language	numbers_builder_language_locale_parity	B	-	-
+numbers/creation.rs	locale	1	numbers	builder	migrated	litchi_numbers::Builder::locale	numbers_builder_language_locale_parity	B	-	-
 numbers/creation.rs	new	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	sheet_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/creation.rs	table_dimensions	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
+numbers/creation.rs	table_dimensions	1	numbers	builder	migrated	litchi_numbers::Builder::table_dimensions	numbers_builder_table_dimensions_parity	B	-	-
 numbers/creation.rs	table_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/editor/column_insert.rs	insert_table_column	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_insert_column_parity	A	-	-
 numbers/editor/date_time_fields.rs	add_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-

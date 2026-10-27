@@ -494,3 +494,35 @@ fn numbers_table_duplicate_cost_abba() -> TestResult {
     black_box(host_lifecycle(&input.bytes, 3)?);
     Ok(())
 }
+
+#[inline(never)]
+fn host_builder() -> TestResult<Vec<u8>> {
+    Ok(numbers::Draft::builder()
+        .table_dimensions(20, 8)
+        .language("fr")
+        .locale("fr_FR")
+        .build()?
+        .to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_builder() -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Builder::new()
+        .identity(litchi_numbers::Identity::BLANK)
+        .table_dimensions(20, 8)
+        .language("fr")
+        .locale("fr_FR")
+        .build()?;
+    Ok(leaf_bytes!(&package))
+}
+
+/// A 20×8 `fr`/`fr_FR` workbook from each builder.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_builder_cost_abba() -> TestResult {
+    black_box(host_builder()?);
+    black_box(leaf_builder()?);
+    black_box(leaf_builder()?);
+    black_box(host_builder()?);
+    Ok(())
+}

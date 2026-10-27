@@ -178,7 +178,7 @@ impl FooterRangeInsertion {
 /// so a header or footer insertion moves the body's near or far edge; any
 /// other extent moves its far edge on the edited axis, as before.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct TableExtents {
+pub(crate) struct TableExtents {
     total: [u32; 4],
     body: [u32; 4],
 }
@@ -186,7 +186,7 @@ pub(super) struct TableExtents {
 impl TableExtents {
     /// The spanning dependencies of a new table's own owner: its table and
     /// body extents, with no span references (record 0370f).
-    pub(super) fn spanning_dependencies(self) -> tsce::SpanningDependenciesExpandedArchive {
+    pub(crate) fn spanning_dependencies(self) -> tsce::SpanningDependenciesExpandedArchive {
         let range = |[left, top, right, bottom]: [u32; 4]| tsce::RangeCoordinateArchive {
             top_left_column: left,
             top_left_row: top,
@@ -202,7 +202,7 @@ impl TableExtents {
 
     /// The extents of a table of `rows` by `columns` with the given section
     /// counts.
-    pub(super) fn of(
+    pub(crate) fn of(
         rows: u32,
         columns: u32,
         header_rows: u32,
