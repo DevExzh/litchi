@@ -128,7 +128,8 @@
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-protos",
-      "litchi-iwa-text"
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire"
     ],
     "litchi-iwa-table": [
       "litchi-core",

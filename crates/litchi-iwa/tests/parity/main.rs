@@ -23,6 +23,7 @@
 //! The harness lives in the host's tests so that W3 deletes it with the host.
 
 mod archive_diff;
+mod chart_font_cases;
 mod chart_style_cases;
 mod cost_probes;
 mod formula_refresh_cases;
@@ -73,6 +74,7 @@ mod pages_shape_style_cases;
 mod pages_table_cases;
 mod pages_text_cases;
 mod physical_cases;
+mod reference_line_cases;
 mod self_test;
 mod series_graph_cases;
 mod series_style_cases;

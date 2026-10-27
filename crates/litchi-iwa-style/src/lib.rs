@@ -7,6 +7,8 @@
 //! wire codecs of `litchi-iwa-protos` and the IWA objects of
 //! `litchi-iwa-core`:
 //!
+//! - [`chart_font`]: the chart-font graph engine (paragraph-style font
+//!   variations of a chart's text);
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
 //!   directions;
 //! - [`media`]: the embedded-media inventory of a package;
@@ -16,6 +18,10 @@
 //! - [`series`]: the style-variation graph engine of per-series chart
 //!   overrides (allocating, registering and releasing the override objects
 //!   a property write needs) and the per-series properties;
+//! - [`number_format`]: the dual chart number-format codec (axis and
+//!   value-label formatters);
+//! - [`reference_line`]: the reference-line graph engine of a chart's
+//!   primary value axis;
 //! - [`shape`]: the shape-style variation graph engine (copy-on-write
 //!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke.
 //!
@@ -23,8 +29,11 @@
 
 #![forbid(unsafe_code)]
 
+pub mod chart_font;
 pub mod drawing;
 pub mod graph;
 pub mod media;
+pub mod number_format;
+pub mod reference_line;
 pub mod series;
 pub mod shape;
