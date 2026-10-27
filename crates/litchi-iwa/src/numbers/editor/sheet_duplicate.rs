@@ -121,6 +121,9 @@ impl Draft {
             sheet_id,
             new_sheet_id,
         )?;
+        // Host defect fixed with record 0370j: the copy had no sidebar node,
+        // and its tables were listed under the source sheet's node.
+        super::sidebar::insert_node(&mut staged, None, new_sheet_id, Some(sheet_id), None)?;
 
         let mut working = Self::from_package(staged)?;
         let mut cloned_drawable_ids = Vec::with_capacity(drawables.len());
@@ -140,8 +143,25 @@ impl Draft {
                         &table_name,
                     )?;
                     restore_table_geometry(&mut working.package, model_id, cloned.object_id)?;
-                    cloned_drawable_ids
-                        .push(find_table_owner(working.package(), cloned.object_id)?.table_info_id);
+                    let cloned_info =
+                        find_table_owner(working.package(), cloned.object_id)?.table_info_id;
+                    super::sidebar::move_node(&mut working.package, cloned_info, new_sheet_id)?;
+                    // Host defect fixed with record 0370j: a copy whose
+                    // drawable lives outside the document component (a
+                    // legacy table info in the calculation engine's) did not
+                    // register its reference to its new parent sheet.
+                    let locations = object_locations(working.package())?;
+                    if let (Some(info_entry), Some(sheet_entry)) =
+                        (locations.get(&cloned_info), locations.get(&new_sheet_id))
+                    {
+                        super::table_duplicate::register_numbers_component_reference(
+                            &mut working.package,
+                            info_entry,
+                            sheet_entry,
+                            new_sheet_id,
+                        )?;
+                    }
+                    cloned_drawable_ids.push(cloned_info);
                 },
                 SheetDrawableClone::TextBox { drawable_id, text } => {
                     let cloned = working.duplicate_text_box_to_sheet(

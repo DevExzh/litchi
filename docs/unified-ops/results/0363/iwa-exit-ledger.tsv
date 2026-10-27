@@ -697,8 +697,8 @@ keynote/editor/slide_tables/conditional_highlight.rs	slide_table_cell_conditiona
 keynote/editor/slide_tables/formula.rs	clear_slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_clear_parity	B	-	-
 keynote/editor/slide_tables/formula.rs	set_slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::slide::drawable::Edit::set_table_formula_cached	keynote_slide_table_formula_author_parity	B	-	-
 keynote/editor/slide_tables/formula.rs	slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::Package::slide_table_cells	keynote_slide_table_formula_read_parity	A	test-data/iwork/keynote/slide-table-read-native-receipt.json	-
-keynote/editor/slide_tables/hidden_axes.rs	set_slide_table_hidden_axes	1	keynote	table.hidden_axes	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/hidden_axes.rs	slide_table_hidden_axes	1	keynote	table.hidden_axes	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables/hidden_axes.rs	set_slide_table_hidden_axes	1	keynote	table.hidden_axes	migrated	litchi_keynote::Package::edit_slide_table_hidden_axes	keynote_slide_table_hidden_axes_set_parity	B	-	-
+keynote/editor/slide_tables/hidden_axes.rs	slide_table_hidden_axes	1	keynote	table.hidden_axes	migrated	litchi_keynote::Package::slide_table_hidden_axes	keynote_slide_table_hidden_axes_read_parity	A	-	-
 keynote/editor/slide_tables/topology.rs	insert_slide_table_column	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/topology.rs	insert_slide_table_row	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/topology.rs	remove_slide_table_column	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
@@ -1252,7 +1252,7 @@ numbers/editor/sheet_charts/title.rs	remove_sheet_chart_title	1	numbers	chart.te
 numbers/editor/sheet_charts/title.rs	set_sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_delete.rs	remove_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_remove_parity	B	-	-
-numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_duplicate_parity	B	-	-
 numbers/editor/sheet_images.rs	add_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::add_image	numbers_sheet_media_add_parity	B	-	-
 numbers/editor/sheet_images.rs	duplicate_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_images.rs	flip_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_image_flip_parity	A	-	-
