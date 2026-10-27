@@ -2509,7 +2509,11 @@ fn rewrite<L: Leaf>(
         .map_err(|_| Error::Allocation {
             amount: PREVIEW_ENTRY_NAMES.len(),
         })?;
-    for name in PREVIEW_ENTRY_NAMES.iter().copied() {
+    for name in PREVIEW_ENTRY_NAMES
+        .iter()
+        .copied()
+        .filter(|_| L::DELETES_ROOT_PREVIEWS)
+    {
         if support::physical(source)?
             .package()
             .iter()
