@@ -1055,7 +1055,7 @@ numbers/editor/semantic/workbook.rs	set_formula_with_cached_value	1	numbers	tabl
 numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::sheets	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	migrated	litchi_numbers::Sheet::tables	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/sheet_audio.rs	add_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_audio.rs	duplicate_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_audio.rs	duplicate_sheet_audio	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_audio.rs	remove_sheet_audio	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_media_remove_parity	B	-	-
 numbers/editor/sheet_audio.rs	replace_sheet_audio_data	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::media::Edit::replace_data	numbers_sheet_media_replace_data_parity	B	-	-
 numbers/editor/sheet_audio.rs	set_sheet_audio_playback_settings	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_playback	numbers_sheet_audio_playback_parity	A	test-data/iwork/numbers/audio-playback-native-resaved.numbers	-
@@ -1254,7 +1254,7 @@ numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	host
 numbers/editor/sheet_delete.rs	remove_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_remove_parity	B	-	-
 numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_images.rs	add_sheet_image	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_images.rs	duplicate_sheet_image	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_images.rs	duplicate_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_images.rs	flip_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_image_flip_parity	A	-	-
 numbers/editor/sheet_images.rs	remove_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_media_remove_parity	B	-	-
 numbers/editor/sheet_images.rs	remove_sheet_image_caption	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
@@ -1270,7 +1270,7 @@ numbers/editor/sheet_images.rs	sheet_image_properties	1	numbers	drawable.image	m
 numbers/editor/sheet_images.rs	sheet_image_title_caption	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_images.rs	sheet_images	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_movies.rs	add_sheet_movie	1	numbers	drawable.movie	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_movies.rs	duplicate_sheet_movie	1	numbers	drawable.movie	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_movies.rs	duplicate_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_movies.rs	flip_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_movie_flip_parity	A	-	-
 numbers/editor/sheet_movies.rs	remove_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_media_remove_parity	B	-	-
 numbers/editor/sheet_movies.rs	replace_sheet_movie_data	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::media::Edit::replace_data	numbers_sheet_media_replace_data_parity	B	-	-
@@ -1343,7 +1343,7 @@ numbers/editor/table_sort.rs	clear_table_sort_order	1	numbers	table.sort	host-on
 numbers/editor/table_sort.rs	set_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
 numbers/editor/table_sort.rs	table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
 numbers/editor/text_box_create.rs	add_sheet_text_box	1	numbers	drawable.text_box_lifecycle	migrated	litchi_numbers::sheet::drawable::Edit::add_text_box	numbers_sheet_text_box_add_parity	B	-	-
-numbers/editor/text_box_duplicate.rs	duplicate_sheet_text_box	1	numbers	drawable.text_box_lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/text_box_duplicate.rs	duplicate_sheet_text_box	1	numbers	drawable.text_box_lifecycle	migrated	litchi_numbers::sheet::drawable::Edit::duplicate_text_box	numbers_sheet_text_box_duplicate_parity	B	-	-
 numbers/editor/topology_oracle.rs	__edit_table_topology_unverified	1	numbers	other	host-only	litchi-numbers	-	-	-	-
 package.rs	apply	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	archive	1	shared	other	migrated	litchi_iwa_archive::unstable::cached_component	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures

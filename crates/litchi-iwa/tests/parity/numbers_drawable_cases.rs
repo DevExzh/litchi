@@ -721,6 +721,10 @@ enum Structural {
     Layer(usize, DrawableLayerMove),
     /// Remove the `index`-th drawable of `kind`.
     Remove(Kind, usize),
+    /// Duplicate the `index`-th drawable of `kind`.
+    Duplicate(Kind, usize),
+    /// Duplicate the `index`-th text box with new text.
+    DuplicateTextBox(usize, &'static str),
 }
 
 /// The leaf `move_to` destination of a native Arrange move.
@@ -765,6 +769,19 @@ fn structural_case(
                         _ => return Err("no host removal for this kind".into()),
                     }
                 },
+                Structural::Duplicate(kind, index) => {
+                    let (_, id) = host_drawable(&editor, kind, index)?;
+                    match kind {
+                        Kind::Image => drop(editor.duplicate_sheet_image(sheet, id)?),
+                        Kind::Movie => drop(editor.duplicate_sheet_movie(sheet, id)?),
+                        Kind::Audio => drop(editor.duplicate_sheet_audio(sheet, id)?),
+                        _ => return Err("no host duplicate for this kind".into()),
+                    }
+                },
+                Structural::DuplicateTextBox(index, text) => {
+                    let (_, id) = host_drawable(&editor, Kind::TextBox, index)?;
+                    drop(editor.duplicate_sheet_text_box(sheet, id, text)?);
+                },
             }
             Ok(editor.to_bytes()?)
         })
@@ -782,6 +799,12 @@ fn structural_case(
                 Structural::Remove(kind, index) => {
                     edit.remove(DrawableSelector::of(kind, index))?;
                 },
+                Structural::Duplicate(kind, index) => {
+                    edit.duplicate(DrawableSelector::of(kind, index))?;
+                },
+                Structural::DuplicateTextBox(index, text) => {
+                    edit.duplicate_text_box(DrawableSelector::text_box(index), text)?;
+                },
             }
             let commit = edit.commit()?;
             let restored = commit
@@ -794,7 +817,10 @@ fn structural_case(
         })
         .read("host sheet_drawable_order", host_order)
         .read("leaf sheet_drawable_list", leaf_list);
-    if matches!(op, Structural::Remove(..)) {
+    if matches!(
+        op,
+        Structural::Remove(..) | Structural::Duplicate(..) | Structural::DuplicateTextBox(..)
+    ) {
         case = case
             .leaf_invalidates_root_previews()
             .leaf_structural_metadata();
@@ -876,6 +902,47 @@ fn numbers_sheet_media_remove_parity() -> TestResult {
             Structural::Remove(kind, 0),
         )
         .map_err(|error| format!("{kind:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_media_duplicate_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for (input, kind) in [
+        (authored_fixture()?, Kind::Movie),
+        (
+            fixture("iwork/numbers/image-adjustments-native.numbers")?,
+            Kind::Image,
+        ),
+        (
+            fixture("iwork/numbers/audio-playback-native.numbers")?,
+            Kind::Audio,
+        ),
+    ] {
+        structural_case(
+            "numbers_sheet_media_duplicate_parity",
+            Tier::B,
+            Evidence::Queued,
+            &input,
+            Structural::Duplicate(kind, 0),
+        )
+        .map_err(|error| format!("{kind:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_duplicate_parity() -> TestResult {
+    let input = authored_fixture()?;
+    for (index, text) in [(0, "Copied text"), (1, ""), (0, "Line one\nLine two")] {
+        structural_case(
+            "numbers_sheet_text_box_duplicate_parity",
+            Tier::B,
+            Evidence::Queued,
+            &input,
+            Structural::DuplicateTextBox(index, text),
+        )?;
     }
     Ok(())
 }
