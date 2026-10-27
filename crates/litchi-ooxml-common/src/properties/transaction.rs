@@ -535,6 +535,69 @@ impl Snapshot {
         )
     }
 
+    /// Capture only the core-properties family of an owning package; the
+    /// application and custom families are not read (record 0377a).
+    ///
+    /// Only [`publish_core_metadata`] uses such a snapshot, and only for a
+    /// changed core patch, which reads and writes nothing of the other two
+    /// families: their states here are placeholders, never published.
+    fn read_core_only(package: &OpcPackage, host: Host) -> Result<Self> {
+        let core_graph = graph::inspect(package).map_err(source_error)?;
+        let bytes = |part: &PackURI| -> Result<Arc<Vec<u8>>> {
+            Ok(package
+                .get_part(part)
+                .map_err(|error| source_error(crate::Error::Opc(error)))?
+                .blob_arc())
+        };
+        let core = family_state(
+            package,
+            Family::Core,
+            core_graph.part,
+            core_graph.relationship_id,
+            &bytes,
+        )
+        .map_err(source_local_error)?;
+        let core_dialect = core_graph.dialect;
+        let mut core_report = ToleranceReport::default();
+        let core_value = core
+            .present
+            .as_ref()
+            .map(|present| {
+                read::decode_selected(
+                    &present.bytes,
+                    present.part.as_str(),
+                    core_dialect,
+                    &mut core_report,
+                )
+            })
+            .transpose()
+            .map_err(source_error)?;
+        // The placeholders are never staged or published; they reuse the
+        // core state's part name instead of parsing two more.
+        let unread = |new_part: PackURI| FamilyState {
+            present: None,
+            new_part,
+            shared_by: None,
+        };
+        let (app, custom) = (unread(core.new_part.clone()), unread(core.new_part.clone()));
+        let relationship_ids = package
+            .package_relationships()
+            .iter()
+            .map(|relationship| relationship.r_id().to_owned())
+            .collect();
+        Ok(Self {
+            host,
+            core,
+            core_value,
+            core_dialect,
+            core_report,
+            app,
+            custom,
+            custom_value: custom::Props::new(),
+            relationship_ids,
+        })
+    }
+
     /// Capture the document properties of a source-backed package.
     ///
     /// Only the three relationship-selected parts are read, with the
@@ -1988,6 +2051,9 @@ fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
 pub struct Edit {
     package: OpcPackage,
     plan: Plan,
+    /// Whether the plan's snapshot was read from `package` by this edit, so
+    /// commit need not re-authenticate the patch against it.
+    own_snapshot: bool,
 }
 
 impl Edit {
@@ -2014,6 +2080,7 @@ impl Edit {
         Ok(Self {
             package: package.clone(),
             plan: snapshot.plan_with_options(options),
+            own_snapshot: true,
         })
     }
 
@@ -2031,6 +2098,23 @@ impl Edit {
         Self {
             package: package.clone(),
             plan: snapshot.plan_with_options(options),
+            own_snapshot: false,
+        }
+    }
+
+    /// [`Self::new_with_snapshot`] for a snapshot the caller has just read
+    /// from `package` itself with [`Snapshot::read`], so commit can skip
+    /// re-authenticating the patch against `package` (record 0377a).
+    #[doc(hidden)]
+    pub fn new_with_own_snapshot(
+        package: &OpcPackage,
+        snapshot: Snapshot,
+        options: EditOptions,
+    ) -> Self {
+        Self {
+            package: package.clone(),
+            plan: snapshot.plan_with_options(options),
+            own_snapshot: true,
         }
     }
 
@@ -2148,10 +2232,83 @@ impl Edit {
     /// freshness failure; and [`Error::Signed`] for a changed edit of a
     /// signed package.
     pub fn commit(self) -> Result<Commit> {
-        let (_, patch, diagnostics) = self.plan.finish()?;
-        let package = patch.apply(&self.package)?.into_package();
+        let Self {
+            mut package,
+            plan,
+            own_snapshot,
+        } = self;
+        let (_, patch, diagnostics) = plan.finish()?;
+        if !own_snapshot {
+            let package = patch.apply(&package)?.into_package();
+            return Ok(Commit::new(package, patch, diagnostics));
+        }
+        // The patch was planned from this edit's own snapshot of `package`,
+        // which nothing has changed since, so `Patch::apply`'s source check
+        // and second package clone are redundant here (record 0377a).
+        if !patch.is_noop() {
+            refuse_signed_change(&package)?;
+            patch.apply_changes(&mut package)?;
+        }
         Ok(Commit::new(package, patch, diagnostics))
     }
+}
+
+/// Publish a changed core-properties value of an owning package, reading
+/// and diffing only the core family (record 0377a).
+///
+/// `target` replaces the core fields (`None` removes the part), as
+/// [`Edit::set_core_metadata`] and [`Edit::clear_metadata`] stage them. The
+/// application and custom families are neither read nor written. When the
+/// core patch is an exact no-op the complete edit runs instead, so the
+/// no-op patch keeps its authenticated scope of every family.
+///
+/// Returns the commit and the core metadata the new package holds (`None`
+/// when the part is absent), so a host can adopt it without decoding the
+/// part it has just written.
+///
+/// # Errors
+///
+/// The errors of [`Edit::new`], [`Edit::set_core_metadata`] and
+/// [`Edit::commit`] for the core family.
+#[doc(hidden)]
+pub fn publish_core_metadata(
+    package: &OpcPackage,
+    host: Host,
+    target: Option<Metadata>,
+) -> Result<(Commit, Option<Metadata>)> {
+    let snapshot = Snapshot::read_core_only(package, host)?;
+    let mut plan = snapshot.plan();
+    match &target {
+        Some(metadata) => {
+            plan.set_core_metadata(metadata.clone())?;
+        },
+        None => {
+            plan.clear_metadata();
+        },
+    }
+    let (after, patch, diagnostics) = plan.finish()?;
+    if patch.is_noop() {
+        let mut edit = Edit::new(package, host)?;
+        match target {
+            Some(metadata) => {
+                edit.set_core_metadata(metadata)?;
+            },
+            None => {
+                edit.clear_metadata();
+            },
+        }
+        let commit = edit.commit()?;
+        let core = Snapshot::read(commit.package(), host)?
+            .core_value
+            .as_ref()
+            .map(Core::metadata);
+        return Ok((commit, core));
+    }
+    refuse_signed_change(package)?;
+    let mut candidate = package.clone();
+    patch.apply_changes(&mut candidate)?;
+    let core = after.core_value.as_ref().map(Core::metadata);
+    Ok((Commit::new(candidate, patch, diagnostics), core))
 }
 
 fn next_relationship_id(used: &BTreeSet<String>) -> Result<String> {
