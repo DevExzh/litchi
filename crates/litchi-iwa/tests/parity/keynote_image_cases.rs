@@ -462,3 +462,142 @@ fn keynote_slide_image_text_read_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+fn host_asset_rows(assets: &[litchi_iwa::media::EmbeddedMediaAsset]) -> Vec<String> {
+    assets
+        .iter()
+        .map(|asset| {
+            format!(
+                "{} {:?} {:?} {:?} {:?} {:02x?} {} {} {} {}",
+                asset.preferred_filename,
+                asset.package_path,
+                asset.media_type,
+                asset.size,
+                asset.declared_size,
+                asset.digest,
+                asset.component_reference_count,
+                asset.message_reference_count,
+                asset.has_data_metadata,
+                asset.is_materialized()
+            )
+        })
+        .collect()
+}
+
+fn leaf_asset_rows(assets: &[litchi_keynote::slide::media::assets::MediaAsset]) -> Vec<String> {
+    assets
+        .iter()
+        .map(|asset| {
+            format!(
+                "{} {:?} {:?} {:?} {:?} {:02x?} {} {} {} {}",
+                asset.preferred_file_name(),
+                asset.package_path(),
+                asset.kind(),
+                asset.size(),
+                asset.declared_size(),
+                asset.digest(),
+                asset.component_reference_count(),
+                asset.message_reference_count(),
+                asset.has_data_metadata(),
+                asset.is_materialized()
+            )
+        })
+        .collect()
+}
+
+/// Host and leaf media reads agree: the document's and slide 0's reachable
+/// assets and every reachable asset's bytes.
+fn media_agree(bytes: &[u8]) -> TestResult<usize> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let package = Package::from_bytes(bytes)?;
+    let host = editor.media_assets()?;
+    let leaf = package.media_assets()?;
+    assert_eq!(host_asset_rows(&host), leaf_asset_rows(&leaf));
+    assert_eq!(
+        host_asset_rows(&editor.slide_media_assets(SLIDE)?),
+        leaf_asset_rows(&package.slide_media_assets(SlideSelector::index(SLIDE))?)
+    );
+    for (host_asset, leaf_asset) in host.iter().zip(&leaf) {
+        if host_asset.is_materialized() {
+            assert_eq!(
+                editor.extract_media(host_asset.data_identifier)?,
+                package.media_asset_data(leaf_asset)?
+            );
+        }
+    }
+    Ok(leaf.len())
+}
+
+#[test]
+fn keynote_media_asset_read_parity() -> TestResult {
+    for path in [
+        IMAGE,
+        "iwork/keynote/slide-movie-geometry-source-native.key",
+    ] {
+        let input = fixture(path)?;
+        Case::new(
+            "keynote_media_asset_read_parity",
+            Format::Keynote,
+            Tier::A,
+            Evidence::Queued,
+            &input,
+        )
+        .read_only()
+        .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read("host and leaf media agree", media_agree)
+        .run()?;
+    }
+    Ok(())
+}
+
+/// Host and leaf slide reads agree: count, names, titles and notes.
+fn slides_agree(bytes: &[u8]) -> TestResult<usize> {
+    let host = keynote::Draft::from_bytes(bytes)?.slides()?;
+    let package = Package::from_bytes(bytes)?;
+    let leaf = package.slides()?;
+    assert_eq!(host.len(), leaf.len());
+    for (host, leaf) in host.iter().zip(leaf) {
+        assert_eq!(host.name.as_deref(), leaf.name());
+        assert_eq!(host.title.as_deref(), leaf.title());
+    }
+    Ok(leaf.len())
+}
+
+/// The package lifecycle: open from bytes and from a file, write and save,
+/// on both routes; an unedited package writes back what it read.
+#[test]
+fn keynote_package_lifecycle_parity() -> TestResult {
+    let input = fixture("iwork/keynote/multi-slide.key")?;
+    let scratch = std::env::temp_dir().join(format!("w1c-lifecycle-{}", std::process::id()));
+    std::fs::create_dir_all(&scratch)?;
+    let source = scratch.join("source.key");
+    std::fs::write(&source, &input.bytes)?;
+    let host = keynote::Draft::open(&source)?;
+    let leaf = Package::open(&source)?;
+    let (host_saved, leaf_saved) = (scratch.join("host.key"), scratch.join("leaf.key"));
+    host.save(&host_saved)?;
+    leaf.save(&leaf_saved)?;
+    assert_eq!(
+        std::fs::read(&host_saved)?,
+        keynote::Draft::from_bytes(&input.bytes)?.to_bytes()?
+    );
+    assert_eq!(
+        std::fs::read(&leaf_saved)?,
+        leaf_bytes!(Package::from_bytes(&input.bytes)?)
+    );
+    std::fs::remove_dir_all(&scratch)?;
+    Case::new(
+        "keynote_package_lifecycle_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host and leaf slides agree", slides_agree)
+    .run()?;
+    Ok(())
+}

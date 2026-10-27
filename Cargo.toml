@@ -133,6 +133,7 @@ litchi-iwa-package  = { version = "0.0.1", path = "crates/litchi-iwa-package" }
 litchi-iwa-protos   = { version = "0.0.1", path = "crates/litchi-iwa-protos" }
 litchi-iwa-table    = { version = "0.0.1", path = "crates/litchi-iwa-table" }
 litchi-iwa-structured = { version = "0.0.1", path = "crates/litchi-iwa-structured" }
+litchi-iwa-style    = { version = "0.0.1", path = "crates/litchi-iwa-style" }
 litchi-iwa-text     = { version = "0.0.1", path = "crates/litchi-iwa-text" }
 litchi-iwa-text-wire = { version = "0.0.1", path = "crates/litchi-iwa-text-wire" }
 litchi-keynote      = { version = "0.0.1", path = "crates/litchi-keynote" }

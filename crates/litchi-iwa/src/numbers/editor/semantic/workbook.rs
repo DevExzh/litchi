@@ -404,8 +404,24 @@ impl Draft {
         let sheet_archive = locations.get(&owner.sheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
         })?;
+        let closure =
+            super::super::object_closure::private_closure(&self.package, &[owner.table_info_id])?;
         let mut staged = self.package.clone();
         let mut removed_identifiers = remove_table_formula_graph(&mut staged, owner.table_info_id)?;
+        // The rest of the table's private closure (record 0370g).
+        let private_owned_ids = {
+            let mut identifiers = private_owned_ids;
+            for identifier in &closure {
+                if *identifier != owner.table_info_id
+                    && *identifier != table_id
+                    && !identifiers.contains(identifier)
+                    && !removed_identifiers.contains(identifier)
+                {
+                    identifiers.push(*identifier);
+                }
+            }
+            identifiers
+        };
         staged.update_archive(sheet_archive, |archive| {
             let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
                 Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
@@ -518,31 +534,41 @@ impl Draft {
     /// Append an empty sheet to the workbook and return its allocated object ID.
     pub fn add_empty_sheet(&mut self, name: &str) -> Result<SheetInfo> {
         validate_name(name, "sheet")?;
+        // Host defects fixed with record 0370g: the new sheet was a bare
+        // record (its name only), it took no sidebar node, and the package's
+        // last object identifier stayed below it. A new sheet now takes the
+        // first sheet's settings (page setup, style, unknown fields) without
+        // its private objects, as the builder's own sheet carries them.
+        let identifier = crate::package_metadata::next_object_identifier(&self.package)?;
+        let document = numbers_document(&self.package)?;
+        let template = document
+            .sheets
+            .first()
+            .map(|reference| reference.identifier)
+            .ok_or_else(|| Error::InvalidFormat("Numbers workbook has no sheet".to_owned()))?;
         let locations = object_locations(&self.package)?;
-        let identifier = locations
-            .keys()
-            .copied()
-            .max()
-            .unwrap_or(0)
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let template_archive = locations
+            .get(&template)
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {template} is missing")))?
+            .clone();
+        if template_archive != "Index/Document.iwa" {
+            return Err(Error::InvalidFormat(
+                "Numbers sheet template is outside the document component".to_owned(),
+            ));
+        }
+        let sheet_object = {
+            let archive = self.package.archive(&template_archive)?;
+            let template_object = archive.object(template).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {template} is missing"))
+            })?;
+            empty_sheet_from_template(template_object, identifier, name)?
+        };
+        let style_references = sheet_object.archive_info.message_infos[0]
+            .object_references
+            .clone();
         let mut staged = self.package.clone();
         staged.update_archive("Index/Document.iwa", |archive| {
-            archive.insert_object(
-                crate::archive::ArchiveObject::new(
-                    identifier,
-                    vec![RawMessage {
-                        type_: 2,
-                        data: tn::SheetArchive {
-                            name: name.to_owned(),
-                            ..Default::default()
-                        }
-                        .encode_to_vec(),
-                    }],
-                    Default::default(),
-                )?,
-                Default::default(),
-            )?;
+            archive.insert_object(sheet_object, Default::default())?;
             Ok(())
         })?;
         update_numbers_document(&mut staged, |document| {
@@ -552,6 +578,18 @@ impl Draft {
             });
             Ok(())
         })?;
+        crate::package_metadata::set_package_last_object_identifier(&mut staged, identifier)?;
+        for target in style_references {
+            if let Some(target_archive) = locations.get(&target) {
+                super::super::table_duplicate::register_numbers_component_reference(
+                    &mut staged,
+                    "Index/Document.iwa",
+                    target_archive,
+                    target,
+                )?;
+            }
+        }
+        super::super::sidebar::append_node(&mut staged, None, identifier)?;
         let source_built = !self.package.source_is_exact();
         let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
@@ -843,4 +881,78 @@ fn source_built_table_appearance(
             "focused Numbers source-built table-appearance read failed: {error}"
         ))
     })
+}
+
+/// Sheet fields that address the template sheet's private objects:
+/// drawables, the deprecated header and footer storages, the guide storage,
+/// headers and footers.
+const PRIVATE_SHEET_FIELDS: [u32; 6] = [2, 15, 16, 17, 18, 19];
+
+/// A new empty `TN.SheetArchive` object named `name`, carrying `template`'s
+/// settings without its private objects (record 0370g). Its header copies
+/// the template's first message versions and merge flag and declares the
+/// style it addresses.
+fn empty_sheet_from_template(
+    template: &crate::archive::ArchiveObject,
+    identifier: u64,
+    name: &str,
+) -> Result<crate::archive::ArchiveObject> {
+    let message = template
+        .messages
+        .iter()
+        .find(|message| message.type_ == 2 || message.type_ == 3)
+        .ok_or_else(|| Error::InvalidFormat("Numbers sheet has no sheet message".to_owned()))?;
+    let settings = if message.type_ == 2 {
+        message.data.clone()
+    } else {
+        let form = litchi_iwa_common::wire::parse_wire_view(
+            &message.data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        let mut inner = None;
+        for field in form.fields() {
+            if field.number() == 1 {
+                if inner.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "Numbers form-based sheet holds two sheet payloads".to_owned(),
+                    ));
+                }
+                inner = Some(field.payload().to_vec());
+            }
+        }
+        inner.ok_or_else(|| {
+            Error::InvalidFormat("Numbers form-based sheet has no sheet payload".to_owned())
+        })?
+    };
+    let view = litchi_iwa_common::wire::parse_wire_view(
+        &settings,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    let mut stripped = Vec::with_capacity(settings.len());
+    for field in view.fields() {
+        if !PRIVATE_SHEET_FIELDS.contains(&field.number()) {
+            stripped.extend_from_slice(field.raw());
+        }
+    }
+    let data = litchi_iwa_common::wire::patch_length_delimited_field(
+        &stripped,
+        1,
+        true,
+        Some(name.as_bytes()),
+    )?;
+    let style = tn::SheetArchive::decode(data.as_slice())?
+        .style
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0);
+    let mut object = crate::archive::ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_: 2, data }],
+        Default::default(),
+    )?;
+    object.archive_info.should_merge = template.archive_info.should_merge;
+    if let Some(info) = template.archive_info.message_infos.first() {
+        object.archive_info.message_infos[0].versions = info.versions.clone();
+    }
+    object.archive_info.message_infos[0].object_references = style.into_iter().collect();
+    Ok(object)
 }

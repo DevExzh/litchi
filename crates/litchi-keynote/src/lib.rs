@@ -471,39 +471,7 @@
 
 #![forbid(unsafe_code)]
 
-/// Field pass between the stored drawing values of
-/// `litchi_iwa_protos::shape_style_codec::native` and
-/// `litchi_iwa_common::shape::native` (record 0375; W1-E hunk).
-#[cfg(not(feature = "internal-iwork-source"))]
-#[allow(
-    dead_code,
-    unreachable_pub,
-    reason = "consumed by the W2 drawing families"
-)]
-mod drawing_native;
-/// Field pass between the stored drawing values of
-/// `litchi_iwa_protos::shape_style_codec::native` and
-/// `litchi_iwa_common::shape::native` (record 0375; W1-E hunk), visible to
-/// the `litchi-iwa` exit parity harness only.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub mod drawing_native;
 mod error;
-/// Feed of the shared embedded-media inventory from the package metadata
-/// scan (record 0375; W1-E hunk).
-#[cfg(not(feature = "internal-iwork-source"))]
-#[allow(
-    dead_code,
-    unreachable_pub,
-    reason = "consumed by the W2 media families"
-)]
-mod media_native;
-/// Feed of the shared embedded-media inventory from the package metadata
-/// scan (record 0375; W1-E hunk), visible to the `litchi-iwa` exit parity
-/// harness only.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub mod media_native;
 mod package;
 mod selector;
 mod time;
