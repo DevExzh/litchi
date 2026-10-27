@@ -3,7 +3,7 @@
 - Status: landed on branch `uo2/iwa-w1a`, after slice 9
   ([0370h](0370h-iwa-w1a-table-duplicate.md), merged on trunk).
 - Date: 2026-10-26.
-- `performance_claim`: none. The leaf builder with options runs 3.75 times the host's instructions, over the 5% budget (§4, gap).
+- `performance_claim`: the leaf builder with options runs within the 5% budget, at +2.4% Ir over the host builder (§4).
 
 ## 1. What landed
 
@@ -21,16 +21,34 @@ There are two new error variants: `create::Error::InvalidLanguage` and
 
 **Where the values go** (the host builder writes the same fields):
 
-- Dimensions: the build resizes the template's table through
-  `table::resize`. It then records the new extent in the table's tile
-  (`maxColumn`, `maxRow`).
+- Names: the sheet's `name` and the table model's `table_name`.
+- Dimensions: the model's size; the tiles' extent (`maxColumn`,
+  `maxRow`) and their removed rows; the header buckets' headers inside
+  the new size; a fresh row/column UID map (the template table stores no
+  cell); the stroke sidecar's size; and the table owner's table and body
+  extents.
 - Language: `TSA.DocumentArchive.document_language`.
 - Locale: the document's `locale_identifier` and
   `creation_locale_identifier`, and the calculation engine's
   `saved_locale_identifier`.
 
-The new `package/document_locale.rs` rewrites these fields on the wire
-through the structural working set.
+**How the build writes them.** `package/builder_synthesis.rs` writes every
+option, with the identity, straight into the template in one pass:
+
+- It scans the template's two changed components (`Index/Document.iwa`
+  and `Index/CalculationEngine.iwa`) object by object, reading only the
+  headers' identifiers, message types and lengths.
+- It replaces the affected payloads and their header lengths.
+- It reassembles the package once and opens it once. The final open
+  validates the result in full.
+
+No structural transaction publishes or reopens in between. The package
+metadata is untouched, so the output is one first save with the
+template's save tokens. `package/document_locale.rs` holds the language
+and locale wire rewrites.
+
+A build without options returns the template, or the template under the
+requested identity, as before.
 
 **Host changes:**
 
@@ -48,8 +66,12 @@ The host builder writes one; the leaf refuses it, as `table::resize`
 does, because a native table keeps at least one body row and column.
 `numbers_builder_headers_only_refusal` pins this.
 
-Three ledger rows are migrated: `table_dimensions`, `language` and
-`locale` → `litchi_numbers::Builder`.
+Nine ledger rows are migrated:
+
+- `table_dimensions`, `language` and `locale` → `litchi_numbers::Builder`;
+- `build`, `builder`, `new`, `sheet_name` and `table_name` →
+  `litchi_numbers::Builder`;
+- `create` → `litchi_numbers::Package::new`.
 
 ## 2. Parity
 
@@ -69,12 +91,12 @@ compared by form, as a documented policy:
 |---|---|
 | `numbers_builder_table_dimensions_parity` | 10×5, 20×8, 3×2, 2×2, 40×26 |
 | `numbers_builder_language_locale_parity` | fr/fr_FR, ja/ja_JP, de-CH/de_CH |
+| `numbers_builder_names_parity` | default; sheet only; table only; both, with non-ASCII names |
 
 ## 3. Gaps
 
 | Item | Next step |
 |---|---|
-| leaf builder cost (+275% over the host, budget 5%) | build the options in one pass over the template's archives before the single open: synthesize the resized table (model size, UID map, stroke sidecar, owner extents, tile extent) and the locale fields on the wire, with no intermediate publication. Until then, only builds that set options pay the cost; `Package::new` and identity/name-only builds are unchanged |
 | no native evidence for builder options | mac queue |
 
 ## 4. Performance
@@ -82,16 +104,24 @@ compared by form, as a documented policy:
 `cost_probes::numbers_builder_cost_abba` builds a 20 × 8 `fr`/`fr_FR`
 workbook in the order host, leaf, leaf, host:
 
-The absolute cost is small: about 9.3 M instructions, once per new
-document. The host writes about 6 KiB of archives straight from its
-protobuf values. The leaf opens its template (1.4 M Ir), then publishes
-and reopens twice: the resize costs 4.2 M Ir and the language and locale
-pass 3.4 M Ir, of which the registry parse in `metadata::apply` is 2.3 M
-Ir. The budget is missed; §3 lists the follow-up.
-
 | Route | Host | Leaf | Δ |
 |---|---:|---:|---:|
-| builder with options | 2,480,707 | 9,304,911 | **+275.1%** |
+| builder with options | 2,500,108 | 2,561,096 | **+2.4%** |
+
+The first version composed the names, resize and locale transactions,
+each publishing and reopening the package. It cost 9,304,911 Ir, +275%
+over the host. The one-pass synthesis removed those intermediate
+publications. It also removed two quadratic encoders:
+
+- the shared `litchi_numbers_wire::table_create::empty_storage` UID-map
+  encoder re-parsed its growing output on every append; it now encodes in
+  one linear pass, with the same bytes, which also speeds up the
+  table-add route;
+- `table_topology::geometry` reread the model once per field; the
+  synthesis reads the geometry in one pass.
+
+What remains is mostly the one final open (1.42 M Ir), which every leaf
+route that returns a `Package` pays.
 
 ## 5. Verification
 
