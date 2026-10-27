@@ -21,6 +21,8 @@ use thiserror::Error as ThisError;
 mod budget;
 /// Scalar-control graph surgery and the shared format-list primitives.
 pub mod control;
+/// One cell's complete display format as the neutral `DataFormat` sum.
+pub mod data_format;
 /// The display-format families of an existing cell.
 pub mod display;
 mod metadata;
@@ -31,8 +33,10 @@ pub mod pop_up_menu;
 pub mod pop_up_menu_metadata;
 /// Native Pop-Up Menu graph transitions below the Pop-Up Menu engine.
 pub mod pop_up_menu_native;
+/// Exact-source reassembly of the members a display-format rewrite returns.
+pub mod publish;
 
-pub use budget::TransactionBudget;
+pub use budget::{ListKeys, TransactionBudget};
 pub use metadata::{ENTRY_NAME as METADATA_ENTRY_NAME, MessageRoute};
 
 /// A content-free location carried by a table-cell format failure.
