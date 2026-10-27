@@ -510,9 +510,14 @@ pub(super) fn register_cloned_numbers_objects(
     locations: &HashMap<u64, String>,
     remap: &HashMap<u64, u64>,
 ) -> Result<()> {
-    let mut clone_entries = HashMap::with_capacity(remap.len());
-    let mut uuid_additions = HashMap::<u64, Vec<u64>>::new();
-    for (&source_id, &new_id) in remap {
+    // Host defect fixed with record 0370f: the registrations followed hash
+    // order, so the same edit wrote its metadata in a different order on
+    // every run. They now follow the new identifiers.
+    let mut clone_entries = std::collections::BTreeMap::new();
+    let mut uuid_additions = std::collections::BTreeMap::<u64, Vec<u64>>::new();
+    let mut ordered: Vec<(u64, u64)> = remap.iter().map(|(&source, &new)| (new, source)).collect();
+    ordered.sort_unstable();
+    for (new_id, source_id) in ordered {
         let entry = locations.get(&source_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Numbers cloned object {source_id} has no source component"
@@ -532,7 +537,7 @@ pub(super) fn register_cloned_numbers_objects(
         add_component_object_uuids(staged, component, &identifiers)?;
     }
 
-    let mut references = HashSet::new();
+    let mut references: Vec<(u64, u64, u64)> = Vec::new();
     for (&new_id, source_entry) in &clone_entries {
         let Some(source_component) = component_identifier_for_entry(staged, source_entry)? else {
             continue;
@@ -554,8 +559,10 @@ pub(super) fn register_cloned_numbers_objects(
             else {
                 continue;
             };
-            if source_component != target_component {
-                references.insert((source_component, target_component, *target_id));
+            if source_component != target_component
+                && !references.contains(&(source_component, target_component, *target_id))
+            {
+                references.push((source_component, target_component, *target_id));
             }
         }
     }

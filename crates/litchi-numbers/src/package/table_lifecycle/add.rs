@@ -57,10 +57,11 @@ const DROPPED_MODEL_FIELDS: [u32; 21] = [
 /// Model counters reset to zero (hidden, user-hidden and filtered rows and
 /// columns).
 const ZEROED_MODEL_FIELDS: [u32; 5] = [14, 15, 41, 42, 40];
-/// Table-info fields the clone drops: editing state, summary and category
-/// models, view UIDs, group and hidden-state UUIDs, pasteboard mapping and
-/// pivot state.
-const DROPPED_INFO_FIELDS: [u32; 10] = [3, 4, 5, 6, 7, 8, 13, 15, 16, 17];
+/// Table-info fields the clone drops, as the host editor clears them:
+/// editing state, summary and category models, view UIDs and pivot state
+/// (record 0370f; the group and hidden-state UUIDs, the pasteboard mapping
+/// and the pivot flag are kept, as native tables carry them).
+const DROPPED_INFO_FIELDS: [u32; 6] = [3, 4, 5, 6, 15, 17];
 /// Drawable fields the clone drops: comment, pencil annotations, title and
 /// caption.
 const DROPPED_DRAWABLE_FIELDS: [u32; 4] = [6, 9, 10, 11];
@@ -355,16 +356,18 @@ fn empty_storage(
         },
         Role::MergeMap => structure::strip_fields(payload, &[1])?,
         Role::UidMap => {
-            // Monotonic identities in creation order, so the sorted lists
-            // and both index permutations are the identity, as a freshly
-            // authored native map is.
-            let column_base = metadata::mix(seed ^ 0x434f_4c55_4d4e) & 0x0000_ffff_ffff_0000;
-            let row_base = metadata::mix(seed ^ 0x524f_5753) & 0x0000_ffff_ffff_0000;
-            let column_upper = metadata::mix(seed.rotate_left(29));
-            let row_upper = metadata::mix(seed.rotate_left(31));
+            // The host editor's fresh map (record 0370f): identities in
+            // creation order derived from `seed` (the new model's
+            // identifier), so the sorted lists and both index permutations
+            // are the identity; the index lists are unpacked, as native maps
+            // store them.
             let mut output = Vec::new();
             for index in 0..columns {
-                let uuid = encode_uuid(column_base + u64::from(index), column_upper)?;
+                let uuid = encode_uuid(
+                    seed.wrapping_mul(0x9e37_79b9)
+                        .wrapping_add(u64::from(index)),
+                    seed.rotate_left(29) ^ 0x434f_4c55_4d4e_0000,
+                )?;
                 append_length_delimited_field(
                     &mut output,
                     1,
@@ -373,10 +376,17 @@ fn empty_storage(
                 )
                 .map_err(wire)?;
             }
-            packed(&mut output, 2, (0..columns).map(u64::from))?;
-            packed(&mut output, 3, (0..columns).map(u64::from))?;
+            for field in [2, 3] {
+                for index in 0..columns {
+                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
+                }
+            }
             for index in 0..rows {
-                let uuid = encode_uuid(row_base + u64::from(index), row_upper)?;
+                let uuid = encode_uuid(
+                    seed.wrapping_mul(0x517c_c1b7)
+                        .wrapping_add(u64::from(index)),
+                    seed.rotate_left(31) ^ 0x524f_5700_0000_0000,
+                )?;
                 append_length_delimited_field(
                     &mut output,
                     4,
@@ -385,51 +395,21 @@ fn empty_storage(
                 )
                 .map_err(wire)?;
             }
-            packed(&mut output, 5, (0..rows).map(u64::from))?;
-            packed(&mut output, 6, (0..rows).map(u64::from))?;
+            for field in [5, 6] {
+                for index in 0..rows {
+                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
+                }
+            }
             output
         },
         Role::Stroke => {
+            // The size alone, as the host editor writes a new sidecar.
             let mut output = Vec::new();
-            let order =
-                litchi_iwa_common::wire::repeated_varint_values(payload, 1).map_err(wire)?;
-            if let [max_order] = order.as_slice() {
-                append_varint_field(&mut output, 1, *max_order).map_err(wire)?;
-            }
             append_varint_field(&mut output, 2, u64::from(columns)).map_err(wire)?;
             append_varint_field(&mut output, 3, u64::from(rows)).map_err(wire)?;
             output
         },
     })
-}
-
-/// Append a packed repeated varint field.
-fn packed(output: &mut Vec<u8>, number: u32, values: impl Iterator<Item = u64>) -> FaultResult<()> {
-    let mut payload = Vec::new();
-    for value in values {
-        let mut value = value;
-        loop {
-            let byte = u8::try_from(value & 0x7f).map_err(|_error| Fault::Invalid)?;
-            value >>= 7;
-            if value == 0 {
-                structure::reserve(&mut payload, 1)?;
-                payload.push(byte);
-                break;
-            }
-            structure::reserve(&mut payload, 1)?;
-            payload.push(byte | 0x80);
-        }
-    }
-    if payload.is_empty() {
-        return Ok(());
-    }
-    append_length_delimited_field(
-        output,
-        number,
-        &payload,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(|error| structure::map_wire(&error))
 }
 
 /// The CalculationEngine root (component, object and message).
@@ -700,6 +680,7 @@ fn engine_payload(
 pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Published, Error> {
     check_size(request.rows, request.columns)?;
     let mut working = Working::new(source)?;
+    working.keep_previews();
     let document = working.object(1)?;
     let document_index = structure::document_message(document)?;
     let sheets = references::identifiers(
@@ -738,10 +719,13 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     let owned = owned_storage(&model_object.messages[0].data)?;
 
     // Fresh identities.
-    let fresh = working.allocate(owned.len() + 4)?;
-    let (new_info, new_model, new_node, new_owner) = (fresh[0], fresh[1], fresh[2], fresh[3]);
+    // The host editor's order: the drawable, the model and the owned
+    // storage in source-identifier order; the formula owner and the sidebar
+    // node follow (record 0370f).
+    let fresh = working.allocate(owned.len() + 2)?;
+    let (new_info, new_model) = (fresh[0], fresh[1]);
     let mut remap: HashMap<u64, u64> = HashMap::new();
-    for ((identifier, _), replacement) in owned.iter().zip(&fresh[4..]) {
+    for ((identifier, _), replacement) in owned.iter().zip(&fresh[2..]) {
         remap.insert(*identifier, *replacement);
     }
     let seed = metadata::identity_seed(&working, new_info)?;
@@ -763,7 +747,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             &object.messages[0].data,
             request.rows,
             request.columns,
-            metadata::mix(seed ^ remap[identifier]),
+            new_model,
         )?;
         let clone = structure::new_object(
             remap[identifier],
@@ -780,16 +764,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     // The model, with its styles shared and its storage remapped.
     let model_data = model_payload(&model_object.messages[0].data, &remap, &uuid_text, request)?;
     let geometry = Geometry::of(&model_data, request.rows, request.columns)?;
-    let model_references: Vec<u64> = model_object.archive_info.message_infos[0]
-        .object_references
-        .iter()
-        .filter_map(|identifier| match remap.get(identifier) {
-            Some(replacement) => Some(*replacement),
-            None if owned.contains_key(identifier) => None,
-            None => Some(*identifier),
-        })
-        .filter(|identifier| references_payload(&model_data, *identifier))
-        .collect();
+    let model_references = model_references(&model_data)?;
     let new_model_object = structure::new_object(
         new_model,
         Some(&model_object),
@@ -843,6 +818,45 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         &after,
     )?;
 
+    // A formula owner for the new table, when the workbook has an engine.
+    let mut owner_component = None;
+    let mut new_owner = None;
+    if let Some((component, engine_id, engine_index)) = engine(&working)? {
+        let owner = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
+        new_owner = Some(owner);
+        let new_owner = owner;
+        let engine_data = working.object(engine_id)?.messages[engine_index]
+            .data
+            .clone();
+        let internal = next_internal_owner(&working, &component, &engine_data)?;
+        let uid = (uuid_upper.swap_bytes(), uuid_lower.swap_bytes());
+        let owner_data = owner_payload(uid, internal, new_info, geometry)?;
+        let mut owner_object = structure::new_object(
+            new_owner,
+            None,
+            FORMULA_OWNER_MESSAGE_TYPE,
+            owner_data,
+            Vec::new(),
+            limits,
+        )?;
+        owner_object.archive_info.message_infos[0].versions =
+            FORMULA_OWNER_VERSIONS.to_vec().into();
+        working.insert(&component, owner_object)?;
+        inserted.push((new_owner, component.clone()));
+        let engine_data = engine_payload(&engine_data, new_owner, internal, uid)?;
+        let engine_object = working.object_mut(engine_id)?;
+        references::replace(
+            engine_object,
+            engine_index,
+            engine_data,
+            &[],
+            &[new_owner],
+            &[2, 6],
+            limits,
+        )?;
+        owner_component = Some(component);
+    }
+
     // The sheet's sidebar node lists its tables.
     let mut node_parent = None;
     if let [root] = sidebar_root.as_slice() {
@@ -866,6 +880,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         }
     }
     if let Some((parent, parent_index)) = node_parent {
+        let new_node = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
         let parent_component = working.locate(parent)?.ok_or(Error::InvalidSource)?;
         let mut data = Vec::new();
         append_length_delimited_field(
@@ -902,44 +917,11 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         )?;
     }
 
-    // A formula owner for the new table, when the workbook has an engine.
-    let mut owner_component = None;
-    if let Some((component, engine_id, engine_index)) = engine(&working)? {
-        let engine_data = working.object(engine_id)?.messages[engine_index]
-            .data
-            .clone();
-        let internal = next_internal_owner(&working, &component, &engine_data)?;
-        let uid = (uuid_upper.swap_bytes(), uuid_lower.swap_bytes());
-        let owner_data = owner_payload(uid, internal, new_info, geometry)?;
-        let mut owner_object = structure::new_object(
-            new_owner,
-            None,
-            FORMULA_OWNER_MESSAGE_TYPE,
-            owner_data,
-            Vec::new(),
-            limits,
-        )?;
-        owner_object.archive_info.message_infos[0].versions =
-            FORMULA_OWNER_VERSIONS.to_vec().into();
-        working.insert(&component, owner_object)?;
-        inserted.push((new_owner, component.clone()));
-        let engine_data = engine_payload(&engine_data, new_owner, internal, uid)?;
-        let engine_object = working.object_mut(engine_id)?;
-        references::replace(
-            engine_object,
-            engine_index,
-            engine_data,
-            &[],
-            &[new_owner],
-            &[2, 6],
-            limits,
-        )?;
-        owner_component = Some(component);
-    }
-
     // Registry: UUIDs for the clones of registered objects, and every new
     // cross-component reference.
     let mut transition = Transition::default();
+    // In identifier order, as the host editor registers them.
+    inserted.sort_by_key(|(identifier, _)| *identifier);
     if let Some(registry) = metadata::registry(&working)? {
         let registered = |identifier: u64| {
             registry
@@ -961,7 +943,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             let component_id = registry.component_for_entry(component)?.identifier;
             let needs_uuid = match source_identifier {
                 Some(source_identifier) => registered(source_identifier),
-                None => *identifier == new_owner,
+                None => Some(*identifier) == new_owner,
             };
             if needs_uuid {
                 transition.register_uuid(&registry, component_id, *identifier, seed)?;
@@ -987,6 +969,30 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         }
     }
     Ok(working.publish(&transition)?)
+}
+
+/// The objects a model payload references, sorted, as the host editor's
+/// `table_model_references` lists them (record 0370f): its style and owner
+/// references, and its data store's headers, tiles and lists.
+fn model_references(model: &[u8]) -> FaultResult<Vec<u64>> {
+    const MODEL_FIELDS: [u32; 42] = [
+        3, 24, 25, 26, 27, 18, 19, 20, 21, 30, 36, 48, 5, 34, 35, 38, 46, 49, 60, 61, 62, 63, 64,
+        65, 66, 67, 68, 69, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 85, 86, 87, 88,
+    ];
+    const STORE_FIELDS: [u32; 15] = [2, 4, 5, 6, 11, 12, 16, 13, 15, 17, 18, 19, 20, 21, 22];
+    let mut output = Vec::new();
+    for field in MODEL_FIELDS.into_iter().chain([89]) {
+        output.extend(references::identifiers(model, &[field])?);
+    }
+    output.extend(references::identifiers(model, &[4, 1, 2])?);
+    output.extend(references::identifiers(model, &[4, 3, 1, 2])?);
+    for field in STORE_FIELDS {
+        output.extend(references::identifiers(model, &[4, field])?);
+    }
+    output.retain(|identifier| *identifier != 0);
+    output.sort_unstable();
+    output.dedup();
+    Ok(output)
 }
 
 /// Whether `data` holds a `TSP.Reference` to `identifier` anywhere in its
