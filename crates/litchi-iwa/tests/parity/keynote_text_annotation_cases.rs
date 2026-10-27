@@ -607,3 +607,446 @@ fn keynote_slide_text_box_annotation_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+fn masked_date_time(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut message = tswp::DateTimeSmartFieldArchive::decode(data)?;
+    if let Some(field) = message.super_.as_mut()
+        && field
+            .text_attribute_uuid_string
+            .as_deref()
+            .is_some_and(|uuid| TextAttributeUuid::new(uuid).is_ok())
+    {
+        field.text_attribute_uuid_string = Some("<uuid>".to_owned());
+    }
+    let mut decoded = decode_as::<tswp::DateTimeSmartFieldArchive>(&message.encode_to_vec())?;
+    decoded.unknown_fields = top_level_fields(data)
+        .difference(&top_level_fields(&decoded.canonical))
+        .copied()
+        .collect();
+    Ok(decoded)
+}
+
+fn date_time_settings() -> TestResult<[litchi_iwa_text::date_time::Settings; 2]> {
+    use litchi_iwa_text::date_time::{
+        Format as DateFormat, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
+    };
+    Ok([
+        Settings::fixed(
+            DateFormat::new("yyyy-MM-dd")?,
+            LocaleIdentifier::new("en_US")?,
+            Instant::from_reference_date_seconds(735_000_000.5)?,
+        ),
+        Settings::new(
+            None,
+            Some(LocaleIdentifier::new("fr_FR")?),
+            Some(FormatterStyle::Long),
+            Some(FormatterStyle::Short),
+            Some(UpdatePlan::Automatic),
+            Some(true),
+            None,
+        )?,
+    ])
+}
+
+#[derive(Clone, Debug)]
+enum Field {
+    Add(TextRange, litchi_iwa_text::date_time::Settings),
+    Insert(
+        TextPosition,
+        &'static str,
+        litchi_iwa_text::date_time::Settings,
+    ),
+    Update(usize, TextRange, litchi_iwa_text::date_time::Settings),
+    Remove(usize),
+}
+
+fn host_field(source: &[u8], operation: &Field) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let id = host_id(&editor, source, leaf_position(source, Kind::TextBox)?)?;
+    match operation.clone() {
+        Field::Add(range, settings) => {
+            editor.add_slide_text_box_date_time_field(SLIDE, id, range, settings)?;
+        },
+        Field::Insert(position, display, settings) => {
+            editor.insert_slide_text_box_date_time_field(
+                SLIDE,
+                id,
+                position,
+                litchi_iwa_text::date_time::DisplayText::new(display)?,
+                settings,
+            )?;
+        },
+        Field::Update(index, range, settings) => {
+            let field = editor.slide_text_box_date_time_fields(SLIDE, id)?[index].id;
+            editor.update_slide_text_box_date_time_field(SLIDE, id, field, range, settings)?;
+        },
+        Field::Remove(index) => {
+            let field = editor.slide_text_box_date_time_fields(SLIDE, id)?[index].id;
+            editor.remove_slide_text_box_date_time_field(SLIDE, id, field)?;
+        },
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_field(source: &[u8], operation: &Field) -> TestResult<LeafRun> {
+    let package = Package::from_bytes(source)?;
+    let (slide, drawable) = (
+        SlideSelector::index(SLIDE),
+        DrawableSelector::index(leaf_position(source, Kind::TextBox)?),
+    );
+    let mut edit = package.edit_slide_drawables();
+    match operation.clone() {
+        Field::Add(range, settings) => {
+            edit.add_date_time_field(slide, drawable, range, settings)?
+        },
+        Field::Insert(position, display, settings) => edit.insert_date_time_field(
+            slide,
+            drawable,
+            position,
+            &litchi_iwa_text::date_time::DisplayText::new(display)?,
+            settings,
+        )?,
+        Field::Update(index, range, settings) => {
+            edit.update_date_time_field(slide, drawable, Position::new(index), range, settings)?
+        },
+        Field::Remove(index) => {
+            edit.remove_date_time_field(slide, drawable, Position::new(index))?
+        },
+    };
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_slide_drawables(&commit.patch().inverse())?;
+    Ok(LeafRun::with_inverse(
+        leaf_bytes!(commit.package()),
+        leaf_bytes!(restored.package()),
+    ))
+}
+
+fn host_date_fields(bytes: &[u8]) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let id = host_id(&editor, bytes, leaf_position(bytes, Kind::TextBox)?)?;
+    Ok(format!(
+        "{:?}",
+        editor
+            .slide_text_box_date_time_fields(SLIDE, id)?
+            .into_iter()
+            .map(|field| (field.range, field.settings))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_date_fields(bytes: &[u8]) -> TestResult<String> {
+    let position = leaf_position(bytes, Kind::TextBox)?;
+    Ok(format!(
+        "{:?}",
+        Package::from_bytes(bytes)?
+            .slide_drawable_date_time_fields(SLIDE, DrawableSelector::index(position))?
+    ))
+}
+
+fn field_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &Fixture,
+    operation: &Field,
+) -> TestResult {
+    Case::new(name, Format::Keynote, tier, evidence, input)
+        .host(|source| host_field(source, operation))
+        .leaf(|source| leaf_field(source, operation))
+        .read("host fields", host_date_fields)
+        .read("leaf fields", leaf_date_fields)
+        .known_fields(|known| {
+            known.with(
+                smart_field::DATE_TIME_MESSAGE_TYPE,
+                "TSWP.DateTimeSmartFieldArchive (text-attribute UUID masked)",
+                masked_date_time,
+            )
+        })
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .run()
+        .map_err(|error| format!("{operation:?}: {error}"))?;
+    Ok(())
+}
+
+fn dated() -> TestResult<Fixture> {
+    let input = fixture(TEXT_BOX)?;
+    Ok(Fixture {
+        path: input.path,
+        bytes: host_field(
+            &input.bytes,
+            &Field::Add(range(0, 4)?, date_time_settings()?[0].clone()),
+        )?,
+    })
+}
+
+#[test]
+fn keynote_slide_text_box_date_time_add_parity() -> TestResult {
+    for settings in date_time_settings()? {
+        field_case(
+            "keynote_slide_text_box_date_time_add_parity",
+            Tier::B,
+            Evidence::Queued,
+            &fixture(TEXT_BOX)?,
+            &Field::Add(range(0, 4)?, settings),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn keynote_slide_text_box_date_time_insert_parity() -> TestResult {
+    field_case(
+        "keynote_slide_text_box_date_time_insert_parity",
+        Tier::B,
+        Evidence::Queued,
+        &fixture(TEXT_BOX)?,
+        &Field::Insert(
+            TextPosition::from_utf16_code_units(2),
+            "2026-10-26",
+            date_time_settings()?[0].clone(),
+        ),
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_date_time_update_parity() -> TestResult {
+    field_case(
+        "keynote_slide_text_box_date_time_update_parity",
+        Tier::B,
+        Evidence::Queued,
+        &dated()?,
+        &Field::Update(0, range(1, 3)?, date_time_settings()?[1].clone()),
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_date_time_remove_parity() -> TestResult {
+    field_case(
+        "keynote_slide_text_box_date_time_remove_parity",
+        Tier::B,
+        Evidence::Queued,
+        &dated()?,
+        &Field::Remove(0),
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_date_time_read_parity() -> TestResult {
+    for input in [fixture(TEXT_BOX)?, dated()?] {
+        assert_eq!(
+            host_date_fields(&input.bytes)?,
+            leaf_date_fields(&input.bytes)?
+        );
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
+
+const DROP_CAP_FIXTURE: &str = "iwork/keynote/chart-grid-authored-native.key";
+
+fn drop_cap_samples() -> TestResult<[litchi_iwa_text::paragraph::drop_cap::DropCap; 2]> {
+    use litchi_iwa_text::paragraph::drop_cap::{
+        CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+    };
+    Ok([
+        DropCap::new(LineCount::new(3)?, CharacterCount::new(1)?),
+        DropCap::new(LineCount::new(4)?, CharacterCount::new(2)?)
+            .with_raised_lines(RaisedLines::new(1)?)
+            .with_wrap(Wrap::Contour)
+            .with_padding(Padding::from_points(6.0)?)
+            .with_outdent(Outdent::from_ratio(0.25)?),
+    ])
+}
+
+/// The first (slide, leaf drawable position, host id) text box of the
+/// fixture whose first paragraph takes a Drop Cap on the host.
+fn drop_cap_target(bytes: &[u8]) -> TestResult<(usize, usize, u64)> {
+    let package = Package::from_bytes(bytes)?;
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    for slide in 0..package.slides()?.len() {
+        let list = package.slide_drawable_list(SlideSelector::index(slide))?;
+        for (position, drawable) in list.iter().enumerate() {
+            if drawable.kind() != Kind::TextBox || drawable.text().is_none_or(str::is_empty) {
+                continue;
+            }
+            let z = drawable.z_position().ok_or("no z")?;
+            let id = editor.slide_drawable_order(slide)?[z.get()];
+            let mut probe = keynote::Draft::from_bytes(bytes)?;
+            if probe
+                .set_slide_text_box_paragraph_drop_cap(
+                    slide,
+                    id,
+                    TextPosition::ZERO,
+                    drop_cap_samples()?[0],
+                )
+                .is_ok()
+            {
+                return Ok((slide, position, id));
+            }
+        }
+    }
+    Err("no text box takes a Drop Cap".into())
+}
+
+fn host_drop_cap(
+    source: &[u8],
+    value: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+) -> TestResult<Vec<u8>> {
+    let (slide, _, id) = drop_cap_target(source)?;
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    match value {
+        Some(value) => {
+            editor.set_slide_text_box_paragraph_drop_cap(slide, id, TextPosition::ZERO, value)?
+        },
+        None => {
+            editor.remove_slide_text_box_paragraph_drop_cap(slide, id, TextPosition::ZERO)?;
+        },
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_drop_cap(
+    source: &[u8],
+    value: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+) -> TestResult<LeafRun> {
+    let (slide, position, _) = drop_cap_target(source)?;
+    let package = Package::from_bytes(source)?;
+    let mut edit = package.edit_slide_drawables();
+    edit.set_drop_cap(
+        SlideSelector::index(slide),
+        DrawableSelector::index(position),
+        TextPosition::ZERO,
+        value,
+    )?;
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_slide_drawables(&commit.patch().inverse())?;
+    Ok(LeafRun::with_inverse(
+        leaf_bytes!(commit.package()),
+        leaf_bytes!(restored.package()),
+    ))
+}
+
+fn host_drop_caps(bytes: &[u8]) -> TestResult<String> {
+    let (slide, _, id) = drop_cap_target(bytes)?;
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    Ok(format!(
+        "{:?} {:?}",
+        editor
+            .slide_text_box_paragraph_drop_caps(slide, id)?
+            .into_iter()
+            .map(|placement| (placement.paragraph, placement.drop_cap))
+            .collect::<Vec<_>>(),
+        editor.slide_text_box_paragraph_drop_cap(slide, id, TextPosition::ZERO)?
+    ))
+}
+
+fn leaf_drop_caps(bytes: &[u8]) -> TestResult<String> {
+    let (slide, position, _) = drop_cap_target(bytes)?;
+    let caps = Package::from_bytes(bytes)?.slide_drawable_drop_caps(
+        SlideSelector::index(slide),
+        DrawableSelector::index(position),
+    )?;
+    let first = caps
+        .iter()
+        .find(|(paragraph, _)| *paragraph == TextPosition::ZERO)
+        .map(|(_, value)| *value);
+    Ok(format!("{caps:?} {first:?}"))
+}
+
+fn drop_cap_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &Fixture,
+    value: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+) -> TestResult {
+    Case::new(name, Format::Keynote, tier, evidence, input)
+        .host(|source| host_drop_cap(source, value))
+        .leaf(|source| leaf_drop_cap(source, value))
+        .read("host drop caps", host_drop_caps)
+        .read("leaf drop caps", leaf_drop_caps)
+        .known_fields(|known| {
+            known.with(
+                litchi_iwa_text_wire::drop_cap::MESSAGE_TYPE,
+                "TSWP.DropCapStyleArchive",
+                decode_as::<tswp::DropCapStyleArchive>,
+            )
+        })
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .run()?;
+    Ok(())
+}
+
+/// The Drop Cap fixture with one host-added text box on slide 0 (the
+/// fixture's styled text lives in placeholders).
+fn drop_cap_input() -> TestResult<Fixture> {
+    let input = fixture(DROP_CAP_FIXTURE)?;
+    let mut editor = keynote::Draft::from_bytes(&input.bytes)?;
+    editor.add_slide_text_box(
+        0,
+        "Drop caps open this paragraph",
+        litchi_iwa::shapes::DrawablePoint { x: 80.0, y: 120.0 },
+        litchi_iwa::shapes::DrawableSize {
+            width: 400.0,
+            height: 120.0,
+        },
+    )?;
+    Ok(Fixture {
+        path: input.path,
+        bytes: editor.to_bytes()?,
+    })
+}
+
+fn capped() -> TestResult<Fixture> {
+    let input = drop_cap_input()?;
+    Ok(Fixture {
+        path: input.path,
+        bytes: host_drop_cap(&input.bytes, Some(drop_cap_samples()?[0]))?,
+    })
+}
+
+#[test]
+fn keynote_slide_text_box_drop_cap_set_parity() -> TestResult {
+    for value in drop_cap_samples()? {
+        drop_cap_case(
+            "keynote_slide_text_box_drop_cap_set_parity",
+            Tier::B,
+            Evidence::Queued,
+            &drop_cap_input()?,
+            Some(value),
+        )?;
+    }
+    drop_cap_case(
+        "keynote_slide_text_box_drop_cap_set_parity",
+        Tier::B,
+        Evidence::Queued,
+        &capped()?,
+        Some(drop_cap_samples()?[1]),
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_drop_cap_remove_parity() -> TestResult {
+    drop_cap_case(
+        "keynote_slide_text_box_drop_cap_remove_parity",
+        Tier::B,
+        Evidence::Queued,
+        &capped()?,
+        None,
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_drop_cap_read_parity() -> TestResult {
+    for input in [drop_cap_input()?, capped()?] {
+        assert_eq!(host_drop_caps(&input.bytes)?, leaf_drop_caps(&input.bytes)?);
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
