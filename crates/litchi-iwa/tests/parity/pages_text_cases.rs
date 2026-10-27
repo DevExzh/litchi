@@ -916,8 +916,8 @@ fn pages_body_storage_read_parity() -> TestResult {
     .read("host body text", |bytes: &[u8]| {
         Ok(pages::Draft::from_bytes(bytes)?.body_text()?)
     })
-    .read("leaf body_text", |bytes: &[u8]| {
-        Ok(Package::from_bytes(bytes)?.body_text()?)
+    .read("leaf body_storage text", |bytes: &[u8]| {
+        Ok(Package::from_bytes(bytes)?.body_storage()?.into_text())
     })
     .run()?;
     for path in [
@@ -930,7 +930,7 @@ fn pages_body_storage_read_parity() -> TestResult {
         let document = fixture(path)?;
         let host = pages::Draft::from_bytes(&document.bytes)?;
         let leaf = Package::from_bytes(&document.bytes)?;
-        assert_eq!(host.body_text()?, leaf.body_text()?, "{path}");
+        assert_eq!(host.body_text()?, leaf.body_storage()?.text(), "{path}");
         assert_eq!(host.body_storage()?.storage, leaf.body_storage()?, "{path}");
     }
     Ok(())

@@ -684,40 +684,6 @@ impl Package {
         Edit::new(self, selector)
     }
 
-    /// Read the rooted body storage: its complete native text (section
-    /// breaks, object replacement and footnote markers included) and its
-    /// style and attribute runs.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InvalidSource`] when the body storage cannot be
-    /// resolved or decoded.
-    pub fn body_storage(&self) -> Result<litchi_iwa_text::storage::Storage, Error> {
-        let (storage, _) = super::body_storage_objects::body_storage(self)
-            .map_err(|_error| Error::InvalidSource)?;
-        let limits = storage_rewrite_limits(self.state.source.limits())
-            .map_err(|_error| Error::InvalidSource)?;
-        let limits = litchi_iwa_text_wire::Limits::new(
-            limits.max_message_bytes().max(storage.payload.len()).max(1),
-            limits.max_fields(),
-            limits.max_fragments(),
-            limits.max_text_bytes(),
-        )
-        .map_err(|_error| Error::InvalidSource)?;
-        litchi_iwa_text_wire::from_bytes(&storage.payload, limits)
-            .map_err(|_error| Error::InvalidSource)
-    }
-
-    /// Read the rooted body's complete native text (see
-    /// [`Self::body_storage`]).
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::body_storage`].
-    pub fn body_text(&self) -> Result<String, Error> {
-        Ok(self.body_storage()?.into_text())
-    }
-
     /// Start a whole-body edit when this package has exactly one section.
     ///
     /// # Errors

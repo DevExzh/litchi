@@ -17,6 +17,7 @@ pub(crate) mod body_footnote;
 pub(crate) mod body_media_lifecycle;
 pub(crate) mod body_number_attachments;
 pub(crate) mod body_storage_objects;
+mod body_story;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
 pub(crate) mod body_table_creation;
