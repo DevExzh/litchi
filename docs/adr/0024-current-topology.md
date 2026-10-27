@@ -5078,6 +5078,6 @@ Edges added, all downward and runtime-neutral:
 The package is never re-exported by a facade: its signatures name native
 archive positions, which the supported APIs do not expose. It is an iWork
 package for the non-iWork release gate (18 iWork packages, 21 excluded).
-`tools/check_crate_boundaries.py` reports 69 workspace packages and 302
-internal dependency declarations (trunk at this branch point), with the
-same 11 migration debts.
+`tools/check_crate_boundaries.py` reports 70 workspace packages and 309
+internal dependency declarations with 12 explicit debt items, after trunk
+`c4f00f3a35` (which adds `litchi-iwa-style`) was merged.
