@@ -47,6 +47,7 @@ mod numbers_builder_cases;
 mod numbers_cases;
 mod numbers_cell_list_cases;
 mod numbers_cell_text_cases;
+mod numbers_chart_axis_cases;
 mod numbers_chart_series_cases;
 mod numbers_chart_series_style_cases;
 mod numbers_chart_style_cases;
