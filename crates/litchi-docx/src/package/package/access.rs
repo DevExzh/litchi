@@ -286,6 +286,27 @@ impl Package {
         raw: bool,
         edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
+        self.edit_opc_candidate_known(operation, raw, |opc| Ok((edit(opc)?, None)))
+    }
+
+    /// [`Self::edit_semantic_opc`] for an edit that knows the core-properties
+    /// slot of its candidate and leaves the custom-properties part untouched
+    /// (`Some(slot)`), so publication adopts the slot and keeps the custom
+    /// properties instead of decoding both parts again (record 0377a).
+    pub(crate) fn edit_semantic_opc_known<T>(
+        &mut self,
+        operation: &'static str,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<(T, Option<Slot>)>,
+    ) -> Result<T> {
+        self.edit_opc_candidate_known(operation, false, edit)
+    }
+
+    fn edit_opc_candidate_known<T>(
+        &mut self,
+        operation: &'static str,
+        raw: bool,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<(T, Option<Slot>)>,
+    ) -> Result<T> {
         self.ensure_opc_current(operation)?;
 
         if !raw && (self.opc.is_signed() || self.opc.requires_signature_edit_policy()) {
@@ -294,19 +315,26 @@ impl Package {
             ));
         }
         let mut candidate = self.opc.clone();
-        let value = edit(&mut candidate)?;
+        let (value, known) = edit(&mut candidate)?;
         candidate.validate_signature_edit_from(&self.opc)?;
 
         let main_part = candidate
             .main_document_part()
             .map_err(|error| Error::PartNotFound(format!("main document part: {error}")))?;
         validate_document_main_content_type(main_part.content_type())?;
-        let properties = Slot::load(&candidate)?;
-        let custom_props = CustomProps::read_for(&candidate, CustomPropsHost::Word)?;
-
-        self.opc = candidate;
-        self.properties = properties.into();
-        self.custom_props = custom_props.into();
+        match known {
+            Some(properties) => {
+                self.opc = candidate;
+                self.properties = properties.into();
+            },
+            None => {
+                let properties = Slot::load(&candidate)?;
+                let custom_props = CustomProps::read_for(&candidate, CustomPropsHost::Word)?;
+                self.opc = candidate;
+                self.properties = properties.into();
+                self.custom_props = custom_props.into();
+            },
+        }
         Ok(value)
     }
 }
