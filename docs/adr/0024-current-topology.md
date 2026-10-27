@@ -5025,7 +5025,9 @@ crates) does not apply: this crate carries shared graph logic.
 Edges, all downward:
 
 - `litchi-iwa-style -> litchi-iwa-archive`, `-> litchi-iwa-common`,
-  `-> litchi-iwa-core`, `-> litchi-iwa-protos`;
+  `-> litchi-iwa-core`, `-> litchi-iwa-protos`, and (2026-10-27) `-> litchi-iwa-text`
+  for the text-column values (`litchi_iwa_text::columns`) the shape-style
+  variation engine stores;
 - `litchi-iwa -> litchi-iwa-style` as migration debt (order 11): the exit
   parity harness drives the engines against the legacy host routes; it goes
   with the host in W3.

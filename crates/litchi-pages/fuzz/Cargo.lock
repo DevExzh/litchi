@@ -620,6 +620,7 @@ dependencies = [
  "litchi-iwa-common",
  "litchi-iwa-core",
  "litchi-iwa-protos",
+ "litchi-iwa-text",
  "thiserror",
 ]
 
