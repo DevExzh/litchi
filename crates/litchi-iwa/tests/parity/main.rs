@@ -51,6 +51,7 @@ mod numbers_drawable_cases;
 mod numbers_lifecycle_cases;
 mod numbers_owner_allocation;
 mod numbers_text_box_cases;
+mod numbers_volatile_highlight_cases;
 mod numbers_w2a_cost;
 mod pages_caption_cases;
 mod pages_cases;
