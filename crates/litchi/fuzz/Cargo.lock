@@ -700,6 +700,7 @@ dependencies = [
  "litchi-iwa-core",
  "litchi-iwa-detect",
  "litchi-iwa-protos",
+ "litchi-iwa-text",
  "litchi-iwa-text-wire",
  "litchi-numbers-wire",
  "phf",
@@ -753,6 +754,7 @@ dependencies = [
  "litchi-iwa-text-wire",
  "litchi-numbers-wire",
  "plist",
+ "sha1",
  "thiserror",
 ]
 
