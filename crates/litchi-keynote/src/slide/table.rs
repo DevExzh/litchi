@@ -18,6 +18,8 @@ pub mod dimension;
 pub mod formula;
 /// Lossless header, footer, freeze, and print-repetition settings.
 pub mod headers;
+/// Hidden rows and columns of a slide table (record 0379).
+pub mod hidden_axes;
 /// Interactive lock state for a table.
 pub mod lock;
 /// Compact, archive-free merged-cell geometry and topology algebra.
