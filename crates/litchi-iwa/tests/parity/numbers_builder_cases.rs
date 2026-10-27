@@ -111,13 +111,48 @@ fn metadata_without_object_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeEr
     Ok(decoded(metadata, data))
 }
 
+/// The builder options one case sets.
+#[derive(Clone, Copy, Default)]
+struct Options<'a> {
+    rows: Option<(usize, usize)>,
+    language: Option<&'a str>,
+    locale: Option<&'a str>,
+    sheet: Option<&'a str>,
+    table: Option<&'a str>,
+}
+
 fn run_builder(
     name: &'static str,
     rows: Option<(usize, usize)>,
     language: Option<&str>,
     locale: Option<&str>,
 ) -> TestResult {
+    run_options(
+        name,
+        Options {
+            rows,
+            language,
+            locale,
+            ..Options::default()
+        },
+    )
+}
+
+fn run_options(name: &'static str, options: Options<'_>) -> TestResult {
+    let Options {
+        rows,
+        language,
+        locale,
+        sheet,
+        table,
+    } = options;
     let mut host = litchi_iwa::numbers::Draft::builder();
+    if let Some(sheet) = sheet {
+        host = host.sheet_name(sheet);
+    }
+    if let Some(table) = table {
+        host = host.table_name(table);
+    }
     if let Some((rows, columns)) = rows {
         host = host.table_dimensions(rows, columns);
     }
@@ -131,6 +166,12 @@ fn run_builder(
     let identity = identity(&host_bytes)?;
     let leaf = move |_source: &[u8]| -> TestResult<LeafRun> {
         let mut builder = litchi_numbers::Builder::new().identity(identity);
+        if let Some(sheet) = sheet {
+            builder = builder.sheet_name(sheet);
+        }
+        if let Some(table) = table {
+            builder = builder.table_name(table);
+        }
         if let Some((rows, columns)) = rows {
             builder = builder.table_dimensions(u32::try_from(rows)?, u32::try_from(columns)?);
         }
@@ -233,5 +274,28 @@ fn numbers_builder_headers_only_refusal() -> TestResult {
         leaf,
         Err(litchi_numbers::create::Error::Dimensions(_))
     ));
+    Ok(())
+}
+
+/// The default build and the builder's sheet and table names.
+#[test]
+fn numbers_builder_names_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for (sheet, table) in [
+        (None, None),
+        (Some("Budget"), None),
+        (None, Some("Q1")),
+        (Some("Résumé 2026"), Some("Données")),
+    ] {
+        run_options(
+            "numbers_builder_names_parity",
+            Options {
+                sheet,
+                table,
+                ..Options::default()
+            },
+        )
+        .map_err(|error| format!("{sheet:?}/{table:?}: {error}"))?;
+    }
     Ok(())
 }

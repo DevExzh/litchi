@@ -775,7 +775,7 @@ impl Package {
     }
 }
 
-fn validate_requested_name(name: &str) -> Result<(), Error> {
+pub(crate) fn validate_requested_name(name: &str) -> Result<(), Error> {
     if name.is_empty() {
         return Err(Error::Refused(Refusal::InvalidName {
             reason: InvalidReason::Empty,

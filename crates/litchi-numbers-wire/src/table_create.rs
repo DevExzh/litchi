@@ -530,43 +530,54 @@ pub fn empty_storage(
             // identifier), so the sorted lists and both index permutations
             // are the identity; the index lists are unpacked, as native maps
             // store them.
+            // Encoded in one linear pass (record 0370i): appending each
+            // field through the checked appender re-parsed the growing
+            // output, quadratic in the table size.
+            use litchi_iwa_common::varint::encode_varint_into;
             let mut output = Vec::new();
+            output
+                .try_reserve(26 * (columns as usize + rows as usize) + 64)
+                .map_err(|_error| WriteError::Invalid)?;
+            let uuid = |output: &mut Vec<u8>, number: u32, lower: u64, upper: u64| {
+                let mut payload = Vec::with_capacity(22);
+                encode_varint_into(&mut payload, 1 << 3);
+                encode_varint_into(&mut payload, lower);
+                encode_varint_into(&mut payload, 2 << 3);
+                encode_varint_into(&mut payload, upper);
+                encode_varint_into(output, (u64::from(number) << 3) | 2);
+                encode_varint_into(output, payload.len() as u64);
+                output.extend_from_slice(&payload);
+            };
+            let varint = |output: &mut Vec<u8>, number: u32, value: u64| {
+                encode_varint_into(output, u64::from(number) << 3);
+                encode_varint_into(output, value);
+            };
             for index in 0..columns {
-                let uuid = encode_uuid(
+                uuid(
+                    &mut output,
+                    1,
                     seed.wrapping_mul(0x9e37_79b9)
                         .wrapping_add(u64::from(index)),
                     seed.rotate_left(29) ^ 0x434f_4c55_4d4e_0000,
-                )?;
-                append_length_delimited_field(
-                    &mut output,
-                    1,
-                    &uuid,
-                    litchi_iwa_common::WireLimits::DEFAULT,
-                )
-                .map_err(wire)?;
+                );
             }
             for field in [2, 3] {
                 for index in 0..columns {
-                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
+                    varint(&mut output, field, u64::from(index));
                 }
             }
             for index in 0..rows {
-                let uuid = encode_uuid(
+                uuid(
+                    &mut output,
+                    4,
                     seed.wrapping_mul(0x517c_c1b7)
                         .wrapping_add(u64::from(index)),
                     seed.rotate_left(31) ^ 0x524f_5700_0000_0000,
-                )?;
-                append_length_delimited_field(
-                    &mut output,
-                    4,
-                    &uuid,
-                    litchi_iwa_common::WireLimits::DEFAULT,
-                )
-                .map_err(wire)?;
+                );
             }
             for field in [5, 6] {
                 for index in 0..rows {
-                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
+                    varint(&mut output, field, u64::from(index));
                 }
             }
             output
