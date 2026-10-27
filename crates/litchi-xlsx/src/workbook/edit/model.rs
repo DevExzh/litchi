@@ -2363,6 +2363,10 @@ pub struct Patch {
     // workbook that happens to share changed-part bytes. Durable patches bind
     // complete package bytes through their wire envelope and do not use this.
     pub(super) authority: Option<PatchAuthority>,
+    /// [`Self::retained_bytes`], computed once: a bounded commit checks it
+    /// and the caller then reads it again for its own snapshot budget, and
+    /// each computation walks both endpoint workbooks (record 0377a).
+    pub(super) retained: std::sync::OnceLock<usize>,
 }
 
 /// Exact final semantic state captured for one selected worksheet picture.
@@ -2856,6 +2860,10 @@ impl Patch {
     /// lazily derived cache allocation.
     #[must_use]
     pub fn retained_bytes(&self) -> usize {
+        *self.retained.get_or_init(|| self.compute_retained_bytes())
+    }
+
+    fn compute_retained_bytes(&self) -> usize {
         let archive_hint = self
             .source
             .as_ref()
@@ -3039,6 +3047,7 @@ impl Patch {
             source: self.target.clone(),
             target: self.source.clone(),
             authority: self.authority.as_ref().map(PatchAuthority::inverse),
+            retained: std::sync::OnceLock::new(),
             svg_read_guards: self
                 .svg_read_guards
                 .iter()

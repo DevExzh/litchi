@@ -1100,12 +1100,18 @@ impl CaptureBudget {
         authored_bytes: usize,
     ) -> Result<CaptureReservation> {
         let key = (position, address);
-        let previous = self.cells.get(&key).copied();
         let worksheet_previous = self.worksheets.get(&position).copied();
         let worksheet_next = if worksheet_previous.is_none() {
             worksheet_bytes.saturating_add(size_of::<PartChange>())
         } else {
             worksheet_previous.unwrap_or(0)
+        };
+        // One ledger traversal for the read and the write (record 0377a).
+        let (maximum, reserved) = (self.maximum, self.reserved);
+        let slot = self.cells.entry(key);
+        let previous = match &slot {
+            Entry::Occupied(entry) => Some(*entry.get()),
+            Entry::Vacant(_) => None,
         };
         let mut next = previous.unwrap_or_default();
         next.apply(facet, authored_bytes);
@@ -1113,8 +1119,23 @@ impl CaptureBudget {
             .map_or(0, CellCapture::retained_bytes)
             .saturating_add(worksheet_previous.unwrap_or(0));
         let new_total = next.retained_bytes().saturating_add(worksheet_next);
-        self.replace(old_total, new_total)?;
-        self.cells.insert(key, next);
+        let observed = reserved.saturating_sub(old_total).saturating_add(new_total);
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: super::super::LimitKind::SnapshotBytes.into(),
+                observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            });
+        }
+        match slot {
+            Entry::Occupied(mut entry) => {
+                entry.insert(next);
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(next);
+            },
+        }
+        self.reserved = observed;
         if worksheet_previous.is_none() {
             // Keep the descriptor in the map exactly as it was admitted.
             // Rollback and recomputation must charge the same worksheet
@@ -1366,17 +1387,17 @@ impl Edit {
                 active: false,
             });
         }
-        let sheet = self
-            .base
-            .inner
-            .sheets
-            .get(position)
-            .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
         let worksheet_bytes = if !self
             .capture_budget
             .as_ref()
             .is_some_and(|budget| budget.worksheets.contains_key(&position))
         {
+            let sheet = self
+                .base
+                .inner
+                .sheets
+                .get(position)
+                .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
             match self.base.inner.package.part_metadata(&sheet.part_uri) {
                 Some(metadata) if metadata.payload_is_decoded() => self
                     .base
@@ -5847,6 +5868,7 @@ impl Edit {
                 authority,
                 svg_read_guards,
                 svg_final_guards,
+                retained: std::sync::OnceLock::new(),
             },
         };
         if let Some(budget) = capture_budget.as_ref() {
@@ -6894,7 +6916,7 @@ fn payload_matches_source(
     let source = stored.map(|value| &value.cell);
     match payload {
         Payload::Set(content) => {
-            if !source.is_some_and(|value| value == &content.as_cell()) {
+            if !source.is_some_and(|value| content.same_as_cell(value)) {
                 return Ok(false);
             }
             let Some(stored) = stored else {
