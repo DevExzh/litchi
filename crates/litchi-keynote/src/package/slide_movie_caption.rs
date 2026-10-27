@@ -26,6 +26,9 @@ use crate::{MovieSelector, SlideSelector};
 
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+/// `TSWP.ShapeInfoArchive.is_text_box`.
+const SHAPE_INFO_IS_TEXT_BOX_FIELD: u32 = 6;
 /// `TSD.ImageArchive.flags` bit of an image materialized from the layout.
 const LAYOUT_IMAGE_FLAG: u64 = 1;
 const STANDIN_MESSAGE_TYPE: u32 = 3_097;
@@ -864,6 +867,10 @@ pub(super) enum CaptionedDrawable {
     Movie,
     /// An ordinary file image (`TSD.ImageArchive`, 3005).
     Image,
+    /// An ordinary shape or line (`TSWP.ShapeInfoArchive`, 2011; not a text
+    /// box). Its `TSD.ShapeArchive` (field 1) has the drawable as its super,
+    /// so the movie edge codec reads that nested payload.
+    Shape,
 }
 
 impl CaptionedDrawable {
@@ -871,8 +878,41 @@ impl CaptionedDrawable {
         match self {
             Self::Movie => MOVIE_MESSAGE_TYPE,
             Self::Image => IMAGE_MESSAGE_TYPE,
+            Self::Shape => SHAPE_INFO_MESSAGE_TYPE,
         }
     }
+}
+
+/// The payload the movie edge codec reads for a drawable message: a
+/// ShapeInfo's `TSD.ShapeArchive` (whose super is the drawable), else the
+/// drawable payload itself.
+pub(super) fn edge_payload(
+    message_type: u32,
+    data: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<&[u8], Error> {
+    if message_type == SHAPE_INFO_MESSAGE_TYPE {
+        unique_length_delimited_payload(data, 1, limits)?.ok_or(Error::InvalidSource)
+    } else {
+        Ok(data)
+    }
+}
+
+fn is_text_box(payload: &[u8], limits: litchi_iwa_common::WireLimits) -> Result<bool, Error> {
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let mut found = None;
+    for field in view
+        .fields()
+        .filter(|field| field.number() == SHAPE_INFO_IS_TEXT_BOX_FIELD)
+    {
+        if found.is_some() || field.wire_type() != 0 {
+            return Err(Error::InvalidSource);
+        }
+        let (value, _width) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
+            .map_err(|_| Error::InvalidSource)?;
+        found = Some(value != 0);
+    }
+    Ok(found == Some(true))
 }
 
 /// Resolve the caption or title edge of the drawable of `drawable` kind at
@@ -960,7 +1000,13 @@ pub(super) fn select_drawable_text(
                 return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
         },
+        CaptionedDrawable::Shape => {
+            if is_text_box(movie_payload, limits)? {
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
+            }
+        },
     }
+    let movie_payload = edge_payload(drawable_type, movie_payload, limits)?;
     let movie_options = movie_decode_options(package, movie_payload)?;
     let movie_snapshot =
         keynote_movie_caption_codec::decode_movie_caption(movie_payload, movie_options)
@@ -1506,9 +1552,14 @@ fn prove_exclusive_caption_storage(
                     .get(message_index)
                     .ok_or(Error::InvalidSource)?;
                 if message.type_ == drawable_type {
-                    let snapshot = keynote_movie_caption_codec::decode_movie_caption(
+                    let edge = edge_payload(
+                        message.type_,
                         &message.data,
-                        movie_decode_options(package, &message.data)?,
+                        package.wire_limits().map_err(map_wire_error)?,
+                    )?;
+                    let snapshot = keynote_movie_caption_codec::decode_movie_caption(
+                        edge,
+                        movie_decode_options(package, edge)?,
                     )
                     .map_err(map_movie_codec_error)?;
                     let opposite_identifier = match kind {
@@ -1798,9 +1849,14 @@ fn prove_exclusive_caption_standin(
             let owner_identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             for (message_index, message) in object.messages.iter().enumerate() {
                 if message.type_ == drawable_type {
-                    let snapshot = keynote_movie_caption_codec::decode_movie_caption(
+                    let edge = edge_payload(
+                        message.type_,
                         &message.data,
-                        movie_decode_options(package, &message.data)?,
+                        package.wire_limits().map_err(map_wire_error)?,
+                    )?;
+                    let snapshot = keynote_movie_caption_codec::decode_movie_caption(
+                        edge,
+                        movie_decode_options(package, edge)?,
                     )
                     .map_err(map_movie_codec_error)?;
                     let opposite_identifier = match kind {
