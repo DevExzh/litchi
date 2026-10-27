@@ -247,3 +247,58 @@ fn numbers_chart_reference_lines_remove_all_parity() -> TestResult {
         &[],
     )
 }
+
+#[inline(never)]
+fn leaf_reference_line_route(
+    format: Format,
+    source: &[u8],
+    chart: u64,
+    lines: &[Line],
+) -> TestResult<Vec<u8>> {
+    crate::series_style_cases::leaf_reopen(format, source)?;
+    let output = engine_write(source, chart, lines)?;
+    format.reopen(&output)?;
+    Ok(output)
+}
+
+#[inline(never)]
+fn host_reference_line_route(
+    source: &[u8],
+    target: Target,
+    chart: u64,
+    lines: &[Line],
+) -> TestResult<Vec<u8>> {
+    host_write(source, target, chart, lines)
+}
+
+/// ABBA cost probe of the reference-line writes with source and candidate
+/// admission (record 0375a §4): an allocation, a patch and a removal per
+/// format; toggle `*reference_line_cases::host_reference_line_route*` or
+/// `*reference_line_cases::leaf_reference_line_route*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn reference_line_write_cost_abba() -> TestResult {
+    for format in [Format::Keynote, Format::Numbers, Format::Pages] {
+        let runs = [
+            (Vec::new(), vec![Line::average()]),
+            (vec![Line::average()], vec![named_average()?]),
+            (
+                vec![Line::minimum(), Line::maximum()],
+                vec![Line::minimum()],
+            ),
+        ];
+        for (before, after) in runs {
+            let mut input = input(format, Kind::Column2d)?;
+            let (target, chart) = (input.target, input.chart);
+            if !before.is_empty() {
+                input.fixture.bytes = host_write(&input.fixture.bytes, target, chart, &before)?;
+            }
+            let source = input.fixture.bytes.as_slice();
+            std::hint::black_box(host_reference_line_route(source, target, chart, &after)?);
+            std::hint::black_box(leaf_reference_line_route(format, source, chart, &after)?);
+            std::hint::black_box(leaf_reference_line_route(format, source, chart, &after)?);
+            std::hint::black_box(host_reference_line_route(source, target, chart, &after)?);
+        }
+    }
+    Ok(())
+}

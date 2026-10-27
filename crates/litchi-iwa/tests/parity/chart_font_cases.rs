@@ -218,3 +218,55 @@ fn pages_chart_font_size_keeps_font_parity() -> TestResult {
         size(9.0)?,
     )
 }
+
+#[inline(never)]
+fn leaf_chart_font_route(
+    format: Format,
+    source: &[u8],
+    chart: u64,
+    change: &Change,
+) -> TestResult<Vec<u8>> {
+    crate::series_style_cases::leaf_reopen(format, source)?;
+    let output = engine_write(source, chart, change)?;
+    format.reopen(&output)?;
+    Ok(output)
+}
+
+#[inline(never)]
+fn host_chart_font_route(
+    source: &[u8],
+    target: Target,
+    chart: u64,
+    change: &Change,
+) -> TestResult<Vec<u8>> {
+    host_write(source, target, chart, change)
+}
+
+/// ABBA cost probe of the chart-font writes with source and candidate
+/// admission (record 0375a §4): font, size and reset per format; toggle
+/// `*chart_font_cases::host_chart_font_route*` or
+/// `*chart_font_cases::leaf_chart_font_route*`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn chart_font_write_cost_abba() -> TestResult {
+    for format in [Format::Keynote, Format::Numbers, Format::Pages] {
+        let runs = [
+            (None, avenir()?),
+            (None, size(17.0)?),
+            (Some(avenir()?), Change::ResetFont),
+        ];
+        for (before, change) in runs {
+            let mut input = input(format, Kind::Column2d)?;
+            let (target, chart) = (input.target, input.chart);
+            if let Some(before) = &before {
+                input.fixture.bytes = host_write(&input.fixture.bytes, target, chart, before)?;
+            }
+            let source = input.fixture.bytes.as_slice();
+            std::hint::black_box(host_chart_font_route(source, target, chart, &change)?);
+            std::hint::black_box(leaf_chart_font_route(format, source, chart, &change)?);
+            std::hint::black_box(leaf_chart_font_route(format, source, chart, &change)?);
+            std::hint::black_box(host_chart_font_route(source, target, chart, &change)?);
+        }
+    }
+    Ok(())
+}
