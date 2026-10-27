@@ -2388,3 +2388,40 @@ fn control_entries(source: &[u8]) -> TestResult<Vec<tst::table_data_list::ListEn
     }
     Err(io::Error::other("control-cell-spec list is missing").into())
 }
+
+/// Callgrind probe (record 0379): create, replace and clear a menu on an
+/// empty cell, serializing each output. Measured before and after the shared
+/// `litchi-iwa-table` engine move with
+/// `--toggle-collect=*table_cell_pop_up_menu::pop_up_menu_probe_routes*`.
+#[inline(never)]
+fn pop_up_menu_probe_routes(source: &[u8]) -> TestResult<usize> {
+    let package = Package::from_bytes(source)?;
+    let first = package
+        .edit_table_cell_pop_up_menu_format(0usize, 0usize, At::new(0, 0))?
+        .set(popup(
+            &["Low", "Medium", "High"],
+            InitialSelection::FirstItem,
+        )?)
+        .commit()?;
+    let second = first
+        .package()
+        .edit_table_cell_pop_up_menu_format(0usize, 0usize, At::new(0, 0))?
+        .set(popup(&["Yes", "No"], InitialSelection::Blank)?)
+        .commit()?;
+    let third = second
+        .package()
+        .edit_table_cell_pop_up_menu_format(0usize, 0usize, At::new(0, 0))?
+        .clear()
+        .commit()?;
+    Ok(first.package().exact_bytes().len()
+        + second.package().exact_bytes().len()
+        + third.package().exact_bytes().len())
+}
+
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn pop_up_menu_cost_probe() -> TestResult {
+    let source = fixture(FixtureMode::EmptyCells)?;
+    assert!(pop_up_menu_probe_routes(&source)? > 0);
+    Ok(())
+}

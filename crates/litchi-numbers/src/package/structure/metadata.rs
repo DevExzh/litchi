@@ -239,6 +239,51 @@ fn payload<'w>(working: &'w Working<'_>, (object, message): (u64, usize)) -> Fau
         .ok_or(Fault::Invalid)
 }
 
+/// The package save token (`TSP.PackageMetadata.save_token`).
+pub(super) fn save_token(working: &Working<'_>) -> FaultResult<Option<u64>> {
+    let Some(route) = route(working)? else {
+        return Ok(None);
+    };
+    let values = litchi_iwa_common::wire::repeated_varint_values(payload(working, route)?, 8)
+        .map_err(|error| super::map_wire(&error))?;
+    Ok(values.last().copied())
+}
+
+/// `data` (a `TSP.PackageMetadata`) with the package save token `token`, and
+/// every component record that a composed transaction advanced past it
+/// brought back to it: the transaction is one save.
+fn with_save_token(data: &[u8], token: u64) -> FaultResult<Vec<u8>> {
+    use litchi_iwa_common::WireLimits;
+    use litchi_iwa_common::wire::{
+        append_length_delimited_field, parse_wire_view, patch_varint_field, repeated_varint_values,
+    };
+    let view =
+        parse_wire_view(data, WireLimits::DEFAULT).map_err(|error| super::map_wire(&error))?;
+    let mut output = Vec::new();
+    reserve(&mut output, data.len())?;
+    for field in view.fields() {
+        if matches!(field.number(), 3 | 11) {
+            let record = field.payload();
+            let current =
+                repeated_varint_values(record, 12).map_err(|error| super::map_wire(&error))?;
+            if current.last().is_some_and(|value| *value > token) {
+                let patched = patch_varint_field(record, 12, true, Some(token))
+                    .map_err(|error| super::map_wire(&error))?;
+                append_length_delimited_field(
+                    &mut output,
+                    field.number(),
+                    &patched,
+                    WireLimits::DEFAULT,
+                )
+                .map_err(|error| super::map_wire(&error))?;
+                continue;
+            }
+        }
+        output.extend_from_slice(field.raw());
+    }
+    patch_varint_field(&output, 8, true, Some(token)).map_err(|error| super::map_wire(&error))
+}
+
 fn options(working: &Working<'_>, payload: usize, additions: usize) -> RewriteOptions {
     let components = working
         .source()
@@ -572,7 +617,11 @@ pub(super) fn apply(
     if allocated.is_none() && transition.released.contains(&current) {
         last = working.maximum_identifier();
     }
-    if transition.is_empty() && last == current && emptied.is_empty() {
+    if transition.is_empty()
+        && last == current
+        && emptied.is_empty()
+        && working.save_token.is_none()
+    {
         return Ok(());
     }
     // Data owners and unreferenced data leave first: the registry codec
@@ -758,6 +807,9 @@ pub(super) fn apply(
     if let Some(last) = restore {
         data = litchi_iwa_common::wire::patch_varint_field(&data, 1, true, Some(last))
             .map_err(|error| super::map_wire(&error))?;
+    }
+    if let Some(token) = working.save_token {
+        data = with_save_token(&data, token)?;
     }
     if !emptied.is_empty() {
         let mut selectors = Vec::new();
