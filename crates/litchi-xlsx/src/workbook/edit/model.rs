@@ -3292,20 +3292,13 @@ pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) 
     );
 
     for metadata in package.iter_parts() {
+        // The archive hint covers deferred source payloads.
         bytes = bytes
             .saturating_add(size_of_val(&metadata))
             .saturating_add(metadata.partname().as_str().len())
             .saturating_add(metadata.content_type().len())
-            .saturating_add(relationship_retained_bytes(metadata.rels()));
-        if metadata.payload_is_decoded() {
-            // `payload_is_decoded` makes this lookup non-blocking and
-            // infallible in the normal built-in package. Keep a failed
-            // lookup conservative by retaining the endpoint overhead; the
-            // archive hint covers deferred source payloads.
-            if let Ok(part) = package.get_part(metadata.partname()) {
-                bytes = bytes.saturating_add(part.blob_arc().capacity());
-            }
-        }
+            .saturating_add(relationship_retained_bytes(metadata.rels()))
+            .saturating_add(metadata.decoded_payload_capacity().unwrap_or(0));
     }
     bytes.saturating_add(relationship_retained_bytes(package.rels()))
 }

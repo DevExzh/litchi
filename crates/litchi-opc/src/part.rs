@@ -769,6 +769,19 @@ impl<'part> PartMetadata<'part> {
     pub fn payload_is_decoded(&self) -> bool {
         self.part.decoded_blob().is_some()
     }
+
+    /// The capacity of the payload allocation if the payload is already
+    /// available, without decoding it; `None` exactly when
+    /// [`Self::payload_is_decoded`] is `false`.
+    ///
+    /// This serves retained-data accounting and is not part of the supported
+    /// surface.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn decoded_payload_capacity(&self) -> Option<usize> {
+        self.part.decoded_blob()?;
+        Some(self.part.blob_arc().capacity())
+    }
 }
 
 /// Factory for creating Part instances based on content type.
