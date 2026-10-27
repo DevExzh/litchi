@@ -11,7 +11,8 @@
 //! is its only user and the variation holds only supported overrides.
 //! Resetting removes the override, dropping a variation that becomes empty.
 //!
-//! The engine reads through a [`TableSource`] and returns a [`Plan`]: the
+//! The engine reads through a [`TableSource`](crate::TableSource) and returns a
+//! [`Plan`](crate::cell_appearance::Plan): the
 //! payload rewrites, the new or removed style object and the registry
 //! changes. The leaf applies the plan, allocates nothing itself beyond the
 //! identifier the caller supplies, and owns publication.
