@@ -692,7 +692,7 @@ fn masked_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     Ok(decoded)
 }
 
-fn masked(known: KnownFields) -> KnownFields {
+pub(crate) fn masked(known: KnownFields) -> KnownFields {
     known
         .with(
             HIGHLIGHT_MESSAGE_TYPE,

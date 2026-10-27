@@ -172,8 +172,12 @@ pub fn leaf_change(source: &[u8], index: usize, change: &Change) -> TestResult<L
     let package = Package::from_bytes(source)?;
     let mut edit = package.edit_sheet_text_box_text(0, DrawableSelector::text_box(index))?;
     match change {
-        Change::Set(property) => drop(edit.set(property.clone())?),
-        Change::Reset(kind) => drop(edit.reset(*kind)?),
+        Change::Set(property) => {
+            edit.set(property.clone())?;
+        },
+        Change::Reset(kind) => {
+            edit.reset(*kind)?;
+        },
     }
     let commit = edit.commit()?;
     let restored = commit
@@ -1010,6 +1014,325 @@ fn numbers_sheet_text_box_date_time_remove_parity() -> TestResult {
 fn numbers_sheet_text_box_date_time_read_parity() -> TestResult {
     for input in [authored_fixture()?, with_date()?] {
         assert_eq!(host_dates(&input.bytes)?, leaf_dates(&input.bytes)?);
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
+
+// ---- highlights, comments, replies --------------------------------------------
+
+use litchi_iwa_text::comment::{TextCommentBody, TextCommentReplyBody};
+
+#[derive(Clone, Debug)]
+enum NoteChange {
+    AddHighlight(TextRange),
+    UpdateHighlight(usize, TextRange),
+    RemoveHighlight(usize),
+    AddComment(TextRange, &'static str),
+    UpdateComment(usize, TextRange, &'static str),
+    RemoveComment(usize),
+    AddReply(usize, &'static str),
+    UpdateReply(usize, usize, &'static str),
+    RemoveReply(usize, usize),
+}
+
+fn host_notes(bytes: &[u8]) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    let highlights: Vec<_> = e
+        .sheet_text_box_highlights(s, d)?
+        .into_iter()
+        .map(|item| item.range)
+        .collect();
+    let mut comments = Vec::new();
+    for comment in e.sheet_text_box_comments(s, d)? {
+        let replies: Vec<String> = e
+            .sheet_text_box_comment_replies(s, d, comment.id())?
+            .into_iter()
+            .map(|reply| reply.body().as_str().to_owned())
+            .collect();
+        comments.push((comment.range(), comment.body().as_str().to_owned(), replies));
+    }
+    Ok(format!("{highlights:?}\n{comments:?}"))
+}
+
+fn leaf_notes(bytes: &[u8]) -> TestResult<String> {
+    let package = Package::from_bytes(bytes)?;
+    let t = DrawableSelector::text_box(0);
+    let highlights: Vec<_> = package
+        .sheet_drawable_highlights(0, t)?
+        .into_iter()
+        .map(|item| item.range())
+        .collect();
+    let comments: Vec<_> = package
+        .sheet_drawable_comments(0, t)?
+        .into_iter()
+        .map(|item| {
+            (
+                item.range(),
+                item.body().to_owned(),
+                item.replies().to_vec(),
+            )
+        })
+        .collect();
+    Ok(format!("{highlights:?}\n{comments:?}"))
+}
+
+fn host_note(source: &[u8], change: &NoteChange) -> TestResult<Vec<u8>> {
+    let mut e = numbers::Draft::from_bytes(source)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    let highlights = e.sheet_text_box_highlights(s, d)?;
+    let comments = e.sheet_text_box_comments(s, d)?;
+    let comment = |position: usize| -> TestResult<_> {
+        Ok(comments.get(position).ok_or("host comment")?.id())
+    };
+    match change {
+        NoteChange::AddHighlight(range) => drop(e.add_sheet_text_box_highlight(s, d, *range)?),
+        NoteChange::UpdateHighlight(p, range) => drop(e.update_sheet_text_box_highlight(
+            s,
+            d,
+            highlights.get(*p).ok_or("host highlight")?.id,
+            *range,
+        )?),
+        NoteChange::RemoveHighlight(p) => drop(e.remove_sheet_text_box_highlight(
+            s,
+            d,
+            highlights.get(*p).ok_or("host highlight")?.id,
+        )?),
+        NoteChange::AddComment(range, body) => {
+            drop(e.add_sheet_text_box_comment(s, d, *range, TextCommentBody::new(body)?)?)
+        },
+        NoteChange::UpdateComment(p, range, body) => drop(e.update_sheet_text_box_comment(
+            s,
+            d,
+            comment(*p)?,
+            *range,
+            TextCommentBody::new(body)?,
+        )?),
+        NoteChange::RemoveComment(p) => {
+            drop(e.remove_sheet_text_box_comment(s, d, comment(*p)?)?)
+        },
+        NoteChange::AddReply(p, body) => drop(e.add_sheet_text_box_comment_reply(
+            s,
+            d,
+            comment(*p)?,
+            TextCommentReplyBody::new(body)?,
+        )?),
+        NoteChange::UpdateReply(p, r, body) => {
+            let id = comment(*p)?;
+            let reply = e.sheet_text_box_comment_replies(s, d, id)?;
+            drop(e.update_sheet_text_box_comment_reply(
+                s,
+                d,
+                id,
+                reply.get(*r).ok_or("host reply")?.id(),
+                TextCommentReplyBody::new(body)?,
+            )?);
+        },
+        NoteChange::RemoveReply(p, r) => {
+            let id = comment(*p)?;
+            let reply = e.sheet_text_box_comment_replies(s, d, id)?;
+            drop(e.remove_sheet_text_box_comment_reply(
+                s,
+                d,
+                id,
+                reply.get(*r).ok_or("host reply")?.id(),
+            )?);
+        },
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn note_case(name: &'static str, tier: Tier, input: &Fixture, change: NoteChange) -> TestResult {
+    let change = &change;
+    let mut case = Case::new(name, Format::Numbers, tier, Evidence::Queued, input)
+        .host(|source| host_note(source, change))
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_annotations(0, DrawableSelector::text_box(0))?;
+            match change {
+                NoteChange::AddHighlight(range) => {
+                    edit.add_highlight(*range)?;
+                },
+                NoteChange::UpdateHighlight(p, range) => {
+                    edit.update_highlight(*p, *range)?;
+                },
+                NoteChange::RemoveHighlight(p) => {
+                    edit.remove_highlight(*p)?;
+                },
+                NoteChange::AddComment(range, body) => {
+                    edit.add_comment(*range, body)?;
+                },
+                NoteChange::UpdateComment(p, range, body) => {
+                    edit.update_comment(*p, *range, body)?;
+                },
+                NoteChange::RemoveComment(p) => {
+                    edit.remove_comment(*p)?;
+                },
+                NoteChange::AddReply(p, body) => {
+                    edit.add_reply(*p, body)?;
+                },
+                NoteChange::UpdateReply(p, r, body) => {
+                    edit.update_reply(*p, *r, body)?;
+                },
+                NoteChange::RemoveReply(p, r) => {
+                    edit.remove_reply(*p, *r)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_annotations(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host annotations", host_notes)
+        .read("leaf annotations", leaf_notes);
+    if tier == Tier::B {
+        case = case
+            .known_fields(|known| {
+                crate::text_comment_cases::masked(known)
+                    .with(
+                        212,
+                        "TSK.AnnotationAuthorArchive",
+                        decode_as::<litchi_iwa_protos::tsk::AnnotationAuthorArchive>,
+                    )
+                    .with(
+                        213,
+                        "TSK.AnnotationAuthorStorageArchive",
+                        decode_as::<litchi_iwa_protos::tsk::AnnotationAuthorStorageArchive>,
+                    )
+            })
+            .leaf_structural_metadata();
+    }
+    case.run()?;
+    Ok(())
+}
+
+fn noted(change: NoteChange) -> TestResult<Fixture> {
+    let input = authored_fixture()?;
+    Ok(Fixture {
+        path: "authored + host annotation",
+        bytes: host_note(&input.bytes, &change)?,
+    })
+}
+
+#[test]
+fn numbers_sheet_text_box_highlight_add_parity() -> TestResult {
+    note_case(
+        "numbers_sheet_text_box_highlight_add_parity",
+        Tier::B,
+        &authored_fixture()?,
+        NoteChange::AddHighlight(range(0, 5)?),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_highlight_update_parity() -> TestResult {
+    note_case(
+        "numbers_sheet_text_box_highlight_update_parity",
+        Tier::A,
+        &noted(NoteChange::AddHighlight(range(0, 5)?))?,
+        NoteChange::UpdateHighlight(0, range(2, 8)?),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_highlight_remove_parity() -> TestResult {
+    note_case(
+        "numbers_sheet_text_box_highlight_remove_parity",
+        Tier::B,
+        &noted(NoteChange::AddHighlight(range(0, 5)?))?,
+        NoteChange::RemoveHighlight(0),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_comment_add_parity() -> TestResult {
+    note_case(
+        "numbers_sheet_text_box_comment_add_parity",
+        Tier::B,
+        &authored_fixture()?,
+        NoteChange::AddComment(range(0, 5)?, "Check this"),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_comment_update_parity() -> TestResult {
+    note_case(
+        "numbers_sheet_text_box_comment_update_parity",
+        Tier::A,
+        &noted(NoteChange::AddComment(range(0, 5)?, "Check this"))?,
+        NoteChange::UpdateComment(0, range(2, 8)?, "Checked"),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_comment_remove_parity() -> TestResult {
+    note_case(
+        "numbers_sheet_text_box_comment_remove_parity",
+        Tier::B,
+        &noted(NoteChange::AddComment(range(0, 5)?, "Check this"))?,
+        NoteChange::RemoveComment(0),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_comment_reply_parity() -> TestResult {
+    let input = noted(NoteChange::AddComment(range(0, 5)?, "Check this"))?;
+    note_case(
+        "numbers_sheet_text_box_comment_reply_parity",
+        Tier::B,
+        &input,
+        NoteChange::AddReply(0, "Done"),
+    )?;
+    let replied = Fixture {
+        path: input.path,
+        bytes: host_note(&input.bytes, &NoteChange::AddReply(0, "Done"))?,
+    };
+    note_case(
+        "numbers_sheet_text_box_comment_reply_parity",
+        Tier::B,
+        &replied,
+        NoteChange::UpdateReply(0, 0, "Done twice"),
+    )?;
+    note_case(
+        "numbers_sheet_text_box_comment_reply_parity",
+        Tier::B,
+        &replied,
+        NoteChange::RemoveReply(0, 0),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_annotation_read_parity() -> TestResult {
+    let commented = noted(NoteChange::AddComment(range(0, 5)?, "Check this"))?;
+    let replied = host_note(&commented.bytes, &NoteChange::AddReply(0, "Done"))?;
+    let highlighted = host_note(&replied, &NoteChange::AddHighlight(range(6, 9)?))?;
+    for bytes in [
+        authored_fixture()?.bytes,
+        commented.bytes.clone(),
+        replied,
+        highlighted,
+    ] {
+        assert_eq!(host_notes(&bytes)?, leaf_notes(&bytes)?);
     }
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
