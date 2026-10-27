@@ -46,6 +46,7 @@ pub(crate) mod slide_movie_title;
 pub(crate) mod slide_notes;
 pub(crate) mod slide_order;
 pub(crate) mod slide_table_appearance;
+pub(crate) mod slide_table_cell_appearance;
 pub(crate) mod slide_table_cell_format;
 pub(crate) mod slide_table_cell_number_format;
 pub(crate) mod slide_table_cells;
