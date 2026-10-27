@@ -41,6 +41,14 @@ pub(in crate::package) struct Workspace<'p> {
     inserted: usize,
     /// Non-archive package members created by this transaction (data).
     members: BTreeMap<String, Vec<u8>>,
+    /// Source members deleted by this transaction (data culled with its
+    /// final owner).
+    deleted: BTreeSet<String>,
+    /// Source objects removed by this transaction and not re-inserted.
+    removed: BTreeSet<u64>,
+    /// Existing non-archive source members (data) whose bytes this
+    /// transaction replaces.
+    replaced: BTreeMap<String, Vec<u8>>,
 }
 
 impl<'p> Workspace<'p> {
@@ -97,11 +105,19 @@ impl<'p> Workspace<'p> {
             next_identifier,
             inserted: 0,
             members: BTreeMap::new(),
+            deleted: BTreeSet::new(),
+            removed: BTreeSet::new(),
+            replaced: BTreeMap::new(),
         })
     }
 
     pub(in crate::package) const fn package(&self) -> &'p Package {
         self.package
+    }
+
+    /// The identifier the next [`Self::allocate`] returns.
+    pub(in crate::package) const fn next_identifier(&self) -> u64 {
+        self.next_identifier
     }
 
     /// Allocate a fresh package-wide object identifier.
@@ -212,7 +228,11 @@ impl<'p> Workspace<'p> {
     /// (the registry member included).
     pub(in crate::package) fn touched_members(&self) -> usize {
         let registry = usize::from(!self.changed.contains_key(METADATA_MEMBER));
-        self.changed.len() + self.created.len() + self.members.len() + registry
+        self.changed.len()
+            + self.created.len()
+            + self.members.len()
+            + self.replaced.len()
+            + registry
     }
 
     /// Insert a new object into an existing or created component.
@@ -231,6 +251,7 @@ impl<'p> Workspace<'p> {
         let limits = self.archive_limits;
         self.archive_mut(member)?.insert_object(object, limits)?;
         self.located.insert(identifier, member.to_owned());
+        self.removed.remove(&identifier);
         self.inserted += 1;
         Ok(())
     }
@@ -248,7 +269,41 @@ impl<'p> Workspace<'p> {
             .remove_object(identifier)
             .ok_or(StructureError::MissingObject)?;
         self.located.remove(&identifier);
+        self.removed.insert(identifier);
         Ok(removed)
+    }
+
+    /// Lower the package watermark as the legacy host does when a removal
+    /// takes out the object that holds it: the new watermark is the largest
+    /// surviving identifier. A watermark above every object (an unused
+    /// metadata-only suffix) is kept, and so is one an allocation in this
+    /// transaction raised.
+    pub(in crate::package) fn release_removed_identifier_suffix(&mut self) {
+        let last = self.registry.last_object_identifier();
+        if !self.removed.contains(&last) {
+            return;
+        }
+        let surviving = self
+            .package
+            .state
+            .object_index
+            .iter()
+            .map(|locator| locator.identifier)
+            .filter(|identifier| !self.removed.contains(identifier))
+            .chain(self.located.keys().copied())
+            .max()
+            .unwrap_or(0);
+        self.registry.release_last_object_identifier(surviving);
+        self.next_identifier = surviving.saturating_add(1);
+    }
+
+    /// Stage the deletion of one source package member.
+    pub(in crate::package) fn delete_member(&mut self, member: &str) -> Result<(), StructureError> {
+        if !self.package.structure_has_member(member) || self.members.contains_key(member) {
+            return Err(StructureError::Registry("package member to delete"));
+        }
+        self.deleted.insert(member.to_owned());
+        Ok(())
     }
 
     /// Whether a package member of this exact name exists or is staged.
@@ -268,6 +323,23 @@ impl<'p> Workspace<'p> {
             return Err(StructureError::Registry("package member exists"));
         }
         self.members.insert(member.to_owned(), bytes);
+        Ok(())
+    }
+
+    /// Replace the bytes of one existing non-archive source member (data).
+    pub(in crate::package) fn replace_member(
+        &mut self,
+        member: &str,
+        bytes: Vec<u8>,
+    ) -> Result<(), StructureError> {
+        if !self.package.structure_has_member(member)
+            || self.deleted.contains(member)
+            || self.changed.contains_key(member)
+            || self.replaced.contains_key(member)
+        {
+            return Err(StructureError::Registry("package member to replace"));
+        }
+        self.replaced.insert(member.to_owned(), bytes);
         Ok(())
     }
 
@@ -428,6 +500,11 @@ impl<'p> Workspace<'p> {
             .iter()
             .filter(|(member, _)| self.changed.contains_key(member))
             .map(|(member, bytes)| EntryEdit::new(member, bytes))
+            .chain(
+                self.replaced
+                    .iter()
+                    .map(|(member, bytes)| EntryEdit::new(member, bytes)),
+            )
             .collect::<Vec<_>>();
         let insertions = encoded
             .iter()
@@ -439,7 +516,9 @@ impl<'p> Workspace<'p> {
                     .map(|(member, bytes)| EntryInsertion::new(member, bytes)),
             )
             .collect::<Vec<_>>();
-        self.package.structure_reassemble(&insertions, &edits, &[])
+        let deleted = self.deleted.iter().map(String::as_str).collect::<Vec<_>>();
+        self.package
+            .structure_reassemble(&insertions, &edits, &deleted)
     }
 }
 

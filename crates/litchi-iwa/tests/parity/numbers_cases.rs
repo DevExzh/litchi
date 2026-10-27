@@ -1,9 +1,13 @@
 //! Numbers parity cases.
 
 use litchi_iwa::numbers;
+use litchi_iwa::text::{TextPointSize, TextStyle};
 use litchi_iwa_common::table::merge::Region;
+use litchi_numbers::cell::text_style::CharacterProperties;
+use litchi_numbers::table::At;
 
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
+use crate::known_fields::decode_as;
 use crate::leaf_bytes;
 
 const MERGES: &str = "iwork/numbers/table-merges-native.numbers";
@@ -233,38 +237,27 @@ fn numbers_table_insert_column_parity() -> TestResult {
     )
 }
 
-/// Row and column removal are not at parity yet (record 0370 §2): the leaf
-/// clears the removed cells through the cell writer first, which deletes
-/// the root previews, releases the cells' format keys and lowers the
-/// perpendicular header counts, where the host keeps the previews, leaks
-/// the format keys, keeps stale header counts and leaves the pre-BNC
-/// offset tables naming the removed column. Until a wave resolves it, this
-/// test pins the divergence so the routes stay listed, not shipped.
+/// Row and column removal (record 0370b): on a table no formula touches,
+/// the leaf drops the removed cells in its structural pass, as the host
+/// does; the host now releases a dropped cell's style and format entries.
 #[test]
-fn numbers_table_removal_divergence_is_reported() -> TestResult {
-    use litchi_numbers::table::topology::{ColumnDeletion, RowDeletion};
-    for (name, op) in [
-        ("remove row", TopologyOp::RemoveRow(RowDeletion::body(0))),
-        (
-            "remove column",
-            TopologyOp::RemoveColumn(ColumnDeletion::body(0)),
-        ),
-    ] {
-        let Err(error) = topology_case(
-            "numbers_table_removal_divergence_is_reported",
-            Tier::B,
-            Evidence::Queued,
-            op,
-        ) else {
-            return Err(
-                format!("the {name} routes now agree: turn this into a parity case").into(),
-            );
-        };
-        let text = error.to_string();
-        eprintln!("{text}");
-        assert!(text.contains("ZIP member sets differ"), "{text}");
-    }
-    Ok(())
+fn numbers_table_remove_row_parity() -> TestResult {
+    topology_case(
+        "numbers_table_remove_row_parity",
+        Tier::A,
+        Evidence::Queued,
+        TopologyOp::RemoveRow(litchi_numbers::table::topology::RowDeletion::body(0)),
+    )
+}
+
+#[test]
+fn numbers_table_remove_column_parity() -> TestResult {
+    topology_case(
+        "numbers_table_remove_column_parity",
+        Tier::A,
+        Evidence::Queued,
+        TopologyOp::RemoveColumn(litchi_numbers::table::topology::ColumnDeletion::body(0)),
+    )
 }
 
 /// Every tracked Numbers fixture the harness sweeps.
@@ -317,7 +310,8 @@ pub const NUMBERS_CORPUS: &[&str] = &[
 #[test]
 fn numbers_table_topology_corpus_parity() -> TestResult {
     use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
-    let ops = [
+    let (_tier, _evidence) = (Tier::B, Evidence::Queued);
+    topology_corpus(&[
         TopologyOp::InsertRow(RowInsertion::header(0)),
         TopologyOp::InsertRow(RowInsertion::body(0)),
         TopologyOp::InsertRow(RowInsertion::body(1)),
@@ -325,13 +319,33 @@ fn numbers_table_topology_corpus_parity() -> TestResult {
         TopologyOp::InsertColumn(ColumnInsertion::header(0)),
         TopologyOp::InsertColumn(ColumnInsertion::body(0)),
         TopologyOp::InsertColumn(ColumnInsertion::body(2)),
-    ];
+    ])
+}
+
+/// Row and column removal at seven positions on the whole corpus (record
+/// 0370b), compared as the insertion sweep is.
+#[test]
+fn numbers_table_removal_corpus_parity() -> TestResult {
+    use litchi_numbers::table::topology::{ColumnDeletion, RowDeletion};
+    let (_tier, _evidence) = (Tier::B, Evidence::Queued);
+    topology_corpus(&[
+        TopologyOp::RemoveRow(RowDeletion::header(0)),
+        TopologyOp::RemoveRow(RowDeletion::body(0)),
+        TopologyOp::RemoveRow(RowDeletion::body(1)),
+        TopologyOp::RemoveRow(RowDeletion::footer(0)),
+        TopologyOp::RemoveColumn(ColumnDeletion::header(0)),
+        TopologyOp::RemoveColumn(ColumnDeletion::body(0)),
+        TopologyOp::RemoveColumn(ColumnDeletion::body(1)),
+    ])
+}
+
+fn topology_corpus(ops: &[TopologyOp]) -> TestResult {
     let mut failures = Vec::new();
     let mut compared = 0_usize;
     let mut identical = 0_usize;
     for path in NUMBERS_CORPUS {
         let input = fixture(path)?;
-        for op in ops {
+        for &op in ops {
             let host = (|| -> TestResult<Vec<u8>> {
                 let mut editor = numbers::Draft::from_bytes(&input.bytes)?;
                 let table = litchi_numbers::TableSelector::index(0);
@@ -412,4 +426,338 @@ impl TopologyOp {
             Self::RemoveColumn(_) => "remove column",
         }
     }
+}
+
+/// Whole-cell character style (record 0370): the host's
+/// `set_table_cell_text_style` (point size, bold, italic) against the leaf's
+/// `edit_table_cell_text_style`, ported from the host's
+/// `cell_paragraph_style` new-style path (record 0309).
+const TEXT_STYLE_FIXTURE: &str = "iwork/numbers/basic.numbers";
+
+fn host_text_style(bytes: &[u8], row: u32, column: u32) -> TestResult<TextStyle> {
+    let editor = numbers::Draft::from_bytes(bytes)?;
+    let id = host_table_model_id(&editor)?;
+    Ok(editor.table_cell_text_style(id, row as usize, column as usize)?)
+}
+
+fn leaf_text_style(bytes: &[u8], row: u32, column: u32) -> TestResult<CharacterProperties> {
+    Ok(
+        litchi_numbers::Package::from_bytes(bytes)?.table_cell_text_style(
+            0usize,
+            0usize,
+            At::new(row, column),
+        )?,
+    )
+}
+
+fn text_style_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    cells: &[(u32, u32)],
+    style: TextStyle,
+) -> TestResult {
+    let input = fixture(TEXT_STYLE_FIXTURE)?;
+    let mut properties = CharacterProperties::new();
+    properties.size = Some(style.point_size.points());
+    properties.bold = Some(style.bold);
+    properties.italic = Some(style.italic);
+    let properties = &properties;
+    let mut case = Case::new(name, Format::Numbers, tier, evidence, &input)
+        .leaf_structural_metadata()
+        .known_fields(|known| {
+            known.with(
+                2_022,
+                "TSWP.ParagraphStyleArchive",
+                decode_as::<litchi_iwa_protos::tswp::ParagraphStyleArchive>,
+            )
+        })
+        .host(|source| {
+            let mut editor = numbers::Draft::from_bytes(source)?;
+            let id = host_table_model_id(&editor)?;
+            for (row, column) in cells {
+                editor.set_table_cell_text_style(id, *row as usize, *column as usize, style)?;
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = litchi_numbers::Package::from_bytes(source)?;
+            let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
+            for (row, column) in cells {
+                edit = edit.set(At::new(*row, *column), properties.clone())?;
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_table_cell_text_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("leaf table cells", leaf_table_cells);
+    for (row, column) in cells {
+        let (row, column) = (*row, *column);
+        case = case
+            .read("host table_cell_text_style", move |bytes| {
+                host_text_style(bytes, row, column)
+            })
+            .read("leaf table_cell_text_style", move |bytes| {
+                leaf_text_style(bytes, row, column)
+            });
+    }
+    case.run()?;
+    Ok(())
+}
+
+/// The host's whole-cell point size, bold and italic read equals the
+/// leaf's effective character properties on every corpus cell B2 and on
+/// the cells both routes styled.
+#[test]
+fn numbers_cell_text_style_read_parity() -> TestResult {
+    // A read-only comparison of the same bytes; no native receipt.
+    let (_tier, _evidence) = (Tier::A, Evidence::Queued);
+    let mut compared = 0_usize;
+    for path in NUMBERS_CORPUS {
+        let input = fixture(path)?;
+        let mut inputs = vec![input.bytes.clone()];
+        if let Ok(mut editor) = numbers::Draft::from_bytes(&input.bytes)
+            && let Ok(id) = host_first_table_model_id(&editor)
+            && editor
+                .set_table_cell_text_style(
+                    id,
+                    1,
+                    1,
+                    TextStyle::new(TextPointSize::from_points(21.0)?).with_italic(true),
+                )
+                .is_ok()
+        {
+            inputs.push(editor.to_bytes()?);
+        }
+        for bytes in inputs {
+            let Ok(editor) = numbers::Draft::from_bytes(&bytes) else {
+                continue;
+            };
+            let Ok(id) = host_first_table_model_id(&editor) else {
+                continue;
+            };
+            let Ok(host) = editor.table_cell_text_style(id, 1, 1) else {
+                continue;
+            };
+            let leaf = leaf_text_style(&bytes, 1, 1)?;
+            // An unset size reads as the host's 12 pt default.
+            assert_eq!(
+                leaf.size.unwrap_or(TextPointSize::TWELVE.points()),
+                host.point_size.points(),
+                "{path}"
+            );
+            assert_eq!(leaf.bold.unwrap_or(false), host.bold, "{path}");
+            assert_eq!(leaf.italic.unwrap_or(false), host.italic, "{path}");
+            compared += 1;
+        }
+    }
+    eprintln!("text style reads compared: {compared}");
+    assert!(compared >= 30, "only {compared} reads compared");
+    Ok(())
+}
+
+/// Two cells of one table take the same style: each takes its own
+/// variation on both routes.
+#[test]
+fn numbers_cell_text_style_shared_parity() -> TestResult {
+    text_style_case(
+        "numbers_cell_text_style_shared_parity",
+        Tier::B,
+        Evidence::Queued,
+        &[(1, 1), (2, 1)],
+        TextStyle::new(TextPointSize::from_points(9.5)?)
+            .with_bold(false)
+            .with_italic(true),
+    )
+}
+
+/// The style route over every tracked fixture whose first table stores
+/// cell B2: where the host edits, the leaf passes tier B.
+#[test]
+fn numbers_cell_text_style_corpus_parity() -> TestResult {
+    let style = TextStyle::new(TextPointSize::from_points(14.0)?).with_bold(true);
+    let mut properties = CharacterProperties::new();
+    properties.size = Some(14.0);
+    properties.bold = Some(true);
+    properties.italic = Some(false);
+    let known = crate::known_fields::KnownFields::for_format(Format::Numbers).with(
+        2_022,
+        "TSWP.ParagraphStyleArchive",
+        decode_as::<litchi_iwa_protos::tswp::ParagraphStyleArchive>,
+    );
+    let mut failures = Vec::new();
+    let mut compared = 0_usize;
+    for path in NUMBERS_CORPUS {
+        let input = fixture(path)?;
+        let host = (|| -> TestResult<Vec<u8>> {
+            let mut editor = numbers::Draft::from_bytes(&input.bytes)?;
+            let id = host_first_table_model_id(&editor)?;
+            editor.set_table_cell_text_style(id, 1, 1, style)?;
+            Ok(editor.to_bytes()?)
+        })();
+        let leaf = (|| -> TestResult<Vec<u8>> {
+            let package = litchi_numbers::Package::from_bytes(&input.bytes)?;
+            let commit = package
+                .edit_table_cell_text_style(0usize, 0usize)?
+                .set(At::new(1, 1), properties.clone())?
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        })();
+        match (host, leaf) {
+            (Ok(host), Ok(leaf)) => {
+                compared += 1;
+                let diff = crate::archive_diff::compare_with_policies(
+                    &input.bytes,
+                    &host,
+                    &leaf,
+                    &known,
+                    &[],
+                    crate::archive_diff::MetadataPolicy {
+                        save_token: true,
+                        fresh_uuids: true,
+                    },
+                )?;
+                if !diff.violations.is_empty() {
+                    failures.push(format!("{path}: tier B violations\n{}", diff.render()));
+                }
+            },
+            (Ok(_), Err(error)) => {
+                failures.push(format!(
+                    "{path}: the leaf refuses what the host edits: {error}"
+                ));
+            },
+            (Err(host), Ok(_)) => eprintln!("{path}: host refuses ({host}); the leaf edits"),
+            (Err(host), Err(leaf)) => eprintln!("{path}: both refuse (host {host}; leaf {leaf})"),
+        }
+    }
+    eprintln!("text style corpus: {compared} routes compared");
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("\n").into())
+    }
+}
+
+#[test]
+fn numbers_cell_text_style_parity() -> TestResult {
+    text_style_case(
+        "numbers_cell_text_style_parity",
+        Tier::B,
+        Evidence::Queued,
+        &[(1, 1)],
+        TextStyle::new(TextPointSize::from_points(18.0)?)
+            .with_bold(true)
+            .with_italic(false),
+    )
+}
+/// The host's native identifier of the first sheet's first table model.
+pub fn host_first_table_model_id(editor: &numbers::Draft) -> TestResult<u64> {
+    let package = editor.package();
+    let document = package
+        .iwa_entry_names()
+        .find_map(|name| {
+            package
+                .archive(name)
+                .ok()?
+                .objects
+                .into_iter()
+                .find_map(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .find(|message| message.type_ == 1)
+                        .map(|message| message.data.clone())
+                })
+        })
+        .ok_or("no document")?;
+    let document =
+        <litchi_iwa_protos::tn::DocumentArchive as prost::Message>::decode(document.as_slice())?;
+    let sheet = document.sheets.first().ok_or("no sheet")?.identifier;
+    let find = |identifier: u64, types: &[u32]| -> TestResult<Vec<u8>> {
+        for name in package.iwa_entry_names() {
+            for object in package.archive(name)?.objects {
+                if object.archive_info.identifier == Some(identifier)
+                    && let Some(message) = object.messages.iter().find(|m| types.contains(&m.type_))
+                {
+                    return Ok(message.data.clone());
+                }
+            }
+        }
+        Err(format!("object {identifier} not found").into())
+    };
+    let sheet = <litchi_iwa_protos::tn::SheetArchive as prost::Message>::decode(
+        find(sheet, &[2])?.as_slice(),
+    )?;
+    for drawable in &sheet.drawable_infos {
+        if let Ok(info) = find(drawable.identifier, &[6_000]) {
+            let info = <litchi_iwa_protos::tst::TableInfoArchive as prost::Message>::decode(
+                info.as_slice(),
+            )?;
+            return Ok(info.table_model.identifier);
+        }
+    }
+    Err("the first sheet has no table".into())
+}
+
+/// The host's workbook catalog reads (`sheets`, `tables`) against the
+/// leaf's `Package::sheets` and each sheet's tables with
+/// `Package::table_appearance`, on every tracked fixture the host opens
+/// (record 0370).
+#[test]
+fn numbers_workbook_catalog_read_parity() -> TestResult {
+    // A read-only comparison of the same bytes; no native receipt needed
+    // beyond the fixtures' own.
+    let (_tier, _evidence) = (Tier::A, Evidence::Queued);
+    let mut compared = 0_usize;
+    for path in NUMBERS_CORPUS {
+        let input = fixture(path)?;
+        let editor = numbers::Draft::from_bytes(&input.bytes)?;
+        let leaf = litchi_numbers::Package::from_bytes(&input.bytes)?;
+        let host_sheets: Vec<String> = editor
+            .sheets()?
+            .into_iter()
+            .map(|sheet| sheet.name)
+            .collect();
+        let leaf_sheets: Vec<String> = leaf
+            .sheets()
+            .iter()
+            .map(|sheet| sheet.name().to_owned())
+            .collect();
+        assert_eq!(host_sheets, leaf_sheets, "{path}: sheets");
+        let Ok(host_tables) = editor.tables() else {
+            // The host's catalog refuses tables its appearance read rejects.
+            continue;
+        };
+        let mut leaf_tables = Vec::new();
+        for (sheet_index, sheet) in leaf.sheets().iter().enumerate() {
+            for (table_index, table) in sheet.tables().enumerate() {
+                let appearance = leaf.table_appearance(sheet_index, table_index)?;
+                leaf_tables.push(format!(
+                    "{} {}x{} {appearance:?}",
+                    table.name(),
+                    table.row_count(),
+                    table.column_count()
+                ));
+            }
+        }
+        let host_tables: Vec<String> = host_tables
+            .into_iter()
+            .map(|table| {
+                format!(
+                    "{} {}x{} {:?}",
+                    table.name, table.rows, table.columns, table.appearance
+                )
+            })
+            .collect();
+        assert_eq!(host_tables, leaf_tables, "{path}: tables");
+        compared += 1;
+    }
+    eprintln!("workbook catalogs compared: {compared}");
+    assert!(compared >= 20, "only {compared} catalogs compared");
+    Ok(())
 }

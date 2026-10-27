@@ -5,6 +5,7 @@
 //! non-style extension. This module treats those coordinated fields as one
 //! validated value.
 
+use litchi_iwa_common::chart::series;
 use prost::Message;
 
 use crate::charts::series_non_style::{
@@ -45,9 +46,10 @@ impl ChartSeriesTrendlinePolynomialOrder {
     /// Native inspector default.
     pub const DEFAULT: Self = Self(Self::MIN);
 
-    /// Validate and construct a polynomial order.
+    /// Validate and construct a polynomial order (the shared
+    /// `litchi_iwa_common::chart::series::PolynomialOrder` rule).
     pub fn new(value: u8) -> Result<Self> {
-        if !(Self::MIN..=Self::MAX).contains(&value) {
+        if series::PolynomialOrder::new(value).is_err() {
             return Err(Error::InvalidFormat(format!(
                 "chart series trendline polynomial order must be {}..={}, got {value}",
                 Self::MIN,
@@ -81,9 +83,10 @@ impl ChartSeriesTrendlineMovingAveragePeriod {
     /// Native inspector default.
     pub const DEFAULT: Self = Self(Self::MIN);
 
-    /// Validate and construct a moving-average period.
+    /// Validate and construct a moving-average period (the shared
+    /// `litchi_iwa_common::chart::series::MovingAveragePeriod` rule).
     pub fn new(value: u32) -> Result<Self> {
-        if !(Self::MIN..=Self::MAX).contains(&value) {
+        if series::MovingAveragePeriod::new(value).is_err() {
             return Err(Error::InvalidFormat(format!(
                 "chart series trendline moving-average period must be {}..={}, got {value}",
                 Self::MIN,
@@ -283,39 +286,51 @@ impl ChartSeriesTrendline {
         Ok(self)
     }
 
+    /// The shared value (`litchi_iwa_common::chart::series::Trendline`),
+    /// built through its checked builders.
+    fn to_common(&self) -> std::result::Result<series::Trendline, series::Error> {
+        let mut value = match self.trendline_type {
+            ChartSeriesTrendlineType::None => series::Trendline::none(),
+            ChartSeriesTrendlineType::Linear => series::Trendline::linear(),
+            ChartSeriesTrendlineType::Logarithmic => series::Trendline::logarithmic(),
+            ChartSeriesTrendlineType::Polynomial(order) => {
+                series::Trendline::polynomial(series::PolynomialOrder::new(order.get())?)
+            },
+            ChartSeriesTrendlineType::Power => series::Trendline::power(),
+            ChartSeriesTrendlineType::Exponential => series::Trendline::exponential(),
+            ChartSeriesTrendlineType::MovingAverage(period) => {
+                series::Trendline::moving_average(series::MovingAveragePeriod::new(period.get())?)
+            },
+            ChartSeriesTrendlineType::Unsupported(native) => {
+                series::Trendline::unsupported(native)?
+            },
+        };
+        if let Some(name) = &self.custom_name {
+            value = value.with_legend_name(name.clone())?;
+        }
+        value = value.with_legend_visibility(self.show_name_in_legend)?;
+        value = value.with_equation_visibility(self.show_equation)?;
+        value.with_r_squared_visibility(self.show_r_squared)
+    }
+
     fn validate(&self) -> Result<()> {
-        if let ChartSeriesTrendlineType::Unsupported(value) = self.trendline_type
-            && matches!(
-                value,
-                NATIVE_NONE
-                    | NATIVE_LINEAR
-                    | NATIVE_LOGARITHMIC
-                    | NATIVE_POLYNOMIAL
-                    | NATIVE_POWER
-                    | NATIVE_EXPONENTIAL
-                    | NATIVE_MOVING_AVERAGE
-            )
-        {
-            return Err(Error::InvalidFormat(format!(
-                "known chart series trendline type {value} must use its named representation"
-            )));
-        }
-        if !self.trendline_type.is_visible()
-            && (self.custom_name.is_some()
-                || self.show_name_in_legend
-                || self.show_equation
-                || self.show_r_squared)
-        {
-            return Err(Error::InvalidFormat(
-                "a hidden chart series trendline cannot expose display options".to_owned(),
-            ));
-        }
-        if !self.trendline_type.supports_equation() && (self.show_equation || self.show_r_squared) {
-            return Err(Error::InvalidFormat(
+        match self.to_common() {
+            Ok(_) => Ok(()),
+            Err(series::Error::KnownTrendlineAsUnsupported) => {
+                let ChartSeriesTrendlineType::Unsupported(value) = self.trendline_type else {
+                    unreachable!("only unsupported types are rejected as known")
+                };
+                Err(Error::InvalidFormat(format!(
+                    "known chart series trendline type {value} must use its named representation"
+                )))
+            },
+            Err(series::Error::MovingAverageLabels) => Err(Error::InvalidFormat(
                 "moving-average trendlines do not support equation or R² labels".to_owned(),
-            ));
+            )),
+            Err(_) => Err(Error::InvalidFormat(
+                "a hidden chart series trendline cannot expose display options".to_owned(),
+            )),
         }
-        Ok(())
     }
 }
 

@@ -34,6 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/chart_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
     println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_style_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_style_codec/merge.rs");
+    println!("cargo:rerun-if-changed=src/shape_style_codec.rs");
+    println!("cargo:rerun-if-changed=src/shape_style_codec/native.rs");
     println!("cargo:rerun-if-changed=src/chart_data_codec/rewrite.rs");
     println!("cargo:rerun-if-changed=src/chart_grid_creation_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");
@@ -2453,7 +2457,9 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
     // for the same forbidden Prost/owned-view markers and for accidental
     // Buffa usage.
     const RAW_CODECS: &[&str] = &[
+        "src/chart_style_codec.rs",
         "src/hyperlink_codec.rs",
+        "src/shape_style_codec.rs",
         "src/keynote_chart_caption_graph_codec.rs",
         "src/pages_footnote_graph_codec.rs",
         "src/table_appearance_codec.rs",

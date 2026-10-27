@@ -256,7 +256,7 @@ fn point(x: f32, y: f32) -> Writer {
     Writer::new().float(1, x).float(2, y)
 }
 
-fn drawable_archive(geometry: Geometry, slide: u64, title: u64, caption: u64) -> Writer {
+pub(super) fn drawable_archive(geometry: Geometry, slide: u64, title: u64, caption: u64) -> Writer {
     Writer::new()
         .message(
             1,
@@ -301,8 +301,8 @@ fn path(elements: &[Writer]) -> Writer {
     path
 }
 
-/// The host's `shape_path_source` for the supported presets.
-fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error> {
+/// The host's `shape_path_source` for every preset.
+pub(super) fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error> {
     let size = point(width, height);
     let source = Writer::new().boolean(1, false).boolean(2, false);
     Ok(match preset {
@@ -354,7 +354,47 @@ fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error>
                 ),
             )
         },
+        Preset::LeftArrow => {
+            source.message(3, &arrow(0, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
+        },
+        Preset::RightArrow => {
+            source.message(3, &arrow(1, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
+        },
+        Preset::DoubleArrow => {
+            source.message(3, &arrow(10, DOUBLE_ARROW_HEAD_END_RATIO, width, &size))
+        },
+        Preset::RegularPolygon { sides } => source.message(
+            4,
+            &Writer::new()
+                .varint(1, 1)
+                .float(2, f32::from(sides.count()))
+                .message(3, &size)
+                .boolean(4, false),
+        ),
+        Preset::Star {
+            points,
+            inner_radius,
+        } => source.message(
+            3,
+            &Writer::new()
+                .varint(1, 100)
+                .message(2, &point(f32::from(points.count()), inner_radius.ratio()))
+                .message(3, &size),
+        ),
     })
+}
+
+/// The host's native arrow proportions (`TSD.PointPathSourceArchive`).
+const SINGLE_ARROW_HEAD_START_RATIO: f32 = 0.64;
+const DOUBLE_ARROW_HEAD_END_RATIO: f32 = 0.40;
+const ARROW_SHAFT_RATIO: f32 = 0.34;
+
+/// A `TSD.PointPathSourceArchive` arrow of native `kind`.
+fn arrow(kind: u64, head_ratio: f32, width: f32, size: &Writer) -> Writer {
+    Writer::new()
+        .varint(1, kind)
+        .message(2, &point(width * head_ratio, ARROW_SHAFT_RATIO))
+        .message(3, size)
 }
 
 fn native_object(
@@ -490,6 +530,68 @@ pub(super) fn add_text_shape(
     geometry: Geometry,
     text: &str,
 ) -> Result<u64, Error> {
+    let shape_path = path_source(
+        preset.unwrap_or(Preset::Rectangle),
+        geometry.width,
+        geometry.height,
+    )?;
+    add_path_shape(
+        workspace,
+        context,
+        slide,
+        geometry,
+        &shape_path,
+        preset.is_none(),
+        text,
+    )
+}
+
+/// The host's `line_path_source`: a two-element Bézier of the line's length.
+fn line_path_source(length: f32) -> Writer {
+    Writer::new().boolean(1, false).boolean(2, false).message(
+        5,
+        &Writer::new().message(2, &point(length, 0.0)).message(
+            3,
+            &path(&[element(1, &[(0.0, 0.0)]), element(2, &[(length, 0.0)])]),
+        ),
+    )
+}
+
+/// Add a native straight line along `segment` (host `add_slide_line`).
+pub(super) fn add_line(
+    workspace: &mut Workspace<'_>,
+    context: &Context,
+    slide: u64,
+    segment: litchi_iwa_common::shape::line::Segment,
+) -> Result<u64, Error> {
+    let (position, size, angle) = segment.geometry();
+    let geometry = Geometry {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+        rotation: Some(angle),
+    };
+    add_path_shape(
+        workspace,
+        context,
+        slide,
+        geometry,
+        &line_path_source(segment.length()),
+        false,
+        "",
+    )
+}
+
+fn add_path_shape(
+    workspace: &mut Workspace<'_>,
+    context: &Context,
+    slide: u64,
+    geometry: Geometry,
+    shape_path: &Writer,
+    text_box: bool,
+    text: &str,
+) -> Result<u64, Error> {
     let style = context.textbox_style.ok_or(Error::Refused(
         crate::slide::drawable::Refusal::Unsupported {
             reason: Unsupported::MissingThemeStyle,
@@ -498,11 +600,6 @@ pub(super) fn add_text_shape(
     let member = slide_member(workspace, slide)?;
     let slide_payload = workspace.payload(slide, SLIDE).map_err(lift)?.to_vec();
     let styles = storage_styles(workspace, &slide_payload, context).map_err(lift)?;
-    let shape_path = path_source(
-        preset.unwrap_or(Preset::Rectangle),
-        geometry.width,
-        geometry.height,
-    )?;
     let drawable = workspace.allocate().map_err(lift)?;
     let caption = workspace.allocate().map_err(lift)?;
     let title = workspace.allocate().map_err(lift)?;
@@ -513,12 +610,12 @@ pub(super) fn add_text_shape(
             &Writer::new()
                 .message(1, &drawable_archive(geometry, slide, title, caption))
                 .reference(2, style)
-                .message(3, &shape_path)
+                .message(3, shape_path)
                 .float(6, 0.0),
         )
         .reference(2, storage)
         .reference(4, storage)
-        .boolean(6, preset.is_none())
+        .boolean(6, text_box)
         .finish();
     let (storage_payload, storage_references) = storage_payload(text, &styles);
     let objects = [

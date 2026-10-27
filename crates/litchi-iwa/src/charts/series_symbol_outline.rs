@@ -5,6 +5,8 @@
 
 use prost::Message;
 
+use litchi_iwa_common::chart::series;
+
 use crate::charts::Kind;
 use crate::charts::series_stroke::ChartSeriesStroke;
 use crate::charts::series_style::{
@@ -34,12 +36,12 @@ pub enum ChartSeriesSymbolOutlineKind {
 
 impl ChartSeriesSymbolOutlineKind {
     pub fn for_chart_kind(kind: Kind) -> Result<Self> {
-        match kind {
-            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
-            Kind::Bubble2d => Ok(Self::Bubble2d),
-            Kind::Line2d => Ok(Self::Line2d),
-            Kind::Radar2d => Ok(Self::Radar2d),
-            Kind::Scatter2d => Ok(Self::Scatter2d),
+        match series::SymbolOutlineFamily::for_chart_kind(kind) {
+            Some(series::SymbolOutlineFamily::Area2d) => Ok(Self::Area2d),
+            Some(series::SymbolOutlineFamily::Bubble2d) => Ok(Self::Bubble2d),
+            Some(series::SymbolOutlineFamily::Line2d) => Ok(Self::Line2d),
+            Some(series::SymbolOutlineFamily::Radar2d) => Ok(Self::Radar2d),
+            Some(series::SymbolOutlineFamily::Scatter2d) => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol outline family"
             ))),

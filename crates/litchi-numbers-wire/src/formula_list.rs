@@ -17,49 +17,49 @@ const REF_COUNT_FIELD: u32 = 2;
 const FORMULA_FIELD: u32 = 5;
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct SourceMessage<'a> {
-    pub(super) object_id: u64,
-    pub(super) payload: &'a [u8],
-    pub(super) object_references: &'a [u64],
+pub struct SourceMessage<'a> {
+    pub object_id: u64,
+    pub payload: &'a [u8],
+    pub object_references: &'a [u64],
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct SourceList<'a> {
-    pub(super) root: SourceMessage<'a>,
-    pub(super) segments: &'a [SourceMessage<'a>],
-    pub(super) expected_entries: usize,
+pub struct SourceList<'a> {
+    pub root: SourceMessage<'a>,
+    pub segments: &'a [SourceMessage<'a>],
+    pub expected_entries: usize,
     /// Complete source formula hosts, sorted uniquely by coordinate.
-    pub(super) source_hosts: &'a [SourceHost],
+    pub source_hosts: &'a [SourceHost],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct SourceHost {
-    pub(super) row: u32,
-    pub(super) column: u32,
-    pub(super) key: u32,
+pub struct SourceHost {
+    pub row: u32,
+    pub column: u32,
+    pub key: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct HostDelta<'a> {
-    pub(super) row: u32,
-    pub(super) column: u32,
-    pub(super) old_formula_key: Option<u32>,
-    pub(super) new_formula: Option<&'a [u8]>,
+pub struct HostDelta<'a> {
+    pub row: u32,
+    pub column: u32,
+    pub old_formula_key: Option<u32>,
+    pub new_formula: Option<&'a [u8]>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Limits {
-    pub(super) max_input_bytes: usize,
-    pub(super) max_output_bytes: usize,
-    pub(super) max_fields: usize,
-    pub(super) max_work: usize,
-    pub(super) max_entries: usize,
-    pub(super) max_hosts: usize,
-    pub(super) max_references: usize,
-    pub(super) max_retained_elements: usize,
-    pub(super) max_retained_bytes: usize,
-    pub(super) max_scratch_bytes: usize,
-    pub(super) max_allocations: usize,
+pub struct Limits {
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+    pub max_fields: usize,
+    pub max_work: usize,
+    pub max_entries: usize,
+    pub max_hosts: usize,
+    pub max_references: usize,
+    pub max_retained_elements: usize,
+    pub max_retained_bytes: usize,
+    pub max_scratch_bytes: usize,
+    pub max_allocations: usize,
 }
 
 /// Governed bounds admitted before any formula-list planning allocation.
@@ -67,78 +67,101 @@ pub(super) struct Limits {
 /// Artifact sizes are settled after strict candidate reopen. Work, fields,
 /// allocation events, and peak scratch are conservative transaction bounds.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct Report {
-    pub(super) input_bytes: usize,
-    pub(super) output_bytes: usize,
-    pub(super) fields: usize,
-    pub(super) work: usize,
-    pub(super) references: usize,
-    pub(super) entries: usize,
-    pub(super) hosts: usize,
-    pub(super) allocations: usize,
-    pub(super) retained_bytes: usize,
-    pub(super) peak_scratch_bytes: usize,
-    pub(super) changed_messages: usize,
-    pub(super) retained_elements: usize,
-    pub(super) assignments: usize,
+pub struct Report {
+    pub input_bytes: usize,
+    pub output_bytes: usize,
+    pub fields: usize,
+    pub work: usize,
+    pub references: usize,
+    pub entries: usize,
+    pub hosts: usize,
+    pub allocations: usize,
+    pub retained_bytes: usize,
+    pub peak_scratch_bytes: usize,
+    pub changed_messages: usize,
+    pub retained_elements: usize,
+    pub assignments: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct MessageEdit {
-    pub(super) object_id: u64,
-    pub(super) payload: Option<Vec<u8>>,
-    pub(super) object_references: Vec<u64>,
+pub struct MessageEdit {
+    pub object_id: u64,
+    pub payload: Option<Vec<u8>>,
+    pub object_references: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Assignment {
-    pub(super) delta: usize,
-    pub(super) key: Option<u32>,
+pub struct Assignment {
+    pub delta: usize,
+    pub key: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct FinalEntry {
-    pub(super) key: u32,
-    pub(super) ref_count: u32,
-    pub(super) formula: Vec<u8>,
+pub struct FinalEntry {
+    pub key: u32,
+    pub ref_count: u32,
+    pub formula: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Artifact {
-    pub(super) assignments: Vec<Assignment>,
-    pub(super) root: MessageEdit,
-    pub(super) segments: Vec<MessageEdit>,
-    pub(super) final_entries: Vec<FinalEntry>,
-    pub(super) report: Report,
+pub struct Artifact {
+    pub assignments: Vec<Assignment>,
+    pub root: MessageEdit,
+    pub segments: Vec<MessageEdit>,
+    pub final_entries: Vec<FinalEntry>,
+    pub report: Report,
 }
 
+/// A typed formula-list planning failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum Error {
+#[non_exhaustive]
+pub enum Error {
+    /// The source list or the requested deltas are malformed.
     InvalidSource,
+    /// A caller-selected [`Limits`] ceiling was exceeded.
     Limit {
-        resource: Resource,
+        /// The exceeded dimension.
+        kind: LimitKind,
+        /// Observed or requested amount.
         observed: usize,
+        /// Selected maximum.
         maximum: usize,
     },
+    /// A fallible allocation failed.
     Allocation {
+        /// Requested element or byte count.
         requested: usize,
     },
+    /// The shared wire layer rejected a payload.
     Wire,
+    /// The strict storage codec rejected a payload.
     Strict,
 }
 
+/// The [`Limits`] dimension an [`Error::Limit`] names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Resource {
+pub enum LimitKind {
+    /// Source payload bytes.
     InputBytes,
+    /// Candidate output bytes.
     OutputBytes,
+    /// Wire fields.
     Fields,
+    /// Wire and planning work.
     Work,
+    /// Formula-list entries.
     Entries,
+    /// Formula host deltas.
     Hosts,
+    /// Object references.
     References,
+    /// Retained elements.
     RetainedElements,
+    /// Retained bytes.
     RetainedBytes,
+    /// Peak scratch bytes.
     ScratchBytes,
+    /// Fallible allocation events.
     Allocations,
 }
 
@@ -191,50 +214,50 @@ struct Requirements {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct PlanRequirements {
-    pub(super) input_bytes: usize,
-    pub(super) output_bytes: usize,
-    pub(super) fields: usize,
-    pub(super) work: usize,
-    pub(super) references: usize,
-    pub(super) retained_elements: usize,
-    pub(super) retained_bytes: usize,
-    pub(super) scratch_bytes: usize,
-    pub(super) allocations: usize,
-    pub(super) assignments: usize,
-    pub(super) changed_messages: usize,
+pub struct PlanRequirements {
+    pub input_bytes: usize,
+    pub output_bytes: usize,
+    pub fields: usize,
+    pub work: usize,
+    pub references: usize,
+    pub retained_elements: usize,
+    pub retained_bytes: usize,
+    pub scratch_bytes: usize,
+    pub allocations: usize,
+    pub assignments: usize,
+    pub changed_messages: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct LogicalReport {
-    pub(super) input_bytes: usize,
-    pub(super) fields: usize,
-    pub(super) work: usize,
-    pub(super) references: usize,
-    pub(super) output_bytes: usize,
-    pub(super) retained_elements: usize,
-    pub(super) retained_bytes: usize,
-    pub(super) peak_scratch_bytes: usize,
-    pub(super) allocations: usize,
+pub struct LogicalReport {
+    pub input_bytes: usize,
+    pub fields: usize,
+    pub work: usize,
+    pub references: usize,
+    pub output_bytes: usize,
+    pub retained_elements: usize,
+    pub retained_bytes: usize,
+    pub peak_scratch_bytes: usize,
+    pub allocations: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct ExecutionRequirements {
-    pub(super) input_bytes: usize,
-    pub(super) fields: usize,
-    pub(super) work: usize,
-    pub(super) references: usize,
-    pub(super) output_bytes: usize,
-    pub(super) retained_elements: usize,
-    pub(super) retained_bytes: usize,
-    pub(super) peak_scratch_bytes: usize,
-    pub(super) allocations: usize,
-    pub(super) assignments: usize,
-    pub(super) changed_messages: usize,
+pub struct ExecutionRequirements {
+    pub input_bytes: usize,
+    pub fields: usize,
+    pub work: usize,
+    pub references: usize,
+    pub output_bytes: usize,
+    pub retained_elements: usize,
+    pub retained_bytes: usize,
+    pub peak_scratch_bytes: usize,
+    pub allocations: usize,
+    pub assignments: usize,
+    pub changed_messages: usize,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct PreparedPlan<'a> {
+pub struct PreparedPlan<'a> {
     source: SourceList<'a>,
     deltas: &'a [HostDelta<'a>],
     limits: Limits,
@@ -242,27 +265,27 @@ pub(super) struct PreparedPlan<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct LogicalAssignment {
-    pub(super) delta: usize,
-    pub(super) row: u32,
-    pub(super) column: u32,
-    pub(super) key: Option<u32>,
+pub struct LogicalAssignment {
+    pub delta: usize,
+    pub row: u32,
+    pub column: u32,
+    pub key: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct LogicalEntry<'a> {
-    pub(super) key: u32,
-    pub(super) ref_count: u32,
-    pub(super) formula: &'a [u8],
+pub struct LogicalEntry<'a> {
+    pub key: u32,
+    pub ref_count: u32,
+    pub formula: &'a [u8],
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct LogicalList<'a> {
-    pub(super) assignments: &'a [LogicalAssignment],
-    pub(super) entries: &'a [LogicalEntry<'a>],
+pub struct LogicalList<'a> {
+    pub assignments: &'a [LogicalAssignment],
+    pub entries: &'a [LogicalEntry<'a>],
 }
 
-pub(super) struct LogicalPlan<'a> {
+pub struct LogicalPlan<'a> {
     source: SourceList<'a>,
     requirements: Requirements,
     entries: Vec<Entry<'a>>,
@@ -278,38 +301,38 @@ pub(super) struct LogicalPlan<'a> {
 }
 
 impl<'a> PreparedPlan<'a> {
-    pub(super) fn requirements(self) -> Result<PlanRequirements, Error> {
+    pub fn requirements(self) -> Result<PlanRequirements, Error> {
         public_requirements(self.deltas, self.requirements)
     }
 
     #[cfg(test)]
-    pub(super) fn execute(self) -> Result<Artifact, Error> {
+    pub fn execute(self) -> Result<Artifact, Error> {
         let limits = self.limits;
         self.logical()?.execute(limits)
     }
 
-    pub(super) fn logical(self) -> Result<LogicalPlan<'a>, Error> {
+    pub fn logical(self) -> Result<LogicalPlan<'a>, Error> {
         prepare_logical(self.source, self.deltas, self.limits, self.requirements)
     }
 }
 
 impl<'a> LogicalPlan<'a> {
-    pub(super) fn logical_view(&self) -> LogicalList<'_> {
+    pub fn logical_view(&self) -> LogicalList<'_> {
         LogicalList {
             assignments: &self.logical_assignments,
             entries: &self.logical_entries,
         }
     }
 
-    pub(super) const fn prepare_report(&self) -> LogicalReport {
+    pub const fn prepare_report(&self) -> LogicalReport {
         self.report
     }
 
-    pub(super) const fn execution_requirements(&self) -> ExecutionRequirements {
+    pub const fn execution_requirements(&self) -> ExecutionRequirements {
         self.execution
     }
 
-    pub(super) fn execute(self, limits: Limits) -> Result<Artifact, Error> {
+    pub fn execute(self, limits: Limits) -> Result<Artifact, Error> {
         self.execution.ensure(limits)?;
         execute_logical(self, limits)
     }
@@ -318,46 +341,46 @@ impl<'a> LogicalPlan<'a> {
 impl ExecutionRequirements {
     fn ensure(self, limits: Limits) -> Result<(), Error> {
         ensure(
-            Resource::InputBytes,
+            LimitKind::InputBytes,
             self.input_bytes,
             limits.max_input_bytes,
         )?;
-        ensure(Resource::Fields, self.fields, limits.max_fields)?;
-        ensure(Resource::Work, self.work, limits.max_work)?;
-        ensure(Resource::References, self.references, limits.max_references)?;
+        ensure(LimitKind::Fields, self.fields, limits.max_fields)?;
+        ensure(LimitKind::Work, self.work, limits.max_work)?;
         ensure(
-            Resource::OutputBytes,
+            LimitKind::References,
+            self.references,
+            limits.max_references,
+        )?;
+        ensure(
+            LimitKind::OutputBytes,
             self.output_bytes,
             limits.max_output_bytes,
         )?;
         ensure(
-            Resource::RetainedElements,
+            LimitKind::RetainedElements,
             self.retained_elements,
             limits.max_retained_elements,
         )?;
         ensure(
-            Resource::RetainedBytes,
+            LimitKind::RetainedBytes,
             self.retained_bytes,
             limits.max_retained_bytes,
         )?;
         ensure(
-            Resource::ScratchBytes,
+            LimitKind::ScratchBytes,
             self.peak_scratch_bytes,
             limits.max_scratch_bytes,
         )?;
         ensure(
-            Resource::Allocations,
+            LimitKind::Allocations,
             self.allocations,
             limits.max_allocations,
         )
     }
 }
 
-pub(super) fn preflight_work_upper(
-    segments: usize,
-    hosts: usize,
-    deltas: usize,
-) -> Result<usize, Error> {
+pub fn preflight_work_upper(segments: usize, hosts: usize, deltas: usize) -> Result<usize, Error> {
     segments
         .checked_mul(8)
         .and_then(|work| work.checked_add(hosts.checked_mul(2)?))
@@ -366,7 +389,7 @@ pub(super) fn preflight_work_upper(
         .ok_or(Error::InvalidSource)
 }
 
-pub(super) fn prepare<'a>(
+pub fn prepare<'a>(
     source: SourceList<'a>,
     deltas: &'a [HostDelta<'a>],
     limits: Limits,
@@ -415,19 +438,23 @@ fn preflight(
     limits: Limits,
 ) -> Result<Requirements, Error> {
     ensure(
-        Resource::References,
+        LimitKind::References,
         source.segments.len(),
         limits.max_references,
     )?;
     ensure(
-        Resource::Entries,
+        LimitKind::Entries,
         source.expected_entries,
         limits.max_entries,
     )?;
-    ensure(Resource::Hosts, source.source_hosts.len(), limits.max_hosts)?;
-    ensure(Resource::Hosts, deltas.len(), limits.max_hosts)?;
     ensure(
-        Resource::InputBytes,
+        LimitKind::Hosts,
+        source.source_hosts.len(),
+        limits.max_hosts,
+    )?;
+    ensure(LimitKind::Hosts, deltas.len(), limits.max_hosts)?;
+    ensure(
+        LimitKind::InputBytes,
         source.root.payload.len(),
         limits.max_input_bytes,
     )?;
@@ -467,7 +494,7 @@ fn preflight(
                     .checked_add(segment.payload.len())
                     .ok_or(Error::InvalidSource)
             })?;
-    ensure(Resource::InputBytes, input_bytes, limits.max_input_bytes)?;
+    ensure(LimitKind::InputBytes, input_bytes, limits.max_input_bytes)?;
     let messages = source
         .segments
         .len()
@@ -490,13 +517,13 @@ fn preflight(
                 .count(),
         )
         .ok_or(Error::InvalidSource)?;
-    ensure(Resource::Hosts, final_host_upper, limits.max_hosts)?;
+    ensure(LimitKind::Hosts, final_host_upper, limits.max_hosts)?;
     let (authored_bytes, largest_authored) =
         deltas
             .iter()
             .try_fold((0usize, 0usize), |(total, largest), delta| {
                 let bytes = delta.new_formula.map_or(0, <[u8]>::len);
-                ensure(Resource::OutputBytes, bytes, limits.max_output_bytes)?;
+                ensure(LimitKind::OutputBytes, bytes, limits.max_output_bytes)?;
                 Ok::<_, Error>((
                     total.checked_add(bytes).ok_or(Error::InvalidSource)?,
                     largest.max(bytes),
@@ -695,7 +722,11 @@ fn preflight(
         .checked_add(authored_bytes)
         .and_then(|bytes| bytes.checked_add(formula_occurrences.checked_mul(64)?))
         .ok_or(Error::InvalidSource)?;
-    ensure(Resource::OutputBytes, output_upper, limits.max_output_bytes)?;
+    ensure(
+        LimitKind::OutputBytes,
+        output_upper,
+        limits.max_output_bytes,
+    )?;
     // Delayed execution decodes the source envelopes once more, rewrites the
     // candidate, and strictly reopens that candidate. Candidate fields can be
     // proportional to authored output even when the source list is empty.
@@ -707,26 +738,26 @@ fn preflight(
         .checked_mul(128)
         .and_then(|value| value.checked_add(index_count.checked_mul(6)?))
         .ok_or(Error::InvalidSource)?;
-    ensure(Resource::Fields, execution_fields, limits.max_fields)?;
-    ensure(Resource::Work, execution_work, limits.max_work)?;
-    ensure(Resource::References, references, limits.max_references)?;
+    ensure(LimitKind::Fields, execution_fields, limits.max_fields)?;
+    ensure(LimitKind::Work, execution_work, limits.max_work)?;
+    ensure(LimitKind::References, references, limits.max_references)?;
     ensure(
-        Resource::RetainedElements,
+        LimitKind::RetainedElements,
         logical_retained_elements,
         limits.max_retained_elements,
     )?;
     ensure(
-        Resource::RetainedBytes,
+        LimitKind::RetainedBytes,
         logical_retained_bytes,
         limits.max_retained_bytes,
     )?;
     ensure(
-        Resource::ScratchBytes,
+        LimitKind::ScratchBytes,
         logical_scratch_bytes,
         limits.max_scratch_bytes,
     )?;
     ensure(
-        Resource::Allocations,
+        LimitKind::Allocations,
         logical_allocations,
         limits.max_allocations,
     )?;
@@ -757,41 +788,41 @@ fn preflight(
 
 fn admit(requirements: Requirements, limits: Limits) -> Result<(), Error> {
     ensure(
-        Resource::InputBytes,
+        LimitKind::InputBytes,
         requirements.input_bytes,
         limits.max_input_bytes,
     )?;
-    ensure(Resource::Fields, requirements.fields, limits.max_fields)?;
-    ensure(Resource::Work, requirements.work, limits.max_work)?;
-    ensure(Resource::Entries, requirements.entries, limits.max_entries)?;
-    ensure(Resource::Hosts, requirements.hosts, limits.max_hosts)?;
+    ensure(LimitKind::Fields, requirements.fields, limits.max_fields)?;
+    ensure(LimitKind::Work, requirements.work, limits.max_work)?;
+    ensure(LimitKind::Entries, requirements.entries, limits.max_entries)?;
+    ensure(LimitKind::Hosts, requirements.hosts, limits.max_hosts)?;
     ensure(
-        Resource::Hosts,
+        LimitKind::Hosts,
         requirements.formula_occurrences,
         limits.max_hosts,
     )?;
     ensure(
-        Resource::OutputBytes,
+        LimitKind::OutputBytes,
         requirements.output_upper,
         limits.max_output_bytes,
     )?;
     ensure(
-        Resource::References,
+        LimitKind::References,
         requirements.references,
         limits.max_references,
     )?;
     ensure(
-        Resource::ScratchBytes,
+        LimitKind::ScratchBytes,
         requirements.scratch_bytes,
         limits.max_scratch_bytes,
     )?;
     ensure(
-        Resource::RetainedBytes,
+        LimitKind::RetainedBytes,
         requirements.retained_upper,
         limits.max_retained_bytes,
     )?;
     ensure(
-        Resource::Allocations,
+        LimitKind::Allocations,
         requirements.allocations,
         limits.max_allocations,
     )
@@ -956,7 +987,7 @@ fn prepare_logical<'a>(
                 .count(),
         )
         .ok_or(Error::InvalidSource)?;
-    ensure(Resource::Entries, logical_capacity, limits.max_entries)?;
+    ensure(LimitKind::Entries, logical_capacity, limits.max_entries)?;
     let mut logical_entries = exact_vec::<LogicalEntry<'a>>(logical_capacity)?;
     for entry_index in &key_order {
         let entry = entries[*entry_index];
@@ -1197,7 +1228,7 @@ fn execute_logical(plan: LogicalPlan<'_>, limits: Limits) -> Result<Artifact, Er
                 .count(),
         )
         .ok_or(Error::InvalidSource)?;
-    ensure(Resource::Entries, final_capacity, limits.max_entries)?;
+    ensure(LimitKind::Entries, final_capacity, limits.max_entries)?;
     let mut final_entries = exact_vec::<FinalEntry>(final_capacity)?;
     for entry_index in &key_order {
         let entry = entries[*entry_index];
@@ -1225,7 +1256,7 @@ fn execute_logical(plan: LogicalPlan<'_>, limits: Limits) -> Result<Artifact, Er
         sum.checked_add(usize::try_from(entry.ref_count).map_err(|_| Error::InvalidSource)?)
             .ok_or(Error::InvalidSource)
     })?;
-    ensure(Resource::Hosts, hosts, limits.max_hosts)?;
+    ensure(LimitKind::Hosts, hosts, limits.max_hosts)?;
     let output_bytes = root_edit
         .payload
         .as_ref()
@@ -1238,7 +1269,7 @@ fn execute_logical(plan: LogicalPlan<'_>, limits: Limits) -> Result<Artifact, Er
     let retained_bytes =
         artifact_retained(&assignments, &root_edit, &segment_edits, &final_entries)?;
     ensure(
-        Resource::RetainedBytes,
+        LimitKind::RetainedBytes,
         retained_bytes,
         requirements.retained_upper.min(limits.max_retained_bytes),
     )?;
@@ -1485,7 +1516,7 @@ fn rewrite_message(
             .checked_add(length_field_len(ENTRY_FIELD, new_entry_len(*formula)?)?)
             .ok_or(Error::InvalidSource)?;
     }
-    ensure(Resource::OutputBytes, exact, limits.max_output_bytes)?;
+    ensure(LimitKind::OutputBytes, exact, limits.max_output_bytes)?;
     let mut output = exact_vec::<u8>(exact)?;
     entry_cursor = 0;
     for field in view.fields() {
@@ -1571,7 +1602,7 @@ fn rewritten_entry_len(entry: Entry<'_>) -> Result<usize, Error> {
 
 fn rewrite_entry(entry: Entry<'_>, limits: Limits) -> Result<Vec<u8>, Error> {
     let exact = rewritten_entry_len(entry)?;
-    ensure(Resource::OutputBytes, exact, limits.max_output_bytes)?;
+    ensure(LimitKind::OutputBytes, exact, limits.max_output_bytes)?;
     let fields = parse_wire_fields(entry.raw, wire_limits(entry.raw.len(), limits)?)
         .map_err(|_| Error::Wire)?;
     let mut output = exact_vec(exact)?;
@@ -1600,7 +1631,7 @@ fn append_new_entry(
     limits: Limits,
 ) -> Result<(), Error> {
     let exact = new_entry_len(formula)?;
-    ensure(Resource::OutputBytes, exact, limits.max_output_bytes)?;
+    ensure(LimitKind::OutputBytes, exact, limits.max_output_bytes)?;
     let outer = length_field_len(ENTRY_FIELD, exact)?;
     if output
         .len()
@@ -1834,10 +1865,10 @@ fn wire_limits(input: usize, limits: Limits) -> Result<WireLimits, Error> {
         .map_err(|_error| Error::Wire)
 }
 
-fn ensure(resource: Resource, observed: usize, maximum: usize) -> Result<(), Error> {
+fn ensure(kind: LimitKind, observed: usize, maximum: usize) -> Result<(), Error> {
     if observed > maximum {
         Err(Error::Limit {
-            resource,
+            kind,
             observed,
             maximum,
         })
@@ -2445,7 +2476,7 @@ mod tests {
         assert!(matches!(
             prepare(source, &deltas, logical_refused),
             Err(Error::Limit {
-                resource: Resource::ScratchBytes,
+                kind: LimitKind::ScratchBytes,
                 ..
             })
         ));
@@ -2457,41 +2488,41 @@ mod tests {
             let expected = match axis {
                 0 => {
                     refused.max_input_bytes = report.input_bytes - 1;
-                    Resource::InputBytes
+                    LimitKind::InputBytes
                 },
                 1 => {
                     refused.max_fields = report.fields - 1;
-                    Resource::Fields
+                    LimitKind::Fields
                 },
                 2 => {
                     refused.max_work = report.work - 1;
-                    Resource::Work
+                    LimitKind::Work
                 },
                 3 => {
                     refused.max_references = report.references - 1;
-                    Resource::References
+                    LimitKind::References
                 },
                 4 => {
                     refused.max_retained_elements = report.retained_elements - 1;
-                    Resource::RetainedElements
+                    LimitKind::RetainedElements
                 },
                 5 => {
                     refused.max_retained_bytes = report.retained_bytes - 1;
-                    Resource::RetainedBytes
+                    LimitKind::RetainedBytes
                 },
                 6 => {
                     refused.max_scratch_bytes = report.peak_scratch_bytes - 1;
-                    Resource::ScratchBytes
+                    LimitKind::ScratchBytes
                 },
                 7 => {
                     refused.max_allocations = report.allocations - 1;
-                    Resource::Allocations
+                    LimitKind::Allocations
                 },
                 _ => unreachable!(),
             };
             assert!(matches!(
                 prepare(source, &deltas, refused),
-                Err(Error::Limit { resource, .. }) if resource == expected
+                Err(Error::Limit { kind, .. }) if kind == expected
             ));
         }
 
@@ -2515,45 +2546,45 @@ mod tests {
             let expected = match axis {
                 0 => {
                     refused.max_input_bytes = execution.input_bytes - 1;
-                    Resource::InputBytes
+                    LimitKind::InputBytes
                 },
                 1 => {
                     refused.max_fields = execution.fields - 1;
-                    Resource::Fields
+                    LimitKind::Fields
                 },
                 2 => {
                     refused.max_work = execution.work - 1;
-                    Resource::Work
+                    LimitKind::Work
                 },
                 3 => {
                     refused.max_references = execution.references - 1;
-                    Resource::References
+                    LimitKind::References
                 },
                 4 => {
                     refused.max_output_bytes = execution.output_bytes - 1;
-                    Resource::OutputBytes
+                    LimitKind::OutputBytes
                 },
                 5 => {
                     refused.max_retained_elements = execution.retained_elements - 1;
-                    Resource::RetainedElements
+                    LimitKind::RetainedElements
                 },
                 6 => {
                     refused.max_retained_bytes = execution.retained_bytes - 1;
-                    Resource::RetainedBytes
+                    LimitKind::RetainedBytes
                 },
                 7 => {
                     refused.max_scratch_bytes = execution.peak_scratch_bytes - 1;
-                    Resource::ScratchBytes
+                    LimitKind::ScratchBytes
                 },
                 8 => {
                     refused.max_allocations = execution.allocations - 1;
-                    Resource::Allocations
+                    LimitKind::Allocations
                 },
                 _ => unreachable!(),
             };
             let result = logical().execute(refused);
             assert!(
-                matches!(&result, Err(Error::Limit { resource, .. }) if *resource == expected),
+                matches!(&result, Err(Error::Limit { kind, .. }) if *kind == expected),
                 "execution axis {axis} returned {result:?}"
             );
         }

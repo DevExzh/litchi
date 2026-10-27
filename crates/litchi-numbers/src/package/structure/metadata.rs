@@ -11,14 +11,16 @@
 
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::package_metadata_codec::{
-    Batch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor, ComponentRemovalBatch,
-    ComponentSelector, DataReferenceOwnerDescriptor, ExternalReferenceAddition,
-    ExternalReferenceDescriptor, ExternalReferenceRemoval, ObjectUuidAddition,
-    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor, RemovalBatch,
-    RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions, SaveTokenBatch, UuidBits,
-    inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    AdditionSaveTokenBatch, Batch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor,
+    ComponentRemovalBatch, ComponentSelector, DataReferenceOwnerDescriptor,
+    ExternalReferenceAddition, ExternalReferenceDescriptor, ExternalReferenceRemoval,
+    ObjectUuidAddition, ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor,
+    RemovalBatch, RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions,
+    SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    rewrite_package_metadata_additions_and_save_tokens,
     rewrite_package_metadata_combined_additions_and_removals_and_save_tokens,
     rewrite_package_metadata_component_removals, rewrite_package_metadata_removals_and_save_tokens,
+    rewrite_package_metadata_save_tokens,
 };
 
 use super::super::metadata::{ENTRY_NAME, MESSAGE_TYPE, normalized_locator};
@@ -281,11 +283,62 @@ pub(in crate::package) struct Transition {
     pub(in crate::package) uuid_removals: Vec<Uuid>,
     pub(in crate::package) external_removals: Vec<External>,
     pub(in crate::package) external_additions: Vec<External>,
+    /// Removed objects whose identifiers may lower the watermark when they
+    /// are its suffix (the host editor's `release_package_identifier_suffix`).
+    pub(in crate::package) released: Vec<u64>,
+    /// Components whose save token advances although their registry
+    /// records do not change (the host's `advance_save_tokens_for_entries`
+    /// over the components a route rewrites).
+    pub(in crate::package) stamps: Vec<u64>,
 }
 
 impl Transition {
+    /// Record that component `source` no longer references `object` in
+    /// component `target` (a no-op without that registry edge); an edge
+    /// this transition added is withdrawn.
+    pub(in crate::package) fn remove_reference(
+        &mut self,
+        registry: &Registry,
+        source: u64,
+        target: u64,
+        object: u64,
+    ) -> FaultResult<()> {
+        self.external_additions.retain(|external| {
+            !(external.source == source && external.target == target && external.object == object)
+        });
+        for external in &registry.externals {
+            if external.source == source
+                && external.target == target
+                && external.object == object
+                && !self.external_removals.contains(external)
+            {
+                reserve(&mut self.external_removals, 1)?;
+                self.external_removals.push(*external);
+            }
+        }
+        Ok(())
+    }
+
+    /// Lower the watermark over `objects` when the last registered
+    /// identifier is one of them (record 0370).
+    pub(in crate::package) fn release_suffix(&mut self, objects: &[u64]) -> FaultResult<()> {
+        reserve(&mut self.released, objects.len())?;
+        self.released.extend_from_slice(objects);
+        Ok(())
+    }
+
+    /// Advance the save token of `component` (record 0370d).
+    pub(in crate::package) fn stamp(&mut self, component: u64) -> FaultResult<()> {
+        if !self.stamps.contains(&component) {
+            reserve(&mut self.stamps, 1)?;
+            self.stamps.push(component);
+        }
+        Ok(())
+    }
+
     fn is_empty(&self) -> bool {
-        self.uuid_additions.is_empty()
+        self.stamps.is_empty()
+            && self.uuid_additions.is_empty()
             && self.uuid_removals.is_empty()
             && self.external_removals.is_empty()
             && self.external_additions.is_empty()
@@ -398,7 +451,10 @@ pub(super) fn apply(
     };
     let registry = registry(working)?.ok_or(Fault::Invalid)?;
     let current = registry.last_object_identifier;
-    let last = allocated.map_or(current, |allocated| allocated.max(current));
+    let mut last = allocated.map_or(current, |allocated| allocated.max(current));
+    if allocated.is_none() && transition.released.contains(&current) {
+        last = working.maximum_identifier();
+    }
     if transition.is_empty() && last == current && emptied.is_empty() {
         return Ok(());
     }
@@ -410,6 +466,7 @@ pub(super) fn apply(
         .saturating_add(transition.external_removals.len())
         .saturating_add(transition.external_additions.len());
     let options = options(working, source.len(), additions);
+    let mut restore = None;
     let output = if transition.is_empty() && last == current {
         None
     } else if transition.is_empty() {
@@ -477,7 +534,8 @@ pub(super) fn apply(
                     .iter()
                     .chain(&transition.external_additions)
                     .flat_map(|external| [external.source, external.target]),
-            );
+            )
+            .chain(transition.stamps.iter().copied());
         for identifier in touched {
             let selector = selector(identifier)?;
             if !tokens.contains(&selector) {
@@ -487,11 +545,50 @@ pub(super) fn apply(
         }
         let removes = !uuid_removals.is_empty() || !external_removals.is_empty();
         let adds = !external_additions.is_empty() || !uuid_additions.is_empty();
-        let output = if removes && !adds && last == current {
+        // The addition batches require a rising watermark; a transaction
+        // that adds registry records without allocating (a reference to an
+        // existing style, record 0370b) passes one step up and the
+        // watermark is put back to `last` below.
+        let unraised = adds && last <= current;
+        if unraised {
+            restore = Some(last);
+        }
+        let last = if unraised {
+            current.checked_add(1).ok_or(Fault::Limit {
+                kind: FaultLimit::Identifiers,
+                observed: u64::MAX,
+                maximum: u64::MAX,
+            })?
+        } else {
+            last
+        };
+        let stamped = !transition.stamps.is_empty();
+        let output = if !removes && !adds && last == current {
+            rewrite_package_metadata_save_tokens(source, SaveTokenBatch::new(&tokens), options)
+        } else if !removes && !adds && last > current {
+            rewrite_package_metadata_additions_and_save_tokens(
+                source,
+                AdditionSaveTokenBatch::new(
+                    Batch::new(current, last, &[], &[]),
+                    SaveTokenBatch::new(&tokens),
+                ),
+                options,
+            )
+        } else if !adds && last <= current {
             rewrite_package_metadata_removals_and_save_tokens(
                 source,
                 RemovalSaveTokenBatch::new(
-                    RemovalBatch::new(current, &uuid_removals, &external_removals, &[]),
+                    RemovalBatch::new(current, &uuid_removals, &external_removals, &[])
+                        .with_new_last_object_identifier(last),
+                    SaveTokenBatch::new(&tokens),
+                ),
+                options,
+            )
+        } else if adds && !removes && stamped {
+            rewrite_package_metadata_additions_and_save_tokens(
+                source,
+                AdditionSaveTokenBatch::new(
+                    Batch::new(current, last, &uuid_additions, &external_additions),
                     SaveTokenBatch::new(&tokens),
                 ),
                 options,
@@ -526,6 +623,10 @@ pub(super) fn apply(
         Some(output) => output.into_bytes(),
         None => super::copy_bytes(source)?,
     };
+    if let Some(last) = restore {
+        data = litchi_iwa_common::wire::patch_varint_field(&data, 1, true, Some(last))
+            .map_err(|error| super::map_wire(&error))?;
+    }
     if !emptied.is_empty() {
         let mut selectors = Vec::new();
         reserve(&mut selectors, emptied.len())?;

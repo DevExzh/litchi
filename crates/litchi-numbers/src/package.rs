@@ -20,6 +20,7 @@ pub(crate) mod comments_metadata;
     reason = "The private native reply transition is reached through package::comments."
 )]
 pub(crate) mod comments_reply_native;
+pub(crate) mod conditional_highlight;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
@@ -49,8 +50,17 @@ mod save;
     reason = "Decoded sheets expose only the construction path used at package ingress."
 )]
 mod sheet;
+pub(crate) mod sheet_chart_style;
+pub(crate) mod sheet_drawable;
+mod sheet_drawable_author;
+mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_language;
+pub(crate) mod sheet_drawable_plain_text;
+pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_order;
+mod storage_list;
 mod structure;
 #[allow(
     dead_code,
@@ -67,12 +77,14 @@ pub(crate) mod table_cell_display_format_native;
 pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;
+pub(crate) mod table_cell_list;
 pub(crate) mod table_cell_number_format;
 pub(crate) mod table_cell_percentage_format;
 pub(crate) mod table_cell_pop_up_menu;
 pub(crate) mod table_cell_pop_up_menu_metadata;
 pub(crate) mod table_cell_pop_up_menu_native;
 pub(crate) mod table_cell_scientific_format;
+pub(crate) mod table_cell_text;
 pub(crate) mod table_cell_text_format;
 pub(crate) mod table_cell_text_style;
 pub(crate) mod table_cells;
@@ -89,6 +101,7 @@ pub(crate) mod table_relocation;
     reason = "The physical-only relocation seam is retained solely for the legacy migration host."
 )]
 mod table_relocation_compat;
+pub(crate) mod table_resize;
 pub(crate) mod table_sort;
 #[allow(
     dead_code,
@@ -745,6 +758,18 @@ impl Package {
     pub(crate) fn from_shared_profile(source: Arc<[u8]>, options: Profile) -> Result<Self> {
         let components = Components::from_shared_bytes(source, options.archive())?;
         Self::from_components_with_options(components, options)
+    }
+
+    /// Reopen `candidate`, an edited reassembly of this package, under this
+    /// package's profile. Unchanged IWA members reuse this package's parsed
+    /// archives; the ZIP and every budget are still checked in full
+    /// (`SourceCatalog::reopen`).
+    pub(crate) fn reopen_candidate(&self, candidate: Arc<[u8]>) -> Result<Self> {
+        let components = match self.state.components.physical() {
+            Some(catalog) => Components::PhysicalShared(Box::new(catalog.reopen(candidate)?)),
+            None => Components::from_shared_bytes(candidate, self.state.options.archive())?,
+        };
+        Self::from_components_with_options(components, self.state.options)
     }
 
     pub(crate) fn from_owned_bytes_with_options(source: Vec<u8>, options: Profile) -> Result<Self> {

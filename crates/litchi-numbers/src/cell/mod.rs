@@ -1,8 +1,8 @@
 //! Numbers cell vocabulary.
 //!
 //! Native Binary Numbers Cell (BNC) storage is an implementation detail. Use
-//! the semantic [`Value`](crate::cell::Value) and
-//! [`data_format`](crate::cell::data_format) APIs instead of depending on its
+//! the semantic [`Value`] and
+//! [`data_format`] APIs instead of depending on its
 //! byte layout.
 
 /// Archive-free direct replies attached to a cell comment.
@@ -10,6 +10,45 @@ pub mod comment;
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
+/// One character or paragraph property of whole cells' text (record 0370),
+/// started by [`crate::Package::edit_table_cell_text`] and read by
+/// [`crate::Package::table_cell_text`].
+pub mod text {
+    pub use crate::package::table_cell_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+/// Ordered conditional-highlight rules of cells (record 0370d), started by
+/// [`crate::Package::edit_table_cell_conditional_highlights`] and read by
+/// [`crate::Package::table_cell_conditional_highlight`].
+pub mod conditional_highlight {
+    pub use crate::package::conditional_highlight::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::conditional_highlight::{
+        Condition, Date, DateRange, Error as ValueError, Number, Offset, OffsetDirection, Period,
+        PeriodUnit, Range, Rule, Style, Text,
+    };
+}
+/// Paragraph lists of cells' text (record 0370b), started by
+/// [`crate::Package::edit_table_cell_lists`]: a plain cell is promoted to
+/// rich text on its first list change.
+pub mod list {
+    pub use crate::package::table_cell_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
 /// Character properties of cells' text (record 0309), started by
 /// [`crate::Package::edit_table_cell_text_style`].
 pub mod text_style {

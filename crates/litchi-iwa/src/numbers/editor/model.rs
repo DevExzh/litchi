@@ -3716,6 +3716,7 @@ pub(super) fn resize_attached_table_in_package(
             columns_u32,
         )?;
     }
+    resize_formula_owner_extents(package, &descriptor, rows_u32, columns_u32)?;
     let table_archive = locations.get(&table_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
     })?;
@@ -3746,6 +3747,76 @@ pub(super) fn resize_attached_table_in_package(
     })
 }
 
+/// Move the table's own formula owner's table and body extents to the new
+/// size (host defect fixed with record 0370e: a resize left them at the old
+/// size).
+fn resize_formula_owner_extents(
+    package: &mut HostPackage,
+    descriptor: &TableDescriptor,
+    rows: u32,
+    columns: u32,
+) -> Result<()> {
+    use litchi_numbers_wire::table_topology::extents::{Extents, resize_extents};
+    let Some(entry) = package.calculation_engine_entry_name()?.map(str::to_owned) else {
+        return Ok(());
+    };
+    let settings = table_headers::settings_from_model(&descriptor.model)?;
+    let count = |value: usize| u32::try_from(value).unwrap_or(u32::MAX);
+    let extents = |rows: u32, columns: u32| {
+        Extents::of(
+            rows,
+            columns,
+            count(settings.header_row_count()),
+            count(settings.header_column_count()),
+            count(settings.footer_row_count()),
+        )
+    };
+    let before = extents(
+        descriptor.model.number_of_rows,
+        descriptor.model.number_of_columns,
+    );
+    let after = extents(rows, columns);
+    let info = descriptor.table_info_id;
+    package.update_archive(&entry, |archive| {
+        for object in &mut archive.objects {
+            for index in 0..object.messages.len() {
+                if object.messages[index].type_ != 4_008 {
+                    continue;
+                }
+                let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+                    object.messages[index].data.as_slice(),
+                )?;
+                if owner
+                    .formula_owner
+                    .as_ref()
+                    .map(|reference| reference.identifier)
+                    != Some(info)
+                {
+                    continue;
+                }
+                if let Some(data) = resize_extents(&object.messages[index].data, before, after)
+                    .map_err(|_| {
+                        Error::InvalidFormat(
+                            "Numbers formula-owner extents are malformed".to_owned(),
+                        )
+                    })?
+                {
+                    let message_type = object.messages[index].type_;
+                    object.replace_message(
+                        index,
+                        RawMessage {
+                            type_: message_type,
+                            data,
+                        },
+                        Default::default(),
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
 pub(super) fn set_attached_cell_in_package(
     package: &mut HostPackage,
     table_id: u64,
@@ -3755,7 +3826,45 @@ pub(super) fn set_attached_cell_in_package(
 ) -> Result<()> {
     table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
-    set_cell_at_location(package, location, row, column, value)
+    set_cell_at_location(
+        package,
+        location,
+        row,
+        column,
+        value,
+        ClearPolicy::KeepMetadata,
+    )
+}
+
+/// Remove an attached cell's value together with its stored metadata, as
+/// an axis removal needs before it drops the axis (record 0370: a value
+/// clear now keeps a cell's formatting).
+pub(super) fn remove_attached_cell_in_package(
+    package: &mut HostPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    set_cell_at_location(
+        package,
+        location,
+        row,
+        column,
+        CellValue::Empty,
+        ClearPolicy::DropMetadata,
+    )
+}
+
+/// What clearing a cell's value does with the rest of the cell.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ClearPolicy {
+    /// A cell whose style, text-style or format keys survive the clear
+    /// stays (native Numbers keeps a cleared cell's formatting).
+    KeepMetadata,
+    /// The cell goes unless it is commented (axis removal).
+    DropMetadata,
 }
 
 /// Return whether an attached table cell stores a native formula reference.
@@ -3828,13 +3937,7 @@ pub(super) fn relocate_attached_cell_in_package(
                 destination_column,
             )?;
         }
-        set_attached_cell_in_package(
-            package,
-            table_id,
-            destination_row,
-            destination_column,
-            CellValue::Empty,
-        )?;
+        remove_attached_cell_in_package(package, table_id, destination_row, destination_column)?;
     }
 
     let destination_count = update_tile(
@@ -3919,7 +4022,14 @@ fn set_cells_for_descriptor(
             tile_id,
             tile_row,
         };
-        set_cell_with_context(package, &context, update.row, update.column, update.value)?;
+        set_cell_with_context(
+            package,
+            &context,
+            update.row,
+            update.column,
+            update.value,
+            ClearPolicy::KeepMetadata,
+        )?;
     }
     Ok(())
 }
@@ -3930,6 +4040,7 @@ fn set_cell_at_location(
     row: usize,
     column: usize,
     value: CellValue,
+    clear: ClearPolicy,
 ) -> Result<()> {
     let context = CellWriteContext {
         descriptor: &location.descriptor,
@@ -3938,7 +4049,7 @@ fn set_cell_at_location(
         tile_id: location.tile_id,
         tile_row: location.tile_row,
     };
-    set_cell_with_context(package, &context, row, column, value)
+    set_cell_with_context(package, &context, row, column, value, clear)
 }
 
 struct CellWriteContext<'a> {
@@ -3949,12 +4060,25 @@ struct CellWriteContext<'a> {
     tile_row: u32,
 }
 
+/// Whether `cell` still stores anything once its value is cleared.
+fn keeps_metadata_after_clear(cell: Option<&BncCell>) -> Result<bool> {
+    let Some(cell) = cell else {
+        return Ok(false);
+    };
+    let limits = litchi_numbers_wire::Limits::DEFAULT;
+    let mut cleared = cell.clone();
+    cleared.clear_value_preserving_metadata();
+    Ok(crate::numbers::bnc_encode(&cleared, &limits)?
+        != crate::numbers::bnc_encode(&BncCell::minimal(), &limits)?)
+}
+
 fn set_cell_with_context(
     package: &mut HostPackage,
     context: &CellWriteContext<'_>,
     row: usize,
     column: usize,
     value: CellValue,
+    clear: ClearPolicy,
 ) -> Result<()> {
     let CellWriteContext {
         descriptor,
@@ -4002,21 +4126,16 @@ fn set_cell_with_context(
         if replacement_identifier == identifier && old_formula_error.is_none() {
             return Ok(());
         }
-        let cell_count = update_tile(
-            package,
-            tile_archive,
-            *tile_id,
-            *tile_row,
-            column,
-            descriptor.model.number_of_columns as usize,
-            EncodedValue::RichText(replacement_identifier),
-        )?;
-        return update_row_header(
+        return update_tile_and_headers(
             package,
             object_locations,
             &descriptor.model,
+            tile_archive,
+            *tile_id,
+            *tile_row,
             row,
-            cell_count,
+            column,
+            EncodedValue::RichText(replacement_identifier),
         );
     }
 
@@ -4043,7 +4162,17 @@ fn set_cell_with_context(
                     None,
                 )?;
             }
-            if old_comment.is_some() {
+            // Host defect fixed with record 0370: clearing a value kept
+            // only a commented cell and dropped every other cell with its
+            // style, text-style and format keys, leaving their table-data
+            // list entries counting a cell that no longer exists. Native
+            // Numbers keeps a cleared cell's formatting; the shared leaf
+            // writer (`table_write::cell_bytes`) keeps a cell whose
+            // metadata survives the clear.
+            if old_comment.is_some()
+                || (clear == ClearPolicy::KeepMetadata
+                    && keeps_metadata_after_clear(old_bnc.as_ref())?)
+            {
                 EncodedValue::ClearValuePreservingMetadata
             } else {
                 EncodedValue::Clear
@@ -4101,22 +4230,73 @@ fn set_cell_with_context(
         )?;
     }
 
-    let cell_count = update_tile(
-        package,
-        tile_archive,
-        *tile_id,
-        *tile_row,
-        column,
-        descriptor.model.number_of_columns as usize,
-        encoded_value,
-    )?;
-    update_row_header(
+    // Host defect fixed with record 0370b: a cell dropped by an axis
+    // removal kept its style, text-style, conditional-style, control and
+    // format entries counting it.
+    if matches!(encoded_value, EncodedValue::Clear)
+        && let Some(cell) = old_bnc.as_ref()
+    {
+        release_dropped_cell_metadata(package, object_locations, &descriptor.model, cell)?;
+    }
+
+    update_tile_and_headers(
         package,
         object_locations,
         &descriptor.model,
+        tile_archive,
+        *tile_id,
+        *tile_row,
         row,
-        cell_count,
+        column,
+        encoded_value,
     )
+}
+
+/// Release one reference of every metadata list entry a dropped cell held.
+fn release_dropped_cell_metadata(
+    package: &mut HostPackage,
+    locations: &HashMap<u64, String>,
+    model: &TableModelArchive,
+    cell: &BncCell,
+) -> Result<()> {
+    use litchi_numbers_wire::ListKind;
+    use tst::table_data_list::ListType;
+    let store = &model.base_data_store;
+    for (kind, key) in cell.list_keys() {
+        let (list, list_type) = match kind {
+            ListKind::Style => (Some(store.style_table.identifier), ListType::Style),
+            ListKind::ConditionalStyle => (
+                store.conditionalstyletable.as_ref().map(|r| r.identifier),
+                ListType::ConditionalStyle,
+            ),
+            ListKind::ControlCellSpec => (
+                store.control_cell_spec_table.as_ref().map(|r| r.identifier),
+                ListType::ControlCellSpec,
+            ),
+            ListKind::Format => (
+                store.format_table.as_ref().map(|r| r.identifier),
+                ListType::Format,
+            ),
+            _ => continue,
+        };
+        let list = list.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers cell references a missing {list_type:?} list"
+            ))
+        })?;
+        let resolved = storage::resolve_table_data_list(package, locations, list, list_type)?;
+        let located = resolved
+            .entries
+            .iter()
+            .find(|located| located.entry.key == key)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers {list_type:?} list has no entry {key}"))
+            })?;
+        storage::decrement_table_data_list_entry(
+            package, locations, &resolved, located, list_type,
+        )?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone)]

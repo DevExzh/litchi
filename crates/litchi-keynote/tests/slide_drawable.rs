@@ -162,6 +162,98 @@ fn remove_drops_the_text_box_and_its_private_objects() -> TestResult {
 }
 
 #[test]
+fn removing_an_image_culls_its_final_owner_data() -> TestResult {
+    let package = open("image-adjustments-native.key")?;
+    let image = list(&package, 0)?
+        .iter()
+        .position(|drawable| drawable.kind() == Kind::Image)
+        .ok_or("fixture has an image")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(image))?;
+    let commit = edit.commit()?;
+    // The image and its three derived renditions had no other owner
+    // (record 0372; host `remove_slide_image` parity).
+    assert_eq!(commit.diagnostics().removed_data(), 4);
+    let output = bytes(commit.package())?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output, Default::default())?;
+    assert!(
+        !catalog
+            .iter()
+            .any(|entry| entry.name().starts_with("Data/abstract1"))
+    );
+    let restored = commit
+        .package()
+        .apply_slide_drawables(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn removing_the_newest_drawable_releases_the_identifier_watermark() -> TestResult {
+    let package = open("basic.key")?;
+    let mut edit = package.edit_slide_drawables();
+    edit.add_shape(
+        SlideSelector::index(0),
+        Preset::Star {
+            points: litchi_keynote::slide::drawable::StarPoints::new(5)?,
+            inner_radius: litchi_keynote::slide::drawable::InnerRadiusRatio::new(0.5)?,
+        },
+        Geometry::new(10.0, 10.0, 100.0, 100.0),
+        "",
+    )?;
+    let added = edit.commit()?.into_package();
+    let star = list(&added, 0)?.len() - 1;
+    let mut edit = added.edit_slide_drawables();
+    edit.remove(SlideSelector::index(0), DrawableSelector::index(star))?;
+    let removed = edit.commit()?.into_package();
+    // A new shape after the removal takes the identifiers the star had.
+    let mut again = removed.edit_slide_drawables();
+    again.add_shape(
+        SlideSelector::index(0),
+        Preset::Rectangle,
+        Geometry::new(10.0, 10.0, 100.0, 100.0),
+        "",
+    )?;
+    let first = again.commit()?.into_package();
+    let source = watermark(&package)?;
+    assert!(watermark(&added)? > source);
+    assert_eq!(watermark(&removed)?, source);
+    // The rectangle reuses the identifiers the star released.
+    assert_eq!(watermark(&first)?, watermark(&added)?);
+    assert_eq!(
+        reopen(&first)?
+            .slide_drawable_list(SlideSelector::index(0))?
+            .len(),
+        4
+    );
+    Ok(())
+}
+
+/// `TSP.PackageMetadata.last_object_identifier`.
+fn watermark(package: &Package) -> TestResult<u64> {
+    use prost::Message as _;
+    let output = bytes(package)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output, Default::default())?;
+    let member = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Metadata.iwa")
+        .ok_or("metadata member")?;
+    let stream = litchi_iwa_core::SnappyStream::decompress(member.data(), Default::default())?;
+    let archive = litchi_iwa_core::Archive::parse(&stream.into_bytes(), Default::default())?;
+    for object in &archive.objects {
+        for message in &object.messages {
+            if message.type_ == 11_006 {
+                return Ok(litchi_iwa_protos::tsp::PackageMetadata::decode(
+                    message.data.as_slice(),
+                )?
+                .last_object_identifier);
+            }
+        }
+    }
+    Err("no package metadata".into())
+}
+
+#[test]
 fn move_to_reorders_the_z_order_only() -> TestResult {
     let package = open("basic.key")?;
     let mut edit = package.edit_slide_drawables();
@@ -964,9 +1056,15 @@ fn slide_table_cells_take_values() -> TestResult {
     Ok(())
 }
 
-/// A formula cell, and a cell a formula reads, refuse a value write.
+/// The native formula cell D2 carries a comment, which the shared cell
+/// writer does not rewrite, so a value write over it is refused (record
+/// 0376a removes formulas from uncommented cells); a cell a formula reads
+/// takes the write and the formula's cached result is refreshed (record
+/// 0376).
 #[test]
-fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
+fn formula_cells_refuse_and_precedents_refresh_value_writes() -> TestResult {
+    use litchi_iwa_common::table::cell::value::Value;
+    use litchi_iwa_common::table::coordinate::At;
     use litchi_keynote::slide::drawable::TableCellValue;
     let package = open("slide-table-read-native.key")?;
     let slide_index = (0..package.slides()?.len())
@@ -980,24 +1078,37 @@ fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
         .iter()
         .position(|item| item.kind() == Kind::Table)
         .expect("table");
-    for (row, column) in [(1, 3), (1, 1)] {
-        let mut edit = package.edit_slide_drawables();
-        edit.set_table_cell(
-            slide,
-            DrawableSelector::index(table),
-            row,
-            column,
-            TableCellValue::Number(1.0),
-        )?;
-        assert!(matches!(
-            edit.commit(),
-            Err(Error::Refused(
-                litchi_keynote::slide::drawable::Refusal::Unsupported {
-                    reason: Unsupported::TableFormulas
-                }
-            ))
-        ));
-    }
+    let mut edit = package.edit_slide_drawables();
+    edit.set_table_cell(
+        slide,
+        DrawableSelector::index(table),
+        1,
+        3,
+        TableCellValue::Number(1.0),
+    )?;
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::TableStorage
+            }
+        ))
+    ));
+    // D2 = B2 + 1: writing B2 refreshes D2's cache.
+    let mut edit = package.edit_slide_drawables();
+    edit.set_table_cell(
+        slide,
+        DrawableSelector::index(table),
+        1,
+        1,
+        TableCellValue::Number(41.0),
+    )?;
+    let written = edit.commit()?.into_package();
+    let read = written.slide_table_cells(slide, 0_usize)?;
+    assert!(matches!(
+        read.table().get(At::new(1, 1)),
+        Some(Value::Number(number)) if number.get() == 41.0
+    ));
     Ok(())
 }
 
@@ -1072,5 +1183,86 @@ fn corpus_placeholders_take_character_styles() -> TestResult {
     }
     eprintln!("styled {styled}; refused {refused:?}");
     assert!(styled >= 10, "only {styled} styled");
+    Ok(())
+}
+
+/// A formula authored into a slide table reads back as its source and is
+/// removed again by a value write; the cell then takes a new formula
+/// (record 0376a).
+#[test]
+fn slide_table_formulas_author_and_clear() -> TestResult {
+    use litchi_iwa_common::table::cell::value::Value;
+    use litchi_iwa_common::table::coordinate::At;
+    use litchi_keynote::slide::drawable::TableCellValue;
+    use litchi_keynote::slide::table::formula::{
+        FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference, FormulaExpression,
+    };
+    let package = open("table-discovery.key")?;
+    let slide_index = (0..package.slides()?.len())
+        .find(|index| {
+            list(&package, *index)
+                .is_ok_and(|drawables| drawables.iter().any(|item| item.kind() == Kind::Table))
+        })
+        .expect("a slide with a table");
+    let slide = SlideSelector::index(slide_index);
+    let table = list(&package, slide_index)?
+        .iter()
+        .position(|item| item.kind() == Kind::Table)
+        .expect("table");
+    let expression = FormulaExpression::binary(
+        FormulaBinaryOperator::Add,
+        FormulaExpression::Cell(FormulaCellReference::relative(2, 1)),
+        FormulaExpression::Number(1.0),
+    );
+    let mut edit = package.edit_slide_drawables();
+    edit.set_table_formula_cached(
+        slide,
+        DrawableSelector::index(table),
+        2,
+        2,
+        expression.clone(),
+        FormulaCachedValue::number(3.0)?,
+    )?;
+    let authored = edit.commit()?.into_package();
+    let read = authored.slide_table_cells(slide, 0_usize)?;
+    assert_eq!(
+        read.table().get(At::new(2, 2)),
+        Some(&Value::Formula("=(B3+1)".into()))
+    );
+    let mut edit = authored.edit_slide_drawables();
+    edit.set_table_cell(
+        slide,
+        DrawableSelector::index(table),
+        2,
+        2,
+        TableCellValue::Number(4.0),
+    )?;
+    let replaced = edit.commit()?.into_package();
+    let read = replaced.slide_table_cells(slide, 0_usize)?;
+    assert!(matches!(
+        read.table().get(At::new(2, 2)),
+        Some(Value::Number(number)) if number.get() == 4.0
+    ));
+    // A reference to another table is refused (it names a native object).
+    let mut edit = replaced.edit_slide_drawables();
+    edit.set_table_formula_cached(
+        slide,
+        DrawableSelector::index(table),
+        2,
+        2,
+        FormulaExpression::TableCell {
+            table_id: 1,
+            reference: FormulaCellReference::relative(0, 0),
+        },
+        FormulaCachedValue::number(3.0)?,
+    )?;
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::TableFormulas
+            }
+        ))
+    ));
     Ok(())
 }

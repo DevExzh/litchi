@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_core::archive::{
     ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceVisitor,
@@ -1461,7 +1461,10 @@ fn rewrite_name(
         .charge_input_source(&output)
         .and_then(|_| budget.charge_payload_work(output.len()))
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
@@ -1610,7 +1613,10 @@ fn reopen_target(
     budget
         .charge_payload_work(target.len())
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
         .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)

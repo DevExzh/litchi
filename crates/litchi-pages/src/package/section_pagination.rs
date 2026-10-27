@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, encode_varint_into, varint::encoded_len, wire::WireView,
 };
@@ -554,9 +554,9 @@ impl Package {
             return Err(Error::PatchConflict);
         }
 
-        let candidate_source =
-            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
-                .map_err(map_archive_error)?;
+        let candidate_source = source
+            .reopen(Arc::clone(&patch.target_bytes))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         candidate.validate().map_err(map_package_error)?;
@@ -668,7 +668,8 @@ fn rewrite_package_pagination(
             physical_limits,
         )
         .map_err(map_archive_error)?;
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), physical_limits)
+    let candidate_source = source_catalog
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     candidate.validate().map_err(map_package_error)?;

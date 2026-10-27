@@ -20,91 +20,91 @@ const OWNER_TILED_CELL_PATH: [u32; 1] = [13];
 const STRICT_WORK_MULTIPLIER: usize = 16;
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct SourceMessage<'a> {
-    pub(super) object_id: u64,
-    pub(super) payload: &'a [u8],
+pub struct SourceMessage<'a> {
+    pub object_id: u64,
+    pub payload: &'a [u8],
     /// Exact ArchiveInfo object-reference identifiers, in source order.
-    pub(super) object_references: &'a [u64],
+    pub object_references: &'a [u64],
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct CellTileSource<'a> {
-    pub(super) message: SourceMessage<'a>,
+pub struct CellTileSource<'a> {
+    pub message: SourceMessage<'a>,
     /// Whether this tile and its reference already exist in the source owner.
     /// A false value describes a caller-allocated empty canonical tile that is
     /// published only by the final artifact.
-    pub(super) source_present: bool,
-    pub(super) tile_column_begin: u32,
-    pub(super) tile_row_begin: u32,
+    pub source_present: bool,
+    pub tile_column_begin: u32,
+    pub tile_row_begin: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct RangeTileSource<'a> {
-    pub(super) message: SourceMessage<'a>,
+pub struct RangeTileSource<'a> {
+    pub message: SourceMessage<'a>,
     /// Expected native `to_owner_id`, used to group the complete range set in
     /// one bounded pass before any tile is emitted.
-    pub(super) target_owner: u32,
+    pub target_owner: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct SourceOwner<'source, 'plan> {
-    pub(super) message: SourceMessage<'source>,
-    pub(super) internal_owner: u32,
-    pub(super) uid_lower: u64,
-    pub(super) uid_upper: u64,
-    pub(super) cell_tiles: &'plan [CellTileSource<'source>],
-    pub(super) range_tiles: &'plan [RangeTileSource<'source>],
+pub struct SourceOwner<'source, 'plan> {
+    pub message: SourceMessage<'source>,
+    pub internal_owner: u32,
+    pub uid_lower: u64,
+    pub uid_upper: u64,
+    pub cell_tiles: &'plan [CellTileSource<'source>],
+    pub range_tiles: &'plan [RangeTileSource<'source>],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Precedent {
-    pub(super) target_owner: u32,
-    pub(super) row: u32,
-    pub(super) column: u32,
+pub struct Precedent {
+    pub target_owner: u32,
+    pub row: u32,
+    pub column: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Range {
-    pub(super) target_owner: u32,
-    pub(super) top: u32,
-    pub(super) left: u32,
-    pub(super) bottom: u32,
-    pub(super) right: u32,
+pub struct Range {
+    pub target_owner: u32,
+    pub top: u32,
+    pub left: u32,
+    pub bottom: u32,
+    pub right: u32,
 }
 
 /// One final formula host. Host owner and target-qualified facts are distinct.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct FormulaHost<'a> {
-    pub(super) owner: u32,
-    pub(super) row: u32,
-    pub(super) column: u32,
-    pub(super) precedents: &'a [Precedent],
-    pub(super) ranges: &'a [Range],
+pub struct FormulaHost<'a> {
+    pub owner: u32,
+    pub row: u32,
+    pub column: u32,
+    pub precedents: &'a [Precedent],
+    pub ranges: &'a [Range],
     raw_cell_record: Option<&'a [u8]>,
     raw_range_records: &'a [Option<&'a [u8]>],
     cell_tile_object_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct LogicalHost {
-    pub(super) owner: u32,
-    pub(super) row: u32,
-    pub(super) column: u32,
-    pub(super) precedents: Vec<Precedent>,
-    pub(super) ranges: Vec<Range>,
-    pub(super) is_in_cycle: bool,
+pub struct LogicalHost {
+    pub owner: u32,
+    pub row: u32,
+    pub column: u32,
+    pub precedents: Vec<Precedent>,
+    pub ranges: Vec<Range>,
+    pub is_in_cycle: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct LogicalGraph<'graph> {
-    pub(super) formula_count: u64,
+pub struct LogicalGraph<'graph> {
+    pub formula_count: u64,
     /// Sorted unique dependency hosts. A final formula with no precedent,
     /// range, or cycle marker is intentionally absent.
-    pub(super) hosts: &'graph [LogicalHost],
+    pub hosts: &'graph [LogicalHost],
 }
 
 impl<'a> FormulaHost<'a> {
-    pub(super) const fn authored(
+    pub const fn authored(
         owner: u32,
         row: u32,
         column: u32,
@@ -126,58 +126,61 @@ impl<'a> FormulaHost<'a> {
 
 #[derive(Debug, Clone, Copy)]
 struct CompleteGraph<'source, 'plan> {
-    pub(super) engine: SourceMessage<'source>,
-    pub(super) owners: &'plan [SourceOwner<'source, 'plan>],
-    pub(super) hosts: &'plan [FormulaHost<'source>],
+    pub engine: SourceMessage<'source>,
+    pub owners: &'plan [SourceOwner<'source, 'plan>],
+    pub hosts: &'plan [FormulaHost<'source>],
     table_owner: u32,
     formula_count: u64,
+    /// The selected owner mirrors its range records inline and in its
+    /// range-precedents tiles: the rewrite regenerates both (record 0376a).
+    mirrored_ranges: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct HostKey {
-    pub(super) owner: u32,
-    pub(super) row: u32,
-    pub(super) column: u32,
+pub struct HostKey {
+    pub owner: u32,
+    pub row: u32,
+    pub column: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct HostChange<'a> {
+pub struct HostChange<'a> {
     /// Authoritative old formula presence from the BNC/formula-list index.
-    pub(super) old: Option<HostKey>,
+    pub old: Option<HostKey>,
     /// Authoritative new formula presence and complete AST-derived facts.
-    pub(super) new: Option<FormulaHost<'a>>,
+    pub new: Option<FormulaHost<'a>>,
     /// Existing destination cell-record tile for `new`, or `None` for inline.
-    pub(super) cell_tile_object_id: Option<u64>,
+    pub cell_tile_object_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct SourceGraph<'source, 'plan> {
-    pub(super) engine: SourceMessage<'source>,
-    pub(super) owners: &'plan [SourceOwner<'source, 'plan>],
+pub struct SourceGraph<'source, 'plan> {
+    pub engine: SourceMessage<'source>,
+    pub owners: &'plan [SourceOwner<'source, 'plan>],
     /// Resolved table owner whose BNC/formula-list hosts are authoritative.
-    pub(super) table_owner: u32,
+    pub table_owner: u32,
     /// Complete authoritative source formula-host index derived from BNC and
     /// FormulaList linkage, sorted and unique. It includes zero-edge formulas.
-    pub(super) existing_formula_hosts: &'plan [HostKey],
+    pub existing_formula_hosts: &'plan [HostKey],
     /// Sorted changed-host overlay. Exact formula/cache no-ops are excluded.
-    pub(super) changes: &'plan [HostChange<'plan>],
+    pub changes: &'plan [HostChange<'plan>],
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Limits {
-    pub(super) max_source_bytes: usize,
-    pub(super) max_output_bytes: usize,
-    pub(super) max_fields: usize,
-    pub(super) max_work_bytes: usize,
-    pub(super) max_references: usize,
-    pub(super) max_messages: usize,
-    pub(super) max_hosts: usize,
-    pub(super) max_precedents: usize,
-    pub(super) max_ranges: usize,
-    pub(super) max_retained_bytes: usize,
-    pub(super) max_scratch_bytes: usize,
-    pub(super) max_allocations: usize,
-    pub(super) recursion_limit: u32,
+pub struct Limits {
+    pub max_source_bytes: usize,
+    pub max_output_bytes: usize,
+    pub max_fields: usize,
+    pub max_work_bytes: usize,
+    pub max_references: usize,
+    pub max_messages: usize,
+    pub max_hosts: usize,
+    pub max_precedents: usize,
+    pub max_ranges: usize,
+    pub max_retained_bytes: usize,
+    pub max_scratch_bytes: usize,
+    pub max_allocations: usize,
+    pub recursion_limit: u32,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -185,45 +188,45 @@ pub(super) struct Limits {
 ///
 /// Allocation, work, and scratch values are deliberately admitted upper bounds,
 /// not allocator telemetry. They are fixed before the governed phase begins.
-pub(super) struct Report {
-    pub(super) source_bytes: usize,
-    pub(super) output_bytes: usize,
-    pub(super) fields: usize,
-    pub(super) strict_work_bytes: usize,
-    pub(super) graph_work_bytes: usize,
-    pub(super) references: usize,
-    pub(super) reference_bytes: usize,
-    pub(super) text_bytes: usize,
-    pub(super) max_depth: u32,
-    pub(super) hosts: usize,
-    pub(super) precedents: usize,
-    pub(super) ranges: usize,
-    pub(super) changed_messages: usize,
-    pub(super) objects: usize,
-    pub(super) retained_elements: usize,
-    pub(super) allocations: usize,
-    pub(super) retained_bytes: usize,
-    pub(super) peak_scratch_bytes: usize,
+pub struct Report {
+    pub source_bytes: usize,
+    pub output_bytes: usize,
+    pub fields: usize,
+    pub strict_work_bytes: usize,
+    pub graph_work_bytes: usize,
+    pub references: usize,
+    pub reference_bytes: usize,
+    pub text_bytes: usize,
+    pub max_depth: u32,
+    pub hosts: usize,
+    pub precedents: usize,
+    pub ranges: usize,
+    pub changed_messages: usize,
+    pub objects: usize,
+    pub retained_elements: usize,
+    pub allocations: usize,
+    pub retained_bytes: usize,
+    pub peak_scratch_bytes: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct ExecutionRequirements {
-    pub(super) output_bytes: usize,
-    pub(super) fields: usize,
-    pub(super) work_bytes: usize,
-    pub(super) references: usize,
-    pub(super) allocations: usize,
-    pub(super) peak_scratch_bytes: usize,
-    pub(super) retained_bytes: usize,
-    pub(super) retained_elements: usize,
-    pub(super) objects: usize,
-    pub(super) message_edits: usize,
-    pub(super) hosts: usize,
-    pub(super) precedents: usize,
-    pub(super) ranges: usize,
+pub struct ExecutionRequirements {
+    pub output_bytes: usize,
+    pub fields: usize,
+    pub work_bytes: usize,
+    pub references: usize,
+    pub allocations: usize,
+    pub peak_scratch_bytes: usize,
+    pub retained_bytes: usize,
+    pub retained_elements: usize,
+    pub objects: usize,
+    pub message_edits: usize,
+    pub hosts: usize,
+    pub precedents: usize,
+    pub ranges: usize,
 }
 
-pub(super) struct PreparedGraph<'source> {
+pub struct PreparedGraph<'source> {
     engine: SourceMessage<'source>,
     owners: Vec<PreparedOwner<'source>>,
     final_hosts: Vec<OwnedHost<'source>>,
@@ -232,6 +235,7 @@ pub(super) struct PreparedGraph<'source> {
     table_formula_count: u64,
     engine_formula_count: u64,
     table_owner: u32,
+    mirrored_ranges: bool,
     prepare_report: Report,
     requirements: ExecutionRequirements,
     preflight: Preflight,
@@ -246,36 +250,76 @@ struct PreparedOwner<'source> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct MessageEdit {
-    pub(super) object_id: u64,
+pub struct MessageEdit {
+    pub object_id: u64,
     /// `None` proves the complete candidate equals the exact source payload.
-    pub(super) payload: Option<Vec<u8>>,
+    pub payload: Option<Vec<u8>>,
     /// Exact, unchanged ArchiveInfo object-reference identifiers.
-    pub(super) object_references: Vec<u64>,
+    pub object_references: Vec<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Artifact {
-    pub(super) engine: MessageEdit,
-    pub(super) owners: Vec<MessageEdit>,
-    pub(super) cell_tiles: Vec<MessageEdit>,
-    pub(super) range_tiles: Vec<MessageEdit>,
-    pub(super) report: Report,
+pub struct Artifact {
+    pub engine: MessageEdit,
+    pub owners: Vec<MessageEdit>,
+    pub cell_tiles: Vec<MessageEdit>,
+    pub range_tiles: Vec<MessageEdit>,
+    pub report: Report,
 }
 
+/// A typed dependency-graph rewrite failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum Error {
+#[non_exhaustive]
+pub enum Error {
+    /// The source graph or the requested final graph is malformed.
     InvalidGraph,
+    /// A caller-selected [`Limits`] ceiling was exceeded.
     Limit {
-        resource: &'static str,
+        /// The exceeded dimension.
+        kind: LimitKind,
+        /// Observed or requested amount.
         observed: usize,
+        /// Selected maximum.
         maximum: usize,
     },
+    /// A fallible allocation failed.
     Allocation {
+        /// Requested element or byte count.
         requested: usize,
     },
+    /// The strict dependency codec rejected a payload.
     StrictDependency,
+    /// The shared wire layer rejected a payload.
     Wire,
+}
+
+/// The [`Limits`] dimension an [`Error::Limit`] names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitKind {
+    /// [`Limits::max_source_bytes`].
+    SourceBytes,
+    /// [`Limits::max_output_bytes`].
+    OutputBytes,
+    /// [`Limits::max_fields`].
+    Fields,
+    /// [`Limits::max_work_bytes`].
+    Work,
+    /// [`Limits::max_references`].
+    References,
+    /// [`Limits::max_messages`].
+    Messages,
+    /// [`Limits::max_hosts`].
+    Hosts,
+    /// [`Limits::max_precedents`].
+    Precedents,
+    /// [`Limits::max_ranges`].
+    Ranges,
+    /// [`Limits::max_retained_bytes`].
+    RetainedBytes,
+    /// [`Limits::max_scratch_bytes`].
+    ScratchBytes,
+    /// [`Limits::max_allocations`].
+    Allocations,
 }
 
 impl fmt::Display for Error {
@@ -289,7 +333,7 @@ impl std::error::Error for Error {}
 /// Strictly prepare the complete final graph without allocating candidate
 /// payload or output bytes. Callers may validate [`LogicalGraph`] and stop
 /// before [`PreparedGraph::execute`] when cache or cycle policy refuses it.
-pub(super) fn prepare_graph<'source>(
+pub fn prepare_graph<'source>(
     graph: SourceGraph<'source, '_>,
     limits: Limits,
 ) -> Result<PreparedGraph<'source>, Error> {
@@ -347,6 +391,7 @@ pub(super) fn prepare_graph<'source>(
         hosts: &borrowed,
         table_owner: graph.table_owner,
         formula_count: engine_formula_count,
+        mirrored_ranges: source.mirrored_ranges,
     };
     let preflight = Preflight::new(complete, remaining)?;
     let retained_bytes = prepared_graph_retained(
@@ -393,12 +438,12 @@ pub(super) fn prepare_graph<'source>(
         ..remaining
     })?;
     ensure_limit(
-        "prepared graph retained bytes",
+        LimitKind::RetainedBytes,
         prepare_report.retained_bytes,
         limits.max_retained_bytes,
     )?;
     ensure_limit(
-        "prepared graph peak scratch",
+        LimitKind::ScratchBytes,
         prepare_report.peak_scratch_bytes,
         limits.max_scratch_bytes,
     )?;
@@ -413,6 +458,7 @@ pub(super) fn prepare_graph<'source>(
         table_formula_count,
         engine_formula_count,
         table_owner: graph.table_owner,
+        mirrored_ranges: source.mirrored_ranges,
         prepare_report,
         requirements,
         preflight,
@@ -420,24 +466,24 @@ pub(super) fn prepare_graph<'source>(
 }
 
 impl<'source> PreparedGraph<'source> {
-    pub(super) fn logical_view(&self) -> LogicalGraph<'_> {
+    pub fn logical_view(&self) -> LogicalGraph<'_> {
         LogicalGraph {
             formula_count: self.table_formula_count,
             hosts: &self.logical_hosts,
         }
     }
 
-    pub(super) const fn prepare_report(&self) -> Report {
+    pub const fn prepare_report(&self) -> Report {
         self.prepare_report
     }
 
-    pub(super) const fn execution_requirements(&self) -> ExecutionRequirements {
+    pub const fn execution_requirements(&self) -> ExecutionRequirements {
         self.requirements
     }
 
     /// Allocate, splice, and strictly reopen candidates only after all
     /// logical consumers have accepted the prepared graph.
-    pub(super) fn execute(self, limits: Limits) -> Result<Artifact, Error> {
+    pub fn execute(self, limits: Limits) -> Result<Artifact, Error> {
         self.requirements.ensure(limits)?;
         let PreparedGraph {
             engine,
@@ -448,6 +494,7 @@ impl<'source> PreparedGraph<'source> {
             table_formula_count: _,
             engine_formula_count,
             table_owner,
+            mirrored_ranges,
             prepare_report: _,
             requirements: _,
             preflight,
@@ -471,6 +518,7 @@ impl<'source> PreparedGraph<'source> {
                 hosts: &borrowed,
                 table_owner,
                 formula_count: engine_formula_count,
+                mirrored_ranges,
             },
             limits,
             preflight,
@@ -481,39 +529,39 @@ impl<'source> PreparedGraph<'source> {
 impl ExecutionRequirements {
     fn ensure(self, limits: Limits) -> Result<(), Error> {
         ensure_limit(
-            "execution output bytes",
+            LimitKind::OutputBytes,
             self.output_bytes,
             limits.max_output_bytes,
         )?;
-        ensure_limit("execution fields", self.fields, limits.max_fields)?;
-        ensure_limit("execution work", self.work_bytes, limits.max_work_bytes)?;
+        ensure_limit(LimitKind::Fields, self.fields, limits.max_fields)?;
+        ensure_limit(LimitKind::Work, self.work_bytes, limits.max_work_bytes)?;
         ensure_limit(
-            "execution references",
+            LimitKind::References,
             self.references,
             limits.max_references,
         )?;
         ensure_limit(
-            "execution allocations",
+            LimitKind::Allocations,
             self.allocations,
             limits.max_allocations,
         )?;
         ensure_limit(
-            "execution peak scratch",
+            LimitKind::ScratchBytes,
             self.peak_scratch_bytes,
             limits.max_scratch_bytes,
         )?;
         ensure_limit(
-            "execution retained bytes",
+            LimitKind::RetainedBytes,
             self.retained_bytes,
             limits.max_retained_bytes,
         )?;
-        ensure_limit("execution hosts", self.hosts, limits.max_hosts)?;
+        ensure_limit(LimitKind::Hosts, self.hosts, limits.max_hosts)?;
         ensure_limit(
-            "execution precedents",
+            LimitKind::Precedents,
             self.precedents,
             limits.max_precedents,
         )?;
-        ensure_limit("execution ranges", self.ranges, limits.max_ranges)
+        ensure_limit(LimitKind::Ranges, self.ranges, limits.max_ranges)
     }
 }
 
@@ -813,7 +861,7 @@ struct SourceAdmission {
 impl SourceAdmission {
     fn new(graph: SourceGraph<'_, '_>, limits: Limits) -> Result<Self, Error> {
         let owner_messages = checked_add(1, graph.owners.len())?;
-        ensure_limit("owner source messages", owner_messages, limits.max_messages)?;
+        ensure_limit(LimitKind::Messages, owner_messages, limits.max_messages)?;
         let mut messages = owner_messages;
         for owner in graph.owners {
             messages = checked_add(
@@ -827,7 +875,7 @@ impl SourceAdmission {
                     owner.range_tiles.len(),
                 )?,
             )?;
-            ensure_limit("aggregate source messages", messages, limits.max_messages)?;
+            ensure_limit(LimitKind::Messages, messages, limits.max_messages)?;
         }
         let archive_references =
             graph
@@ -850,7 +898,7 @@ impl SourceAdmission {
                         })
                 })?;
         ensure_limit(
-            "aggregate ArchiveInfo references",
+            LimitKind::References,
             archive_references,
             limits.max_references,
         )?;
@@ -865,11 +913,7 @@ impl SourceAdmission {
             )?,
             archive_references,
         )?;
-        ensure_limit(
-            "ArchiveInfo locality work",
-            locality_work,
-            limits.max_work_bytes,
-        )?;
+        ensure_limit(LimitKind::Work, locality_work, limits.max_work_bytes)?;
         validate_archive_info_references(graph)?;
         let mut bytes = graph.engine.payload.len();
         for owner in graph.owners {
@@ -881,10 +925,10 @@ impl SourceAdmission {
                 bytes = checked_add(bytes, tile.message.payload.len())?;
             }
         }
-        ensure_limit("aggregate source bytes", bytes, limits.max_source_bytes)?;
-        ensure_limit("changed hosts", graph.changes.len(), limits.max_hosts)?;
+        ensure_limit(LimitKind::SourceBytes, bytes, limits.max_source_bytes)?;
+        ensure_limit(LimitKind::Hosts, graph.changes.len(), limits.max_hosts)?;
         ensure_limit(
-            "authoritative formula hosts",
+            LimitKind::Hosts,
             graph.existing_formula_hosts.len(),
             limits.max_hosts,
         )?;
@@ -913,7 +957,7 @@ impl SourceAdmission {
         })?;
         let candidate_upper = checked_add(bytes, changed_fact_bytes)?;
         ensure_limit(
-            "source candidate upper",
+            LimitKind::OutputBytes,
             candidate_upper,
             limits.max_output_bytes,
         )?;
@@ -953,16 +997,12 @@ impl SourceAdmission {
         )?;
         let graph_work = checked_add(checked_add(merge_work, sort_work)?, locality_work)?;
         ensure_limit(
-            "source decode/merge work",
+            LimitKind::Work,
             checked_add(decode_work, graph_work)?,
             limits.max_work_bytes,
         )?;
         let field_upper = checked_add(bytes / 2 + messages, candidate_upper / 2 + messages)?;
-        ensure_limit(
-            "aggregate field preauthorization",
-            field_upper,
-            limits.max_fields,
-        )?;
+        ensure_limit(LimitKind::Fields, field_upper, limits.max_fields)?;
         let selected_references =
             graph
                 .owners
@@ -976,7 +1016,7 @@ impl SourceAdmission {
         let reference_upper =
             checked_add(archive_references, checked_mul(selected_references, 3)?)?;
         ensure_limit(
-            "aggregate reference preauthorization",
+            LimitKind::References,
             reference_upper,
             limits.max_references,
         )?;
@@ -1008,11 +1048,7 @@ impl SourceAdmission {
                 )?,
             )?,
         )?;
-        ensure_limit(
-            "source scratch preauthorization",
-            scratch,
-            limits.max_scratch_bytes,
-        )?;
+        ensure_limit(LimitKind::ScratchBytes, scratch, limits.max_scratch_bytes)?;
         let allocations = checked_add(
             17,
             checked_add(
@@ -1020,11 +1056,7 @@ impl SourceAdmission {
                 checked_mul(checked_add(limits.max_hosts, limits.max_ranges)?, 3)?,
             )?,
         )?;
-        ensure_limit(
-            "source allocation preauthorization",
-            allocations,
-            limits.max_allocations,
-        )?;
+        ensure_limit(LimitKind::Allocations, allocations, limits.max_allocations)?;
         Ok(Self {
             source_bytes: bytes,
             allocations,
@@ -1223,14 +1255,22 @@ fn execute_complete_graph(
     }
 
     let engine = finish_edit(graph.engine, engine_candidate, &mut report)?;
-    ensure_limit("output bytes", report.output_bytes, limits.max_output_bytes)?;
-    ensure_limit("strict fields", report.fields, limits.max_fields)?;
     ensure_limit(
-        "strict work",
+        LimitKind::OutputBytes,
+        report.output_bytes,
+        limits.max_output_bytes,
+    )?;
+    ensure_limit(LimitKind::Fields, report.fields, limits.max_fields)?;
+    ensure_limit(
+        LimitKind::Work,
         report.strict_work_bytes,
         limits.max_work_bytes,
     )?;
-    ensure_limit("references", report.references, limits.max_references)?;
+    ensure_limit(
+        LimitKind::References,
+        report.references,
+        limits.max_references,
+    )?;
     report.allocations = preflight.allocations;
     report.objects = preflight.messages;
     report.retained_elements = checked_add(preflight.messages, report.references)?;
@@ -1255,7 +1295,7 @@ fn execute_complete_graph(
         )?,
     )?;
     ensure_limit(
-        "retained bytes",
+        LimitKind::RetainedBytes,
         report.retained_bytes,
         limits.max_retained_bytes,
     )?;
@@ -1328,7 +1368,7 @@ fn logical_hosts(
             is_in_cycle: host.is_in_cycle,
         });
     }
-    ensure_limit("logical dependency hosts", logical.len(), limits.max_hosts)?;
+    ensure_limit(LimitKind::Hosts, logical.len(), limits.max_hosts)?;
     Ok(logical)
 }
 
@@ -1349,6 +1389,7 @@ struct DecodedSource<'a> {
     hosts: Vec<OwnedHost<'a>>,
     formula_count: u64,
     report: Report,
+    mirrored_ranges: bool,
 }
 
 fn decode_source_hosts<'source>(
@@ -1381,6 +1422,7 @@ fn decode_source_hosts<'source>(
     let mut hosts = try_vec(observed_host_bound)?;
     let mut aggregate_precedents = 0usize;
     let mut aggregate_ranges = 0usize;
+    let mut mirrored_ranges = false;
     for owner in graph.owners {
         let mut inline = SourceFacts::new(
             owner.internal_owner,
@@ -1404,6 +1446,27 @@ fn decode_source_hosts<'source>(
         }
         attach_cell_raw(&mut inline.hosts, snapshot.cell_dependencies(), 1, limits)?;
         attach_inline_range_raw(&mut inline.hosts, snapshot.range_dependencies(), limits)?;
+        // The selected owner may mirror its range records inline and in its
+        // range-precedents tiles, as Numbers does: the inline copy is set
+        // aside, proved equal to the tiled facts below, and regenerated by
+        // the rewrite (record 0376a).
+        let mut inline_ranges = Vec::new();
+        if owner.internal_owner == graph.table_owner
+            && !owner.range_tiles.is_empty()
+            && inline.hosts.iter().any(|host| !host.ranges.is_empty())
+        {
+            for host in &mut inline.hosts {
+                for range in host.ranges.drain(..) {
+                    inline_ranges
+                        .try_reserve(1)
+                        .map_err(|_error| Error::Allocation { requested: 1 })?;
+                    inline_ranges.push((host.key, range));
+                }
+                host.raw_range_records.clear();
+            }
+            inline_ranges.sort_unstable();
+        }
+        let mut tiled_ranges = Vec::new();
         add_source_fact_counts(
             &mut aggregate_precedents,
             &mut aggregate_ranges,
@@ -1472,27 +1535,34 @@ fn decode_source_hosts<'source>(
             }
             attach_tiled_range_raw(&mut facts.ranges, tile.message.payload, limits)?;
             aggregate_ranges = checked_add(aggregate_ranges, facts.ranges.len())?;
-            ensure_limit(
-                "aggregate source ranges",
-                aggregate_ranges,
-                limits.max_ranges,
-            )?;
+            ensure_limit(LimitKind::Ranges, aggregate_ranges, limits.max_ranges)?;
+            if !inline_ranges.is_empty() {
+                tiled_ranges
+                    .try_reserve(facts.ranges.len())
+                    .map_err(|_error| Error::Allocation {
+                        requested: facts.ranges.len(),
+                    })?;
+                tiled_ranges.extend(facts.ranges.iter().map(|(key, range, _)| (*key, *range)));
+            }
             merge_source_ranges(&mut hosts, facts.ranges, limits)?;
+        }
+        if !inline_ranges.is_empty() {
+            tiled_ranges.sort_unstable();
+            if tiled_ranges != inline_ranges {
+                return Err(Error::InvalidGraph);
+            }
+            mirrored_ranges = true;
         }
     }
     hosts.sort_unstable_by_key(|host| host.key);
     coalesce_hosts(&mut hosts, graph.table_owner, limits)?;
     // Coalescing changes only record packing, never the aggregate fact count.
     ensure_limit(
-        "aggregate source precedents",
+        LimitKind::Precedents,
         aggregate_precedents,
         limits.max_precedents,
     )?;
-    ensure_limit(
-        "aggregate source ranges",
-        aggregate_ranges,
-        limits.max_ranges,
-    )?;
+    ensure_limit(LimitKind::Ranges, aggregate_ranges, limits.max_ranges)?;
     let union_lower_bound = checked_add(graph.existing_formula_hosts.len(), hosts.len())?
         .checked_sub(
             hosts
@@ -1523,18 +1593,14 @@ fn decode_source_hosts<'source>(
     // count lower bound above, but are opaque to this single-table rewrite and
     // are emitted byte-for-byte unchanged by `execute_complete_graph`.
     hosts.retain(|host| host.key.owner == graph.table_owner);
+    ensure_limit(LimitKind::Fields, report.fields, limits.max_fields)?;
     ensure_limit(
-        "aggregate decoded source fields",
-        report.fields,
-        limits.max_fields,
-    )?;
-    ensure_limit(
-        "aggregate decoded source work",
+        LimitKind::Work,
         report.strict_work_bytes,
         limits.max_work_bytes,
     )?;
     ensure_limit(
-        "aggregate decoded source references",
+        LimitKind::References,
         report.references,
         limits.max_references,
     )?;
@@ -1542,6 +1608,7 @@ fn decode_source_hosts<'source>(
         hosts,
         formula_count,
         report,
+        mirrored_ranges,
     })
 }
 
@@ -1572,7 +1639,7 @@ fn overlay_changes<'a>(
     limits: Limits,
 ) -> Result<Vec<OwnedHost<'a>>, Error> {
     let capacity = checked_add(hosts.len(), changes.len())?;
-    ensure_limit("final dependency host capacity", capacity, limits.max_hosts)?;
+    ensure_limit(LimitKind::Hosts, capacity, limits.max_hosts)?;
     let mut output = try_vec(capacity)?;
     let mut source = hosts.into_iter().peekable();
     let mut previous = None;
@@ -1639,7 +1706,7 @@ fn overlay_changes<'a>(
         }
     }
     output.extend(source);
-    ensure_limit("final dependency hosts", output.len(), limits.max_hosts)?;
+    ensure_limit(LimitKind::Hosts, output.len(), limits.max_hosts)?;
     Ok(output)
 }
 
@@ -1650,7 +1717,7 @@ struct SourceFacts<'source, 'index> {
     hosts: Vec<OwnedHost<'source>>,
     limits: Limits,
     invalid: bool,
-    limit_resource: Option<&'static str>,
+    limit_resource: Option<LimitKind>,
     uid_index: &'index OwnerUidIndex,
 }
 
@@ -1694,7 +1761,7 @@ impl dependency::DependencyVisitor for SourceFacts<'_, '_> {
             dependency::ExpandedEdgeKind::InternalOwner => 4,
         };
         if self.arrays[slot].len() >= self.limits.max_precedents {
-            self.limit_resource = Some("source precedents");
+            self.limit_resource = Some(LimitKind::Precedents);
             return Ok(());
         }
         self.arrays[slot].push(component.value());
@@ -1737,7 +1804,7 @@ impl dependency::DependencyVisitor for SourceFacts<'_, '_> {
             return Ok(());
         }
         if self.hosts.len() >= self.limits.max_hosts {
-            self.limit_resource = Some("source hosts");
+            self.limit_resource = Some(LimitKind::Hosts);
             return Ok(());
         }
         self.hosts.push(OwnedHost {
@@ -1793,7 +1860,7 @@ impl dependency::DependencyVisitor for SourceFacts<'_, '_> {
             right: range.bottom_right_column(),
         });
         if self.hosts.len() >= self.limits.max_hosts {
-            self.limit_resource = Some("source hosts");
+            self.limit_resource = Some(LimitKind::Hosts);
             return Ok(());
         }
         self.hosts.push(OwnedHost {
@@ -1908,7 +1975,7 @@ fn borrow_hosts<'a>(
             cell_tile_object_id: host.cell_tile_object_id,
         });
     }
-    ensure_limit("borrowed final hosts", borrowed.len(), limits.max_hosts)?;
+    ensure_limit(LimitKind::Hosts, borrowed.len(), limits.max_hosts)?;
     Ok(borrowed)
 }
 
@@ -1918,13 +1985,13 @@ fn append_owned_hosts<'source>(
     limits: Limits,
 ) -> Result<(), Error> {
     if let Some(resource) = source.limit_resource {
-        let maximum = if resource == "source hosts" {
+        let maximum = if resource == LimitKind::Hosts {
             limits.max_hosts
         } else {
             limits.max_precedents
         };
         return Err(Error::Limit {
-            resource,
+            kind: resource,
             observed: maximum.checked_add(1).ok_or(Error::InvalidGraph)?,
             maximum,
         });
@@ -1933,7 +2000,7 @@ fn append_owned_hosts<'source>(
         return Err(Error::InvalidGraph);
     }
     ensure_limit(
-        "decoded source hosts",
+        LimitKind::Hosts,
         checked_add(destination.len(), source.hosts.len())?,
         checked_add(limits.max_hosts, limits.max_ranges)?,
     )?;
@@ -1968,12 +2035,8 @@ fn add_source_fact_counts(
         *precedents = checked_add(*precedents, host.precedents.len())?;
         *ranges = checked_add(*ranges, host.ranges.len())?;
     }
-    ensure_limit(
-        "aggregate source precedents",
-        *precedents,
-        limits.max_precedents,
-    )?;
-    ensure_limit("aggregate source ranges", *ranges, limits.max_ranges)
+    ensure_limit(LimitKind::Precedents, *precedents, limits.max_precedents)?;
+    ensure_limit(LimitKind::Ranges, *ranges, limits.max_ranges)
 }
 
 fn merge_source_ranges<'a>(
@@ -1982,7 +2045,7 @@ fn merge_source_ranges<'a>(
     limits: Limits,
 ) -> Result<(), Error> {
     ensure_limit(
-        "decoded source range hosts",
+        LimitKind::Ranges,
         checked_add(hosts.len(), ranges.len())?,
         checked_add(limits.max_hosts, limits.max_ranges)?,
     )?;
@@ -2145,15 +2208,15 @@ fn coalesce_hosts(
             host.ranges.extend(candidate.ranges);
             host.raw_range_records.extend(candidate.raw_range_records);
         }
-        normalize_range_records(&mut host)?;
+        normalize_range_records(&mut host, table_owner)?;
         output.push(host);
     }
-    ensure_limit("coalesced hosts", output.len(), limits.max_hosts)?;
+    ensure_limit(LimitKind::Hosts, output.len(), limits.max_hosts)?;
     *hosts = output;
     Ok(())
 }
 
-fn normalize_range_records(host: &mut OwnedHost<'_>) -> Result<(), Error> {
+fn normalize_range_records(host: &mut OwnedHost<'_>, table_owner: u32) -> Result<(), Error> {
     if host.raw_range_records.len() != host.ranges.len() {
         return Err(Error::InvalidGraph);
     }
@@ -2167,7 +2230,20 @@ fn normalize_range_records(host: &mut OwnedHost<'_>) -> Result<(), Error> {
         pairs.push((range, raw));
     }
     pairs.sort_unstable_by_key(|pair| pair.0);
-    if pairs.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+    // Numbers mirrors a range declaration inline and in a range-precedents
+    // tile, as it mirrors cell records. A non-table owner (a table's merge
+    // owner) keeps both containers unchanged, so its mirror (two different
+    // source records) is admitted. A repeated range of the selected table,
+    // whose containers this rewrite regenerates, stays an authority conflict
+    // (record 0376a).
+    if pairs.windows(2).any(|pair| {
+        pair[0].0 == pair[1].0
+            && (host.key.owner == table_owner
+                || match (pair[0].1, pair[1].1) {
+                    (Some(first), Some(second)) => first == second,
+                    _ => true,
+                })
+    }) {
         return Err(Error::InvalidGraph);
     }
     host.ranges.clear();
@@ -2324,7 +2400,11 @@ fn rewrite_owner(
             report,
             range_edits,
         )?;
-        None
+        if graph.mirrored_ranges && owner.internal_owner == graph.table_owner {
+            Some(encode_mirrored_inline_ranges(hosts, limits)?)
+        } else {
+            None
+        }
     };
     let cell_replacement = (!cell_payload.is_empty()).then_some(cell_payload.as_slice());
     let tiled_cell_replacement =
@@ -2691,8 +2771,10 @@ impl dependency::DependencyVisitor for RangeTileVisitor<'_> {
             || rect.origin().packed_data().is_some()
             || rect.origin().column() != Some(expected.left)
             || rect.origin().row() != Some(expected.top)
-            || rect.size().num_columns() != width
-            || rect.size().num_rows() != height
+            // A native size omits a dimension of one, as the source decode
+            // reads it (record 0376a).
+            || Some(rect.size().num_columns().unwrap_or(1)) != width
+            || Some(rect.size().num_rows().unwrap_or(1)) != height
         {
             self.invalid = true;
         }
@@ -2834,7 +2916,7 @@ fn encode_cell_record(host: &FormulaHost<'_>, limits: Limits) -> Result<Vec<u8>,
     } else {
         checked_add(size, message_field_len(6, edges.len())?)?
     };
-    ensure_limit("encoded cell record", size, limits.max_output_bytes)?;
+    ensure_limit(LimitKind::OutputBytes, size, limits.max_output_bytes)?;
     let mut output = try_vec_bytes(size)?;
     append_varint(&mut output, 1, u64::from(host.column));
     append_varint(&mut output, 2, u64::from(host.row));
@@ -2858,6 +2940,22 @@ fn encode_inline_ranges(hosts: &[FormulaHost<'_>], limits: Limits) -> Result<Vec
             } else {
                 records.push(encode_range_back(host, *range, limits)?);
             }
+        }
+    }
+    encode_repeated_message(2, &records, limits.max_output_bytes)
+}
+
+/// The inline mirror of a selected owner whose range records are tiled: every
+/// range again as a back-dependency record (the tile records' raw bytes are
+/// another message, so none is reused).
+fn encode_mirrored_inline_ranges(
+    hosts: &[FormulaHost<'_>],
+    limits: Limits,
+) -> Result<Vec<u8>, Error> {
+    let mut records = try_vec(hosts.iter().map(|host| host.ranges.len()).sum())?;
+    for host in hosts {
+        for range in host.ranges {
+            records.push(encode_range_back(host, *range, limits)?);
         }
     }
     encode_repeated_message(2, &records, limits.max_output_bytes)
@@ -2899,7 +2997,7 @@ fn encode_range_back(
         )?,
         message_field_len(4, internal.len())?,
     )?;
-    ensure_limit("encoded range record", size, limits.max_output_bytes)?;
+    ensure_limit(LimitKind::OutputBytes, size, limits.max_output_bytes)?;
     let mut output = try_vec_bytes(size)?;
     append_varint(&mut output, 1, u64::from(host.row));
     append_varint(&mut output, 2, u64::from(host.column));
@@ -2963,7 +3061,7 @@ fn encode_from_to_range(fact: RangeFact<'_>, limits: Limits) -> Result<Vec<u8>, 
         message_field_len(1, from.len())?,
         message_field_len(2, rect.len())?,
     )?;
-    ensure_limit("encoded tiled range", output_len, limits.max_output_bytes)?;
+    ensure_limit(LimitKind::OutputBytes, output_len, limits.max_output_bytes)?;
     let mut output = try_vec_bytes(output_len)?;
     append_message(&mut output, 1, &from)?;
     append_message(&mut output, 2, &rect)?;
@@ -2999,7 +3097,7 @@ fn replace_repeated(
         .checked_sub(removed)
         .and_then(|value| value.checked_add(inserted))
         .ok_or(Error::InvalidGraph)?;
-    ensure_limit("wire output", size, limits.max_output_bytes())?;
+    ensure_limit(LimitKind::OutputBytes, size, limits.max_output_bytes())?;
     let mut output = try_vec_bytes(size)?;
     let mut emitted = false;
     for field in view.fields() {
@@ -3029,7 +3127,7 @@ fn encode_repeated_message(
     let size = payloads.iter().try_fold(0usize, |sum, payload| {
         checked_add(sum, message_field_len(number, payload.len())?)
     })?;
-    ensure_limit("encoded repeated message", size, maximum)?;
+    ensure_limit(LimitKind::OutputBytes, size, maximum)?;
     let mut output = try_vec_bytes(size)?;
     append_payloads(&mut output, number, payloads)?;
     Ok(output)
@@ -3059,7 +3157,7 @@ fn encode_empty_cell_tile(
             varint_field_len(3, u64::from(tile_row_begin))?,
         )?,
     )?;
-    ensure_limit("encoded empty cell tile", size, limits.max_output_bytes)?;
+    ensure_limit(LimitKind::OutputBytes, size, limits.max_output_bytes)?;
     let mut output = try_vec_bytes(size)?;
     append_varint(&mut output, 1, u64::from(internal_owner));
     append_varint(&mut output, 2, u64::from(tile_column_begin));
@@ -3368,7 +3466,7 @@ fn remaining_decode_options(
         .ok_or(Error::InvalidGraph)?;
     if fields == 0 || work == 0 {
         return Err(Error::Limit {
-            resource: "aggregate strict decode",
+            kind: LimitKind::Work,
             observed: report.fields.max(report.strict_work_bytes),
             maximum: limits.max_fields.max(limits.max_work_bytes),
         });
@@ -3468,8 +3566,8 @@ impl<'a> RangeFact<'a> {
 
 impl Preflight {
     fn new(graph: CompleteGraph<'_, '_>, limits: Limits) -> Result<Self, Error> {
-        ensure_limit("hosts", graph.hosts.len(), limits.max_hosts)?;
-        ensure_limit("messages", 1, limits.max_messages)?;
+        ensure_limit(LimitKind::Hosts, graph.hosts.len(), limits.max_hosts)?;
+        ensure_limit(LimitKind::Messages, 1, limits.max_messages)?;
         if graph.owners.is_empty() {
             return Err(Error::InvalidGraph);
         }
@@ -3482,7 +3580,7 @@ impl Preflight {
                 )?,
             )
         })?;
-        ensure_limit("messages", messages, limits.max_messages)?;
+        ensure_limit(LimitKind::Messages, messages, limits.max_messages)?;
         let mut source_bytes = graph.engine.payload.len();
         let mut cell_tiles = 0usize;
         let mut range_tiles = 0usize;
@@ -3528,7 +3626,11 @@ impl Preflight {
         if object_ids.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(Error::InvalidGraph);
         }
-        ensure_limit("source bytes", source_bytes, limits.max_source_bytes)?;
+        ensure_limit(
+            LimitKind::SourceBytes,
+            source_bytes,
+            limits.max_source_bytes,
+        )?;
 
         let mut precedents = 0usize;
         let mut ranges = 0usize;
@@ -3572,8 +3674,8 @@ impl Preflight {
             precedents = checked_add(precedents, host.precedents.len())?;
             ranges = checked_add(ranges, host.ranges.len())?;
         }
-        ensure_limit("precedents", precedents, limits.max_precedents)?;
-        ensure_limit("ranges", ranges, limits.max_ranges)?;
+        ensure_limit(LimitKind::Precedents, precedents, limits.max_precedents)?;
+        ensure_limit(LimitKind::Ranges, ranges, limits.max_ranges)?;
 
         let encoded_upper = checked_add(
             64,
@@ -3584,7 +3686,7 @@ impl Preflight {
         )?;
         let output_upper = checked_add(source_bytes, encoded_upper)?;
         ensure_limit(
-            "output preauthorization",
+            LimitKind::OutputBytes,
             output_upper,
             limits.max_output_bytes,
         )?;
@@ -3592,13 +3694,9 @@ impl Preflight {
             checked_add(source_bytes, output_upper)?,
             STRICT_WORK_MULTIPLIER,
         )?;
-        ensure_limit(
-            "strict work preauthorization",
-            strict_upper,
-            limits.max_work_bytes,
-        )?;
+        ensure_limit(LimitKind::Work, strict_upper, limits.max_work_bytes)?;
         let field_upper = checked_mul(checked_add(source_bytes, output_upper)?, 4)?;
-        ensure_limit("field preauthorization", field_upper, limits.max_fields)?;
+        ensure_limit(LimitKind::Fields, field_upper, limits.max_fields)?;
         // Each owner may gain one dependency tile (an owner without tiles,
         // such as a created workbook's table owner, gets its first one), so
         // the bound allows one more reference per owner (record 0309).
@@ -3610,7 +3708,7 @@ impl Preflight {
             graph.owners.len(),
         )?;
         ensure_limit(
-            "reference preauthorization",
+            LimitKind::References,
             reference_upper,
             limits.max_references,
         )?;
@@ -3629,11 +3727,7 @@ impl Preflight {
                 checked_add(checked_mul(ranges, 12)?, membership_work)?,
             )?,
         )?;
-        ensure_limit(
-            "graph work preauthorization",
-            graph_work,
-            limits.max_work_bytes,
-        )?;
+        ensure_limit(LimitKind::Work, graph_work, limits.max_work_bytes)?;
         let allocations = checked_add(
             64,
             checked_add(
@@ -3641,7 +3735,7 @@ impl Preflight {
                 checked_add(checked_mul(graph.hosts.len(), 10)?, checked_mul(ranges, 6)?)?,
             )?,
         )?;
-        ensure_limit("allocation events", allocations, limits.max_allocations)?;
+        ensure_limit(LimitKind::Allocations, allocations, limits.max_allocations)?;
         let peak_scratch_bytes = checked_add(
             checked_add(
                 encoded_upper,
@@ -3655,7 +3749,11 @@ impl Preflight {
                 )?,
             )?,
         )?;
-        ensure_limit("peak scratch", peak_scratch_bytes, limits.max_scratch_bytes)?;
+        ensure_limit(
+            LimitKind::ScratchBytes,
+            peak_scratch_bytes,
+            limits.max_scratch_bytes,
+        )?;
         let reference_count =
             graph
                 .owners
@@ -3692,7 +3790,7 @@ impl Preflight {
             checked_mul(outer_edits, size_of::<MessageEdit>())?,
         )?;
         ensure_limit(
-            "retained preauthorization",
+            LimitKind::RetainedBytes,
             retained_upper,
             limits.max_retained_bytes,
         )?;
@@ -3789,10 +3887,10 @@ fn checked_mul(left: usize, right: usize) -> Result<usize, Error> {
     left.checked_mul(right).ok_or(Error::InvalidGraph)
 }
 
-fn ensure_limit(resource: &'static str, observed: usize, maximum: usize) -> Result<(), Error> {
+fn ensure_limit(kind: LimitKind, observed: usize, maximum: usize) -> Result<(), Error> {
     if observed > maximum {
         return Err(Error::Limit {
-            resource,
+            kind,
             observed,
             maximum,
         });
@@ -3964,7 +4062,7 @@ mod tests {
         assert!(matches!(
             prepared.execute(refused),
             Err(Error::Limit {
-                resource: "execution output bytes",
+                kind: LimitKind::OutputBytes,
                 observed,
                 maximum,
             }) if observed == requirements.output_bytes && maximum + 1 == observed
@@ -3976,7 +4074,7 @@ mod tests {
         assert!(matches!(
             prepared.execute(refused),
             Err(Error::Limit {
-                resource: "execution retained bytes",
+                kind: LimitKind::RetainedBytes,
                 observed,
                 maximum,
             }) if observed == requirements.retained_bytes && maximum + 1 == observed
@@ -4005,10 +4103,14 @@ mod tests {
             assert!(matches!(
                 prepared.execute(refused),
                 Err(Error::Limit {
-                    resource: actual,
+                    kind: actual,
                     observed: actual_observed,
                     maximum,
-                }) if actual == resource
+                }) if actual == match resource {
+                    "execution hosts" => LimitKind::Hosts,
+                    "execution precedents" => LimitKind::Precedents,
+                    _ => LimitKind::Ranges,
+                }
                     && actual_observed == observed
                     && maximum + 1 == actual_observed
                     && actual_observed >= lower
@@ -4099,7 +4201,7 @@ mod tests {
         assert!(matches!(
             prepared.execute(refused),
             Err(Error::Limit {
-                resource: "execution output bytes",
+                kind: LimitKind::OutputBytes,
                 observed,
                 maximum,
             }) if observed == requirements.output_bytes && maximum + 1 == observed
@@ -4421,7 +4523,7 @@ mod tests {
         assert!(matches!(
             prepared.execute(refused),
             Err(Error::Limit {
-                resource: "execution retained bytes",
+                kind: LimitKind::RetainedBytes,
                 observed,
                 maximum,
             }) if observed == requirements.retained_bytes && maximum + 1 == observed
@@ -4435,7 +4537,7 @@ mod tests {
             assert_eq!(vector.capacity(), amount);
         }
         assert!(matches!(
-            ensure_limit("exact", 8_192, 8_191),
+            ensure_limit(LimitKind::Work, 8_192, 8_191),
             Err(Error::Limit {
                 observed: 8_192,
                 maximum: 8_191,
@@ -4551,7 +4653,7 @@ mod tests {
             assert!(matches!(
                 SourceAdmission::new(graph, one_less),
                 Err(Error::Limit {
-                    resource: "source scratch preauthorization",
+                    kind: LimitKind::ScratchBytes,
                     ..
                 })
             ));
@@ -4856,7 +4958,7 @@ mod tests {
                 }
             ),
             Err(Error::Limit {
-                resource: "source scratch preauthorization",
+                kind: LimitKind::ScratchBytes,
                 ..
             })
         ));

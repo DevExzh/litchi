@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_common::{WireLimits, color::RgbColorSpace, wire::WireView};
 use litchi_iwa_protos::pages_section_background_codec::{
     self as codec, BackgroundSnapshot, BackgroundWrite, DecodeOptions, RgbSpace,
@@ -169,12 +168,12 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             transaction_path(Path::Package),
         )
         .map_err(map_transaction)?;
-    let catalog = SourceCatalog::from_shared_bytes(
-        Arc::clone(patch.target_artifact()),
-        source.state.source.limits(),
-    )
-    .map_err(transaction::map_archive_error)
-    .map_err(map_transaction)?;
+    let catalog = source
+        .state
+        .source
+        .reopen(Arc::clone(patch.target_artifact()))
+        .map_err(transaction::map_archive_error)
+        .map_err(map_transaction)?;
     let candidate = Package::from_source_catalog(catalog)
         .map_err(transaction::map_package_error)
         .map_err(map_transaction)?;

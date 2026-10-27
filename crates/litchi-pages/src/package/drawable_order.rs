@@ -12,7 +12,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
 };
@@ -524,9 +524,11 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source =
-            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), self.state.source.limits())
-                .map_err(map_archive_error)?;
+        let candidate_source = self
+            .state
+            .source
+            .reopen(Arc::clone(&patch.target))
+            .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         let (candidate_location, candidate_order) = read_order(&candidate)?;
@@ -982,8 +984,7 @@ fn rewrite_order(
             catalog.limits(),
         )
         .map_err(map_archive_error)?;
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
-        .map_err(map_archive_error)?;
+    let candidate_source = catalog.reopen(output.into()).map_err(map_archive_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
 

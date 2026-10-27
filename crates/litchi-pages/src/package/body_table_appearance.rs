@@ -502,11 +502,11 @@ impl Package {
         budget.charge_output_bytes(target_owner.len(), Path::Package)?;
         budget.charge_transaction_work(target_owner.len().saturating_mul(2), Path::Package)?;
         budget.preflight_candidate_reopen_bytes(target_owner.as_ref(), Path::Package)?;
-        let candidate_source = SourceCatalog::from_shared_bytes(
-            Arc::<[u8]>::from(target_owner.as_slice()),
-            self.state.source.limits(),
-        )
-        .map_err(|error| map_archive_error(error, Path::Package))?;
+        let candidate_source = self
+            .state
+            .source
+            .reopen(Arc::<[u8]>::from(target_owner.as_slice()))
+            .map_err(|error| map_archive_error(error, Path::Package))?;
         budget.preflight_candidate_catalog(&candidate_source, Path::Package)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
@@ -664,9 +664,12 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .execute(requirements.exact_limits())
         .map_err(|error| map_archive_error(error, edit_path))?;
     budget.preflight_candidate_reopen_bytes(target_bytes.as_slice(), edit_path)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes(target_bytes.into(), edit.source.state.source.limits())
-            .map_err(|error| map_archive_error(error, edit_path))?;
+    let candidate_source = edit
+        .source
+        .state
+        .source
+        .reopen(target_bytes.into())
+        .map_err(|error| map_archive_error(error, edit_path))?;
     budget.preflight_candidate_catalog(&candidate_source, edit_path)?;
     let package =
         Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;

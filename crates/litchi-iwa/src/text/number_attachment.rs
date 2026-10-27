@@ -139,6 +139,7 @@ pub(crate) fn remove_text_number_attachment(
     package: &mut HostPackage,
     storage_id: u64,
     id: TextNumberAttachmentId,
+    prune: bool,
 ) -> Result<TextNumberAttachment> {
     let removed = number_attachment_by_id(package, storage_id, id)?;
     require_exclusive_storage_reference(
@@ -154,6 +155,9 @@ pub(crate) fn remove_text_number_attachment(
         .ok_or_else(|| Error::ParseError("number-attachment range overflow".to_owned()))?;
     let mut staged = package.clone();
     replace_storage_text(&mut staged, storage_id, start..end, "")?;
+    if prune {
+        prune_exclusive_number_attachment(&mut staged, storage_id, native_object_id(id))?;
+    }
     let verified = roundtrip(&staged)?;
     if text_number_attachments(&verified, storage_id)?
         .iter()
@@ -165,6 +169,55 @@ pub(crate) fn remove_text_number_attachment(
     }
     *package = staged;
     Ok(removed)
+}
+
+/// Delete a removed attachment object the text rewrite could not prune.
+///
+/// `replace_storage_text` prunes a removed reference only when the storage
+/// header's reference list is exactly the payload's references; a header
+/// that also lists references the payload does not count (common in
+/// application-saved storages) left the object and its header reference
+/// behind (host defect, record 0371; fixed for Pages storages, where the
+/// leaf `number_attachment` family deletes the object). The exclusivity proof above already
+/// showed that only this storage references the object, and the placeholder
+/// is gone, so the header reference and the object are deleted here.
+fn prune_exclusive_number_attachment(
+    package: &mut HostPackage,
+    storage_id: u64,
+    identifier: u64,
+) -> Result<()> {
+    let location = locate_attachment_storage(package, storage_id)?;
+    let archive_name = location.archive_name;
+    if package.archive(&archive_name)?.object(identifier).is_none() {
+        return Ok(());
+    }
+    package.update_archive(&archive_name, |archive| {
+        let object = archive.object_mut(storage_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("text storage object {storage_id} disappeared"))
+        })?;
+        let info = object
+            .archive_info
+            .message_infos
+            .get_mut(location.message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "text storage object {storage_id} has no metadata for its storage message"
+                ))
+            })?;
+        info.object_references
+            .retain(|reference| *reference != identifier);
+        for field in &mut info.field_infos {
+            field
+                .object_references
+                .retain(|reference| *reference != identifier);
+        }
+        Ok(())
+    })?;
+    remove_unreferenced_number_attachment_objects(
+        package,
+        &archive_name,
+        &HashSet::from([identifier]),
+    )
 }
 
 pub(crate) fn remove_unreferenced_number_attachment_objects(

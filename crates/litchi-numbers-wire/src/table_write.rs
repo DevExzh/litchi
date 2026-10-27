@@ -149,14 +149,14 @@ fn fixed32_field(output: &mut Vec<u8>, number: u32, value: u32, limits: &Limits)
     append(output, &value.to_le_bytes(), limits)
 }
 
-struct Field<'a> {
-    number: u32,
-    wire_type: u8,
-    raw: &'a [u8],
-    payload: &'a [u8],
+pub(crate) struct Field<'a> {
+    pub(crate) number: u32,
+    pub(crate) wire_type: u8,
+    pub(crate) raw: &'a [u8],
+    pub(crate) payload: &'a [u8],
 }
 
-fn fields<'a>(data: &'a [u8], limits: &Limits) -> Result<Vec<Field<'a>>> {
+pub(crate) fn fields<'a>(data: &'a [u8], limits: &Limits) -> Result<Vec<Field<'a>>> {
     limits.check_input(data.len()).map_err(map_limits)?;
     let view = WireView::parse(data, limits.wire()).map_err(map_wire_error)?;
     let count = view.fields().count();
@@ -218,7 +218,7 @@ fn varint(payload: &[u8]) -> Result<u64> {
     Ok(value)
 }
 
-fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>> {
+pub(crate) fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>> {
     let mut found = None;
     for field in fields(data, limits)? {
         if field.number == number {
@@ -230,7 +230,11 @@ fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64
     Ok(found)
 }
 
-fn single_bytes<'a>(data: &'a [u8], number: u32, limits: &Limits) -> Result<Option<&'a [u8]>> {
+pub(crate) fn single_bytes<'a>(
+    data: &'a [u8],
+    number: u32,
+    limits: &Limits,
+) -> Result<Option<&'a [u8]>> {
     let mut found = None;
     for field in fields(data, limits)? {
         if field.number == number {
@@ -495,6 +499,78 @@ pub fn tile_cell(
     Ok(None)
 }
 
+/// `previous` without its formula: the formula reference, the cached result
+/// and every other value field go, the cell's metadata stays (the
+/// formula-removal half of a write into a formula cell, record 0376a).
+///
+/// # Errors
+///
+/// [`WriteError::Unsupported`] for a formula with a formula-error entry;
+/// [`WriteError::Invalid`] for malformed BNC.
+pub fn formula_free(previous: &[u8], limits: &Limits) -> Result<Vec<u8>> {
+    let mut cell = BncCell::parse(previous, limits).map_err(map_bnc_error)?;
+    if cell.formula_error_identifier().is_some() {
+        return Err(WriteError::Unsupported);
+    }
+    cell.clear_value_preserving_metadata();
+    cell.encode(limits).map_err(map_bnc_error)
+}
+
+/// `cell`, holding a formula's cached result, with the formula-list key
+/// `key` attached (the host's order: cached value first, then the formula).
+///
+/// # Errors
+///
+/// [`WriteError::Invalid`] for malformed BNC.
+pub fn with_formula(cell: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
+    let mut cell = BncCell::parse(cell, limits).map_err(map_bnc_error)?;
+    cell.set_formula_reference(key);
+    cell.encode(limits).map_err(map_bnc_error)
+}
+
+/// Every stored BNC cell of a modern tile, as `(local row, column, bytes)`
+/// in row then column order (the formula-cache refresh's tile scan).
+pub(crate) fn stored_cells<'a>(
+    tile: &'a [u8],
+    limits: &Limits,
+) -> Result<Vec<(u32, u32, &'a [u8])>> {
+    let mut cells = Vec::new();
+    for field in fields(tile, limits)? {
+        if field.number != 5 {
+            continue;
+        }
+        let row = single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?;
+        let row = u32::try_from(row).map_err(|_| WriteError::Invalid)?;
+        let (Some(storage), Some(offsets)) = (
+            single_bytes(field.payload, 6, limits)?,
+            single_bytes(field.payload, 7, limits)?,
+        ) else {
+            return Err(WriteError::Unsupported);
+        };
+        let unit = if single_varint(field.payload, 8, limits)?.unwrap_or(0) != 0 {
+            4
+        } else {
+            1
+        };
+        for (column, slot) in slots(storage, offsets, unit, limits)?
+            .into_iter()
+            .enumerate()
+        {
+            let Some((start, end)) = slot else {
+                continue;
+            };
+            let column = u32::try_from(column).map_err(|_| WriteError::Invalid)?;
+            let next = cells.len().checked_add(1).ok_or(WriteError::Invalid)?;
+            limits.check_items(next).map_err(map_limits)?;
+            cells
+                .try_reserve(1)
+                .map_err(|_| WriteError::Allocation { requested: 1 })?;
+            cells.push((row, column, &storage[start..end]));
+        }
+    }
+    Ok(cells)
+}
+
 /// Set (`Some`) or remove (`None`) the BNC cell at `local_row`/`column` of
 /// a modern tile with `columns` table columns; a missing row is inserted in
 /// row order.
@@ -508,6 +584,42 @@ pub fn tile_set_cell(
     column: u32,
     columns: u32,
     cell: Option<&[u8]>,
+    limits: &Limits,
+) -> Result<TileCellWrite> {
+    tile_set_cell_placed(tile, local_row, column, columns, cell, false, limits)
+}
+
+/// [`tile_set_cell`], writing a new row after every stored row in field
+/// order: after the last row record, before the tile's storage-version
+/// fields, as the Numbers host writer's encoder places it (record 0370b).
+/// [`tile_set_cell`] appends such a row after them, as the Pages and
+/// Keynote host writers do.
+///
+/// # Errors
+///
+/// As [`tile_set_cell`].
+pub fn tile_set_cell_in_field_order(
+    tile: &[u8],
+    local_row: u32,
+    column: u32,
+    columns: u32,
+    cell: Option<&[u8]>,
+    limits: &Limits,
+) -> Result<TileCellWrite> {
+    tile_set_cell_placed(tile, local_row, column, columns, cell, true, limits)
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "one row rewrite: decode, splice, new row and row count"
+)]
+fn tile_set_cell_placed(
+    tile: &[u8],
+    local_row: u32,
+    column: u32,
+    columns: u32,
+    cell: Option<&[u8]>,
+    field_order: bool,
     limits: &Limits,
 ) -> Result<TileCellWrite> {
     if single_varint(tile, 6, limits)? != Some(5) || single_varint(tile, 7, limits)? != Some(1) {
@@ -530,9 +642,17 @@ pub fn tile_set_cell(
         .map_err(|_| WriteError::Allocation {
             requested: row_count,
         })?;
+    // A new row's offset table takes the widest existing row's capacity
+    // (native rows keep spare slots), as the Numbers host writer sizes it
+    // (record 0370).
+    let mut capacity = columns_usize;
     for field in tile_fields.iter().filter(|field| field.number == 5) {
         rows.push(single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?);
+        if let Some(offsets) = single_bytes(field.payload, 7, limits)? {
+            capacity = capacity.max(offsets.len() / 2);
+        }
     }
+    limits.check_items(capacity).map_err(map_limits)?;
     limits.check_items(rows.len()).map_err(map_limits)?;
     let numrows = single_varint(tile, 4, limits)?.ok_or(WriteError::Invalid)?;
     let counts_rows = numrows == rows.len() as u64;
@@ -584,6 +704,11 @@ pub fn tile_set_cell(
         };
         cells[column] = cell;
         let count = cells.iter().filter(|cell| cell.is_some()).count() as u64;
+        if count == 0 {
+            // A row left without cells goes, as the host writer drops it
+            // (record 0370; native tiles store no empty rows).
+            return Ok(None);
+        }
         let (storage, offsets) = encode(&cells, unit, limits)?;
         Ok(Some(rebuild(row, limits, |field| match field.number {
             2 => {
@@ -609,11 +734,11 @@ pub fn tile_set_cell(
         limits.check_items(columns_usize).map_err(map_limits)?;
         let mut cells = Vec::new();
         cells
-            .try_reserve_exact(columns_usize)
+            .try_reserve_exact(capacity)
             .map_err(|_| WriteError::Allocation {
-                requested: columns_usize,
+                requested: capacity,
             })?;
-        cells.resize(columns_usize, None);
+        cells.resize(capacity, None);
         cells[column] = Some(cell);
         let (storage, offsets) = encode(&cells, 1, limits)?;
         let mut row = Vec::new();
@@ -633,9 +758,33 @@ pub fn tile_set_cell(
     let exists = rows.contains(&u64::from(local_row));
     let mut row_index = 0_usize;
     let mut inserted = false;
+    let mut removed = false;
     let mut output = Vec::new();
     reserve(&mut output, tile.len().min(limits.max_output_bytes()))?;
-    for field in fields(tile, limits)? {
+    // In field order, a row after every stored row follows the last row
+    // record (or, in a tile without rows, precedes the storage-version
+    // fields); otherwise it goes last.
+    let all_fields = fields(tile, limits)?;
+    let trailing = if field_order {
+        all_fields
+            .iter()
+            .rposition(|field| field.number == 5)
+            .map(|last| last + 1)
+            .or_else(|| all_fields.iter().position(|field| field.number > 5))
+            .unwrap_or(all_fields.len())
+    } else {
+        all_fields.len()
+    };
+    for (position, field) in all_fields.into_iter().enumerate() {
+        if position == trailing
+            && !exists
+            && insert_before.is_none()
+            && let Some(cell) = cell
+        {
+            let row = new_row(cell)?;
+            append(&mut output, &row, limits)?;
+            inserted = true;
+        }
         if field.number == 5 {
             let this = row_index;
             row_index += 1;
@@ -648,8 +797,10 @@ pub fn tile_set_cell(
             }
             if single_varint(field.payload, 1, limits)? == Some(u64::from(local_row)) {
                 found = true;
-                let row = rewritten_row(field.payload)?.ok_or(WriteError::Invalid)?;
-                bytes_field(&mut output, 5, &row, limits)?;
+                match rewritten_row(field.payload)? {
+                    Some(row) => bytes_field(&mut output, 5, &row, limits)?,
+                    None => removed = true,
+                }
                 continue;
             }
         }
@@ -663,15 +814,24 @@ pub fn tile_set_cell(
         }
     }
     let _ = found;
-    if inserted {
+    if inserted || removed {
         let new_numrows = if counts_rows {
-            numrows.checked_add(1).ok_or(WriteError::Invalid)?
-        } else {
+            if inserted {
+                numrows.checked_add(1).ok_or(WriteError::Invalid)?
+            } else {
+                numrows.checked_sub(1).ok_or(WriteError::Invalid)?
+            }
+        } else if inserted {
             numrows.max(
                 u64::from(local_row)
                     .checked_add(1)
                     .ok_or(WriteError::Invalid)?,
             )
+        } else {
+            rows.iter()
+                .filter(|row| **row != u64::from(local_row))
+                .max()
+                .map_or(0, |row| row + 1)
         };
         output = rebuild(&output, limits, |field| {
             if field.number != 4 {
@@ -688,8 +848,31 @@ pub fn tile_set_cell(
     })
 }
 
+/// Whether a `TST.HeaderStorageBucket.Header` holds only its index, a zero
+/// size, a visible hiding state and its cell count.
+fn header_is_bare(header: &[u8], limits: &Limits) -> Result<bool> {
+    for field in fields(header, limits)? {
+        match field.number {
+            1 | 4 => {},
+            2 => {
+                if field.payload.iter().any(|byte| *byte != 0) {
+                    return Ok(false);
+                }
+            },
+            3 => {
+                if single_varint(header, 3, limits)? != Some(0) {
+                    return Ok(false);
+                }
+            },
+            _ => return Ok(false),
+        }
+    }
+    Ok(true)
+}
+
 /// Add `delta` to the cell count of header `index` in a header bucket,
-/// creating the header (size 0, visible) when it has none.
+/// creating the header (size 0, visible) when it has none; a bare header
+/// left counting no cell goes.
 ///
 /// # Errors
 ///
@@ -719,6 +902,11 @@ pub fn header_adjust(bucket: &[u8], index: u32, delta: i64, limits: &Limits) -> 
             .and_then(|cells| cells.checked_add(delta))
             .filter(|after| *after >= 0)
             .ok_or(WriteError::Unsupported)?;
+        if after == 0 && header_is_bare(field.payload, limits)? {
+            // A header left counting no cell and carrying nothing else goes,
+            // as the host writer drops it (record 0370).
+            return Ok(Some(Vec::new()));
+        }
         let header = rebuild(field.payload, limits, |inner| {
             if inner.number != 4 {
                 return Ok(None);
@@ -839,7 +1027,8 @@ pub fn list_intern(list: &[u8], text: &str, limits: &Limits) -> Result<(Vec<u8>,
 }
 
 /// Drop one reference to string entry `key`; an entry left without
-/// references goes.
+/// references goes, and when it held the list's last key, `next_list_id`
+/// takes that key back.
 ///
 /// # Errors
 ///
@@ -847,7 +1036,7 @@ pub fn list_intern(list: &[u8], text: &str, limits: &Limits) -> Result<(Vec<u8>,
 /// a key the list does not hold.
 pub fn list_release(list: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
     let mut done = false;
-    let output = rebuild(list, limits, |field| {
+    let mut output = rebuild(list, limits, |field| {
         if field.number != 3 || single_varint(field.payload, 1, limits)? != Some(u64::from(key)) {
             return Ok(None);
         }
@@ -873,6 +1062,23 @@ pub fn list_release(list: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
     })?;
     if !done {
         return Err(WriteError::Unsupported);
+    }
+    // A removed last key is handed back, as the Numbers cell writers do
+    // (record 0370).
+    if single_varint(&output, 2, limits)? == Some(u64::from(key) + 1)
+        && !fields(&output, limits)?.iter().any(|field| {
+            field.number == 3
+                && single_varint(field.payload, 1, limits).ok().flatten() == Some(u64::from(key))
+        })
+    {
+        output = rebuild(&output, limits, |field| {
+            if field.number != 2 {
+                return Ok(None);
+            }
+            let mut replacement = Vec::new();
+            varint_field(&mut replacement, 2, u64::from(key), limits)?;
+            Ok(Some(replacement))
+        })?;
     }
     Ok(output)
 }

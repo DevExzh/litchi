@@ -589,8 +589,11 @@ pub(super) fn delete_formula_dependencies(
     axis: DependencyAxis,
     deletion: u32,
     retained_hosts: Vec<FormulaHostCoordinate>,
+    extents: (TableExtents, TableExtents),
 ) -> Result<()> {
     let retained_hosts = FormulaHostRetentions::new(retained_hosts, axis, deletion)?;
+    // Host defect fixed with record 0370b: a removal left the spanning
+    // dependencies' body range at the old header and footer edges.
     mutate_formula_dependencies(
         package,
         table_info_id,
@@ -599,7 +602,7 @@ pub(super) fn delete_formula_dependencies(
         DependencyMutation::Delete,
         false,
         &retained_hosts,
-        None,
+        Some(extents),
     )
 }
 

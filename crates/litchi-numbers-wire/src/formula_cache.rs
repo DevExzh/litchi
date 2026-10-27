@@ -8,8 +8,14 @@
 
 use core::mem::size_of;
 
-use super::formula_metadata;
-use crate::formula::{CachedKind, CachedValue};
+use crate::formula_dependencies;
+
+/// Formula authoring and removal for the Keynote and Pages table owners
+/// (record 0376a).
+pub mod author;
+/// The dependent-cache refresh of value writes for the Keynote and Pages
+/// table owners (record 0376).
+pub mod refresh;
 use litchi_iwa_common::formula::{FiniteF64, FormulaCachedValue};
 use litchi_iwa_common::{varint, wire::WireView};
 use litchi_iwa_protos::{
@@ -32,37 +38,37 @@ const FORMULA_NESTING_CEILING: u32 = 32;
 
 /// Stable identity of the selected native formula owner/table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct TableIdentity {
-    pub(super) owner: u32,
-    pub(super) uuid_lower: u64,
-    pub(super) uuid_upper: u64,
+pub struct TableIdentity {
+    pub owner: u32,
+    pub uuid_lower: u64,
+    pub uuid_upper: u64,
 }
 
 /// Geometry for one owner participating in the final dependency graph.
 /// Internal owner IDs and opaque source identities are both unique.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct TableGeometry {
-    pub(super) identity: TableIdentity,
-    pub(super) rows: u32,
-    pub(super) columns: u32,
-    pub(super) header_rows: u32,
-    pub(super) header_columns: u32,
-    pub(super) footer_rows: u32,
+pub struct TableGeometry {
+    pub identity: TableIdentity,
+    pub rows: u32,
+    pub columns: u32,
+    pub header_rows: u32,
+    pub header_columns: u32,
+    pub footer_rows: u32,
 }
 
 /// A table-local cell coordinate used by native dependency records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Coordinate {
-    pub(super) row: u32,
-    pub(super) column: u32,
+pub struct Coordinate {
+    pub row: u32,
+    pub column: u32,
 }
 
 /// One scalar final-batch overlay value.
 #[derive(Debug, Clone)]
-pub(super) struct FinalCell {
-    pub(super) table: TableIdentity,
-    pub(super) coordinate: Coordinate,
-    pub(super) value: FinalValue,
+pub struct FinalCell {
+    pub table: TableIdentity,
+    pub coordinate: Coordinate,
+    pub value: FinalValue,
 }
 
 /// Content-free final overlay value offered to formula evaluation.
@@ -71,7 +77,7 @@ pub(super) struct FinalCell {
 /// Text remains aggregate-ignored/direct-poison, so the planner never clones
 /// authored string content.
 #[derive(Debug, Clone)]
-pub(super) struct FinalValue(FinalValueKind);
+pub struct FinalValue(FinalValueKind);
 
 #[derive(Debug, Clone)]
 enum FinalValueKind {
@@ -87,7 +93,7 @@ enum FinalValueKind {
 /// `TextScalar` refusal as an ignored value. Keeping this type copy-only lets
 /// external table baselines stay lazy without cloning owned strings.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) enum ScalarValue {
+pub enum ScalarValue {
     Number(FiniteF64),
     Boolean(bool),
     Date(FiniteF64),
@@ -95,36 +101,36 @@ pub(super) enum ScalarValue {
 }
 
 impl FinalValue {
-    pub(super) const fn clear() -> Self {
+    pub const fn clear() -> Self {
         Self(FinalValueKind::Clear)
     }
 
-    pub(super) const fn number(value: FiniteF64) -> Self {
+    pub const fn number(value: FiniteF64) -> Self {
         Self(FinalValueKind::Supported(ScalarValue::Number(value)))
     }
 
-    pub(super) const fn boolean(value: bool) -> Self {
+    pub const fn boolean(value: bool) -> Self {
         Self(FinalValueKind::Supported(ScalarValue::Boolean(value)))
     }
 
-    pub(super) const fn date(value: FiniteF64) -> Self {
+    pub const fn date(value: FiniteF64) -> Self {
         Self(FinalValueKind::Supported(ScalarValue::Date(value)))
     }
 
-    pub(super) const fn duration(value: FiniteF64) -> Self {
+    pub const fn duration(value: FiniteF64) -> Self {
         Self(FinalValueKind::Supported(ScalarValue::Duration(value)))
     }
 
-    pub(super) const fn aggregate_ignored() -> Self {
+    pub const fn aggregate_ignored() -> Self {
         Self(FinalValueKind::AggregateIgnored)
     }
 
-    fn supported(&self) -> Result<Option<ScalarValue>, Failure> {
+    fn supported(&self) -> Result<Option<ScalarValue>, Error> {
         match &self.0 {
             FinalValueKind::Clear => Ok(None),
             FinalValueKind::Supported(value) => Ok(Some(*value)),
             FinalValueKind::AggregateIgnored => {
-                Err(Failure::UnsupportedDependency(Unsupported::TextScalar))
+                Err(Error::UnsupportedDependency(Unsupported::TextScalar))
             },
         }
     }
@@ -132,20 +138,20 @@ impl FinalValue {
 
 /// A raw dependency object selected from the owning IWA component.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct DependencyPayload<'source> {
-    pub(super) identifier: u64,
-    pub(super) bytes: &'source [u8],
+pub struct DependencyPayload<'source> {
+    pub identifier: u64,
+    pub bytes: &'source [u8],
 }
 
 /// One formula cell whose display cache can be rewritten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct FormulaCell {
+pub struct FormulaCell {
     /// Native internal formula-owner ID.
-    pub(super) owner: u32,
+    pub owner: u32,
     /// Physical table coordinate.
-    pub(super) coordinate: Coordinate,
+    pub coordinate: Coordinate,
     /// IWA object containing this cell's formula cache entry.
-    pub(super) cache_object: u64,
+    pub cache_object: u64,
 }
 
 /// One authored formula which must participate in this transaction's dirty
@@ -153,26 +159,42 @@ pub(super) struct FormulaCell {
 /// formulas evaluate and require exact equality; unsupported leaves may keep
 /// the supplied cache or omit a cache entirely.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct AuthoredFormulaCache<'cache> {
-    pub(super) owner: u32,
-    pub(super) coordinate: Coordinate,
-    pub(super) supplied: Option<&'cache CachedValue>,
+pub struct AuthoredFormulaCache<'cache> {
+    pub owner: u32,
+    pub coordinate: Coordinate,
+    pub supplied: Option<SuppliedCache<'cache>>,
+}
+
+/// A cached result supplied beside an authored formula, borrowed from the
+/// caller's semantic value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SuppliedCache<'cache> {
+    /// A finite numeric result.
+    Number(FiniteF64),
+    /// A textual result.
+    Text(&'cache str),
+    /// A Boolean result.
+    Boolean(bool),
+    /// An Apple-epoch date result.
+    Date(FiniteF64),
+    /// A duration result in seconds.
+    Duration(FiniteF64),
 }
 
 /// Complete final formula artifacts borrowed from the physical authoring
 /// planner. All slices describe the post-edit package state.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct FinalFormulaSet<'source> {
-    pub(super) tables: &'source [TableGeometry],
+pub struct FinalFormulaSet<'source> {
+    pub tables: &'source [TableGeometry],
     /// Complete authoritative source BNC formula cells. Raw selected-owner
     /// dependency hosts are validated against this pre-edit index before the
     /// logical final graph is applied.
-    pub(super) source_cells: &'source [FormulaCell],
+    pub source_cells: &'source [FormulaCell],
     /// Complete final BNC formula cells after the edit overlay.
-    pub(super) cells: &'source [FormulaCell],
-    pub(super) entries: &'source [FormulaListEntry<'source>],
-    pub(super) payloads: &'source [FormulaPayload<'source>],
-    pub(super) authored: &'source [AuthoredFormulaCache<'source>],
+    pub cells: &'source [FormulaCell],
+    pub entries: &'source [FormulaListEntry<'source>],
+    pub payloads: &'source [FormulaPayload<'source>],
+    pub authored: &'source [AuthoredFormulaCache<'source>],
 }
 
 /// One formula host discovered in the selected owner's dependency records.
@@ -180,42 +202,42 @@ pub(super) struct FinalFormulaSet<'source> {
 /// The storage join deliberately remains outside this module: callers match
 /// this semantic key to the complete formula-cell index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct FormulaHost {
-    pub(super) owner: u32,
-    pub(super) coordinate: Coordinate,
+pub struct FormulaHost {
+    pub owner: u32,
+    pub coordinate: Coordinate,
 }
 
 /// All byte sources used to construct a single dependency graph.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct CacheSource<'source> {
+pub struct CacheSource<'source> {
     /// The table being edited. Other registry entries are read-only inputs.
-    pub(super) selected_table: TableIdentity,
+    pub selected_table: TableIdentity,
     /// Complete, sorted owner registry involved in this final graph.
-    pub(super) tables: &'source [TableGeometry],
+    pub tables: &'source [TableGeometry],
     /// The one rooted `CalculationEngineArchive` payload.
-    pub(super) engine: &'source [u8],
+    pub engine: &'source [u8],
     /// Referenced `FormulaOwnerDependenciesArchive` payloads.
-    pub(super) owners: &'source [DependencyPayload<'source>],
+    pub owners: &'source [DependencyPayload<'source>],
     /// Referenced `CellRecordTileArchive` payloads.
-    pub(super) record_tiles: &'source [DependencyPayload<'source>],
+    pub record_tiles: &'source [DependencyPayload<'source>],
     /// Referenced `RangePrecedentsTileArchive` payloads.
-    pub(super) range_tiles: &'source [DependencyPayload<'source>],
+    pub range_tiles: &'source [DependencyPayload<'source>],
     /// Formula cells in every involved table, sorted owner-qualified.
-    pub(super) formulas: &'source [FormulaCell],
+    pub formulas: &'source [FormulaCell],
     /// Complete source formula cells used only to prove raw selected-owner
     /// dependency host coverage before logical replacement/removal.
-    pub(super) source_formulas: &'source [FormulaCell],
+    pub source_formulas: &'source [FormulaCell],
 }
 
 fn validate_table_registry(
     tables: &[TableGeometry],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
-    check_limit(tables.len(), limits.graph_nodes)?;
+) -> Result<(), Error> {
+    check_limit(tables.len(), limits.graph_nodes, LimitKind::GraphNodes)?;
     graph_step(
         usage,
-        tables.len().checked_mul(2).ok_or(Failure::InvalidSource)?,
+        tables.len().checked_mul(2).ok_or(Error::InvalidSource)?,
         limits,
     )?;
     if tables.is_empty()
@@ -233,7 +255,7 @@ fn validate_table_registry(
                 || table.header_columns > table.columns
         })
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut uid_order = Vec::new();
     scratch_allocation::<(u64, u64)>(usage, tables.len(), limits)?;
@@ -247,87 +269,159 @@ fn validate_table_registry(
     uid_order.sort_unstable();
     graph_step(usage, uid_order.len(), limits)?;
     if uid_order.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn table_by_owner(tables: &[TableGeometry], owner: u32) -> Result<TableGeometry, Failure> {
+fn table_by_owner(tables: &[TableGeometry], owner: u32) -> Result<TableGeometry, Error> {
     let position = tables
         .binary_search_by_key(&owner, |table| table.identity.owner)
-        .map_err(|_error| Failure::UnsupportedDependency(Unsupported::MissingOwner))?;
+        .map_err(|_error| Error::UnsupportedDependency(Unsupported::MissingOwner))?;
     Ok(tables[position])
 }
 
-fn selected_geometry(source: CacheSource<'_>) -> Result<TableGeometry, Failure> {
+fn selected_geometry(source: CacheSource<'_>) -> Result<TableGeometry, Error> {
     let table = table_by_owner(source.tables, source.selected_table.owner)?;
     if table.identity != source.selected_table {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(table)
 }
 
 /// A finite cache-planning policy.  Every limit is independent.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct CacheLimits {
-    pub(super) wire_bytes: usize,
-    pub(super) wire_fields: usize,
-    pub(super) wire_work: usize,
-    pub(super) wire_references: usize,
-    pub(super) wire_text: usize,
-    pub(super) nesting: u32,
-    pub(super) graph_nodes: usize,
-    pub(super) graph_edges: usize,
-    pub(super) cache_cells: usize,
+pub struct CacheLimits {
+    pub wire_bytes: usize,
+    pub wire_fields: usize,
+    pub wire_work: usize,
+    pub wire_references: usize,
+    pub wire_text: usize,
+    pub nesting: u32,
+    pub graph_nodes: usize,
+    pub graph_edges: usize,
+    pub cache_cells: usize,
     /// Evaluator-reported AST/evaluation operations.
-    pub(super) formula_work: usize,
+    pub formula_work: usize,
     /// Graph indexing, searches, edge scans, closure, and queue operations.
-    pub(super) graph_work: usize,
+    pub graph_work: usize,
     /// Total bytes retained by the successful output plan.
-    pub(super) retained_bytes: usize,
+    pub retained_bytes: usize,
     /// Conservative peak bytes retained by graph-planning scratch buffers.
-    pub(super) scratch_bytes: usize,
+    pub scratch_bytes: usize,
     /// Fallible vector-growth events during graph planning.
-    pub(super) allocations: usize,
+    pub allocations: usize,
 }
 
 /// Exact work performed by a successful cache plan.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(super) struct CacheUsage {
-    pub(super) wire_bytes: u64,
-    pub(super) wire_fields: u64,
-    pub(super) wire_work: u64,
-    pub(super) wire_references: u64,
-    pub(super) wire_text_bytes: u64,
-    pub(super) lookup_work: u64,
-    pub(super) queue_work: u64,
-    pub(super) formula_graph_builds: u64,
-    pub(super) formula_nodes: u64,
-    pub(super) formula_work: u64,
-    pub(super) graph_work: u64,
-    pub(super) dependency_edges: u64,
-    pub(super) dependency_range_queries: u64,
-    pub(super) dependency_range_candidates: u64,
-    pub(super) cache_cells_read: u64,
-    pub(super) cache_hosts_refreshed: u64,
-    pub(super) retained_elements: u64,
-    pub(super) retained_bytes: u64,
-    pub(super) peak_scratch_bytes: u64,
-    pub(super) allocations: u64,
+pub struct CacheUsage {
+    pub wire_bytes: u64,
+    pub wire_fields: u64,
+    pub wire_work: u64,
+    pub wire_references: u64,
+    pub wire_text_bytes: u64,
+    pub lookup_work: u64,
+    pub queue_work: u64,
+    pub formula_graph_builds: u64,
+    pub formula_nodes: u64,
+    pub formula_work: u64,
+    pub graph_work: u64,
+    pub dependency_edges: u64,
+    pub dependency_range_queries: u64,
+    pub dependency_range_candidates: u64,
+    pub cache_cells_read: u64,
+    pub cache_hosts_refreshed: u64,
+    pub retained_elements: u64,
+    pub retained_bytes: u64,
+    pub peak_scratch_bytes: u64,
+    pub allocations: u64,
 }
 
 /// A non-publishing dependency/cache planning failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Failure {
+#[non_exhaustive]
+pub enum Error {
+    /// The dependency graph, a formula or a cache is malformed.
     InvalidSource,
+    /// A dependency feature the conservative scalar evaluator declines.
     UnsupportedDependency(Unsupported),
-    LimitExceeded { observed: u64, maximum: u64 },
-    Allocation { amount: usize },
+    /// A caller-selected [`CacheLimits`] ceiling was exceeded.
+    Limit {
+        /// The exceeded dimension.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Selected maximum.
+        maximum: u64,
+    },
+    /// A fallible allocation failed.
+    Allocation {
+        /// Requested element or byte count.
+        amount: usize,
+    },
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidSource => formatter.write_str("malformed Numbers formula graph or cache"),
+            Self::UnsupportedDependency(reason) => {
+                write!(formatter, "unsupported formula dependency: {reason:?}")
+            },
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "formula cache {kind:?} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::Allocation { amount } => {
+                write!(formatter, "formula cache allocation of {amount} failed")
+            },
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+/// The [`CacheLimits`] dimension an [`Error::Limit`] names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitKind {
+    /// [`CacheLimits::wire_bytes`].
+    WireBytes,
+    /// [`CacheLimits::wire_fields`].
+    WireFields,
+    /// [`CacheLimits::wire_work`].
+    WireWork,
+    /// [`CacheLimits::wire_references`].
+    WireReferences,
+    /// [`CacheLimits::wire_text`].
+    WireText,
+    /// [`CacheLimits::nesting`].
+    Nesting,
+    /// [`CacheLimits::graph_nodes`].
+    GraphNodes,
+    /// [`CacheLimits::graph_edges`].
+    GraphEdges,
+    /// [`CacheLimits::cache_cells`].
+    CacheCells,
+    /// [`CacheLimits::formula_work`].
+    FormulaWork,
+    /// [`CacheLimits::graph_work`].
+    GraphWork,
+    /// [`CacheLimits::retained_bytes`].
+    RetainedBytes,
+    /// [`CacheLimits::scratch_bytes`].
+    ScratchBytes,
+    /// [`CacheLimits::allocations`].
+    Allocations,
 }
 
 /// The exact dependency feature this conservative scalar evaluator declines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Unsupported {
+pub enum Unsupported {
     Volatile,
     Spanning,
     WholeOwner,
@@ -339,127 +433,132 @@ pub(super) enum Unsupported {
     TextScalar,
     CacheType,
     HeaderNameManager,
+    /// A tile or cell shape outside the shared cell writer (record 0376).
+    Storage,
+    /// A dependency-graph shape the shared rewrite does not regenerate, such
+    /// as the selected table's mirrored range records (record 0376a).
+    Graph,
 }
 
 /// A cache cell rewrite.  The owner is retained to make raw list rewrites
 /// deterministic when one cache object contains more than one formula owner.
 #[derive(Debug, Clone)]
-pub(super) struct CacheCellRewrite {
-    pub(super) owner: u32,
-    pub(super) coordinate: Coordinate,
-    pub(super) value: FormulaCachedValue,
+pub struct CacheCellRewrite {
+    pub owner: u32,
+    pub coordinate: Coordinate,
+    pub value: FormulaCachedValue,
 }
 
 /// All cache-cell rewrites for one IWA cache object.
 #[derive(Debug, Clone)]
-pub(super) struct CacheRewrite {
-    pub(super) cache_object: u64,
-    pub(super) cells: Vec<CacheCellRewrite>,
+pub struct CacheRewrite {
+    pub cache_object: u64,
+    pub cells: Vec<CacheCellRewrite>,
 }
 
 /// An old formula dependency entry to delete after a formula cell is replaced
 /// by a scalar or cleared in the final batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct DependencyRemoval {
-    pub(super) owner: u32,
-    pub(super) coordinate: Coordinate,
+pub struct DependencyRemoval {
+    pub owner: u32,
+    pub coordinate: Coordinate,
 }
 
 /// A complete, directional final-state cache plan.
 #[derive(Debug, Clone)]
-pub(super) struct CachePlan {
-    pub(super) rewrites: Vec<CacheRewrite>,
-    pub(super) removals: Vec<DependencyRemoval>,
-    pub(super) usage: CacheUsage,
+pub struct CachePlan {
+    pub rewrites: Vec<CacheRewrite>,
+    pub removals: Vec<DependencyRemoval>,
+    pub usage: CacheUsage,
 }
 
 /// Read a scalar cache value not supplied by the final-batch overlay.
-pub(super) trait CacheBaseline {
-    fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Failure>;
+pub trait CacheBaseline {
+    fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Error>;
 
-    fn lookup_work(&self, owner: u32) -> Result<usize, Failure>;
+    fn lookup_work(&self, owner: u32) -> Result<usize, Error>;
 }
 
 /// A final-state lookup offered to the supported formula evaluator.
-pub(super) trait CacheValues {
-    fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Failure>;
+pub trait CacheValues {
+    fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Error>;
 
     /// Exact comparison work for one `value` call, charged by the evaluator
     /// before executing any lookup.
-    fn lookup_work(&self, owner: u32) -> Result<usize, Failure>;
+    fn lookup_work(&self, owner: u32) -> Result<usize, Error>;
 }
 
 /// The storage kernel owns formula decoding.  This module owns dependency
 /// reachability and final-state ordering, and asks the kernel to evaluate only
 /// a scalar formula it recognizes. Implementations must honor the supplied
 /// remaining limits before allocating or invoking externally visible work.
-pub(super) trait CacheEvaluator {
+pub trait CacheEvaluator {
     /// Strictly enumerate this formula's owner-qualified local precedents.
     fn analyze(
         &mut self,
         formula: FormulaCell,
         limits: CacheLimits,
-    ) -> Result<FormulaAnalysis, Failure>;
+    ) -> Result<FormulaAnalysis, Error>;
 
     fn evaluate(
         &mut self,
         formula: FormulaCell,
         values: &dyn CacheValues,
         limits: CacheLimits,
-    ) -> Result<Evaluation, Failure>;
+    ) -> Result<Evaluation, Error>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct FormulaPrecedent {
-    pub(super) owner: u32,
-    pub(super) coordinate: Coordinate,
+pub struct FormulaPrecedent {
+    pub owner: u32,
+    pub coordinate: Coordinate,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(super) struct FormulaEvaluationUsage {
-    pub(super) wire_bytes: usize,
-    pub(super) wire_fields: usize,
-    pub(super) wire_work: usize,
-    pub(super) wire_text_bytes: usize,
-    pub(super) formula_work: usize,
-    pub(super) lookup_work: usize,
-    pub(super) graph_work: usize,
-    pub(super) scratch_bytes: usize,
-    pub(super) allocations: usize,
+pub struct FormulaEvaluationUsage {
+    pub wire_bytes: usize,
+    pub wire_fields: usize,
+    pub wire_work: usize,
+    pub wire_text_bytes: usize,
+    pub formula_work: usize,
+    pub lookup_work: usize,
+    pub graph_work: usize,
+    pub scratch_bytes: usize,
+    pub allocations: usize,
 }
 
 #[derive(Debug)]
-pub(super) struct FormulaAnalysis {
-    pub(super) precedents: Vec<FormulaPrecedent>,
-    pub(super) ranges: Vec<FormulaRange>,
-    pub(super) evaluation_supported: bool,
-    pub(super) usage: FormulaEvaluationUsage,
+pub struct FormulaAnalysis {
+    pub precedents: Vec<FormulaPrecedent>,
+    pub ranges: Vec<FormulaRange>,
+    pub evaluation_supported: bool,
+    pub usage: FormulaEvaluationUsage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct FormulaRange {
-    pub(super) owner: u32,
-    pub(super) top: u32,
-    pub(super) left: u32,
-    pub(super) bottom: u32,
-    pub(super) right: u32,
+pub struct FormulaRange {
+    pub owner: u32,
+    pub top: u32,
+    pub left: u32,
+    pub bottom: u32,
+    pub right: u32,
 }
 
 /// A scalar evaluator result with exact AST/evaluation work.
 #[derive(Debug, Clone)]
-pub(super) struct Evaluation {
-    pub(super) value: FormulaCachedValue,
-    pub(super) usage: FormulaEvaluationUsage,
+pub struct Evaluation {
+    pub value: FormulaCachedValue,
+    pub usage: FormulaEvaluationUsage,
 }
 
 /// One byte-exact formula table entry used by [`StrictEvaluator`].
 #[derive(Debug, Clone, Copy)]
-pub(super) struct FormulaPayload<'source> {
-    pub(super) owner: u32,
-    pub(super) coordinate: Coordinate,
+pub struct FormulaPayload<'source> {
+    pub owner: u32,
+    pub coordinate: Coordinate,
     /// Native formula-list key stored in the host cell.
-    pub(super) key: u32,
-    pub(super) bytes: &'source [u8],
+    pub key: u32,
+    pub bytes: &'source [u8],
 }
 
 /// Table-local, deterministic evaluator for the legacy scalar parity subset.
@@ -467,7 +566,7 @@ pub(super) struct FormulaPayload<'source> {
 /// The formula payload is decoded only for evaluation and is never re-encoded;
 /// the cache plan consequently preserves the original formula AST bytes and
 /// dependency objects exactly.
-pub(super) struct StrictEvaluator<'source> {
+pub struct StrictEvaluator<'source> {
     formulas: &'source [FormulaPayload<'source>],
     tables: &'source [TableGeometry],
     registry: formula_codec::ResolvedFormulaReadRegistry,
@@ -475,12 +574,12 @@ pub(super) struct StrictEvaluator<'source> {
 
 impl<'source> StrictEvaluator<'source> {
     /// Construct an evaluator only after proving exact formula-list coverage.
-    pub(super) fn new(
+    pub fn new(
         entries: &[FormulaListEntry<'_>],
         formulas: &'source [FormulaPayload<'source>],
         tables: &'source [TableGeometry],
         limits: CacheLimits,
-    ) -> Result<(Self, CacheUsage), Failure> {
+    ) -> Result<(Self, CacheUsage), Error> {
         let mut usage = validate_formula_coverage(entries, formulas, tables, limits)?;
         let mut ordered = Vec::new();
         scratch_allocation::<TableGeometry>(&mut usage, tables.len(), limits)?;
@@ -525,11 +624,13 @@ impl<'source> StrictEvaluator<'source> {
             &mut usage.retained_bytes,
             requirements.retained_bytes(),
             limits.retained_bytes,
+            LimitKind::RetainedBytes,
         )?;
         charge(
             &mut usage.allocations,
             requirements.allocations(),
             limits.allocations,
+            LimitKind::Allocations,
         )?;
         add_usage(
             &mut usage.retained_elements,
@@ -550,16 +651,16 @@ impl<'source> StrictEvaluator<'source> {
         ))
     }
 
-    fn payload(&self, formula: FormulaCell) -> Result<FormulaPayload<'source>, Failure> {
+    fn payload(&self, formula: FormulaCell) -> Result<FormulaPayload<'source>, Error> {
         let key = (formula.owner, formula.coordinate);
         let position = self
             .formulas
             .binary_search_by(|entry| (entry.owner, entry.coordinate).cmp(&key))
-            .map_err(|_error| Failure::InvalidSource)?;
+            .map_err(|_error| Error::InvalidSource)?;
         Ok(self.formulas[position])
     }
 
-    fn context(&self, formula: FormulaCell) -> Result<formula_codec::FormulaWriteContext, Failure> {
+    fn context(&self, formula: FormulaCell) -> Result<formula_codec::FormulaWriteContext, Error> {
         let table = table_by_owner(self.tables, formula.owner)?;
         Ok(formula_codec::FormulaWriteContext::new(
             formula.owner,
@@ -587,11 +688,11 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         &mut self,
         formula: FormulaCell,
         limits: CacheLimits,
-    ) -> Result<FormulaAnalysis, Failure> {
+    ) -> Result<FormulaAnalysis, Error> {
         let lookup_work = binary_search_work(self.formulas.len())
             .checked_add(binary_search_work(self.tables.len()))
-            .ok_or(Failure::InvalidSource)?;
-        check_limit(lookup_work, limits.graph_work)?;
+            .ok_or(Error::InvalidSource)?;
+        check_limit(lookup_work, limits.graph_work, LimitKind::GraphWork)?;
         let work_limits = CacheLimits {
             graph_work: limits.graph_work - lookup_work,
             ..limits
@@ -618,10 +719,10 @@ impl CacheEvaluator for StrictEvaluator<'_> {
             .checked_add(precedent_count)
             .and_then(|work| work.checked_add(sort_work(range_count).ok()?))
             .and_then(|work| work.checked_add(range_count))
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         preflight_formula_dependency_pass(probe, ordering_work, work_limits)?;
-        check_limit(precedent_count, limits.graph_edges)?;
-        check_limit(range_count, limits.graph_edges)?;
+        check_limit(precedent_count, limits.graph_edges, LimitKind::GraphEdges)?;
+        check_limit(range_count, limits.graph_edges, LimitKind::GraphEdges)?;
         let bytes = precedent_count
             .checked_mul(size_of::<FormulaPrecedent>())
             .and_then(|bytes| {
@@ -629,10 +730,10 @@ impl CacheEvaluator for StrictEvaluator<'_> {
                     .checked_mul(size_of::<FormulaRange>())
                     .and_then(|range_bytes| bytes.checked_add(range_bytes))
             })
-            .ok_or(Failure::InvalidSource)?;
-        check_limit(bytes, limits.scratch_bytes)?;
+            .ok_or(Error::InvalidSource)?;
+        check_limit(bytes, limits.scratch_bytes, LimitKind::ScratchBytes)?;
         let allocations = usize::from(precedent_count != 0) + usize::from(range_count != 0);
-        check_limit(allocations, limits.allocations)?;
+        check_limit(allocations, limits.allocations, LimitKind::Allocations)?;
         let mut visitor = FormulaPrecedentCollector {
             precedents: Vec::new(),
             ranges: Vec::new(),
@@ -646,7 +747,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         if (size_of::<FormulaPrecedent>() != 0 && visitor.precedents.capacity() != precedent_count)
             || (size_of::<FormulaRange>() != 0 && visitor.ranges.capacity() != range_count)
         {
-            return Err(Failure::Allocation {
+            return Err(Error::Allocation {
                 amount: precedent_count.max(range_count),
             });
         }
@@ -662,7 +763,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
             return Err(failure);
         }
         if visitor.precedents.len() != precedent_count || visitor.ranges.len() != range_count {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let mut usage = formula_reports_usage(probe, report)?;
         usage.scratch_bytes = bytes;
@@ -670,12 +771,13 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         usage.formula_work = usage
             .formula_work
             .checked_add(ordering_work)
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         usage.lookup_work = lookup_work;
         usage.graph_work = lookup_work;
         check_limit(
             usage.formula_work,
             work_limits.formula_work.min(work_limits.graph_work),
+            LimitKind::FormulaWork,
         )?;
         visitor.precedents.sort_unstable();
         visitor.precedents.dedup();
@@ -694,11 +796,11 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         formula: FormulaCell,
         values: &dyn CacheValues,
         limits: CacheLimits,
-    ) -> Result<Evaluation, Failure> {
+    ) -> Result<Evaluation, Error> {
         let lookup_work = binary_search_work(self.formulas.len())
             .checked_add(binary_search_work(self.tables.len()))
-            .ok_or(Failure::InvalidSource)?;
-        check_limit(lookup_work, limits.graph_work)?;
+            .ok_or(Error::InvalidSource)?;
+        check_limit(lookup_work, limits.graph_work, LimitKind::GraphWork)?;
         let work_limits = CacheLimits {
             graph_work: limits.graph_work - lookup_work,
             ..limits
@@ -718,15 +820,15 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         let remaining_work = preflight_formula_pass(probe, 0, work_limits)?;
         let bytes = count
             .checked_mul(size_of::<StreamingValue>())
-            .ok_or(Failure::InvalidSource)?;
-        check_limit(bytes, limits.scratch_bytes)?;
+            .ok_or(Error::InvalidSource)?;
+        check_limit(bytes, limits.scratch_bytes, LimitKind::ScratchBytes)?;
         if count != 0 {
-            check_limit(1, limits.allocations)?;
+            check_limit(1, limits.allocations, LimitKind::Allocations)?;
         }
         let maximum_work = work_limits.formula_work.min(work_limits.graph_work);
         let fixed_work = maximum_work
             .checked_sub(remaining_work)
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let mut visitor =
             StreamingFormula::new(formula.owner, values, count, fixed_work, maximum_work)?;
         let report = formula_codec::decode_resolved_formula_archive_with_visitor(
@@ -742,14 +844,15 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         usage.formula_work = usage
             .formula_work
             .checked_add(evaluation_work)
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         usage.lookup_work = lookup_work
             .checked_add(value_lookup_work)
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         usage.graph_work = lookup_work;
         check_limit(
             usage.formula_work,
             work_limits.formula_work.min(work_limits.graph_work),
+            LimitKind::FormulaWork,
         )?;
         usage.scratch_bytes = bytes;
         usage.allocations = usize::from(count != 0);
@@ -760,7 +863,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
 struct FormulaPrecedentCollector {
     precedents: Vec<FormulaPrecedent>,
     ranges: Vec<FormulaRange>,
-    failure: Option<Failure>,
+    failure: Option<Error>,
     maximum_precedents: usize,
     maximum_ranges: usize,
     evaluation_supported: bool,
@@ -777,7 +880,7 @@ impl formula_codec::FormulaDependencyVisitor for FormulaPrecedentCollector {
         if self.precedents.len() >= self.maximum_precedents
             || self.precedents.len() == self.precedents.capacity()
         {
-            self.failure = Some(Failure::InvalidSource);
+            self.failure = Some(Error::InvalidSource);
             return Ok(());
         }
         let coordinate = precedent.coordinate();
@@ -799,7 +902,7 @@ impl formula_codec::FormulaDependencyVisitor for FormulaPrecedentCollector {
             return Ok(());
         }
         if self.ranges.len() >= self.maximum_ranges || self.ranges.len() == self.ranges.capacity() {
-            self.failure = Some(Failure::InvalidSource);
+            self.failure = Some(Error::InvalidSource);
             return Ok(());
         }
         self.ranges.push(FormulaRange {
@@ -847,7 +950,7 @@ struct StreamingFormula<'values> {
     owner: u32,
     values: &'values dyn CacheValues,
     stack: Vec<StreamingValue>,
-    failure: Option<Failure>,
+    failure: Option<Error>,
     fixed_work: usize,
     work: usize,
     maximum_work: usize,
@@ -861,11 +964,11 @@ impl<'values> StreamingFormula<'values> {
         capacity: usize,
         fixed_work: usize,
         maximum_work: usize,
-    ) -> Result<Self, Failure> {
+    ) -> Result<Self, Error> {
         let mut stack = Vec::new();
         reserve(&mut stack, capacity)?;
         if size_of::<StreamingValue>() != 0 && stack.capacity() != capacity {
-            return Err(Failure::Allocation { amount: capacity });
+            return Err(Error::Allocation { amount: capacity });
         }
         Ok(Self {
             owner,
@@ -879,25 +982,25 @@ impl<'values> StreamingFormula<'values> {
         })
     }
 
-    fn finish(mut self) -> Result<(FormulaCachedValue, usize, usize), Failure> {
+    fn finish(mut self) -> Result<(FormulaCachedValue, usize, usize), Error> {
         if let Some(failure) = self.failure {
             return Err(failure);
         }
         if self.stack.len() != 1 {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let popped = self.stack.pop().ok_or(Failure::InvalidSource)?;
+        let popped = self.stack.pop().ok_or(Error::InvalidSource)?;
         let value = self.scalar(popped)?;
         let value = match value {
             StreamingScalar::Empty => FormulaCachedValue::number(0.0),
             StreamingScalar::Number(number) => FormulaCachedValue::number(number),
             StreamingScalar::Boolean(boolean) => Ok(FormulaCachedValue::Boolean(boolean)),
         }
-        .map_err(|_error| Failure::UnsupportedDependency(Unsupported::Formula))?;
+        .map_err(|_error| Error::UnsupportedDependency(Unsupported::Formula))?;
         Ok((value, self.work, self.lookup_work))
     }
 
-    fn visit(&mut self, node: formula_codec::FormulaNode) -> Result<(), Failure> {
+    fn visit(&mut self, node: formula_codec::FormulaNode) -> Result<(), Error> {
         use formula_codec::FormulaNode;
 
         self.step(1)?;
@@ -1006,12 +1109,12 @@ impl<'values> StreamingFormula<'values> {
                 argument_count,
             } => {
                 let count =
-                    usize::try_from(argument_count).map_err(|_error| Failure::InvalidSource)?;
+                    usize::try_from(argument_count).map_err(|_error| Error::InvalidSource)?;
                 let start = self
                     .stack
                     .len()
                     .checked_sub(count)
-                    .ok_or(Failure::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let value = self.evaluate_function(identifier, start)?;
                 self.stack.truncate(start);
                 self.push(StreamingValue::Scalar(value))
@@ -1022,31 +1125,31 @@ impl<'values> StreamingFormula<'values> {
         }
     }
 
-    fn push(&mut self, value: StreamingValue) -> Result<(), Failure> {
+    fn push(&mut self, value: StreamingValue) -> Result<(), Error> {
         if self.stack.len() == self.stack.capacity() {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         self.stack.push(value);
         Ok(())
     }
 
-    fn pop(&mut self) -> Result<StreamingValue, Failure> {
-        self.stack.pop().ok_or(Failure::InvalidSource)
+    fn pop(&mut self) -> Result<StreamingValue, Error> {
+        self.stack.pop().ok_or(Error::InvalidSource)
     }
 
-    fn step(&mut self, increment: usize) -> Result<(), Failure> {
+    fn step(&mut self, increment: usize) -> Result<(), Error> {
         self.work = self
             .work
             .checked_add(increment)
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let observed = self
             .fixed_work
             .checked_add(self.work)
-            .ok_or(Failure::InvalidSource)?;
-        check_limit(observed, self.maximum_work)
+            .ok_or(Error::InvalidSource)?;
+        check_limit(observed, self.maximum_work, LimitKind::FormulaWork)
     }
 
-    fn scalar(&mut self, value: StreamingValue) -> Result<StreamingScalar, Failure> {
+    fn scalar(&mut self, value: StreamingValue) -> Result<StreamingScalar, Error> {
         match value {
             StreamingValue::Scalar(value) => Ok(value),
             StreamingValue::Reference(reference) => {
@@ -1055,7 +1158,7 @@ impl<'values> StreamingFormula<'values> {
                 self.lookup_work = self
                     .lookup_work
                     .checked_add(lookup_work)
-                    .ok_or(Failure::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 match self.values.value(reference.owner, reference.coordinate)? {
                     None => Ok(StreamingScalar::Empty),
                     Some(ScalarValue::Number(number)) => Ok(StreamingScalar::Number(number.get())),
@@ -1073,7 +1176,7 @@ impl<'values> StreamingFormula<'values> {
         &mut self,
         identifier: u32,
         start: usize,
-    ) -> Result<StreamingScalar, Failure> {
+    ) -> Result<StreamingScalar, Error> {
         if !matches!(
             identifier,
             AVERAGE_FUNCTION_ID
@@ -1096,7 +1199,7 @@ impl<'values> StreamingFormula<'values> {
             AVERAGE_FUNCTION_ID => return unsupported_formula(),
             MIN_FUNCTION_ID => aggregate.minimum.unwrap_or(0.0),
             MAX_FUNCTION_ID => aggregate.maximum.unwrap_or(0.0),
-            _ => return Err(Failure::InvalidSource),
+            _ => return Err(Error::InvalidSource),
         };
         streaming_finite_number(number)
     }
@@ -1105,7 +1208,7 @@ impl<'values> StreamingFormula<'values> {
         &mut self,
         value: StreamingValue,
         aggregate: &mut StreamingAggregate,
-    ) -> Result<(), Failure> {
+    ) -> Result<(), Error> {
         match value {
             StreamingValue::Scalar(StreamingScalar::Number(number)) => aggregate.push(number),
             StreamingValue::Scalar(StreamingScalar::Empty) => Ok(()),
@@ -1132,13 +1235,13 @@ impl<'values> StreamingFormula<'values> {
         }
     }
 
-    fn collect_reference(&mut self, reference: FormulaKey) -> Result<Option<f64>, Failure> {
+    fn collect_reference(&mut self, reference: FormulaKey) -> Result<Option<f64>, Error> {
         let lookup_work = self.values.lookup_work(reference.owner)?;
         self.step(lookup_work)?;
         self.lookup_work = self
             .lookup_work
             .checked_add(lookup_work)
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         match self.values.value(reference.owner, reference.coordinate) {
             Ok(None) => Ok(None),
             Ok(Some(ScalarValue::Number(number))) => Ok(Some(number.get())),
@@ -1146,7 +1249,7 @@ impl<'values> StreamingFormula<'values> {
                 Ok(Some(value.get()))
             },
             Ok(Some(ScalarValue::Boolean(_)))
-            | Err(Failure::UnsupportedDependency(Unsupported::TextScalar)) => Ok(None),
+            | Err(Error::UnsupportedDependency(Unsupported::TextScalar)) => Ok(None),
             Err(error) => Err(error),
         }
     }
@@ -1175,7 +1278,7 @@ struct StreamingAggregate {
 }
 
 impl StreamingAggregate {
-    fn push(&mut self, value: f64) -> Result<(), Failure> {
+    fn push(&mut self, value: f64) -> Result<(), Error> {
         if !value.is_finite() {
             return unsupported_formula();
         }
@@ -1183,7 +1286,7 @@ impl StreamingAggregate {
         if !self.sum.is_finite() {
             return unsupported_formula();
         }
-        self.count = self.count.checked_add(1).ok_or(Failure::InvalidSource)?;
+        self.count = self.count.checked_add(1).ok_or(Error::InvalidSource)?;
         self.minimum = Some(self.minimum.map_or(value, |current| current.min(value)));
         self.maximum = Some(self.maximum.map_or(value, |current| current.max(value)));
         Ok(())
@@ -1198,7 +1301,7 @@ fn streaming_scalar_number(value: StreamingScalar) -> f64 {
     }
 }
 
-fn streaming_finite_number(value: f64) -> Result<StreamingScalar, Failure> {
+fn streaming_finite_number(value: f64) -> Result<StreamingScalar, Error> {
     if value.is_finite() {
         Ok(StreamingScalar::Number(value))
     } else {
@@ -1210,7 +1313,7 @@ fn streaming_binary(
     operator: formula_codec::BinaryOperator,
     left: StreamingScalar,
     right: StreamingScalar,
-) -> Result<StreamingScalar, Failure> {
+) -> Result<StreamingScalar, Error> {
     use formula_codec::BinaryOperator;
 
     match operator {
@@ -1250,8 +1353,8 @@ fn streaming_binary(
 fn formula_reports_usage(
     first: formula_codec::DecodeReport,
     second: formula_codec::DecodeReport,
-) -> Result<FormulaEvaluationUsage, Failure> {
-    let sum = |left: usize, right: usize| left.checked_add(right).ok_or(Failure::InvalidSource);
+) -> Result<FormulaEvaluationUsage, Error> {
+    let sum = |left: usize, right: usize| left.checked_add(right).ok_or(Error::InvalidSource);
     Ok(FormulaEvaluationUsage {
         wire_bytes: sum(first.bytes(), second.bytes())?,
         wire_fields: sum(first.fields(), second.fields())?,
@@ -1259,7 +1362,7 @@ fn formula_reports_usage(
         wire_text_bytes: sum(first.text_bytes(), second.text_bytes())?,
         formula_work: sum(first.node_count(), second.node_count())?
             .checked_add(sum(first.precedent_count(), second.precedent_count())?)
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         lookup_work: 0,
         graph_work: 0,
         scratch_bytes: 0,
@@ -1273,19 +1376,35 @@ fn preflight_formula_pass(
     inspection: formula_codec::DecodeReport,
     fixed_formula_work: usize,
     limits: CacheLimits,
-) -> Result<usize, Failure> {
-    let doubled = |value: usize| value.checked_mul(2).ok_or(Failure::InvalidSource);
-    let tripled = |value: usize| value.checked_mul(3).ok_or(Failure::InvalidSource);
-    check_limit(doubled(inspection.bytes())?, limits.wire_bytes)?;
-    check_limit(tripled(inspection.fields())?, limits.wire_fields)?;
-    check_limit(tripled(inspection.work())?, limits.wire_work)?;
-    check_limit(tripled(inspection.text_bytes())?, limits.wire_text)?;
+) -> Result<usize, Error> {
+    let doubled = |value: usize| value.checked_mul(2).ok_or(Error::InvalidSource);
+    let tripled = |value: usize| value.checked_mul(3).ok_or(Error::InvalidSource);
+    check_limit(
+        doubled(inspection.bytes())?,
+        limits.wire_bytes,
+        LimitKind::WireBytes,
+    )?;
+    check_limit(
+        tripled(inspection.fields())?,
+        limits.wire_fields,
+        LimitKind::WireFields,
+    )?;
+    check_limit(
+        tripled(inspection.work())?,
+        limits.wire_work,
+        LimitKind::WireWork,
+    )?;
+    check_limit(
+        tripled(inspection.text_bytes())?,
+        limits.wire_text,
+        LimitKind::WireText,
+    )?;
     let fixed = doubled(inspection.node_count())?
         .checked_add(doubled(inspection.precedent_count())?)
         .and_then(|work| work.checked_add(fixed_formula_work))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let maximum = limits.formula_work.min(limits.graph_work);
-    check_limit(fixed, maximum)?;
+    check_limit(fixed, maximum, LimitKind::FormulaWork)?;
     Ok(maximum - fixed)
 }
 
@@ -1297,70 +1416,111 @@ fn preflight_formula_dependency_pass(
     inspection: formula_codec::DecodeReport,
     fixed_formula_work: usize,
     limits: CacheLimits,
-) -> Result<(), Failure> {
-    let doubled = |value: usize| value.checked_mul(2).ok_or(Failure::InvalidSource);
-    check_limit(doubled(inspection.bytes())?, limits.wire_bytes)?;
-    check_limit(doubled(inspection.fields())?, limits.wire_fields)?;
-    check_limit(doubled(inspection.work())?, limits.wire_work)?;
-    check_limit(doubled(inspection.text_bytes())?, limits.wire_text)?;
+) -> Result<(), Error> {
+    let doubled = |value: usize| value.checked_mul(2).ok_or(Error::InvalidSource);
+    check_limit(
+        doubled(inspection.bytes())?,
+        limits.wire_bytes,
+        LimitKind::WireBytes,
+    )?;
+    check_limit(
+        doubled(inspection.fields())?,
+        limits.wire_fields,
+        LimitKind::WireFields,
+    )?;
+    check_limit(
+        doubled(inspection.work())?,
+        limits.wire_work,
+        LimitKind::WireWork,
+    )?;
+    check_limit(
+        doubled(inspection.text_bytes())?,
+        limits.wire_text,
+        LimitKind::WireText,
+    )?;
     let fixed = doubled(inspection.node_count())?
         .checked_add(doubled(inspection.precedent_count())?)
         .and_then(|work| work.checked_add(fixed_formula_work))
-        .ok_or(Failure::InvalidSource)?;
-    check_limit(fixed, limits.formula_work.min(limits.graph_work))
+        .ok_or(Error::InvalidSource)?;
+    check_limit(
+        fixed,
+        limits.formula_work.min(limits.graph_work),
+        LimitKind::FormulaWork,
+    )
 }
 
-fn map_formula_decode_failure(error: formula_codec::DecodeError) -> Failure {
+fn map_formula_decode_failure(error: formula_codec::DecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
-        let (observed, maximum) = match limit {
-            formula_codec::DecodeLimit::Bytes { observed, maximum }
-            | formula_codec::DecodeLimit::Fields { observed, maximum }
-            | formula_codec::DecodeLimit::Work { observed, maximum }
-            | formula_codec::DecodeLimit::Nodes { observed, maximum }
-            | formula_codec::DecodeLimit::Text { observed, maximum } => (
+        let (kind, observed, maximum) = match limit {
+            formula_codec::DecodeLimit::Bytes { observed, maximum } => (
+                LimitKind::WireBytes,
+                usize_to_u64_saturating(observed),
+                usize_to_u64_saturating(maximum),
+            ),
+            formula_codec::DecodeLimit::Fields { observed, maximum } => (
+                LimitKind::WireFields,
+                usize_to_u64_saturating(observed),
+                usize_to_u64_saturating(maximum),
+            ),
+            formula_codec::DecodeLimit::Work { observed, maximum } => (
+                LimitKind::WireWork,
+                usize_to_u64_saturating(observed),
+                usize_to_u64_saturating(maximum),
+            ),
+            formula_codec::DecodeLimit::Nodes { observed, maximum } => (
+                LimitKind::FormulaWork,
+                usize_to_u64_saturating(observed),
+                usize_to_u64_saturating(maximum),
+            ),
+            formula_codec::DecodeLimit::Text { observed, maximum } => (
+                LimitKind::WireText,
                 usize_to_u64_saturating(observed),
                 usize_to_u64_saturating(maximum),
             ),
             formula_codec::DecodeLimit::Nesting { observed, maximum } => {
-                (u64::from(observed), u64::from(maximum))
+                (LimitKind::Nesting, u64::from(observed), u64::from(maximum))
             },
             formula_codec::DecodeLimit::Allocation { requested } => {
-                return Failure::Allocation { amount: requested };
+                return Error::Allocation { amount: requested };
             },
         };
-        return Failure::LimitExceeded { observed, maximum };
+        return Error::Limit {
+            kind,
+            observed,
+            maximum,
+        };
     }
     match error.invalid_reason() {
         Some(formula_codec::InvalidReason::ExternalOwner) => {
-            Failure::UnsupportedDependency(Unsupported::ExternalOwner)
+            Error::UnsupportedDependency(Unsupported::ExternalOwner)
         },
         Some(formula_codec::InvalidReason::UnsupportedFormula) => {
-            Failure::UnsupportedDependency(Unsupported::Formula)
+            Error::UnsupportedDependency(Unsupported::Formula)
         },
-        _ => Failure::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn unsupported_formula<T>() -> Result<T, Failure> {
-    Err(Failure::UnsupportedDependency(Unsupported::Formula))
+fn unsupported_formula<T>() -> Result<T, Error> {
+    Err(Error::UnsupportedDependency(Unsupported::Formula))
 }
 
 const FORMULA_LIST_TYPE: i32 = 3;
 
 /// One borrowed segment selected by the root formula-list reference.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct FormulaListSegment<'source> {
-    pub(super) identifier: u64,
-    pub(super) bytes: &'source [u8],
+pub struct FormulaListSegment<'source> {
+    pub identifier: u64,
+    pub bytes: &'source [u8],
 }
 
 /// A formula entry retained without copying its native `FormulaArchive`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct FormulaListEntry<'source> {
-    pub(super) owner: u32,
-    pub(super) key: u32,
-    pub(super) ref_count: u32,
-    pub(super) bytes: &'source [u8],
+pub struct FormulaListEntry<'source> {
+    pub owner: u32,
+    pub key: u32,
+    pub ref_count: u32,
+    pub bytes: &'source [u8],
 }
 
 /// Strictly collect one selected table's formula data list.
@@ -1369,17 +1529,21 @@ pub(super) struct FormulaListEntry<'source> {
 /// storage codec. Visitor effects remain staged until the whole enclosing
 /// decode has passed Buffa parity. The result is sorted and key-unique, which
 /// lets the cache commit layer perform one indexed join with formula cells.
-pub(super) fn collect_formula_list<'source>(
+pub fn collect_formula_list<'source>(
     selected: TableIdentity,
     root: &'source [u8],
     segments: &[FormulaListSegment<'source>],
     expected_total_entries: usize,
     limits: CacheLimits,
-) -> Result<(Vec<FormulaListEntry<'source>>, CacheUsage), Failure> {
+) -> Result<(Vec<FormulaListEntry<'source>>, CacheUsage), Error> {
     if selected.owner == 0 {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    check_limit(expected_total_entries, limits.graph_nodes)?;
+    check_limit(
+        expected_total_entries,
+        limits.graph_nodes,
+        LimitKind::GraphNodes,
+    )?;
     let mut usage = CacheUsage::default();
     let segment_index = formula_segment_index(segments, &mut usage, limits)?;
     let mut entries = Vec::new();
@@ -1396,7 +1560,7 @@ pub(super) fn collect_formula_list<'source>(
     charge_formula_list_stage(&mut usage, &root_stage, limits)?;
     charge_report(&mut usage, report, limits)?;
     if root_snapshot.list_type() != FORMULA_LIST_TYPE {
-        return Err(Failure::UnsupportedDependency(Unsupported::CacheType));
+        return Err(Error::UnsupportedDependency(Unsupported::CacheType));
     }
     verify_formula_segments(&mut root_stage.segments, &segment_index, &mut usage, limits)?;
     let mut root_entries =
@@ -1430,7 +1594,7 @@ pub(super) fn collect_formula_list<'source>(
         if snapshot.list_type() != FORMULA_LIST_TYPE
             || segment_contains_nested_reference(segment.bytes, &mut usage, limits)?
         {
-            return Err(Failure::UnsupportedDependency(Unsupported::CacheType));
+            return Err(Error::UnsupportedDependency(Unsupported::CacheType));
         }
         let mut segment_entries =
             decode_formula_entries(segment.bytes, expected_total_entries, limits, &mut usage)?;
@@ -1453,7 +1617,7 @@ pub(super) fn collect_formula_list<'source>(
         )?;
     }
     if entries.len() != expected_total_entries {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     graph_step(&mut usage, sort_work(entries.len())?, limits)?;
     entries.sort_unstable();
@@ -1462,7 +1626,7 @@ pub(super) fn collect_formula_list<'source>(
         .windows(2)
         .any(|pair| (pair[0].owner, pair[0].key) == (pair[1].owner, pair[1].key))
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok((entries, usage))
 }
@@ -1472,34 +1636,34 @@ pub(super) fn collect_formula_list<'source>(
 ///
 /// This check rejects orphan list entries, missing hosts, duplicate hosts,
 /// wrong formula keys, and joins that substitute a different formula payload.
-pub(super) fn validate_formula_coverage(
+pub fn validate_formula_coverage(
     entries: &[FormulaListEntry<'_>],
     payloads: &[FormulaPayload<'_>],
     tables: &[TableGeometry],
     limits: CacheLimits,
-) -> Result<CacheUsage, Failure> {
-    check_limit(entries.len(), limits.graph_nodes)?;
-    check_limit(payloads.len(), limits.graph_nodes)?;
+) -> Result<CacheUsage, Error> {
+    check_limit(entries.len(), limits.graph_nodes, LimitKind::GraphNodes)?;
+    check_limit(payloads.len(), limits.graph_nodes, LimitKind::GraphNodes)?;
     let mut usage = CacheUsage::default();
     validate_table_registry(tables, &mut usage, limits)?;
     let table_lookup = binary_search_work(tables.len());
     let validation_work = entries
         .len()
-        .checked_mul(table_lookup.checked_add(2).ok_or(Failure::InvalidSource)?)
+        .checked_mul(table_lookup.checked_add(2).ok_or(Error::InvalidSource)?)
         .and_then(|work| {
             payloads
                 .len()
                 .checked_mul(table_lookup.checked_add(2)?)
                 .and_then(|value| work.checked_add(value))
         })
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(&mut usage, validation_work, limits)?;
     add_usage(
         &mut usage.lookup_work,
         entries
             .len()
             .checked_add(payloads.len())
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     if entries
         .windows(2)
@@ -1508,17 +1672,17 @@ pub(super) fn validate_formula_coverage(
             .windows(2)
             .any(|pair| (pair[0].owner, pair[0].coordinate) >= (pair[1].owner, pair[1].coordinate))
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for entry in entries {
         if entry.key == 0 || entry.ref_count == 0 || table_by_owner(tables, entry.owner).is_err() {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for payload in payloads {
         let table = table_by_owner(tables, payload.owner)?;
         if payload.coordinate.row >= table.rows || payload.coordinate.column >= table.columns {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
 
@@ -1526,7 +1690,7 @@ pub(super) fn validate_formula_coverage(
         .len()
         .checked_mul(binary_search_work(entries.len()))
         .and_then(|work| work.checked_add(entries.len()))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(&mut usage, graph_work, limits)?;
     let mut counts = usize_slots(entries.len(), &mut usage, limits)?;
     for payload in payloads {
@@ -1535,48 +1699,52 @@ pub(super) fn validate_formula_coverage(
             .binary_search_by_key(&(payload.owner, payload.key), |entry| {
                 (entry.owner, entry.key)
             })
-            .map_err(|_error| Failure::InvalidSource)?;
+            .map_err(|_error| Error::InvalidSource)?;
         if entries[index].bytes != payload.bytes {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        counts[index] = counts[index].checked_add(1).ok_or(Failure::InvalidSource)?;
+        counts[index] = counts[index].checked_add(1).ok_or(Error::InvalidSource)?;
     }
     for (entry, count) in entries.iter().zip(counts) {
-        if usize::try_from(entry.ref_count).map_err(|_error| Failure::InvalidSource)? != count {
-            return Err(Failure::InvalidSource);
+        if usize::try_from(entry.ref_count).map_err(|_error| Error::InvalidSource)? != count {
+            return Err(Error::InvalidSource);
         }
     }
     Ok(usage)
 }
 
-pub(super) fn validate_formula_cell_payloads(
+pub fn validate_formula_cell_payloads(
     cells: &[FormulaCell],
     payloads: &[FormulaPayload<'_>],
     limits: CacheLimits,
-) -> Result<CacheUsage, Failure> {
+) -> Result<CacheUsage, Error> {
     if cells.len() != payloads.len() {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut usage = CacheUsage::default();
     graph_step(&mut usage, cells.len(), limits)?;
     for (cell, payload) in cells.iter().zip(payloads) {
         if (cell.owner, cell.coordinate) != (payload.owner, payload.coordinate) {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(usage)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FormulaListStageFailure {
+enum FormulaListStageError {
     Invalid,
     Allocation(usize),
-    Limit { observed: usize, maximum: usize },
+    Limit {
+        kind: LimitKind,
+        observed: usize,
+        maximum: usize,
+    },
 }
 
 struct FormulaListStage {
     segments: Vec<u64>,
-    failure: Option<FormulaListStageFailure>,
+    failure: Option<FormulaListStageError>,
     scratch_bytes: usize,
     allocations: usize,
     limits: CacheLimits,
@@ -1593,14 +1761,15 @@ impl FormulaListStage {
         }
     }
 
-    fn push<T>(&mut self, slot: &mut Vec<T>, value: T, maximum: usize) {
+    fn push<T>(&mut self, slot: &mut Vec<T>, value: T, maximum: usize, kind: LimitKind) {
         if self.failure.is_some() {
             return;
         }
         let observed = match slot.len().checked_add(1) {
             Some(value) => value,
             None => {
-                self.failure = Some(FormulaListStageFailure::Limit {
+                self.failure = Some(FormulaListStageError::Limit {
+                    kind,
                     observed: usize::MAX,
                     maximum,
                 });
@@ -1608,13 +1777,18 @@ impl FormulaListStage {
             },
         };
         if observed > maximum {
-            self.failure = Some(FormulaListStageFailure::Limit { observed, maximum });
+            self.failure = Some(FormulaListStageError::Limit {
+                kind,
+                observed,
+                maximum,
+            });
             return;
         }
         let scratch_bytes = match self.scratch_bytes.checked_add(size_of::<T>()) {
             Some(value) => value,
             None => {
-                self.failure = Some(FormulaListStageFailure::Limit {
+                self.failure = Some(FormulaListStageError::Limit {
+                    kind: LimitKind::ScratchBytes,
                     observed: usize::MAX,
                     maximum: self.limits.scratch_bytes,
                 });
@@ -1622,7 +1796,8 @@ impl FormulaListStage {
             },
         };
         if scratch_bytes > self.limits.scratch_bytes {
-            self.failure = Some(FormulaListStageFailure::Limit {
+            self.failure = Some(FormulaListStageError::Limit {
+                kind: LimitKind::ScratchBytes,
                 observed: scratch_bytes,
                 maximum: self.limits.scratch_bytes,
             });
@@ -1632,7 +1807,8 @@ impl FormulaListStage {
             let allocations = match self.allocations.checked_add(1) {
                 Some(value) => value,
                 None => {
-                    self.failure = Some(FormulaListStageFailure::Limit {
+                    self.failure = Some(FormulaListStageError::Limit {
+                        kind: LimitKind::Allocations,
                         observed: usize::MAX,
                         maximum: self.limits.allocations,
                     });
@@ -1640,7 +1816,8 @@ impl FormulaListStage {
                 },
             };
             if allocations > self.limits.allocations {
-                self.failure = Some(FormulaListStageFailure::Limit {
+                self.failure = Some(FormulaListStageError::Limit {
+                    kind: LimitKind::Allocations,
                     observed: allocations,
                     maximum: self.limits.allocations,
                 });
@@ -1649,11 +1826,11 @@ impl FormulaListStage {
             self.allocations = allocations;
         }
         if slot.try_reserve_exact(1).is_err() {
-            self.failure = Some(FormulaListStageFailure::Allocation(1));
+            self.failure = Some(FormulaListStageError::Allocation(1));
             return;
         }
         if size_of::<T>() != 0 && slot.capacity() != observed {
-            self.failure = Some(FormulaListStageFailure::Allocation(observed));
+            self.failure = Some(FormulaListStageError::Allocation(observed));
             return;
         }
         self.scratch_bytes = scratch_bytes;
@@ -1662,22 +1839,28 @@ impl FormulaListStage {
 
     fn push_segment(&mut self, identifier: u64) {
         let mut segments = core::mem::take(&mut self.segments);
-        self.push(&mut segments, identifier, self.limits.wire_references);
+        self.push(
+            &mut segments,
+            identifier,
+            self.limits.wire_references,
+            LimitKind::WireReferences,
+        );
         self.segments = segments;
     }
 
-    fn ensure_complete(&self) -> Result<(), Failure> {
+    fn ensure_complete(&self) -> Result<(), Error> {
         match self.failure {
-            Some(FormulaListStageFailure::Invalid) => Err(Failure::InvalidSource),
-            Some(FormulaListStageFailure::Allocation(amount)) => {
-                Err(Failure::Allocation { amount })
-            },
-            Some(FormulaListStageFailure::Limit { observed, maximum }) => {
-                Err(Failure::LimitExceeded {
-                    observed: usize_to_u64_saturating(observed),
-                    maximum: usize_to_u64_saturating(maximum),
-                })
-            },
+            Some(FormulaListStageError::Invalid) => Err(Error::InvalidSource),
+            Some(FormulaListStageError::Allocation(amount)) => Err(Error::Allocation { amount }),
+            Some(FormulaListStageError::Limit {
+                kind,
+                observed,
+                maximum,
+            }) => Err(Error::Limit {
+                kind,
+                observed: usize_to_u64_saturating(observed),
+                maximum: usize_to_u64_saturating(maximum),
+            }),
             None => Ok(()),
         }
     }
@@ -1690,7 +1873,7 @@ impl storage::StorageVisitor for FormulaListStage {
     ) -> Result<(), storage::DecodeError> {
         let reference = reference.reference();
         if reference.identifier() == 0 || reference.deprecated_is_external() == Some(true) {
-            self.failure = Some(FormulaListStageFailure::Invalid);
+            self.failure = Some(FormulaListStageError::Invalid);
             return Ok(());
         }
         self.push_segment(reference.identifier());
@@ -1709,7 +1892,7 @@ fn storage_decode_options(limits: CacheLimits) -> storage::DecodeOptions {
     )
 }
 
-fn map_storage_decode_failure(error: storage::DecodeError) -> Failure {
+fn map_storage_decode_failure(error: storage::DecodeError) -> Error {
     map_decode_failure(error)
 }
 
@@ -1718,27 +1901,33 @@ fn decode_formula_entries<'source>(
     maximum_entries: usize,
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<Vec<FormulaListEntry<'source>>, Failure> {
+) -> Result<Vec<FormulaListEntry<'source>>, Error> {
     // The strict storage pass already charged one full decode. This retained
     // raw projection is a second bounded pass over the same source.
-    charge(&mut usage.wire_bytes, source.len(), limits.wire_bytes)?;
+    charge(
+        &mut usage.wire_bytes,
+        source.len(),
+        limits.wire_bytes,
+        LimitKind::WireBytes,
+    )?;
     graph_step(usage, source.len(), limits)?;
     let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_error| Failure::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     let mut output = Vec::new();
     for field in view.fields() {
         if field.number() != 3 {
             continue;
         }
         if field.wire_type() != 2 {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
-            .map_err(|_error| Failure::InvalidSource)?;
-        let observed = output.len().checked_add(1).ok_or(Failure::InvalidSource)?;
+            .map_err(|_error| Error::InvalidSource)?;
+        let observed = output.len().checked_add(1).ok_or(Error::InvalidSource)?;
         if observed > maximum_entries {
-            return Err(Failure::LimitExceeded {
+            return Err(Error::Limit {
+                kind: LimitKind::GraphNodes,
                 observed: usize_to_u64_saturating(observed),
                 maximum: usize_to_u64_saturating(maximum_entries),
             });
@@ -1751,7 +1940,7 @@ fn decode_formula_entries<'source>(
         charge_report(usage, report, limits)?;
         let bytes = entry
             .formula()
-            .ok_or(Failure::UnsupportedDependency(Unsupported::CacheType))?;
+            .ok_or(Error::UnsupportedDependency(Unsupported::CacheType))?;
         if entry.key() == 0
             || entry.ref_count() == 0
             || entry.string_value().is_some()
@@ -1763,7 +1952,7 @@ fn decode_formula_entries<'source>(
             || entry.import_warning_set().is_some()
             || entry.cell_spec().is_some()
         {
-            return Err(Failure::UnsupportedDependency(Unsupported::CacheType));
+            return Err(Error::UnsupportedDependency(Unsupported::CacheType));
         }
         scratch_allocation::<FormulaListEntry<'source>>(usage, 1, limits)?;
         reserve(&mut output, 1)?;
@@ -1782,13 +1971,13 @@ fn formula_segment_index(
     segments: &[FormulaListSegment<'_>],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<PayloadIndex>, Failure> {
+) -> Result<Vec<PayloadIndex>, Error> {
     let mut index = Vec::new();
     scratch_allocation::<PayloadIndex>(usage, segments.len(), limits)?;
     reserve(&mut index, segments.len())?;
     for (position, segment) in segments.iter().enumerate() {
         if segment.identifier == 0 {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         graph_step(usage, 1, limits)?;
         index.push(PayloadIndex {
@@ -1802,7 +1991,7 @@ fn formula_segment_index(
         .windows(2)
         .any(|pair| pair[0].identifier == pair[1].identifier)
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(index)
 }
@@ -1812,24 +2001,24 @@ fn verify_formula_segments(
     segments: &[PayloadIndex],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     if references.len() != segments.len() {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     graph_step(
         usage,
         sort_work(references.len())?
             .checked_add(references.len())
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     references.sort_unstable();
     if references.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for (reference, segment) in references.iter().zip(segments) {
         if *reference != segment.identifier {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1839,16 +2028,21 @@ fn segment_contains_nested_reference(
     source: &[u8],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<bool, Failure> {
-    charge(&mut usage.wire_bytes, source.len(), limits.wire_bytes)?;
+) -> Result<bool, Error> {
+    charge(
+        &mut usage.wire_bytes,
+        source.len(),
+        limits.wire_bytes,
+        LimitKind::WireBytes,
+    )?;
     graph_step(usage, source.len(), limits)?;
     let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_error| Failure::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     for field in view.fields() {
         if field.number() == 4 {
             field
                 .validate_canonical_framing()
-                .map_err(|_error| Failure::InvalidSource)?;
+                .map_err(|_error| Error::InvalidSource)?;
             return Ok(true);
         }
     }
@@ -1861,15 +2055,15 @@ fn validate_segment_keys(
     length: u32,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     graph_step(usage, entries.len(), limits)?;
-    let end = location.checked_add(length).ok_or(Failure::InvalidSource)?;
+    let end = location.checked_add(length).ok_or(Error::InvalidSource)?;
     if length == 0
         || entries
             .iter()
             .any(|entry| entry.key < location || entry.key >= end)
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1880,13 +2074,13 @@ fn append_formula_list_entries<'source>(
     expected: usize,
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     let total = output
         .len()
         .checked_add(staged.len())
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if total > expected {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     graph_step(usage, staged.len(), limits)?;
     output.append(staged);
@@ -1897,16 +2091,18 @@ fn charge_formula_list_stage(
     usage: &mut CacheUsage,
     stage: &FormulaListStage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     charge(
         &mut usage.peak_scratch_bytes,
         stage.scratch_bytes,
         limits.scratch_bytes,
+        LimitKind::ScratchBytes,
     )?;
     charge(
         &mut usage.allocations,
         stage.allocations,
         limits.allocations,
+        LimitKind::Allocations,
     )
 }
 
@@ -1916,12 +2112,12 @@ fn charge_formula_list_stage(
 /// dependency projection details here while leaving the byte-exact formula
 /// table-data-list lookup, payload join, and cache-object routing to the
 /// caller. The returned hosts are sorted uniquely by `(owner, row, column)`.
-pub(super) fn collect_formula_hosts(
+pub fn collect_formula_hosts(
     selected: TableIdentity,
     owners: &[DependencyPayload<'_>],
     record_tiles: &[DependencyPayload<'_>],
     limits: CacheLimits,
-) -> Result<(Vec<FormulaHost>, CacheUsage), Failure> {
+) -> Result<(Vec<FormulaHost>, CacheUsage), Error> {
     let mut usage = CacheUsage {
         formula_graph_builds: 1,
         ..CacheUsage::default()
@@ -1954,7 +2150,7 @@ pub(super) fn collect_formula_hosts(
             || owner.formula_owner_uid().lower() != selected.uuid_lower
             || owner.formula_owner_uid().upper() != selected.uuid_upper
         {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         selected_owner_seen = true;
         append_formula_hosts(
@@ -1986,7 +2182,7 @@ pub(super) fn collect_formula_hosts(
             charge_stage_usage(&mut usage, &tile_stage, limits)?;
             charge_report(&mut usage, report, limits)?;
             if tile.internal_owner_id() != selected.owner {
-                return Err(Failure::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             append_formula_hosts(
                 &mut candidates,
@@ -1998,14 +2194,14 @@ pub(super) fn collect_formula_hosts(
         }
     }
     if !selected_owner_seen {
-        return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+        return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
     }
 
     graph_step(&mut usage, sort_work(candidates.len())?, limits)?;
     candidates.sort_unstable();
     graph_step(&mut usage, candidates.len(), limits)?;
     candidates.dedup();
-    check_limit(candidates.len(), limits.graph_nodes)?;
+    check_limit(candidates.len(), limits.graph_nodes, LimitKind::GraphNodes)?;
     add_usage(&mut usage.formula_nodes, candidates.len())?;
 
     let mut hosts = Vec::new();
@@ -2024,39 +2220,39 @@ pub(super) fn collect_formula_hosts(
 /// that compact buffer from the edit planner.  Formula cells addressed by the
 /// overlay are deleted from the old dependency graph before propagation, so a
 /// final clear/scalar write cannot refresh an obsolete formula cache.
-pub(super) fn plan_final_cache(
+pub fn plan_final_cache(
     source: CacheSource<'_>,
     overlay: &[FinalCell],
     limits: CacheLimits,
     baseline: &dyn CacheBaseline,
     evaluator: &mut dyn CacheEvaluator,
-) -> Result<CachePlan, Failure> {
+) -> Result<CachePlan, Error> {
     plan_final_cache_with_authored(source, overlay, &[], limits, baseline, evaluator)
 }
 
 /// Construct a final-state cache plan with explicit authored-formula dirty
 /// seeds. The source graph and formula slices must already be the complete
 /// post-edit state; no sequential or transient formula graph is admitted.
-pub(super) fn plan_final_cache_with_authored(
+pub fn plan_final_cache_with_authored(
     source: CacheSource<'_>,
     overlay: &[FinalCell],
     authored: &[AuthoredFormulaCache<'_>],
     limits: CacheLimits,
     baseline: &dyn CacheBaseline,
     evaluator: &mut dyn CacheEvaluator,
-) -> Result<CachePlan, Failure> {
+) -> Result<CachePlan, Error> {
     plan_final_cache_internal(source, overlay, authored, None, limits, baseline, evaluator)
 }
 
-pub(super) fn plan_final_cache_with_logical_graph(
+pub fn plan_final_cache_with_logical_graph(
     source: CacheSource<'_>,
     overlay: &[FinalCell],
     authored: &[AuthoredFormulaCache<'_>],
-    logical: formula_metadata::LogicalGraph<'_>,
+    logical: formula_dependencies::LogicalGraph<'_>,
     limits: CacheLimits,
     baseline: &dyn CacheBaseline,
     evaluator: &mut dyn CacheEvaluator,
-) -> Result<CachePlan, Failure> {
+) -> Result<CachePlan, Error> {
     plan_final_cache_internal(
         source,
         overlay,
@@ -2072,18 +2268,18 @@ fn plan_final_cache_internal(
     source: CacheSource<'_>,
     overlay: &[FinalCell],
     authored: &[AuthoredFormulaCache<'_>],
-    logical: Option<formula_metadata::LogicalGraph<'_>>,
+    logical: Option<formula_dependencies::LogicalGraph<'_>>,
     limits: CacheLimits,
     baseline: &dyn CacheBaseline,
     evaluator: &mut dyn CacheEvaluator,
-) -> Result<CachePlan, Failure> {
+) -> Result<CachePlan, Error> {
     let mut usage = CacheUsage {
         formula_graph_builds: 1,
         ..CacheUsage::default()
     };
     validate_table_registry(source.tables, &mut usage, limits)?;
-    check_limit(overlay.len(), limits.cache_cells)?;
-    check_limit(authored.len(), limits.graph_nodes)?;
+    check_limit(overlay.len(), limits.cache_cells, LimitKind::CacheCells)?;
+    check_limit(authored.len(), limits.graph_nodes, LimitKind::GraphNodes)?;
     let validation_work = overlay
         .len()
         .checked_add(authored.len())
@@ -2102,14 +2298,14 @@ fn plan_final_cache_internal(
                 )
                 .and_then(|value| work.checked_add(value))
         })
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(&mut usage, validation_work, limits)?;
     add_usage(
         &mut usage.lookup_work,
         overlay
             .len()
             .checked_add(authored.len())
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     ensure_overlay(source, overlay)?;
     ensure_authored(source, overlay, authored)?;
@@ -2133,7 +2329,11 @@ fn plan_final_cache_internal(
     };
     let formula_index = formula_index(source, &mut usage, limits)?;
     let coordinate_index = formula_coordinate_index(&formula_index, &mut usage, limits)?;
-    check_limit(formula_index.len(), limits.graph_nodes)?;
+    check_limit(
+        formula_index.len(),
+        limits.graph_nodes,
+        LimitKind::GraphNodes,
+    )?;
     add_usage(&mut usage.formula_nodes, formula_index.len())?;
 
     let stage_limits = remaining_limits(limits, &usage)?;
@@ -2154,9 +2354,7 @@ fn plan_final_cache_internal(
                 || cell.coordinate.column < selected_geometry.header_columns
         })
     {
-        return Err(Failure::UnsupportedDependency(
-            Unsupported::HeaderNameManager,
-        ));
+        return Err(Error::UnsupportedDependency(Unsupported::HeaderNameManager));
     }
     verify_owner_references(
         &mut engine_stage.owner_references,
@@ -2194,7 +2392,7 @@ fn plan_final_cache_internal(
         add_usage(&mut usage.lookup_work, 1)?;
         let owner_geometry = match table_by_owner(source.tables, owner_id) {
             Ok(geometry) => Some(geometry),
-            Err(Failure::UnsupportedDependency(Unsupported::MissingOwner)) => {
+            Err(Error::UnsupportedDependency(Unsupported::MissingOwner)) => {
                 graph_step(&mut usage, binary_search_work(formula_index.len()), limits)?;
                 add_usage(&mut usage.lookup_work, 1)?;
                 let formula_position =
@@ -2209,7 +2407,7 @@ fn plan_final_cache_internal(
                 // used by the complete final formula set) still requires exact
                 // geometry and baseline authority.
                 if has_formula {
-                    return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+                    return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
                 }
                 if owner.formula_owner().is_some() {
                     // Another table's owner with no formula in the final set
@@ -2222,7 +2420,7 @@ fn plan_final_cache_internal(
                         && stage.range_references.is_empty()
                         && stage.components.is_empty();
                     if !inert || !inert_foreign_owner(owner) {
-                        return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+                        return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
                     }
                     continue;
                 }
@@ -2237,7 +2435,7 @@ fn plan_final_cache_internal(
             owner.formula_owner_uid().lower() != geometry.identity.uuid_lower
                 || owner.formula_owner_uid().upper() != geometry.identity.uuid_upper
         }) {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let selected_owner =
             owner_geometry.is_some_and(|geometry| geometry.identity == source.selected_table);
@@ -2246,7 +2444,7 @@ fn plan_final_cache_internal(
                 || owner.formula_owner_uid().lower() != source.selected_table.uuid_lower
                 || owner.formula_owner_uid().upper() != source.selected_table.uuid_upper
             {
-                return Err(Failure::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             selected_owner_seen = true;
         }
@@ -2276,7 +2474,7 @@ fn plan_final_cache_internal(
         )?;
         if !stage.ranges.is_empty() {
             if owner_geometry.is_none() {
-                return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+                return Err(Error::UnsupportedDependency(Unsupported::Formula));
             }
             append_range_edges(
                 &mut edges,
@@ -2310,7 +2508,7 @@ fn plan_final_cache_internal(
             charge_stage_usage(&mut usage, &tile_stage, limits)?;
             charge_report(&mut usage, report, limits)?;
             if tile.internal_owner_id() != owner.internal_formula_owner_id() {
-                return Err(Failure::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             append_edges(
                 &mut edges,
@@ -2336,7 +2534,7 @@ fn plan_final_cache_internal(
         }
         for range_reference in stage.range_references.iter().copied() {
             if owner_geometry.is_none() {
-                return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+                return Err(Error::UnsupportedDependency(Unsupported::Formula));
             }
             let range_payload = indexed_payload(
                 source.range_tiles,
@@ -2369,14 +2567,14 @@ fn plan_final_cache_internal(
         }
     }
     if (!overlay.is_empty() || !source.formulas.is_empty()) && !selected_owner_seen {
-        return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+        return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
     }
     if let Some(logical) = logical {
         validate_selected_dependency_hosts(
             &dependency_hosts,
             source_formula_index
                 .as_deref()
-                .ok_or(Failure::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             source.selected_table.owner,
             limits,
             &mut usage,
@@ -2436,7 +2634,7 @@ fn plan_final_cache_internal(
             coordinate: authored_formula.coordinate,
         };
         let position =
-            find_formula(&formula_index, key, &mut usage, limits)?.ok_or(Failure::InvalidSource)?;
+            find_formula(&formula_index, key, &mut usage, limits)?.ok_or(Error::InvalidSource)?;
         dirty[position] = true;
     }
     // First build the complete dirty closure.  Evaluating while this walk is
@@ -2447,7 +2645,7 @@ fn plan_final_cache_internal(
         .len()
         .checked_add(authored.len())
         .and_then(|count| count.checked_add(source.formulas.len()))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     scratch_allocation::<FormulaKey>(&mut usage, closure_capacity, limits)?;
     reserve(&mut closure, closure_capacity)?;
     for cell in overlay {
@@ -2465,7 +2663,7 @@ fn plan_final_cache_internal(
     let mut cursor = 0usize;
     while cursor < closure.len() {
         let changed = closure[cursor];
-        cursor = cursor.checked_add(1).ok_or(Failure::InvalidSource)?;
+        cursor = cursor.checked_add(1).ok_or(Error::InvalidSource)?;
         graph_step(&mut usage, 1, limits)?;
         add_usage(&mut usage.queue_work, 1)?;
         let (start, end) = edge_range(&edges, changed, &mut usage, limits)?;
@@ -2474,12 +2672,12 @@ fn plan_final_cache_internal(
             graph_step(&mut usage, 1, limits)?;
             add_usage(&mut usage.dependency_range_candidates, 1)?;
             let formula_position = find_formula(&formula_index, edge.target, &mut usage, limits)?
-                .ok_or(Failure::UnsupportedDependency(Unsupported::Formula))?;
+                .ok_or(Error::UnsupportedDependency(Unsupported::Formula))?;
             if overlay_has(overlay, edge.target, &mut usage, limits)? {
                 continue;
             }
             if edge.target_is_in_cycle {
-                return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+                return Err(Error::UnsupportedDependency(Unsupported::Formula));
             }
             if dirty[formula_position] {
                 continue;
@@ -2495,7 +2693,7 @@ fn plan_final_cache_internal(
     for host in &cycle_hosts {
         if let Some(target) = find_formula(&formula_index, *host, &mut usage, limits)? {
             if dirty[target] && !overlay_has(overlay, *host, &mut usage, limits)? {
-                return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+                return Err(Error::UnsupportedDependency(Unsupported::Formula));
             }
         }
     }
@@ -2506,7 +2704,7 @@ fn plan_final_cache_internal(
     let mut dirty_count = 0usize;
     for is_dirty in dirty.iter().copied() {
         if is_dirty {
-            dirty_count = dirty_count.checked_add(1).ok_or(Failure::InvalidSource)?;
+            dirty_count = dirty_count.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     for edge in &edges {
@@ -2518,7 +2716,7 @@ fn plan_final_cache_internal(
             continue;
         }
         let target = find_formula(&formula_index, edge.target, &mut usage, limits)?
-            .ok_or(Failure::UnsupportedDependency(Unsupported::Formula))?;
+            .ok_or(Error::UnsupportedDependency(Unsupported::Formula))?;
         if !dirty[target] {
             continue;
         }
@@ -2528,7 +2726,7 @@ fn plan_final_cache_internal(
             if dirty[precedent] {
                 indegree[target] = indegree[target]
                     .checked_add(1)
-                    .ok_or(Failure::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
         }
     }
@@ -2543,7 +2741,7 @@ fn plan_final_cache_internal(
     cursor = 0;
     while cursor < ready.len() {
         let formula_position = ready[cursor];
-        cursor = cursor.checked_add(1).ok_or(Failure::InvalidSource)?;
+        cursor = cursor.checked_add(1).ok_or(Error::InvalidSource)?;
         graph_step(&mut usage, 1, limits)?;
         add_usage(&mut usage.queue_work, 1)?;
         let source_formula = source.formulas[formula_index[formula_position].index];
@@ -2565,7 +2763,7 @@ fn plan_final_cache_internal(
             if let Some(supplied) = supplied {
                 let supplied = retain_supplied_cache(supplied, &mut usage, limits)?;
                 if !cache_values_equal(&supplied, &evaluation.value) {
-                    return Err(Failure::UnsupportedDependency(Unsupported::CacheType));
+                    return Err(Error::UnsupportedDependency(Unsupported::CacheType));
                 }
             }
             computed[formula_position] = Some(evaluation.value);
@@ -2585,23 +2783,23 @@ fn plan_final_cache_internal(
             graph_step(&mut usage, 1, limits)?;
             add_usage(&mut usage.dependency_range_candidates, 1)?;
             let target = find_formula(&formula_index, edge.target, &mut usage, limits)?
-                .ok_or(Failure::UnsupportedDependency(Unsupported::Formula))?;
+                .ok_or(Error::UnsupportedDependency(Unsupported::Formula))?;
             if !dirty[target] {
                 continue;
             }
             if !evaluation_support[formula_index[formula_position].index] {
-                return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+                return Err(Error::UnsupportedDependency(Unsupported::Formula));
             }
             indegree[target] = indegree[target]
                 .checked_sub(1)
-                .ok_or(Failure::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if indegree[target] == 0 {
                 ready.push(target);
             }
         }
     }
     if cursor != dirty_count {
-        return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+        return Err(Error::UnsupportedDependency(Unsupported::Formula));
     }
 
     let rewrites = grouped_rewrites(
@@ -2663,7 +2861,7 @@ struct Stage {
     records: Vec<CapturedRecord>,
     ranges: Vec<CapturedRange>,
     allocation: Option<usize>,
-    limit: Option<(usize, usize)>,
+    limit: Option<(usize, usize, LimitKind)>,
     unsupported_formula: bool,
     retained_bytes: usize,
     allocations: usize,
@@ -2711,8 +2909,9 @@ impl Stage {
         slot: &mut Vec<T>,
         value: T,
         maximum: usize,
+        kind: LimitKind,
         allocation: &mut Option<usize>,
-        limit: &mut Option<(usize, usize)>,
+        limit: &mut Option<(usize, usize, LimitKind)>,
         retained_bytes: &mut usize,
         allocations: &mut usize,
         limits: CacheLimits,
@@ -2725,35 +2924,35 @@ impl Stage {
         let observed = match length.checked_add(1) {
             Some(value) => value,
             None => {
-                *limit = Some((usize::MAX, maximum));
+                *limit = Some((usize::MAX, maximum, kind));
                 return;
             },
         };
         if observed > maximum {
-            *limit = Some((observed, maximum));
+            *limit = Some((observed, maximum, kind));
             return;
         }
         let bytes = match retained_bytes.checked_add(size_of::<T>()) {
             Some(value) => value,
             None => {
-                *limit = Some((usize::MAX, limits.scratch_bytes));
+                *limit = Some((usize::MAX, limits.scratch_bytes, LimitKind::ScratchBytes));
                 return;
             },
         };
         if bytes > limits.scratch_bytes {
-            *limit = Some((bytes, limits.scratch_bytes));
+            *limit = Some((bytes, limits.scratch_bytes, LimitKind::ScratchBytes));
             return;
         }
         if length == capacity {
             let next_allocations = match allocations.checked_add(1) {
                 Some(value) => value,
                 None => {
-                    *limit = Some((usize::MAX, limits.allocations));
+                    *limit = Some((usize::MAX, limits.allocations, LimitKind::Allocations));
                     return;
                 },
             };
             if next_allocations > limits.allocations {
-                *limit = Some((next_allocations, limits.allocations));
+                *limit = Some((next_allocations, limits.allocations, LimitKind::Allocations));
                 return;
             }
             *allocations = next_allocations;
@@ -2770,17 +2969,18 @@ impl Stage {
         slot.push(value);
     }
 
-    fn ensure_complete(&self) -> Result<(), Failure> {
+    fn ensure_complete(&self) -> Result<(), Error> {
         match self.allocation {
-            Some(amount) => Err(Failure::Allocation { amount }),
+            Some(amount) => Err(Error::Allocation { amount }),
             None if self.unsupported_formula => {
-                Err(Failure::UnsupportedDependency(Unsupported::Formula))
+                Err(Error::UnsupportedDependency(Unsupported::Formula))
             },
-            None if let Some((observed, maximum)) = self.limit => Err(Failure::LimitExceeded {
+            None if let Some((observed, maximum, kind)) = self.limit => Err(Error::Limit {
+                kind,
                 observed: usize_to_u64_saturating(observed),
                 maximum: usize_to_u64_saturating(maximum),
             }),
-            None if !self.components.is_empty() => Err(Failure::InvalidSource),
+            None if !self.components.is_empty() => Err(Error::InvalidSource),
             None => Ok(()),
         }
     }
@@ -2795,6 +2995,7 @@ impl dependency::DependencyVisitor for Stage {
             &mut self.owner_references,
             reference.reference().identifier(),
             self.limits.wire_references,
+            LimitKind::WireReferences,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2812,6 +3013,7 @@ impl dependency::DependencyVisitor for Stage {
             &mut self.tile_references,
             reference.reference().identifier(),
             self.limits.wire_references,
+            LimitKind::WireReferences,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2829,6 +3031,7 @@ impl dependency::DependencyVisitor for Stage {
             &mut self.range_references,
             reference.reference().identifier(),
             self.limits.wire_references,
+            LimitKind::WireReferences,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2846,6 +3049,7 @@ impl dependency::DependencyVisitor for Stage {
             &mut self.components,
             component,
             self.limits.graph_edges.saturating_mul(5),
+            LimitKind::GraphEdges,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2865,17 +3069,17 @@ impl dependency::DependencyVisitor for Stage {
         let size = rect.size();
         let values = (from.row(), from.column(), origin.row(), origin.column());
         let (Some(target_row), Some(target_column), Some(top), Some(left)) = values else {
-            self.limit = Some((usize::MAX, self.limits.graph_edges));
+            self.limit = Some((usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges));
             return Ok(());
         };
         let rows = size.num_rows().unwrap_or(1);
         let columns = size.num_columns().unwrap_or(1);
         let Some(bottom) = top.checked_add(rows.saturating_sub(1)) else {
-            self.limit = Some((usize::MAX, self.limits.graph_edges));
+            self.limit = Some((usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges));
             return Ok(());
         };
         let Some(right) = left.checked_add(columns.saturating_sub(1)) else {
-            self.limit = Some((usize::MAX, self.limits.graph_edges));
+            self.limit = Some((usize::MAX, self.limits.graph_edges, LimitKind::GraphEdges));
             return Ok(());
         };
         Self::push(
@@ -2892,6 +3096,7 @@ impl dependency::DependencyVisitor for Stage {
                 right,
             },
             self.limits.graph_edges,
+            LimitKind::GraphEdges,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2931,6 +3136,7 @@ impl dependency::DependencyVisitor for Stage {
                 right: range.bottom_right_column(),
             },
             self.limits.graph_edges,
+            LimitKind::GraphEdges,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2957,6 +3163,7 @@ impl dependency::DependencyVisitor for Stage {
             &mut self.records,
             captured,
             self.limits.graph_nodes,
+            LimitKind::GraphNodes,
             &mut self.allocation,
             &mut self.limit,
             &mut self.retained_bytes,
@@ -2978,24 +3185,40 @@ fn decode_options(limits: CacheLimits) -> dependency::DecodeOptions {
     )
 }
 
-fn map_decode_failure(error: dependency::DecodeError) -> Failure {
+fn map_decode_failure(error: dependency::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return Failure::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
-        dependency::DecodeLimit::Bytes { observed, maximum }
-        | dependency::DecodeLimit::References { observed, maximum }
-        | dependency::DecodeLimit::Text { observed, maximum }
-        | dependency::DecodeLimit::Fields { observed, maximum }
-        | dependency::DecodeLimit::Work { observed, maximum } => Failure::LimitExceeded {
-            observed: usize_to_u64_saturating(observed),
-            maximum: usize_to_u64_saturating(maximum),
+        dependency::DecodeLimit::Bytes { observed, maximum } => {
+            decode_limit(LimitKind::WireBytes, observed, maximum)
         },
-        dependency::DecodeLimit::Nesting { observed, maximum } => Failure::LimitExceeded {
+        dependency::DecodeLimit::References { observed, maximum } => {
+            decode_limit(LimitKind::WireReferences, observed, maximum)
+        },
+        dependency::DecodeLimit::Text { observed, maximum } => {
+            decode_limit(LimitKind::WireText, observed, maximum)
+        },
+        dependency::DecodeLimit::Fields { observed, maximum } => {
+            decode_limit(LimitKind::WireFields, observed, maximum)
+        },
+        dependency::DecodeLimit::Work { observed, maximum } => {
+            decode_limit(LimitKind::WireWork, observed, maximum)
+        },
+        dependency::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::Nesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        _ => Failure::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
+fn decode_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind,
+        observed: usize_to_u64_saturating(observed),
+        maximum: usize_to_u64_saturating(maximum),
     }
 }
 
@@ -3009,7 +3232,7 @@ fn reject_unsupported_owner(
     source: CacheSource<'_>,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     let inert_graph = source.formulas.is_empty()
         && stage.owner_references.is_empty()
         && stage.tile_references.is_empty()
@@ -3026,23 +3249,38 @@ fn reject_unsupported_owner(
         .chain(owner.uuid_references())
         .chain(owner.spill_range_sizes())
         .try_fold(0usize, |total, payload| total.checked_add(payload.len()))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // Every helper scans its outer opaque message, and some scan each nested
     // length-delimited payload once more. Nested payloads are disjoint slices
     // of the outer messages, so two full byte passes are a conservative upper
     // bound. Every visited field consumes at least one source byte, making the
     // top-level byte total a conservative field bound. Admit the complete
     // manual projection before executing any WireView pass.
-    let manual_work = manual_bytes.checked_mul(2).ok_or(Failure::InvalidSource)?;
-    charge(&mut usage.wire_bytes, manual_work, limits.wire_bytes)?;
-    charge(&mut usage.wire_work, manual_work, limits.wire_work)?;
-    charge(&mut usage.wire_fields, manual_bytes, limits.wire_fields)?;
+    let manual_work = manual_bytes.checked_mul(2).ok_or(Error::InvalidSource)?;
+    charge(
+        &mut usage.wire_bytes,
+        manual_work,
+        limits.wire_bytes,
+        LimitKind::WireBytes,
+    )?;
+    charge(
+        &mut usage.wire_work,
+        manual_work,
+        limits.wire_work,
+        LimitKind::WireWork,
+    )?;
+    charge(
+        &mut usage.wire_fields,
+        manual_bytes,
+        limits.wire_fields,
+        LimitKind::WireFields,
+    )?;
     graph_step(usage, manual_work, limits)?;
     if owner
         .volatile_dependencies()
         .is_some_and(|value| !empty_volatile_dependencies(value))
     {
-        return Err(Failure::UnsupportedDependency(Unsupported::Volatile));
+        return Err(Error::UnsupportedDependency(Unsupported::Volatile));
     }
     if owner.spanning_column_dependencies().is_some_and(|value| {
         !(owner_spanning_dependencies(value, owner.internal_formula_owner_id(), source)
@@ -3051,25 +3289,25 @@ fn reject_unsupported_owner(
         !(owner_spanning_dependencies(value, owner.internal_formula_owner_id(), source)
             || inert_graph && empty_message(value))
     }) {
-        return Err(Failure::UnsupportedDependency(Unsupported::Spanning));
+        return Err(Error::UnsupportedDependency(Unsupported::Spanning));
     }
     if owner
         .whole_owner_dependencies()
         .is_some_and(|value| !empty_whole_owner_dependencies(value))
     {
-        return Err(Failure::UnsupportedDependency(Unsupported::WholeOwner));
+        return Err(Error::UnsupportedDependency(Unsupported::WholeOwner));
     }
     if owner
         .uuid_references()
         .is_some_and(|value| !empty_message(value))
     {
-        return Err(Failure::UnsupportedDependency(Unsupported::UuidReference));
+        return Err(Error::UnsupportedDependency(Unsupported::UuidReference));
     }
     if owner
         .spill_range_sizes()
         .is_some_and(|value| !inactive_spill_sizes(value))
     {
-        return Err(Failure::UnsupportedDependency(Unsupported::Spill));
+        return Err(Error::UnsupportedDependency(Unsupported::Spill));
     }
     Ok(())
 }
@@ -3230,12 +3468,12 @@ fn append_formula_hosts(
     records: &[CapturedRecord],
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     let observed = output
         .len()
         .checked_add(records.len())
-        .ok_or(Failure::InvalidSource)?;
-    check_limit(observed, limits.graph_nodes)?;
+        .ok_or(Error::InvalidSource)?;
+    check_limit(observed, limits.graph_nodes, LimitKind::GraphNodes)?;
     grow_scratch(output, records.len(), usage, limits)?;
     for record in records {
         graph_step(
@@ -3244,7 +3482,7 @@ fn append_formula_hosts(
                 .components
                 .len()
                 .checked_add(1)
-                .ok_or(Failure::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             limits,
         )?;
         output.push(FormulaHost {
@@ -3261,13 +3499,13 @@ fn append_cycle_hosts(
     records: &[CapturedRecord],
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     let count = records.iter().filter(|record| record.is_in_cycle).count();
     let observed = output
         .len()
         .checked_add(count)
-        .ok_or(Failure::InvalidSource)?;
-    check_limit(observed, limits.graph_nodes)?;
+        .ok_or(Error::InvalidSource)?;
+    check_limit(observed, limits.graph_nodes, LimitKind::GraphNodes)?;
     graph_step(usage, count, limits)?;
     grow_scratch(output, count, usage, limits)?;
     for record in records.iter().filter(|record| record.is_in_cycle) {
@@ -3285,7 +3523,7 @@ fn validate_selected_dependency_hosts(
     selected_owner: u32,
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     let selected = hosts
         .iter()
         .filter(|host| host.owner == selected_owner)
@@ -3297,9 +3535,9 @@ fn validate_selected_dependency_hosts(
             .checked_add(
                 selected
                     .checked_mul(binary_search_work(formulas.len()))
-                    .ok_or(Failure::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     add_usage(&mut usage.lookup_work, selected)?;
@@ -3315,7 +3553,7 @@ fn validate_selected_dependency_hosts(
                 )
                 .is_err()
     }) {
-        return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+        return Err(Error::UnsupportedDependency(Unsupported::Formula));
     }
     Ok(())
 }
@@ -3328,7 +3566,7 @@ fn append_edges(
     records: &[CapturedRecord],
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     // Admit the record traversal before inspecting even the first attacker-controlled
     // record.  Each record's variable component scan and edge materialization are
     // admitted separately below, before their scratch buffers are reserved.
@@ -3342,15 +3580,13 @@ fn append_edges(
             let total = shape
                 .local()
                 .checked_add(shape.external())
-                .ok_or(Failure::InvalidSource)?;
-            total_edges = total_edges
-                .checked_add(total)
-                .ok_or(Failure::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
+            total_edges = total_edges.checked_add(total).ok_or(Error::InvalidSource)?;
             total_work = total_work
                 .checked_add(record.components.len())
                 .and_then(|work| work.checked_add(total))
                 .and_then(|work| work.checked_add(EXPANDED_EDGE_ARRAYS))
-                .ok_or(Failure::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             maximum_local = maximum_local.max(shape.local());
             maximum_external = maximum_external.max(shape.external());
         }
@@ -3360,8 +3596,9 @@ fn append_edges(
         output
             .len()
             .checked_add(total_edges)
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits.graph_edges,
+        LimitKind::GraphEdges,
     )?;
     grow_scratch(output, total_edges, usage, limits)?;
     let mut local_rows = Vec::new();
@@ -3382,7 +3619,7 @@ fn append_edges(
     for record in records {
         let Some(shape) = record.edges else {
             if !record.components.is_empty() {
-                return Err(Failure::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         };
@@ -3395,11 +3632,11 @@ fn append_edges(
                     .checked_mul(3)
                     .and_then(|value| count.checked_add(value))
             })
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if record.components.len() != expected {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let total = local.checked_add(external).ok_or(Failure::InvalidSource)?;
+        let total = local.checked_add(external).ok_or(Error::InvalidSource)?;
         local_rows.clear();
         local_columns.clear();
         external_rows.clear();
@@ -3424,7 +3661,7 @@ fn append_edges(
             || external_columns.len() != external
             || external_owners.len() != external
         {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         for index in 0..local {
             output.push(Edge {
@@ -3475,50 +3712,51 @@ fn append_range_edges(
     tables: &[TableGeometry],
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     graph_step(
         usage,
         binary_search_work(tables.len())
-            .checked_mul(ranges.len().checked_add(1).ok_or(Failure::InvalidSource)?)
+            .checked_mul(ranges.len().checked_add(1).ok_or(Error::InvalidSource)?)
             .and_then(|value| value.checked_add(ranges.len()))
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     add_usage(
         &mut usage.lookup_work,
-        ranges.len().checked_add(1).ok_or(Failure::InvalidSource)?,
+        ranges.len().checked_add(1).ok_or(Error::InvalidSource)?,
     )?;
     let target_table = table_by_owner(tables, target_owner)?;
     let mut total_edges = 0usize;
     for range in ranges {
         if range.top > range.bottom || range.left > range.right {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let rows = usize::try_from(range.bottom - range.top)
             .ok()
             .and_then(|value| value.checked_add(1))
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let columns = usize::try_from(range.right - range.left)
             .ok()
             .and_then(|value| value.checked_add(1))
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         total_edges = total_edges
-            .checked_add(rows.checked_mul(columns).ok_or(Failure::InvalidSource)?)
-            .ok_or(Failure::InvalidSource)?;
+            .checked_add(rows.checked_mul(columns).ok_or(Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
     }
     graph_step(
         usage,
         total_edges
             .checked_add(ranges.len())
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     check_limit(
         output
             .len()
             .checked_add(total_edges)
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits.graph_edges,
+        LimitKind::GraphEdges,
     )?;
     grow_scratch(output, total_edges, usage, limits)?;
     for range in ranges {
@@ -3531,17 +3769,17 @@ fn append_range_edges(
             || range.target.row >= target_table.rows
             || range.target.column >= target_table.columns
         {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let rows = usize::try_from(range.bottom - range.top)
             .ok()
             .and_then(|value| value.checked_add(1))
-            .ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let columns = usize::try_from(range.right - range.left)
             .ok()
             .and_then(|value| value.checked_add(1))
-            .ok_or(Failure::InvalidSource)?;
-        let count = rows.checked_mul(columns).ok_or(Failure::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
+        let count = rows.checked_mul(columns).ok_or(Error::InvalidSource)?;
         for row in range.top..=range.bottom {
             for column in range.left..=range.right {
                 output.push(Edge {
@@ -3566,11 +3804,11 @@ fn validate_formula_edges(
     formulas: &[FormulaCell],
     formula_index: &[FormulaIndex],
     dependency_edges: &[Edge],
-    logical: Option<formula_metadata::LogicalGraph<'_>>,
+    logical: Option<formula_dependencies::LogicalGraph<'_>>,
     evaluator: &mut dyn CacheEvaluator,
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<Vec<bool>, Failure> {
+) -> Result<Vec<bool>, Error> {
     let mut formula_edges = Vec::new();
     let mut evaluation_support = Vec::new();
     scratch_allocation::<FormulaEdge>(usage, dependency_edges.len(), limits)?;
@@ -3588,7 +3826,7 @@ fn validate_formula_edges(
         evaluation_support.push(analysis.evaluation_supported);
         for precedent in analysis.precedents {
             if formula_edges.len() == formula_edges.capacity() {
-                return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+                return Err(Error::UnsupportedDependency(Unsupported::Formula));
             }
             graph_step(usage, 1, limits)?;
             formula_edges.push(FormulaEdge {
@@ -3619,7 +3857,7 @@ fn validate_formula_edges(
         }
     }
     if formula_edges != dependency_formula_edges {
-        return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+        return Err(Error::UnsupportedDependency(Unsupported::Formula));
     }
     Ok(evaluation_support)
 }
@@ -3627,10 +3865,10 @@ fn validate_formula_edges(
 fn validate_formula_ranges(
     formula: FormulaCell,
     ranges: &[FormulaRange],
-    logical: formula_metadata::LogicalGraph<'_>,
+    logical: formula_dependencies::LogicalGraph<'_>,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     graph_step(usage, binary_search_work(logical.hosts.len()), limits)?;
     add_usage(&mut usage.lookup_work, 1)?;
     let key = (
@@ -3649,7 +3887,7 @@ fn validate_formula_ranges(
         ranges
             .len()
             .checked_add(expected.len())
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     if ranges.len() != expected.len()
@@ -3661,7 +3899,7 @@ fn validate_formula_ranges(
                 || actual.right != expected.right
         })
     {
-        return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+        return Err(Error::UnsupportedDependency(Unsupported::Formula));
     }
     Ok(())
 }
@@ -3678,17 +3916,17 @@ fn replace_with_logical_graph(
     formula_index: &[FormulaIndex],
     tables: &[TableGeometry],
     selected_owner: u32,
-    logical: formula_metadata::LogicalGraph<'_>,
+    logical: formula_dependencies::LogicalGraph<'_>,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
-    if usize::try_from(logical.formula_count).map_err(|_| Failure::InvalidSource)? != formulas.len()
+) -> Result<(), Error> {
+    if usize::try_from(logical.formula_count).map_err(|_| Error::InvalidSource)? != formulas.len()
         || logical.hosts.windows(2).any(|pair| {
             (pair[0].owner, pair[0].row, pair[0].column)
                 >= (pair[1].owner, pair[1].row, pair[1].column)
         })
     {
-        return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+        return Err(Error::UnsupportedDependency(Unsupported::Formula));
     }
     let selected_host_count = logical
         .hosts
@@ -3702,7 +3940,7 @@ fn replace_with_logical_graph(
         .try_fold(0usize, |count, host| {
             count
                 .checked_add(host.precedents.len())
-                .ok_or(Failure::InvalidSource)
+                .ok_or(Error::InvalidSource)
         })?;
     let cycle_count = logical
         .hosts
@@ -3714,7 +3952,7 @@ fn replace_with_logical_graph(
         .len()
         .checked_mul(2)
         .and_then(|work| work.checked_add(edge_count))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let graph_work = logical
         .hosts
         .len()
@@ -3724,7 +3962,7 @@ fn replace_with_logical_graph(
                 edge_count.checked_mul(binary_search_work(tables.len()).checked_add(1)?)?,
             )
         })
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(usage, graph_work, limits)?;
     add_usage(&mut usage.lookup_work, lookup_work)?;
     let preserved_edges = edges
@@ -3741,23 +3979,23 @@ fn replace_with_logical_graph(
         .count();
     let final_edge_count = preserved_edges
         .checked_add(edge_count)
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let final_host_count = preserved_hosts
         .checked_add(selected_host_count)
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let final_cycle_count = preserved_cycles
         .checked_add(cycle_count)
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(
         usage,
         edges
             .len()
             .checked_add(hosts.len())
             .and_then(|work| work.checked_add(cycles.len()))
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
-    check_limit(final_edge_count, limits.graph_edges)?;
+    check_limit(final_edge_count, limits.graph_edges, LimitKind::GraphEdges)?;
     scratch_allocation::<Edge>(usage, final_edge_count, limits)?;
     scratch_allocation::<FormulaHost>(usage, final_host_count, limits)?;
     scratch_allocation::<FormulaKey>(usage, final_cycle_count, limits)?;
@@ -3797,7 +4035,7 @@ fn replace_with_logical_graph(
             },
         };
         if find_formula(formula_index, target, usage, limits)?.is_none() {
-            return Err(Failure::UnsupportedDependency(Unsupported::Formula));
+            return Err(Error::UnsupportedDependency(Unsupported::Formula));
         }
         let table = table_by_owner(tables, host.owner)?;
         if host.row >= table.rows
@@ -3805,7 +4043,7 @@ fn replace_with_logical_graph(
             || host.precedents.windows(2).any(|pair| pair[0] >= pair[1])
             || host.ranges.windows(2).any(|pair| pair[0] >= pair[1])
         {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if host.is_in_cycle {
             final_cycles.push(target);
@@ -3817,7 +4055,7 @@ fn replace_with_logical_graph(
         for precedent in &host.precedents {
             let table = table_by_owner(tables, precedent.target_owner)?;
             if precedent.row >= table.rows || precedent.column >= table.columns {
-                return Err(Failure::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             final_edges.push(Edge {
                 source: FormulaKey {
@@ -3843,14 +4081,14 @@ fn payload_index(
     payloads: &[DependencyPayload<'_>],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<PayloadIndex>, Failure> {
+) -> Result<Vec<PayloadIndex>, Error> {
     let mut result = Vec::new();
     graph_step(
         usage,
         payloads
             .len()
             .checked_add(sort_work(payloads.len())?)
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     scratch_allocation::<PayloadIndex>(usage, payloads.len(), limits)?;
@@ -3867,7 +4105,7 @@ fn payload_index(
         .windows(2)
         .any(|pair| pair[0].identifier == pair[1].identifier)
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(result)
 }
@@ -3876,7 +4114,7 @@ fn formula_index(
     source: CacheSource<'_>,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<FormulaIndex>, Failure> {
+) -> Result<Vec<FormulaIndex>, Error> {
     let formulas = source.formulas;
     let mut result = Vec::new();
     graph_step(
@@ -3886,10 +4124,10 @@ fn formula_index(
             .checked_mul(
                 binary_search_work(source.tables.len())
                     .checked_add(1)
-                    .ok_or(Failure::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
             .and_then(|work| work.checked_add(sort_work(formulas.len()).ok()?))
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     scratch_allocation::<FormulaIndex>(usage, formulas.len(), limits)?;
@@ -3898,7 +4136,7 @@ fn formula_index(
         add_usage(&mut usage.lookup_work, 1)?;
         let table = table_by_owner(source.tables, formula.owner)?;
         if formula.coordinate.row >= table.rows || formula.coordinate.column >= table.columns {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         result.push(FormulaIndex {
             key: FormulaKey {
@@ -3910,7 +4148,7 @@ fn formula_index(
     }
     result.sort_unstable();
     if result.windows(2).any(|pair| pair[0].key == pair[1].key) {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(result)
 }
@@ -3919,14 +4157,14 @@ fn formula_coordinate_index(
     index: &[FormulaIndex],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<CoordinateIndex>, Failure> {
+) -> Result<Vec<CoordinateIndex>, Error> {
     let mut result = Vec::new();
     graph_step(
         usage,
         index
             .len()
             .checked_add(sort_work(index.len())?)
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     scratch_allocation::<CoordinateIndex>(usage, index.len(), limits)?;
@@ -3941,7 +4179,7 @@ fn formula_coordinate_index(
     result.sort_unstable();
     if result.windows(2).any(|pair| pair[0].key == pair[1].key) {
         // One selected table must not expose two formula owners for one cell.
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(result)
 }
@@ -3952,12 +4190,12 @@ fn indexed_payload<'source>(
     identifier: u64,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<DependencyPayload<'source>, Failure> {
+) -> Result<DependencyPayload<'source>, Error> {
     graph_step(usage, binary_search_work(index.len()), limits)?;
     add_usage(&mut usage.lookup_work, 1)?;
     let position = index
         .binary_search_by_key(&identifier, |entry| entry.identifier)
-        .map_err(|_error| Failure::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     Ok(payloads[index[position].index])
 }
 
@@ -3966,35 +4204,35 @@ fn verify_owner_references(
     owner_index: &[PayloadIndex],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     if references.len() != owner_index.len() {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     graph_step(
         usage,
         sort_work(references.len())?
             .checked_add(references.len())
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     references.sort_unstable();
     if references.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for (reference, payload) in references.iter().zip(owner_index) {
         if *reference != payload.identifier {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn ensure_overlay(source: CacheSource<'_>, overlay: &[FinalCell]) -> Result<(), Failure> {
+fn ensure_overlay(source: CacheSource<'_>, overlay: &[FinalCell]) -> Result<(), Error> {
     if overlay
         .windows(2)
         .any(|pair| (pair[0].table, pair[0].coordinate) >= (pair[1].table, pair[1].coordinate))
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for cell in overlay {
         let table = table_by_owner(source.tables, cell.table.owner)?;
@@ -4003,7 +4241,7 @@ fn ensure_overlay(source: CacheSource<'_>, overlay: &[FinalCell]) -> Result<(), 
             || cell.coordinate.row >= table.rows
             || cell.coordinate.column >= table.columns
         {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -4013,12 +4251,12 @@ fn ensure_authored(
     source: CacheSource<'_>,
     overlay: &[FinalCell],
     authored: &[AuthoredFormulaCache<'_>],
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     if authored
         .windows(2)
         .any(|pair| (pair[0].owner, pair[0].coordinate) >= (pair[1].owner, pair[1].coordinate))
     {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for formula in authored {
         let table = table_by_owner(source.tables, formula.owner)?;
@@ -4031,37 +4269,43 @@ fn ensure_authored(
                 })
                 .is_ok()
         {
-            return Err(Failure::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
 fn retain_supplied_cache(
-    supplied: &CachedValue,
+    supplied: SuppliedCache<'_>,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<FormulaCachedValue, Failure> {
-    match supplied.kind() {
-        CachedKind::Number(value) => Ok(FormulaCachedValue::Number(to_native(*value))),
-        CachedKind::Boolean(value) => Ok(FormulaCachedValue::Boolean(*value)),
-        CachedKind::Date(value) => Ok(FormulaCachedValue::Date(to_native(*value))),
-        CachedKind::Duration(value) => Ok(FormulaCachedValue::Duration(to_native(*value))),
-        CachedKind::Text(value) => {
+) -> Result<FormulaCachedValue, Error> {
+    match supplied {
+        SuppliedCache::Number(value) => Ok(FormulaCachedValue::Number(value)),
+        SuppliedCache::Boolean(value) => Ok(FormulaCachedValue::Boolean(value)),
+        SuppliedCache::Date(value) => Ok(FormulaCachedValue::Date(value)),
+        SuppliedCache::Duration(value) => Ok(FormulaCachedValue::Duration(value)),
+        SuppliedCache::Text(value) => {
             charge(
                 &mut usage.retained_bytes,
                 value.len(),
                 limits.retained_bytes,
+                LimitKind::RetainedBytes,
             )?;
-            charge(&mut usage.allocations, 1, limits.allocations)?;
+            charge(
+                &mut usage.allocations,
+                1,
+                limits.allocations,
+                LimitKind::Allocations,
+            )?;
             let mut copied = String::new();
             copied
                 .try_reserve_exact(value.len())
-                .map_err(|_error| Failure::Allocation {
+                .map_err(|_error| Error::Allocation {
                     amount: value.len(),
                 })?;
             if copied.capacity() != value.len() {
-                return Err(Failure::Allocation {
+                return Err(Error::Allocation {
                     amount: value.len(),
                 });
             }
@@ -4069,10 +4313,6 @@ fn retain_supplied_cache(
             Ok(FormulaCachedValue::Text(copied))
         },
     }
-}
-
-fn to_native(value: crate::cell::FiniteF64) -> FiniteF64 {
-    FiniteF64::new(value.get()).expect("Numbers scalar invariant guarantees finite value")
 }
 
 fn cache_values_equal(left: &FormulaCachedValue, right: &FormulaCachedValue) -> bool {
@@ -4093,7 +4333,7 @@ fn authored_cache<'cache>(
     formula: FormulaCell,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Option<&'cache CachedValue>, Failure> {
+) -> Result<Option<SuppliedCache<'cache>>, Error> {
     graph_step(usage, binary_search_work(authored.len()), limits)?;
     add_usage(&mut usage.lookup_work, 1)?;
     Ok(authored
@@ -4111,18 +4351,18 @@ fn changed_formula_removals(
     coordinate_index: &[CoordinateIndex],
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<DependencyRemoval>, Failure> {
+) -> Result<Vec<DependencyRemoval>, Error> {
     let mut removals = Vec::new();
     let work = overlay
         .len()
         .checked_mul(
             binary_search_work(coordinate_index.len())
                 .checked_add(1)
-                .ok_or(Failure::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .and_then(|value| value.checked_add(sort_work(overlay.len()).ok()?))
         .and_then(|value| value.checked_add(overlay.len()))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(usage, work, limits)?;
     add_usage(&mut usage.lookup_work, overlay.len())?;
     retained_allocation::<DependencyRemoval>(usage, overlay.len(), limits)?;
@@ -4154,7 +4394,7 @@ fn find_formula(
     key: FormulaKey,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Option<usize>, Failure> {
+) -> Result<Option<usize>, Error> {
     graph_step(usage, binary_search_work(index.len()), limits)?;
     add_usage(&mut usage.lookup_work, 1)?;
     Ok(index.binary_search_by(|entry| entry.key.cmp(&key)).ok())
@@ -4165,7 +4405,7 @@ fn find_coordinate_formula(
     key: FormulaKey,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Option<usize>, Failure> {
+) -> Result<Option<usize>, Error> {
     graph_step(usage, binary_search_work(index.len()), limits)?;
     add_usage(&mut usage.lookup_work, 1)?;
     Ok(index
@@ -4179,7 +4419,7 @@ fn overlay_has(
     key: FormulaKey,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<bool, Failure> {
+) -> Result<bool, Error> {
     graph_step(usage, binary_search_work(overlay.len()), limits)?;
     add_usage(&mut usage.lookup_work, 1)?;
     Ok(overlay
@@ -4194,7 +4434,7 @@ fn edge_range(
     source: FormulaKey,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(usize, usize), Failure> {
+) -> Result<(usize, usize), Error> {
     graph_step(
         usage,
         binary_search_work(edges.len()).saturating_mul(2),
@@ -4210,7 +4450,7 @@ fn option_slots(
     length: usize,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<Option<FormulaCachedValue>>, Failure> {
+) -> Result<Vec<Option<FormulaCachedValue>>, Error> {
     let mut slots = Vec::new();
     scratch_allocation::<Option<FormulaCachedValue>>(usage, length, limits)?;
     reserve(&mut slots, length)?;
@@ -4222,7 +4462,7 @@ fn bool_slots(
     length: usize,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<bool>, Failure> {
+) -> Result<Vec<bool>, Error> {
     let mut slots = Vec::new();
     scratch_allocation::<bool>(usage, length, limits)?;
     reserve(&mut slots, length)?;
@@ -4234,7 +4474,7 @@ fn usize_slots(
     length: usize,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<Vec<usize>, Failure> {
+) -> Result<Vec<usize>, Error> {
     let mut slots = Vec::new();
     scratch_allocation::<usize>(usage, length, limits)?;
     reserve(&mut slots, length)?;
@@ -4250,7 +4490,7 @@ struct FinalValues<'a> {
 }
 
 impl CacheValues for FinalValues<'_> {
-    fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Failure> {
+    fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Error> {
         let key = FormulaKey { owner, coordinate };
         if let Ok(position) = self
             .overlay
@@ -4272,7 +4512,7 @@ impl CacheValues for FinalValues<'_> {
         self.baseline.value(owner, coordinate)
     }
 
-    fn lookup_work(&self, owner: u32) -> Result<usize, Failure> {
+    fn lookup_work(&self, owner: u32) -> Result<usize, Error> {
         binary_search_work(self.overlay.len())
             .checked_add(binary_search_work(self.coordinate_index.len()))
             .and_then(|work| {
@@ -4281,11 +4521,11 @@ impl CacheValues for FinalValues<'_> {
                     .ok()
                     .and_then(|value| work.checked_add(value))
             })
-            .ok_or(Failure::InvalidSource)
+            .ok_or(Error::InvalidSource)
     }
 }
 
-fn supported_value(value: Option<&FormulaCachedValue>) -> Result<Option<ScalarValue>, Failure> {
+fn supported_value(value: Option<&FormulaCachedValue>) -> Result<Option<ScalarValue>, Error> {
     match value {
         None => Ok(None),
         Some(FormulaCachedValue::Number(value)) => Ok(Some(ScalarValue::Number(*value))),
@@ -4293,7 +4533,7 @@ fn supported_value(value: Option<&FormulaCachedValue>) -> Result<Option<ScalarVa
         Some(FormulaCachedValue::Date(value)) => Ok(Some(ScalarValue::Date(*value))),
         Some(FormulaCachedValue::Duration(value)) => Ok(Some(ScalarValue::Duration(*value))),
         Some(FormulaCachedValue::Text(_)) => {
-            Err(Failure::UnsupportedDependency(Unsupported::CacheType))
+            Err(Error::UnsupportedDependency(Unsupported::CacheType))
         },
     }
 }
@@ -4304,12 +4544,12 @@ fn grouped_rewrites(
     computed: &mut [Option<FormulaCachedValue>],
     limits: CacheLimits,
     usage: &mut CacheUsage,
-) -> Result<Vec<CacheRewrite>, Failure> {
+) -> Result<Vec<CacheRewrite>, Error> {
     let work = computed
         .len()
         .checked_mul(4)
         .and_then(|value| value.checked_add(sort_work(computed.len()).ok()?))
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     graph_step(usage, work, limits)?;
     let mut cells = Vec::new();
     scratch_allocation::<(u64, CacheCellRewrite)>(usage, computed.len(), limits)?;
@@ -4319,8 +4559,9 @@ fn grouped_rewrites(
             continue;
         };
         check_limit(
-            cells.len().checked_add(1).ok_or(Failure::InvalidSource)?,
+            cells.len().checked_add(1).ok_or(Error::InvalidSource)?,
             limits.cache_cells,
+            LimitKind::CacheCells,
         )?;
         let formula = formulas[index[position].index];
         cells.push((
@@ -4350,8 +4591,8 @@ fn grouped_rewrites(
         if position == 0 || cells[position - 1].0 != *object {
             group_lengths.push(1usize);
         } else {
-            let last = group_lengths.last_mut().ok_or(Failure::InvalidSource)?;
-            *last = last.checked_add(1).ok_or(Failure::InvalidSource)?;
+            let last = group_lengths.last_mut().ok_or(Error::InvalidSource)?;
+            *last = last.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     let mut grouped = Vec::new();
@@ -4363,12 +4604,12 @@ fn grouped_rewrites(
         retained_allocation::<CacheCellRewrite>(usage, length, limits)?;
         let mut current_cells = Vec::new();
         reserve(&mut current_cells, length)?;
-        let (cache_object, first) = cells.next().ok_or(Failure::InvalidSource)?;
+        let (cache_object, first) = cells.next().ok_or(Error::InvalidSource)?;
         current_cells.push(first);
         for _ in 1..length {
-            let (object, cell) = cells.next().ok_or(Failure::InvalidSource)?;
+            let (object, cell) = cells.next().ok_or(Error::InvalidSource)?;
             if object != cache_object {
-                return Err(Failure::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             current_cells.push(cell);
         }
@@ -4378,7 +4619,7 @@ fn grouped_rewrites(
         });
     }
     if cells.next().is_some() {
-        return Err(Failure::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     add_usage(&mut usage.cache_cells_read, computed.len())?;
     add_usage(&mut usage.cache_hosts_refreshed, refreshed_hosts)?;
@@ -4389,23 +4630,36 @@ fn charge_report(
     usage: &mut CacheUsage,
     report: dependency::DecodeReport,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     charge(
         &mut usage.wire_bytes,
         report.source_bytes(),
         limits.wire_bytes,
+        LimitKind::WireBytes,
     )?;
-    charge(&mut usage.wire_fields, report.fields(), limits.wire_fields)?;
-    charge(&mut usage.wire_work, report.work_bytes(), limits.wire_work)?;
+    charge(
+        &mut usage.wire_fields,
+        report.fields(),
+        limits.wire_fields,
+        LimitKind::WireFields,
+    )?;
+    charge(
+        &mut usage.wire_work,
+        report.work_bytes(),
+        limits.wire_work,
+        LimitKind::WireWork,
+    )?;
     charge(
         &mut usage.wire_references,
         report.references(),
         limits.wire_references,
+        LimitKind::WireReferences,
     )?;
     charge(
         &mut usage.wire_text_bytes,
         report.text_bytes(),
         limits.wire_text,
+        LimitKind::WireText,
     )
 }
 
@@ -4413,34 +4667,43 @@ fn charge_formula_evaluation_usage(
     usage: &mut CacheUsage,
     evaluation: FormulaEvaluationUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     charge(
         &mut usage.wire_bytes,
         evaluation.wire_bytes,
         limits.wire_bytes,
+        LimitKind::WireBytes,
     )?;
     charge(
         &mut usage.wire_fields,
         evaluation.wire_fields,
         limits.wire_fields,
+        LimitKind::WireFields,
     )?;
-    charge(&mut usage.wire_work, evaluation.wire_work, limits.wire_work)?;
+    charge(
+        &mut usage.wire_work,
+        evaluation.wire_work,
+        limits.wire_work,
+        LimitKind::WireWork,
+    )?;
     charge(
         &mut usage.wire_text_bytes,
         evaluation.wire_text_bytes,
         limits.wire_text,
+        LimitKind::WireText,
     )?;
     charge(
         &mut usage.formula_work,
         evaluation.formula_work,
         limits.formula_work,
+        LimitKind::FormulaWork,
     )?;
     graph_step(
         usage,
         evaluation
             .formula_work
             .checked_add(evaluation.graph_work)
-            .ok_or(Failure::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         limits,
     )?;
     add_usage(&mut usage.lookup_work, evaluation.lookup_work)?;
@@ -4448,27 +4711,24 @@ fn charge_formula_evaluation_usage(
         &mut usage.peak_scratch_bytes,
         evaluation.scratch_bytes,
         limits.scratch_bytes,
+        LimitKind::ScratchBytes,
     )?;
     charge(
         &mut usage.allocations,
         evaluation.allocations,
         limits.allocations,
+        LimitKind::Allocations,
     )
 }
 
 /// Derive exact residual cache limits after a previously completed bounded
 /// stage. Callers use this to compose host/list/coverage/planning stages
 /// without authorizing the same remaining budget more than once.
-pub(super) fn remaining_limits(
-    limits: CacheLimits,
-    usage: &CacheUsage,
-) -> Result<CacheLimits, Failure> {
-    fn remaining(maximum: usize, used: u64) -> Result<usize, Failure> {
-        let maximum_u64 = u64::try_from(maximum).map_err(|_error| Failure::InvalidSource)?;
-        let value = maximum_u64
-            .checked_sub(used)
-            .ok_or(Failure::InvalidSource)?;
-        usize::try_from(value).map_err(|_error| Failure::InvalidSource)
+pub fn remaining_limits(limits: CacheLimits, usage: &CacheUsage) -> Result<CacheLimits, Error> {
+    fn remaining(maximum: usize, used: u64) -> Result<usize, Error> {
+        let maximum_u64 = u64::try_from(maximum).map_err(|_error| Error::InvalidSource)?;
+        let value = maximum_u64.checked_sub(used).ok_or(Error::InvalidSource)?;
+        usize::try_from(value).map_err(|_error| Error::InvalidSource)
     }
 
     Ok(CacheLimits {
@@ -4493,26 +4753,29 @@ fn charge_stage_usage(
     usage: &mut CacheUsage,
     stage: &Stage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     charge(
         &mut usage.peak_scratch_bytes,
         stage.retained_bytes,
         limits.scratch_bytes,
+        LimitKind::ScratchBytes,
     )?;
     charge(
         &mut usage.allocations,
         stage.allocations,
         limits.allocations,
+        LimitKind::Allocations,
     )
 }
 
-fn charge(total: &mut u64, increment: usize, maximum: usize) -> Result<(), Failure> {
+fn charge(total: &mut u64, increment: usize, maximum: usize, kind: LimitKind) -> Result<(), Error> {
     let next = total
-        .checked_add(u64::try_from(increment).map_err(|_error| Failure::InvalidSource)?)
-        .ok_or(Failure::InvalidSource)?;
-    let maximum = u64::try_from(maximum).map_err(|_error| Failure::InvalidSource)?;
+        .checked_add(u64::try_from(increment).map_err(|_error| Error::InvalidSource)?)
+        .ok_or(Error::InvalidSource)?;
+    let maximum = u64::try_from(maximum).map_err(|_error| Error::InvalidSource)?;
     if next > maximum {
-        return Err(Failure::LimitExceeded {
+        return Err(Error::Limit {
+            kind,
             observed: next,
             maximum,
         });
@@ -4521,36 +4784,44 @@ fn charge(total: &mut u64, increment: usize, maximum: usize) -> Result<(), Failu
     Ok(())
 }
 
-fn check_limit(observed: usize, maximum: usize) -> Result<(), Failure> {
+fn check_limit(observed: usize, maximum: usize, kind: LimitKind) -> Result<(), Error> {
     if observed > maximum {
-        return Err(Failure::LimitExceeded {
-            observed: u64::try_from(observed).map_err(|_error| Failure::InvalidSource)?,
-            maximum: u64::try_from(maximum).map_err(|_error| Failure::InvalidSource)?,
+        return Err(Error::Limit {
+            kind,
+            observed: u64::try_from(observed).map_err(|_error| Error::InvalidSource)?,
+            maximum: u64::try_from(maximum).map_err(|_error| Error::InvalidSource)?,
         });
     }
     Ok(())
 }
 
-fn graph_step(
-    usage: &mut CacheUsage,
-    increment: usize,
-    limits: CacheLimits,
-) -> Result<(), Failure> {
-    charge(&mut usage.graph_work, increment, limits.graph_work)
+fn graph_step(usage: &mut CacheUsage, increment: usize, limits: CacheLimits) -> Result<(), Error> {
+    charge(
+        &mut usage.graph_work,
+        increment,
+        limits.graph_work,
+        LimitKind::GraphWork,
+    )
 }
 
 fn scratch_allocation<T>(
     usage: &mut CacheUsage,
     elements: usize,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     allocation_bytes::<T>(
         &mut usage.peak_scratch_bytes,
         elements,
         limits.scratch_bytes,
+        LimitKind::ScratchBytes,
     )?;
     if elements != 0 {
-        charge(&mut usage.allocations, 1, limits.allocations)?;
+        charge(
+            &mut usage.allocations,
+            1,
+            limits.allocations,
+            LimitKind::Allocations,
+        )?;
     }
     Ok(())
 }
@@ -4559,20 +4830,35 @@ fn retained_allocation<T>(
     usage: &mut CacheUsage,
     elements: usize,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     add_usage(&mut usage.retained_elements, elements)?;
-    allocation_bytes::<T>(&mut usage.retained_bytes, elements, limits.retained_bytes)?;
+    allocation_bytes::<T>(
+        &mut usage.retained_bytes,
+        elements,
+        limits.retained_bytes,
+        LimitKind::RetainedBytes,
+    )?;
     if elements != 0 {
-        charge(&mut usage.allocations, 1, limits.allocations)?;
+        charge(
+            &mut usage.allocations,
+            1,
+            limits.allocations,
+            LimitKind::Allocations,
+        )?;
     }
     Ok(())
 }
 
-fn allocation_bytes<T>(total: &mut u64, elements: usize, maximum: usize) -> Result<(), Failure> {
+fn allocation_bytes<T>(
+    total: &mut u64,
+    elements: usize,
+    maximum: usize,
+    kind: LimitKind,
+) -> Result<(), Error> {
     let bytes = elements
         .checked_mul(size_of::<T>())
-        .ok_or(Failure::InvalidSource)?;
-    charge(total, bytes, maximum)
+        .ok_or(Error::InvalidSource)?;
+    charge(total, bytes, maximum, kind)
 }
 
 fn binary_search_work(length: usize) -> usize {
@@ -4585,40 +4871,40 @@ fn binary_search_work(length: usize) -> usize {
     }
 }
 
-pub(super) fn baseline_lookup_work(
+pub fn baseline_lookup_work(
     selected_values: usize,
     selected_aggregate_ignored: usize,
     selected_unsupported: usize,
-) -> Result<usize, Failure> {
+) -> Result<usize, Error> {
     binary_search_work(selected_values)
         .checked_add(binary_search_work(selected_aggregate_ignored))
         .and_then(|work| work.checked_add(binary_search_work(selected_unsupported)))
-        .ok_or(Failure::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn sort_work(length: usize) -> Result<usize, Failure> {
+fn sort_work(length: usize) -> Result<usize, Error> {
     length
         .checked_mul(binary_search_work(length))
-        .ok_or(Failure::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn add_usage(total: &mut u64, increment: usize) -> Result<(), Failure> {
+fn add_usage(total: &mut u64, increment: usize) -> Result<(), Error> {
     *total = total
-        .checked_add(u64::try_from(increment).map_err(|_error| Failure::InvalidSource)?)
-        .ok_or(Failure::InvalidSource)?;
+        .checked_add(u64::try_from(increment).map_err(|_error| Error::InvalidSource)?)
+        .ok_or(Error::InvalidSource)?;
     Ok(())
 }
 
-fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), Failure> {
+fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), Error> {
     let required = values
         .len()
         .checked_add(additional)
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     values
         .try_reserve_exact(additional)
-        .map_err(|_error| Failure::Allocation { amount: additional })?;
+        .map_err(|_error| Error::Allocation { amount: additional })?;
     if size_of::<T>() != 0 && values.capacity() != required {
-        return Err(Failure::Allocation { amount: required });
+        return Err(Error::Allocation { amount: required });
     }
     Ok(())
 }
@@ -4631,16 +4917,16 @@ fn grow_scratch<T>(
     additional: usize,
     usage: &mut CacheUsage,
     limits: CacheLimits,
-) -> Result<(), Failure> {
+) -> Result<(), Error> {
     let required = values
         .len()
         .checked_add(additional)
-        .ok_or(Failure::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if required <= values.capacity() {
         return Ok(());
     }
     let old = values.capacity();
-    let target = required.max(old.checked_mul(2).ok_or(Failure::InvalidSource)?);
+    let target = required.max(old.checked_mul(2).ok_or(Error::InvalidSource)?);
     graph_step(usage, old, limits)?;
     // Charging `target` at each geometric growth accounts for the new bytes
     // plus the old buffer overlap. Across all doublings this remains <2x the
@@ -4648,9 +4934,9 @@ fn grow_scratch<T>(
     scratch_allocation::<T>(usage, target, limits)?;
     values
         .try_reserve_exact(target - values.len())
-        .map_err(|_error| Failure::Allocation { amount: target })?;
+        .map_err(|_error| Error::Allocation { amount: target })?;
     if size_of::<T>() != 0 && values.capacity() != target {
-        return Err(Failure::Allocation { amount: target });
+        return Err(Error::Allocation { amount: target });
     }
     Ok(())
 }
@@ -4716,7 +5002,7 @@ mod tests {
                     ..limits()
                 },
             ),
-            Err(Failure::LimitExceeded { observed, maximum })
+            Err(Error::Limit { observed, maximum, .. })
                 if observed == u64::try_from(with_text).expect("fits")
                     && maximum == u64::try_from(with_text - 1).expect("fits")
         ));
@@ -4731,7 +5017,7 @@ mod tests {
         assert!(supported_value(Some(&duration)).is_ok());
         assert!(matches!(
             supported_value(Some(&text)),
-            Err(Failure::UnsupportedDependency(Unsupported::CacheType))
+            Err(Error::UnsupportedDependency(Unsupported::CacheType))
         ));
         let overlay_date = FinalValue::date(FiniteF64::new(12.0).expect("finite"));
         let overlay_duration = FinalValue::duration(FiniteF64::new(3.5).expect("finite"));
@@ -4746,7 +5032,7 @@ mod tests {
         ));
         assert!(matches!(
             overlay_text.supported(),
-            Err(Failure::UnsupportedDependency(Unsupported::TextScalar))
+            Err(Error::UnsupportedDependency(Unsupported::TextScalar))
         ));
 
         let values = Baseline(vec![
@@ -4795,20 +5081,16 @@ mod tests {
                 owner: OWNER,
                 coordinate: coordinate(2),
             })),
-            Err(Failure::UnsupportedDependency(Unsupported::TextScalar))
+            Err(Error::UnsupportedDependency(Unsupported::TextScalar))
         ));
     }
 
     struct Baseline(Vec<(Coordinate, FormulaCachedValue)>);
 
     impl CacheBaseline for Baseline {
-        fn value(
-            &self,
-            owner: u32,
-            coordinate: Coordinate,
-        ) -> Result<Option<ScalarValue>, Failure> {
+        fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Error> {
             if owner != OWNER {
-                return Err(Failure::UnsupportedDependency(Unsupported::MissingOwner));
+                return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
             }
             match self
                 .0
@@ -4816,28 +5098,24 @@ mod tests {
                 .find_map(|(candidate, value)| (*candidate == coordinate).then_some(value))
             {
                 Some(FormulaCachedValue::Text(_)) => {
-                    Err(Failure::UnsupportedDependency(Unsupported::TextScalar))
+                    Err(Error::UnsupportedDependency(Unsupported::TextScalar))
                 },
                 Some(value) => supported_value(Some(value)),
                 None => Ok(None),
             }
         }
 
-        fn lookup_work(&self, _owner: u32) -> Result<usize, Failure> {
+        fn lookup_work(&self, _owner: u32) -> Result<usize, Error> {
             Ok(self.0.len())
         }
     }
 
     impl CacheValues for Baseline {
-        fn value(
-            &self,
-            owner: u32,
-            coordinate: Coordinate,
-        ) -> Result<Option<ScalarValue>, Failure> {
+        fn value(&self, owner: u32, coordinate: Coordinate) -> Result<Option<ScalarValue>, Error> {
             CacheBaseline::value(self, owner, coordinate)
         }
 
-        fn lookup_work(&self, owner: u32) -> Result<usize, Failure> {
+        fn lookup_work(&self, owner: u32) -> Result<usize, Error> {
             let _ = owner;
             Ok(self.0.len())
         }
@@ -4853,12 +5131,12 @@ mod tests {
             &mut self,
             formula: FormulaCell,
             _limits: CacheLimits,
-        ) -> Result<FormulaAnalysis, Failure> {
+        ) -> Result<FormulaAnalysis, Error> {
             let column = formula
                 .coordinate
                 .column
                 .checked_sub(1)
-                .ok_or(Failure::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             Ok(FormulaAnalysis {
                 precedents: vec![FormulaPrecedent {
                     owner: formula.owner,
@@ -4883,7 +5161,7 @@ mod tests {
             formula: FormulaCell,
             values: &dyn CacheValues,
             _limits: CacheLimits,
-        ) -> Result<Evaluation, Failure> {
+        ) -> Result<Evaluation, Error> {
             self.calls.push(formula.coordinate);
             let preceding = Coordinate {
                 row: formula.coordinate.row,
@@ -4891,15 +5169,15 @@ mod tests {
                     .coordinate
                     .column
                     .checked_sub(1)
-                    .ok_or(Failure::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             };
             let number = match values.value(formula.owner, preceding)? {
                 Some(ScalarValue::Number(number)) => number.get(),
-                _ => return Err(Failure::InvalidSource),
+                _ => return Err(Error::InvalidSource),
             };
             Ok(Evaluation {
                 value: FormulaCachedValue::number(number + 1.0)
-                    .map_err(|_error| Failure::InvalidSource)?,
+                    .map_err(|_error| Error::InvalidSource)?,
                 usage: FormulaEvaluationUsage {
                     formula_work: 1,
                     ..FormulaEvaluationUsage::default()
@@ -4916,7 +5194,7 @@ mod tests {
             &mut self,
             formula: FormulaCell,
             _limits: CacheLimits,
-        ) -> Result<FormulaAnalysis, Failure> {
+        ) -> Result<FormulaAnalysis, Error> {
             Ok(FormulaAnalysis {
                 precedents: vec![FormulaPrecedent {
                     owner: formula.owner,
@@ -4938,14 +5216,14 @@ mod tests {
             _formula: FormulaCell,
             values: &dyn CacheValues,
             _limits: CacheLimits,
-        ) -> Result<Evaluation, Failure> {
+        ) -> Result<Evaluation, Error> {
             let number = match values.value(OWNER, coordinate(0))? {
                 Some(ScalarValue::Number(number)) => number.get(),
-                _ => return Err(Failure::InvalidSource),
+                _ => return Err(Error::InvalidSource),
             };
             Ok(Evaluation {
                 value: FormulaCachedValue::number(number + 1.0)
-                    .map_err(|_error| Failure::InvalidSource)?,
+                    .map_err(|_error| Error::InvalidSource)?,
                 usage: FormulaEvaluationUsage {
                     formula_work: 1,
                     ..FormulaEvaluationUsage::default()
@@ -5184,7 +5462,7 @@ mod tests {
         overlay: &'a [FinalCell],
         limits: CacheLimits,
         evaluator: &mut dyn CacheEvaluator,
-    ) -> Result<CachePlan, Failure> {
+    ) -> Result<CachePlan, Error> {
         plan_final_cache(
             CacheSource {
                 selected_table: TABLE,
@@ -5214,7 +5492,7 @@ mod tests {
         authored: &'a [AuthoredFormulaCache<'a>],
         limits: CacheLimits,
         evaluator: &mut dyn CacheEvaluator,
-    ) -> Result<CachePlan, Failure> {
+    ) -> Result<CachePlan, Error> {
         plan_final_cache_with_authored(
             CacheSource {
                 selected_table: TABLE,
@@ -5243,10 +5521,10 @@ mod tests {
         formulas: &'a [FormulaCell],
         overlay: &'a [FinalCell],
         authored: &'a [AuthoredFormulaCache<'a>],
-        logical: formula_metadata::LogicalGraph<'a>,
+        logical: formula_dependencies::LogicalGraph<'a>,
         limits: CacheLimits,
         evaluator: &mut dyn CacheEvaluator,
-    ) -> Result<CachePlan, Failure> {
+    ) -> Result<CachePlan, Error> {
         plan_final_cache_with_logical_graph(
             CacheSource {
                 selected_table: TABLE,
@@ -5276,9 +5554,9 @@ mod tests {
         opaque: &'a [u8],
         formulas: &'a [FormulaCell],
         overlay: &'a [FinalCell],
-        logical: formula_metadata::LogicalGraph<'a>,
+        logical: formula_dependencies::LogicalGraph<'a>,
         evaluator: &mut dyn CacheEvaluator,
-    ) -> Result<CachePlan, Failure> {
+    ) -> Result<CachePlan, Error> {
         plan_final_cache_with_logical_graph(
             CacheSource {
                 selected_table: TABLE,
@@ -5313,9 +5591,9 @@ mod tests {
         owner: &'a [u8],
         source_formulas: &'a [FormulaCell],
         overlay: &'a [FinalCell],
-        logical: formula_metadata::LogicalGraph<'a>,
+        logical: formula_dependencies::LogicalGraph<'a>,
         evaluator: &mut dyn CacheEvaluator,
-    ) -> Result<CachePlan, Failure> {
+    ) -> Result<CachePlan, Error> {
         plan_final_cache_with_logical_graph(
             CacheSource {
                 selected_table: TABLE,
@@ -5351,7 +5629,7 @@ mod tests {
                 &mut self,
                 _formula: FormulaCell,
                 _limits: CacheLimits,
-            ) -> Result<FormulaAnalysis, Failure> {
+            ) -> Result<FormulaAnalysis, Error> {
                 self.analyses += 1;
                 Ok(FormulaAnalysis {
                     precedents: Vec::new(),
@@ -5366,17 +5644,17 @@ mod tests {
                 _formula: FormulaCell,
                 _values: &dyn CacheValues,
                 _limits: CacheLimits,
-            ) -> Result<Evaluation, Failure> {
+            ) -> Result<Evaluation, Error> {
                 self.evaluations += 1;
-                Err(Failure::UnsupportedDependency(Unsupported::Formula))
+                Err(Error::UnsupportedDependency(Unsupported::Formula))
             }
         }
 
-        let number = CachedValue::number(1.5).expect("finite");
-        let text = CachedValue::text("typed text").expect("bounded");
-        let boolean = CachedValue::boolean(true);
-        let date = CachedValue::date(123.0).expect("finite");
-        let duration = CachedValue::duration(45.0).expect("finite");
+        let number = SuppliedCache::Number(FiniteF64::new(1.5).expect("finite"));
+        let text = SuppliedCache::Text("typed text");
+        let boolean = SuppliedCache::Boolean(true);
+        let date = SuppliedCache::Date(FiniteF64::new(123.0).expect("finite"));
+        let duration = SuppliedCache::Duration(FiniteF64::new(45.0).expect("finite"));
         let supplied = [&number, &text, &boolean, &date, &duration];
         let formulas: Vec<_> = (0..5).map(|column| formula(column, 20)).collect();
         let records: Vec<_> = (0..5).map(|column| record(column, &[], false)).collect();
@@ -5386,7 +5664,7 @@ mod tests {
             .map(|(column, supplied)| AuthoredFormulaCache {
                 owner: OWNER,
                 coordinate: coordinate(u32::try_from(column).expect("small")),
-                supplied: Some(*supplied),
+                supplied: Some(**supplied),
             })
             .collect();
         let (engine, owner) = encoded_graph(records, false);
@@ -5428,7 +5706,7 @@ mod tests {
                 &mut self,
                 _formula: FormulaCell,
                 _limits: CacheLimits,
-            ) -> Result<FormulaAnalysis, Failure> {
+            ) -> Result<FormulaAnalysis, Error> {
                 Ok(FormulaAnalysis {
                     precedents: Vec::new(),
                     ranges: Vec::new(),
@@ -5442,7 +5720,7 @@ mod tests {
                 _formula: FormulaCell,
                 _values: &dyn CacheValues,
                 _limits: CacheLimits,
-            ) -> Result<Evaluation, Failure> {
+            ) -> Result<Evaluation, Error> {
                 panic!("static unsupported classification must prevent evaluation")
             }
         }
@@ -5476,7 +5754,7 @@ mod tests {
                 &mut self,
                 _formula: FormulaCell,
                 _limits: CacheLimits,
-            ) -> Result<FormulaAnalysis, Failure> {
+            ) -> Result<FormulaAnalysis, Error> {
                 Ok(FormulaAnalysis {
                     precedents: Vec::new(),
                     ranges: Vec::new(),
@@ -5490,19 +5768,17 @@ mod tests {
                 formula: FormulaCell,
                 _values: &dyn CacheValues,
                 _limits: CacheLimits,
-            ) -> Result<Evaluation, Failure> {
-                let value =
-                    match formula.coordinate.column {
-                        0 => FormulaCachedValue::number(1.5)
-                            .map_err(|_error| Failure::InvalidSource)?,
-                        1 => FormulaCachedValue::Text("typed text".to_owned()),
-                        2 => FormulaCachedValue::Boolean(true),
-                        3 => FormulaCachedValue::date(123.0)
-                            .map_err(|_error| Failure::InvalidSource)?,
-                        4 => FormulaCachedValue::duration(45.0)
-                            .map_err(|_error| Failure::InvalidSource)?,
-                        _ => return Err(Failure::InvalidSource),
-                    };
+            ) -> Result<Evaluation, Error> {
+                let value = match formula.coordinate.column {
+                    0 => FormulaCachedValue::number(1.5).map_err(|_error| Error::InvalidSource)?,
+                    1 => FormulaCachedValue::Text("typed text".to_owned()),
+                    2 => FormulaCachedValue::Boolean(true),
+                    3 => FormulaCachedValue::date(123.0).map_err(|_error| Error::InvalidSource)?,
+                    4 => {
+                        FormulaCachedValue::duration(45.0).map_err(|_error| Error::InvalidSource)?
+                    },
+                    _ => return Err(Error::InvalidSource),
+                };
                 Ok(Evaluation {
                     value,
                     usage: FormulaEvaluationUsage::default(),
@@ -5510,11 +5786,11 @@ mod tests {
             }
         }
 
-        let number = CachedValue::number(1.5).expect("finite");
-        let text = CachedValue::text("typed text").expect("bounded");
-        let boolean = CachedValue::boolean(true);
-        let date = CachedValue::date(123.0).expect("finite");
-        let duration = CachedValue::duration(45.0).expect("finite");
+        let number = SuppliedCache::Number(FiniteF64::new(1.5).expect("finite"));
+        let text = SuppliedCache::Text("typed text");
+        let boolean = SuppliedCache::Boolean(true);
+        let date = SuppliedCache::Date(FiniteF64::new(123.0).expect("finite"));
+        let duration = SuppliedCache::Duration(FiniteF64::new(45.0).expect("finite"));
         let supplied = [&number, &text, &boolean, &date, &duration];
         let formulas: Vec<_> = (0..5).map(|column| formula(column, 20)).collect();
         let records: Vec<_> = (0..5).map(|column| record(column, &[], false)).collect();
@@ -5524,7 +5800,7 @@ mod tests {
             .map(|(column, supplied)| AuthoredFormulaCache {
                 owner: OWNER,
                 coordinate: coordinate(u32::try_from(column).expect("small")),
-                supplied: Some(*supplied),
+                supplied: Some(**supplied),
             })
             .collect();
         let (engine, owner) = encoded_graph(records, false);
@@ -5551,7 +5827,7 @@ mod tests {
                 &mut self,
                 formula: FormulaCell,
                 _limits: CacheLimits,
-            ) -> Result<FormulaAnalysis, Failure> {
+            ) -> Result<FormulaAnalysis, Error> {
                 Ok(FormulaAnalysis {
                     precedents: (formula.coordinate.column == 1)
                         .then(|| FormulaPrecedent {
@@ -5571,11 +5847,11 @@ mod tests {
                 _formula: FormulaCell,
                 _values: &dyn CacheValues,
                 _limits: CacheLimits,
-            ) -> Result<Evaluation, Failure> {
+            ) -> Result<Evaluation, Error> {
                 self.evaluations += 1;
                 Ok(Evaluation {
                     value: FormulaCachedValue::number(1.0)
-                        .map_err(|_error| Failure::InvalidSource)?,
+                        .map_err(|_error| Error::InvalidSource)?,
                     usage: FormulaEvaluationUsage::default(),
                 })
             }
@@ -5583,11 +5859,11 @@ mod tests {
 
         let (engine, owner) = encoded_graph(vec![record(1, &[0], false)], false);
         let formulas = [formula(1, 20)];
-        let mismatch = CachedValue::boolean(true);
+        let mismatch = SuppliedCache::Boolean(true);
         let authored = [AuthoredFormulaCache {
             owner: OWNER,
             coordinate: coordinate(1),
-            supplied: Some(&mismatch),
+            supplied: Some(mismatch),
         }];
         let mut evaluator = MixedEvaluator { evaluations: 0 };
         assert!(matches!(
@@ -5600,18 +5876,18 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::CacheType))
+            Err(Error::UnsupportedDependency(Unsupported::CacheType))
         ));
         assert_eq!(evaluator.evaluations, 1);
 
         let (engine, owner) =
             encoded_graph(vec![record(0, &[], false), record(1, &[0], false)], false);
         let formulas = [formula(0, 20), formula(1, 20)];
-        let poison = CachedValue::text("not evaluator input").expect("bounded");
+        let poison = SuppliedCache::Text("not evaluator input");
         let authored = [AuthoredFormulaCache {
             owner: OWNER,
             coordinate: coordinate(0),
-            supplied: Some(&poison),
+            supplied: Some(poison),
         }];
         let mut evaluator = MixedEvaluator { evaluations: 0 };
         assert!(matches!(
@@ -5624,7 +5900,7 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert_eq!(evaluator.evaluations, 0);
     }
@@ -5640,7 +5916,7 @@ mod tests {
                 &mut self,
                 _formula: FormulaCell,
                 _limits: CacheLimits,
-            ) -> Result<FormulaAnalysis, Failure> {
+            ) -> Result<FormulaAnalysis, Error> {
                 Ok(FormulaAnalysis {
                     precedents: vec![FormulaPrecedent {
                         owner: OWNER,
@@ -5657,9 +5933,9 @@ mod tests {
                 _formula: FormulaCell,
                 _values: &dyn CacheValues,
                 _limits: CacheLimits,
-            ) -> Result<Evaluation, Failure> {
+            ) -> Result<Evaluation, Error> {
                 self.evaluations += 1;
-                Err(Failure::UnsupportedDependency(Unsupported::Formula))
+                Err(Error::UnsupportedDependency(Unsupported::Formula))
             }
         }
 
@@ -5694,7 +5970,7 @@ mod tests {
                 one_short,
                 &mut evaluator,
             ),
-            Err(Failure::LimitExceeded { maximum, .. })
+            Err(Error::Limit { maximum, .. })
                 if maximum == preserved.usage.graph_work - 1
         ));
         assert_eq!(evaluator.evaluations, 0);
@@ -5713,7 +5989,7 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert_eq!(evaluator.evaluations, 0);
 
@@ -5782,18 +6058,18 @@ mod tests {
             coordinate: coordinate(0),
             value: FinalValue::number(FiniteF64::new(2.0).expect("finite")),
         }];
-        let first_precedents = [formula_metadata::Precedent {
+        let first_precedents = [formula_dependencies::Precedent {
             target_owner: OWNER,
             row: 0,
             column: 0,
         }];
-        let second_precedents = [formula_metadata::Precedent {
+        let second_precedents = [formula_dependencies::Precedent {
             target_owner: OWNER,
             row: 0,
             column: 1,
         }];
         let hosts = [
-            formula_metadata::LogicalHost {
+            formula_dependencies::LogicalHost {
                 owner: OWNER,
                 row: 0,
                 column: 1,
@@ -5801,7 +6077,7 @@ mod tests {
                 ranges: Vec::new(),
                 is_in_cycle: false,
             },
-            formula_metadata::LogicalHost {
+            formula_dependencies::LogicalHost {
                 owner: OWNER,
                 row: 0,
                 column: 2,
@@ -5810,7 +6086,7 @@ mod tests {
                 is_in_cycle: false,
             },
         ];
-        let logical = formula_metadata::LogicalGraph {
+        let logical = formula_dependencies::LogicalGraph {
             formula_count: 2,
             hosts: &hosts,
         };
@@ -5838,14 +6114,14 @@ mod tests {
                 &formulas,
                 &overlay,
                 &[],
-                formula_metadata::LogicalGraph {
+                formula_dependencies::LogicalGraph {
                     formula_count: 2,
                     hosts: &incomplete_hosts,
                 },
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
 
@@ -5859,14 +6135,14 @@ mod tests {
                 &formulas,
                 &overlay,
                 &[],
-                formula_metadata::LogicalGraph {
+                formula_dependencies::LogicalGraph {
                     formula_count: 2,
                     hosts: &cyclic_hosts,
                 },
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -5875,13 +6151,13 @@ mod tests {
     fn logical_overlay_preserves_unrelated_opaque_graph_and_refuses_impacted_targets() {
         let (engine, selected, opaque) = encoded_graph_with_opaque_target(Vec::new(), false);
         let formulas = [formula(1, 20)];
-        let precedents = [formula_metadata::Precedent {
+        let precedents = [formula_dependencies::Precedent {
             target_owner: OWNER,
             row: 0,
             column: 0,
         }];
         let hosts = [
-            formula_metadata::LogicalHost {
+            formula_dependencies::LogicalHost {
                 owner: OWNER,
                 row: 0,
                 column: 1,
@@ -5889,7 +6165,7 @@ mod tests {
                 ranges: Vec::new(),
                 is_in_cycle: false,
             },
-            formula_metadata::LogicalHost {
+            formula_dependencies::LogicalHost {
                 owner: 99,
                 row: 0,
                 column: 5,
@@ -5898,7 +6174,7 @@ mod tests {
                 is_in_cycle: false,
             },
         ];
-        let logical = formula_metadata::LogicalGraph {
+        let logical = formula_dependencies::LogicalGraph {
             formula_count: 1,
             hosts: &hosts,
         };
@@ -5937,7 +6213,7 @@ mod tests {
                 logical,
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
 
@@ -5953,7 +6229,7 @@ mod tests {
                 logical,
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -5963,12 +6239,12 @@ mod tests {
         let (engine, selected, opaque) =
             encoded_graph_with_opaque_target(vec![record(2, &[], false)], false);
         let formulas = [formula(1, 20)];
-        let precedents = [formula_metadata::Precedent {
+        let precedents = [formula_dependencies::Precedent {
             target_owner: OWNER,
             row: 0,
             column: 0,
         }];
-        let hosts = [formula_metadata::LogicalHost {
+        let hosts = [formula_dependencies::LogicalHost {
             owner: OWNER,
             row: 0,
             column: 1,
@@ -5984,13 +6260,13 @@ mod tests {
                 &opaque,
                 &formulas,
                 &[],
-                formula_metadata::LogicalGraph {
+                formula_dependencies::LogicalGraph {
                     formula_count: 1,
                     hosts: &hosts,
                 },
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6004,7 +6280,7 @@ mod tests {
             coordinate: coordinate(2),
             value: FinalValue::clear(),
         }];
-        let logical = formula_metadata::LogicalGraph {
+        let logical = formula_dependencies::LogicalGraph {
             formula_count: 0,
             hosts: &[],
         };
@@ -6025,7 +6301,7 @@ mod tests {
         let mut evaluator = ChainEvaluator::default();
         assert!(matches!(
             plan_logical_clear(&engine, &owner, &[], &overlay, logical, &mut evaluator,),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6216,7 +6492,7 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
     }
 
@@ -6267,9 +6543,10 @@ mod tests {
         bounded.graph_nodes = 2;
         assert!(matches!(
             collect_formula_hosts(TABLE, &owners, &tiles, bounded),
-            Err(Failure::LimitExceeded {
+            Err(Error::Limit {
                 observed: 3,
                 maximum: 2,
+                ..
             })
         ));
     }
@@ -6334,7 +6611,7 @@ mod tests {
         );
         assert!(matches!(
             cycle,
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
 
@@ -6349,7 +6626,7 @@ mod tests {
         );
         assert!(matches!(
             missing,
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6361,7 +6638,7 @@ mod tests {
         let mut evaluator = ChainEvaluator::default();
         assert!(matches!(
             plan(&engine, &owner, &formulas, &[], limits(), &mut evaluator,),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6385,7 +6662,7 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Formula))
+            Err(Error::UnsupportedDependency(Unsupported::Formula))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6421,7 +6698,7 @@ mod tests {
         one_short.graph_work = exact - 1;
         assert!(matches!(
             validate_formula_coverage(&entries, &payloads, &table_geometry(1, 32), one_short),
-            Err(Failure::LimitExceeded { maximum, .. }) if maximum == usage.graph_work - 1
+            Err(Error::Limit { maximum, .. }) if maximum == usage.graph_work - 1
         ));
 
         let wrong_count = [FormulaListEntry {
@@ -6430,7 +6707,7 @@ mod tests {
         }];
         assert!(matches!(
             validate_formula_coverage(&wrong_count, &payloads, &table_geometry(1, 32), limits(),),
-            Err(Failure::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -6454,7 +6731,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(Failure::UnsupportedDependency(Unsupported::Volatile))
+            Err(Error::UnsupportedDependency(Unsupported::Volatile))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6496,7 +6773,7 @@ mod tests {
                 one_short,
                 &mut bounded,
             ),
-            Err(Failure::LimitExceeded { maximum, .. })
+            Err(Error::Limit { maximum, .. })
                 if maximum == result.usage.wire_fields - 1
         ));
     }
@@ -6556,7 +6833,7 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Spanning))
+            Err(Error::UnsupportedDependency(Unsupported::Spanning))
         ));
         assert!(evaluator.calls.is_empty());
     }
@@ -6581,7 +6858,7 @@ mod tests {
                 limits(),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::Spanning))
+            Err(Error::UnsupportedDependency(Unsupported::Spanning))
         ));
         assert!(evaluator.calls.is_empty());
 
@@ -6633,7 +6910,7 @@ mod tests {
         let wrong_owner = plan(&engine, &owner, &formulas, &[], limits(), &mut evaluator);
         assert!(matches!(
             wrong_owner,
-            Err(Failure::UnsupportedDependency(Unsupported::MissingOwner))
+            Err(Error::UnsupportedDependency(Unsupported::MissingOwner))
         ));
 
         let absent_engine = tsce::CalculationEngineArchive {
@@ -6651,8 +6928,8 @@ mod tests {
         );
         assert!(matches!(
             missing,
-            Err(Failure::UnsupportedDependency(Unsupported::MissingOwner))
-                | Err(Failure::InvalidSource)
+            Err(Error::UnsupportedDependency(Unsupported::MissingOwner))
+                | Err(Error::InvalidSource)
         ));
     }
 
@@ -6842,7 +7119,7 @@ mod tests {
                 &Baseline(Vec::new()),
                 &mut evaluator,
             ),
-            Err(Failure::UnsupportedDependency(Unsupported::MissingOwner))
+            Err(Error::UnsupportedDependency(Unsupported::MissingOwner))
         ));
     }
 
@@ -6880,7 +7157,7 @@ mod tests {
         );
         assert!(matches!(
             rejected,
-            Err(Failure::LimitExceeded { maximum, .. }) if maximum == successful.usage.graph_work - 1
+            Err(Error::Limit { maximum, .. }) if maximum == successful.usage.graph_work - 1
         ));
     }
 
@@ -6938,7 +7215,7 @@ mod tests {
                 one_short,
                 &mut refused_usage,
             ),
-            Err(Failure::LimitExceeded { observed, maximum })
+            Err(Error::Limit { observed, maximum, .. })
                 if observed == u64::try_from(exact).unwrap()
                     && maximum == u64::try_from(exact - 1).unwrap()
         ));
@@ -7077,7 +7354,7 @@ mod tests {
                     .expect("strict evaluator");
             assert!(matches!(
                 evaluator.evaluate(formula(1, 20), &Baseline(Vec::new()), limits()),
-                Err(Failure::UnsupportedDependency(Unsupported::Formula))
+                Err(Error::UnsupportedDependency(Unsupported::Formula))
             ));
         }
     }
@@ -7122,44 +7399,45 @@ mod tests {
         one_short.formula_work = exact - 1;
         assert!(matches!(
             evaluate(&valid, one_short),
-            Err(Failure::LimitExceeded { maximum, .. }) if maximum == u64::try_from(exact - 1).unwrap()
+            Err(Error::Limit { maximum, .. }) if maximum == u64::try_from(exact - 1).unwrap()
         ));
 
         let mut duplicate = valid.clone();
         duplicate.extend_from_slice(&valid);
         assert!(matches!(
             evaluate(&duplicate, limits()),
-            Err(Failure::InvalidSource)
+            Err(Error::InvalidSource)
         ));
 
         let mut noncanonical = vec![0x8a, 0x00];
         noncanonical.extend_from_slice(&valid[1..]);
         assert!(matches!(
             evaluate(&noncanonical, limits()),
-            Err(Failure::InvalidSource)
+            Err(Error::InvalidSource)
         ));
 
         let mut unknown = valid.clone();
         unknown.extend_from_slice(&[0x50, 0x00]);
         assert!(matches!(
             evaluate(&unknown, limits()),
-            Err(Failure::InvalidSource)
+            Err(Error::InvalidSource)
         ));
 
         let mut oversized = limits();
         oversized.wire_bytes = valid.len() - 1;
         assert!(matches!(
             evaluate(&valid, oversized),
-            Err(Failure::LimitExceeded { maximum, .. }) if maximum == u64::try_from(valid.len() - 1).unwrap()
+            Err(Error::Limit { maximum, .. }) if maximum == u64::try_from(valid.len() - 1).unwrap()
         ));
 
         let mut no_allocation = limits();
         no_allocation.allocations = 0;
         assert!(matches!(
             evaluate(&valid, no_allocation),
-            Err(Failure::LimitExceeded {
+            Err(Error::Limit {
                 observed: 1,
                 maximum: 0,
+                ..
             })
         ));
 
@@ -7167,7 +7445,7 @@ mod tests {
         one_byte_short.scratch_bytes = size_of::<StreamingValue>() - 1;
         assert!(matches!(
             evaluate(&valid, one_byte_short),
-            Err(Failure::LimitExceeded { maximum, .. })
+            Err(Error::Limit { maximum, .. })
                 if maximum == u64::try_from(size_of::<StreamingValue>() - 1).unwrap()
         ));
     }

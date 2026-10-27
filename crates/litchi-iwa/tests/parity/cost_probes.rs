@@ -72,3 +72,312 @@ fn numbers_topology_insert_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+#[inline(never)]
+fn host_text_style(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    use litchi_iwa::text::{TextPointSize, TextStyle};
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = editor
+        .package()
+        .iwa_entry_names()
+        .find_map(|name| {
+            editor
+                .package()
+                .archive(name)
+                .ok()?
+                .objects
+                .into_iter()
+                .find_map(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .any(|message| message.type_ == 6_001)
+                        .then_some(object.archive_info.identifier)
+                        .flatten()
+                })
+        })
+        .ok_or("no table model")?;
+    let style = TextStyle::new(TextPointSize::from_points(18.0)?).with_bold(true);
+    for (row, column) in cells {
+        editor.set_table_cell_text_style(id, *row as usize, *column as usize, style)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_text_style(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    use litchi_numbers::cell::text_style::CharacterProperties;
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let mut properties = CharacterProperties::new();
+    properties.size = Some(18.0);
+    properties.bold = Some(true);
+    let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
+    for (row, column) in cells {
+        edit = edit.set(
+            litchi_numbers::table::At::new(*row, *column),
+            properties.clone(),
+        )?;
+    }
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Whole-cell text style on `basic.numbers`: one cell, then two.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_text_style_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    for cells in [&[(1, 1)][..], &[(1, 1), (2, 1)][..]] {
+        black_box(host_text_style(&input.bytes, cells)?);
+        black_box(leaf_text_style(&input.bytes, cells)?);
+        black_box(leaf_text_style(&input.bytes, cells)?);
+        black_box(host_text_style(&input.bytes, cells)?);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn host_cell_text(source: &[u8], reset: bool) -> TestResult<Vec<u8>> {
+    use litchi_iwa::text::Alignment;
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = editor
+        .package()
+        .iwa_entry_names()
+        .find_map(|name| {
+            editor
+                .package()
+                .archive(name)
+                .ok()?
+                .objects
+                .into_iter()
+                .find_map(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .any(|message| message.type_ == 6_001)
+                        .then_some(object.archive_info.identifier)
+                        .flatten()
+                })
+        })
+        .ok_or("no table model")?;
+    if reset {
+        editor.reset_table_cell_text_alignment(id, 1, 1)?;
+    } else {
+        editor.set_table_cell_text_alignment(id, 1, 1, Alignment::Justified)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_cell_text(source: &[u8], reset: bool) -> TestResult<Vec<u8>> {
+    use litchi_iwa::text::Alignment;
+    use litchi_numbers::cell::text::{Property, PropertyKind};
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let at = litchi_numbers::table::At::new(1, 1);
+    let edit = package.edit_table_cell_text(0usize, 0usize)?;
+    let edit = if reset {
+        edit.reset(at, PropertyKind::Alignment)?
+    } else {
+        edit.set(at, Property::Alignment(Alignment::Justified))?
+    };
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Cell paragraph alignment on `basic.numbers` B2: set, then reset on the
+/// host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_cell_text_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let set = host_cell_text(&input.bytes, false)?;
+    for (bytes, reset) in [(&input.bytes, false), (&set, true)] {
+        black_box(host_cell_text(bytes, reset)?);
+        black_box(leaf_cell_text(bytes, reset)?);
+        black_box(leaf_cell_text(bytes, reset)?);
+        black_box(host_cell_text(bytes, reset)?);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn host_cell_list(source: &[u8], numbered: bool) -> TestResult<Vec<u8>> {
+    use litchi_iwa_text::paragraph::list::ParagraphList;
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let list = if numbered {
+        ParagraphList::Numbered
+    } else {
+        ParagraphList::Bullet
+    };
+    editor.set_table_cell_paragraph_list(id, 1, 1, list)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_cell_list(source: &[u8], numbered: bool) -> TestResult<Vec<u8>> {
+    use litchi_numbers::cell::list::ParagraphList;
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let list = if numbered {
+        ParagraphList::Numbered
+    } else {
+        ParagraphList::Bullet
+    };
+    let commit = package
+        .edit_table_cell_lists(0usize, 0usize)?
+        .set_list(litchi_numbers::table::At::new(1, 1), list)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Cell paragraph list on `basic.numbers` B2: a bullet list on the plain
+/// cell (promotion), then a numbered list on the host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_cell_list_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let listed = host_cell_list(&input.bytes, false)?;
+    for (bytes, numbered) in [(&input.bytes, false), (&listed, true)] {
+        black_box(host_cell_list(bytes, numbered)?);
+        black_box(leaf_cell_list(bytes, numbered)?);
+        black_box(leaf_cell_list(bytes, numbered)?);
+        black_box(host_cell_list(bytes, numbered)?);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum Remove {
+    Row(litchi_numbers::table::topology::RowDeletion),
+    Column(litchi_numbers::table::topology::ColumnDeletion),
+}
+
+#[inline(never)]
+fn host_removal(source: &[u8], op: Remove) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let table = litchi_numbers::TableSelector::index(0);
+    match op {
+        Remove::Row(at) => editor.remove_table_row(table, at)?,
+        Remove::Column(at) => editor.remove_table_column(table, at)?,
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_removal(source: &[u8], op: Remove) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let edit = package.edit_table_topology(0usize, 0usize)?;
+    let edit = match op {
+        Remove::Row(at) => edit.remove_row(at)?,
+        Remove::Column(at) => edit.remove_column(at)?,
+    };
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Row and column removal on `basic.numbers` and a native fixture.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_topology_remove_cost_abba() -> TestResult {
+    use litchi_numbers::table::topology::{ColumnDeletion, RowDeletion};
+    let inputs = [
+        fixture("iwork/numbers/basic.numbers")?,
+        fixture("iwork/numbers/custom-number-native.numbers")?,
+    ];
+    let ops = [
+        Remove::Row(RowDeletion::body(0)),
+        Remove::Column(ColumnDeletion::body(0)),
+    ];
+    for input in &inputs {
+        for op in ops {
+            black_box(host_removal(&input.bytes, op)?);
+            black_box(leaf_removal(&input.bytes, op)?);
+            black_box(leaf_removal(&input.bytes, op)?);
+            black_box(host_removal(&input.bytes, op)?);
+        }
+    }
+    Ok(())
+}
+
+fn highlight_rules() -> TestResult<Vec<litchi_numbers::cell::conditional_highlight::Rule>> {
+    use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    use litchi_numbers::cell::conditional_highlight::{Condition, Number, Rule, Style, Text};
+    let fill = Rgba::new(1.0, 0.8, 0.2, 1.0, RgbColorSpace::Srgb)?;
+    Ok(vec![
+        Rule::new(
+            Condition::GreaterThan(Number::new(2.5)?),
+            Style::with_fill(fill),
+        ),
+        Rule::new(
+            Condition::TextContains(Text::new("ot")?),
+            Style::with_fill(fill),
+        ),
+    ])
+}
+
+#[inline(never)]
+fn host_highlight(source: &[u8], clear: bool) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let id = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    if clear {
+        editor.clear_cell_conditional_highlighting(id, 1, 1)?;
+    } else {
+        editor.set_cell_conditional_highlighting(id, 1, 1, &highlight_rules()?)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_highlight(source: &[u8], clear: bool) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let at = litchi_numbers::table::At::new(1, 1);
+    let edit = package.edit_table_cell_conditional_highlights(0usize, 0usize)?;
+    let edit = if clear {
+        edit.clear(at)?
+    } else {
+        edit.set(at, highlight_rules()?)?
+    };
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Conditional highlighting on `basic.numbers` B2: two rules, then a clear
+/// on the host's output.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_conditional_highlight_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let set = host_highlight(&input.bytes, false)?;
+    for (bytes, clear) in [(&input.bytes, false), (&set, true)] {
+        black_box(host_highlight(bytes, clear)?);
+        black_box(leaf_highlight(bytes, clear)?);
+        black_box(leaf_highlight(bytes, clear)?);
+        black_box(host_highlight(bytes, clear)?);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn host_resize(source: &[u8], rows: usize, columns: usize) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.resize_table(litchi_numbers::TableSelector::index(0), rows, columns)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_resize(source: &[u8], rows: u32, columns: u32) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let commit = package
+        .edit_table_resize(0usize, 0usize)?
+        .resize(rows, columns)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Growing the first table of `basic.numbers` by five rows and four columns.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_resize_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(leaf_resize(&input.bytes, 26, 11)?);
+    black_box(host_resize(&input.bytes, 26, 11)?);
+    Ok(())
+}

@@ -33,12 +33,14 @@ pub(crate) struct DirectoryIndexReport {
 pub struct Component {
     name: Box<str>,
     archive: ComponentArchive,
+    /// Decompressed stream length charged when the component was parsed
+    /// from a ZIP member (0 when it was not), so a reopen can reuse it.
+    decompressed_bytes: u64,
 }
 
 #[derive(Debug)]
 enum ComponentArchive {
     Owned(Archive),
-    #[cfg(feature = "internal-iwork-source")]
     Shared(Arc<Archive>),
 }
 
@@ -47,6 +49,7 @@ impl Component {
         Self {
             name: name.into(),
             archive: ComponentArchive::Owned(archive),
+            decompressed_bytes: 0,
         }
     }
 
@@ -62,6 +65,7 @@ impl Component {
         Ok(Self {
             name: owned.into_boxed_str(),
             archive: ComponentArchive::Owned(archive),
+            decompressed_bytes: 0,
         })
     }
 
@@ -89,6 +93,7 @@ impl Component {
         Ok(Self {
             name: owned.into_boxed_str(),
             archive: ComponentArchive::Owned(archive),
+            decompressed_bytes: 0,
         })
     }
 
@@ -103,7 +108,6 @@ impl Component {
     pub fn archive(&self) -> &Archive {
         match &self.archive {
             ComponentArchive::Owned(archive) => archive,
-            #[cfg(feature = "internal-iwork-source")]
             ComponentArchive::Shared(archive) => archive,
         }
     }
@@ -115,16 +119,8 @@ impl Component {
     /// [`Self::archive`] always borrows the retained record.
     #[must_use]
     pub fn into_parts(self) -> (String, Archive) {
-        #[cfg_attr(
-            not(feature = "internal-iwork-source"),
-            allow(
-                clippy::infallible_destructuring_match,
-                reason = "the shared arm exists only with internal-iwork-source"
-            )
-        )]
         let archive = match self.archive {
             ComponentArchive::Owned(archive) => archive,
-            #[cfg(feature = "internal-iwork-source")]
             ComponentArchive::Shared(archive) => Arc::unwrap_or_clone(archive),
         };
         (self.name.into(), archive)
@@ -406,7 +402,30 @@ impl ComponentCatalog {
     }
 
     fn from_package_catalog(catalog: &Catalog, limits: Limits) -> Result<Self> {
+        Self::from_package_catalog_reusing(catalog, limits, None)
+    }
+
+    /// Parse every IWA member of `catalog`, reusing the parsed component of
+    /// `base` for a member whose compressed payload is byte-identical to the
+    /// base member of the same name (same limits, ZIP-profile source). The
+    /// budgets are charged exactly as a full parse charges them.
+    fn from_package_catalog_reusing(
+        catalog: &Catalog,
+        limits: Limits,
+        base: Option<&SourceCatalog>,
+    ) -> Result<Self> {
         let validated_limits = limits.validate()?;
+        let base = base.filter(|base| {
+            base.limits == validated_limits
+                && !catalog.has_semantic_profile()
+                && !base.package.has_semantic_profile()
+        });
+        let base_members = base.map(|base| {
+            base.package
+                .iter()
+                .map(|entry| (entry.name(), entry.data()))
+                .collect::<std::collections::HashMap<_, _>>()
+        });
         let mut components = Vec::new();
         let mut decompressed_iwa_bytes = 0;
         let mut semantic_iwa_objects = 0usize;
@@ -435,6 +454,27 @@ impl ComponentCatalog {
                     decompressed_iwa_bytes,
                     semantic_iwa_objects,
                 )?
+            } else if let Some(reused) =
+                base.zip(base_members.as_ref()).and_then(|(base, members)| {
+                    let component = base.components.get(entry.name())?;
+                    let ComponentArchive::Shared(archive) = &component.archive else {
+                        return None;
+                    };
+                    (component.decompressed_bytes != 0
+                        && members.get(entry.name()) == Some(&entry.data()))
+                    .then(|| {
+                        (
+                            Component {
+                                name: component.name.clone(),
+                                archive: ComponentArchive::Shared(Arc::clone(archive)),
+                                decompressed_bytes: component.decompressed_bytes,
+                            },
+                            component.decompressed_bytes,
+                        )
+                    })
+                })
+            {
+                Some(reused)
             } else {
                 parse_component(entry.name(), entry.data(), validated_limits)?
             };
@@ -787,6 +827,41 @@ impl SourceCatalog {
         Self::from_package(package, limits)
     }
 
+    /// Parse `candidate`, a package derived from this snapshot (for example
+    /// an edited reassembly of it), under this snapshot's limits.
+    ///
+    /// The candidate's ZIP is read and checked in full and every budget is
+    /// charged exactly as [`Self::from_shared_bytes`] charges it. Only the
+    /// Snappy decompression and archive parse of IWA members whose
+    /// compressed payload is byte-identical to this snapshot's member of the
+    /// same name are skipped: those members share this snapshot's parsed
+    /// archive. A directory- or semantic-profile snapshot parses every
+    /// member.
+    ///
+    /// ```
+    /// # use std::sync::Arc;
+    /// # use litchi_iwa_archive::SourceCatalog;
+    /// # fn demo(source: &SourceCatalog, edited: Vec<u8>) -> litchi_iwa_archive::Result<()> {
+    /// let candidate = source.reopen(Arc::from(edited))?;
+    /// assert_eq!(candidate.limits(), source.limits());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::from_shared_bytes`].
+    pub fn reopen(&self, candidate: Arc<[u8]>) -> Result<Self> {
+        let package = Catalog::from_shared_bytes(candidate, self.limits)?;
+        let components =
+            ComponentCatalog::from_package_catalog_reusing(&package, self.limits, Some(self))?;
+        Ok(Self {
+            package,
+            components,
+            limits: self.limits,
+        })
+    }
+
     fn from_package(package: Catalog, limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let components = ComponentCatalog::from_package_catalog(&package, validated_limits)?;
@@ -922,7 +997,14 @@ pub(crate) fn parse_component(
         crate::Error::InvalidBundle("decompressed IWA stream length does not fit u64".to_owned())
     })?;
     let archive = Archive::parse(decompressed.as_bytes(), limits.effective_archive_limits()?)?;
-    Ok(Some((Component::new(name, archive), decompressed_bytes)))
+    Ok(Some((
+        Component {
+            name: name.into(),
+            archive: ComponentArchive::Shared(Arc::new(archive)),
+            decompressed_bytes,
+        },
+        decompressed_bytes,
+    )))
 }
 
 #[cfg(test)]
@@ -1021,6 +1103,48 @@ mod tests {
             &Archive { objects }.to_bytes(Default::default())?,
             Default::default(),
         )?)
+    }
+
+    fn two_member_package(bravo_type: u32) -> Result<Vec<u8>> {
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+        writer.write_stored("Index/Alpha.iwa", &iwa_bytes(1, 6000)?)?;
+        writer.write_stored("Index/Bravo.iwa", &iwa_bytes(2, bravo_type)?)?;
+        Ok(writer.finish_to_bytes()?)
+    }
+
+    #[test]
+    fn reopen_reuses_unchanged_members_and_parses_changed_ones() -> Result<()> {
+        let base = SourceCatalog::from_bytes(&two_member_package(6001)?, Default::default())?;
+        let candidate: Arc<[u8]> = Arc::from(two_member_package(6002)?);
+        let reopened = base.reopen(Arc::clone(&candidate))?;
+        let parsed = SourceCatalog::from_shared_bytes(candidate, Default::default())?;
+        let shared = |catalog: &SourceCatalog, name: &str| match &catalog
+            .components
+            .get(name)
+            .map(|component| &component.archive)
+        {
+            Some(ComponentArchive::Shared(archive)) => Some(Arc::as_ptr(archive)),
+            _ => None,
+        };
+        // The unchanged member is the base's parsed archive; the changed one
+        // is parsed again and equals a full parse.
+        assert_eq!(
+            shared(&reopened, "Index/Alpha.iwa"),
+            shared(&base, "Index/Alpha.iwa")
+        );
+        assert_ne!(
+            shared(&reopened, "Index/Bravo.iwa"),
+            shared(&base, "Index/Bravo.iwa")
+        );
+        for name in ["Index/Alpha.iwa", "Index/Bravo.iwa"] {
+            assert_eq!(
+                reopened.components.get(name).map(Component::archive),
+                parsed.components.get(name).map(Component::archive)
+            );
+        }
+        assert_eq!(reopened.components.len(), parsed.components.len());
+        Ok(())
     }
 
     fn indexed_catalog() -> Result<ComponentCatalog> {

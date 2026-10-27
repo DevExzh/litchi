@@ -6759,7 +6759,9 @@ fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
             .iter()
             .map(|header| (header.index, header.number_of_cells))
             .collect::<Vec<_>>(),
-        [(0, 1), (2, 1), (3, 1)]
+        // The column-header counts now follow the cell writes (record 0371):
+        // the fixture's own counts plus the Apples cell and the formula.
+        [(0, 1), (2, 2), (3, 2)]
     );
 
     let engine = editor

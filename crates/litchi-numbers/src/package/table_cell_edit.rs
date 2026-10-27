@@ -1,11 +1,8 @@
 //! Exact-source selector-first Numbers table-cell mutations.
 
 mod budget;
-mod cache;
 mod cache_commit;
 mod formula_author;
-mod formula_list;
-mod formula_metadata;
 mod lists;
 mod locality;
 mod metadata;
@@ -18,6 +15,10 @@ mod sparse_commit;
 pub(super) mod tile;
 
 use std::{cell::Cell, mem::size_of, sync::Arc};
+
+use litchi_numbers_wire::{
+    formula_cache as cache, formula_dependencies as formula_metadata, formula_list,
+};
 
 use litchi_iwa_protos::package_metadata_codec::{
     Batch, ObjectUuidAddition, PreparedPackageMetadataRewrite, UuidBits,
@@ -5480,37 +5481,37 @@ fn map_formula_list_error(
 ) -> Error {
     match error {
         formula_list::Error::Limit {
-            resource,
+            kind,
             observed,
             maximum,
         } => Error::Limit {
-            kind: match resource {
-                formula_list::Resource::InputBytes => {
+            kind: match kind {
+                formula_list::LimitKind::InputBytes => {
                     crate::package::table_cells::LimitKind::WireBytes
                 },
-                formula_list::Resource::OutputBytes => {
+                formula_list::LimitKind::OutputBytes => {
                     crate::package::table_cells::LimitKind::OutputBytes
                 },
-                formula_list::Resource::Fields => {
+                formula_list::LimitKind::Fields => {
                     crate::package::table_cells::LimitKind::WireFields
                 },
-                formula_list::Resource::Work => crate::package::table_cells::LimitKind::WireWork,
-                formula_list::Resource::Entries | formula_list::Resource::Hosts => {
+                formula_list::LimitKind::Work => crate::package::table_cells::LimitKind::WireWork,
+                formula_list::LimitKind::Entries | formula_list::LimitKind::Hosts => {
                     crate::package::table_cells::LimitKind::RetainedElements
                 },
-                formula_list::Resource::References => {
+                formula_list::LimitKind::References => {
                     crate::package::table_cells::LimitKind::References
                 },
-                formula_list::Resource::RetainedElements => {
+                formula_list::LimitKind::RetainedElements => {
                     crate::package::table_cells::LimitKind::RetainedElements
                 },
-                formula_list::Resource::RetainedBytes => {
+                formula_list::LimitKind::RetainedBytes => {
                     crate::package::table_cells::LimitKind::RetainedBytes
                 },
-                formula_list::Resource::ScratchBytes => {
+                formula_list::LimitKind::ScratchBytes => {
                     crate::package::table_cells::LimitKind::PeakScratchBytes
                 },
-                formula_list::Resource::Allocations => {
+                formula_list::LimitKind::Allocations => {
                     crate::package::table_cells::LimitKind::AllocationEvents
                 },
             },
@@ -5525,6 +5526,7 @@ fn map_formula_list_error(
         formula_list::Error::InvalidSource
         | formula_list::Error::Wire
         | formula_list::Error::Strict => Error::InvalidSource { path },
+        _ => Error::InvalidSource { path },
     }
 }
 
@@ -5742,24 +5744,37 @@ fn map_formula_metadata_error(
             amount: requested,
         },
         formula_metadata::Error::Limit {
-            resource,
+            kind,
             observed,
             maximum,
         } => Error::Limit {
-            kind: if resource.contains("output") {
-                crate::package::table_cells::LimitKind::OutputBytes
-            } else if resource.contains("field") {
-                crate::package::table_cells::LimitKind::WireFields
-            } else if resource.contains("reference") {
-                crate::package::table_cells::LimitKind::References
-            } else if resource.contains("allocation") {
-                crate::package::table_cells::LimitKind::AllocationEvents
-            } else if resource.contains("scratch") {
-                crate::package::table_cells::LimitKind::PeakScratchBytes
-            } else if resource.contains("retained") {
-                crate::package::table_cells::LimitKind::RetainedBytes
-            } else {
-                crate::package::table_cells::LimitKind::WireWork
+            kind: match kind {
+                formula_metadata::LimitKind::OutputBytes => {
+                    crate::package::table_cells::LimitKind::OutputBytes
+                },
+                formula_metadata::LimitKind::Fields => {
+                    crate::package::table_cells::LimitKind::WireFields
+                },
+                formula_metadata::LimitKind::References => {
+                    crate::package::table_cells::LimitKind::References
+                },
+                formula_metadata::LimitKind::Allocations => {
+                    crate::package::table_cells::LimitKind::AllocationEvents
+                },
+                formula_metadata::LimitKind::ScratchBytes => {
+                    crate::package::table_cells::LimitKind::PeakScratchBytes
+                },
+                formula_metadata::LimitKind::RetainedBytes => {
+                    crate::package::table_cells::LimitKind::RetainedBytes
+                },
+                formula_metadata::LimitKind::SourceBytes
+                | formula_metadata::LimitKind::Work
+                | formula_metadata::LimitKind::Messages
+                | formula_metadata::LimitKind::Hosts
+                | formula_metadata::LimitKind::Precedents
+                | formula_metadata::LimitKind::Ranges => {
+                    crate::package::table_cells::LimitKind::WireWork
+                },
             },
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
@@ -5768,6 +5783,7 @@ fn map_formula_metadata_error(
         formula_metadata::Error::InvalidGraph
         | formula_metadata::Error::StrictDependency
         | formula_metadata::Error::Wire => Error::InvalidSource { path },
+        _ => Error::InvalidSource { path },
     }
 }
 

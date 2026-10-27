@@ -948,7 +948,8 @@ fn rewrite_headers(
     if output.len() > package_output_bound {
         return Err(Error::Verification);
     }
-    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), physical_limits)
+    let candidate_source = source_catalog
+        .reopen(output.into())
         .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     if settings_at_rewritten_target(&candidate, target, wire_limits)? != after
@@ -1520,7 +1521,10 @@ fn reopen_target(
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
         .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)

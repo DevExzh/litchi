@@ -556,6 +556,10 @@ pub struct Edit<'a> {
     before: Option<Comment>,
     after: Option<Comment>,
     staging_error: Option<Error>,
+    /// A clear for a row or column removal (record 0370b): the root
+    /// previews stay and a released last comment key is handed back, as
+    /// the host's axis removal does.
+    axis_removal: bool,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -1287,7 +1291,24 @@ impl Package {
             before: located.comment.clone(),
             after: located.comment,
             staging_error: None,
+            axis_removal: false,
         })
+    }
+
+    /// Clear one table-cell comment for a row or column removal: the root
+    /// previews stay and a released last key is handed back (record
+    /// 0370b).
+    pub(crate) fn clear_table_cell_comment_for_axis_removal(
+        &self,
+        sheet: SheetSelector<'_>,
+        table: TableSelector<'_>,
+        position: At,
+    ) -> Result<Commit, Error> {
+        let mut edit = self
+            .edit_table_cell_comment(sheet, table, position)?
+            .clear();
+        edit.axis_removal = true;
+        edit.commit()
     }
 
     /// Create or replace one selector-first table-cell comment.
@@ -2725,7 +2746,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             });
         }
         let remove_uuid = prove_root_clear_ownership(edit.source, &located)?;
-        let mut prepared = prepare_root_clear(edit.source, &located, remove_uuid)?;
+        let mut prepared =
+            prepare_root_clear(edit.source, &located, remove_uuid, edit.axis_removal)?;
         if prepared.cell.is_empty()
             || prepared.mutations.len() != 3
             || prepared.metadata_entry.0 != super::metadata::ENTRY_NAME
@@ -2736,7 +2758,11 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         let source_cell = located.cell_bytes.clone().ok_or(Error::InvalidSource {
             path: edit.target.path,
         })?;
-        let previews = root_preview_deletions(source_catalog)?;
+        let previews = if edit.axis_removal {
+            Vec::new()
+        } else {
+            root_preview_deletions(source_catalog)?
+        };
         let (native_entries, touched) = rewrite_archives(
             edit.source,
             prepared.mutations.as_mut_slice(),
@@ -2763,7 +2789,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             .map_err(|_| Error::InvalidSource {
                 path: edit.target.path,
             })?;
-        let package = Package::from_shared_profile(output.into(), edit.source.state.options)
+        let package = edit
+            .source
+            .reopen_candidate(output.into())
             .map_err(|_| Error::Verification)?;
         let position = cell_position_for_path(edit.target.path)?;
         if package
@@ -2935,15 +2963,36 @@ fn rewrite_existing(
         .map_err(|_| Error::InvalidSource {
             path: located.target.path,
         })?;
-    let package = Package::from_shared_profile(output.into(), source.state.options)
+    let package = source
+        .reopen_candidate(output.into())
         .map_err(|_| Error::Verification)?;
     Ok((package, Arc::clone(cell), touched, deleted.len()))
+}
+
+/// `list` with `next_list_id` lowered to `key` when it is `key + 1`.
+fn reclaim_last_key(list: Vec<u8>, key: u32) -> Result<Vec<u8>, ()> {
+    let view = litchi_iwa_common::wire::parse_wire_view(&list, WireLimits::DEFAULT)
+        .map_err(|_error| ())?;
+    let next = view
+        .fields()
+        .find(|field| field.number() == 2)
+        .and_then(|field| {
+            litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
+                .ok()
+                .map(|(value, _)| value)
+        });
+    if next != Some(u64::from(key) + 1) {
+        return Ok(list);
+    }
+    litchi_iwa_common::wire::patch_varint_field(&list, 2, true, Some(u64::from(key)))
+        .map_err(|_error| ())
 }
 
 fn prepare_root_clear(
     source: &Package,
     located: &Located,
     remove_uuid: bool,
+    reclaim: bool,
 ) -> Result<PreparedRootClear, Error> {
     let path = located.target.path;
     let entry = located
@@ -3021,6 +3070,13 @@ fn prepare_root_clear(
         ),
     )
     .map_err(|error| map_table_codec_error(error, path))?;
+    // The released last key goes back to `next_list_id` when the entry
+    // went (an axis removal, as the host's list decrement does).
+    let list_data = if reclaim && entry.entry.refcount <= 1 {
+        reclaim_last_key(list_data, key).map_err(|()| Error::InvalidSource { path })?
+    } else {
+        list_data
+    };
     let mut mutations = Vec::new();
     mutations
         .try_reserve_exact(3)

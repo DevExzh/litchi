@@ -434,6 +434,16 @@ pub mod data {
     };
 }
 
+/// Chart lifecycle of a slide chart: kind, series direction, frame,
+/// complete data, removal and duplication (record 0372).
+pub mod lifecycle {
+    pub use crate::package::slide_chart_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::Direction;
+    pub use litchi_iwa_common::chart::kind::Kind;
+}
+
 /// Typed failures of slide chart metadata reads.
 pub mod metadata {
     pub use crate::package::slide_chart_metadata::{Error, LimitKind};

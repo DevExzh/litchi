@@ -10,9 +10,10 @@
 //! overrides the requested character properties (every other property
 //! stays inherited), inserts it beside the stylesheet and lists it there,
 //! appends a style-list entry for it and points the cell at the new key;
-//! the old key's entry loses the cell's reference. Cells that start from
-//! the same style and take the same properties share one variation. Ported
-//! from the host editor's `cell_paragraph_style` (new-style path).
+//! the old key's entry loses the cell's reference. Each cell takes its own
+//! variation, and a property equal to the inherited one stays inherited,
+//! as the host editor writes them (record 0370). Ported from the host
+//! editor's `cell_paragraph_style` (new-style path).
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -47,6 +48,8 @@ structure::structural_family!("cell-text-style", Wire(litchi_iwa_common::LimitKi
 
 /// `TSWP.ParagraphStyleArchive`.
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
+/// `TST.HeaderStorageBucket`.
+const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 /// `TSS.StylesheetArchive`.
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 /// `DataStore.styleTable`.
@@ -103,10 +106,6 @@ pub enum Refusal {
     /// The cell is outside the table.
     #[error("cell outside the table")]
     CellNotFound,
-    /// The cell stores nothing yet (styling an empty cell is not
-    /// supported).
-    #[error("the cell stores no value to style")]
-    EmptyCell,
     /// The style sets no property.
     #[error("the style sets no property")]
     EmptyStyle,
@@ -128,7 +127,6 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::EmptyCell { .. } => RefusalKind::UnsupportedOperation,
             Self::SheetNotFound { .. } | Self::TableNotFound { .. } | Self::CellNotFound { .. } => {
                 RefusalKind::NotFound
             },
@@ -147,7 +145,7 @@ impl From<Refusal> for Error {
     }
 }
 
-fn from_topology(error: topology::Error) -> Error {
+pub(super) fn from_topology(error: topology::Error) -> Error {
     use topology::Error as E;
     match error {
         E::Refused(crate::package::table_topology::Refusal::SheetNotFound) => {
@@ -180,7 +178,9 @@ fn from_style(error: litchi_iwa_text_wire::CharStyleError) -> Error {
     }
 }
 
-fn style_wire_limits(working: &Working<'_>) -> Result<litchi_iwa_common::WireLimits, Error> {
+pub(super) fn style_wire_limits(
+    working: &Working<'_>,
+) -> Result<litchi_iwa_common::WireLimits, Error> {
     let maximum = working.archive_limits().max_message_bytes();
     litchi_iwa_common::WireLimits::default()
         .with_input_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES))
@@ -243,8 +243,8 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Refusal::NoStagedOperation`]; [`Refusal::EmptyCell`] for a cell that
-    /// stores nothing; [`Refusal::UnsupportedDependency`] for a style graph
+    /// [`Refusal::NoStagedOperation`] (an empty cell takes a style-only
+    /// cell); [`Refusal::UnsupportedDependency`] for a style graph
     /// this transaction does not rewrite; source, resource and
     /// verification errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
@@ -256,19 +256,22 @@ impl Edit<'_> {
             let effective = text_style(&published.package, self.sheet, self.table, *position)?;
             let mut expected = properties.clone();
             expected.inherit(&effective);
-            if expected != effective {
+            if with_flags_off(expected) != with_flags_off(effective) {
                 return Err(Error::Verification);
             }
         }
-        if published.package.workbook_ref().sheets()[self.sheet]
-            .tables()
-            .nth(self.table)
-            .map(|table| table.iter_cells().count())
-            != self.source.workbook_ref().sheets()[self.sheet]
+        // Every stored cell survives; an empty cell may gain a style-only
+        // cell (record 0370).
+        let count = |package: &Package| {
+            package.workbook_ref().sheets()[self.sheet]
                 .tables()
                 .nth(self.table)
                 .map(|table| table.iter_cells().count())
-        {
+        };
+        let (Some(before), Some(after)) = (count(self.source), count(&published.package)) else {
+            return Err(Error::Verification);
+        };
+        if after < before || after > before.saturating_add(self.cells.len()) {
             return Err(Error::Verification);
         }
         Commit::new(self.source, published)
@@ -276,15 +279,15 @@ impl Edit<'_> {
 }
 
 /// One stored BNC cell located in the table's tiles.
-struct Located {
-    tile: u64,
-    tile_index: usize,
+pub(super) struct Located {
+    pub(super) tile: u64,
+    pub(super) tile_index: usize,
     /// The field index of the cell's row record among the tile's fields.
-    row_field: usize,
-    bytes: Vec<u8>,
+    pub(super) row_field: usize,
+    pub(super) bytes: Vec<u8>,
 }
 
-fn locate_cell(
+pub(super) fn locate_cell(
     working: &Working<'_>,
     store: &[u8],
     position: At,
@@ -322,7 +325,11 @@ fn locate_cell(
 }
 
 /// The entry of `key` in the style list (root or segments): its reference.
-fn list_reference(working: &Working<'_>, list: &[u8], key: u32) -> Result<Option<u64>, Error> {
+pub(super) fn list_reference(
+    working: &Working<'_>,
+    list: &[u8],
+    key: u32,
+) -> Result<Option<u64>, Error> {
     let find = |data: &[u8]| -> FaultResult<Option<Option<u64>>> {
         for entry in repeated_bytes(data, 3)? {
             if single_varint(entry, 1)? == Some(u64::from(key)) {
@@ -346,7 +353,11 @@ fn list_reference(working: &Working<'_>, list: &[u8], key: u32) -> Result<Option
 }
 
 /// The section base text style of `position`.
-fn base_style(model: &[u8], geometry: topology::Geometry, position: At) -> Result<u64, Error> {
+pub(super) fn base_style(
+    model: &[u8],
+    geometry: topology::Geometry,
+    position: At,
+) -> Result<u64, Error> {
     let field = if position.row() < geometry.header_rows {
         25
     } else if position.row() >= geometry.rows.saturating_sub(geometry.footer_rows) {
@@ -361,7 +372,7 @@ fn base_style(model: &[u8], geometry: topology::Geometry, position: At) -> Resul
 
 /// The current text style object of the stored cell at `position` (its
 /// key's entry, else its section's base style).
-fn current_style(
+pub(super) fn current_style(
     working: &Working<'_>,
     sheet: usize,
     table: usize,
@@ -430,8 +441,65 @@ fn text_style(
     effective(&working, style)
 }
 
+/// `TSWP.ParagraphStyleArchive.para_properties`.
+const PARAGRAPH_PROPERTIES_FIELD: u32 = 12;
+
+/// `style` with an empty `para_properties` when it has none.
+pub(super) fn with_paragraph_properties(mut style: Vec<u8>) -> Result<Vec<u8>, Error> {
+    if single_bytes(&style, PARAGRAPH_PROPERTIES_FIELD)?.is_none() {
+        push_bytes_field(&mut style, PARAGRAPH_PROPERTIES_FIELD, &[])?;
+    }
+    Ok(style)
+}
+
+/// `properties` with every unset emphasis flag read as off.
+fn with_flags_off(mut properties: CharacterProperties) -> CharacterProperties {
+    for flag in [
+        &mut properties.bold,
+        &mut properties.italic,
+        &mut properties.underline,
+        &mut properties.strikethrough,
+    ] {
+        flag.get_or_insert(false);
+    }
+    properties
+}
+
+/// The overrides of `requested` that differ from `inherited`.
+fn minimal(
+    requested: &CharacterProperties,
+    inherited: &CharacterProperties,
+) -> CharacterProperties {
+    // An unset emphasis flag reads as off.
+    let flag = |value: Option<bool>| value.unwrap_or(false);
+    let mut output = CharacterProperties::new();
+    output.bold = requested
+        .bold
+        .filter(|value| flag(inherited.bold) != *value);
+    output.italic = requested
+        .italic
+        .filter(|value| flag(inherited.italic) != *value);
+    output.underline = requested
+        .underline
+        .filter(|value| flag(inherited.underline) != *value);
+    output.strikethrough = requested
+        .strikethrough
+        .filter(|value| flag(inherited.strikethrough) != *value);
+    output.size = requested
+        .size
+        .filter(|value| inherited.size != Some(*value));
+    output.font_name = requested
+        .font_name
+        .clone()
+        .filter(|value| inherited.font_name.as_ref() != Some(value));
+    output.color = requested
+        .color
+        .filter(|value| inherited.color != Some(*value));
+    output
+}
+
 /// The stylesheet a paragraph style belongs to (`super.stylesheet`).
-fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
+pub(super) fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
     let (_, data) =
         topology::message(working, style, &[PARAGRAPH_STYLE_MESSAGE_TYPE]).map_err(Error::from)?;
     let base = single_bytes(data, 1)?.ok_or(Error::InvalidSource)?;
@@ -439,7 +507,7 @@ fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
 }
 
 /// Replace one message, transitioning its aggregate object references.
-fn replace_with_references(
+pub(super) fn replace_with_references(
     working: &mut Working<'_>,
     identifier: u64,
     index: usize,
@@ -452,7 +520,7 @@ fn replace_with_references(
     references::replace(object, index, data, removed, appended, &[], limits)
 }
 
-fn replace_message(
+pub(super) fn replace_message(
     working: &mut Working<'_>,
     identifier: u64,
     index: usize,
@@ -485,9 +553,12 @@ fn publish(
     cells: &[(At, CharacterProperties)],
 ) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
+    // A cell-level edit keeps the root previews, as the host does (record 0370).
+    working.keep_previews();
     let wire = style_wire_limits(&working)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
     let (_, model) = topology::message(&working, target.model, &[6_001]).map_err(Error::from)?;
+    let model_columns = topology::geometry(model).map_err(from_topology)?.columns;
     let store = single_bytes(model, 4)?
         .ok_or(Error::InvalidSource)?
         .to_vec();
@@ -498,8 +569,6 @@ fn publish(
         metadata::registry(&working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let mut transition = Transition::default();
 
-    // One variation per (current style, properties).
-    let mut variations: Vec<(u64, CharacterProperties, u64, u32)> = Vec::new();
     let mut list_data = topology::message(&working, list, &[LIST_MESSAGE_TYPE, 6_201])
         .map_err(Error::from)?
         .1
@@ -511,20 +580,29 @@ fn publish(
     let mut appended: Vec<u64> = Vec::new();
     let mut cell_updates: Vec<(At, u32)> = Vec::new();
     for (position, properties) in cells {
-        let located =
-            locate_cell(&working, &store, *position)?.ok_or(Error::Refused(Refusal::EmptyCell))?;
-        let cell = litchi_numbers_wire::BncCell::parse(
-            &located.bytes,
-            &crate::cell::wire::limits_for_source(&located.bytes),
-        )
-        .map_err(|_error| Error::InvalidSource)?;
+        // An empty cell takes a style-only cell, as the host editor
+        // materializes it (record 0370).
+        let old_key = match locate_cell(&working, &store, *position)? {
+            Some(located) => litchi_numbers_wire::BncCell::parse(
+                &located.bytes,
+                &crate::cell::wire::limits_for_source(&located.bytes),
+            )
+            .map_err(|_error| Error::InvalidSource)?
+            .text_style_identifier(),
+            None => None,
+        };
         let current = current_style(&working, sheet, table, *position)?;
-        let key = if let Some((_, _, _, key)) = variations
-            .iter_mut()
-            .find(|(parent, staged, _, _)| *parent == current && staged == properties)
-        {
-            *key
-        } else {
+        // A property equal to the inherited value stays inherited, as the
+        // host editor's minimal style variation leaves it (record 0370).
+        let inherited = effective(&working, current)?;
+        let properties = &minimal(properties, &inherited);
+        if properties.is_empty() {
+            continue;
+        }
+        // One variation per cell, as the host editor writes one per cell
+        // (record 0370); a later stage of the same cell already merged into
+        // this one.
+        let key = {
             let stylesheet = stylesheet_of(&working, current)?;
             let sheet_member = working.locate(stylesheet)?.ok_or(Error::InvalidSource)?;
             if working.locate(current)?.as_deref() != Some(sheet_member.as_str()) {
@@ -538,13 +616,18 @@ fn publish(
                 wire,
             )
             .map_err(from_style)?;
+            // The variation states its (empty) paragraph properties, as the
+            // host editor's variation does (record 0370).
+            let data = with_paragraph_properties(data)?;
             let template = working.object(current)?;
             let object = structure::new_object(
                 identifier,
                 Some(template),
                 PARAGRAPH_STYLE_MESSAGE_TYPE,
                 data,
-                vec![current, stylesheet],
+                // Native styles list their parent, not their stylesheet
+                // back-reference (record 0370; every tracked native style).
+                vec![current],
                 working.archive_limits(),
             )?;
             working.insert(&sheet_member, object)?;
@@ -576,6 +659,21 @@ fn publish(
                 Ok(()) => {},
                 Err(Fault::Invalid) => {
                     replace_message(&mut working, stylesheet, sheet_index, sheet_data)?;
+                    // The aggregate list still names the new style, as the
+                    // host editor's stylesheet write does (record 0370).
+                    let object = working.object_mut(stylesheet)?;
+                    let references = &mut object
+                        .archive_info
+                        .message_infos
+                        .get_mut(sheet_index)
+                        .ok_or(Fault::Invalid)?
+                        .object_references;
+                    if !references.contains(&identifier) {
+                        references
+                            .try_reserve(1)
+                            .map_err(|_error| Error::Allocation { amount: 1 })?;
+                        references.push(identifier);
+                    }
                 },
                 Err(other) => return Err(other.into()),
             }
@@ -606,7 +704,6 @@ fn publish(
             push_bytes_field(&mut rebuilt, 3, &entry)?;
             list_data = rebuilt;
             appended.push(identifier);
-            variations.push((current, properties.clone(), identifier, key));
             key
         };
         // One more reference to the entry.
@@ -623,7 +720,7 @@ fn publish(
             })?;
             bytes_field(3, &entry).map(Some)
         })?;
-        if let Some(old) = cell.text_style_identifier() {
+        if let Some(old) = old_key {
             *releases.entry(old).or_insert(0) += 1;
         }
         cell_updates.push((*position, key));
@@ -648,8 +745,10 @@ fn publish(
 
     // Point each cell at its new key.
     for (position, key) in cell_updates {
-        let located =
-            locate_cell(&working, &store, position)?.ok_or(Error::Refused(Refusal::EmptyCell))?;
+        let Some(located) = locate_cell(&working, &store, position)? else {
+            materialize(&mut working, &store, model_columns, position, key)?;
+            continue;
+        };
         let limits = crate::cell::wire::limits_for_source(&located.bytes);
         let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
             .map_err(|_error| Error::InvalidSource)?;
@@ -673,6 +772,85 @@ fn publish(
         replace_message(&mut working, located.tile, located.tile_index, rewritten)?;
     }
     Ok(working.publish(&transition)?)
+}
+
+/// Store a style-only cell for the empty cell at `position` (its row's and
+/// column's headers count it), pointing at text-style key `key`.
+pub(super) fn materialize(
+    working: &mut Working<'_>,
+    store: &[u8],
+    columns: u32,
+    position: At,
+    key: u32,
+) -> Result<(), Error> {
+    let mut cell = litchi_numbers_wire::BncCell::minimal();
+    cell.set_text_style_identifier(Some(key));
+    materialize_cell(working, store, columns, position, &cell)
+}
+
+/// Store `cell` at the empty position `position`, counting it in its row
+/// and column headers.
+pub(super) fn materialize_cell(
+    working: &mut Working<'_>,
+    store: &[u8],
+    columns: u32,
+    position: At,
+    cell: &litchi_numbers_wire::BncCell,
+) -> Result<(), Error> {
+    let (tiles, size) = topology::tiles(store).map_err(from_topology)?;
+    let tile_key = u64::from(position.row()) / size;
+    let local =
+        u32::try_from(u64::from(position.row()) % size).map_err(|_| Error::InvalidSource)?;
+    let (_, tile) = tiles
+        .iter()
+        .find(|(candidate, _)| u64::from(*candidate) == tile_key)
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+    let limits = litchi_numbers_wire::Limits::DEFAULT;
+    let encoded = crate::cell::wire::encode(cell, &limits).map_err(|_| Error::InvalidSource)?;
+    let (tile_index, tile_data) =
+        topology::message(working, *tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
+    let written = litchi_numbers_wire::table_write::tile_set_cell_in_field_order(
+        tile_data,
+        local,
+        position.column(),
+        columns,
+        Some(&encoded),
+        &limits,
+    )
+    .map_err(|error| match error {
+        litchi_numbers_wire::table_write::WriteError::Unsupported => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        litchi_numbers_wire::table_write::WriteError::Allocation { requested } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::InvalidSource,
+    })?;
+    replace_message(working, *tile, tile_index, written.tile)?;
+    // The row's header counts the new cell.
+    let headers = single_bytes(store, 1)?.ok_or(Error::InvalidSource)?;
+    let bucket = usize::try_from(u64::from(position.row()) / storage::HEADER_BUCKET_ROWS)
+        .map_err(|_| Error::InvalidSource)?;
+    let reference = *repeated_bytes(headers, 2)?
+        .get(bucket)
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+    let bucket = references::reference_identifier(reference)?;
+    let (bucket_index, bucket_data) =
+        topology::message(working, bucket, &[HEADER_BUCKET_MESSAGE_TYPE]).map_err(Error::from)?;
+    let adjusted =
+        litchi_numbers_wire::table_write::header_adjust(bucket_data, position.row(), 1, &limits)
+            .map_err(|_| Error::InvalidSource)?;
+    replace_message(working, bucket, bucket_index, adjusted)?;
+    // So does its column's header.
+    let column_bucket =
+        single_reference(store, 2)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+    let (column_index, column_data) =
+        topology::message(working, column_bucket, &[HEADER_BUCKET_MESSAGE_TYPE])
+            .map_err(Error::from)?;
+    let adjusted =
+        litchi_numbers_wire::table_write::header_adjust(column_data, position.column(), 1, &limits)
+            .map_err(|_| Error::InvalidSource)?;
+    replace_message(working, column_bucket, column_index, adjusted).map_err(Error::from)
 }
 
 impl From<topology::Error> for Error {

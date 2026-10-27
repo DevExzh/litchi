@@ -12,6 +12,7 @@ use crate::wire::{
 use crate::{Error, Result};
 
 pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+use litchi_iwa_common::shape::line::{Error as LineError, Segment};
 
 use super::geometry::{
     DrawableGeometry, DrawablePoint, DrawableSize, geometry_from_drawable, patch_drawable_geometry,
@@ -24,57 +25,57 @@ const LINE_COMPARISON_EPSILON: f32 = 0.001;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const ZERO_LINE_HEIGHT: f32 = 0.0;
 
-/// A non-degenerate straight line between two points in document coordinates.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct LineSegment {
-    start: DrawablePoint,
-    end: DrawablePoint,
+/// A non-degenerate straight line between two points in document coordinates
+/// (the shared `litchi_iwa_common::shape::line::Segment`, record 0375).
+#[derive(Clone, Copy, PartialEq)]
+pub struct LineSegment(Segment);
+
+impl std::fmt::Debug for LineSegment {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("LineSegment")
+            .field("start", &self.0.start())
+            .field("end", &self.0.end())
+            .finish()
+    }
 }
 
 impl LineSegment {
     /// Validate and construct a straight line from two document-space endpoints.
     pub fn new(start: DrawablePoint, end: DrawablePoint) -> Result<Self> {
-        if !start.x.is_finite() || !start.y.is_finite() || !end.x.is_finite() || !end.y.is_finite()
-        {
-            return Err(Error::ParseError(
-                "iWork line endpoints must be finite".to_owned(),
-            ));
-        }
-        let delta_x = end.x - start.x;
-        let delta_y = end.y - start.y;
-        let length = delta_x.hypot(delta_y);
-        if !length.is_finite() || length <= 0.0 {
-            return Err(Error::ParseError(
-                "iWork line endpoints must have a finite positive distance".to_owned(),
-            ));
-        }
-        Ok(Self { start, end })
+        Segment::new(start, end).map(Self).map_err(|error| {
+            Error::ParseError(
+                match error {
+                    LineError::NonFinite => "iWork line endpoints must be finite",
+                    _ => "iWork line endpoints must have a finite positive distance",
+                }
+                .to_owned(),
+            )
+        })
     }
 
     /// First endpoint in document coordinates.
     pub const fn start(self) -> DrawablePoint {
-        self.start
+        self.0.start()
     }
 
     /// Second endpoint in document coordinates.
     pub const fn end(self) -> DrawablePoint {
-        self.end
+        self.0.end()
     }
 
     /// Euclidean line length in document points.
     pub fn length(self) -> f32 {
-        let delta_x = self.end.x - self.start.x;
-        let delta_y = self.end.y - self.start.y;
-        delta_x.hypot(delta_y)
+        self.0.length()
     }
 }
 
 pub(crate) fn line_geometry(segment: LineSegment) -> DrawableGeometry {
-    let delta_x = segment.end.x - segment.start.x;
-    let delta_y = segment.end.y - segment.start.y;
+    let delta_x = segment.end().x - segment.start().x;
+    let delta_y = segment.end().y - segment.start().y;
     let length = delta_x.hypot(delta_y);
-    let center_x = segment.start.x + delta_x / 2.0;
-    let center_y = segment.start.y + delta_y / 2.0;
+    let center_x = segment.start().x + delta_x / 2.0;
+    let center_y = segment.start().y + delta_y / 2.0;
     let angle = (delta_y.atan2(delta_x) * DEGREES_PER_RADIAN).rem_euclid(FULL_ROTATION_DEGREES);
     DrawableGeometry {
         position: Some(DrawablePoint {
@@ -134,7 +135,7 @@ pub(crate) fn shape_line_segment(shape: &tswp::ShapeInfoArchive) -> Result<Optio
     let geometry = geometry_from_drawable(&shape.super_.super_)?;
     let mut segment = line_segment_from_geometry(geometry, effective_width)?;
     if path_source.horizontal_flip == Some(true) {
-        segment = LineSegment::new(segment.end, segment.start)?;
+        segment = LineSegment::new(segment.end(), segment.start())?;
     }
     Ok(Some(segment))
 }
@@ -157,7 +158,7 @@ pub(crate) fn is_straight_line_bezier(bezier: &tsd::BezierPathSourceArchive) -> 
 }
 
 pub(crate) fn line_segments_match(left: LineSegment, right: LineSegment) -> bool {
-    points_match(left.start, right.start) && points_match(left.end, right.end)
+    points_match(left.start(), right.start()) && points_match(left.end(), right.end())
 }
 
 pub(crate) fn set_shape_line_segment(
@@ -213,7 +214,7 @@ fn patch_line_shape(data: &[u8], drawable_id: u64, replacement: LineSegment) -> 
         .as_ref()
         .is_some_and(|path| path.horizontal_flip == Some(true))
     {
-        LineSegment::new(replacement.end, replacement.start)?
+        LineSegment::new(replacement.end(), replacement.start())?
     } else {
         replacement
     };

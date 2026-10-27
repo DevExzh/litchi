@@ -4,10 +4,19 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
+pub(crate) mod body_bookmarks;
 pub(crate) mod body_chart_arrangement;
 pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_metadata;
+pub(crate) mod body_date_time_fields;
+pub(crate) mod body_drawable_caption;
+pub(crate) mod body_drawable_graph;
+pub(crate) mod body_drawable_properties;
+pub(crate) mod body_drawable_text;
 pub(crate) mod body_footnote;
+pub(crate) mod body_media_lifecycle;
+pub(crate) mod body_number_attachments;
+pub(crate) mod body_storage_objects;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
 pub(crate) mod body_table_creation;
@@ -30,6 +39,12 @@ pub(crate) mod header_footer_text;
 pub(crate) mod image_adjustments;
 pub(crate) mod metadata_edit;
 #[cfg(feature = "internal-iwork-source")]
+mod movie_playback;
+// The drawable-properties family reads and rewrites movie playback through
+// the same owner module, so it is compiled without the host seam feature as
+// well; only the hidden `__*` re-exports stay behind the feature.
+#[cfg(not(feature = "internal-iwork-source"))]
+#[path = "package/movie_playback.rs"]
 mod movie_playback;
 pub(crate) mod page_layout;
 mod save;

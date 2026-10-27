@@ -48,6 +48,16 @@ pub mod table_lifecycle;
 /// three table owners (record 0370).
 pub mod table_topology;
 
+/// Final-state formula dependency and dependent-cache refresh planning,
+/// with the strict scalar evaluator, shared by the three table owners
+/// (record 0376).
+pub mod formula_cache;
+/// Exact rewrites of the complete native formula dependency graph: removal
+/// and insertion of formula hosts (record 0376).
+pub mod formula_dependencies;
+/// Bounded exact formula-list planning for rooted and segmented lists
+/// (record 0376).
+pub mod formula_list;
 /// Shared native Numbers formula function-token registry.
 pub mod function_map;
 /// Payload-level cell writes shared by the Pages and Keynote table owners.

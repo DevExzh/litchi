@@ -1409,7 +1409,49 @@ mod tests {
 
         crate::package_metadata::set_package_last_object_identifier(&mut after, baseline_watermark)
             .unwrap();
+        restore_zero_count_column_headers(&baseline, &mut after);
         assert_eq!(after.to_bytes().unwrap(), baseline_bytes);
+    }
+
+    /// A formula set and clear leaves a zero-count column header behind
+    /// (the shared header writer keeps zero entries, as native saves do;
+    /// record 0371). Put back the baseline bucket after proving that this is
+    /// the only difference.
+    fn restore_zero_count_column_headers(baseline: &HostPackage, after: &mut HostPackage) {
+        for name in baseline
+            .iwa_entry_names()
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>()
+        {
+            let source = baseline.archive(&name).unwrap();
+            for object in &source.objects {
+                let Some(message) = object.messages.iter().find(|message| {
+                    message.type_ == NumbersMessageType::HeaderStorageBucket.value()
+                }) else {
+                    continue;
+                };
+                let identifier = object.archive_info.identifier.unwrap();
+                let current = after.archive(&name).unwrap();
+                let changed = current.object(identifier).unwrap().messages[0].data.clone();
+                if changed == message.data {
+                    continue;
+                }
+                let before = tst::HeaderStorageBucket::decode(message.data.as_slice()).unwrap();
+                let mut residue = tst::HeaderStorageBucket::decode(changed.as_slice()).unwrap();
+                residue.headers.retain(|header| {
+                    header.number_of_cells != 0 || before.headers.contains(header)
+                });
+                assert_eq!(residue, before, "only zero-count headers may remain");
+                let restored = message.clone();
+                after
+                    .update_archive(&name, |archive| {
+                        let target = archive.object_mut(identifier).unwrap();
+                        target.replace_message(0, restored, Default::default())?;
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+        }
     }
 
     #[test]
