@@ -25,6 +25,8 @@ use litchi_iwa_core::RawMessage;
 /// (moved from `litchi-numbers`, record 0379).
 pub mod cell_format;
 
+pub mod structure;
+
 /// A located native object: its messages and its position in the component
 /// catalog.
 #[derive(Debug, Clone, Copy)]

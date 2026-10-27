@@ -19,7 +19,7 @@ use super::{Fault, FaultResult, copy_bytes, map_core, map_wire, reserve};
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 
 /// Encode a canonical `TSP.Reference` payload for `identifier`.
-pub(in crate::package) fn reference_payload(identifier: u64) -> FaultResult<Vec<u8>> {
+pub fn reference_payload(identifier: u64) -> FaultResult<Vec<u8>> {
     let mut output = Vec::new();
     reserve(&mut output, 11)?;
     output.push(0x08);
@@ -38,7 +38,7 @@ pub(in crate::package) fn reference_payload(identifier: u64) -> FaultResult<Vec<
 
 /// The identifier of a `TSP.Reference` payload. Records carrying anything but
 /// their identifier are refused: a structural edit never reinterprets them.
-pub(in crate::package) fn reference_identifier(payload: &[u8]) -> FaultResult<u64> {
+pub fn reference_identifier(payload: &[u8]) -> FaultResult<u64> {
     let view = parse_wire_view(payload, litchi_iwa_common::WireLimits::DEFAULT)
         .map_err(|error| map_wire(&error))?;
     if view
@@ -56,7 +56,7 @@ pub(in crate::package) fn reference_identifier(payload: &[u8]) -> FaultResult<u6
 }
 
 /// The raw records of the repeated reference field at `path` of `data`.
-pub(in crate::package) fn records<'d>(data: &'d [u8], path: &[u32]) -> FaultResult<Vec<&'d [u8]>> {
+pub fn records<'d>(data: &'d [u8], path: &[u32]) -> FaultResult<Vec<&'d [u8]>> {
     match path {
         [field] => {
             repeated_length_delimited_payloads(data, *field).map_err(|error| map_wire(&error))
@@ -74,7 +74,7 @@ pub(in crate::package) fn records<'d>(data: &'d [u8], path: &[u32]) -> FaultResu
 }
 
 /// The identifiers of the repeated reference field at `path` of `data`.
-pub(in crate::package) fn identifiers(data: &[u8], path: &[u32]) -> FaultResult<Vec<u64>> {
+pub fn identifiers(data: &[u8], path: &[u32]) -> FaultResult<Vec<u64>> {
     let records = records(data, path)?;
     let mut output = Vec::new();
     reserve(&mut output, records.len())?;
@@ -86,11 +86,7 @@ pub(in crate::package) fn identifiers(data: &[u8], path: &[u32]) -> FaultResult<
 
 /// Rewrite the repeated reference field at `path` to `after`, reusing the
 /// exact bytes of every retained record and encoding new ones canonically.
-pub(in crate::package) fn rewrite(
-    data: &[u8],
-    path: &[u32],
-    after: &[u64],
-) -> FaultResult<Vec<u8>> {
+pub fn rewrite(data: &[u8], path: &[u32], after: &[u64]) -> FaultResult<Vec<u8>> {
     match path {
         [field] => {
             let records = records(data, path)?;
@@ -134,7 +130,7 @@ impl From<litchi_iwa_common::Error> for WireFault {
 /// references: `removed` leave the aggregate list and every field list,
 /// `appended` join the aggregate list as its suffix and the field list at
 /// `field_path` when the header describes that field.
-pub(in crate::package) fn replace(
+pub fn replace(
     object: &mut ArchiveObject,
     index: usize,
     data: Vec<u8>,

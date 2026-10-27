@@ -131,6 +131,24 @@ the five decimal families, `set_table_cell_data_format`,
 without Number, plus the two generic rows). Six macOS queue rows cover the
 routes; none has native evidence.
 
+### 2.3 The structural working set
+
+The Numbers structural workspace (`package/structure.rs` and
+`structure/{budget,collect,formula,metadata,plan,references}.rs`) moves to
+`litchi_iwa_table::structure` as `Working<'p, P: TableLeaf>`. `TableLeaf`
+is `TableSource` plus the leaf's strict `reopen_candidate`. Numbers keeps
+its sheet and document helpers, the patch `Artifacts` and the
+`structural_family!` macro, and aliases `type Working<'p> =
+litchi_iwa_table::structure::Working<'p, Package>` and `type Published =
+Published<Package>`, so its call sites are unchanged. Every Numbers test
+(1,044 with the crate's) and the 151 Numbers parity cases pass; callgrind,
+same probes as 0370/0370a (A before, B after, A B B A):
+
+| Route | Before | After | Δ |
+|---|---:|---:|---:|
+| leaf topology insertion (`cost_probes::numbers_topology_insert_cost_abba`) | 415,361,948 | 415,363,167 | +0.0003% |
+| leaf whole-cell text style (`cost_probes::numbers_text_style_cost_abba`) | 323,242,772 | 323,187,077 | −0.02% |
+
 ## 3. Tools and docs
 
 - `tools/crate_boundaries.json`: the package with six edges (archive, core,
