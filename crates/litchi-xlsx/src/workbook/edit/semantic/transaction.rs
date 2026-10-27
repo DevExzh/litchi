@@ -714,7 +714,37 @@ impl CaptureBudget {
         sheets: &BTreeMap<usize, SheetActions>,
         added: &[Added],
     ) -> Result<Self> {
-        let mut budget = Self::new(base, maximum);
+        Self::from_staged_onto(Self::new(base, maximum), base, sheets, added)
+    }
+
+    /// [`Self::from_staged`] for a ledger rebuilt over the same `base` as
+    /// `previous`: the two immutable endpoint charges are a function of
+    /// `base` alone, so they are taken from `previous` instead of walking
+    /// the workbook again (record 0377).
+    fn rebuilt(
+        previous: &Self,
+        base: &Workbook,
+        sheets: &BTreeMap<usize, SheetActions>,
+        added: &[Added],
+    ) -> Result<Self> {
+        let empty = Self {
+            maximum: previous.maximum,
+            base_reserved: previous.base_reserved,
+            reserved: previous.base_reserved,
+            worksheets: BTreeMap::new(),
+            cells: BTreeMap::new(),
+            added_sheets: BTreeMap::new(),
+            added_cells: BTreeMap::new(),
+        };
+        Self::from_staged_onto(empty, base, sheets, added)
+    }
+
+    fn from_staged_onto(
+        mut budget: Self,
+        base: &Workbook,
+        sheets: &BTreeMap<usize, SheetActions>,
+        added: &[Added],
+    ) -> Result<Self> {
         for (position, actions) in sheets {
             let mut addresses = BTreeSet::new();
             addresses.extend(actions.cells.keys().copied());
@@ -1621,6 +1651,17 @@ impl Edit {
         address: Address,
         authored_bytes: usize,
     ) -> Result<()> {
+        // The reservation exists to admit the worksheet before-image before
+        // a projected read can decode it. Once that worksheet is charged, a
+        // read decodes nothing unadmitted, and the setter that follows
+        // charges the cell's final payload itself (record 0377).
+        if self
+            .capture_budget
+            .as_ref()
+            .is_some_and(|budget| budget.worksheets.contains_key(&position))
+        {
+            return Ok(());
+        }
         self.preflight_cell_capture(position, address, authored_bytes)
             .map(drop)
     }
@@ -3429,11 +3470,19 @@ impl Edit {
             }
         }
 
-        let previous_capture_budget = self.capture_budget.take();
+        // A join rebuilds the ledger from the normalized actions, because the
+        // joined edit keeps staging against it. Commit (`retain_undo` false)
+        // reads only the ledger's maximum afterwards (`check_patch` measures
+        // the published patch itself), so it keeps the incremental ledger
+        // instead of rebuilding an exact one it never consults (record 0377).
+        let previous_capture_budget = if retain_undo {
+            self.capture_budget.take()
+        } else {
+            None
+        };
         let mut undo_capture_budget = None;
         if let Some(previous) = previous_capture_budget {
-            let maximum = previous.maximum;
-            match CaptureBudget::from_staged(&self.base, maximum, &self.sheets, &self.added) {
+            match CaptureBudget::rebuilt(&previous, &self.base, &self.sheets, &self.added) {
                 Ok(budget) => {
                     self.capture_budget = Some(budget);
                     if retain_undo {
@@ -3941,7 +3990,7 @@ impl Edit {
             svg_projected_owners: _,
             svg_staged_payload_bytes: _,
             svg_base_part_bytes,
-            mut capture_budget,
+            capture_budget,
         } = self;
         let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
@@ -3965,21 +4014,9 @@ impl Edit {
         let (styles_part_changed, projected_style_count) =
             lower_style_requests(&base, &mut sheets, &mut parts)?;
 
-        // Style lowering canonicalizes property-level requests into their
-        // final cell actions. Rebuild the bounded ledger from that published
-        // shape so an equal typed style, a canceled request, or a merged
-        // replacement does not retain a stale pre-lowering charge. This is
-        // only paid by bounded edits and is still metadata-only for deferred
-        // worksheet parts.
-        if let Some(previous) = capture_budget.take() {
-            capture_budget = Some(CaptureBudget::from_staged(
-                &base,
-                previous.maximum,
-                &sheets,
-                &added,
-            )?);
-        }
-
+        // Commit reads only the ledger's maximum from here on (`check_patch`
+        // measures the published patch), so the style lowering above needs no
+        // ledger rebuild (record 0377).
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
             let data = base

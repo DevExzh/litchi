@@ -1,0 +1,160 @@
+{
+ "schema": "litchi.unified-fin-perf.w6-summary.v1",
+ "record": "0377",
+ "rows": [
+  {
+   "scenario": "odt/open_get",
+   "base_median_us": [
+    139.757,
+    140.08499999999998
+   ],
+   "candidate_median_us": [
+    208.99519999999998,
+    209.66320000000002
+   ]
+  },
+  {
+   "scenario": "odt/set",
+   "base_median_us": [
+    415.3824000000001,
+    413.7686
+   ],
+   "candidate_median_us": [
+    492.457,
+    488.11679999999996
+   ]
+  },
+  {
+   "scenario": "odt/batch1k",
+   "base_median_us": [
+    1762.0800000000002,
+    1777.621
+   ],
+   "candidate_median_us": [
+    1847.751,
+    1881.941
+   ]
+  },
+  {
+   "scenario": "ods/open_get",
+   "base_median_us": [
+    1220.9192,
+    1249.5196
+   ],
+   "candidate_median_us": [
+    1336.896,
+    1304.9016
+   ]
+  },
+  {
+   "scenario": "ods/set",
+   "base_median_us": [
+    11.5442,
+    11.564
+   ],
+   "candidate_median_us": [
+    7.978199999999999,
+    7.99
+   ]
+  },
+  {
+   "scenario": "ods/batch1k",
+   "base_median_us": [
+    5006.909000000001,
+    5129.78
+   ],
+   "candidate_median_us": [
+    5303.861,
+    5319.540999999999
+   ]
+  },
+  {
+   "scenario": "odp/open_get",
+   "base_median_us": [
+    122.91680000000001,
+    121.42080000000001
+   ],
+   "candidate_median_us": [
+    123.1688,
+    122.90859999999998
+   ]
+  },
+  {
+   "scenario": "odp/set",
+   "base_median_us": [
+    429.76660000000004,
+    430.7586
+   ],
+   "candidate_median_us": [
+    330.37199999999996,
+    331.824
+   ]
+  },
+  {
+   "scenario": "odg/open_get",
+   "base_median_us": [
+    2352.26065,
+    2348.8986
+   ],
+   "candidate_median_us": [
+    2343.73445,
+    2353.3166499999998
+   ]
+  },
+  {
+   "scenario": "odg/set",
+   "base_median_us": [
+    10142.2038,
+    10149.355899999999
+   ],
+   "candidate_median_us": [
+    10121.3991,
+    10212.5303
+   ]
+  },
+  {
+   "scenario": "odc/open_get",
+   "base_median_us": [
+    78.61526,
+    78.10686
+   ],
+   "candidate_median_us": [
+    84.58949999999999,
+    84.4657
+   ]
+  },
+  {
+   "scenario": "odc/set",
+   "base_median_us": [
+    208.6482,
+    205.2002
+   ],
+   "candidate_median_us": [
+    218.26079999999996,
+    217.14224999999996
+   ]
+  },
+  {
+   "scenario": "fodt/open_get",
+   "base_median_us": [
+    388.1442,
+    388.72020000000003
+   ],
+   "candidate_median_us": [
+    475.80280000000005,
+    476.00460000000004
+   ]
+  },
+  {
+   "scenario": "fods/open_get",
+   "base_median_us": [
+    2203.9348,
+    2223.747
+   ],
+   "candidate_median_us": [
+    2241.1274,
+    2253.9792
+   ]
+  }
+ ]
+}

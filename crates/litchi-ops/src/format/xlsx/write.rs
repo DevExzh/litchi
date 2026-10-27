@@ -3117,7 +3117,7 @@ pub(crate) mod coalesce {
     use crate::transaction::{Error as TransactionError, SemanticLimits};
     use litchi_core::FileFormat;
     use litchi_xlsx as xlsx;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     /// One admitted direct cell payload assignment.
     pub(crate) struct Plan {
@@ -3162,7 +3162,9 @@ pub(crate) mod coalesce {
         source: xlsx::Package,
         edit: xlsx::workbook::Edit,
         items: Vec<Item>,
-        seen: HashSet<CellTarget>,
+        /// Each staged target's charge; a key is present exactly when the
+        /// target was staged in this run (record 0377: one map, not a set
+        /// and a map, per cell).
         charges: HashMap<CellTarget, usize>,
         initial: Option<HashMap<CellTarget, xlsx::State>>,
         final_states: Option<HashMap<CellTarget, xlsx::State>>,
@@ -3338,7 +3340,6 @@ pub(crate) mod coalesce {
                 source,
                 edit,
                 items: Vec::new(),
-                seen: HashSet::new(),
                 charges: HashMap::new(),
                 initial: (base.signature() == Signature::Signed).then(HashMap::new),
                 final_states: (base.signature() == Signature::Signed).then(HashMap::new),
@@ -3373,8 +3374,9 @@ pub(crate) mod coalesce {
         /// cumulative staged-byte boundary.  The plan itself has already
         /// passed the per-cell admission bound.
         pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
-            let previous = self.charges.get(&plan.key()).copied().unwrap_or(0);
-            self.seen.contains(&plan.key()) && !self.allow_repeated
+            let staged = self.charges.get(&plan.key()).copied();
+            let previous = staged.unwrap_or(0);
+            staged.is_some() && !self.allow_repeated
                 || self
                     .staged_bytes
                     .saturating_sub(previous)
@@ -3389,8 +3391,9 @@ pub(crate) mod coalesce {
         /// refusal, because staging after it would make changed attribution
         /// ambiguous.
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
-            let previous = self.charges.get(&plan.key()).copied().unwrap_or(0);
-            if self.seen.contains(&plan.key()) && !self.allow_repeated
+            let staged = self.charges.get(&plan.key()).copied();
+            let previous = staged.unwrap_or(0);
+            if staged.is_some() && !self.allow_repeated
                 || self
                     .staged_bytes
                     .saturating_sub(previous)
@@ -3407,15 +3410,11 @@ pub(crate) mod coalesce {
             self.items
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
-            self.seen
-                .try_reserve(1)
-                .map_err(|source| TransactionError::Allocation { source })?;
             self.charges
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
 
             let result = self.stage_native(&plan).inspect(|_| {
-                self.seen.insert(plan.key());
                 self.staged_bytes = self
                     .staged_bytes
                     .saturating_sub(previous)

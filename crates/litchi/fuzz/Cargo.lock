@@ -657,6 +657,7 @@ dependencies = [
  "litchi-iwa-common",
  "litchi-iwa-core",
  "litchi-iwa-protos",
+ "litchi-iwa-text",
  "thiserror",
 ]
 
@@ -669,6 +670,7 @@ dependencies = [
  "litchi-iwa-common",
  "litchi-iwa-core",
  "litchi-iwa-protos",
+ "litchi-iwa-style",
  "litchi-numbers-wire",
  "thiserror",
 ]
@@ -703,6 +705,7 @@ dependencies = [
  "litchi-iwa-detect",
  "litchi-iwa-protos",
  "litchi-iwa-style",
+ "litchi-iwa-table",
  "litchi-iwa-text",
  "litchi-iwa-text-wire",
  "litchi-numbers-wire",
@@ -779,6 +782,7 @@ dependencies = [
  "litchi-iwa-detect",
  "litchi-iwa-protos",
  "litchi-iwa-style",
+ "litchi-iwa-table",
  "litchi-iwa-text",
  "litchi-iwa-text-wire",
  "litchi-numbers-wire",

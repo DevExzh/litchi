@@ -5,6 +5,7 @@
 //! every state verb; [`crate::Workbook`] is its read-only semantic
 //! projection (ADR 0034 §2).
 
+pub(crate) mod builder_synthesis;
 mod chart_arrangement;
 mod chart_data;
 mod chart_data_edit;

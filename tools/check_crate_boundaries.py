@@ -18333,6 +18333,9 @@ PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE = (
 PAGES_TABLE_HIDDEN_AXES_OWNER_HELPER_ROOT = (
     PAGES_SOURCE_ROOT / "package" / "body_table_hidden_axes"
 )
+# Record 0379 moved the hidden-axis engine (graph proof, owner creation,
+# UID-map rewrite) into `litchi-iwa-table`; the Pages owner is its facade.
+IWA_TABLE_HIDDEN_AXES_ENGINE_SOURCE = Path("crates/litchi-iwa-table/src/hidden_axes.rs")
 PAGES_TABLE_HIDDEN_AXES_IMPLEMENTATION_SOURCES = (
     PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE,
     PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE,
@@ -42981,6 +42984,11 @@ def audit_pages_table_hidden_axes_facade_source_topology(
     # downstream Pages code may import the strict codec, never generated
     # archive types or Prost's eager message API.
     owner_code = code[owner_path]
+    engine_path = root / IWA_TABLE_HIDDEN_AXES_ENGINE_SOURCE
+    if engine_path.is_file():
+        owner_code += "\n" + _mask_rust_non_code(
+            _mask_rust_cfg_test_items(engine_path.read_text(encoding="utf-8"))
+        )
     if PAGES_TABLE_HIDDEN_AXES_UID_MAP_OWNER_MARKER.search(owner_code) is None:
         violations.append(
             "focused litchi-pages body-table hidden-axes owner is missing the "
