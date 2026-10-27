@@ -2,7 +2,9 @@
 
 - Status: implemented on `uo2/fin-perf`, cut from `feat/unified-ops-api` at
   `ac0d111c4c` (the commit on which all 53 gate rows passed, record 0373),
-  trunk merged at `41dc20503e` (trunk tip `c4e4c5266a`).
+  trunk merged at `41dc20503e` (trunk tip `c4e4c5266a`; measured there) and
+  again before finishing (trunk tip `8c2b44e22e`, iWork-only changes; not
+  re-measured).
 - Date: 2026-10-26
 - Input: owner decision [0350](0350-owner-api-debt-decision.md), contract
   [0351](0351-api-contract.md) §2.6 and §5, `docs/UNIFIED_OPS_GOAL.md`
