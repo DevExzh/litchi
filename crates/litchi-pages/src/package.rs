@@ -20,6 +20,7 @@ pub(crate) mod body_storage_objects;
 mod body_story;
 pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
+pub(crate) mod body_table_cell_format;
 pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;
@@ -360,6 +361,64 @@ impl Stats {
 pub struct Package {
     state: Arc<State>,
 }
+
+/// The shared table engines (`litchi-iwa-table`, record 0379) read the
+/// package through its catalog and ingress limits. Pages keeps no object
+/// index; an object is found by a scan of the component catalog. The
+/// semantic ceilings are the engines' defaults, the same as Numbers'.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.source.components()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        Some(&self.state.source)
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> Result<Option<litchi_iwa_table::ResolvedObject<'_>>, litchi_iwa_table::ResolveError> {
+        for (component_index, component) in self.state.source.components().iter().enumerate() {
+            let archive = component.archive();
+            if archive.object(identifier).is_none() {
+                continue;
+            }
+            let object_index = archive
+                .objects
+                .iter()
+                .position(|object| object.archive_info.identifier == Some(identifier))
+                .ok_or(litchi_iwa_table::ResolveError)?;
+            return Ok(Some(litchi_iwa_table::ResolvedObject {
+                messages: &archive.objects[object_index].messages,
+                component_index,
+                object_index,
+            }));
+        }
+        Ok(None)
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        self.state.source.source_bytes()
+    }
+
+    fn archive_limits(&self) -> Limits {
+        self.state.source.limits()
+    }
+
+    fn max_objects(&self) -> usize {
+        TABLE_ENGINE_MAX_OBJECTS
+    }
+
+    fn max_references(&self) -> usize {
+        TABLE_ENGINE_MAX_REFERENCES
+    }
+}
+
+/// Semantic ceilings handed to the shared table engines (the Numbers
+/// defaults, record 0379).
+const TABLE_ENGINE_MAX_OBJECTS: usize = 1_000_000;
+const TABLE_ENGINE_MAX_REFERENCES: usize = 1_000_000;
 
 impl fmt::Debug for Package {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

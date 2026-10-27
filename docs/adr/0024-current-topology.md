@@ -5070,10 +5070,14 @@ Edges added, all downward and runtime-neutral:
 - `litchi-numbers -> litchi-iwa-table`: the Numbers format, control and
   Pop-Up Menu facades call the moved engines through their previous module
   names; their public API and behaviour are unchanged.
+- `litchi-pages -> litchi-iwa-table` and `litchi-keynote -> litchi-iwa-table`:
+  the body-table and slide-table cell-format families
+  (`edit_body_table_cell_format`, `edit_slide_table_cell_format`) run the
+  same engines over their own selectors.
 
 The package is never re-exported by a facade: its signatures name native
 archive positions, which the supported APIs do not expose. It is an iWork
 package for the non-iWork release gate (18 iWork packages, 21 excluded).
-`tools/check_crate_boundaries.py` reports 69 workspace packages and 300
-internal dependency declarations (trunk at this branch point), with the
-same 11 migration debts.
+`tools/check_crate_boundaries.py` reports 70 workspace packages and 309
+internal dependency declarations with 12 explicit debt items, after trunk
+`c4f00f3a35` (which adds `litchi-iwa-style`) was merged.
