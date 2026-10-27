@@ -23326,6 +23326,7 @@
         "litchi_numbers::table::merge::transaction",
         "litchi_numbers::table::order",
         "litchi_numbers::table::relocation",
+        "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology"
@@ -23487,6 +23488,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_relocation",
           "ok": "litchi_numbers::table::relocation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_resize",
+          "ok": "litchi_numbers::table::resize::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_sort_order",
@@ -24172,6 +24177,7 @@
         "litchi_numbers::table::merge::transaction",
         "litchi_numbers::table::order",
         "litchi_numbers::table::relocation",
+        "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology"
@@ -24333,6 +24339,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_relocation",
           "ok": "litchi_numbers::table::relocation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_resize",
+          "ok": "litchi_numbers::table::resize::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_sort_order",
