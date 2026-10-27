@@ -65,6 +65,16 @@ pub(in crate::package) struct DataOwner {
     pub(in crate::package) count: u32,
 }
 
+/// One new embedded asset: its `DataInfo` record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::package) struct DataAddition {
+    pub(in crate::package) identifier: u64,
+    pub(in crate::package) digest: Vec<u8>,
+    pub(in crate::package) preferred: String,
+    pub(in crate::package) file: String,
+    pub(in crate::package) length: u64,
+}
+
 /// The registry facts of one metadata payload.
 #[derive(Debug, Default)]
 pub(in crate::package) struct Registry {
@@ -369,6 +379,10 @@ pub(in crate::package) struct Transition {
     /// Data-reference owner records of new objects (a duplicate sharing its
     /// source's embedded data).
     pub(in crate::package) data_owner_additions: Vec<DataOwner>,
+    /// New embedded assets (their `DataInfo` records).
+    pub(in crate::package) data_additions: Vec<DataAddition>,
+    /// New non-IWA package members (embedded data).
+    pub(in crate::package) entry_insertions: Vec<(String, Vec<u8>)>,
     /// Non-IWA package members (embedded data) this transaction rewrites.
     pub(in crate::package) entry_writes: Vec<(String, Vec<u8>)>,
 }
@@ -421,6 +435,7 @@ impl Transition {
         self.registry_is_empty()
             && self.data_owner_removals.is_empty()
             && self.data_owner_additions.is_empty()
+            && self.data_additions.is_empty()
             && self.data_removals.is_empty()
     }
 
@@ -633,6 +648,7 @@ pub(super) fn apply(
     let staged;
     let source = if transition.data_owner_removals.is_empty()
         && transition.data_owner_additions.is_empty()
+        && transition.data_additions.is_empty()
         && transition.data_removals.is_empty()
     {
         payload(working, route)?
@@ -854,6 +870,34 @@ pub(super) fn apply(
     Ok(())
 }
 
+/// The next embedded-data identifier: one above every `DataInfo` record
+/// and every asset this transition adds (the host's
+/// `insert_unreferenced`).
+pub(in crate::package) fn next_data_identifier(
+    working: &Working<'_>,
+    transition: &Transition,
+) -> FaultResult<u64> {
+    let Some(route) = route(working)? else {
+        return Err(Fault::Unsupported);
+    };
+    let source = payload(working, route)?;
+    let mut files = DataFiles::default();
+    media::visit_package_metadata_media(
+        source,
+        media::DecodeOptions::for_source(source),
+        &mut files,
+    )
+    .map_err(|_error| Fault::Invalid)?;
+    let maximum = files
+        .records
+        .iter()
+        .map(|(identifier, _)| *identifier)
+        .chain(transition.data_additions.iter().map(|data| data.identifier))
+        .max()
+        .unwrap_or(0);
+    maximum.checked_add(1).ok_or(Fault::Invalid)
+}
+
 /// The `DataInfo` file names of a metadata payload.
 #[derive(Default)]
 struct DataFiles {
@@ -938,6 +982,15 @@ fn rewrite_media(
             owner.count,
         ));
     }
+    let mut data_additions = Vec::new();
+    reserve(&mut data_additions, transition.data_additions.len())?;
+    for data in &transition.data_additions {
+        data_additions.push(
+            media::DataInfoAddition::new(data.identifier, &data.digest, &data.preferred)
+                .with_file_name(&data.file)
+                .with_materialized_length(data.length),
+        );
+    }
     let mut removals = Vec::new();
     reserve(&mut removals, transition.data_removals.len())?;
     for (data, _) in &transition.data_removals {
@@ -950,13 +1003,14 @@ fn rewrite_media(
             owners
                 .len()
                 .saturating_add(additions.len())
+                .saturating_add(data_additions.len())
                 .saturating_add(removals.len())
                 .saturating_add(1),
         ),
     );
     let report =
         media::inspect_package_metadata_media(source, options).map_err(|_error| Fault::Invalid)?;
-    let mut batch = MediaRewriteBatch::new(&[], &removals, &additions, &owners);
+    let mut batch = MediaRewriteBatch::new(&data_additions, &removals, &additions, &owners);
     if !removals.is_empty()
         && let Some(map) = data_metadata_map(working, report)?
     {
