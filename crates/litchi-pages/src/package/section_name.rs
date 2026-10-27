@@ -948,6 +948,8 @@ fn map_package_error(package_error: PackageError) -> Error {
         PackageError::UnexpectedFormat { .. }
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
         | PackageError::InvalidLimit { .. }
         | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
         PackageError::PayloadLimit { observed, limit } => Error::Limit {
