@@ -492,7 +492,7 @@ pub(crate) struct PartDigests {
     /// under an equal source profile, like a rebind's projection, and only
     /// [`Snapshot::package_memo`] attaches it: [`Self::project`] and
     /// [`Self::union`] never carry it to another package.
-    slide_roots: Option<(litchi_opc::SourceLimits, Arc<SlideRootMemo>)>,
+    slide_roots: Option<Box<(litchi_opc::SourceLimits, Arc<SlideRootMemo>)>>,
 }
 
 impl PartDigests {
@@ -546,8 +546,8 @@ impl PartDigests {
     fn slide_roots_for(&self, limits: litchi_opc::SourceLimits) -> Option<&SlideRootMemo> {
         self.slide_roots
             .as_ref()
-            .filter(|(admitted, _memo)| *admitted == limits)
-            .map(|(_admitted, memo)| memo.as_ref())
+            .filter(|roots| roots.0 == limits)
+            .map(|roots| roots.1.as_ref())
     }
 
     /// Return the package-owned payload allocation for an exact memo key.
@@ -779,7 +779,7 @@ impl Snapshot {
         let limits = package.read_limits();
         if self.package.read_limits() == limits {
             let roots = self.slide_roots.project(|key| memo.owner_for(key));
-            memo.slide_roots = Some((limits, Arc::new(roots)));
+            memo.slide_roots = Some(Box::new((limits, Arc::new(roots))));
         }
         Ok(memo)
     }

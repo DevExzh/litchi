@@ -481,10 +481,10 @@ impl Doc {
             .with_format(FileFormat::Doc));
         };
         if self.0.signature() == Signature::RemovalAuthorized {
-            return Ok(signature::unsign_compound_file(
+            return signature::unsign_compound_file(
                 package.to_bytes()?,
                 litchi_sign::cfb::Format::Doc,
-            )?);
+            );
         }
         Ok(package.to_bytes()?)
     }

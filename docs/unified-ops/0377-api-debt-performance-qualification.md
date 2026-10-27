@@ -356,8 +356,26 @@ owner").
 
 ## 7. Gates
 
-See the final report of this record's commit (commands and exit codes are
-listed there and in §8 once run).
+Run on the merged tree with the rules' build environment
+(`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`):
+
+| Gate | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-pptx -p litchi-xlsx -p litchi-xlsb -p litchi-odf-common -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features doc / ppt / xlsx / pptx / odc] --all-targets -- -D warnings` | 0 (all six) |
+| `cargo test --all-features -p litchi-pptx` / `-p litchi-xlsx` / `-p litchi-xlsb` / `-p litchi-odf-common` / `-p litchi-odc` | 0 each |
+| `cargo test -p litchi-ops --all-features`: `--lib` (1,022), `--doc` (217), all 167 `--test` targets in six chunks (capability and registry goldens unchanged, no re-bless) | 0 |
+| `cargo test -p litchi --all-features` | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pptx -p litchi-xlsx -p litchi-xlsb -p litchi-odf-common -p litchi-ops` | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 0 (71 profiles) |
+| tool unit tests (the five required modules plus `test_unified_bench_matrix`; 1,288 tests) | 0 |
+| `officecli_capability_delta.py --check`, `officecli_corpus.py --check`, `unified_bench_matrix.py --check`, `check_feature_matrix.py` | 0 each |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `python3 tools/check_crate_boundaries.py` | **1** — two findings in `crates/litchi-keynote/src/package/slide_drawable/named_styles.rs` (392, 548: a private `fn rename` read as `fs::rename`), from trunk commit `af21c5ea69` (iwa-w1c, merged here); not touched by this record |
+| `crates/pyo3-litchi/tests/run_tests.sh` (301) | 0 |
+| `tools/perf-baseline`: `cargo check --locked --all-targets`; same for `unified-fin-perf` | 0, 0 |
+| perf-baseline default matrix (41 cases, 213 rows) on the candidate | runs again (was exit 1 on trunk, §3) |
 
 ## 8. Evidence
 

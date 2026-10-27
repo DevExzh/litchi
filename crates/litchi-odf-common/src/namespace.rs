@@ -986,7 +986,10 @@ fn namespace_normalized_len(value: &str, context: &str) -> Result<(usize, bool)>
     // attribute-value normalization keeps unchanged, so such a value (every
     // namespace URI in practice) normalizes to itself; one vectorizable scan
     // replaces the per-character walk below (record 0377).
-    if bytes.iter().all(|&byte| (0x20..0x7f).contains(&byte) && byte != b'&') {
+    if bytes
+        .iter()
+        .all(|&byte| (0x20..0x7f).contains(&byte) && byte != b'&')
+    {
         return Ok((bytes.len(), false));
     }
     let mut index = 0;
