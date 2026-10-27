@@ -37,12 +37,12 @@ use litchi_numbers_wire::formula_owner::Uuid as WireUuid;
 
 use super::super::Package;
 use super::super::structure::{
-    self, DOCUMENT_SIDEBAR_FIELD, Fault, Published, TREE_CHILDREN_FIELD, TREE_NODE_MESSAGE_TYPE,
-    TREE_OBJECT_FIELD, Working,
+    self, DOCUMENT_SIDEBAR_FIELD, Fault, FaultResult, Published, TREE_CHILDREN_FIELD,
+    TREE_NODE_MESSAGE_TYPE, TREE_OBJECT_FIELD, Working,
     metadata::{self, Transition},
     references,
 };
-use super::{Error, Located, locate, rewrite_list};
+use super::{Error, locate, rewrite_list};
 
 /// `TST.TableModelArchive` (and its pre-BNC form).
 const TABLE_MODEL_MESSAGE_TYPES: [u32; 2] = [6_000, 6_001];
@@ -206,8 +206,41 @@ pub(super) fn duplicate_table(
     let mut working = Working::new(source)?;
     working.keep_previews();
     let located = locate(&working, sheet_position, position)?;
-    let transition = clone(&mut working, &located, name).map_err(|error| error.0)?;
+    let mut transition = Transition::default();
+    clone_table(
+        &mut working,
+        &mut transition,
+        located.table,
+        Placement {
+            sheet: located.sheet,
+            source_sheet: located.sheet,
+            offset: OFFSET,
+        },
+        name,
+    )?;
     Ok(working.publish(&transition)?)
+}
+
+/// Where a copy goes: the sheet whose drawables it joins (and under whose
+/// sidebar node it is listed), the source table's sheet, and how far it is
+/// offset from its source.
+#[derive(Debug, Clone, Copy)]
+pub(in crate::package) struct Placement {
+    pub(in crate::package) sheet: u64,
+    pub(in crate::package) source_sheet: u64,
+    pub(in crate::package) offset: f32,
+}
+
+/// Copy the table drawable `info` as `name` at `placement`, recording its
+/// registry consequences in `transition`; returns the copy's drawable.
+pub(in crate::package) fn clone_table(
+    working: &mut Working<'_>,
+    transition: &mut Transition,
+    info: u64,
+    placement: Placement,
+    name: &str,
+) -> FaultResult<u64> {
+    clone(working, transition, info, placement, name).map_err(|error| error.0)
 }
 
 /// One cloned object and the component it goes to.
@@ -244,9 +277,14 @@ const FORMULA_LIST_TYPE: u64 = 3;
     clippy::too_many_lines,
     reason = "the port keeps the host editor's single clone sequence"
 )]
-fn clone(working: &mut Working<'_>, located: &Located, name: &str) -> R<Transition> {
+fn clone(
+    working: &mut Working<'_>,
+    transition: &mut Transition,
+    info_id: u64,
+    placement: Placement,
+    name: &str,
+) -> R<u64> {
     let limits = working.archive_limits();
-    let info_id = located.table;
     let info_component = working.locate(info_id)?.ok_or(Fault::Invalid)?;
     let info_object = working.object(info_id)?.clone();
     let info_index = structure::table_info_message(&info_object)?;
@@ -275,6 +313,10 @@ fn clone(working: &mut Working<'_>, located: &Located, name: &str) -> R<Transiti
     let mut remap: HashMap<u64, u64> = HashMap::new();
     remap.insert(info_id, new_info);
     remap.insert(model_id, new_model);
+    if placement.sheet != placement.source_sheet {
+        // The copy's drawable is parented to its new sheet.
+        remap.insert(placement.source_sheet, placement.sheet);
+    }
     for (source, replacement) in graph.keys().zip(&fresh[2..]) {
         remap.insert(*source, *replacement);
     }
@@ -328,7 +370,10 @@ fn clone(working: &mut Working<'_>, located: &Located, name: &str) -> R<Transiti
                 .last()
                 .copied()
                 .unwrap_or(0);
-            let (x, y) = (f32::from_bits(x) + OFFSET, f32::from_bits(y) + OFFSET);
+            let (x, y) = (
+                f32::from_bits(x) + placement.offset,
+                f32::from_bits(y) + placement.offset,
+            );
             if !x.is_finite() || !y.is_finite() {
                 return invalid();
             }
@@ -406,25 +451,27 @@ fn clone(working: &mut Working<'_>, located: &Located, name: &str) -> R<Transiti
     }
 
     // Attach to the sheet's drawables.
-    let mut after = located.drawables.clone();
+    let sheet_object = working.object(placement.sheet)?;
+    let (sheet_index, sheet_path) = structure::sheet_message(sheet_object)?;
+    let drawables = references::identifiers(&sheet_object.messages[sheet_index].data, sheet_path)?;
+    let mut after = drawables.clone();
     after.push(new_info);
     rewrite_list(
         working,
-        located.sheet,
-        located.sheet_index,
-        located.sheet_path,
-        &located.drawables,
+        placement.sheet,
+        sheet_index,
+        sheet_path,
+        &drawables,
         &after,
     )?;
 
     // The sheet's sidebar node lists its tables.
-    let node = append_sidebar_node(working, located.sheet, new_info)?;
+    let node = append_sidebar_node(working, placement.sheet, new_info)?;
 
     // Registry: UUIDs for the clones of registered objects, and every new
     // cross-component reference.
-    let mut transition = Transition::default();
     let Some(registry) = metadata::registry(working)? else {
-        return Ok(transition);
+        return Ok(new_info);
     };
     let seed = metadata::identity_seed(working, new_info)?;
     let mut inserted: Vec<(u64, String, Option<u64>)> = Vec::new();
@@ -453,20 +500,34 @@ fn clone(working: &mut Working<'_>, located: &Located, name: &str) -> R<Transiti
             .object_references
             .clone();
         for target in referenced {
+            if placement.sheet != placement.source_sheet && target == placement.sheet {
+                // Registered last, below, where the host editor records it.
+                continue;
+            }
             let target_component = working.locate(target)?.ok_or(Fault::Invalid)?;
             let target_id = registry.component_for_entry(&target_component)?.identifier;
             transition.reference(&registry, component_id, target_id, target)?;
         }
     }
     let info_component_id = registry.component_for_entry(&info_component)?.identifier;
-    let sheet_component = working.locate(located.sheet)?.ok_or(Fault::Invalid)?;
+    let sheet_component = working.locate(placement.sheet)?.ok_or(Fault::Invalid)?;
     let sheet_component = registry.component_for_entry(&sheet_component)?.identifier;
     transition.reference(&registry, sheet_component, info_component_id, new_info)?;
     if let Some((component, _, _)) = &engine {
         let engine_component = registry.component_for_entry(component)?.identifier;
         transition.reference(&registry, engine_component, info_component_id, new_info)?;
     }
-    Ok(transition)
+    if placement.sheet != placement.source_sheet {
+        // A drawable outside the document component (a legacy table info)
+        // addresses its new parent sheet across components.
+        transition.reference(
+            &registry,
+            info_component_id,
+            sheet_component,
+            placement.sheet,
+        )?;
+    }
+    Ok(new_info)
 }
 
 /// The storage objects a model owns: its tiles, header buckets, lists and
@@ -1165,4 +1226,75 @@ fn append_sidebar_node(
         &after,
     )?;
     Ok(Some((node, component)))
+}
+
+/// Whether every dependency edge of table drawable `info`'s owner family
+/// stays inside the family (the host editor's
+/// `table_formula_graph_is_self_contained`). A sheet copy refuses a table
+/// whose formulas read another table: their edges would need a sheet-wide
+/// remap.
+pub(in crate::package) fn self_contained(working: &Working<'_>, info: u64) -> FaultResult<bool> {
+    contained(working, info).map_err(|error| error.0)
+}
+
+fn contained(working: &Working<'_>, info: u64) -> R<bool> {
+    let Some((component, _, _)) = engine(working)? else {
+        return Ok(true);
+    };
+    let family = owner_family(working, &component, info)?;
+    let internal: HashSet<u64> = family
+        .owners
+        .iter()
+        .map(|(_, owner)| u64::from(owner.internal))
+        .collect();
+    let uuids: HashSet<(u64, u64)> = family
+        .owners
+        .iter()
+        .map(|(_, owner)| uuid_key(&owner.uid))
+        .collect();
+    let edges_inside = |data: &[u8], path: &[u32]| -> R<bool> {
+        for edges in payloads_at(data, path)? {
+            if !repeated_varint_values(edges, 5)?
+                .iter()
+                .all(|identifier| internal.contains(identifier))
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    };
+    for (member, _) in &family.owners {
+        let data = member.data();
+        if !edges_inside(data, &[4, 1, 6])? {
+            return Ok(false);
+        }
+        for dependency in payloads_at(data, &[5, 2])? {
+            if bytes(dependency, 3)?.is_some() {
+                return Ok(false);
+            }
+            if let Some(reference) = bytes(dependency, 4)?
+                && !internal.contains(&varint(reference, 1)?.unwrap_or(0))
+            {
+                return Ok(false);
+            }
+        }
+        for path in [&[14, 1, 1][..], &[14, 2, 1]] {
+            for uuid in payloads_at(data, path)? {
+                if !uuids.contains(&uuid_key(&read_uuid(uuid)?)) {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    for member in &family.cell_tiles {
+        if !edges_inside(member.data(), &[4, 6])? {
+            return Ok(false);
+        }
+    }
+    for member in &family.range_tiles {
+        if !internal.contains(&varint(member.data(), 1)?.unwrap_or(0)) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
