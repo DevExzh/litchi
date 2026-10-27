@@ -16,6 +16,9 @@ enum Operation {
     RemoveSheet(usize),
     AddTable(usize),
     RemoveTable(usize, usize),
+    /// Duplicate table `.1` of sheet `.0` (the host's selector counts
+    /// tables across the workbook; the cases use the first sheet).
+    DuplicateTable(usize, usize),
 }
 
 fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
@@ -34,6 +37,9 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 4,
                 3,
             )?;
+        },
+        Operation::DuplicateTable(_sheet, table) => {
+            editor.duplicate_table(litchi_numbers::TableSelector::index(table))?;
         },
         Operation::RemoveTable(_sheet, table) => {
             // The host's selector counts tables across the workbook; the
@@ -63,11 +69,14 @@ fn leaf_route(source: &[u8], operation: Operation) -> TestResult<LeafRun> {
                 leaf_bytes!(restored.package()),
             )
         },
-        Operation::AddTable(sheet) | Operation::RemoveTable(sheet, _) => {
+        Operation::AddTable(sheet)
+        | Operation::RemoveTable(sheet, _)
+        | Operation::DuplicateTable(sheet, _) => {
             let edit = package.edit_table_lifecycle(sheet)?;
             let edit = match operation {
                 Operation::AddTable(_) => edit.add("Added Table", 4, 3)?,
                 Operation::RemoveTable(_, table) => edit.remove(table)?,
+                Operation::DuplicateTable(_, table) => edit.duplicate(table)?,
                 _ => unreachable!(),
             };
             let commit = edit.commit()?;
@@ -116,7 +125,14 @@ fn corpus(name: &'static str, tier: Tier, operation: Operation) -> TestResult {
         ) {
             (Ok(_), Ok(_)) => {
                 cases += 1;
-                if let Err(error) = run(name, tier, &input, operation) {
+                let collides = matches!(operation, Operation::DuplicateTable(..))
+                    && OWNER_MAP_COLLISIONS.contains(path);
+                let result = if collides {
+                    run_owner_collision(name, tier, &input, operation)
+                } else {
+                    run(name, tier, &input, operation)
+                };
+                if let Err(error) = result {
                     failures.push(format!("{path} {operation:?}: {error}"));
                 }
             },
@@ -486,4 +502,104 @@ fn numbers_sheet_add_parity() -> TestResult {
         &input,
         Operation::AddSheet,
     )
+}
+
+/// Duplicating the first table of `basic.numbers`.
+#[test]
+fn numbers_table_duplicate_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    run(
+        "numbers_table_duplicate_parity",
+        Tier::B,
+        &input,
+        Operation::DuplicateTable(0, 0),
+    )
+}
+
+/// Duplicating the first table of each corpus fixture.
+#[test]
+fn numbers_table_duplicate_corpus_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    corpus(
+        "numbers_table_duplicate_corpus_parity",
+        Tier::B,
+        Operation::DuplicateTable(0, 0),
+    )
+}
+
+/// `TSCE.CellRecordTileArchive` without its internal owner identifiers.
+fn cell_tile_without_identities(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut tile = litchi_iwa_protos::tsce::CellRecordTileArchive::decode(data)?;
+    tile.internal_owner_id = 0;
+    for record in &mut tile.cell_records {
+        if let Some(edges) = record.expanded_edges.as_mut() {
+            edges.internal_owner_id_for_edge.clear();
+        }
+    }
+    Ok(decoded(tile, data))
+}
+
+/// `TSCE.FormulaOwnerDependenciesArchive` without its internal owner
+/// identifiers (its own and its edges').
+fn owner_without_internal_identities(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut owner = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(data)?;
+    owner.internal_formula_owner_id = 0;
+    if let Some(dependencies) = owner.cell_dependencies.as_mut() {
+        for record in &mut dependencies.cell_record {
+            if let Some(edges) = record.expanded_edges.as_mut() {
+                edges.internal_owner_id_for_edge.clear();
+            }
+        }
+    }
+    Ok(decoded(owner, data))
+}
+
+/// `TSCE.CalculationEngineArchive` without its owner map's internal
+/// identifiers.
+fn engine_without_internal_identities(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut engine = litchi_iwa_protos::tsce::CalculationEngineArchive::decode(data)?;
+    if let Some(map) = engine.dependency_tracker.owner_id_map.as_mut() {
+        for entry in &mut map.map_entry {
+            entry.internal_owner_id = 0;
+        }
+    }
+    Ok(decoded(engine, data))
+}
+
+/// One route on a fixture whose owner map holds internal identifiers above
+/// every owner object: the host allocates colliding internal identifiers
+/// for the cloned owners, the leaf allocates above the map (policy 0368a),
+/// so the internal identifiers are compared by form.
+fn run_owner_collision(
+    name: &'static str,
+    tier: Tier,
+    input: &Fixture,
+    operation: Operation,
+) -> TestResult {
+    Case::new(name, Format::Numbers, tier, Evidence::Queued, input)
+        .leaf_structural_metadata()
+        .known_fields(|known| {
+            known
+                .with(
+                    4_008,
+                    "TSCE.FormulaOwnerDependenciesArchive (internal owner identifiers by form)",
+                    owner_without_internal_identities,
+                )
+                .with(
+                    4_000,
+                    "TSCE.CalculationEngineArchive (owner-map internal identifiers by form)",
+                    engine_without_internal_identities,
+                )
+                .with(
+                    4_009,
+                    "TSCE.CellRecordTileArchive (internal owner identifiers by form)",
+                    cell_tile_without_identities,
+                )
+        })
+        .host(|source| host_route(source, operation))
+        .leaf(|source| leaf_route(source, operation))
+        .read("leaf shape", leaf_shape)
+        .run()?;
+    Ok(())
 }

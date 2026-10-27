@@ -48,6 +48,7 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
+pub mod body;
 pub mod bookmark;
 pub mod builder;
 pub mod chart;
