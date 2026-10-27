@@ -344,7 +344,11 @@ impl<'a> ResolvedReader<'a> {
         let mut declarations = 0usize;
         let mut declaration_bytes = 0usize;
         let mut attributes = element.attributes();
-        attributes.with_checks(self.check_attribute_errors);
+        // With document validation on, its expanded-name check refuses every
+        // duplicate attribute (two equal qualified names have one expanded
+        // name), so the qualified-name check is not repeated here
+        // (record 0377a).
+        attributes.with_checks(self.check_attribute_errors && !self.document.enabled);
         for attribute in attributes {
             let attribute = match attribute {
                 Ok(attribute) => attribute,
@@ -667,34 +671,56 @@ fn validate_start_event(
         reject_unknown_namespace(namespace, offset)?;
     }
 
-    let mut expanded_names = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    // Expanded names seen on this element, compared linearly: elements have
+    // few attributes, and the borrowed keys avoid the per-attribute
+    // allocations and hashing of a set (record 0377a). The duplicate rule is
+    // unchanged.
+    let mut expanded_names: Vec<(ExpandedNamespace<'_>, &[u8])> = Vec::new();
+    let mut expanded_set: Option<HashSet<(ExpandedNamespace<'_>, &[u8])>> = None;
+    // quick-xml's duplicate check compares qualified names; the
+    // expanded-name check below refuses every such duplicate as well, so
+    // the attributes are read without it (record 0377a).
+    for attribute in element.attributes().with_checks(false) {
         let attribute = attribute
             .map_err(|error| invalid_xml(offset, format!("malformed XML attribute: {error}")))?;
         validate_qname(attribute.key.as_ref(), offset, "attribute")?;
         let value = attribute.value.as_ref();
-        str::from_utf8(value)
-            .map_err(|error| invalid_xml(offset, format!("XML attribute is not UTF-8: {error}")))?;
-        if value.contains(&b'<') {
-            return Err(invalid_xml(
-                offset,
-                "XML attribute values cannot contain an unescaped '<'",
-            ));
+        // One vectorizable pass classifies the value (record 0377a); the
+        // checks below then run only where it found something, in the same
+        // order and with the same errors as the four scans they replace.
+        let mut non_ascii = false;
+        let mut special = false;
+        for &byte in value {
+            non_ascii |= byte >= 0x80;
+            special |= (byte < 0x20) | (byte == b'<') | (byte == b'&');
         }
-        if value
-            .iter()
-            .any(|byte| !matches!(*byte, 0x09 | 0x0A | 0x0D | 0x20..=0x7F) && *byte < 0x80)
-        {
-            return Err(invalid_xml(
-                offset,
-                "XML attribute contains a forbidden control",
-            ));
+        if non_ascii {
+            str::from_utf8(value).map_err(|error| {
+                invalid_xml(offset, format!("XML attribute is not UTF-8: {error}"))
+            })?;
         }
-        validate_references(value, offset)?;
+        if special || non_ascii {
+            if value.contains(&b'<') {
+                return Err(invalid_xml(
+                    offset,
+                    "XML attribute values cannot contain an unescaped '<'",
+                ));
+            }
+            if value
+                .iter()
+                .any(|byte| !matches!(*byte, 0x09 | 0x0A | 0x0D | 0x20..=0x7F) && *byte < 0x80)
+            {
+                return Err(invalid_xml(
+                    offset,
+                    "XML attribute contains a forbidden control",
+                ));
+            }
+            validate_references(value, offset)?;
+        }
         let (resolved, local) = resolver.resolve_attribute(attribute.key);
         let namespace = match resolved {
-            ResolveResult::Bound(Namespace(uri)) => uri.to_vec(),
-            ResolveResult::Unbound => Vec::new(),
+            ResolveResult::Bound(Namespace(uri)) => ExpandedNamespace::Bound(uri),
+            ResolveResult::Unbound => ExpandedNamespace::Unbound,
             ResolveResult::Unknown(prefix) if allow_unknown_namespaces => {
                 // Keep unknown inherited prefixes in a separate key space so
                 // duplicate checking remains meaningful without pretending
@@ -708,19 +734,54 @@ fn validate_start_event(
                 })?;
                 namespace.push(0);
                 namespace.extend_from_slice(prefix.as_ref());
-                namespace
+                ExpandedNamespace::Unknown(namespace)
             },
             ResolveResult::Unknown(_) => {
                 reject_unknown_namespace(&resolved, offset)?;
                 unreachable!("unknown namespace was rejected")
             },
         };
-        let key = (namespace, local.as_ref().to_vec());
-        if !expanded_names.insert(key) {
+        let local = local.into_inner();
+        let duplicate = match &mut expanded_set {
+            Some(set) => !set.insert((namespace, local)),
+            None => {
+                let duplicate = expanded_names
+                    .iter()
+                    .any(|(seen, seen_local)| *seen_local == local && *seen == namespace);
+                if !duplicate {
+                    expanded_names.try_reserve(1).map_err(|source| {
+                        Error::from(litchi_core::Error::Allocation {
+                            resource: "ODF expanded attribute names",
+                            source,
+                        })
+                    })?;
+                    expanded_names.push((namespace, local));
+                    // Many attributes: keep the comparison count linear.
+                    if expanded_names.len() > LINEAR_EXPANDED_NAMES {
+                        expanded_set = Some(expanded_names.drain(..).collect());
+                    }
+                }
+                duplicate
+            },
+        };
+        if duplicate {
             return Err(invalid_xml(offset, "duplicate XML attribute expanded name"));
         }
     }
     Ok(())
+}
+
+/// Attributes compared pairwise before the duplicate check switches to a set.
+const LINEAR_EXPANDED_NAMES: usize = 16;
+
+/// The namespace part of an attribute's expanded name, as the duplicate
+/// check compares it: a bound URI, no namespace, or (when unknown prefixes
+/// are admitted) the opaque prefix in its own key space.
+#[derive(PartialEq, Eq, Hash)]
+enum ExpandedNamespace<'r> {
+    Bound(&'r [u8]),
+    Unbound,
+    Unknown(Vec<u8>),
 }
 
 fn validate_declaration(
