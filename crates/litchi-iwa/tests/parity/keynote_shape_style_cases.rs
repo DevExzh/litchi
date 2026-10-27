@@ -807,3 +807,156 @@ fn keynote_slide_line_add_with_style_parity() -> TestResult {
         },
     )
 }
+
+fn host_preset(preset: Option<litchi_iwa_common::shape::path::Preset>) -> String {
+    use litchi_iwa_common::shape::path::Preset as Host;
+    match preset {
+        None => "none".to_owned(),
+        Some(Host::Rectangle) => "rectangle".to_owned(),
+        Some(Host::RoundedRectangle { corner_radius }) => {
+            format!("rounded {}", corner_radius.points())
+        },
+        Some(Host::Ellipse) => "ellipse".to_owned(),
+        Some(Host::LeftArrow) => "left arrow".to_owned(),
+        Some(Host::RightArrow) => "right arrow".to_owned(),
+        Some(Host::DoubleArrow) => "double arrow".to_owned(),
+        Some(Host::RegularPolygon { sides }) => format!("polygon {}", sides.count()),
+        Some(Host::Star {
+            points,
+            inner_radius,
+        }) => format!("star {} {}", points.count(), inner_radius.ratio()),
+    }
+}
+
+fn leaf_preset(preset: Option<Preset>) -> String {
+    match preset {
+        None => "none".to_owned(),
+        Some(Preset::Rectangle) => "rectangle".to_owned(),
+        Some(Preset::RoundedRectangle { radius }) => format!("rounded {radius}"),
+        Some(Preset::Ellipse) => "ellipse".to_owned(),
+        Some(Preset::LeftArrow) => "left arrow".to_owned(),
+        Some(Preset::RightArrow) => "right arrow".to_owned(),
+        Some(Preset::DoubleArrow) => "double arrow".to_owned(),
+        Some(Preset::RegularPolygon { sides }) => format!("polygon {}", sides.count()),
+        Some(Preset::Star {
+            points,
+            inner_radius,
+        }) => format!("star {} {}", points.count(), inner_radius.ratio()),
+        Some(_) => "other".to_owned(),
+    }
+}
+
+/// Host `slide_shapes` / `slide_shape_preset` and the leaf shape and line
+/// list with `slide_shape_preset` agree on every slide (as multisets of
+/// preset and text).
+fn shapes_agree(bytes: &[u8]) -> TestResult<usize> {
+    use litchi_keynote::slide::drawable::Kind;
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let package = Package::from_bytes(bytes)?;
+    let mut total = 0;
+    for slide in 0..editor.slides()?.len() {
+        let mut host = Vec::new();
+        for shape in editor.slide_shapes(slide)? {
+            assert_eq!(
+                editor.slide_shape_preset(slide, shape.drawable_object_id)?,
+                shape.preset
+            );
+            host.push(format!(
+                "{} {:?}",
+                host_preset(shape.preset),
+                shape.storage.storage.text()
+            ));
+        }
+        let mut leaf = Vec::new();
+        let list = package.slide_drawable_list(SlideSelector::index(slide))?;
+        for (position, drawable) in list.iter().enumerate() {
+            if !matches!(drawable.kind(), Kind::Shape | Kind::Line) {
+                continue;
+            }
+            let preset = package.slide_shape_preset(
+                SlideSelector::index(slide),
+                DrawableSelector::index(position),
+            )?;
+            leaf.push(format!(
+                "{} {:?}",
+                leaf_preset(preset),
+                drawable.text().unwrap_or_default()
+            ));
+        }
+        host.sort();
+        leaf.sort();
+        assert_eq!(host, leaf, "slide {slide}");
+        total += leaf.len();
+    }
+    Ok(total)
+}
+
+#[test]
+fn keynote_slide_shape_preset_read_parity() -> TestResult {
+    use litchi_iwa_common::shape::path::{
+        InnerRadiusRatio, PolygonSides, Preset as Host, StarPoints,
+    };
+    let _ = (Tier::A, Evidence::Queued);
+    let mut editor = keynote::Draft::from_bytes(&fixture(DECK)?.bytes)?;
+    for (index, preset) in [
+        Host::Rectangle,
+        Host::ROUNDED_RECTANGLE,
+        Host::Ellipse,
+        Host::LeftArrow,
+        Host::RightArrow,
+        Host::DoubleArrow,
+        Host::RegularPolygon {
+            sides: PolygonSides::new(6)?,
+        },
+        Host::Star {
+            points: StarPoints::new(7)?,
+            inner_radius: InnerRadiusRatio::new(0.4)?,
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        editor.add_slide_shape(SLIDE, &format!("Shape {index}"), POSITION, SIZE, preset)?;
+    }
+    editor.add_slide_line(SLIDE, LINE_START, LINE_END)?;
+    let input = Fixture {
+        path: DECK,
+        bytes: editor.to_bytes()?,
+    };
+    for input in [input, fixture(SHADOW_DECK)?] {
+        Case::new(
+            "keynote_slide_shape_preset_read_parity",
+            Format::Keynote,
+            Tier::A,
+            Evidence::Queued,
+            &input,
+        )
+        .read_only()
+        .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read("host and leaf shapes agree", shapes_agree)
+        .run()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn keynote_slide_shapes_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    for path in ["iwork/keynote/basic.key", DECK, SHADOW_DECK] {
+        let input = fixture(path)?;
+        Case::new(
+            "keynote_slide_shapes_read_parity",
+            Format::Keynote,
+            Tier::A,
+            Evidence::Queued,
+            &input,
+        )
+        .read_only()
+        .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read("host and leaf shapes agree", shapes_agree)
+        .run()?;
+    }
+    Ok(())
+}

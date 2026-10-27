@@ -517,12 +517,12 @@ keynote/editor/slide_shapes.rs	slide_line_segment	1	keynote	drawable.shape	migra
 keynote/editor/slide_shapes.rs	slide_shape_effects	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_fill	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_geometry	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_drawable_read_parity	A	-	-
-keynote/editor/slide_shapes.rs	slide_shape_preset	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	slide_shape_preset	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_shape_preset	keynote_slide_shape_preset_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_properties	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_properties	keynote_slide_drawable_properties_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_shadow	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_stroke	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_text_layout	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
-keynote/editor/slide_shapes.rs	slide_shapes	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes.rs	slide_shapes	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_shapes_read_parity	A	-	-
 keynote/editor/slide_shapes/caption.rs	remove_slide_shape_caption	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes/caption.rs	remove_slide_shape_title	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_shapes/caption.rs	set_slide_shape_caption	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
