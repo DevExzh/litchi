@@ -67,6 +67,10 @@ const ROUTES: &[(&str, &str)] = &[
     ("shape_fill", TEXT_BOX),
     ("shape_caption", TEXT_BOX),
     ("text_box_columns", TEXT_BOX),
+    (
+        "table_cell_fill",
+        "iwork/keynote/slide-table-read-native.key",
+    ),
 ];
 
 fn red() -> TestResult<litchi_iwa_common::color::Rgba> {
@@ -185,6 +189,16 @@ fn w1c_host_route(route: &str, source: &[u8], png: &[u8], id: u64) -> TestResult
         "text_box_columns" => {
             editor.set_slide_text_box_columns(0, id, &two_columns()?)?;
         },
+        "table_cell_fill" => {
+            let model = editor.slide_tables(0)?[0].model_object_id;
+            editor.set_slide_table_cell_fill(
+                0,
+                model,
+                1,
+                1,
+                &litchi_iwa::shapes::ShapeFill::Solid(red()?),
+            )?;
+        },
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(editor.to_bytes()?)
@@ -223,6 +237,14 @@ fn w1c_leaf_route(route: &str, source: &[u8], png: &[u8], position: usize) -> Te
         "image_duplicate" => {
             let mut edit = package.edit_slide_image_lifecycle();
             edit.duplicate(slide, ImageSelector::index(0))?;
+            edit.commit()?.into_package()
+        },
+        "table_cell_fill" => {
+            let mut edit = package.edit_slide_table_cell_appearance(
+                slide,
+                litchi_keynote::slide::table::TableSelector::index(0),
+            )?;
+            edit.set_fill(1, 1, litchi_iwa_common::shape::fill::Fill::Solid(red()?))?;
             edit.commit()?.into_package()
         },
         "shape_caption" => package
@@ -349,6 +371,15 @@ fn keynote_w1c_route_cost_abba() -> TestResult {
         } else {
             Kind::TextBox
         };
+        if route.starts_with("table_") {
+            let a1 = black_box(w1c_host_route(route, &input, &png, 0)?);
+            let b1 = black_box(w1c_leaf_route(route, &input, &png, 0)?);
+            let b2 = black_box(w1c_leaf_route(route, &input, &png, 0)?);
+            let a2 = black_box(w1c_host_route(route, &input, &png, 0)?);
+            assert_eq!(b1, b2, "{route}: the leaf route is deterministic");
+            assert!(!a1.is_empty() && !a2.is_empty());
+            continue;
+        }
         let position = if kind == Kind::Shape {
             Package::from_bytes(&input)?
                 .slide_drawable_list(SlideSelector::index(0))?
