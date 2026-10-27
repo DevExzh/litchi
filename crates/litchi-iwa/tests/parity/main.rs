@@ -58,6 +58,7 @@ mod numbers_text_box_cases;
 mod numbers_w2a_cost;
 mod pages_caption_cases;
 mod pages_cases;
+mod pages_cell_appearance_cases;
 mod pages_cell_format_cases;
 mod pages_cost_probes;
 mod pages_drawable_cases;

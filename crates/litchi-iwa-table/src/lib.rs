@@ -25,6 +25,10 @@ use litchi_iwa_core::RawMessage;
 /// (moved from `litchi-numbers`, record 0379).
 pub mod cell_format;
 
+/// Cell fill and text layout through the copy-on-write cell-style graph
+/// (record 0371).
+pub mod cell_appearance;
+
 pub mod hidden_axes;
 
 pub mod structure;
