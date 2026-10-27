@@ -1210,11 +1210,17 @@ pub fn symbols(
 
 /// The per-series properties of the chart Format panel.
 pub mod property {
-    use litchi_iwa_common::chart::pie::{LabelDistance, WedgeExplosion};
+    use litchi_iwa_common::chart::error_bar::{
+        CustomValue, CustomValues, Direction as ErrorBarDirection, FixedValue, Percentage,
+        Series as ErrorBarSeries, StandardDeviationCount,
+    };
+    use litchi_iwa_common::chart::kind::Kind;
+    use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
     use litchi_iwa_common::chart::series::{
         ConnectionLine, ConnectionLineFamily, SymbolFamily, SymbolShape, SymbolSize, Trendline,
         TrendlineType,
     };
+    use litchi_iwa_common::chart::series_labels::Visibility;
     use litchi_iwa_common::wire;
     use litchi_iwa_protos::chart_style_codec::{
         self as codec, Archive, Limits as CodecLimits, field, property as rules,
@@ -1668,6 +1674,382 @@ pub mod property {
             )?;
             if self.read(&patched)? != *value {
                 return Err(Error::Invalid("a trendline write does not read back"));
+            }
+            Ok(patched)
+        }
+    }
+
+    const ERROR_CUSTOM_NEGATIVE: u32 = 2;
+    const ERROR_CUSTOM_POSITIVE: u32 = 4;
+    const ERROR_FIXED_VALUE: u32 = 6;
+    const ERROR_PERCENTAGE: u32 = 8;
+    const ERROR_DIRECTION: u32 = 10;
+    const ERROR_STANDARD_DEVIATION: u32 = 12;
+    const ERROR_VALUE_TYPE: u32 = 14;
+    const SHOW_ERROR_BARS: u32 = 27;
+    const CUSTOM_ARRAY_VALUE: u32 = 1;
+    const NATIVE_DIRECTION_BOTH: i32 = 1;
+    const NATIVE_FIXED_VALUE: i32 = 1;
+    const NATIVE_PERCENTAGE: i32 = 2;
+    const NATIVE_STANDARD_DEVIATION: i32 = 3;
+    const NATIVE_STANDARD_ERROR: i32 = 4;
+    const NATIVE_CUSTOM_VALUES: i32 = 5;
+
+    fn strict_f32(extension: &[u8], number: u32) -> Result<Option<f32>> {
+        let mut found = None;
+        for candidate in crate::graph::fields(extension)? {
+            if candidate.number() != number {
+                continue;
+            }
+            if found.is_some() {
+                return Err(Error::Invalid("a singular override field is repeated"));
+            }
+            if candidate.wire_type() != 5 {
+                return Err(Error::Invalid("an override float has the wrong wire type"));
+            }
+            let bytes: [u8; 4] = extension[candidate.payload_start()..candidate.end()]
+                .try_into()
+                .map_err(|_| Error::Invalid("a truncated override float"))?;
+            let value = f32::from_le_bytes(bytes);
+            if !value.is_finite() {
+                return Err(Error::Invalid("an override float is not finite"));
+            }
+            found = Some(value);
+        }
+        Ok(found)
+    }
+
+    fn patch_fixed32(data: &[u8], number: u32, value: Option<u32>) -> Result<Vec<u8>> {
+        let present = strict_f32(data, number)?.is_some();
+        Ok(wire::patch_fixed32_field(data, number, present, value)?)
+    }
+
+    fn whole(value: f32, maximum: f32) -> Result<f32> {
+        if !value.is_finite() || value.fract() != 0.0 || value < 0.0 || value > maximum {
+            return Err(Error::Invalid(
+                "an error-bar count is not an unsigned integer",
+            ));
+        }
+        Ok(value)
+    }
+
+    fn custom_values(extension: &[u8], number: u32) -> Result<Vec<CustomValue>> {
+        let Some(nested) = strict_bytes(extension, number)? else {
+            return Ok(Vec::new());
+        };
+        wire::repeated_fixed64_values(nested, CUSTOM_ARRAY_VALUE)?
+            .into_iter()
+            .map(|bits| {
+                CustomValue::new(f64::from_bits(bits))
+                    .map_err(|_| Error::Invalid("an invalid custom error value"))
+            })
+            .collect()
+    }
+
+    fn patch_custom_values(
+        extension: &[u8],
+        number: u32,
+        values: &[CustomValue],
+    ) -> Result<Vec<u8>> {
+        let existing = strict_bytes(extension, number)?;
+        let nested = wire::rewrite_repeated_fixed64_fields(
+            existing.unwrap_or_default(),
+            CUSTOM_ARRAY_VALUE,
+            &values
+                .iter()
+                .map(|value| value.value().to_bits())
+                .collect::<Vec<_>>(),
+        )?;
+        Ok(wire::patch_length_delimited_field(
+            extension,
+            number,
+            existing.is_some(),
+            (!nested.is_empty()).then_some(nested.as_slice()),
+        )?)
+    }
+
+    /// The error bars of each series.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct ErrorBars;
+
+    impl Property for ErrorBars {
+        type Value = ErrorBarSeries;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> ErrorBarSeries {
+            ErrorBarSeries::None
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<ErrorBarSeries> {
+            let invalid = |_| Error::Invalid("an unsupported stored error bar");
+            let Some(extension) = extension(payload)? else {
+                return Ok(ErrorBarSeries::None);
+            };
+            let visible = strict_bool(extension, SHOW_ERROR_BARS)?.unwrap_or(false);
+            let direction =
+                strict_enum(extension, ERROR_DIRECTION)?.unwrap_or(NATIVE_DIRECTION_BOTH);
+            let native = strict_enum(extension, ERROR_VALUE_TYPE)?.unwrap_or(NATIVE_FIXED_VALUE);
+            let fixed = strict_f32(extension, ERROR_FIXED_VALUE)?;
+            let percentage = strict_f32(extension, ERROR_PERCENTAGE)?;
+            let deviations = strict_f32(extension, ERROR_STANDARD_DEVIATION)?;
+            let negative = custom_values(extension, ERROR_CUSTOM_NEGATIVE)?;
+            let positive = custom_values(extension, ERROR_CUSTOM_POSITIVE)?;
+            if !visible {
+                return Ok(ErrorBarSeries::None);
+            }
+            let direction = ErrorBarDirection::from_native(direction);
+            let value = match native {
+                NATIVE_FIXED_VALUE => ErrorBarSeries::FixedValue {
+                    direction,
+                    value: FixedValue::new(fixed.unwrap_or(FixedValue::DEFAULT.value()))
+                        .map_err(invalid)?,
+                },
+                NATIVE_PERCENTAGE => ErrorBarSeries::Percentage {
+                    direction,
+                    percentage: Percentage::new(whole(
+                        percentage.unwrap_or(f32::from(Percentage::DEFAULT.value())),
+                        f32::from(u8::MAX),
+                    )? as u8)
+                    .map_err(invalid)?,
+                },
+                NATIVE_STANDARD_DEVIATION => ErrorBarSeries::StandardDeviation {
+                    direction,
+                    deviations: StandardDeviationCount::new(whole(
+                        deviations.unwrap_or(StandardDeviationCount::DEFAULT.value() as f32),
+                        u32::MAX as f32,
+                    )? as u32)
+                    .map_err(invalid)?,
+                },
+                NATIVE_STANDARD_ERROR => ErrorBarSeries::StandardError { direction },
+                NATIVE_CUSTOM_VALUES => ErrorBarSeries::CustomValues {
+                    direction,
+                    values: CustomValues::from_validated(positive, negative).map_err(invalid)?,
+                },
+                native => ErrorBarSeries::unsupported(direction, native).map_err(invalid)?,
+            };
+            value.validate().map_err(invalid)?;
+            Ok(value)
+        }
+
+        fn patch(&self, payload: &[u8], value: &ErrorBarSeries) -> Result<Vec<u8>> {
+            value
+                .validate()
+                .map_err(|_| Error::Invalid("an invalid error bar"))?;
+            let existing = extension(payload)?;
+            if existing.is_none() && *value == ErrorBarSeries::None {
+                return Ok(payload.to_vec());
+            }
+            let mut extension = existing.unwrap_or_default().to_vec();
+            let direction = value.direction();
+            extension = patch_varint(
+                &extension,
+                SHOW_ERROR_BARS,
+                direction.is_some().then_some(1),
+            )?;
+            if let Some(direction) = direction {
+                extension = patch_varint(
+                    &extension,
+                    ERROR_DIRECTION,
+                    Some(i64::from(direction.native_value()) as u64),
+                )?;
+                extension = patch_varint(
+                    &extension,
+                    ERROR_VALUE_TYPE,
+                    value.native_type().map(|native| i64::from(native) as u64),
+                )?;
+                match value {
+                    ErrorBarSeries::FixedValue { value, .. } => {
+                        extension = patch_fixed32(
+                            &extension,
+                            ERROR_FIXED_VALUE,
+                            Some(value.value().to_bits()),
+                        )?;
+                    },
+                    ErrorBarSeries::Percentage { percentage, .. } => {
+                        extension = patch_fixed32(
+                            &extension,
+                            ERROR_PERCENTAGE,
+                            Some(f32::from(percentage.value()).to_bits()),
+                        )?;
+                    },
+                    ErrorBarSeries::StandardDeviation { deviations, .. } => {
+                        extension = patch_fixed32(
+                            &extension,
+                            ERROR_STANDARD_DEVIATION,
+                            Some((deviations.value() as f32).to_bits()),
+                        )?;
+                    },
+                    ErrorBarSeries::CustomValues { values, .. } => {
+                        extension = patch_custom_values(
+                            &extension,
+                            ERROR_CUSTOM_NEGATIVE,
+                            values.negative(),
+                        )?;
+                        extension = patch_custom_values(
+                            &extension,
+                            ERROR_CUSTOM_POSITIVE,
+                            values.positive(),
+                        )?;
+                    },
+                    _ => {},
+                }
+            }
+            let patched = wire::patch_length_delimited_field(
+                payload,
+                codec::EXTENSION_FIELD,
+                existing.is_some(),
+                (!extension.is_empty()).then_some(extension.as_slice()),
+            )?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid("an error-bar write does not read back"));
+            }
+            Ok(patched)
+        }
+    }
+
+    const PIE_SHOW_NAMES: u32 = 31;
+    const PIE_SHOW_VALUES: u32 = 44;
+
+    /// Data-point-name and value label visibility of each pie or donut
+    /// wedge.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct PieLabels;
+
+    impl Property for PieLabels {
+        type Value = LabelVisibility;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> LabelVisibility {
+            LabelVisibility::DEFAULT
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<LabelVisibility> {
+            let Some(extension) = extension(payload)? else {
+                return Ok(LabelVisibility::DEFAULT);
+            };
+            Ok(LabelVisibility::new(
+                strict_bool(extension, PIE_SHOW_NAMES)?.unwrap_or(false),
+                strict_bool(extension, PIE_SHOW_VALUES)?.unwrap_or(true),
+            ))
+        }
+
+        fn patch(&self, payload: &[u8], value: &LabelVisibility) -> Result<Vec<u8>> {
+            let existing = extension(payload)?;
+            if existing.is_none() && *value == LabelVisibility::DEFAULT {
+                return Ok(payload.to_vec());
+            }
+            let source = existing.unwrap_or_default();
+            let names_present = strict_bool(source, PIE_SHOW_NAMES)?.is_some();
+            let values_present = strict_bool(source, PIE_SHOW_VALUES)?.is_some();
+            let extension = wire::patch_varint_field(
+                source,
+                PIE_SHOW_NAMES,
+                names_present,
+                value.data_point_names_visible().then_some(1),
+            )?;
+            let extension = wire::patch_varint_field(
+                &extension,
+                PIE_SHOW_VALUES,
+                values_present,
+                (!value.values_visible()).then_some(0),
+            )?;
+            let patched = wire::patch_length_delimited_field(
+                payload,
+                codec::EXTENSION_FIELD,
+                existing.is_some(),
+                (!extension.is_empty()).then_some(extension.as_slice()),
+            )?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid("a pie-label write does not read back"));
+            }
+            Ok(patched)
+        }
+    }
+
+    /// Value-label visibility of each series, in the chart family's field.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct ValueLabels {
+        field: u32,
+        default: Visibility,
+    }
+
+    impl ValueLabels {
+        /// The value-label storage of a chart kind, if it has value labels.
+        #[must_use]
+        pub fn for_chart_kind(kind: Kind) -> Option<Self> {
+            let (field, default) = match kind {
+                Kind::Area2d | Kind::Area3d | Kind::StackedArea2d | Kind::StackedArea3d => {
+                    (38, Visibility::Hidden)
+                },
+                Kind::Column2d
+                | Kind::Column3d
+                | Kind::Bar2d
+                | Kind::Bar3d
+                | Kind::StackedColumn2d
+                | Kind::StackedColumn3d
+                | Kind::StackedBar2d
+                | Kind::StackedBar3d
+                | Kind::MultiDataColumn2d
+                | Kind::MultiDataBar2d => (39, Visibility::Hidden),
+                Kind::Bubble2d | Kind::MultiDataBubble2d => (40, Visibility::Hidden),
+                Kind::Line2d | Kind::Line3d => (42, Visibility::Hidden),
+                Kind::Mixed2d | Kind::TwoAxis2d => (43, Visibility::Hidden),
+                Kind::Pie2d | Kind::Pie3d | Kind::Donut2d | Kind::Donut3d => {
+                    (PIE_SHOW_VALUES, Visibility::Visible)
+                },
+                Kind::Radar2d => (162, Visibility::Hidden),
+                Kind::Scatter2d | Kind::MultiDataScatter2d => (45, Visibility::Hidden),
+                _ => return None,
+            };
+            Some(Self { field, default })
+        }
+    }
+
+    impl Property for ValueLabels {
+        type Value = Visibility;
+
+        fn base(&self) -> Base {
+            Base::Styled
+        }
+
+        fn default_value(&self) -> Visibility {
+            self.default
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<Visibility> {
+            let Some(extension) = extension(payload)? else {
+                return Ok(self.default);
+            };
+            Ok(strict_bool(extension, self.field)?.map_or(self.default, Visibility::from))
+        }
+
+        fn patch(&self, payload: &[u8], value: &Visibility) -> Result<Vec<u8>> {
+            let existing = extension(payload)?;
+            if existing.is_none() && *value == self.default {
+                return Ok(payload.to_vec());
+            }
+            let source = existing.unwrap_or_default();
+            let present = strict_bool(source, self.field)?.is_some();
+            let extension = wire::patch_varint_field(
+                source,
+                self.field,
+                present,
+                (*value != self.default).then_some(u64::from(value.is_visible())),
+            )?;
+            let patched = wire::patch_length_delimited_field(
+                payload,
+                codec::EXTENSION_FIELD,
+                existing.is_some(),
+                (!extension.is_empty()).then_some(extension.as_slice()),
+            )?;
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid("a value-label write does not read back"));
             }
             Ok(patched)
         }

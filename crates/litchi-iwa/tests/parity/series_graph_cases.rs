@@ -18,6 +18,9 @@ use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_archive::Limits as ArchiveLimits;
 use litchi_iwa_archive::iwa::{Limits as CoreLimits, SnappyLimits, SnappyStream};
 use litchi_iwa_archive::unstable::{EntryEdit, EntryInsertion};
+use litchi_iwa_common::chart::error_bar::{
+    CustomValues, Direction as ErrorBarDirection, FixedValue, Percentage, Series as ErrorBarSeries,
+};
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::pie::{LabelDistance, WedgeExplosion};
 use litchi_iwa_common::chart::series::{
@@ -27,7 +30,7 @@ use litchi_iwa_common::chart::series::{
 use litchi_iwa_style::graph::{Changes, Workspace};
 use litchi_iwa_style::series::{
     self,
-    property::{ConnectionLines, LabelDistances, Trendlines, WedgeExplosions},
+    property::{ConnectionLines, ErrorBars, LabelDistances, Trendlines, WedgeExplosions},
 };
 
 use crate::chart_style_cases::{Components, Target, input};
@@ -44,6 +47,7 @@ enum Values {
     /// Data symbols: `None` hides; `(shape, size in points)`.
     Symbols(Kind, Vec<Option<(SymbolShape, Option<f32>)>>),
     Trendlines(Vec<Trend>),
+    ErrorBars(Vec<ErrorBarSeries>),
 }
 
 /// A trendline configuration, spelled once for both vocabularies.
@@ -107,6 +111,7 @@ impl Values {
             Self::Lines(kind, _) | Self::Symbols(kind, _) => *kind,
             Self::Wedges(_) | Self::Labels(_) => Kind::Pie2d,
             Self::Trendlines(_) => Kind::Scatter2d,
+            Self::ErrorBars(_) => Kind::Column2d,
         }
     }
 }
@@ -154,7 +159,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
         values.iter().map(|trend| trend.host()).collect()
     };
     macro_rules! write {
-        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident) => {{
+        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident, $errors:ident) => {{
             let mut editor = $editor;
             match values {
                 Values::Lines(_, values) => editor.$lines($($scope,)? chart, &lines(values))?,
@@ -162,6 +167,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
                 Values::Labels(values) => editor.$labels($($scope,)? chart, &labels(values)?)?,
                 Values::Symbols(_, values) => editor.$symbols($($scope,)? chart, &symbols(values)?)?,
                 Values::Trendlines(values) => editor.$trends($($scope,)? chart, &trends(values)?)?,
+                Values::ErrorBars(values) => editor.$errors($($scope,)? chart, values)?,
             }
             editor.to_bytes()?
         }};
@@ -171,19 +177,19 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
             keynote::Draft::from_bytes(source)?, slide, ;
             set_slide_chart_series_connection_lines, set_slide_chart_pie_wedge_explosions,
             set_slide_chart_pie_label_distances, set_slide_chart_series_symbols,
-            set_slide_chart_series_trendlines
+            set_slide_chart_series_trendlines, set_slide_chart_series_error_bars
         ),
         Target::Numbers { sheet } => write!(
             numbers::Draft::from_bytes(source)?, sheet, ;
             set_sheet_chart_series_connection_lines, set_sheet_chart_pie_wedge_explosions,
             set_sheet_chart_pie_label_distances, set_sheet_chart_series_symbols,
-            set_sheet_chart_series_trendlines
+            set_sheet_chart_series_trendlines, set_sheet_chart_series_error_bars
         ),
         Target::Pages => write!(
             pages::Draft::from_bytes(source)?, ;
             set_body_chart_series_connection_lines, set_body_chart_pie_wedge_explosions,
             set_body_chart_pie_label_distances, set_body_chart_series_symbols,
-            set_body_chart_series_trendlines
+            set_body_chart_series_trendlines, set_body_chart_series_error_bars
         ),
     })
 }
@@ -191,7 +197,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, values: &Values) -> Tes
 /// The host's read of the same property, as comparable text.
 fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestResult<String> {
     macro_rules! read {
-        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident) => {{
+        ($editor:expr, $($scope:expr,)? ; $lines:ident, $wedges:ident, $labels:ident, $symbols:ident, $trends:ident, $errors:ident) => {{
             let editor = $editor;
             match values {
                 Values::Lines(..) => format!("{:?}", editor.$lines($($scope,)? chart)?),
@@ -199,6 +205,7 @@ fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestR
                 Values::Labels(_) => format!("{:?}", editor.$labels($($scope,)? chart)?),
                 Values::Symbols(..) => format!("{:?}", editor.$symbols($($scope,)? chart)?),
                 Values::Trendlines(_) => format!("{:?}", editor.$trends($($scope,)? chart)?),
+                Values::ErrorBars(_) => format!("{:?}", editor.$errors($($scope,)? chart)?),
             }
         }};
     }
@@ -207,19 +214,19 @@ fn host_read(bytes: &[u8], target: Target, chart: u64, values: &Values) -> TestR
             keynote::Draft::from_bytes(bytes)?, slide, ;
             slide_chart_series_connection_lines, slide_chart_pie_wedge_explosions,
             slide_chart_pie_label_distances, slide_chart_series_symbols,
-            slide_chart_series_trendlines
+            slide_chart_series_trendlines, slide_chart_series_error_bars
         ),
         Target::Numbers { sheet } => read!(
             numbers::Draft::from_bytes(bytes)?, sheet, ;
             sheet_chart_series_connection_lines, sheet_chart_pie_wedge_explosions,
             sheet_chart_pie_label_distances, sheet_chart_series_symbols,
-            sheet_chart_series_trendlines
+            sheet_chart_series_trendlines, sheet_chart_series_error_bars
         ),
         Target::Pages => read!(
             pages::Draft::from_bytes(bytes)?, ;
             body_chart_series_connection_lines, body_chart_pie_wedge_explosions,
             body_chart_pie_label_distances, body_chart_series_symbols,
-            body_chart_series_trendlines
+            body_chart_series_trendlines, body_chart_series_error_bars
         ),
     })
 }
@@ -337,6 +344,9 @@ fn engine_write(source: &[u8], chart: u64, values: &Values) -> TestResult<Vec<u8
                 .collect::<TestResult<Vec<_>>>()?;
             series::set_values(&mut workspace, chart, &Trendlines, &trends)?;
         },
+        Values::ErrorBars(values) => {
+            series::set_values(&mut workspace, chart, &ErrorBars, values)?;
+        },
     }
     let changes = workspace.finish();
     publish_changes(source, &components, changes)
@@ -391,6 +401,33 @@ const DIAMONDS: [Option<(SymbolShape, Option<f32>)>; 2] = [
 ];
 const SQUARE_HIDDEN: [Option<(SymbolShape, Option<f32>)>; 2] =
     [Some((SymbolShape::Square, Some(12.0))), None];
+fn errors_a() -> TestResult<Values> {
+    Ok(Values::ErrorBars(vec![
+        ErrorBarSeries::FixedValue {
+            direction: ErrorBarDirection::PositiveAndNegative,
+            value: FixedValue::new(2.5)?,
+        },
+        ErrorBarSeries::None,
+    ]))
+}
+
+fn errors_b() -> TestResult<Values> {
+    Ok(Values::ErrorBars(vec![
+        ErrorBarSeries::Percentage {
+            direction: ErrorBarDirection::PositiveOnly,
+            percentage: Percentage::new(15)?,
+        },
+        ErrorBarSeries::CustomValues {
+            direction: ErrorBarDirection::PositiveAndNegative,
+            values: CustomValues::new([1.0, 2.0, 3.0], [0.5, 0.5, 0.5])?,
+        },
+    ]))
+}
+
+fn errors_none() -> Values {
+    Values::ErrorBars(vec![ErrorBarSeries::None, ErrorBarSeries::None])
+}
+
 const NO_SYMBOLS: [Option<(SymbolShape, Option<f32>)>; 2] = [None, None];
 
 macro_rules! graph_cases {
@@ -435,6 +472,11 @@ graph_cases! {
     pages_chart_series_trendlines_allocate_parity: Pages, B, [], Values::Trendlines(vec![Trend::MovingAverage]);
     keynote_chart_series_trendlines_patch_parity: Keynote, A, [Values::Trendlines(vec![Trend::NamedLinear])], Values::Trendlines(vec![Trend::Polynomial]);
     numbers_chart_series_trendlines_patch_parity: Numbers, A, [Values::Trendlines(vec![Trend::Polynomial])], Values::Trendlines(vec![Trend::MovingAverage]);
+    keynote_chart_series_error_bars_allocate_parity: Keynote, B, [], errors_a()?;
+    numbers_chart_series_error_bars_allocate_parity: Numbers, B, [], errors_b()?;
+    pages_chart_series_error_bars_patch_parity: Pages, B, [errors_a()?], errors_b()?;
+    keynote_chart_series_error_bars_patch_parity: Keynote, A, [errors_b()?], errors_a()?;
+    numbers_chart_series_error_bars_remove_parity: Numbers, A, [errors_b()?], errors_none();
     pages_chart_series_trendlines_remove_parity: Pages, A, [Values::Trendlines(vec![Trend::NamedLinear])], Values::Trendlines(vec![Trend::None]);
 }
 
