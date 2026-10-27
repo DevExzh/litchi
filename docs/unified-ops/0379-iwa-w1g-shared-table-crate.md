@@ -188,4 +188,32 @@ inventory; it stays inside the 5% bar.
 
 ## 6. Verification
 
-(filled at the end)
+Build env of the coordinator rules (`CARGO_BUILD_JOBS=6`,
+`RUST_TEST_THREADS=8`), sequential gate scripts outside the repository
+(`.coord/iwa-w1g/gates{1,2}.sh`). Both pre-commit size checks printed
+nothing for every commit.
+
+| Command | `35908bbc0a` | `73f6fa976a` |
+|---|---|---|
+| `cargo fmt --all --check` | 0 | 0 |
+| `cargo clippy -p litchi-iwa-table -p litchi-numbers -p litchi-pages -p litchi-keynote -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 (without pages, keynote, iwa) | 0 |
+| `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features numbers`, `pages`, `keynote` | 0, 0, —, — | 0, 0, 0, 0 |
+| `cargo test --all-features` for `litchi-iwa-table`, `litchi-numbers`, `litchi-pages`, `litchi-keynote`, `litchi-iwa` (every target, `parity` included) | 0, 0, —, —, — | 0 each |
+| `cargo test -p litchi --all-features` | 0 | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, nine groups of `--test` targets | 0 each | 0 each |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-iwa-table -p litchi-numbers -p litchi-pages -p litchi-keynote` | 0 | 101 (two module links), 0 after `b21879b779` |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (every profile) | 0 | 0 |
+| `python3 tools/check_crate_boundaries.py` | 0 (69 packages, 300 declarations, 11 debts) | 0 (302 declarations) |
+| `python3 tools/non_iwork_gate.py verify` | 0 | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` | 0 | 0 |
+| `python3 tools/iwa_exit_ledger.py --check` | 0 | 0 |
+| `officecli_capability_delta.py --check`, `officecli_corpus.py --check`, `unified_bench_matrix.py --check` | 0, 0, 0 | 0, 0, 1 (matrix stale for this record), 0 after `bd243a541d` |
+| `python3 tools/check_feature_matrix.py` | 0 | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 | 0 |
+| `cargo test -p litchi-cli --all-features --test officecli_corpus` | 0 | 0 |
+| `cargo check --locked --offline --manifest-path crates/<c>/fuzz/Cargo.toml --bins` for `litchi`, `litchi-numbers` (`7ea1e295b1`), `litchi-pages`, `litchi-keynote` | 0 | 0 |
+
+The capability and registry goldens and the OfficeCLI corpus pass unchanged
+inside the litchi-ops chunks; no `litchi-ops` dispatch changed (owner
+decision D7), so they were not re-blessed.
