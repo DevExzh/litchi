@@ -167,6 +167,23 @@ impl Owner {
         }
     }
 
+    /// Whether building this owner's tree can fail: a database tree parses
+    /// its catalog, the other trees project the model the leaf parsed.
+    const fn tree_can_fail(&self) -> bool {
+        match self {
+            #[cfg(feature = "odg")]
+            Self::Odg(_) => false,
+            #[cfg(feature = "odc")]
+            Self::Odc(_) => false,
+            #[cfg(feature = "odi")]
+            Self::Odi(_) => false,
+            #[cfg(feature = "odb")]
+            Self::Odb(_) => true,
+            #[cfg(feature = "odf-formula")]
+            Self::Formula(_) => false,
+        }
+    }
+
     /// Build the object tree of this owner.
     fn tree(&self) -> Result<Tree> {
         let format = self.format();
@@ -272,16 +289,23 @@ impl OdfTree {
     }
 
     /// Adopt a leaf owner (an open, a commit result or a fresh package).
+    /// A tree whose build can fail is built here, so the open refuses a
+    /// database whose catalog it cannot read; the others are built on the
+    /// first read, as after a commit (record 0377a).
     pub(crate) fn from_owner(
         owner: Owner,
         origin: Option<Arc<Path>>,
         odf_options: litchi_odf_common::OpenOptions,
     ) -> Result<Self> {
-        let tree = owner.tree()?;
+        let tree = if owner.tree_can_fail() {
+            std::sync::OnceLock::from(owner.tree()?)
+        } else {
+            std::sync::OnceLock::new()
+        };
         Ok(Self(Arc::new(State {
             owner,
             odf_options,
-            tree: std::sync::OnceLock::from(tree),
+            tree,
             origin,
             flat: None,
         })))
@@ -413,12 +437,12 @@ impl OdfTree {
         &self.0.owner
     }
 
-    /// The object tree built at open.
+    /// The object tree: a database's built at open, any other on first read.
     pub(crate) fn tree(&self) -> &Tree {
         self.0.tree.get_or_init(|| {
-            // Only builders that cannot fail on a committed package are
-            // deferred (`from_commit`); a failure would still leave the
-            // root rather than panic.
+            // Only builders that cannot fail (`from_owner`), or cannot fail
+            // on a committed package (`from_commit`), are deferred; a
+            // failure would still leave the root rather than panic.
             self.0.owner.tree().unwrap_or_else(|_| Tree::root_only())
         })
     }
@@ -966,6 +990,30 @@ mod tests {
         let reopened = crate::open_bytes(file.to_bytes().expect("bytes")).expect("reopen");
         assert_eq!(lazy, format!("{:?}", tree(&reopened).tree()));
         assert!(lazy.contains("SELECT 20"));
+    }
+
+    /// Record 0377a: an opened chart builds its tree on the first read, and
+    /// that tree is the one the leaf owner builds; an opened database builds
+    /// (and so validates) its tree at open.
+    #[cfg(feature = "odc")]
+    #[test]
+    fn opened_trees_that_cannot_fail_are_built_on_first_read() {
+        let chart = crate::create(FileFormat::Odc).expect("create chart");
+        let opened = crate::open_bytes(chart.to_bytes().expect("bytes")).expect("open chart");
+        let File::Odc(handle) = &opened else {
+            panic!("not a chart");
+        };
+        assert!(handle.0.tree.get().is_none(), "open built the chart tree");
+        assert_eq!(
+            format!("{:?}", handle.tree()),
+            format!("{:?}", handle.0.owner.tree().expect("chart tree"))
+        );
+        let database = crate::create(FileFormat::Odb).expect("create database");
+        let opened = crate::open_bytes(database.to_bytes().expect("bytes")).expect("open database");
+        assert!(
+            tree(&opened).0.tree.get().is_some(),
+            "open deferred the catalog"
+        );
     }
 
     #[test]
