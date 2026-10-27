@@ -618,9 +618,21 @@ impl File {
     /// Returns source, output-policy and format capability errors. Publication
     /// is repeatable and does not consume or mutate this handle.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut bytes = Vec::new();
-        self.write_to(&mut bytes)?;
-        Ok(bytes)
+        match self {
+            // A retained DOC or PPT package publishes its exact compound-file
+            // bytes; the leaf copies them once into a buffer of the known
+            // size, where the generic sink route below would copy every
+            // chunk a second time (record 0377).
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle.to_bytes(),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle.to_bytes(),
+            _ => {
+                let mut bytes = Vec::new();
+                self.write_to(&mut bytes)?;
+                Ok(bytes)
+            },
+        }
     }
 
     /// Publish this snapshot to a caller-owned sink and return bytes written.

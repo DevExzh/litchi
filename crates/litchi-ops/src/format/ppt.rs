@@ -612,6 +612,13 @@ impl Ppt {
         snapshot_budget: usize,
     ) -> Result<WriteCommit> {
         self.check_source_for_write()?;
+        let props = crate::Props::from_props(props)?;
+        if let Some(commit) =
+            write::coalesce::single_text_set(self, &target, &props, limits, snapshot_budget)
+        {
+            self.check_source_for_write()?;
+            return self.enforce_signed_noop(Ok(commit));
+        }
         let result = write::set_with_snapshot_budget(self, target, props, limits, snapshot_budget);
         self.check_source_for_write()?;
         self.enforce_signed_noop(result)
@@ -875,6 +882,38 @@ impl Ppt {
     /// signature; only `Signed::unsign` reaches the explicit signature
     /// removal adapter.  A released source cannot publish because its edit
     /// owner was intentionally discarded at open.
+    /// [`Self::write_to`] into an owned buffer: the leaf's single sized
+    /// copy of the retained compound file.
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
+        let package = match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => package,
+            PptOwner::Released => {
+                return Err(crate::Error::new(
+                    Code::UnsupportedCapability,
+                    "the PPT source was released before publication",
+                )
+                .with_format(FileFormat::Ppt)
+                .with_suggestion(
+                    "reopen the presentation without `OpenOptions::retain_source(false)`",
+                ));
+            },
+        };
+        self.check_source()?;
+        if self.is_encrypted() {
+            return Err(litchi_ppt::Error::EncryptionPolicy.into());
+        }
+        let bytes = if self.signature() == Signature::RemovalAuthorized {
+            signature::unsign_compound_file(
+                package.to_encrypted_bytes()?,
+                litchi_sign::cfb::Format::Ppt,
+            )?
+        } else {
+            package.to_bytes()?
+        };
+        self.check_source()?;
+        Ok(bytes)
+    }
+
     pub(crate) fn write_to<W: Write>(&self, sink: &mut W) -> Result<()> {
         let package = match &self.0.owner {
             PptOwner::Source(package) | PptOwner::Eager(package) => package,

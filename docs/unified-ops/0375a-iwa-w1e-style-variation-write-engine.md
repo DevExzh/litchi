@@ -34,6 +34,13 @@
 | `75abec418d` | `litchi-pages` | after the trunk merge: the W1-B body-media lifecycle reads its inventory through `litchi_iwa_style::media` (edge `litchi-pages -> litchi-iwa-style`, ADR 0024 note) |
 | `3d253aea5d` | `litchi-iwa-style` | `series::{StyleProperty, style_values, set_style_values}` (series-style writes with the exclusivity rule), `series::{set_symbols, symbols}`, `property::{SymbolMarks, SymbolSizes, Trendlines}` |
 | `4e1c6f7de2`, `8882bd2cce` | `litchi-iwa` (tests) | 12 data-symbol and trendline cases, two mac-queue rows; probe extended |
+| `2172717f0a` | docs | this record (slice 3) |
+| `20ac817942` | fuzz | litchi-pages and litchi fuzz lock files for the new edge |
+| `3b01f6cc33`, `92be664436` | style, tests | `property::{ErrorBars, PieLabels, ValueLabels}`; 10 cases, two mac-queue rows |
+| `006d86f956`, `491736b1d2` | style, tests | `shape`: the shape-style variation graph engine (fills, strokes); 12 cases, one mac-queue row, cost probe |
+| `3b9b92ac03` | `litchi-keynote` | after the trunk merge: W1-C's media-asset reads use `litchi_iwa_style::media` (edge `litchi-keynote -> litchi-iwa-style`); keynote and litchi fuzz locks |
+| `7f08c1f2f0` | style | the shape-style **plan API** for the leaves; multi-slot `ShapeProperty`; `Shadows`, `ShapeEffects`, `TextLayout`, `TextColumns`; edge `litchi-iwa-style -> litchi-iwa-text` |
+| `fae0aa7ee5` | tests | 16 more shape cases (28), two mac-queue rows |
 | this commit | docs | this record |
 
 ## 2. The engine
@@ -104,6 +111,30 @@ shared style is refused, as the host refuses it). `property::SymbolSizes` is
 one; `series::set_symbols` composes marks and sizes as the host's
 `set_*_chart_series_symbols` does.
 
+### 2.3 `litchi_iwa_style::shape`
+
+The host's shape-style variation lifecycle (`shapes::line_end::registry`:
+`direct_shape_style_overrides`, `shape_style_is_exclusive`, the variation
+object, insert/replace/collapse and the stylesheet registry), in two layers.
+The **plan layer** is payload-only, for the leaves' own transactions (the
+same shape as `litchi_iwa_text_wire::paragraph_style`): `Styles` resolves
+shape-style payloads, `Target` carries the style and its exclusivity,
+`plan_set`/`plan_reset` take `Slot` writes (fill, stroke, opacity, shadow,
+reflection, line ends; shrink-to-fit, vertical alignment, columns and
+padding with their null flags) and return `Plan::{Unchanged, Rewrite,
+Derive, Collapse}`; `repoint`, `stylesheet_with_variation` and
+`stylesheet_without_variation` are the payload edits a leaf publishes with
+it, and the module documentation lists every publication step (object,
+metadata references, UUID, external references, watermark). The
+**workspace layer** (`target`, `apply`, `set`, `reset`, `value`) does all of
+it over a `graph::Workspace`. A minimal variation is recognised by its exact
+field set; its payload is rebuilt as a protobuf encoder writes it.
+`ShapeProperty` maps a value to slot groups (inherited as units: a null
+flag and its payload together): `Fills`, `Strokes`, `Shadows`,
+`ShapeEffects`, `TextLayout`, `TextColumns`. Image fills (data references
+and media) and line endpoints (written with the line geometry) use the plan
+layer with the families' values.
+
 ## 3. Parity
 
 `crates/litchi-iwa/tests/parity/series_graph_cases.rs`: the host editors
@@ -123,13 +154,22 @@ host's read of the property on both outputs and strictly reopens both.
 | data symbols: patch (shape, size; one hidden), removal | Keynote, Pages; Numbers | A |
 | trendlines: patch (linear → polynomial → moving average), removal | Keynote, Numbers; Pages | A |
 | data-symbol and trendline allocation | three formats each | B |
+| error bars: patch, removal; allocation | Keynote, Numbers; Keynote, Numbers, Pages | A; B |
+| pie and value labels: patch, removal; allocation | Numbers, Keynote; three formats | A; B |
+
+Shape styles (`shape_style_cases.rs`, a rectangle or text box the host
+added to `chart-data-native.*`): fills, strokes, text layout, text-box
+columns and effects on the three formats, shadows on Pages (the host cannot
+read the themed rectangle shadows of Keynote and Numbers and fails before
+writing); 20 Tier A (rewrites, collapses, resets of shared variations), 8
+Tier B (allocations; fresh-UUID policy).
 | styled allocation (line, scatter, radar; and a patch plus allocation) | three formats | B |
 | unstyled allocation in a new object container (wedges, labels) | three formats | B |
 
 Tier B differs only by the documented fresh-UUID policy: the new objects'
 UUIDs (deterministic in the engine, random in the host), and the ZIP local
 layout of the inserted container member and of the members after it (equal
-content). 16 Tier A, 17 Tier B; all pass. The public setters stay
+content). Series overrides: 22 Tier A, 21 Tier B; all pass. The public setters stay
 `host-only` in the ledger: they belong to the format families (W2), which
 wrap this engine with their selectors; three mac-queue rows cover the
 engine routes, two more for symbols and trendlines. Earlier slice 1: 24 Tier A series-style write cases
@@ -146,6 +186,7 @@ admission (strict reopen), the host route its own reopen-and-verify.
 | `series_style_write_cost_abba` (slice 1: strokes, fills, symbol fills) | 9.86 G | 1.03 G | −89.6% |
 | `series_graph_write_cost_abba` (styled allocation, container allocation, container release) | 8,477,902,285 | 1,876,741,217 | −77.9% |
 | `series_graph_write_cost_abba`, extended with data symbols and a trendline | 15,083,360,713 | 3,164,011,104 | −79.0% |
+| `shape_style_write_cost_abba` (allocation, rewrite, collapse) | 2,647,457,057 | 1,547,306,775 | −41.6% |
 
 ```sh
 CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --test parity --no-run
@@ -159,6 +200,6 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*series_graph_cases::ho
 
 | Capability | Engine state | Next |
 |---|---|---|
-| error bars, value labels and their affixes/number formats, pie label visibility | same engine (`Base::Styled`) | port the per-property patches |
-| shape-style variations (fill, stroke, shadow, effects, line end, text layout) | `shape_style_codec` readers and encoders | the shape-style variation graph |
+| value-label affixes and number formats | same engine (`Base::Styled`) | port the per-property patches |
+| line endpoints and image fills on shape styles | plan layer (`Slot::{HeadLineEnd, TailLineEnd, Fill}`) | the families supply the values, data references and media |
 | chart drawable codec and reference lines; chart font | 0375 §6 | coordinate with W1-C; values in `litchi_iwa_text` |

@@ -3657,6 +3657,173 @@ def p0359qe():
     return out
 
 
+# Record 0377: performance qualification of the API-debt program against the
+# pre-program trunk 839212fa9d (baseline) on the merged candidate.
+P0377_DEFERRED = ("deferred by owner (owner decision 2026-10-26: ODT/ODP performance improvement "
+                  "is deferred; measured and reported, not fixed; record 0377 §4). The ODT "
+                  "engine's raw-XML admission (ResolvedReader, record 0362ul44) resolves every "
+                  "event where the baseline's gated BindingTracker resolved only shallow ones.")
+P0377_METADATA = ("explained residual (record 0377 §5.2): the W8 metadata commit (record 0362o) "
+                  "inspects the strict graph of the core, app and custom families and builds an "
+                  "exact reversible patch with an authenticated scope (contract 0351 §2.3) — a "
+                  "fixed 60–190k Ir (≈1–3 µs) per commit; follow-up 0377-F2: read only the "
+                  "changed family's payload.")
+P0377_XLSX_BOUND = ("explained residual (record 0377 §5.3): contract 0351 §2.5 snapshot bound — "
+                    "the unified edit is bounded, the 0337 leaf leg is not; after 0377 removed the "
+                    "commit-time ledger rebuilds and the duplicate cell reservation, one ledger "
+                    "admission per staged cell remains; follow-up 0377-F3: a flat per-sheet "
+                    "ledger.")
+P0377_XLSX_LEAF = ("explained residual (record 0377 §5.3): the leaf XLSX cell edit also carries "
+                   "the W4 typed-cell and capture plumbing (1.062 in instructions, the "
+                   "remainder of the wall ratio is the codegen residual of §5.5); follow-up "
+                   "0377-F3.")
+P0377_CODEGEN = ("explained residual of code generation (record 0377 §5.5): instructions are "
+                 "within 5 % (callgrind); the wall difference is instruction-cache placement of "
+                 "the fat-LTO 16-codegen-unit release build — the same perf-baseline cases built "
+                 "with codegen-units=1 measure 0.995–1.011 (results/0377/perf-baseline-rerun.tsv).")
+P0377_ODC_XML = ("explained residual (record 0377 §5.4): raw-XML admission of record 0362ul44 "
+                 "(duplicate-attribute and UTF-8 checks, per-event namespace resolution) on the "
+                 "odfdom fixture's many namespace declarations; 0377 added the namespace "
+                 "normalization fast path (1.162 → 1.080); follow-up 0377-F4.")
+
+
+def p0377_budget(group, scenario):
+    if group == "batch":
+        return BATCH if "batch1000" in scenario else SCALING
+    if scenario.endswith("_open") or "_open_" in scenario or scenario.endswith("open_validated"):
+        return OPEN
+    if scenario.endswith("_get"):
+        return READ_POINT
+    return SINGLE
+
+
+def p0377_op(route):
+    for key, op in (("batch", "batch"), ("_open", "open"), ("save_", "save"), ("_get", "get"),
+                    ("_add", "add"), ("remove", "remove"), ("move", "move")):
+        if key in route:
+            return op
+    return "set"
+
+
+def p0377_explain(route, kind):
+    fmt = route.split("_", 1)[0]
+    if fmt in ("odt", "oth", "odm"):
+        return P0377_DEFERRED
+    if "metadata_title_set" in route:
+        return P0377_METADATA
+    if route.startswith("xlsx_eager_cell_value_set"):
+        return P0377_XLSX_LEAF if kind == "leaf" else P0377_XLSX_BOUND
+    if fmt == "odc":
+        return P0377_ODC_XML
+    return P0377_CODEGEN if kind.startswith("wall") else ""
+
+
+@needs("0377")
+def p0377():
+    """Record 0377: unified-fin-perf (one source built on the baseline with
+    `--features base` and on the candidate), callgrind instructions of the
+    timed region per call (primary evidence for the 5 % regression rule) and
+    wall-clock unified/leaf ABBA blocks (the leaf-vs-unified budgets);
+    perf-baseline default matrix (instructions and wall); odf_w6_probe;
+    odf_source_backed_probe (ODP memory); the Python binding."""
+    res = RES / "0377"
+    out = []
+    path = res / "callgrind.tsv"
+    with open(path, encoding="utf-8") as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            route = r["route"]
+            if route == "docx_eager_open":
+                continue  # unpaired: see docx_eager_open_validated
+            fmt = route.split("_", 1)[0]
+            op = p0377_op(route)
+            vals = {k: (float(r[k]) if r[k] else None) for k in
+                    ("leaf_base_ir", "leaf_cand_ir", "unified_base_ir", "unified_cand_ir")}
+            for leg in ("leaf", "unified"):
+                b, c = vals[f"{leg}_base_ir"], vals[f"{leg}_cand_ir"]
+                if b and c:
+                    out.append(row("0377", fmt, op, f"{route} ({leg} leg, candidate vs pre-program baseline)",
+                                   "", b, c, [c / b], regression("0377"),
+                                   f"fin_perf:{route}:{leg}:after-before", src([path]),
+                                   comparison="after/before (callgrind Ir)", unit="Ir",
+                                   explanation=p0377_explain(route, leg) if c / b > 1.05 else ""))
+            if vals["leaf_cand_ir"] and vals["unified_cand_ir"]:
+                out.append(row("0377", fmt, op, f"{route} (instructions)", "",
+                               vals["leaf_cand_ir"], vals["unified_cand_ir"],
+                               [vals["unified_cand_ir"] / vals["leaf_cand_ir"]], NONE,
+                               f"fin_perf:{route}:ir", src([path]), unit="Ir",
+                               comparison="unified/leaf (callgrind Ir; budgets judged on wall)"))
+    path = res / "abba.json"
+    data: dict = {}
+    for run in load_json(path)["runs"]:
+        for c in run["cases"]:
+            data.setdefault(c["route"], {"base": [], "cand": []})[run["build"]].append(c)
+    for route, v in data.items():
+        if not v["cand"]:
+            continue
+        group = v["cand"][0]["group"]
+        fmt = route.split("_", 1)[0]
+        leaf = med(x for c in v["cand"] for x in c["leaf_block_median_ns"])
+        uni = med(x for c in v["cand"] for x in c["unified_block_median_ns"])
+        ratios = [u / l for c in v["cand"] for u, l in
+                  zip(c["unified_block_median_ns"], c["leaf_block_median_ns"])]
+        budget = p0377_budget(group, route)
+        out.append(row("0377", fmt, p0377_op(route), f"{route} (wall)", "",
+                       us(leaf), us(uni), [med(ratios)], budget, f"fin_perf:{route}:wall",
+                       src([path]), comparison="unified/leaf (wall, ABBA blocks)",
+                       explanation=p0377_explain(route, "wall") if (
+                           budget[0] and med(ratios) > budget[0]) else ""))
+    path = res / "odf-w6-callgrind.tsv"
+    with open(path, encoding="utf-8") as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            scen = r["scenario"]
+            fmt, op = scen.split("/")
+            b, c = float(r["base_ir_per_round"]), float(r["candidate_ir_per_round"])
+            expl = ""
+            if c / b > 1.05:
+                expl = P0377_DEFERRED if fmt in ("odt", "fodt") else (
+                    P0377_ODC_XML if fmt == "odc" else "")
+            out.append(row("0377", fmt, W6_ODF_OPS.get(op, op),
+                           f"odf_w6_probe {scen} (unified, candidate vs pre-program baseline)",
+                           "", b, c, [c / b], regression("0377"), f"odf_w6:{scen}:after-before",
+                           src([path]), comparison="after/before (callgrind Ir per round)",
+                           unit="Ir", explanation=expl))
+    path = res / "odf-sb-wall.json"
+    for r in load_json(path)["rows"]:
+        if "base_peak_heap_bytes" not in r:
+            continue
+        fmt, scen = r["scenario"].split("/")
+        b, c = med(r["base_peak_heap_bytes"]), med(r["candidate_peak_heap_bytes"])
+        out.append(row("0377", fmt, "set" if fmt == "ods" else "add",
+                       f"odf_source_backed_probe {r['scenario']} peak heap", "", b, c, [c / b],
+                       regression("0377"), f"odf_sb:{r['scenario']}:peak-heap", src([path]),
+                       comparison="after/before (peak live heap)", unit="bytes"))
+    path = res / "perf-baseline-callgrind.tsv"
+    with open(path, encoding="utf-8") as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            case = r["case"]
+            b, c = float(r["base_ir_per_sample"]), float(r["candidate_ir_per_sample"])
+            fmt = case.split("_", 1)[0]
+            expl = ""
+            if c / b > 1.05:
+                expl = P0377_DEFERRED if case.startswith("odp_") else (
+                    "explained residual (record 0377 §5.5): the per-sample instruction count "
+                    "includes untimed per-sample setup; the timed wall interval is 0.93–0.97 "
+                    "of the baseline (perf-baseline-wall.tsv)")
+            out.append(row("0377", fmt, "default-matrix",
+                           f"perf-baseline {case} (all corpora, per sample)", "", b, c, [c / b],
+                           regression("0377"), f"perf_baseline:{case}:ir", src([path]),
+                           comparison="after/before (callgrind Ir per sample)", unit="Ir",
+                           explanation=expl))
+    path = res / "python.json"
+    for r in load_json(path)["rows"]:
+        b, c = med(r["base_median_us_per_run"]), med(r["candidate_median_us_per_run"])
+        out.append(row("0377", "python", r["scenario"].split()[1] if " " in r["scenario"] else "",
+                       f"Python {r['scenario']}", "", b, c, [c / b], NONE,
+                       f"python:{slug(r['scenario'])}:after-before", src([path]),
+                       comparison="after/before (wall, A-B-B-A processes)"))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -3667,7 +3834,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0377]
 
 
 

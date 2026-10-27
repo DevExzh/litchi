@@ -1115,11 +1115,7 @@ impl Package {
         opc: &OpcPackage,
         snapshot: &crate::opened::Snapshot,
     ) -> Option<std::sync::Arc<crate::opened::PartDigests>> {
-        snapshot
-            .part_digests
-            .project(opc)
-            .ok()
-            .map(std::sync::Arc::new)
+        snapshot.package_memo(opc).ok().map(std::sync::Arc::new)
     }
 
     /// The payload-digest memo this package retains for its current graph.
