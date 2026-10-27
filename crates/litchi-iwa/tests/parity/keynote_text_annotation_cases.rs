@@ -1050,3 +1050,164 @@ fn keynote_slide_text_box_drop_cap_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+fn host_language(
+    source: &[u8],
+    change: &litchi_iwa_text_wire::language::Change,
+) -> TestResult<Vec<u8>> {
+    use litchi_iwa_text_wire::language::Change;
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let id = host_id(&editor, source, leaf_position(source, Kind::TextBox)?)?;
+    match change.clone() {
+        Change::Set { position, language } => {
+            editor.set_slide_text_box_text_language(SLIDE, id, position, language)?;
+        },
+        Change::RemoveBoundary(position) => {
+            editor.remove_slide_text_box_text_language_boundary(SLIDE, id, position)?;
+        },
+        Change::Reset => {
+            editor.reset_slide_text_box_text_languages(SLIDE, id)?;
+        },
+        other => return Err(format!("unmapped change {other:?}").into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_language(
+    source: &[u8],
+    change: &litchi_iwa_text_wire::language::Change,
+) -> TestResult<LeafRun> {
+    let package = Package::from_bytes(source)?;
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text_language(
+        SlideSelector::index(SLIDE),
+        DrawableSelector::index(leaf_position(source, Kind::TextBox)?),
+        change.clone(),
+    )?;
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_slide_drawables(&commit.patch().inverse())?;
+    Ok(LeafRun::with_inverse(
+        leaf_bytes!(commit.package()),
+        leaf_bytes!(restored.package()),
+    ))
+}
+
+fn host_languages(bytes: &[u8]) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let id = host_id(&editor, bytes, leaf_position(bytes, Kind::TextBox)?)?;
+    Ok(format!(
+        "{:?} {:?}",
+        editor.slide_text_box_text_languages(SLIDE, id)?,
+        editor.slide_text_box_text_language(SLIDE, id, TextPosition::from_utf16_code_units(2))?
+    ))
+}
+
+fn leaf_languages(bytes: &[u8]) -> TestResult<String> {
+    let package = Package::from_bytes(bytes)?;
+    let (slide, drawable) = (
+        SlideSelector::index(SLIDE),
+        DrawableSelector::index(leaf_position(bytes, Kind::TextBox)?),
+    );
+    Ok(format!(
+        "{:?} {:?}",
+        package.slide_drawable_text_languages(slide, drawable)?,
+        package.slide_drawable_text_language(
+            slide,
+            drawable,
+            TextPosition::from_utf16_code_units(2)
+        )?
+    ))
+}
+
+fn language_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input: &Fixture,
+    change: &litchi_iwa_text_wire::language::Change,
+) -> TestResult {
+    Case::new(name, Format::Keynote, tier, evidence, input)
+        .host(|source| host_language(source, change))
+        .leaf(|source| leaf_language(source, change))
+        .read("host languages", host_languages)
+        .read("leaf languages", leaf_languages)
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .run()
+        .map_err(|error| format!("{change:?}: {error}"))?;
+    Ok(())
+}
+
+fn set_language(at: u32, tag: &str) -> TestResult<litchi_iwa_text_wire::language::Change> {
+    Ok(litchi_iwa_text_wire::language::Change::Set {
+        position: TextPosition::from_utf16_code_units(at),
+        language: litchi_iwa_text::language::TextLanguage::tag(tag)?,
+    })
+}
+
+fn tagged() -> TestResult<Fixture> {
+    let input = fixture(TEXT_BOX)?;
+    let mut bytes = input.bytes;
+    for (at, tag) in [(0, "en"), (3, "fr")] {
+        bytes = host_language(&bytes, &set_language(at, tag)?)?;
+    }
+    Ok(Fixture {
+        path: input.path,
+        bytes,
+    })
+}
+
+#[test]
+fn keynote_slide_text_box_language_set_parity() -> TestResult {
+    let (input, base) = (fixture(TEXT_BOX)?, tagged()?);
+    for (fixture, at, tag) in [
+        (&input, 0, "de"),
+        (&input, 3, "ja"),
+        (&base, 3, "es"),
+        (&base, 0, "fr"),
+    ] {
+        language_case(
+            "keynote_slide_text_box_language_set_parity",
+            Tier::B,
+            Evidence::Queued,
+            fixture,
+            &set_language(at, tag)?,
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn keynote_slide_text_box_language_remove_parity() -> TestResult {
+    language_case(
+        "keynote_slide_text_box_language_remove_parity",
+        Tier::B,
+        Evidence::Queued,
+        &tagged()?,
+        &litchi_iwa_text_wire::language::Change::RemoveBoundary(
+            TextPosition::from_utf16_code_units(3),
+        ),
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_language_reset_parity() -> TestResult {
+    language_case(
+        "keynote_slide_text_box_language_reset_parity",
+        Tier::B,
+        Evidence::Queued,
+        &tagged()?,
+        &litchi_iwa_text_wire::language::Change::Reset,
+    )
+}
+
+#[test]
+fn keynote_slide_text_box_language_read_parity() -> TestResult {
+    for input in [fixture(TEXT_BOX)?, tagged()?] {
+        assert_eq!(host_languages(&input.bytes)?, leaf_languages(&input.bytes)?);
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
