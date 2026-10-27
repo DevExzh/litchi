@@ -827,3 +827,190 @@ fn numbers_sheet_text_box_hyperlink_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- Date & Time fields ------------------------------------------------------
+
+use litchi_numbers::sheet::drawable::date_time::DisplayText;
+
+#[derive(Clone, Debug)]
+enum FieldChange {
+    Add(TextRange, usize),
+    Insert(TextPosition, &'static str, usize),
+    Update(usize, TextRange, usize),
+    Remove(usize),
+}
+
+fn host_dates(bytes: &[u8]) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    Ok(format!(
+        "{:?}",
+        e.sheet_text_box_date_time_fields(s, d)?
+            .into_iter()
+            .map(|field| (field.range, field.settings))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_dates(bytes: &[u8]) -> TestResult<String> {
+    Ok(format!(
+        "{:?}",
+        Package::from_bytes(bytes)?
+            .sheet_drawable_date_time_fields(0, DrawableSelector::text_box(0))?
+            .into_iter()
+            .map(|field| (field.range(), field.settings().clone()))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn host_date(source: &[u8], change: &FieldChange) -> TestResult<Vec<u8>> {
+    let samples = crate::text_field_cases::settings()?;
+    let mut e = numbers::Draft::from_bytes(source)?;
+    let (s, d) = host_drawable(&e, Kind::TextBox, 0)?;
+    let fields = e.sheet_text_box_date_time_fields(s, d)?;
+    match change {
+        FieldChange::Add(range, value) => {
+            drop(e.add_sheet_text_box_date_time_field(s, d, *range, samples[*value].clone())?)
+        },
+        FieldChange::Insert(position, display, value) => {
+            drop(e.insert_sheet_text_box_date_time_field(
+                s,
+                d,
+                *position,
+                DisplayText::new(display)?,
+                samples[*value].clone(),
+            )?);
+        },
+        FieldChange::Update(position, range, value) => {
+            drop(e.update_sheet_text_box_date_time_field(
+                s,
+                d,
+                fields.get(*position).ok_or("host field")?.id,
+                *range,
+                samples[*value].clone(),
+            )?);
+        },
+        FieldChange::Remove(position) => drop(e.remove_sheet_text_box_date_time_field(
+            s,
+            d,
+            fields.get(*position).ok_or("host field")?.id,
+        )?),
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn date_case(name: &'static str, tier: Tier, input: &Fixture, change: FieldChange) -> TestResult {
+    let change = &change;
+    let mut case = Case::new(name, Format::Numbers, tier, Evidence::Queued, input)
+        .host(|source| host_date(source, change))
+        .leaf(|source| {
+            let samples = crate::text_field_cases::settings()?;
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_date_time_fields(0, DrawableSelector::text_box(0))?;
+            match change {
+                FieldChange::Add(range, value) => {
+                    edit.add(*range, samples[*value].clone())?;
+                },
+                FieldChange::Insert(position, display, value) => {
+                    edit.insert(
+                        *position,
+                        DisplayText::new(display)?,
+                        samples[*value].clone(),
+                    )?;
+                },
+                FieldChange::Update(position, range, value) => {
+                    edit.update(*position, *range, samples[*value].clone())?;
+                },
+                FieldChange::Remove(position) => {
+                    edit.remove(*position)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_date_time_fields(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host fields", host_dates)
+        .read("leaf fields", leaf_dates);
+    if tier == Tier::B {
+        case = case
+            .known_fields(crate::text_field_cases::masked)
+            .leaf_structural_metadata();
+    }
+    case.run()?;
+    Ok(())
+}
+
+fn with_date() -> TestResult<Fixture> {
+    let input = authored_fixture()?;
+    Ok(Fixture {
+        path: "authored + host date-time field over 0..5",
+        bytes: host_date(&input.bytes, &FieldChange::Add(range(0, 5)?, 0))?,
+    })
+}
+
+#[test]
+fn numbers_sheet_text_box_date_time_add_parity() -> TestResult {
+    for value in [0, 1] {
+        date_case(
+            "numbers_sheet_text_box_date_time_add_parity",
+            Tier::B,
+            &authored_fixture()?,
+            FieldChange::Add(range(0, 5)?, value),
+        )?;
+    }
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_date_time_insert_parity() -> TestResult {
+    for position in [0, 9] {
+        date_case(
+            "numbers_sheet_text_box_date_time_insert_parity",
+            Tier::B,
+            &authored_fixture()?,
+            FieldChange::Insert(TextPosition::from_utf16_index(position)?, "2026-10-26", 0),
+        )?;
+    }
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_date_time_update_parity() -> TestResult {
+    date_case(
+        "numbers_sheet_text_box_date_time_update_parity",
+        Tier::A,
+        &with_date()?,
+        FieldChange::Update(0, range(2, 8)?, 1),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_date_time_remove_parity() -> TestResult {
+    date_case(
+        "numbers_sheet_text_box_date_time_remove_parity",
+        Tier::A,
+        &with_date()?,
+        FieldChange::Remove(0),
+    )?;
+    let _ = Evidence::Queued;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_text_box_date_time_read_parity() -> TestResult {
+    for input in [authored_fixture()?, with_date()?] {
+        assert_eq!(host_dates(&input.bytes)?, leaf_dates(&input.bytes)?);
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

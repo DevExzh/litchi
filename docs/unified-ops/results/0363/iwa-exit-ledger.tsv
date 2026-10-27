@@ -761,11 +761,11 @@ numbers/creation.rs	sheet_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	
 numbers/creation.rs	table_dimensions	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/creation.rs	table_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
 numbers/editor/column_insert.rs	insert_table_column	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_insert_column_parity	A	-	-
-numbers/editor/date_time_fields.rs	add_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
-numbers/editor/date_time_fields.rs	insert_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
-numbers/editor/date_time_fields.rs	remove_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
-numbers/editor/date_time_fields.rs	sheet_text_box_date_time_fields	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
-numbers/editor/date_time_fields.rs	update_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
+numbers/editor/date_time_fields.rs	add_sheet_text_box_date_time_field	1	numbers	text.date_time_field	migrated	litchi_numbers::sheet::drawable::date_time::Edit::add	numbers_sheet_text_box_date_time_add_parity	B	-	-
+numbers/editor/date_time_fields.rs	insert_sheet_text_box_date_time_field	1	numbers	text.date_time_field	migrated	litchi_numbers::sheet::drawable::date_time::Edit::insert	numbers_sheet_text_box_date_time_insert_parity	B	-	-
+numbers/editor/date_time_fields.rs	remove_sheet_text_box_date_time_field	1	numbers	text.date_time_field	migrated	litchi_numbers::sheet::drawable::date_time::Edit::remove	numbers_sheet_text_box_date_time_remove_parity	A	-	-
+numbers/editor/date_time_fields.rs	sheet_text_box_date_time_fields	1	numbers	text.date_time_field	migrated	litchi_numbers::Package::sheet_drawable_date_time_fields	numbers_sheet_text_box_date_time_read_parity	A	-	-
+numbers/editor/date_time_fields.rs	update_sheet_text_box_date_time_field	1	numbers	text.date_time_field	migrated	litchi_numbers::sheet::drawable::date_time::Edit::update	numbers_sheet_text_box_date_time_update_parity	A	-	-
 numbers/editor/drawable_order.rs	move_sheet_drawable	1	numbers	drawable.order	migrated	litchi_numbers::sheet::drawable::Edit::move_to	numbers_sheet_drawable_to_front_parity	A	-	-
 numbers/editor/drawable_order.rs	set_sheet_drawable_order	1	numbers	drawable.order	migrated	litchi_numbers::sheet::drawable::Edit::move_to	numbers_sheet_drawable_order_parity	A	-	-
 numbers/editor/drawable_order.rs	sheet_drawable_order	1	numbers	drawable.order	migrated	litchi_numbers::Package::sheet_drawable_list	numbers_sheet_drawable_list_read_parity	A	-	-
