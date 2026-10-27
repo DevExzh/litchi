@@ -180,6 +180,39 @@ impl Package {
         }))
     }
 
+    /// Add (or compose into an existing rewrite of the body storage) the
+    /// rewrite replacing the whole body text by `text`.
+    pub(crate) fn body_text_rewrite(
+        &self,
+        rewrites: &mut Vec<MessageRewrite>,
+        text: &str,
+    ) -> Result<(), PackageError> {
+        let (storage, _) = super::body_storage_objects::body_storage(self).map_err(invalid)?;
+        let limits = super::storage_rewrite_limits(self.state.source.limits())
+            .map_err(|_error| invalid("storage limits"))?;
+        let length = storage.text.encode_utf16().count();
+        let existing = rewrites.iter().position(|rewrite| {
+            rewrite.object == storage.identifier && rewrite.message_index == storage.message_index
+        });
+        let base = existing.map_or(storage.payload.as_slice(), |index| {
+            rewrites[index].data.as_slice()
+        });
+        let data = litchi_iwa_text_wire::rewrite_storage_text(base, 0..length, text, limits)
+            .map_err(invalid)?
+            .into_bytes();
+        match existing {
+            Some(index) => rewrites[index].data = data,
+            None => rewrites.push(MessageRewrite {
+                component: storage.component,
+                object: storage.identifier,
+                message_index: storage.message_index,
+                message_type: storage.message_type,
+                data,
+            }),
+        }
+        Ok(())
+    }
+
     /// The rewrites writing the document `language` and `locale` where the
     /// host builder writes them. `None` keeps a value.
     pub(crate) fn language_and_locale_rewrites(

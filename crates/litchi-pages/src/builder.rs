@@ -211,23 +211,33 @@ impl Builder {
         {
             return Err(PackageError::InvalidLocale);
         }
-        let package = Package::new()?.with_identity(
+        let template = Package::new()?;
+        let body_text = if self.body_text.is_empty() {
+            None
+        } else {
+            // The body-text transaction's validation (reserved markers,
+            // limits); its staged edit is not committed: the text goes out
+            // in the one identity publication.
+            template
+                .edit_body_text()
+                .and_then(|mut edit| edit.set(&self.body_text).map(|_| ()))
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+            Some(self.body_text.as_str())
+        };
+        let package = template.with_identity(
             &identity,
             self.language.as_deref(),
             self.locale.as_deref(),
+            body_text,
         )?;
-        if self.body_text.is_empty() {
-            return Ok(package);
+        if let Some(text) = body_text
+            && package.text()? != text
+        {
+            return Err(PackageError::InvalidFormat(
+                "the built Pages body text failed verification".to_owned(),
+            ));
         }
-        let mut edit = package
-            .edit_body_text()
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        edit.set(&self.body_text)
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        let commit = edit
-            .commit()
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        Ok(commit.into_package())
+        Ok(package)
     }
 }
 
@@ -249,13 +259,14 @@ impl Package {
     /// The same document with `identity` written into its identity
     /// sidecars (`Metadata/DocumentIdentifier` and the UUID keys and
     /// revision of `Metadata/Properties.plist`) and the package metadata's
-    /// revision identifier, and with `language` and `locale` written where
-    /// the host builder writes them, in one publication.
+    /// revision identifier, and with `language`, `locale` and the body text
+    /// written where the host builder writes them, in one publication.
     fn with_identity(
         &self,
         identity: &Identity,
         language: Option<&str>,
         locale: Option<&str>,
+        body_text: Option<&str>,
     ) -> PackageResult<Self> {
         let document = identity.document_uuid();
         let version = identity.version_uuid();
@@ -282,6 +293,9 @@ impl Package {
         let encoded = super::package::sidecars::encode(&dictionary)?;
         let mut rewrites = self.language_and_locale_rewrites(language, locale)?;
         rewrites.extend(self.revision_rewrite(&version)?);
+        if let Some(text) = body_text {
+            self.body_text_rewrite(&mut rewrites, text)?;
+        }
         super::package::body_drawable_graph::publish_with_replacements(
             self,
             rewrites,
