@@ -64,7 +64,28 @@ const ROUTES: &[(&str, &str)] = &[
     ("hyperlink_add", TEXT_BOX),
     ("text_style", TEXT_BOX),
     ("image_duplicate", IMAGE),
+    ("shape_fill", TEXT_BOX),
+    ("shape_caption", TEXT_BOX),
+    ("text_box_columns", TEXT_BOX),
 ];
+
+fn red() -> TestResult<litchi_iwa_common::color::Rgba> {
+    Ok(litchi_iwa_common::color::Rgba::new(
+        0.9,
+        0.3,
+        0.1,
+        1.0,
+        litchi_iwa_common::color::RgbColorSpace::Srgb,
+    )?)
+}
+
+fn two_columns() -> TestResult<litchi_iwa_text::columns::Columns> {
+    use litchi_iwa_text::columns::{Columns, Count, Gap};
+    Ok(Columns::equal(
+        Count::new(2)?,
+        Some(Gap::from_points(12.0)?),
+    ))
+}
 
 #[inline(never)]
 fn w1c_host_route(route: &str, source: &[u8], png: &[u8], id: u64) -> TestResult<Vec<u8>> {
@@ -155,6 +176,15 @@ fn w1c_host_route(route: &str, source: &[u8], png: &[u8], id: u64) -> TestResult
         "image_duplicate" => {
             editor.duplicate_slide_image(0, id)?;
         },
+        "shape_fill" => {
+            editor.set_slide_shape_fill(0, id, &litchi_iwa::shapes::ShapeFill::Solid(red()?))?;
+        },
+        "shape_caption" => {
+            editor.set_slide_shape_caption(0, id, "First step")?;
+        },
+        "text_box_columns" => {
+            editor.set_slide_text_box_columns(0, id, &two_columns()?)?;
+        },
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(editor.to_bytes()?)
@@ -195,6 +225,15 @@ fn w1c_leaf_route(route: &str, source: &[u8], png: &[u8], position: usize) -> Te
             edit.duplicate(slide, ImageSelector::index(0))?;
             edit.commit()?.into_package()
         },
+        "shape_caption" => package
+            .edit_slide_shape_text(
+                slide,
+                DrawableSelector::index(position),
+                litchi_keynote::slide::image::text::Text::Caption,
+            )?
+            .set("First step")?
+            .commit()?
+            .into_package(),
         _ => {
             let mut edit = package.edit_slide_drawables();
             match route {
@@ -246,6 +285,24 @@ fn w1c_leaf_route(route: &str, source: &[u8], png: &[u8], position: usize) -> Te
                         link_target()?,
                     )?;
                 },
+                "shape_fill" => {
+                    edit.set_shape_style(
+                        slide,
+                        DrawableSelector::index(position),
+                        litchi_keynote::slide::drawable::shape_style::Property::Fill(
+                            litchi_iwa_common::shape::fill::Fill::Solid(red()?),
+                        ),
+                    )?;
+                },
+                "text_box_columns" => {
+                    edit.set_shape_style(
+                        slide,
+                        DrawableSelector::index(position),
+                        litchi_keynote::slide::drawable::shape_style::Property::Columns(
+                            two_columns()?,
+                        ),
+                    )?;
+                },
                 "text_style" => {
                     edit.set_text_property(
                         slide,
@@ -279,14 +336,28 @@ fn keynote_w1c_route_cost_abba() -> TestResult {
         {
             continue;
         }
-        let input = fixture(path)?.bytes;
+        let mut input = fixture(path)?.bytes;
         // Selectors resolve outside the measured routes.
         let kind = if *path == IMAGE {
             Kind::Image
+        } else if route.starts_with("shape_") {
+            // The shape routes run on a host-added rectangle.
+            let mut editor = keynote::Draft::from_bytes(&input)?;
+            editor.add_slide_rectangle(0, "Box", POINT, SIZE)?;
+            input = editor.to_bytes()?;
+            Kind::Shape
         } else {
             Kind::TextBox
         };
-        let position = leaf_position(&input, kind)?;
+        let position = if kind == Kind::Shape {
+            Package::from_bytes(&input)?
+                .slide_drawable_list(SlideSelector::index(0))?
+                .iter()
+                .rposition(|drawable| drawable.kind() == Kind::Shape)
+                .ok_or("no added shape")?
+        } else {
+            leaf_position(&input, kind)?
+        };
         let id = host_id(&keynote::Draft::from_bytes(&input)?, &input, position)?;
         let a1 = black_box(w1c_host_route(route, &input, &png, id)?);
         let b1 = black_box(w1c_leaf_route(route, &input, &png, position)?);
