@@ -19,6 +19,8 @@ mod stage;
 mod table;
 mod text;
 mod text_comments;
+mod text_date_time;
+mod text_drop_caps;
 mod text_hyperlinks;
 mod text_lists;
 mod text_properties;
@@ -684,6 +686,22 @@ enum Operation {
         storage: u64,
         change: text_comments::CommentChange,
     },
+    DropCap {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        drop_cap: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+    },
+    DateTime {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_date_time::DateTimeChange,
+        /// Display text inserted at the field's start first (host
+        /// `insert_slide_text_box_date_time_field`).
+        insert: Option<Box<str>>,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1082,6 +1100,8 @@ impl<'a> Edit<'a> {
             | Operation::NamedStyle { .. }
             | Operation::Hyperlink { .. }
             | Operation::Comment { .. }
+            | Operation::DateTime { .. }
+            | Operation::DropCap { .. }
             | Operation::TableCell { .. }
             | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
@@ -1349,6 +1369,147 @@ impl<'a> Edit<'a> {
             change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
         });
         Ok(self)
+    }
+
+    /// Stage `drop_cap` for the paragraph starting at `paragraph` of the text
+    /// of a text box or shape; `None` removes it (host
+    /// `set_slide_text_box_paragraph_drop_cap`,
+    /// `remove_slide_text_box_paragraph_drop_cap`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a stylesheet without a Drop Cap base.
+    pub fn set_drop_cap<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        paragraph: litchi_iwa_text::position::TextPosition,
+        drop_cap: Option<litchi_iwa_text::paragraph::drop_cap::DropCap>,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::DropCap {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            paragraph,
+            drop_cap,
+        });
+        Ok(self)
+    }
+
+    fn stage_date_time(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_date_time::DateTimeChange,
+        insert: Option<Box<str>>,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::DateTime {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+            insert,
+        });
+        Ok(self)
+    }
+
+    /// Stage a Date & Time field over `range` (UTF-16 code units) of the
+    /// text of a text box or shape (host
+    /// `add_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a range another field occupies.
+    pub fn add_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        settings: litchi_iwa_text::date_time::Settings,
+    ) -> Result<&mut Self, Error> {
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Add(range, settings),
+            None,
+        )
+    }
+
+    /// Stage inserting `display` at `position` of the text and a Date &
+    /// Time field over it (host `insert_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_date_time_field`].
+    pub fn insert_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: litchi_iwa_text::position::TextPosition,
+        display: &litchi_iwa_text::date_time::DisplayText,
+        settings: litchi_iwa_text::date_time::Settings,
+    ) -> Result<&mut Self, Error> {
+        let start = position.utf16_index();
+        let length = u32::try_from(display.as_str().encode_utf16().count())
+            .map_err(|_| Error::Refused(Refusal::InvalidSpan))?;
+        let range = litchi_iwa_text::position::TextRange::new(
+            position,
+            litchi_iwa_text::position::TextPosition::from_utf16_code_units(start + length),
+        )
+        .map_err(|_| Error::Refused(Refusal::InvalidSpan))?;
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Add(range, settings),
+            Some(display.as_str().into()),
+        )
+    }
+
+    /// Stage moving the text's date-time field at `field` (in text order)
+    /// onto `range` with new `settings` (host
+    /// `update_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_date_time_field`]; a missing field is refused.
+    pub fn update_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        field: Position,
+        range: litchi_iwa_text::position::TextRange,
+        settings: litchi_iwa_text::date_time::Settings,
+    ) -> Result<&mut Self, Error> {
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Update(field.get(), range, settings),
+            None,
+        )
+    }
+
+    /// Stage removing the text's date-time field at `field` (host
+    /// `remove_slide_text_box_date_time_field`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_date_time_field`].
+    pub fn remove_date_time_field<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        field: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_date_time(
+            slide.into(),
+            drawable.into(),
+            text_date_time::DateTimeChange::Remove(field.get()),
+            None,
+        )
     }
 
     fn stage_comment(
@@ -2892,6 +3053,55 @@ impl Package {
             }))
     }
 
+    /// Read the paragraph Drop Caps of the text of one text box or shape
+    /// (host `slide_text_box_paragraph_drop_caps`,
+    /// `slide_text_box_paragraph_drop_cap`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_drop_caps<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<
+        Vec<(
+            litchi_iwa_text::position::TextPosition,
+            litchi_iwa_text::paragraph::drop_cap::DropCap,
+        )>,
+        Error,
+    > {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_drop_caps::drop_caps(&Workspace::new(self).map_err(lift)?, storage)
+    }
+
+    /// Read the Date & Time fields of the text of one text box or shape, in
+    /// text order: their ranges and settings (host
+    /// `slide_text_box_date_time_fields`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_date_time_fields<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<
+        Vec<(
+            litchi_iwa_text::position::TextRange,
+            litchi_iwa_text::date_time::Settings,
+        )>,
+        Error,
+    > {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        Ok(
+            text_date_time::fields(&Workspace::new(self).map_err(lift)?, storage)?
+                .into_iter()
+                .map(|(_, range, settings)| (range, settings))
+                .collect(),
+        )
+    }
+
     /// Read the highlights of the text of one text box or shape, in text
     /// order (host `slide_text_box_highlights`).
     ///
@@ -3706,6 +3916,55 @@ fn commit_operations(
                 {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::DropCap {
+                slide,
+                drawable,
+                storage,
+                paragraph,
+                drop_cap,
+            } => {
+                let change = match drop_cap {
+                    Some(value) => litchi_iwa_text_wire::drop_cap::Change::Set(*value),
+                    None => litchi_iwa_text_wire::drop_cap::Change::Remove,
+                };
+                text_drop_caps::apply(&mut workspace, *storage, *paragraph, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::DateTime {
+                slide,
+                drawable,
+                storage,
+                change,
+                insert,
+            } => {
+                if let (Some(display), text_date_time::DateTimeChange::Add(range, _)) =
+                    (insert, change)
+                {
+                    let wire = workspace.wire;
+                    let before =
+                        inventory::storage_text(&workspace, *storage, wire).map_err(lift)?;
+                    let at = usize::try_from(range.start().utf16_index())
+                        .map_err(|_| Error::Refused(Refusal::InvalidSpan))?;
+                    let mut units = 0;
+                    let mut split = None;
+                    for (offset, character) in before.char_indices() {
+                        if units == at {
+                            split = Some(offset);
+                            break;
+                        }
+                        units += character.len_utf16();
+                    }
+                    let split = match split {
+                        Some(split) => split,
+                        None if units == at => before.len(),
+                        None => return Err(Error::Refused(Refusal::InvalidSpan)),
+                    };
+                    let text = format!("{}{display}{}", &before[..split], &before[split..]);
+                    stage::set_text(&mut workspace, *slide, *drawable, *storage, &text, source)?;
+                }
+                text_date_time::apply(&mut workspace, *storage, change)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::Comment {
