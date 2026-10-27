@@ -26,6 +26,7 @@ pub(crate) mod body_table_cell_format;
 pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;
+mod body_table_duplicate;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
 pub(crate) mod body_table_merges;
@@ -423,6 +424,23 @@ impl litchi_iwa_table::TableSource for Package {
 
     fn max_references(&self) -> usize {
         TABLE_ENGINE_MAX_REFERENCES
+    }
+}
+
+/// The shared structural working set (`litchi_iwa_table::structure`)
+/// reopens its candidate through this package's strict ingress, reusing the
+/// parsed archive of every byte-identical member.
+impl litchi_iwa_table::structure::TableLeaf for Package {
+    fn reopen_candidate(
+        &self,
+        candidate: Arc<[u8]>,
+    ) -> Result<Self, litchi_iwa_table::structure::ReopenError> {
+        let source = self
+            .state
+            .source
+            .reopen(candidate)
+            .map_err(|_error| litchi_iwa_table::structure::ReopenError)?;
+        Self::from_source_catalog(source).map_err(|_error| litchi_iwa_table::structure::ReopenError)
     }
 }
 
