@@ -437,6 +437,7 @@ pub(super) fn remove_table(
     position: usize,
 ) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
+    working.keep_previews();
     let located = locate(&working, sheet_position, position)?;
     let mut roots = vec![located.table];
     let mut detached = vec![(located.sheet, located.table)];
@@ -545,6 +546,9 @@ pub(super) fn remove_table(
     if let Some(registry) = metadata::registry(&working)? {
         transition.remove_objects(&registry, &removed_list)?;
     }
+    // A removed suffix of the identifier space lowers the watermark, as the
+    // host editor releases it (record 0370g).
+    transition.release_suffix(&removed_list)?;
     for identifier in &removed_list {
         working.remove(*identifier)?;
     }
