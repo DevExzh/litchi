@@ -321,6 +321,8 @@ pub(in crate::package) struct Transition {
     /// Embedded data no surviving object references: its `DataInfo` record
     /// leaves the registry and its package entry is deleted.
     pub(in crate::package) data_removals: Vec<(u64, String)>,
+    /// Non-IWA package members (embedded data) this transaction rewrites.
+    pub(in crate::package) entry_writes: Vec<(String, Vec<u8>)>,
 }
 
 impl Transition {

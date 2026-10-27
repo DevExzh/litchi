@@ -606,6 +606,13 @@ impl<'p> Working<'p> {
                 SnappyStream::compress(&bytes, snappy_limits).map_err(|error| map_core(&error))?;
             encoded.push((name.clone(), compressed));
         }
+        for (name, data) in &registry.entry_writes {
+            if encoded.iter().any(|(existing, _)| existing == name) {
+                return Err(Fault::Invalid);
+            }
+            reserve(&mut encoded, 1)?;
+            encoded.push((name.clone(), copy_bytes(data)?));
+        }
         let mut deleted: Vec<&str> = previews.clone();
         deleted.extend(emptied.iter().map(String::as_str));
         deleted.extend(registry.deleted_entries());
