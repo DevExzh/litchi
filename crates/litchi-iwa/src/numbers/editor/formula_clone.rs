@@ -378,6 +378,10 @@ pub(super) fn clone_table_formula_graph(
                 .then_some(*replacement)
         })
         .collect::<Vec<_>>();
+    // Host defect fixed with record 0370h: the registrations followed hash
+    // order; they now follow the new identifiers.
+    let mut new_uuid_ids = new_uuid_ids;
+    new_uuid_ids.sort_unstable();
 
     package.update_archive(&calculation_engine_entry, |archive| {
         let (engine_id, engine_message_index) = calculation_engine_location(archive)?;
