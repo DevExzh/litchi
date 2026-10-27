@@ -190,7 +190,7 @@ mod date_time_fields;
 mod drawable_order;
 mod formula_cache;
 mod formula_clone;
-mod formula_dependency_shift;
+pub(crate) mod formula_dependency_shift;
 mod model;
 mod named_paragraph_styles;
 mod object_closure;
