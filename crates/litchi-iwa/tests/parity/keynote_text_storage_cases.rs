@@ -116,7 +116,11 @@ fn read_case(
 fn keynote_slide_text_storage_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     for path in [TEXT_BOX, COMMENTS] {
-        read_case("keynote_slide_text_storage_read_parity", path, storages_agree)?;
+        read_case(
+            "keynote_slide_text_storage_read_parity",
+            path,
+            storages_agree,
+        )?;
     }
     Ok(())
 }
