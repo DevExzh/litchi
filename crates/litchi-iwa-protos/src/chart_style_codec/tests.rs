@@ -860,3 +860,57 @@ fn legend_frames_rewrite_in_place() -> TestResult {
     assert_eq!(restored.as_bytes(), drawable.as_slice());
     Ok(())
 }
+
+fn drawable_with(chart: &tsch::ChartArchive) -> Vec<u8> {
+    let mut drawable = tsch::ChartDrawableArchive::default().encode_to_vec();
+    drawable.extend(length_delimited(EXTENSION_FIELD, &chart.encode_to_vec()));
+    drawable
+}
+
+fn sparse(entries: &[(u32, u64)]) -> tsp::SparseReferenceArray {
+    tsp::SparseReferenceArray {
+        count: entries.len() as u32,
+        entries: entries
+            .iter()
+            .map(|&(index, identifier)| tsp::sparse_reference_array::Entry {
+                index,
+                reference: tsp::Reference {
+                    identifier,
+                    ..Default::default()
+                },
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn series_non_styles_match_the_generated_encoder() -> TestResult {
+    let chart = tsch::ChartArchive {
+        series_theme_styles: vec![tsp::Reference {
+            identifier: 40,
+            ..Default::default()
+        }],
+        paragraph_styles: vec![tsp::Reference {
+            identifier: 41,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let drawable = drawable_with(&chart);
+    // Absent: inserted before the first later field (paragraph styles).
+    let added = super::rewrite_series_non_styles(&drawable, &[(0, 7), (2, 9)], Limits::DEFAULT)?;
+    let mut expected = chart.clone();
+    expected.series_non_styles = Some(sparse(&[(0, 7), (2, 9)]));
+    assert_eq!(added.as_bytes(), drawable_with(&expected).as_slice());
+    // Present: replaced in place, an empty array keeps its count.
+    let emptied = super::rewrite_series_non_styles(added.as_bytes(), &[], Limits::DEFAULT)?;
+    expected.series_non_styles = Some(sparse(&[]));
+    assert_eq!(emptied.as_bytes(), drawable_with(&expected).as_slice());
+    let unchanged = super::rewrite_series_non_styles(emptied.as_bytes(), &[], Limits::DEFAULT)?;
+    assert!(!unchanged.changed());
+    assert!(matches!(
+        super::rewrite_series_non_styles(&drawable, &[(0, 0)], Limits::DEFAULT),
+        Err(Error::InvalidField { .. })
+    ));
+    Ok(())
+}

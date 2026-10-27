@@ -69,8 +69,8 @@ IWORK_LEAF_PACKAGES = frozenset(
     }
 )
 IWORK_PACKAGE_PREFIX = "litchi-iwa"
-EXPECTED_IWORK_PACKAGES = 17
-EXPECTED_EXCLUDED_PACKAGES = 20
+EXPECTED_IWORK_PACKAGES = 19
+EXPECTED_EXCLUDED_PACKAGES = 22
 EXPECTED_BULK_PACKAGES = 47
 
 # The unified operations layer depends on the iWork leaves under its
@@ -96,6 +96,8 @@ EXPECTED_IWORK_PACKAGE_NAMES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-style",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -117,6 +119,8 @@ EXPECTED_EXCLUDED_PACKAGE_NAMES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-style",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -206,6 +210,8 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-style",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",

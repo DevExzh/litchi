@@ -28,25 +28,27 @@ use litchi_iwa_protos::{
 };
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, NumericCellType};
 
-use super::table_cell_control_native as native;
+use super::control as native;
 use super::{
-    Package, table_cell_pop_up_menu as popup,
-    table_cell_pop_up_menu::{CellTarget, Error, Path, TransactionBudget},
-    table_cell_pop_up_menu_native as popup_native,
+    Error, Path, Target, TransactionBudget, pop_up_menu as popup,
+    pop_up_menu_native as popup_native,
 };
-use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
-use crate::cell::data_format::custom::{
+use crate::TableSource;
+use litchi_iwa_common::table::cell::data_format::currency::{
+    Currency, CurrencyCode, CurrencyStyle,
+};
+use litchi_iwa_common::table::cell::data_format::custom::{
     Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, MAX_NAME_BYTES,
     MAX_PATTERN_BYTES, Name, Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
 };
-use crate::cell::data_format::duration::{
+use litchi_iwa_common::table::cell::data_format::duration::{
     Duration, Style as DurationStyle, Unit as DurationUnit, UnitRange, Units as DurationUnits,
 };
-use crate::cell::data_format::number::{
+use litchi_iwa_common::table::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
     Percentage, Scientific, ThousandsSeparator,
 };
-use crate::cell::data_format::{DateTime, Text};
+use litchi_iwa_common::table::cell::data_format::{DateTime, Text};
 
 const NUMBER_FORMAT_TYPE: u32 = number_codec::NATIVE_NUMBER_FORMAT_TYPE;
 const CURRENCY_FORMAT_TYPE: u32 = currency_codec::NATIVE_CURRENCY_FORMAT_TYPE;
@@ -118,7 +120,7 @@ const BNC_FIELD_LAYOUT: &[(u32, usize)] = &[
 /// supply an arbitrary native discriminator and use this route as a generic
 /// raw-ID editor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DisplayFormatFamily {
+pub enum DisplayFormatFamily {
     Number,
     Currency,
     Percentage,
@@ -158,7 +160,7 @@ impl From<Error> for DisplayReadError {
 
 /// Typed native failure returned to the Number package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum NumberFormatReadError {
+pub enum NumberFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -171,7 +173,7 @@ impl From<Error> for NumberFormatReadError {
 
 /// Typed native failure returned to the Percentage package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum PercentageFormatReadError {
+pub enum PercentageFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -184,7 +186,7 @@ impl From<Error> for PercentageFormatReadError {
 
 /// Typed native failure returned to the Currency package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum CurrencyFormatReadError {
+pub enum CurrencyFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -197,7 +199,7 @@ impl From<Error> for CurrencyFormatReadError {
 
 /// Typed native failure returned to the Scientific package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ScientificFormatReadError {
+pub enum ScientificFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -210,7 +212,7 @@ impl From<Error> for ScientificFormatReadError {
 
 /// Typed native failure returned to the Fraction package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum FractionFormatReadError {
+pub enum FractionFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -223,7 +225,7 @@ impl From<Error> for FractionFormatReadError {
 
 /// Typed native failure returned to the Date & Time package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DateTimeFormatReadError {
+pub enum DateTimeFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -236,7 +238,7 @@ impl From<Error> for DateTimeFormatReadError {
 
 /// Typed native failure returned to the Duration package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DurationFormatReadError {
+pub enum DurationFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -249,7 +251,7 @@ impl From<Error> for DurationFormatReadError {
 
 /// Typed native failure returned to the Text package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum TextFormatReadError {
+pub enum TextFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -397,7 +399,7 @@ fn rewrite_display_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
@@ -407,8 +409,9 @@ fn rewrite_display_cell_metadata(
     cell.set_number_or_percentage_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
     let output = encode_bnc(&cell, source, output_limit, path)?;
-    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
-        .map_err(|_| Error::Verification)?;
+    let candidate_cell =
+        BncCell::parse(&output, &crate::cell_format::bnc_limits_for_source(&output))
+            .map_err(|_| Error::Verification)?;
     verify_display_cell_metadata(
         source_value,
         source_cache,
@@ -483,7 +486,7 @@ fn rewrite_date_time_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
@@ -492,14 +495,15 @@ fn rewrite_date_time_cell_metadata(
     let source_numeric_type = cell.numeric_cell_type();
     if !cell.is_date_time_format_compatible() {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     cell.set_date_time_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
     let output = encode_bnc(&cell, source, output_limit, path)?;
-    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
-        .map_err(|_| Error::Verification)?;
+    let candidate_cell =
+        BncCell::parse(&output, &crate::cell_format::bnc_limits_for_source(&output))
+            .map_err(|_| Error::Verification)?;
     verify_date_time_cell_metadata(
         source_value,
         source_cache,
@@ -568,7 +572,7 @@ fn rewrite_duration_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
@@ -577,14 +581,15 @@ fn rewrite_duration_cell_metadata(
     let source_secondary = cell.secondary_format_identifier();
     if !cell.is_duration_format_compatible() || !cell.has_only_duration_format_metadata() {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     cell.set_duration_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
     let output = encode_bnc(&cell, source, output_limit, path)?;
-    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
-        .map_err(|_| Error::Verification)?;
+    let candidate_cell =
+        BncCell::parse(&output, &crate::cell_format::bnc_limits_for_source(&output))
+            .map_err(|_| Error::Verification)?;
     verify_duration_cell_metadata(
         source_value,
         source_cache,
@@ -654,7 +659,7 @@ fn rewrite_currency_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
@@ -664,8 +669,9 @@ fn rewrite_currency_cell_metadata(
     cell.set_currency_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
     let output = encode_bnc(&cell, source, output_limit, path)?;
-    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
-        .map_err(|_| Error::Verification)?;
+    let candidate_cell =
+        BncCell::parse(&output, &crate::cell_format::bnc_limits_for_source(&output))
+            .map_err(|_| Error::Verification)?;
     verify_currency_cell_metadata(
         source_value,
         source_cache,
@@ -796,17 +802,17 @@ fn inspect_text_cell_metadata(
     );
     if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0 {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     if flags & BNC_FORMAT_FLAGS & !BNC_TEXT_ALLOWED_FORMAT_FLAGS != 0 {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     if cell.cell_format_kind() != Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
 
@@ -880,7 +886,7 @@ fn validate_text_cell_metadata(
             .is_none_or(|identifier| identifier == 0)
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     Ok(metadata)
@@ -913,7 +919,7 @@ fn rewrite_text_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
@@ -937,7 +943,7 @@ fn rewrite_text_cell_metadata(
         )
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
 
@@ -969,7 +975,9 @@ fn rewrite_text_cell_metadata(
                 output
             } else {
                 cell.set_data_format_identifier(identifier, CellDataFormatKind::Text, None)
-                    .map_err(|_| Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }))?;
+                    .map_err(|_| {
+                        Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path })
+                    })?;
                 encode_bnc(&cell, source, output_limit, path)?
             }
         },
@@ -978,7 +986,7 @@ fn rewrite_text_cell_metadata(
             encode_bnc(&cell, source, output_limit, path)?
         },
     };
-    let candidate = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
+    let candidate = BncCell::parse(&output, &crate::cell_format::bnc_limits_for_source(&output))
         .map_err(|_| Error::Verification)?;
     if candidate.stored_value() != source_value
         || candidate.cached_scalar().map_err(|_| Error::Verification)? != source_cache
@@ -1028,7 +1036,7 @@ fn encode_bnc(
     max_output_bytes: usize,
     path: Path,
 ) -> Result<Vec<u8>, Error> {
-    let limits = crate::cell::wire::limits_for_source(source)
+    let limits = crate::cell_format::bnc_limits_for_source(source)
         .with_output_bytes(max_output_bytes)
         .map_err(|_| Error::InvalidSource { path })?;
     cell.encode(&limits)
@@ -1036,9 +1044,9 @@ fn encode_bnc(
 }
 
 /// Read one existing Number format with a fresh transaction ledger.
-pub(super) fn read_number_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_number_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Number>, NumberFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1046,9 +1054,9 @@ pub(super) fn read_number_format(
 }
 
 /// Read one existing Number format against a caller-owned transaction ledger.
-pub(super) fn read_number_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_number_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Number>, NumberFormatReadError> {
@@ -1069,9 +1077,9 @@ pub(super) fn read_number_format_with_budget(
 }
 
 /// Read one existing Currency format with a fresh transaction ledger.
-pub(super) fn read_currency_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_currency_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Currency>, CurrencyFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1080,9 +1088,9 @@ pub(super) fn read_currency_format(
 
 /// Read one existing Currency format against a caller-owned transaction
 /// ledger.
-pub(super) fn read_currency_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_currency_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Currency>, CurrencyFormatReadError> {
@@ -1110,9 +1118,9 @@ pub(super) fn read_currency_format_with_budget(
 }
 
 /// Read one existing Percentage format with a fresh transaction ledger.
-pub(super) fn read_percentage_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_percentage_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Percentage>, PercentageFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1121,9 +1129,9 @@ pub(super) fn read_percentage_format(
 
 /// Read one existing Percentage format against a caller-owned transaction
 /// ledger.
-pub(super) fn read_percentage_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_percentage_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Percentage>, PercentageFormatReadError> {
@@ -1151,9 +1159,9 @@ pub(super) fn read_percentage_format_with_budget(
 }
 
 /// Read one existing Scientific format with a fresh transaction ledger.
-pub(super) fn read_scientific_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_scientific_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Scientific>, ScientificFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1162,9 +1170,9 @@ pub(super) fn read_scientific_format(
 
 /// Read one existing Scientific format against a caller-owned transaction
 /// ledger.
-pub(super) fn read_scientific_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_scientific_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Scientific>, ScientificFormatReadError> {
@@ -1192,9 +1200,9 @@ pub(super) fn read_scientific_format_with_budget(
 }
 
 /// Read one existing Fraction format with a fresh transaction ledger.
-pub(super) fn read_fraction_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_fraction_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Fraction>, FractionFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1203,9 +1211,9 @@ pub(super) fn read_fraction_format(
 
 /// Read one existing Fraction format against a caller-owned transaction
 /// ledger.
-pub(super) fn read_fraction_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_fraction_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Fraction>, FractionFormatReadError> {
@@ -1233,9 +1241,9 @@ pub(super) fn read_fraction_format_with_budget(
 }
 
 /// Read one existing Date & Time format with a fresh transaction ledger.
-pub(super) fn read_date_time_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_date_time_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<DateTime>, DateTimeFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1244,9 +1252,9 @@ pub(super) fn read_date_time_format(
 
 /// Read one existing Date & Time format against a caller-owned transaction
 /// ledger.
-pub(super) fn read_date_time_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_date_time_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<DateTime>, DateTimeFormatReadError> {
@@ -1274,9 +1282,9 @@ pub(super) fn read_date_time_format_with_budget(
 }
 
 /// Read one existing Duration format with a fresh transaction ledger.
-pub(super) fn read_duration_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_duration_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Duration>, DurationFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1285,9 +1293,9 @@ pub(super) fn read_duration_format(
 
 /// Read one existing Duration format against a caller-owned transaction
 /// ledger.
-pub(super) fn read_duration_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_duration_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Duration>, DurationFormatReadError> {
@@ -1315,9 +1323,9 @@ pub(super) fn read_duration_format_with_budget(
 }
 
 /// Read one existing Text format with a fresh transaction ledger.
-pub(super) fn read_text_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_text_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Text>, TextFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -1325,9 +1333,9 @@ pub(super) fn read_text_format(
 }
 
 /// Read one existing Text format against a caller-owned transaction ledger.
-pub(super) fn read_text_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_text_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Text>, TextFormatReadError> {
@@ -1347,9 +1355,9 @@ pub(super) fn read_text_format_with_budget(
 }
 
 /// Rewrite one ordinary Number cell without manufacturing a CellSpec graph.
-pub(super) fn rewrite_number_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_number_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Number>,
     after: Option<&Number>,
     path: Path,
@@ -1367,9 +1375,9 @@ pub(super) fn rewrite_number_format(
 }
 
 /// Rewrite one ordinary Currency cell without manufacturing a CellSpec graph.
-pub(super) fn rewrite_currency_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_currency_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Currency>,
     after: Option<&Currency>,
     path: Path,
@@ -1388,9 +1396,9 @@ pub(super) fn rewrite_currency_format(
 
 /// Rewrite one ordinary Percentage cell without manufacturing a CellSpec
 /// graph.
-pub(super) fn rewrite_percentage_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_percentage_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Percentage>,
     after: Option<&Percentage>,
     path: Path,
@@ -1409,9 +1417,9 @@ pub(super) fn rewrite_percentage_format(
 
 /// Rewrite one ordinary Scientific cell without manufacturing a CellSpec
 /// graph.
-pub(super) fn rewrite_scientific_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_scientific_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Scientific>,
     after: Option<&Scientific>,
     path: Path,
@@ -1429,9 +1437,9 @@ pub(super) fn rewrite_scientific_format(
 }
 
 /// Rewrite one ordinary Fraction cell without manufacturing a CellSpec graph.
-pub(super) fn rewrite_fraction_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_fraction_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Fraction>,
     after: Option<&Fraction>,
     path: Path,
@@ -1450,9 +1458,9 @@ pub(super) fn rewrite_fraction_format(
 
 /// Rewrite one Date & Time cell without converting its stored value or
 /// formula cache.
-pub(super) fn rewrite_date_time_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_date_time_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&DateTime>,
     after: Option<&DateTime>,
     path: Path,
@@ -1471,9 +1479,9 @@ pub(super) fn rewrite_date_time_format(
 
 /// Rewrite one ordinary Duration cell without changing its stored value or
 /// formula cache.
-pub(super) fn rewrite_duration_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_duration_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Duration>,
     after: Option<&Duration>,
     path: Path,
@@ -1491,9 +1499,9 @@ pub(super) fn rewrite_duration_format(
 }
 
 /// Rewrite one ordinary Text cell without manufacturing a CellSpec graph.
-pub(super) fn rewrite_text_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_text_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Text>,
     after: Option<&Text>,
     path: Path,
@@ -1512,14 +1520,12 @@ pub(super) fn rewrite_text_format(
 
 fn read_display_format_with_budget(
     family: DisplayFormatFamily,
-    source: &Package,
-    target: CellTarget,
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<NativeDisplayValue>, DisplayReadError> {
     let model_component = source
-        .state
-        .components
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
@@ -1573,17 +1579,15 @@ fn read_display_format_with_budget(
         .iter()
         .filter(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference);
-    let tile_identifier = tile_matches.next().ok_or(Error::Refused(
-        crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
-    ))?;
+    let tile_identifier = tile_matches
+        .next()
+        .ok_or(Error::Refused(crate::cell_format::Refusal::CellNotFound))?;
     if tile_matches.next().is_some() || tile_identifier == target.model_identifier {
         return Err(Error::InvalidSource { path }.into());
     }
     popup::validate_selected_model_reference(source, target, tile_identifier, path)?;
     let tile_component_index = native::resolved_component_index(source, tile_identifier, path)?;
     let tile_archive = source
-        .state
-        .components
         .catalog()
         .get_index(tile_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -1600,7 +1604,7 @@ fn read_display_format_with_budget(
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(
         cell_source,
-        &crate::cell::wire::limits_for_source(cell_source),
+        &crate::cell_format::bnc_limits_for_source(cell_source),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(cell_source, &cell, path)?;
@@ -1708,10 +1712,9 @@ fn read_display_format_with_budget(
     if format_table_identifier == target.model_identifier
         || format_table_identifier == tile_identifier
     {
-        return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-        )
-        .into());
+        return Err(
+            Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path }).into(),
+        );
     }
     popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
     native::require_exclusive_selected_model_reference(
@@ -1724,8 +1727,6 @@ fn read_display_format_with_budget(
     let format_component_index =
         native::resolved_component_index(source, format_table_identifier, path)?;
     let format_archive = source
-        .state
-        .components
         .catalog()
         .get_index(format_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -1760,11 +1761,7 @@ fn read_display_format_with_budget(
             (tile_component_index, tile_identifier),
             (format_component_index, format_table_identifier),
         ])
-        .map_err(|_| {
-            Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-            )
-        })?;
+        .map_err(|_| Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path }))?;
     let format_object = native::unique_object(format_archive, format_table_identifier, path)?;
     let format_message = native::unique_list_message(format_object, 2, budget, path)?;
     let format_payload = native::copy_payload_with_budget(format_message.payload, budget, path)?;
@@ -1820,17 +1817,17 @@ fn read_display_format_with_budget(
 
 fn rewrite_display_format(
     family: DisplayFormatFamily,
-    source: &Package,
-    target: CellTarget,
+    source: &dyn TableSource,
+    target: Target,
     before: Option<NativeDisplayValue>,
     after: Option<NativeDisplayValue>,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<native::NativeControlOutput, Error> {
     if target.locked {
-        return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path },
-        ));
+        return Err(Error::Refused(crate::cell_format::Refusal::TableLocked {
+            path,
+        }));
     }
     if before
         .as_ref()
@@ -1838,12 +1835,10 @@ fn rewrite_display_format(
         || after.as_ref().is_some_and(|value| value.family() != family)
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let model_component = source
-        .state
-        .components
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
@@ -1883,9 +1878,9 @@ fn rewrite_display_format(
         .iter()
         .filter(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference);
-    let tile_identifier = tile_matches.next().ok_or(Error::Refused(
-        crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
-    ))?;
+    let tile_identifier = tile_matches
+        .next()
+        .ok_or(Error::Refused(crate::cell_format::Refusal::CellNotFound))?;
     if tile_matches.next().is_some() || tile_identifier == target.model_identifier {
         return Err(Error::InvalidSource { path });
     }
@@ -1913,8 +1908,6 @@ fn rewrite_display_format(
     }
     let tile_component_index = native::resolved_component_index(source, tile_identifier, path)?;
     let tile_archive = source
-        .state
-        .components
         .catalog()
         .get_index(tile_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -1935,7 +1928,7 @@ fn rewrite_display_format(
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(
         cell_source,
-        &crate::cell::wire::limits_for_source(cell_source),
+        &crate::cell_format::bnc_limits_for_source(cell_source),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(cell_source, &cell, path)?;
@@ -1949,7 +1942,7 @@ fn rewrite_display_format(
         };
     if cell.control_cell_spec_identifier().is_some() {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let explicit_flags = cell.explicit_format_flags();
@@ -1970,7 +1963,7 @@ fn rewrite_display_format(
                     && !scientific_cell_type_matches_value(&cell))
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
         },
@@ -1983,7 +1976,7 @@ fn rewrite_display_format(
                 || !cell.is_date_time_format_compatible()
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
         },
@@ -1998,7 +1991,7 @@ fn rewrite_display_format(
                 || !cell.is_duration_format_compatible()
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
         },
@@ -2012,7 +2005,7 @@ fn rewrite_display_format(
                 || !currency_cell_type_matches_value(&cell, true)
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
         },
@@ -2033,7 +2026,7 @@ fn rewrite_display_format(
                 || old_secondary != metadata.generic_identifier
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
         },
@@ -2054,7 +2047,7 @@ fn rewrite_display_format(
                     || cell.is_duration_format_compatible()) => {},
         _ => {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         },
     }
@@ -2066,7 +2059,7 @@ fn rewrite_display_format(
         || format_table_identifier == tile_identifier
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
@@ -2080,8 +2073,6 @@ fn rewrite_display_format(
     let format_component_index =
         native::resolved_component_index(source, format_table_identifier, path)?;
     let format_archive = source
-        .state
-        .components
         .catalog()
         .get_index(format_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -2116,11 +2107,7 @@ fn rewrite_display_format(
             (tile_component_index, tile_identifier),
             (format_component_index, format_table_identifier),
         ])
-        .map_err(|_| {
-            Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-            )
-        })?;
+        .map_err(|_| Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path }))?;
     let format_object = native::unique_object(format_archive, format_table_identifier, path)?;
     let format_message = native::unique_list_message(format_object, 2, budget, path)?;
     let format_message_index = format_message.message_index;
@@ -2293,9 +2280,7 @@ fn rewrite_display_format(
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let archive_limits = source
-        .state
-        .options
-        .archive()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let mut component_indices = vec![tile_component_index, format_component_index];
@@ -2305,8 +2290,6 @@ fn rewrite_display_format(
         .iter()
         .map(|&component_index| {
             let component = source
-                .state
-                .components
                 .catalog()
                 .get_index(component_index)
                 .ok_or(Error::InvalidSource { path })?;
@@ -2345,8 +2328,6 @@ fn rewrite_display_format(
     let mut candidate_serialized_bytes = 0usize;
     for (component_index, candidate) in &archives {
         let source_archive = source
-            .state
-            .components
             .catalog()
             .get_index(*component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -2394,8 +2375,6 @@ fn rewrite_display_format(
         .collect::<Vec<_>>();
         popup_native::verify_archive_object_locality(
             source
-                .state
-                .components
                 .catalog()
                 .get_index(component_index)
                 .ok_or(Error::InvalidSource { path })?
@@ -2416,14 +2395,12 @@ fn rewrite_display_format(
         budget
             .charge_payload_bytes(archive_bytes.len(), path)
             .map_err(|_| Error::Limit {
-                kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
+                kind: crate::cell_format::LimitKind::PayloadBytes,
                 observed: archive_bytes.len() as u64,
                 maximum: u64::MAX,
                 path,
             })?;
         let member_name = source
-            .state
-            .components
             .catalog()
             .get_index(component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -2445,15 +2422,13 @@ fn rewrite_display_format(
 }
 
 fn resolve_custom_cell_graph(
-    source: &Package,
-    target: CellTarget,
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     for_write: bool,
     budget: &mut TransactionBudget,
 ) -> Result<CustomCellGraph, Error> {
     let model_component = source
-        .state
-        .components
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
@@ -2475,7 +2450,7 @@ fn resolve_custom_cell_graph(
     native::charge_storage_report(budget, store_report, path)?;
     if store.deprecated_custom_format_table().is_some() {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let tile_options = budget.residual_storage_options(store.tiles());
@@ -2498,9 +2473,9 @@ fn resolve_custom_cell_graph(
         .iter()
         .filter(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference);
-    let tile_identifier = tile_matches.next().ok_or(Error::Refused(
-        crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
-    ))?;
+    let tile_identifier = tile_matches
+        .next()
+        .ok_or(Error::Refused(crate::cell_format::Refusal::CellNotFound))?;
     if tile_matches.next().is_some()
         || tile_identifier == target.model_identifier
         || tile_references.iter().any(|(_, reference)| *reference == 0)
@@ -2529,8 +2504,6 @@ fn resolve_custom_cell_graph(
     }
     let tile_component_index = native::resolved_component_index(source, tile_identifier, path)?;
     let tile_archive = source
-        .state
-        .components
         .catalog()
         .get_index(tile_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -2552,13 +2525,13 @@ fn resolve_custom_cell_graph(
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(
         &cell_source,
-        &crate::cell::wire::limits_for_source(&cell_source),
+        &crate::cell_format::bnc_limits_for_source(&cell_source),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(&cell_source, &cell, path)?;
     if cell.control_cell_spec_identifier().is_some() {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let format_identifier = cell.format_identifier();
@@ -2574,14 +2547,14 @@ fn resolve_custom_cell_graph(
             // Custom owner shape; accepting it would require moving two
             // families and could strand the secondary key.
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
     }
     if format_identifier.is_none() {
         if explicit_flags != 0 {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
     }
@@ -2593,7 +2566,7 @@ fn resolve_custom_cell_graph(
         || format_table_identifier == tile_identifier
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
@@ -2609,8 +2582,6 @@ fn resolve_custom_cell_graph(
     let format_component_index =
         native::resolved_component_index(source, format_table_identifier, path)?;
     let format_archive = source
-        .state
-        .components
         .catalog()
         .get_index(format_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -2629,7 +2600,7 @@ fn resolve_custom_cell_graph(
     native::charge_storage_report(budget, list_report, path)?;
     if list_type.list_type() != FORMAT_LIST_TYPE {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let facts = native::list_facts(&format_payload, budget, path)?;
@@ -2680,7 +2651,7 @@ fn selected_custom_reference(
         return Err(Error::InvalidSource { path });
     }
     parse_custom_reference(&entry.payload, budget, path)?.ok_or(Error::Refused(
-        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        crate::cell_format::Refusal::UnsupportedDependency { path },
     ))
 }
 
@@ -2733,8 +2704,8 @@ fn custom_reference_matches_cell(format_type: u32, graph: &CustomCellGraph, flag
 }
 
 fn validate_custom_graph_ownership(
-    source: &Package,
-    target: CellTarget,
+    source: &dyn TableSource,
+    target: Target,
     graph: &CustomCellGraph,
     registry: CustomRegistryLocation,
     path: Path,
@@ -2766,8 +2737,6 @@ fn validate_custom_graph_ownership(
         path,
     )?;
     let document_component = source
-        .state
-        .components
         .catalog()
         .iter()
         .position(|component| component.name() == "Index/Document.iwa")
@@ -2786,25 +2755,21 @@ fn validate_custom_graph_ownership(
             (graph.format_component_index, graph.format_table_identifier),
             (registry.component_index, registry.object_identifier),
         ])
-        .map_err(|_| {
-            Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-            )
-        })?;
+        .map_err(|_| Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path }))?;
     Ok(())
 }
 
 fn locate_custom_registry(
-    source: &Package,
+    source: &dyn TableSource,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<CustomRegistryLocation, Error> {
     let document_archive = source
-        .state
-        .components
-        .get_archive("Index/Document.iwa")
+        .catalog()
+        .get("Index/Document.iwa")
+        .map(litchi_iwa_archive::Component::archive)
         .ok_or(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+            crate::cell_format::Refusal::UnsupportedSource,
         ))?;
     let document_object = native::unique_object(document_archive, 1, path)?;
     let document_index =
@@ -2858,21 +2823,17 @@ fn locate_custom_registry(
         },
         (Some(_), Some(_)) => {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         },
         (None, None) => return Err(Error::InvalidSource { path }),
     };
     let resolved = source
-        .state
-        .index
-        .resolve_ref_id(&source.state.components, registry_identifier)
+        .resolve_object(registry_identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
     let component_index = resolved.component_index;
     let object = source
-        .state
-        .components
         .catalog()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(resolved.object_index))
@@ -2886,10 +2847,10 @@ fn locate_custom_registry(
         .ok_or(Error::InvalidSource { path })?;
     if message.type_ != CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
-    for (other_component_index, component) in source.state.components.catalog().iter().enumerate() {
+    for (other_component_index, component) in source.catalog().iter().enumerate() {
         for other in &component.archive().objects {
             for candidate in &other.messages {
                 if other_component_index == component_index
@@ -2903,9 +2864,7 @@ fn locate_custom_registry(
                     && parse_registry_shape(&candidate.data, budget, path).is_ok()
                 {
                     return Err(Error::Refused(
-                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
-                            path,
-                        },
+                        crate::cell_format::Refusal::UnsupportedDependency { path },
                     ));
                 }
             }
@@ -2927,18 +2886,15 @@ fn parse_custom_registry_reference(field: WireFieldView<'_>, path: Path) -> Resu
     field
         .validate_canonical_framing()
         .map_err(|_| Error::InvalidSource { path })?;
-    super::table_headers::resolve::local_reference_identifier(field.payload())
-        .map_err(|_| Error::InvalidSource { path })
+    super::local_reference_identifier(field.payload()).map_err(|_| Error::InvalidSource { path })
 }
 
 fn registry_payload(
-    source: &Package,
+    source: &dyn TableSource,
     location: CustomRegistryLocation,
     path: Path,
 ) -> Result<&[u8], Error> {
     let archive = source
-        .state
-        .components
         .catalog()
         .get_index(location.component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -3413,7 +3369,7 @@ fn parse_custom_archive(
         CUSTOM_NUMBER_FORMAT_TYPE | CUSTOM_TEXT_FORMAT_TYPE | CUSTOM_DATE_TIME_FORMAT_TYPE
     ) {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let declared_type = parse_optional_varint(&view, CUSTOM_FORMAT_TYPE_FIELD, path)?;
@@ -3426,9 +3382,9 @@ fn parse_custom_archive(
         .fields()
         .filter(|field| field.number() == CUSTOM_FORMAT_CONDITION_FIELD)
         .count();
-    if condition_count > crate::cell::data_format::custom::MAX_RULES {
+    if condition_count > litchi_iwa_common::table::cell::data_format::custom::MAX_RULES {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let mut conditions = Vec::new();
@@ -3485,7 +3441,7 @@ fn parse_custom_archive(
         CUSTOM_TEXT_FORMAT_TYPE => {
             if !conditions.is_empty() {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             let (prefix, suffix, includes_cell) =
@@ -3501,7 +3457,7 @@ fn parse_custom_archive(
         CUSTOM_DATE_TIME_FORMAT_TYPE => {
             if !conditions.is_empty() {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             let pattern = DateTimePattern::from_owned(default_pattern)
@@ -3509,7 +3465,7 @@ fn parse_custom_archive(
             Ok(Custom::DateTime(CustomDateTime::new(name, pattern)))
         },
         _ => Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         )),
     }
 }
@@ -3547,7 +3503,7 @@ fn parse_custom_condition(
         4 => Condition::GreaterThanOrEqualTo(threshold),
         _ => {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         },
     };
@@ -3555,7 +3511,7 @@ fn parse_custom_condition(
     let (format_type, pattern) = parse_custom_pattern(format_payload, expected_type, budget, path)?;
     if format_type != expected_type {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     Ok((condition, pattern))
@@ -3576,7 +3532,7 @@ fn parse_custom_pattern(
     .map_err(|_| Error::InvalidSource { path })?;
     if format_type != expected_type {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let pattern = parse_required_string(
@@ -3594,7 +3550,7 @@ fn parse_custom_pattern(
     let show_thousands = parse_optional_bool(&view, 5, path)?;
     if expected_type != CUSTOM_NUMBER_FORMAT_TYPE && show_thousands.is_some_and(|value| value) {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     if parse_optional_bool(&view, 6, path)?.is_some_and(|value| value)
@@ -3605,13 +3561,13 @@ fn parse_custom_pattern(
         || parse_optional_bool(&view, 36, path)?.is_some_and(|value| value)
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     for field_number in [27_u32, 28, 29, 30, 34, 35] {
         if parse_optional_varint(&view, field_number, path)?.is_some_and(|value| value != 0) {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
     }
@@ -3633,7 +3589,7 @@ fn parse_custom_pattern(
                 .and_then(|index| u64::try_from(index).ok())
                 .ok_or(Error::InvalidSource { path }),
             _ => Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             )),
         }?;
         if value != expected_index
@@ -3641,7 +3597,7 @@ fn parse_custom_pattern(
                 || Some(value) != custom_text_pattern_suffix_width(&pattern))
         {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
     }
@@ -3661,7 +3617,7 @@ fn parse_custom_pattern(
         };
         if !valid {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
     }
@@ -3675,7 +3631,7 @@ fn parse_custom_pattern(
             continue;
         }
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     Ok((format_type, pattern))
@@ -3704,7 +3660,7 @@ fn split_custom_text_pattern(
     };
     if suffix.contains(CUSTOM_TEXT_VALUE_TOKEN) {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     budget.charge_allocations(2, path)?;
@@ -4253,7 +4209,7 @@ fn rewrite_custom_cell_clear(
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
     charge_owned_bnc_parse(source.len(), path, budget)?;
-    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         .map_err(|_| Error::InvalidSource { path })?;
     cell.clear_explicit_format();
     encode_bnc(
@@ -4281,7 +4237,7 @@ fn fresh_custom_uuid(entries: &[CustomRegistryEntry]) -> CustomUuid {
 }
 
 fn custom_uuid_is_referenced(
-    source: &Package,
+    source: &dyn TableSource,
     replacement_component: usize,
     replacement_identifier: u64,
     replacement_message: usize,
@@ -4290,7 +4246,7 @@ fn custom_uuid_is_referenced(
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<bool, Error> {
-    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+    for (component_index, component) in source.catalog().iter().enumerate() {
         for object in &component.archive().objects {
             let object_identifier = object.archive_info.identifier.unwrap_or(0);
             for (message_index, message) in object.messages.iter().enumerate() {
@@ -4311,7 +4267,9 @@ fn custom_uuid_is_referenced(
                         .map_err(|error| native::map_storage_error(error, path))?;
                     native::charge_storage_report(budget, report, path)?;
                     if list_type.list_type() == CUSTOM_FORMAT_LIST_TYPE {
-                        return Err(Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }));
+                        return Err(Error::Refused(
+                            crate::cell_format::Refusal::UnsupportedDependency { path },
+                        ));
                     }
                     if list_type.list_type() != FORMAT_LIST_TYPE {
                         continue;
@@ -4345,7 +4303,9 @@ fn custom_uuid_is_referenced(
                         list_type.list_type(),
                         CUSTOM_FORMAT_LIST_TYPE | FORMAT_LIST_TYPE
                     ) {
-                        return Err(Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }));
+                        return Err(Error::Refused(
+                            crate::cell_format::Refusal::UnsupportedDependency { path },
+                        ));
                     }
                 }
             }
@@ -4392,12 +4352,12 @@ fn parse_custom_reference(
             return Ok(None);
         }
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     if other_known {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let uuid = parse_custom_uuid(
@@ -4409,18 +4369,18 @@ fn parse_custom_reference(
 }
 
 fn validate_custom_legacy_routes(
-    source: &Package,
+    source: &dyn TableSource,
     route: CustomRegistryRoute,
     registry_identifier: u64,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     let document_archive = source
-        .state
-        .components
-        .get_archive("Index/Document.iwa")
+        .catalog()
+        .get("Index/Document.iwa")
+        .map(litchi_iwa_archive::Component::archive)
         .ok_or(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+            crate::cell_format::Refusal::UnsupportedSource,
         ))?;
     let document_object = native::unique_object(document_archive, 1, path)?;
     let document_index =
@@ -4443,14 +4403,14 @@ fn validate_custom_legacy_routes(
             match nested.number() {
                 7 => {
                     return Err(Error::Refused(
-                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
-                            path,
-                        },
+                        crate::cell_format::Refusal::UnsupportedDependency { path },
                     ));
                 },
                 LEGACY_CUSTOM_REGISTRY_REFERENCE_FIELD => {
                     if !matches!(route, CustomRegistryRoute::LegacySuperField12) {
-                        return Err(Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }));
+                        return Err(Error::Refused(
+                            crate::cell_format::Refusal::UnsupportedDependency { path },
+                        ));
                     }
                     let nested_identifier = parse_custom_registry_reference(nested, path)?;
                     if nested_identifier != registry_identifier {
@@ -4467,7 +4427,7 @@ fn validate_custom_legacy_routes(
             return Err(Error::InvalidSource { path });
         }
     }
-    for component in source.state.components.catalog().iter() {
+    for component in source.catalog().iter() {
         for object in &component.archive().objects {
             for message in &object.messages {
                 if message.type_ != 6_001 {
@@ -4487,9 +4447,7 @@ fn validate_custom_legacy_routes(
                 native::charge_storage_report(budget, report, path)?;
                 if store.deprecated_custom_format_table().is_some() {
                     return Err(Error::Refused(
-                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
-                            path,
-                        },
+                        crate::cell_format::Refusal::UnsupportedDependency { path },
                     ));
                 }
             }
@@ -4740,7 +4698,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Number => {
             let NativeDisplayValue::Number(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = number_codec::prepare_number_format_rewrite(
@@ -4758,7 +4716,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Currency => {
             let NativeDisplayValue::Currency(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let code = value.code();
@@ -4779,7 +4737,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Percentage => {
             let NativeDisplayValue::Percentage(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = percentage_codec::prepare_percentage_format_rewrite(
@@ -4797,7 +4755,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Scientific => {
             let NativeDisplayValue::Scientific(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = scientific_codec::prepare_scientific_format_rewrite(
@@ -4813,7 +4771,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Fraction => {
             let NativeDisplayValue::Fraction(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = fraction_codec::prepare_fraction_format_rewrite(
@@ -4829,7 +4787,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::DateTime => {
             let NativeDisplayValue::DateTime(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = date_time_codec::prepare_date_time_format_rewrite(
@@ -4843,7 +4801,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Duration => {
             let NativeDisplayValue::Duration(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = duration_codec::prepare_duration_format_rewrite(
@@ -4857,7 +4815,7 @@ fn prepare_display_rewrite(
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = text_codec::prepare_text_format_rewrite(
@@ -4883,7 +4841,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Number => {
             let NativeDisplayValue::Number(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = number_codec::prepare_number_format_write(
@@ -4900,7 +4858,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Currency => {
             let NativeDisplayValue::Currency(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let code = value.code();
@@ -4920,7 +4878,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Percentage => {
             let NativeDisplayValue::Percentage(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = percentage_codec::prepare_percentage_format_write(
@@ -4937,7 +4895,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Scientific => {
             let NativeDisplayValue::Scientific(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = scientific_codec::prepare_scientific_format_write(
@@ -4952,7 +4910,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Fraction => {
             let NativeDisplayValue::Fraction(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = fraction_codec::prepare_fraction_format_write(
@@ -4967,7 +4925,7 @@ fn prepare_display_append(
         DisplayFormatFamily::DateTime => {
             let NativeDisplayValue::DateTime(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = date_time_codec::prepare_date_time_format_write(
@@ -4980,7 +4938,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Duration => {
             let NativeDisplayValue::Duration(value) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared = duration_codec::prepare_duration_format_write(
@@ -4993,7 +4951,7 @@ fn prepare_display_append(
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             };
             let prepared =
@@ -5346,9 +5304,9 @@ fn execute_text_rewrite(
 
 fn display_read_error_to_write_error(error: DisplayReadError, path: Path) -> Error {
     match error {
-        DisplayReadError::WrongFormatFamily => Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-        ),
+        DisplayReadError::WrongFormatFamily => {
+            Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path })
+        },
         DisplayReadError::Native(error) => error,
     }
 }
@@ -5400,7 +5358,7 @@ const DOCUMENT_LEGACY_SUPER_FIELD: u32 = 8;
 const LEGACY_CUSTOM_REGISTRY_REFERENCE_FIELD: u32 = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum CustomFormatReadError {
+pub enum CustomFormatReadError {
     WrongFormatFamily,
     Native(Error),
 }
@@ -5472,9 +5430,9 @@ struct CustomReference {
 }
 
 /// Read one existing cell's document-scoped Custom display format.
-pub(super) fn read_custom_format(
-    source: &Package,
-    target: CellTarget,
+pub fn read_custom_format(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
 ) -> Result<Option<Custom>, CustomFormatReadError> {
     let mut budget = TransactionBudget::for_cell_control(source);
@@ -5482,9 +5440,9 @@ pub(super) fn read_custom_format(
 }
 
 /// Read one Custom display format against a caller-owned transaction ledger.
-pub(super) fn read_custom_format_with_budget(
-    source: &Package,
-    target: CellTarget,
+pub fn read_custom_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Option<Custom>, CustomFormatReadError> {
@@ -5509,9 +5467,7 @@ pub(super) fn read_custom_format_with_budget(
                     return Err(CustomFormatReadError::WrongFormatFamily);
                 }
             },
-            Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { .. },
-            )) => {
+            Err(Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { .. })) => {
                 return Err(CustomFormatReadError::WrongFormatFamily);
             },
             Err(error) => return Err(CustomFormatReadError::Native(error)),
@@ -5520,9 +5476,7 @@ pub(super) fn read_custom_format_with_budget(
     }
     let reference = match selected_custom_reference(&graph, format_identifier, path, budget) {
         Ok(reference) => reference,
-        Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { .. },
-        )) => {
+        Err(Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { .. })) => {
             return Err(CustomFormatReadError::WrongFormatFamily);
         },
         Err(error) => return Err(CustomFormatReadError::Native(error)),
@@ -5562,23 +5516,23 @@ pub(super) fn read_custom_format_with_budget(
 }
 
 /// Rewrite one existing cell's document-scoped Custom display format.
-pub(super) fn rewrite_custom_format(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_custom_format(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&Custom>,
     after: Option<&Custom>,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<native::NativeControlOutput, Error> {
     if target.locked {
-        return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path },
-        ));
+        return Err(Error::Refused(crate::cell_format::Refusal::TableLocked {
+            path,
+        }));
     }
     if let (Some(before), Some(after)) = (before, after) {
         if custom_format_type(before) != custom_format_type(after) {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
     }
@@ -5615,7 +5569,7 @@ pub(super) fn rewrite_custom_format(
                 )
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             Some(format.clone())
@@ -5623,7 +5577,7 @@ pub(super) fn rewrite_custom_format(
     } else {
         if graph.explicit_flags != 0 {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         }
         None
@@ -5780,9 +5734,7 @@ pub(super) fn rewrite_custom_format(
     .map_err(|_| Error::InvalidSource { path })?;
 
     let archive_limits = source
-        .state
-        .options
-        .archive()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let mut component_indices = vec![graph.tile_component_index, graph.format_component_index];
@@ -5795,8 +5747,6 @@ pub(super) fn rewrite_custom_format(
         .iter()
         .map(|&component_index| {
             let component = source
-                .state
-                .components
                 .catalog()
                 .get_index(component_index)
                 .ok_or(Error::InvalidSource { path })?;
@@ -5810,8 +5760,6 @@ pub(super) fn rewrite_custom_format(
         .collect::<Result<Vec<_>, Error>>()?;
     popup_native::validate_message_without_object_references(
         source
-            .state
-            .components
             .catalog()
             .get_index(graph.format_component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -5839,8 +5787,6 @@ pub(super) fn rewrite_custom_format(
     if let Some(new_registry) = new_registry {
         popup_native::validate_message_without_object_references(
             source
-                .state
-                .components
                 .catalog()
                 .get_index(registry_location.component_index)
                 .ok_or(Error::InvalidSource { path })?
@@ -5880,8 +5826,6 @@ pub(super) fn rewrite_custom_format(
         .collect::<Vec<_>>();
         popup_native::verify_archive_object_locality(
             source
-                .state
-                .components
                 .catalog()
                 .get_index(component_index)
                 .ok_or(Error::InvalidSource { path })?
@@ -5895,8 +5839,6 @@ pub(super) fn rewrite_custom_format(
             .map_err(|_| Error::InvalidSource { path })?;
         budget.charge_payload_bytes(archive_bytes.len(), path)?;
         let member_name = source
-            .state
-            .components
             .catalog()
             .get_index(component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -5927,7 +5869,7 @@ mod tests {
         CUSTOM_CONDITION_DOUBLE_FIELD, CUSTOM_CONDITION_FORMAT_FIELD, CUSTOM_CONDITION_TYPE_FIELD,
         CUSTOM_DATE_TIME_FORMAT_TYPE, CUSTOM_FRACTION_SENTINEL, CUSTOM_NUMBER_FORMAT_TYPE,
         CUSTOM_PATTERN_STRING_FIELD, CUSTOM_PATTERN_TYPE_FIELD, CUSTOM_REGISTRY_REFERENCE_FIELD,
-        CUSTOM_TEXT_FORMAT_TYPE, DOCUMENT_LEGACY_SUPER_FIELD, Package, Path, TransactionBudget,
+        CUSTOM_TEXT_FORMAT_TYPE, DOCUMENT_LEGACY_SUPER_FIELD, Path, TransactionBudget,
         append_custom_bytes, append_custom_fixed64, append_custom_varint,
         custom_condition_encoded_len, custom_pattern_encoded_len,
         custom_pattern_index_from_right_last_integer, custom_text_pattern_suffix_width,
@@ -6005,7 +5947,7 @@ mod tests {
     fn test_budget() -> TransactionBudget {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/numbers/basic.numbers");
-        let package = Package::open(path).expect("Numbers budget fixture");
+        let package = crate::cell_format::test_source::Opened::open(&path);
         TransactionBudget::for_cell_control(&package)
     }
 
@@ -6039,7 +5981,7 @@ mod tests {
     #[test]
     fn native_marker_zero_text_is_valid_default_metadata() {
         let source = hex("050000000000000000100200050000000c000000");
-        let cell = BncCell::parse(&source, &crate::cell::wire::limits_for_source(&source))
+        let cell = BncCell::parse(&source, &crate::cell_format::bnc_limits_for_source(&source))
             .expect("native marker-zero Text cell");
         assert_eq!(cell.explicit_format_flags(), 0);
         let metadata = validate_text_cell_metadata(&source, &cell, Path::Package)
@@ -6051,7 +5993,7 @@ mod tests {
     #[test]
     fn native_converted_text_retains_a_generic_number_edge() {
         let source = hex("0503000000008100083002000200000005000000010000000c000000");
-        let cell = BncCell::parse(&source, &crate::cell::wire::limits_for_source(&source))
+        let cell = BncCell::parse(&source, &crate::cell_format::bnc_limits_for_source(&source))
             .expect("native converted Text cell");
         let metadata = validate_text_cell_metadata(&source, &cell, Path::Package)
             .expect("converted Text metadata");
@@ -6066,7 +6008,7 @@ mod tests {
         flags |= 0x0010_0000;
         source[8..12].copy_from_slice(&flags.to_le_bytes());
         source.extend_from_slice(&[0; 4]);
-        let cell = BncCell::parse(&source, &crate::cell::wire::limits_for_source(&source))
+        let cell = BncCell::parse(&source, &crate::cell_format::bnc_limits_for_source(&source))
             .expect("reserved field remains parseable");
         assert!(validate_text_cell_metadata(&source, &cell, Path::Package).is_err());
     }

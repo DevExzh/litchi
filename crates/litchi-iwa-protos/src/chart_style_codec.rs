@@ -2128,6 +2128,81 @@ pub fn rewrite_legend_frame(
     })
 }
 
+/// Replace a chart's `series_non_styles` sparse array (field 19 of the chart
+/// archive) with `entries` (`(series index, object identifier)` in order),
+/// encoded as a protobuf encoder writes it: the `count` (the number of
+/// entries) and each entry's index and reference identifier. A stored array
+/// is replaced in place; an absent one is inserted before the first chart
+/// field numbered above 19. Every other byte is kept.
+///
+/// # Errors
+///
+/// The [`references`] errors; [`Error::InvalidField`] for a zero
+/// identifier; [`Error::Limit`]/[`Error::Allocation`] for the candidate.
+pub fn rewrite_series_non_styles<'source>(
+    chart_drawable: &'source [u8],
+    entries: &[(u32, u64)],
+    limits: Limits,
+) -> Result<Rewrite<'source>, Error> {
+    references(chart_drawable, limits)?;
+    if entries.iter().any(|(_, identifier)| *identifier == 0) {
+        return Err(Error::InvalidField {
+            field: SERIES_NON_STYLES_FIELD,
+        });
+    }
+    let mut sparse = allocate(entries.len() * 16 + 6, limits)?;
+    sparse.push(0x08);
+    push_varint(&mut sparse, entries.len() as u64);
+    for &(index, identifier) in entries {
+        let mut reference = Vec::with_capacity(11);
+        reference.push(0x08);
+        push_varint(&mut reference, identifier);
+        let mut entry = Vec::with_capacity(reference.len() + 8);
+        entry.push(0x08);
+        push_varint(&mut entry, u64::from(index));
+        entry.push(0x12);
+        push_varint(&mut entry, reference.len() as u64);
+        entry.extend_from_slice(&reference);
+        sparse.push(0x12);
+        push_varint(&mut sparse, entry.len() as u64);
+        sparse.extend_from_slice(&entry);
+    }
+    let mut budget = Budget::new(limits);
+    let chart_field = chart_extension(chart_drawable, &mut budget)?;
+    let chart = chart_field.payload(chart_drawable);
+    let mut existing = None;
+    let mut insert_at = chart.len();
+    visit_fields(chart, &mut budget, |field| {
+        if field.number == SERIES_NON_STYLES_FIELD {
+            existing = Some(field);
+        } else if field.number > SERIES_NON_STYLES_FIELD && insert_at == chart.len() {
+            insert_at = field.start;
+        }
+        Ok(())
+    })?;
+    let next_chart = match existing {
+        Some(field) if field.payload(chart) == sparse.as_slice() => {
+            return Ok(Rewrite {
+                bytes: Cow::Borrowed(chart_drawable),
+            });
+        },
+        Some(field) => replace_payload(chart, &field, &sparse, limits)?,
+        None => {
+            let mut output = allocate(chart.len() + sparse.len() + 7, limits)?;
+            output.extend_from_slice(&chart[..insert_at]);
+            push_varint(&mut output, (u64::from(SERIES_NON_STYLES_FIELD) << 3) | 2);
+            push_varint(&mut output, sparse.len() as u64);
+            output.extend_from_slice(&sparse);
+            output.extend_from_slice(&chart[insert_at..]);
+            output
+        },
+    };
+    let output = replace_payload(chart_drawable, &chart_field, &next_chart, limits)?;
+    Ok(Rewrite {
+        bytes: Cow::Owned(output),
+    })
+}
+
 /// The identifier of one `TSP.Reference` field (`None` for 0).
 fn reference(data: &[u8], field: &Field, budget: &mut Budget) -> Result<Option<u64>, Error> {
     require_wire_type(field, WIRE_LENGTH_DELIMITED)?;

@@ -20157,6 +20157,31 @@
       "families": []
     },
     {
+      "id": "iwa-style",
+      "package": "litchi-iwa-style",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_style",
+          "replacement": "limits are a required argument of every entry point that reads untrusted bytes (record 0351, record 0375a)",
+          "match": "suffix"
+        },
+        {
+          "name": "drawing_native",
+          "scope": "litchi_iwa_style",
+          "replacement": "use litchi_iwa_style::drawing; the per-leaf copies are folded into this crate (record 0375a)"
+        },
+        {
+          "name": "media_native",
+          "scope": "litchi_iwa_style",
+          "replacement": "use litchi_iwa_style::media; the per-leaf copies are folded into this crate (record 0375a)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "iwa-text-wire",
       "package": "litchi-iwa-text-wire",
       "default_features": true,
@@ -22629,6 +22654,26 @@
           "inputs": ["owners", "object", "info", "limits"],
           "limits_argument": "limits",
           "limits_type": "litchi_numbers_wire::Limits"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "iwa-table",
+      "package": "litchi-iwa-table",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_table",
+          "replacement": "table engines take their limits through the supplied TableSource and TransactionBudget on canonical names (records 0351, 0379)",
+          "match": "suffix"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_iwa_table",
+          "replacement": "use Error::Limit { kind, observed, maximum, path } (record 0351)"
         }
       ],
       "families": []
