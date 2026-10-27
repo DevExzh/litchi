@@ -21,6 +21,7 @@ pub(crate) mod comments_metadata;
 )]
 pub(crate) mod comments_reply_native;
 pub(crate) mod conditional_highlight;
+mod document_locale;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
