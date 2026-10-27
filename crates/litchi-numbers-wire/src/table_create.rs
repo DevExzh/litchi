@@ -52,10 +52,11 @@ const DROPPED_MODEL_FIELDS: [u32; 21] = [
 /// Model counters reset to zero (hidden, user-hidden and filtered rows and
 /// columns).
 const ZEROED_MODEL_FIELDS: [u32; 5] = [14, 15, 41, 42, 40];
-/// Table-info fields the clone drops: editing state, summary and category
-/// models, view UIDs, group and hidden-state UUIDs, pasteboard mapping and
-/// pivot state.
-const DROPPED_INFO_FIELDS: [u32; 10] = [3, 4, 5, 6, 7, 8, 13, 15, 16, 17];
+/// Table-info fields the clone drops, as the host editor clears them:
+/// editing state, summary and category models, view UIDs and pivot state
+/// (record 0370f; the group and hidden-state UUIDs, the pasteboard mapping
+/// and the pivot flag are kept, as native tables carry them).
+const DROPPED_INFO_FIELDS: [u32; 6] = [3, 4, 5, 6, 15, 17];
 /// Drawable fields the clone drops: comment, pencil annotations, title and
 /// caption.
 const DROPPED_DRAWABLE_FIELDS: [u32; 4] = [6, 9, 10, 11];
@@ -496,24 +497,6 @@ fn encode_uuid(lower: u64, upper: u64) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-/// Append a packed repeated varint field.
-fn packed(output: &mut Vec<u8>, number: u32, values: impl Iterator<Item = u64>) -> Result<()> {
-    let mut payload = Vec::new();
-    for value in values {
-        litchi_iwa_common::varint::encode_varint_into(&mut payload, value);
-    }
-    if payload.is_empty() {
-        return Ok(());
-    }
-    append_length_delimited_field(
-        output,
-        number,
-        &payload,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)
-}
-
 /// An emptied copy of one storage object's payload for a table of `rows` ×
 /// `columns`; `seed` derives the row and column identities of a UID map.
 ///
@@ -542,16 +525,18 @@ pub fn empty_storage(
         },
         Role::MergeMap => strip_fields(payload, &[1])?,
         Role::UidMap => {
-            // Monotonic identities in creation order, so the sorted lists
-            // and both index permutations are the identity, as a freshly
-            // authored native map is.
-            let column_base = mix(seed ^ 0x434f_4c55_4d4e) & 0x0000_ffff_ffff_0000;
-            let row_base = mix(seed ^ 0x524f_5753) & 0x0000_ffff_ffff_0000;
-            let column_upper = mix(seed.rotate_left(29));
-            let row_upper = mix(seed.rotate_left(31));
+            // The host editor's fresh map (record 0370f): identities in
+            // creation order derived from `seed` (the new model's
+            // identifier), so the sorted lists and both index permutations
+            // are the identity; the index lists are unpacked, as native maps
+            // store them.
             let mut output = Vec::new();
             for index in 0..columns {
-                let uuid = encode_uuid(column_base + u64::from(index), column_upper)?;
+                let uuid = encode_uuid(
+                    seed.wrapping_mul(0x9e37_79b9)
+                        .wrapping_add(u64::from(index)),
+                    seed.rotate_left(29) ^ 0x434f_4c55_4d4e_0000,
+                )?;
                 append_length_delimited_field(
                     &mut output,
                     1,
@@ -560,10 +545,17 @@ pub fn empty_storage(
                 )
                 .map_err(wire)?;
             }
-            packed(&mut output, 2, (0..columns).map(u64::from))?;
-            packed(&mut output, 3, (0..columns).map(u64::from))?;
+            for field in [2, 3] {
+                for index in 0..columns {
+                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
+                }
+            }
             for index in 0..rows {
-                let uuid = encode_uuid(row_base + u64::from(index), row_upper)?;
+                let uuid = encode_uuid(
+                    seed.wrapping_mul(0x517c_c1b7)
+                        .wrapping_add(u64::from(index)),
+                    seed.rotate_left(31) ^ 0x524f_5700_0000_0000,
+                )?;
                 append_length_delimited_field(
                     &mut output,
                     4,
@@ -572,16 +564,16 @@ pub fn empty_storage(
                 )
                 .map_err(wire)?;
             }
-            packed(&mut output, 5, (0..rows).map(u64::from))?;
-            packed(&mut output, 6, (0..rows).map(u64::from))?;
+            for field in [5, 6] {
+                for index in 0..rows {
+                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
+                }
+            }
             output
         },
         Role::Stroke => {
+            // The size alone, as the host editor writes a new sidecar.
             let mut output = Vec::new();
-            let order = repeated_varint_values(payload, 1).map_err(wire)?;
-            if let [max_order] = order.as_slice() {
-                append_varint_field(&mut output, 1, *max_order).map_err(wire)?;
-            }
             append_varint_field(&mut output, 2, u64::from(columns)).map_err(wire)?;
             append_varint_field(&mut output, 3, u64::from(rows)).map_err(wire)?;
             output

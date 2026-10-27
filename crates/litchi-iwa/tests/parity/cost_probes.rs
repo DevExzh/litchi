@@ -381,3 +381,32 @@ fn numbers_table_resize_cost_abba() -> TestResult {
     black_box(host_resize(&input.bytes, 26, 11)?);
     Ok(())
 }
+
+#[inline(never)]
+fn host_table_add(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.add_empty_table(litchi_numbers::SheetSelector::index(0), "Added Table", 4, 3)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_table_add(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let commit = package
+        .edit_table_lifecycle(0)?
+        .add("Added Table", 4, 3)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Adding a 4×3 table to the first sheet of `basic.numbers`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_add_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_table_add(&input.bytes)?);
+    black_box(leaf_table_add(&input.bytes)?);
+    black_box(leaf_table_add(&input.bytes)?);
+    black_box(host_table_add(&input.bytes)?);
+    Ok(())
+}

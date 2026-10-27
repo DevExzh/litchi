@@ -1042,7 +1042,7 @@ numbers/editor/semantic/text_box.rs	update_sheet_text_box_comment_reply	1	number
 numbers/editor/semantic/text_box.rs	update_sheet_text_box_highlight	1	numbers	text.highlight	migrated	litchi_numbers::sheet::drawable::annotation::Edit::update_highlight	numbers_sheet_text_box_highlight_update_parity	A	-	-
 numbers/editor/semantic/text_box.rs	update_sheet_text_box_hyperlink	1	numbers	text.hyperlink	migrated	litchi_numbers::sheet::drawable::hyperlink::Edit::update	numbers_sheet_text_box_hyperlink_update_parity	A	-	-
 numbers/editor/semantic/workbook.rs	add_empty_sheet	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/workbook.rs	add_empty_table	1	numbers	table.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/workbook.rs	add_empty_table	1	numbers	table.lifecycle	migrated	litchi_numbers::Package::edit_table_lifecycle	numbers_table_add_parity	B	-	-
 numbers/editor/semantic/workbook.rs	duplicate_table	1	numbers	table.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	from_bytes	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	from_package	1	numbers	io	host-only	litchi-numbers	-	-	-	-
