@@ -25,6 +25,7 @@
 
 pub mod drawing;
 pub mod graph;
+pub mod line_end;
 pub mod media;
 pub mod series;
 pub mod shape;
