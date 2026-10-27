@@ -446,6 +446,14 @@ impl<'p, P: TableLeaf> Working<'p, P> {
             .ok_or(Fault::Invalid)
     }
 
+    /// The identifier the next [`Self::allocate`] returns first (a planner
+    /// that names the objects it creates before they are allocated, record
+    /// 0376b).
+    #[must_use]
+    pub const fn next_identifier(&self) -> u64 {
+        self.next_identifier
+    }
+
     /// Allocate `count` fresh consecutive identifiers above every identifier
     /// the source holds or its registry has issued.
     pub fn allocate(&mut self, count: usize) -> FaultResult<Vec<u64>> {
