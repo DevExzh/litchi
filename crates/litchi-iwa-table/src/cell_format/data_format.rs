@@ -1,9 +1,11 @@
-//! One cell's complete display format as the neutral [`DataFormat`] sum.
+//! One cell's complete display format as the neutral `DataFormat` sum.
 //!
-//! The per-family readers and writers of [`super::display`] and
-//! [`super::pop_up_menu`] each admit one family and report any other as a
-//! wrong family. This module dispatches over them, so a leaf can offer one
-//! `edit_*_table_cell_format` family that takes a [`DataFormat`] instead of
+//! The per-family readers and writers of
+//! [`display`](crate::cell_format::display) and
+//! [`pop_up_menu`](crate::cell_format::pop_up_menu) each admit one family
+//! and report any other as a wrong family. This module dispatches over
+//! them, so a leaf can offer one `edit_*_table_cell_format` family that
+//! takes a `DataFormat` instead of
 //! one family per format (record 0363 §3.2, record 0379).
 //!
 //! A rewrite changes one family at a time: Automatic to a format, a format
