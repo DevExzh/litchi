@@ -53,6 +53,7 @@ mod sheet;
 pub(crate) mod sheet_chart_style;
 pub(crate) mod sheet_drawable;
 mod sheet_drawable_author;
+pub(crate) mod sheet_drawable_date_time;
 pub(crate) mod sheet_drawable_drop_cap;
 mod sheet_drawable_graph;
 pub(crate) mod sheet_drawable_hyperlink;

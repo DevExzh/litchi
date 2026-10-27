@@ -61,6 +61,18 @@ pub mod drop_cap {
     };
 }
 
+/// Exact-source Date & Time field transactions for the text a sheet text
+/// box or shape owns: [`crate::Package::edit_sheet_drawable_date_time_fields`].
+pub mod date_time {
+    pub use crate::package::sheet_drawable_date_time::{
+        Commit, DateTimeField, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::date_time::{
+        DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
+    };
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
 /// Exact-source hyperlink transactions for the text a sheet text box or
 /// shape owns: [`crate::Package::edit_sheet_drawable_hyperlinks`].
 pub mod hyperlink {
