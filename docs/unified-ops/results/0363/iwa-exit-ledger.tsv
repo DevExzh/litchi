@@ -523,11 +523,11 @@ keynote/editor/slide_shapes.rs	slide_shape_shadow	1	keynote	drawable.shape	migra
 keynote/editor/slide_shapes.rs	slide_shape_stroke	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shape_text_layout	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_shape_style	keynote_slide_shape_style_read_parity	A	-	-
 keynote/editor/slide_shapes.rs	slide_shapes	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_drawable_list	keynote_slide_shapes_read_parity	A	-	-
-keynote/editor/slide_shapes/caption.rs	remove_slide_shape_caption	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes/caption.rs	remove_slide_shape_title	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes/caption.rs	set_slide_shape_caption	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes/caption.rs	set_slide_shape_title	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_shapes/caption.rs	slide_shape_title_caption	1	keynote	drawable.shape	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_shapes/caption.rs	remove_slide_shape_caption	1	keynote	drawable.shape	migrated	litchi_keynote::Package::edit_slide_shape_text	keynote_slide_shape_caption_remove_parity	B	-	-
+keynote/editor/slide_shapes/caption.rs	remove_slide_shape_title	1	keynote	drawable.shape	migrated	litchi_keynote::Package::edit_slide_shape_text	keynote_slide_shape_title_remove_parity	B	-	-
+keynote/editor/slide_shapes/caption.rs	set_slide_shape_caption	1	keynote	drawable.shape	migrated	litchi_keynote::Package::edit_slide_shape_text	keynote_slide_shape_caption_create_parity	B	-	-
+keynote/editor/slide_shapes/caption.rs	set_slide_shape_title	1	keynote	drawable.shape	migrated	litchi_keynote::Package::edit_slide_shape_text	keynote_slide_shape_title_create_parity	B	-	-
+keynote/editor/slide_shapes/caption.rs	slide_shape_title_caption	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_shape_text	keynote_slide_shape_text_read_parity	A	-	-
 keynote/editor/slide_tables.rs	add_slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	cell_count	1	keynote	table.cells	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	clear_slide_table_cell	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_clear_parity	B	-	-

@@ -960,3 +960,192 @@ fn keynote_slide_shapes_read_parity() -> TestResult {
     }
     Ok(())
 }
+
+// ---- Shape titles and captions (the shared image/movie caption seam) ----
+
+use litchi_keynote::slide::image::text::Text;
+
+/// A host rectangle with a host-authored title and caption.
+fn texted_shape() -> TestResult<(Fixture, u64)> {
+    let (mut input, id) = input(Shape::Rectangle)?;
+    let mut editor = keynote::Draft::from_bytes(&input.bytes)?;
+    editor.set_slide_shape_title(SLIDE, id, "Step")?;
+    editor.set_slide_shape_caption(SLIDE, id, "First step")?;
+    input.bytes = editor.to_bytes()?;
+    Ok((input, id))
+}
+
+fn shape_texts(bytes: &[u8], position: usize) -> TestResult<(Option<String>, Option<String>)> {
+    let package = Package::from_bytes(bytes)?;
+    let read = |text| {
+        package.slide_shape_text(
+            SlideSelector::index(SLIDE),
+            DrawableSelector::index(position),
+            text,
+        )
+    };
+    Ok((read(Text::Title)?, read(Text::Caption)?))
+}
+
+fn host_shape_texts(bytes: &[u8], id: u64) -> TestResult<(Option<String>, Option<String>)> {
+    let texts = keynote::Draft::from_bytes(bytes)?.slide_shape_title_caption(SLIDE, id)?;
+    Ok((texts.title, texts.caption))
+}
+
+fn shape_text_case(
+    name: &'static str,
+    texted: bool,
+    host: impl FnOnce(&mut keynote::Draft, u64) -> TestResult,
+    text: Text,
+    step: Option<&'static str>,
+) -> TestResult {
+    let (input, id) = if texted {
+        texted_shape()?
+    } else {
+        input(Shape::Rectangle)?
+    };
+    let position = leaf_position(&input.bytes, id)?;
+    Case::new(name, Format::Keynote, Tier::B, Evidence::Queued, &input)
+        .host(|source| {
+            let mut editor = keynote::Draft::from_bytes(source)?;
+            host(&mut editor, id)?;
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let edit = package.edit_slide_shape_text(
+                SlideSelector::index(SLIDE),
+                DrawableSelector::index(position),
+                text,
+            )?;
+            let edit = match step {
+                Some(value) => edit.set(value)?,
+                None => edit.clear()?,
+            };
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_slide_image_text(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .leaf_invalidates_root_previews()
+        .leaf_structural_metadata()
+        .read("leaf shape title and caption", move |bytes| {
+            shape_texts(bytes, position)
+        })
+        .read("host shape title and caption", move |bytes| {
+            host_shape_texts(bytes, id)
+        })
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn keynote_slide_shape_title_create_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_title_create_parity",
+        false,
+        |editor, id| Ok(editor.set_slide_shape_title(SLIDE, id, "Step")?),
+        Text::Title,
+        Some("Step"),
+    )
+}
+
+#[test]
+fn keynote_slide_shape_title_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_title_set_parity",
+        true,
+        |editor, id| Ok(editor.set_slide_shape_title(SLIDE, id, "Step one")?),
+        Text::Title,
+        Some("Step one"),
+    )
+}
+
+#[test]
+fn keynote_slide_shape_title_remove_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_title_remove_parity",
+        true,
+        |editor, id| {
+            if !editor.remove_slide_shape_title(SLIDE, id)? {
+                return Err("host removed nothing".into());
+            }
+            Ok(())
+        },
+        Text::Title,
+        None,
+    )
+}
+
+#[test]
+fn keynote_slide_shape_caption_create_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_caption_create_parity",
+        false,
+        |editor, id| Ok(editor.set_slide_shape_caption(SLIDE, id, "First step")?),
+        Text::Caption,
+        Some("First step"),
+    )
+}
+
+#[test]
+fn keynote_slide_shape_caption_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_caption_set_parity",
+        true,
+        |editor, id| Ok(editor.set_slide_shape_caption(SLIDE, id, "The first step")?),
+        Text::Caption,
+        Some("The first step"),
+    )
+}
+
+#[test]
+fn keynote_slide_shape_caption_remove_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    shape_text_case(
+        "keynote_slide_shape_caption_remove_parity",
+        true,
+        |editor, id| {
+            if !editor.remove_slide_shape_caption(SLIDE, id)? {
+                return Err("host removed nothing".into());
+            }
+            Ok(())
+        },
+        Text::Caption,
+        None,
+    )
+}
+
+#[test]
+fn keynote_slide_shape_text_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    let (input, id) = texted_shape()?;
+    let position = leaf_position(&input.bytes, id)?;
+    Case::new(
+        "keynote_slide_shape_text_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("leaf shape title and caption", move |bytes| {
+        shape_texts(bytes, position)
+    })
+    .read("host shape title and caption", move |bytes| {
+        host_shape_texts(bytes, id)
+    })
+    .run()?;
+    Ok(())
+}
