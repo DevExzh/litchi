@@ -2,7 +2,7 @@
 //! identity, face traits and point size, stored in the paragraph styles its
 //! `paragraph_styles` list (`TSCH.ChartArchive`, field 20) names.
 //!
-//! [`set`] and [`reset`] are the host's `set_chart_font*` /
+//! [`set`] (with a reset [`Change`]) is the host's `set_chart_font*` /
 //! `reset_chart_font*` ported operation for operation over a
 //! [`Workspace`]: every unique paragraph style of the chart is replaced by a
 //! fresh variation (of its parent when it is a font-only variation, else of
