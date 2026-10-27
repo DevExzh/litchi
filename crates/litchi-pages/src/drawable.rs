@@ -53,14 +53,15 @@ pub mod caption {
     };
 }
 
-/// Drawing styles of body shapes: fill, stroke, shadow, effects and text
-/// layout, over the shared shape-style variation engine (record 0371).
+/// Drawing styles of body shapes: fill, stroke, shadow, effects, text
+/// layout and line endpoints, over the shared shape-style variation engine (record 0371).
 pub mod style {
     pub use crate::package::body_drawable_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
     pub use litchi_iwa_common::shape::effects::Effects;
     pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
     pub use litchi_iwa_common::shape::shadow::Shadow;
     pub use litchi_iwa_common::shape::stroke::Stroke;
     pub use litchi_iwa_common::text::layout::Layout;
@@ -80,6 +81,8 @@ pub mod style {
         Effects(Effects),
         /// Vertical alignment, insets and autosizing of the text frame.
         TextLayout(Layout),
+        /// The decorations at a straight line's directed start and end.
+        LineEndpoints(Endpoints),
     }
 
     /// Which [`Property`] a read or reset addresses.
@@ -96,6 +99,8 @@ pub mod style {
         Effects,
         /// The text-frame layout.
         TextLayout,
+        /// A straight line's endpoint decorations.
+        LineEndpoints,
     }
 
     impl Property {
@@ -108,6 +113,7 @@ pub mod style {
                 Self::Shadow(_) => PropertyKind::Shadow,
                 Self::Effects(_) => PropertyKind::Effects,
                 Self::TextLayout(_) => PropertyKind::TextLayout,
+                Self::LineEndpoints(_) => PropertyKind::LineEndpoints,
             }
         }
     }

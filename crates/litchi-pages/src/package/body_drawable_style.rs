@@ -26,7 +26,7 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::body_drawable_graph::{self as graph, Budget, GraphError, ObjectIndex, kind_name};
-use crate::drawable::style::{Fill, Property, PropertyKind};
+use crate::drawable::style::{Endpoints, Fill, Property, PropertyKind};
 use crate::selector::DrawableSelector;
 
 /// A well-formed request this family refuses, classified by [`Refusal::kind`].
@@ -217,7 +217,12 @@ fn workspace(package: &Package) -> Result<(PackageComponents<'_>, litchi_iwa_cor
     Ok((PackageComponents(package), limits))
 }
 
-fn read(workspace: &Workspace<'_>, shape: u64, kind: PropertyKind) -> Result<Property, Error> {
+fn read(
+    source: &Package,
+    workspace: &Workspace<'_>,
+    shape: u64,
+    kind: PropertyKind,
+) -> Result<Property, Error> {
     Ok(match kind {
         PropertyKind::Fill => {
             Property::Fill(engine::value(workspace, shape, &Fills).map_err(from_engine)?)
@@ -234,7 +239,166 @@ fn read(workspace: &Workspace<'_>, shape: u64, kind: PropertyKind) -> Result<Pro
         PropertyKind::TextLayout => {
             Property::TextLayout(engine::value(workspace, shape, &TextLayout).map_err(from_engine)?)
         },
+        PropertyKind::LineEndpoints => {
+            Property::LineEndpoints(endpoints(workspace, &line_ends(source, shape)?, shape)?)
+        },
     })
+}
+
+// ---- Line endpoints (the host's `shapes::line_end`; the slot values are
+// the shared `litchi_iwa_style::line_end` payloads) ----
+
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const SHAPE_ARCHIVE: u32 = 1;
+const SHAPE_PATH_SOURCE: u32 = 3;
+const SHAPE_HEAD_LINE_END: u32 = 4;
+const SHAPE_TAIL_LINE_END: u32 = 5;
+const PATH_SOURCE_HORIZONTAL_FLIP: u32 = 1;
+
+/// The shape's own (legacy per-shape) head and tail decorations and its
+/// horizontal flip.
+struct LineEnds {
+    head: Option<Vec<u8>>,
+    tail: Option<Vec<u8>>,
+    flipped: bool,
+}
+
+fn single(data: &[u8], number: u32) -> Result<Option<&[u8]>, Error> {
+    let found = litchi_iwa_common::wire::repeated_length_delimited_payloads(data, number)
+        .map_err(|_error| Error::InvalidSource)?;
+    match found.as_slice() {
+        [] => Ok(None),
+        [one] => Ok(Some(one)),
+        _ => Err(Error::InvalidSource),
+    }
+}
+
+fn line_ends(package: &Package, shape: u64) -> Result<LineEnds, Error> {
+    let mut budget = Budget::new(package)?;
+    let index = ObjectIndex::new(package, &mut budget)?;
+    let located = index.get(std::num::NonZeroU64::new(shape).ok_or(Error::InvalidSource)?)?;
+    let info = located
+        .object
+        .messages
+        .iter()
+        .find(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+        .ok_or(Refusal::NotAShape)?;
+    let archive = single(&info.data, SHAPE_ARCHIVE)?.ok_or(Error::InvalidSource)?;
+    let flipped = match single(archive, SHAPE_PATH_SOURCE)? {
+        Some(source) => {
+            litchi_iwa_common::wire::repeated_varint_values(source, PATH_SOURCE_HORIZONTAL_FLIP)
+                .map_err(|_error| Error::InvalidSource)?
+                .last()
+                .is_some_and(|flip| *flip != 0)
+        },
+        None => false,
+    };
+    Ok(LineEnds {
+        head: single(archive, SHAPE_HEAD_LINE_END)?.map(<[u8]>::to_vec),
+        tail: single(archive, SHAPE_TAIL_LINE_END)?.map(<[u8]>::to_vec),
+        flipped,
+    })
+}
+
+fn decode_endpoint(
+    payload: Option<&[u8]>,
+) -> Result<litchi_iwa_common::shape::line::Endpoint, Error> {
+    litchi_iwa_style::line_end::decode(payload).map_err(|_error| Refusal::UnsupportedStyle.into())
+}
+
+/// The effective head and tail of a style chain, each inherited on its own.
+fn inherited_line_ends(
+    workspace: &Workspace<'_>,
+    style: u64,
+) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>), Error> {
+    Ok((
+        engine::effective(workspace, style, engine::Slot::HeadLineEnd).map_err(from_engine)?,
+        engine::effective(workspace, style, engine::Slot::TailLineEnd).map_err(from_engine)?,
+    ))
+}
+
+fn endpoints(workspace: &Workspace<'_>, own: &LineEnds, shape: u64) -> Result<Endpoints, Error> {
+    let (mut head, mut tail) = (own.head.clone(), own.tail.clone());
+    if head.is_none() || tail.is_none() {
+        let style = engine::target(workspace, shape)
+            .map_err(from_engine)?
+            .style();
+        let (inherited_head, inherited_tail) = inherited_line_ends(workspace, style)?;
+        head = head.or(inherited_head);
+        tail = tail.or(inherited_tail);
+    }
+    let mut endpoints = Endpoints {
+        start: decode_endpoint(tail.as_deref())?,
+        end: decode_endpoint(head.as_deref())?,
+    };
+    if own.flipped {
+        std::mem::swap(&mut endpoints.start, &mut endpoints.end);
+    }
+    Ok(endpoints)
+}
+
+/// Store `wanted` as the line's decorations (the host's
+/// `set_shape_line_endpoints`); returns whether anything changed.
+fn set_endpoints(
+    workspace: &mut Workspace<'_>,
+    own: &LineEnds,
+    shape: u64,
+    wanted: Endpoints,
+) -> Result<bool, Error> {
+    if endpoints(workspace, own, shape)? == wanted {
+        return Ok(false);
+    }
+    let mut stored = wanted;
+    if own.flipped {
+        std::mem::swap(&mut stored.start, &mut stored.end);
+    }
+    let target = engine::target(workspace, shape).map_err(from_engine)?;
+    let payload = engine::Styles::shape_style(&*workspace, target.style())
+        .ok_or(Error::InvalidSource)?
+        .to_vec();
+    let disposable = target.exclusive()
+        && engine::direct_slots(&payload)
+            .map_err(from_engine)?
+            .is_some();
+    let mut clear = false;
+    if disposable && wanted == Endpoints::default() {
+        let parent = engine::parent_of(&payload)
+            .map_err(from_engine)?
+            .ok_or(Refusal::UnsupportedStyle)?;
+        let (head, tail) = inherited_line_ends(workspace, parent)?;
+        let inherited = Endpoints {
+            start: decode_endpoint(tail.as_deref())?,
+            end: decode_endpoint(head.as_deref())?,
+        };
+        clear = inherited == Endpoints::default();
+    }
+    let writes = if clear {
+        vec![
+            (engine::Slot::HeadLineEnd, None),
+            (engine::Slot::TailLineEnd, None),
+        ]
+    } else {
+        vec![
+            (
+                engine::Slot::HeadLineEnd,
+                Some(engine::Value::message(litchi_iwa_style::line_end::encode(
+                    stored.end,
+                ))),
+            ),
+            (
+                engine::Slot::TailLineEnd,
+                Some(engine::Value::message(litchi_iwa_style::line_end::encode(
+                    stored.start,
+                ))),
+            ),
+        ]
+    };
+    let plan = engine::plan_set(&*workspace, target, &writes).map_err(from_engine)?;
+    engine::apply(workspace, shape, plan).map_err(from_engine)?;
+    if endpoints(workspace, own, shape)? != wanted {
+        return Err(Error::Verification);
+    }
+    Ok(true)
 }
 
 /// One staged change.
@@ -301,8 +465,23 @@ impl Edit<'_> {
         let (components, limits) = workspace(self.source)?;
         let mut workspace = Workspace::new(&components, limits).map_err(from_engine)?;
         let mut applied = 0;
+        let own = line_ends(self.source, self.shape)?;
         for change in &self.changes {
             let changed = match change {
+                Change::Set(Property::LineEndpoints(wanted)) => {
+                    applied +=
+                        usize::from(set_endpoints(&mut workspace, &own, self.shape, *wanted)?);
+                    continue;
+                },
+                Change::Reset(PropertyKind::LineEndpoints) => {
+                    applied += usize::from(set_endpoints(
+                        &mut workspace,
+                        &own,
+                        self.shape,
+                        Endpoints::default(),
+                    )?);
+                    continue;
+                },
                 Change::Set(Property::Fill(fill)) => {
                     engine::set(&mut workspace, self.shape, &Fills, fill)
                 },
@@ -368,7 +547,9 @@ impl Edit<'_> {
                 .iter()
                 .rposition(|other| other.kind() == property.kind())
                 .map(|index| &expected[index]);
-            if later == Some(property) && read(&reopened, shape, property.kind())? != *property {
+            if later == Some(property)
+                && read(&package, &reopened, shape, property.kind())? != *property
+            {
                 return Err(Error::Verification);
             }
         }
@@ -490,7 +671,7 @@ impl Package {
         let shape = drawable(self, selector.into())?;
         let (components, limits) = workspace(self)?;
         let workspace = Workspace::new(&components, limits).map_err(from_engine)?;
-        read(&workspace, shape, kind)
+        read(self, &workspace, shape, kind)
     }
 
     /// Begin staging drawing-style changes on one body shape.
