@@ -751,15 +751,15 @@ media/package.rs	snapshot	1	shared	io	retired	-	-	-	-	host plumbing of the retir
 media/package.rs	stats	1	shared	media.asset	migrated	litchi_iwa_common::media::Catalog::stats	numbers_media_catalog_parity	A	-	-
 media/package.rs	to_bytes	1	shared	io	retired	-	-	-	-	host plumbing of the retired `MediaManager`/`media::Draft` owners: the leaf `Package` owns open, options and output (`open`, `from_bytes`, `write_to`, `save`), and media discovery is `litchi_iwa_common::media::{Catalog, embedded::Inventory}` over the leaf catalog (record 0375)
 media/package.rs	videos	1	shared	media.asset	retired	-	-	-	-	merged into `litchi_iwa_common::media::Catalog::by_type(Type::Video)` (record 0375)
-numbers/creation.rs	build	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/creation.rs	builder	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/creation.rs	create	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
+numbers/creation.rs	build	1	numbers	builder	migrated	litchi_numbers::Builder::build	numbers_builder_names_parity	B	-	-
+numbers/creation.rs	builder	1	numbers	builder	migrated	litchi_numbers::Builder::new	numbers_builder_names_parity	B	-	-
+numbers/creation.rs	create	1	numbers	builder	migrated	litchi_numbers::Package::new	numbers_builder_names_parity	B	-	-
 numbers/creation.rs	language	1	numbers	builder	migrated	litchi_numbers::Builder::language	numbers_builder_language_locale_parity	B	-	-
 numbers/creation.rs	locale	1	numbers	builder	migrated	litchi_numbers::Builder::locale	numbers_builder_language_locale_parity	B	-	-
-numbers/creation.rs	new	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
-numbers/creation.rs	sheet_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
+numbers/creation.rs	new	1	numbers	builder	migrated	litchi_numbers::Builder::new	numbers_builder_names_parity	B	-	-
+numbers/creation.rs	sheet_name	1	numbers	builder	migrated	litchi_numbers::Builder::sheet_name	numbers_builder_names_parity	B	-	-
 numbers/creation.rs	table_dimensions	1	numbers	builder	migrated	litchi_numbers::Builder::table_dimensions	numbers_builder_table_dimensions_parity	B	-	-
-numbers/creation.rs	table_name	1	numbers	builder	host-only	litchi-numbers	-	-	-	-
+numbers/creation.rs	table_name	1	numbers	builder	migrated	litchi_numbers::Builder::table_name	numbers_builder_names_parity	B	-	-
 numbers/editor/column_insert.rs	insert_table_column	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_insert_column_parity	A	-	-
 numbers/editor/date_time_fields.rs	add_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
 numbers/editor/date_time_fields.rs	insert_sheet_text_box_date_time_field	1	numbers	text.date_time_field	host-only	litchi-numbers	-	-	-	-
