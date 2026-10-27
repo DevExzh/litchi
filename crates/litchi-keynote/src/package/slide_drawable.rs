@@ -18,6 +18,8 @@ mod named_styles;
 mod stage;
 mod table;
 mod text;
+mod text_comments;
+mod text_hyperlinks;
 mod text_lists;
 mod text_properties;
 
@@ -670,6 +672,18 @@ enum Operation {
         storage: u64,
         change: named_styles::NamedChange,
     },
+    Hyperlink {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_hyperlinks::HyperlinkChange,
+    },
+    Comment {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: text_comments::CommentChange,
+    },
 }
 
 /// A new slide table for [`Edit::add_table`]: its size, frame, optional
@@ -1066,6 +1080,8 @@ impl<'a> Edit<'a> {
             | Operation::TextProperty { .. }
             | Operation::TextList { .. }
             | Operation::NamedStyle { .. }
+            | Operation::Hyperlink { .. }
+            | Operation::Comment { .. }
             | Operation::TableCell { .. }
             | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
@@ -1333,6 +1349,284 @@ impl<'a> Edit<'a> {
             change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
         });
         Ok(self)
+    }
+
+    fn stage_comment(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_comments::CommentChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::Comment {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage a highlight over `range` (UTF-16 code units) of the text of a
+    /// text box or shape, created at `created`, by the document's generated
+    /// annotation author (host `add_slide_text_box_highlight`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a range another annotation occupies.
+    pub fn add_highlight<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        created: litchi_iwa_text::date_time::Instant,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::AddHighlight(range, created),
+        )
+    }
+
+    /// Stage moving the text's highlight at `position` (in text order) onto
+    /// `range` (host `update_slide_text_box_highlight`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_highlight`]; a missing highlight is refused.
+    pub fn update_highlight<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+        range: litchi_iwa_text::position::TextRange,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::UpdateHighlight(position.get(), range),
+        )
+    }
+
+    /// Stage removing the text's highlight at `position` (host
+    /// `remove_slide_text_box_highlight`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_highlight`].
+    pub fn remove_highlight<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::RemoveHighlight(position.get()),
+        )
+    }
+
+    /// Stage a comment with a non-empty `body` over `range` of the text,
+    /// created at `created` (host `add_slide_text_box_comment`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_highlight`]; an empty body is refused.
+    pub fn add_comment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        body: &str,
+        created: litchi_iwa_text::date_time::Instant,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::AddComment(range, body.to_owned(), created),
+        )
+    }
+
+    /// Stage moving the text's comment at `position` onto `range` with a
+    /// new `body` (host `update_slide_text_box_comment`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_comment`]; a missing comment is refused.
+    pub fn update_comment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+        range: litchi_iwa_text::position::TextRange,
+        body: &str,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::UpdateComment(position.get(), range, body.to_owned()),
+        )
+    }
+
+    /// Stage removing the text's comment at `position` with its replies
+    /// (host `remove_slide_text_box_comment`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment`].
+    pub fn remove_comment<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::RemoveComment(position.get()),
+        )
+    }
+
+    /// Stage a reply to the text's comment at `comment` (host
+    /// `add_slide_text_box_comment_reply`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment`].
+    pub fn add_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+        body: &str,
+        created: litchi_iwa_text::date_time::Instant,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::AddReply(comment.get(), body.to_owned(), created),
+        )
+    }
+
+    /// Stage a new body for reply `reply` of comment `comment` (host
+    /// `update_slide_text_box_comment_reply`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment`]; a missing reply is refused.
+    pub fn update_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+        reply: Position,
+        body: &str,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::UpdateReply(comment.get(), reply.get(), body.to_owned()),
+        )
+    }
+
+    /// Stage removing reply `reply` of comment `comment` (host
+    /// `remove_slide_text_box_comment_reply`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_comment_reply`].
+    pub fn remove_comment_reply<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+        reply: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_comment(
+            slide.into(),
+            drawable.into(),
+            text_comments::CommentChange::RemoveReply(comment.get(), reply.get()),
+        )
+    }
+
+    fn stage_hyperlink(
+        &mut self,
+        slide: SlideSelector<'_>,
+        drawable: DrawableSelector,
+        change: text_hyperlinks::HyperlinkChange,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide, drawable)?;
+        self.operations.push(Operation::Hyperlink {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
+        });
+        Ok(self)
+    }
+
+    /// Stage a hyperlink to `target` over `range` of the text (UTF-16 code
+    /// units) of a text box or shape (host `add_slide_text_box_hyperlink`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a range another field occupies.
+    pub fn add_hyperlink<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        range: litchi_iwa_text::position::TextRange,
+        target: litchi_iwa_text::hyperlink::TextHyperlinkTarget,
+    ) -> Result<&mut Self, Error> {
+        self.stage_hyperlink(
+            slide.into(),
+            drawable.into(),
+            text_hyperlinks::HyperlinkChange::Add(range, target),
+        )
+    }
+
+    /// Stage moving the text's hyperlink at `position` (in text order) onto
+    /// `range` and pointing it at `target` (host
+    /// `update_slide_text_box_hyperlink`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::add_hyperlink`]; a missing hyperlink is refused.
+    pub fn update_hyperlink<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+        range: litchi_iwa_text::position::TextRange,
+        target: litchi_iwa_text::hyperlink::TextHyperlinkTarget,
+    ) -> Result<&mut Self, Error> {
+        self.stage_hyperlink(
+            slide.into(),
+            drawable.into(),
+            text_hyperlinks::HyperlinkChange::Update(position.get(), range, target),
+        )
+    }
+
+    /// Stage removing the text's hyperlink at `position` (host
+    /// `remove_slide_text_box_hyperlink`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::update_hyperlink`].
+    pub fn remove_hyperlink<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: Position,
+    ) -> Result<&mut Self, Error> {
+        self.stage_hyperlink(
+            slide.into(),
+            drawable.into(),
+            text_hyperlinks::HyperlinkChange::Remove(position.get()),
+        )
     }
 
     fn stage_named(
@@ -2598,6 +2892,91 @@ impl Package {
             }))
     }
 
+    /// Read the highlights of the text of one text box or shape, in text
+    /// order (host `slide_text_box_highlights`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_text_highlights<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::highlight::TextHighlight>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_comments::annotations(&Workspace::new(self).map_err(lift)?, storage, true)?
+            .iter()
+            .map(|item| item.highlight().map_err(|_| Error::InvalidSource))
+            .collect()
+    }
+
+    /// Read the comments of the text of one text box or shape, in text
+    /// order (host `slide_text_box_comments`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_text_highlights`].
+    pub fn slide_drawable_text_comments<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::comment::TextComment>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_comments::annotations(&Workspace::new(self).map_err(lift)?, storage, false)?
+            .iter()
+            .map(|item| item.comment().map_err(|_| Error::InvalidSource))
+            .collect()
+    }
+
+    /// Read the replies of the text's comment at `comment` (host
+    /// `slide_text_box_comment_replies`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_text_highlights`]; a missing comment is refused.
+    pub fn slide_drawable_text_comment_replies<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        comment: Position,
+    ) -> Result<Vec<litchi_iwa_text::comment::TextCommentReply>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        text_comments::annotations(&Workspace::new(self).map_err(lift)?, storage, false)?
+            .get(comment.get())
+            .ok_or(Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            }))?
+            .comment_replies()
+            .map_err(|_| Error::InvalidSource)
+    }
+
+    /// Read the hyperlinks of the text of one text box or shape, in text
+    /// order: their ranges (UTF-16 code units) and targets (host
+    /// `slide_text_box_hyperlinks`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_hyperlinks<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<
+        Vec<(
+            litchi_iwa_text::position::TextRange,
+            litchi_iwa_text::hyperlink::TextHyperlinkTarget,
+        )>,
+        Error,
+    > {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        Ok(
+            text_hyperlinks::hyperlinks(&Workspace::new(self).map_err(lift)?, storage)?
+                .into_iter()
+                .map(|(_, range, target)| (range, target))
+                .collect(),
+        )
+    }
+
     /// Read the named paragraph styles of the text's stylesheet, in theme
     /// preset order (host `slide_text_box_named_paragraph_styles`).
     ///
@@ -3327,6 +3706,24 @@ fn commit_operations(
                 {
                     return Err(Error::Verification);
                 }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Comment {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_comments::apply(&mut workspace, *storage, change)?;
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Hyperlink {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                text_hyperlinks::apply(&mut workspace, *storage, change)?;
                 touched.entry(*slide).or_default().insert(*drawable);
             },
             Operation::NamedStyle {
