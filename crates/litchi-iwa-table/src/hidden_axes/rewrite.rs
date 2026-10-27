@@ -23,29 +23,29 @@ use litchi_iwa_protos::package_metadata_codec::{
 };
 
 use super::{
-    AxisIndex, CURRENT_MESSAGE_VERSIONS, Error, FILTER_SET_MESSAGE_TYPE,
+    AxisIndex, Budget, CURRENT_MESSAGE_VERSIONS, Error, FILTER_SET_MESSAGE_TYPE,
     FORMULA_OWNER_MESSAGE_TYPE, Graph, HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE, HiddenAxes,
-    LEGACY_UID_MAP_MESSAGE_TYPE, LimitKind, METADATA_ENTRY_NAME, METADATA_MESSAGE_TYPE,
+    LEGACY_UID_MAP_MESSAGE_TYPE, Leaf, LimitKind, METADATA_ENTRY_NAME, METADATA_MESSAGE_TYPE,
     MODEL_COLUMN_REFERENCE_PATH, MODEL_ROW_REFERENCE_PATH, MetadataRoute,
     OWNER_CREATION_FIELD_INFOS, OWNER_CREATION_MESSAGES, OWNER_CREATION_OBJECTS, ObjectLocation,
-    Package, UID_MAP_MESSAGE_TYPE, UidIndex, charge_codec, charge_style_codec, codec,
-    codec_options, formula_owner_for, formula_owner_messages, global_objects, map_archive_error,
-    map_codec_error, map_core_error, map_lock_error, map_package_error, map_page_layout_error,
-    map_style_codec_error, map_uid_codec_error, metadata_route, metadata_scan_work,
-    object_location, page_layout, style_codec, style_codec_options, table_lock, uid_codec,
-    validate_aggregate_formula_owner_component, validate_aggregate_formula_owner_metadata,
-    validate_aggregate_formula_owner_provenance, validate_empty_formula_owner_dependencies,
-    validate_message_metadata, validate_no_reference_metadata, validate_reference_shape,
-    validate_uuid,
+    PREVIEW_ENTRY_NAMES, Refusal, UID_MAP_MESSAGE_TYPE, UidIndex, charge_codec, charge_style_codec,
+    codec, codec_options, formula_owner_for, formula_owner_messages, global_objects,
+    map_archive_error, map_codec_error, map_core_error, map_style_codec_error, map_uid_codec_error,
+    metadata_route, metadata_scan_work, object_location, style_codec, style_codec_options, support,
+    uid_codec, validate_aggregate_formula_owner_component,
+    validate_aggregate_formula_owner_metadata, validate_aggregate_formula_owner_provenance,
+    validate_empty_formula_owner_dependencies, validate_message_metadata,
+    validate_no_reference_metadata, validate_reference_shape, validate_uuid,
 };
+use crate::TableSource;
 
 /// Execute the verified hidden-axis rewrite and return its reopened package.
-pub(super) fn run(
-    source: &Package,
+pub(super) fn run<L: Leaf>(
+    source: &L,
     graph: &Graph,
     axes: &HiddenAxes,
-    budget: &mut table_lock::WireBudget,
-) -> Result<(Package, usize, Arc<[u64]>), Error> {
+    budget: &mut impl Budget,
+) -> Result<(L, usize, Arc<[u64]>), Error> {
     let result = rewrite(source, graph, axes, budget)?;
     Ok((
         result.package,
@@ -109,8 +109,8 @@ struct OwnerCreationPlan<'source> {
     metadata: Option<MetadataPlan<'source>>,
 }
 
-struct RewriteResult {
-    package: Package,
+struct RewriteResult<L> {
+    package: L,
     added_object_ids: Arc<[u64]>,
     touched_components: usize,
 }
@@ -145,22 +145,18 @@ impl ArchiveReferenceVisitor for MaximumReferenceVisitor {
 /// are not sufficient for allocation: a dangling reference in an unrelated
 /// object is still a collision with a newly introduced object ID.
 fn maximum_physical_identifier(
-    package: &Package,
+    package: &impl TableSource,
     objects: &[ObjectLocation],
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<u64, Error> {
     let archive_limits = package
-        .state
-        .source
-        .limits()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let mut work = 0usize;
     for location in objects {
         let object = package
-            .state
-            .source
-            .components()
+            .catalog()
             .get_index(location.component_index)
             .and_then(|component| component.archive().objects.get(location.object_index))
             .ok_or(Error::InvalidSource)?;
@@ -182,9 +178,7 @@ fn maximum_physical_identifier(
         .unwrap_or(0);
     for location in objects {
         let object = package
-            .state
-            .source
-            .components()
+            .catalog()
             .get_index(location.component_index)
             .and_then(|component| component.archive().objects.get(location.object_index))
             .ok_or(Error::InvalidSource)?;
@@ -221,7 +215,7 @@ fn maximum_physical_identifier(
         })?;
         maximum = maximum.max(references.maximum);
     }
-    budget.charge_payload_work(work).map_err(map_lock_error)?;
+    budget.charge_payload_work(work)?;
     Ok(maximum)
 }
 
@@ -421,8 +415,12 @@ impl PackageMetadataVisitor for MetadataUuidCollisionVisitor {
     }
 }
 
-fn metadata_options(source: &Package, bytes: usize, additions: usize) -> MetadataRewriteOptions {
-    let physical_max = source.state.source.limits().max_iwa_stream_bytes();
+fn metadata_options(
+    source: &impl TableSource,
+    bytes: usize,
+    additions: usize,
+) -> MetadataRewriteOptions {
+    let physical_max = source.archive_limits().max_iwa_stream_bytes();
     let addition_bytes = additions.saturating_mul(128);
     MetadataRewriteOptions::new(
         bytes.max(1).min(physical_max),
@@ -437,14 +435,9 @@ fn metadata_options(source: &Package, bytes: usize, additions: usize) -> Metadat
             .saturating_add(additions.saturating_mul(bytes.max(1)))
             .clamp(1, WireLimits::MAX_REWRITE_WORK),
         64,
-        bytes
-            .max(source.state.source.components().len())
-            .saturating_mul(4)
-            .max(1),
+        bytes.max(source.catalog().len()).saturating_mul(4).max(1),
         source
-            .state
-            .source
-            .limits()
+            .archive_limits()
             .archive_limits()
             .max_metadata_items()
             .max(1),
@@ -453,7 +446,7 @@ fn metadata_options(source: &Package, bytes: usize, additions: usize) -> Metadat
 }
 
 fn charge_metadata_report(
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
     report: litchi_iwa_protos::package_metadata_codec::RewriteReport,
 ) -> Result<(), Error> {
     budget
@@ -472,19 +465,18 @@ fn charge_metadata_report(
                 .and_then(|value| value.checked_add(report.allocations()))
                 .and_then(|value| value.checked_add(report.retained_bytes()))
                 .and_then(|value| value.checked_add(report.scratch_bytes()))
-                .ok_or(table_lock::Error::Limit {
-                    kind: table_lock::LimitKind::WireWork,
+                .ok_or(Error::Limit {
+                    kind: LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
                         .unwrap_or(u64::MAX),
                 })?;
             budget.charge_payload_work(work)
         })
-        .map_err(map_lock_error)
 }
 
 fn charge_metadata_requirements(
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
     requirements: litchi_iwa_protos::package_metadata_codec::RewriteExecutionRequirements,
 ) -> Result<(), Error> {
     budget
@@ -503,15 +495,14 @@ fn charge_metadata_requirements(
                 .checked_add(requirements.allocations())
                 .and_then(|value| value.checked_add(requirements.retained_bytes()))
                 .and_then(|value| value.checked_add(requirements.scratch_bytes()))
-                .ok_or(table_lock::Error::Limit {
-                    kind: table_lock::LimitKind::WireWork,
+                .ok_or(Error::Limit {
+                    kind: LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
                         .unwrap_or(u64::MAX),
                 })?;
             budget.charge_payload_work(work)
         })
-        .map_err(map_lock_error)
 }
 
 fn owner_creation_uuid(identifier: u64, role: u64) -> UuidBits {
@@ -522,18 +513,16 @@ fn owner_creation_uuid(identifier: u64, role: u64) -> UuidBits {
 }
 
 fn prepare_metadata_probe<'source>(
-    source: &'source Package,
+    source: &'source impl TableSource,
     graph: &Graph,
     physical_maximum: u64,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<Option<MetadataProbe<'source>>, Error> {
     let Some(route) = metadata_route(source, budget)? else {
         return Ok(None);
     };
     let component = source
-        .state
-        .source
-        .components()
+        .catalog()
         .get_index(route.component_index)
         .ok_or(Error::InvalidSource)?;
     let payload = component
@@ -545,9 +534,7 @@ fn prepare_metadata_probe<'source>(
         .map(|message| message.data.as_slice())
         .ok_or(Error::InvalidSource)?;
     let target_component = source
-        .state
-        .source
-        .components()
+        .catalog()
         .get_index(graph.target.model_component_index)
         .ok_or(Error::InvalidSource)?;
     let target_locator = normalized_locator(target_component.name());
@@ -556,17 +543,13 @@ fn prepare_metadata_probe<'source>(
         .len()
         .min(
             source
-                .state
-                .source
-                .limits()
+                .archive_limits()
                 .archive_limits()
                 .max_metadata_items(),
         )
         .max(1);
     let component_capacity = source
-        .state
-        .source
-        .components()
+        .catalog()
         .len()
         .checked_add(1)
         .ok_or(Error::InvalidSource)?;
@@ -585,8 +568,7 @@ fn prepare_metadata_probe<'source>(
         .and_then(|_| budget.charge_payload_work(component_capacity))
         .and_then(|_| budget.charge_payload_work(target_identity_capacity))
         .and_then(|_| budget.charge_payload_work(component_identity_capacity))
-        .and_then(|_| budget.charge_payload_work(metadata_identity_capacity))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(metadata_identity_capacity))?;
     let mut physical_object_identifiers = Vec::new();
     physical_object_identifiers
         .try_reserve_exact(target_object_count)
@@ -702,10 +684,10 @@ fn prepare_metadata_probe<'source>(
 }
 
 fn finish_metadata_plan<'source>(
-    source: &'source Package,
+    source: &'source impl TableSource,
     probe: MetadataProbe<'source>,
     ids: OwnerCreationIds,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<MetadataPlan<'source>, Error> {
     let id_array = ids.as_array();
     let uuids = [
@@ -787,10 +769,10 @@ fn next_owner_creation_ids(floor: u64) -> Result<OwnerCreationIds, Error> {
 }
 
 fn prepare_owner_creation<'source>(
-    source: &'source Package,
+    source: &'source impl TableSource,
     graph: &Graph,
     axes: &HiddenAxes,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<OwnerCreationPlan<'source>, Error> {
     let objects = global_objects(source, budget)?;
     let physical_maximum = maximum_physical_identifier(source, &objects, budget)?;
@@ -806,8 +788,7 @@ fn prepare_owner_creation<'source>(
     budget
         .charge_payload_objects(OWNER_CREATION_OBJECTS)
         .and_then(|_| budget.charge_payload_messages(OWNER_CREATION_MESSAGES))
-        .and_then(|_| budget.charge_payload_items(OWNER_CREATION_FIELD_INFOS))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_items(OWNER_CREATION_FIELD_INFOS))?;
     let mut object_ids_owned = Vec::new();
     object_ids_owned
         .try_reserve_exact(object_ids.len())
@@ -840,11 +821,11 @@ fn prepare_owner_creation<'source>(
 }
 
 fn creation_states(
-    package: &Package,
+    package: &impl TableSource,
     graph: &Graph,
     axes: &HiddenAxes,
     ids: OwnerCreationIds,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(codec::HiddenStatesOwnerSnapshot, codec::UuidSnapshot), Error> {
     let formula_uid = formula_owner_for_creation(package, graph, budget)?;
     let active_uuid = codec::UuidSnapshot::new(
@@ -878,21 +859,17 @@ fn creation_states(
     })?;
     // Admit all state and owner collection storage before constructing any
     // vectors. The helper objects themselves are charged separately below.
-    budget
-        .charge_payload_items(
-            state_count
-                .checked_add(OWNER_CREATION_OBJECTS)
-                .and_then(|value| value.checked_add(OWNER_CREATION_FIELD_INFOS))
-                .ok_or(Error::Limit {
-                    kind: LimitKind::PayloadItems,
-                    observed: u64::MAX,
-                    maximum: u64::MAX,
-                })?,
-        )
-        .map_err(map_lock_error)?;
-    budget
-        .charge_payload_work(state_count.saturating_mul(4).saturating_add(8))
-        .map_err(map_lock_error)?;
+    budget.charge_payload_items(
+        state_count
+            .checked_add(OWNER_CREATION_OBJECTS)
+            .and_then(|value| value.checked_add(OWNER_CREATION_FIELD_INFOS))
+            .ok_or(Error::Limit {
+                kind: LimitKind::PayloadItems,
+                observed: u64::MAX,
+                maximum: u64::MAX,
+            })?,
+    )?;
+    budget.charge_payload_work(state_count.saturating_mul(4).saturating_add(8))?;
     let mut rows = Vec::new();
     rows.try_reserve_exact(row_count)
         .map_err(|_| Error::Allocation { amount: row_count })?;
@@ -948,11 +925,11 @@ fn creation_states(
 /// they have independent allocation authorities and are checked by their
 /// respective transaction plans.
 fn validate_creation_uuid_namespace(
-    package: &Package,
+    package: &impl TableSource,
     objects: &[ObjectLocation],
     graph: &Graph,
     active_uuid: codec::UuidSnapshot,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(), Error> {
     let column_extent_uuid = codec::UuidSnapshot::new(
         active_uuid
@@ -990,8 +967,7 @@ fn validate_creation_uuid_namespace(
         })?;
     budget
         .charge_payload_items(initial_capacity)
-        .and_then(|_| budget.charge_payload_work(initial_capacity))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(initial_capacity))?;
     logical_uuids
         .try_reserve_exact(initial_capacity)
         .map_err(|_| Error::Allocation {
@@ -1004,8 +980,7 @@ fn validate_creation_uuid_namespace(
     let mut map_dimensions = Vec::new();
     budget
         .charge_payload_items(objects.len())
-        .and_then(|_| budget.charge_payload_work(objects.len()))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(objects.len()))?;
     map_dimensions
         .try_reserve_exact(objects.len())
         .map_err(|_| Error::Allocation {
@@ -1021,17 +996,13 @@ fn validate_creation_uuid_namespace(
 
     for location in objects {
         let object = package
-            .state
-            .source
-            .components()
+            .catalog()
             .get_index(location.component_index)
             .and_then(|component| component.archive().objects.get(location.object_index))
             .ok_or(Error::InvalidSource)?;
         for (message_index, message) in object.messages.iter().enumerate() {
             if message.type_ == HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE {
-                budget
-                    .charge_payload_work(message.data.len())
-                    .map_err(map_lock_error)?;
+                budget.charge_payload_work(message.data.len())?;
                 let info = validate_message_metadata(
                     object,
                     message_index,
@@ -1041,9 +1012,7 @@ fn validate_creation_uuid_namespace(
                     || !info.data_references.is_empty()
                     || !info.field_infos.is_empty()
                 {
-                    return Err(Error::Refused(
-                        crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-                    ));
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 let (owner, report) = codec::decode_hidden_state_formula_owner_with_report(
                     message.data.as_slice(),
@@ -1052,15 +1021,13 @@ fn validate_creation_uuid_namespace(
                 .map_err(map_codec_error)?;
                 charge_codec(budget, report)?;
                 if let Some(owner_id) = owner.owner_id() {
-                    let uuid = owner_id.words_uuid().ok_or(Error::Refused(
-                        crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-                    ))?;
+                    let uuid = owner_id
+                        .words_uuid()
+                        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
                     push_logical_uuid(&mut logical_uuids, uuid, budget)?;
                 }
             } else if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
-                budget
-                    .charge_payload_work(message.data.len())
-                    .map_err(map_lock_error)?;
+                budget.charge_payload_work(message.data.len())?;
                 let _info =
                     validate_message_metadata(object, message_index, FORMULA_OWNER_MESSAGE_TYPE)?;
                 let (owner, report) = codec::decode_formula_owner_dependencies_with_report(
@@ -1071,14 +1038,10 @@ fn validate_creation_uuid_namespace(
                 charge_codec(budget, report)?;
                 if owner.has_dependencies() {
                     let Some(expected_formula_owner_uid) = expected_formula_owner_uid else {
-                        return Err(Error::Refused(
-                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-                        ));
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     };
                     let Some(reference) = owner.formula_owner() else {
-                        return Err(Error::Refused(
-                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-                        ));
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     };
                     validate_reference_shape(reference)?;
                     if owner.internal_formula_owner_id() == 0
@@ -1087,17 +1050,13 @@ fn validate_creation_uuid_namespace(
                         || owner.formula_owner_uid() != expected_formula_owner_uid
                         || reference.identifier().get() != graph.target.drawable_identifier.get()
                     {
-                        return Err(Error::Refused(
-                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-                        ));
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     let drawable = object_location(objects, graph.target.drawable_identifier)?;
                     if location.component_index == drawable.component_index
                         || location.identifier == graph.target.model_identifier.get()
                     {
-                        return Err(Error::Refused(
-                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-                        ));
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     validate_aggregate_formula_owner_component(
                         package,
@@ -1132,9 +1091,7 @@ fn validate_creation_uuid_namespace(
                 // is not self-describing, so decoding it without a rooted
                 // model shape would silently accept truncated permutations.
             } else if message.type_ == 6_001 {
-                budget
-                    .charge_payload_work(message.data.len())
-                    .map_err(map_lock_error)?;
+                budget.charge_payload_work(message.data.len())?;
                 let (model, report) = codec::decode_table_model_with_report(
                     message.data.as_slice(),
                     codec_options(budget, message.data.len(), message.data.len())?,
@@ -1154,9 +1111,7 @@ fn validate_creation_uuid_namespace(
                     push_hidden_owner_uuids(&mut logical_uuids, owner, budget)?;
                 }
             } else if message.type_ == 6_003 {
-                budget
-                    .charge_payload_work(message.data.len())
-                    .map_err(map_lock_error)?;
+                budget.charge_payload_work(message.data.len())?;
                 let info_result = codec::decode_table_info_with_report(
                     message.data.as_slice(),
                     codec_options(budget, message.data.len(), message.data.len())?,
@@ -1203,9 +1158,7 @@ fn validate_creation_uuid_namespace(
                         maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
                             .unwrap_or(u64::MAX),
                     })?;
-                    budget
-                        .charge_payload_work(attempt_work)
-                        .map_err(map_lock_error)?;
+                    budget.charge_payload_work(attempt_work)?;
                     match codec::decode_table_model_with_report(
                         message.data.as_slice(),
                         codec_options(budget, message.data.len(), message.data.len())?,
@@ -1258,18 +1211,14 @@ fn validate_creation_uuid_namespace(
         if pair[0].identifier == pair[1].identifier
             && (pair[0].columns != pair[1].columns || pair[0].rows != pair[1].rows)
         {
-            return Err(Error::Refused(
-                crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-            ));
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     map_dimensions.dedup_by_key(|dimensions| dimensions.identifier);
     let mut map_dimension_cursor = 0usize;
     for location in objects {
         let object = package
-            .state
-            .source
-            .components()
+            .catalog()
             .get_index(location.component_index)
             .and_then(|component| component.archive().objects.get(location.object_index))
             .ok_or(Error::InvalidSource)?;
@@ -1303,9 +1252,7 @@ fn validate_creation_uuid_namespace(
             .binary_search_by_key(&map_identifier, |dimensions| dimensions.identifier)
             .ok()
             .map(|index| map_dimensions[index])
-            .ok_or(Error::Refused(
-                crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-            ))?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if map_dimensions
             .get(map_dimension_cursor)
             .is_none_or(|expected| expected.identifier != dimensions.identifier)
@@ -1350,42 +1297,36 @@ fn validate_creation_uuid_namespace(
             )
             .is_ok()
     {
-        return Err(Error::Refused(
-            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-        ));
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let levels = if logical_uuids.len() <= 1 {
         0
     } else {
         (usize::BITS - (logical_uuids.len() - 1).leading_zeros()) as usize
     };
-    budget
-        .charge_payload_work(
-            logical_uuids
-                .len()
-                .checked_mul(levels)
-                .ok_or(Error::Limit {
-                    kind: LimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                        .unwrap_or(u64::MAX),
-                })?,
-        )
-        .map_err(map_lock_error)?;
+    budget.charge_payload_work(
+        logical_uuids
+            .len()
+            .checked_mul(levels)
+            .ok_or(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                observed: u64::MAX,
+                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+            })?,
+    )?;
     Ok(())
 }
 
 fn push_logical_uuid(
     values: &mut Vec<codec::UuidSnapshot>,
     uuid: codec::UuidSnapshot,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(), Error> {
     validate_uuid(uuid)?;
     if values.len() == values.capacity() {
         budget
             .charge_payload_items(1)
-            .and_then(|_| budget.charge_payload_work(1))
-            .map_err(map_lock_error)?;
+            .and_then(|_| budget.charge_payload_work(1))?;
         values
             .try_reserve_exact(1)
             .map_err(|_| Error::Allocation { amount: 1 })?;
@@ -1397,7 +1338,7 @@ fn push_logical_uuid(
 fn push_hidden_owner_uuids(
     values: &mut Vec<codec::UuidSnapshot>,
     owner: &codec::HiddenStatesOwnerSnapshot,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(), Error> {
     push_logical_uuid(values, owner.owner_uid(), budget)?;
     for state in owner.hidden_states() {
@@ -1429,13 +1370,12 @@ fn push_uid_map_dimensions(
     identifier: NonZeroU64,
     columns: u32,
     rows: u32,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(), Error> {
     if dimensions.len() == dimensions.capacity() {
         budget
             .charge_payload_items(1)
-            .and_then(|_| budget.charge_payload_work(1))
-            .map_err(map_lock_error)?;
+            .and_then(|_| budget.charge_payload_work(1))?;
         dimensions
             .try_reserve_exact(1)
             .map_err(|_| Error::Allocation { amount: 1 })?;
@@ -1449,17 +1389,15 @@ fn push_uid_map_dimensions(
 }
 
 fn append_uid_map_uuids(
-    package: &Package,
+    package: &impl TableSource,
     location: ObjectLocation,
     message_index: usize,
     dimensions: UidMapDimensions,
     values: &mut Vec<codec::UuidSnapshot>,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(), Error> {
     let object = package
-        .state
-        .source
-        .components()
+        .catalog()
         .get_index(location.component_index)
         .and_then(|component| component.archive().objects.get(location.object_index))
         .ok_or(Error::InvalidSource)?;
@@ -1493,8 +1431,7 @@ fn append_uid_map_uuids(
         })?;
     budget
         .charge_payload_work(message.data.len())
-        .and_then(|_| budget.charge_payload_items(element_count))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_items(element_count))?;
     let limits = budget.wire_limits();
     let options = uid_codec::DecodeOptions::new(
         message.data.len(),
@@ -1509,23 +1446,18 @@ fn append_uid_map_uuids(
     let (map, report) =
         uid_codec::decode_column_row_uid_map(message.data.as_slice(), columns, rows, options)
             .map_err(map_uid_codec_error)?;
-    budget
-        .charge_codec_report(report.fields(), report.work_bytes(), report.max_depth(), 0)
-        .map_err(map_lock_error)?;
-    budget
-        .charge_payload_work(
-            report
-                .records()
-                .checked_add(report.elements())
-                .and_then(|value| value.checked_add(element_count))
-                .ok_or(Error::Limit {
-                    kind: LimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                        .unwrap_or(u64::MAX),
-                })?,
-        )
-        .map_err(map_lock_error)?;
+    budget.charge_codec_report(report.fields(), report.work_bytes(), report.max_depth(), 0)?;
+    budget.charge_payload_work(
+        report
+            .records()
+            .checked_add(report.elements())
+            .and_then(|value| value.checked_add(element_count))
+            .ok_or(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                observed: u64::MAX,
+                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+            })?,
+    )?;
     for uid in map
         .sorted_row_uids()
         .iter()
@@ -1558,7 +1490,7 @@ fn helper_formula_value(uuid: codec::UuidSnapshot) -> codec::HiddenStateFormulaO
 
 fn helper_formula_measure(
     uuid: codec::UuidSnapshot,
-    budget: &table_lock::WireBudget,
+    budget: &impl Budget,
 ) -> Result<(codec::DecodeReport, codec::DecodeOptions), Error> {
     let options = codec_options(budget, 0, budget.wire_limits().max_output_bytes())?;
     let report = codec::measure_hidden_state_formula_owner(&helper_formula_value(uuid), options)
@@ -1584,7 +1516,7 @@ fn helper_filter_value() -> Result<codec::FilterSetSnapshot, Error> {
 }
 
 fn helper_filter_measure(
-    budget: &table_lock::WireBudget,
+    budget: &impl Budget,
 ) -> Result<(codec::DecodeReport, codec::DecodeOptions), Error> {
     let options = codec_options(budget, 0, budget.wire_limits().max_output_bytes())?;
     let report =
@@ -1608,7 +1540,7 @@ fn build_owner_helper_objects(
     plan: &OwnerCreationPlan<'_>,
     archive_limits: litchi_iwa_core::Limits,
     _wire_limits: WireLimits,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<Vec<ArchiveObject>, Error> {
     let row_uid = plan.active_uuid;
     let column_uid = codec::UuidSnapshot::new(
@@ -1627,8 +1559,7 @@ fn build_owner_helper_objects(
         .ok_or(Error::InvalidSource)?;
     budget
         .charge_output_bytes(payload_bytes)
-        .and_then(|_| budget.charge_payload_work(payload_bytes))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(payload_bytes))?;
     charge_codec(budget, column_formula_report)?;
     charge_codec(budget, row_formula_report)?;
     charge_codec(budget, filter_report)?;
@@ -1679,22 +1610,19 @@ fn build_owner_helper_objects(
     budget
         .charge_payload_bytes(helper_bytes)
         .and_then(|_| budget.charge_total_payload_bytes(helper_bytes))
-        .and_then(|_| budget.charge_payload_work(helper_bytes))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(helper_bytes))?;
     Ok(helper_archive.objects)
 }
 
 fn rewrite_metadata_entry_for_creation(
-    source: &Package,
+    source: &impl TableSource,
     plan: &MetadataPlan<'_>,
     payload: Vec<u8>,
     archive_limits: litchi_iwa_core::Limits,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<Vec<u8>, Error> {
     let component = source
-        .state
-        .source
-        .components()
+        .catalog()
         .get_index(plan.route.component_index)
         .ok_or(Error::InvalidSource)?;
     let object = component
@@ -1707,9 +1635,7 @@ fn rewrite_metadata_entry_for_creation(
         .get(plan.route.message_index)
         .filter(|message| message.type_ == METADATA_MESSAGE_TYPE)
         .ok_or(Error::InvalidSource)?;
-    let entry = source
-        .state
-        .source
+    let entry = support::physical(source)?
         .package()
         .iter()
         .find(|entry| entry.name() == METADATA_ENTRY_NAME)
@@ -1728,10 +1654,8 @@ fn rewrite_metadata_entry_for_creation(
         .and_then(|_| budget.charge_payload_bytes(archive_bound))
         .and_then(|_| budget.charge_total_payload_bytes(archive_bound))
         .and_then(|_| budget.charge_payload_work(archive_bound))
-        .and_then(|_| budget.charge_payload_work(compressed_bound))
-        .map_err(map_lock_error)?;
-    let (mut archive, _) = page_layout::editable_archive(source, METADATA_ENTRY_NAME)
-        .map_err(map_page_layout_error)?;
+        .and_then(|_| budget.charge_payload_work(compressed_bound))?;
+    let (mut archive, _) = support::editable_archive(source, METADATA_ENTRY_NAME)?;
     let object = archive
         .objects
         .get_mut(plan.route.object_index)
@@ -1746,8 +1670,7 @@ fn rewrite_metadata_entry_for_creation(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed = page_layout::compress_archive(source, archive, archive_limits)
-        .map_err(map_page_layout_error)?;
+    let compressed = support::compress_archive(source, archive, archive_limits)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -1755,7 +1678,7 @@ fn rewrite_metadata_entry_for_creation(
 }
 
 fn metadata_replacement_bounds(
-    source: &Package,
+    source: &impl TableSource,
     component: &litchi_iwa_archive::Component,
     old_payload_len: usize,
     new_payload_len: usize,
@@ -1769,58 +1692,54 @@ fn metadata_replacement_bounds(
         .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
+            maximum: source.archive_limits().max_input_bytes(),
         })?;
-    let compressed_bound =
-        table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::Limit {
-            kind: LimitKind::OutputBytes,
-            observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
-        })?;
+    let compressed_bound = support::snappy_compressed_bound(archive_bound).ok_or(Error::Limit {
+        kind: LimitKind::OutputBytes,
+        observed: u64::MAX,
+        maximum: source.archive_limits().max_input_bytes(),
+    })?;
     let replacement_entry_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
+        8 => support::deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
+            maximum: source.archive_limits().max_input_bytes(),
         })?,
         _ => {
-            return Err(Error::Refused(
-                crate::table::hidden_axes::transaction::Refusal::UnsupportedSource,
-            ));
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         },
     };
     Ok((archive_bound, compressed_bound, replacement_entry_bound))
 }
 
 fn formula_owner_for_creation(
-    package: &Package,
+    package: &impl TableSource,
     graph: &Graph,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<codec::UuidSnapshot, Error> {
     let objects = global_objects(package, budget)?;
     let drawable = object_location(&objects, graph.target.drawable_identifier)?;
     let model = object_location(&objects, graph.target.model_identifier)?;
     if drawable.component_index != model.component_index || drawable.identifier == model.identifier
     {
-        return Err(Error::Refused(
-            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-        ));
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let messages = formula_owner_messages(package, &objects, budget)?;
-    formula_owner_for(package, &messages, drawable, model, graph.profile, budget)?.ok_or(
-        Error::Refused(crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency),
-    )
+    formula_owner_for(package, &messages, drawable, model, graph.profile, budget)?
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))
 }
 
 fn desired_owner(
     graph: &Graph,
     axes: &HiddenAxes,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(codec::HiddenStatesOwnerSnapshot, codec::UuidSnapshot), Error> {
-    let owner = graph.model.owner.as_ref().ok_or(Error::Refused(
-        crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-    ))?;
+    let owner = graph
+        .model
+        .owner
+        .as_ref()
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let active_uuid = graph.info.hidden_uuid.ok_or(Error::InvalidSource)?;
     if owner.hidden_states().len() != 1
         || owner
@@ -1831,9 +1750,7 @@ fn desired_owner(
         // The strict owner codec can preserve opaque fields, but it cannot
         // prove byte-exact preservation of an inactive view while changing a
         // sibling.  Reject that shape before allocating a candidate.
-        return Err(Error::Refused(
-            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-        ));
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let state = owner.hidden_states().first().ok_or(Error::InvalidSource)?;
     let column = update_extent(
@@ -1870,7 +1787,7 @@ fn update_extent(
     physical_order: &[codec::UuidSnapshot],
     axes: &HiddenAxes,
     row: bool,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<codec::HiddenStateExtentSnapshot, Error> {
     let loop_work = extent
         .base_hidden_states()
@@ -1881,9 +1798,7 @@ fn update_extent(
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
         })?;
-    budget
-        .charge_payload_work(loop_work)
-        .map_err(map_lock_error)?;
+    budget.charge_payload_work(loop_work)?;
     let mut existing = Vec::new();
     existing
         .try_reserve_exact(extent.base_hidden_states().len())
@@ -1903,13 +1818,11 @@ fn update_extent(
     } else {
         (usize::BITS - (existing.len() - 1).leading_zeros()) as usize
     };
-    budget
-        .charge_payload_work(existing.len().checked_mul(levels).ok_or(Error::Limit {
-            kind: LimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        })?)
-        .map_err(map_lock_error)?;
+    budget.charge_payload_work(existing.len().checked_mul(levels).ok_or(Error::Limit {
+        kind: LimitKind::TransactionWork,
+        observed: u64::MAX,
+        maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+    })?)?;
     let mut states = Vec::new();
     states
         .try_reserve_exact(extent.base_hidden_states().len())
@@ -1982,7 +1895,7 @@ fn archive_source_length(archive: &Archive) -> Result<usize, Error> {
 fn charge_owner_storage(
     owner: &codec::HiddenStatesOwnerSnapshot,
     additional: usize,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<(), Error> {
     let mut count = owner.hidden_states().len();
     for state in owner.hidden_states() {
@@ -2010,11 +1923,11 @@ fn charge_owner_storage(
         observed: u64::MAX,
         maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
     })?;
-    budget.charge_payload_work(count).map_err(map_lock_error)
+    budget.charge_payload_work(count)
 }
 
 fn charge_rewrite_requirements(
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
     requirements: codec::RewriteExecutionRequirements,
 ) -> Result<(), Error> {
     let retained_work = requirements
@@ -2038,7 +1951,6 @@ fn charge_rewrite_requirements(
             )
         })
         .and_then(|_| budget.charge_payload_work(retained_work))
-        .map_err(map_lock_error)
 }
 
 fn desired_model_snapshot(
@@ -2047,7 +1959,7 @@ fn desired_model_snapshot(
     active_uuid: codec::UuidSnapshot,
     formula_columns_ref: Option<codec::ReferenceSnapshot>,
     formula_rows_ref: Option<codec::ReferenceSnapshot>,
-    budget: &mut table_lock::WireBudget,
+    budget: &mut impl Budget,
 ) -> Result<codec::TableModelSnapshot, Error> {
     let active = owner
         .hidden_states()
@@ -2071,9 +1983,7 @@ fn desired_model_snapshot(
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
         })?;
-    budget
-        .charge_payload_work(count_work)
-        .map_err(map_lock_error)?;
+    budget.charge_payload_work(count_work)?;
     let total_rows = active
         .row_hidden_state_extent()
         .base_hidden_states()
@@ -2161,49 +2071,37 @@ fn desired_model_snapshot(
     )
 }
 
-fn rewrite(
-    source: &Package,
+fn rewrite<L: Leaf>(
+    source: &L,
     graph: &Graph,
     axes: &HiddenAxes,
-    budget: &mut table_lock::WireBudget,
-) -> Result<RewriteResult, Error> {
+    budget: &mut impl Budget,
+) -> Result<RewriteResult<L>, Error> {
     let component = source
-        .state
-        .source
-        .components()
+        .catalog()
         .get_index(graph.target.model_component_index)
         .ok_or(Error::InvalidSource)?;
     if graph.target.component_index != graph.target.model_component_index {
-        return Err(Error::Refused(
-            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-        ));
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let component_name = component.name();
-    let entry = source
-        .state
-        .source
+    let entry = support::physical(source)?
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::Refused(
-            crate::table::hidden_axes::transaction::Refusal::UnsupportedSource,
-        ));
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = source
-        .state
-        .source
-        .limits()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let creation = graph.model.owner.is_none();
     if graph.profile.is_native() && creation {
         // Native owner creation has no qualified producer envelope. Keep
         // this restriction at the private rewrite boundary as well.
-        return Err(Error::Refused(
-            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
-        ));
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let creation_plan = if creation {
         Some(prepare_owner_creation(source, graph, axes, budget)?)
@@ -2346,9 +2244,7 @@ fn rewrite(
             .and_then(|creation| creation.metadata.as_ref())
             .ok_or(Error::InvalidSource)?;
         let metadata_component = source
-            .state
-            .source
-            .components()
+            .catalog()
             .get_index(plan.route.component_index)
             .ok_or(Error::InvalidSource)?;
         let metadata_object = metadata_component
@@ -2361,9 +2257,7 @@ fn rewrite(
             .get(plan.route.message_index)
             .filter(|message| message.type_ == METADATA_MESSAGE_TYPE)
             .ok_or(Error::InvalidSource)?;
-        let metadata_entry = source
-            .state
-            .source
+        let metadata_entry = support::physical(source)?
             .package()
             .iter()
             .find(|entry| entry.name() == METADATA_ENTRY_NAME)
@@ -2400,37 +2294,33 @@ fn rewrite(
         .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
+            maximum: source.archive_limits().max_input_bytes(),
         })?;
     let compressed_bound =
-        table_lock::snappy_compressed_bound(rewritten_bound).ok_or(Error::Limit {
+        support::snappy_compressed_bound(rewritten_bound).ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
+            maximum: source.archive_limits().max_input_bytes(),
         })?;
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
+        8 => support::deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
+            maximum: source.archive_limits().max_input_bytes(),
         })?,
         _ => {
-            return Err(Error::Refused(
-                crate::table::hidden_axes::transaction::Refusal::UnsupportedSource,
-            ));
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         },
     };
     let old_compressed_size =
         usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_entry_bytes(),
+            maximum: source.archive_limits().max_entry_bytes(),
         })?;
     let old_metadata_compressed_size = if metadata_replacement_bound.is_some() {
-        let metadata_entry = source
-            .state
-            .source
+        let metadata_entry = support::physical(source)?
             .package()
             .iter()
             .find(|entry| entry.name() == METADATA_ENTRY_NAME)
@@ -2438,14 +2328,12 @@ fn rewrite(
         usize::try_from(metadata_entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_entry_bytes(),
+            maximum: source.archive_limits().max_entry_bytes(),
         })?
     } else {
         0
     };
-    let package_output_bound = source
-        .state
-        .source
+    let package_output_bound = support::physical(source)?
         .source_bytes()
         .len()
         .checked_sub(old_compressed_size)
@@ -2455,7 +2343,7 @@ fn rewrite(
         .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
-            maximum: source.state.source.limits().max_input_bytes(),
+            maximum: source.archive_limits().max_input_bytes(),
         })?;
     budget
         .charge_output_bytes(rewritten_bound)
@@ -2468,20 +2356,17 @@ fn rewrite(
         .and_then(|_| budget.charge_payload_work(compressed_bound))
         .and_then(|_| budget.charge_payload_work(replacement_compressed_bound))
         .and_then(|_| budget.charge_payload_work(package_output_bound))
-        .and_then(|_| budget.charge_payload_work(info_requirements.output_bytes()))
-        .map_err(map_lock_error)?;
-    budget
-        .precharge_candidate_reopen(
-            &source.state.source,
-            package_output_bound,
-            graph.target.model_component_index,
-            compressed_bound,
-            rewritten_bound,
-            graph.target.model_object_index,
-            graph.target.model_message_index,
-            model_requirements.output_bytes(),
-        )
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(info_requirements.output_bytes()))?;
+    budget.precharge_candidate_reopen(
+        support::physical(source)?,
+        package_output_bound,
+        graph.target.model_component_index,
+        compressed_bound,
+        rewritten_bound,
+        graph.target.model_object_index,
+        graph.target.model_message_index,
+        model_requirements.output_bytes(),
+    )?;
 
     let creation_column_reference = creation_plan.as_ref().map(|plan| [plan.ids.column_formula]);
     let creation_row_reference = creation_plan.as_ref().map(|plan| [plan.ids.row_formula]);
@@ -2503,8 +2388,7 @@ fn rewrite(
         budget
             .charge_payload_references(OWNER_CREATION_OBJECTS)
             .and_then(|_| budget.charge_payload_items(OWNER_CREATION_FIELD_INFOS))
-            .and_then(|_| budget.charge_payload_work(after_len))
-            .map_err(map_lock_error)?;
+            .and_then(|_| budget.charge_payload_work(after_len))?;
         let mut aggregate_before = Vec::new();
         aggregate_before
             .try_reserve_exact(before_len)
@@ -2538,9 +2422,7 @@ fn rewrite(
         None
     };
 
-    let mut archive = page_layout::editable_archive(source, component_name)
-        .map_err(map_page_layout_error)?
-        .0;
+    let mut archive = support::editable_archive(source, component_name)?.0;
     let model_object = archive
         .objects
         .get_mut(graph.target.model_object_index)
@@ -2602,8 +2484,7 @@ fn rewrite(
             .append_objects(helper_archive.objects, archive_limits)
             .map_err(map_core_error)?;
     }
-    let compressed = page_layout::compress_archive(source, archive, archive_limits)
-        .map_err(map_page_layout_error)?;
+    let compressed = support::compress_archive(source, archive, archive_limits)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2624,14 +2505,16 @@ fn rewrite(
     };
     let mut previews = Vec::new();
     previews
-        .try_reserve_exact(page_layout::PREVIEW_ENTRY_NAMES.len())
+        .try_reserve_exact(PREVIEW_ENTRY_NAMES.len())
         .map_err(|_| Error::Allocation {
-            amount: page_layout::PREVIEW_ENTRY_NAMES.len(),
+            amount: PREVIEW_ENTRY_NAMES.len(),
         })?;
-    for name in page_layout::PREVIEW_ENTRY_NAMES.iter().copied() {
-        if source
-            .state
-            .source
+    for name in PREVIEW_ENTRY_NAMES
+        .iter()
+        .copied()
+        .filter(|_| L::DELETES_ROOT_PREVIEWS)
+    {
+        if support::physical(source)?
             .package()
             .iter()
             .any(|entry| entry.name() == name)
@@ -2648,35 +2531,28 @@ fn rewrite(
     if let Some(metadata_compressed) = metadata_compressed.as_ref() {
         edits.push(EntryEdit::new(METADATA_ENTRY_NAME, metadata_compressed));
     }
-    let prepared = source
-        .state
-        .source
+    let prepared = support::physical(source)?
         .package()
-        .prepare_reassembly_with_deletions(&edits, &previews, source.state.source.limits())
+        .prepare_reassembly_with_deletions(&edits, &previews, source.archive_limits())
         .map_err(map_archive_error)?;
     let requirements = prepared.execution_requirements();
     budget
         .charge_output_bytes(prepared.output_bytes())
         .and_then(|_| budget.charge_payload_work(requirements.scratch_bytes()))
-        .and_then(|_| budget.charge_payload_work(requirements.allocations()))
-        .map_err(map_lock_error)?;
+        .and_then(|_| budget.charge_payload_work(requirements.allocations()))?;
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
     if output.len() > package_output_bound {
         return Err(Error::Verification);
     }
-    let candidate_source = source
-        .state
-        .source
-        .reopen(output.into())
-        .map_err(map_archive_error)?;
+    let candidate = source.reopen_exact(output.into())?;
     let added_object_ids = creation_plan.as_ref().map_or_else(
         || Arc::from(Vec::<u64>::new()),
         |plan| Arc::clone(&plan.object_ids),
     );
     Ok(RewriteResult {
-        package: Package::from_source_catalog(candidate_source).map_err(map_package_error)?,
+        package: candidate,
         added_object_ids,
         touched_components: 1usize.saturating_add(usize::from(metadata_compressed.is_some())),
     })

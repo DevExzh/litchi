@@ -47,10 +47,31 @@ impl Text {
         }
     }
 
-    const fn edge_kind(self) -> super::slide_chart_caption::CaptionEdgeKind {
+    const fn edge_kind(self, owner: Owner) -> super::slide_chart_caption::CaptionEdgeKind {
+        use super::slide_chart_caption::CaptionEdgeKind;
+        match (owner, self) {
+            (Owner::Image, Self::Title) => CaptionEdgeKind::ImageTitle,
+            (Owner::Image, Self::Caption) => CaptionEdgeKind::Image,
+            (Owner::Shape, Self::Title) => CaptionEdgeKind::ShapeTitle,
+            (Owner::Shape, Self::Caption) => CaptionEdgeKind::Shape,
+        }
+    }
+}
+
+/// The drawable whose title or caption a transaction edits: an ordinary
+/// image, or an ordinary shape or line (record 0372), addressed by its
+/// position among the slide's drawables of that native type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Owner {
+    Image,
+    Shape,
+}
+
+impl Owner {
+    const fn captioned(self) -> super::slide_movie_caption::CaptionedDrawable {
         match self {
-            Self::Title => super::slide_chart_caption::CaptionEdgeKind::ImageTitle,
-            Self::Caption => super::slide_chart_caption::CaptionEdgeKind::Image,
+            Self::Image => super::slide_movie_caption::CaptionedDrawable::Image,
+            Self::Shape => super::slide_movie_caption::CaptionedDrawable::Shape,
         }
     }
 }
@@ -173,6 +194,7 @@ impl From<Refusal> for Error {
 /// One image title or caption staged against an immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
+    owner: Owner,
     text: Text,
     selection: super::slide_movie_caption::MovieCaptionSelection,
     after: Option<String>,
@@ -191,22 +213,18 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl<'a> Edit<'a> {
-    fn new<'slide>(
+    fn new(
         source: &'a Package,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        image_selector: impl Into<ImageSelector>,
+        owner: Owner,
+        slide_selector: SlideSelector<'_>,
+        position: Position,
         text: Text,
     ) -> Result<Self, Error> {
-        let selection = select_text(
-            source,
-            slide_selector.into(),
-            image_selector.into(),
-            text,
-            true,
-        )?;
+        let selection = select_text(source, owner, slide_selector, position, text, true)?;
         let after = selection.text.as_deref().map(copy_text).transpose()?;
         Ok(Self {
             source,
+            owner,
             text,
             selection,
             after,
@@ -270,8 +288,9 @@ impl<'a> Edit<'a> {
         let source_bytes = catalog.shared_source();
         let current = select_text(
             self.source,
+            self.owner,
             SlideSelector::position(self.selection.slide_position),
-            ImageSelector::position(self.selection.movie_position),
+            self.selection.movie_position,
             self.text,
             true,
         )?;
@@ -284,6 +303,7 @@ impl<'a> Edit<'a> {
                 package: self.source.snapshot(),
                 patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
+                    owner: self.owner,
                     text: self.text,
                     selection: self.selection,
                     target_selection: current,
@@ -330,7 +350,7 @@ impl<'a> Edit<'a> {
         let (package, touched_components, deleted_previews) = rewrite_text(
             base,
             &self.selection,
-            self.text,
+            self.text.edge_kind(self.owner),
             self.after.as_deref(),
             &mut budget,
         )?;
@@ -339,8 +359,9 @@ impl<'a> Edit<'a> {
             .map_err(map_chart_error)?;
         let candidate = select_text(
             &package,
+            self.owner,
             SlideSelector::position(self.selection.slide_position),
-            ImageSelector::position(self.selection.movie_position),
+            self.selection.movie_position,
             self.text,
             true,
         )?;
@@ -366,6 +387,7 @@ impl<'a> Edit<'a> {
             package,
             patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, target),
+                owner: self.owner,
                 text: self.text,
                 selection: self.selection,
                 target_selection: candidate,
@@ -383,6 +405,7 @@ impl<'a> Edit<'a> {
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
     artifacts: ExactArtifacts,
+    owner: Owner,
     text: Text,
     selection: super::slide_movie_caption::MovieCaptionSelection,
     target_selection: super::slide_movie_caption::MovieCaptionSelection,
@@ -458,6 +481,7 @@ impl Patch {
     pub fn inverse(&self) -> Self {
         Self {
             artifacts: self.artifacts.inverse(),
+            owner: self.owner,
             text: self.text,
             selection: self.target_selection.clone(),
             target_selection: self.selection.clone(),
@@ -580,8 +604,9 @@ impl Package {
     ) -> Result<Option<String>, Error> {
         Ok(select_text(
             self,
+            Owner::Image,
             slide_selector.into(),
-            image_selector.into(),
+            image_selector.into().as_position(),
             text,
             true,
         )?
@@ -601,7 +626,52 @@ impl Package {
         image_selector: impl Into<ImageSelector>,
         text: Text,
     ) -> Result<Edit<'_>, Error> {
-        Edit::new(self, slide_selector, image_selector, text)
+        Edit::new(
+            self,
+            Owner::Image,
+            slide_selector.into(),
+            image_selector.into().as_position(),
+            text,
+        )
+    }
+
+    /// Read the title or caption of one ordinary shape or line (host
+    /// `slide_shape_title_caption`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and refusals; a text box is refused
+    /// ([`Refusal::UnsupportedDependency`]).
+    pub fn slide_shape_text<'slide>(
+        &self,
+        slide_selector: impl Into<SlideSelector<'slide>>,
+        drawable_selector: impl Into<crate::DrawableSelector>,
+        text: Text,
+    ) -> Result<Option<String>, Error> {
+        let slide_selector = slide_selector.into();
+        let position = shape_position(self, slide_selector, drawable_selector.into())?;
+        Ok(select_text(self, Owner::Shape, slide_selector, position, text, true)?.text)
+    }
+
+    /// Start an exact immutable edit of one ordinary shape's or line's
+    /// title or caption (host `set_slide_shape_title`,
+    /// `remove_slide_shape_title`, `set_slide_shape_caption`,
+    /// `remove_slide_shape_caption`). The edit and its patch are those of
+    /// image titles and captions; [`Self::apply_slide_image_text`] replays
+    /// either.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and refusals.
+    pub fn edit_slide_shape_text<'slide>(
+        &self,
+        slide_selector: impl Into<SlideSelector<'slide>>,
+        drawable_selector: impl Into<crate::DrawableSelector>,
+        text: Text,
+    ) -> Result<Edit<'_>, Error> {
+        let slide_selector = slide_selector.into();
+        let position = shape_position(self, slide_selector, drawable_selector.into())?;
+        Edit::new(self, Owner::Shape, slide_selector, position, text)
     }
 
     /// Apply an exact-source-checked image title or caption patch.
@@ -618,8 +688,9 @@ impl Package {
         }
         let current = select_text(
             self,
+            patch.owner,
             SlideSelector::position(patch.selection.slide_position),
-            ImageSelector::position(patch.selection.movie_position),
+            patch.selection.movie_position,
             patch.text,
             true,
         )?;
@@ -658,8 +729,9 @@ impl Package {
             .map_err(map_chart_error)?;
         let selected = select_text(
             &candidate,
+            patch.owner,
             SlideSelector::position(patch.selection.slide_position),
-            ImageSelector::position(patch.selection.movie_position),
+            patch.selection.movie_position,
             patch.text,
             true,
         )?;
@@ -692,20 +764,40 @@ impl Package {
 
 fn select_text(
     package: &Package,
+    owner: Owner,
     slide_selector: SlideSelector<'_>,
-    image_selector: ImageSelector,
+    position: Position,
     text: Text,
     mutation_guards: bool,
 ) -> Result<super::slide_movie_caption::MovieCaptionSelection, Error> {
     super::slide_movie_caption::select_drawable_text(
         package,
         slide_selector,
-        super::slide_movie_caption::CaptionedDrawable::Image,
-        image_selector.as_position(),
+        owner.captioned(),
+        position,
         mutation_guards,
         text.movie_kind(),
     )
     .map_err(map_movie_caption_error)
+}
+
+/// The position of the selected shape among the slide's ShapeInfo drawables.
+fn shape_position(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    drawable: crate::DrawableSelector,
+) -> Result<Position, Error> {
+    super::slide_drawable::shape_info_position(package, slide_selector, drawable).map_err(|error| {
+        match error {
+            super::slide_drawable::Error::Refused(
+                super::slide_drawable::Refusal::DrawablePositionNotFound { position },
+            ) => Error::Refused(Refusal::ImagePositionNotFound { position }),
+            super::slide_drawable::Error::Refused(_) => {
+                Error::Refused(Refusal::UnsupportedDependency)
+            },
+            _ => Error::InvalidSource,
+        }
+    })
 }
 
 /// Register the new caption graph's foreign theme dependencies (stylesheet
@@ -772,7 +864,7 @@ fn register_dependencies(
 fn rewrite_text(
     source: &Package,
     selection: &super::slide_movie_caption::MovieCaptionSelection,
-    text: Text,
+    edge_kind: super::slide_chart_caption::CaptionEdgeKind,
     after: Option<&str>,
     budget: &mut super::slide_chart_caption::CaptionBudget,
 ) -> Result<(Package, usize, usize), Error> {
@@ -800,7 +892,7 @@ fn rewrite_text(
             selection.reference_identifier,
             selection.storage_identifier,
             after,
-            text.edge_kind(),
+            edge_kind,
             budget,
         )
     };

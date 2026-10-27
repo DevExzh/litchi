@@ -424,6 +424,9 @@ fn host_lifecycle(source: &[u8], operation: u8) -> TestResult<Vec<u8>> {
         3 => {
             editor.duplicate_table(litchi_numbers::TableSelector::index(0))?;
         },
+        4 => {
+            editor.duplicate_sheet(litchi_numbers::SheetSelector::index(0))?;
+        },
         _ => {
             editor.remove_sheet(litchi_numbers::SheetSelector::index(1))?;
         },
@@ -448,6 +451,10 @@ fn leaf_lifecycle(source: &[u8], operation: u8) -> TestResult<Vec<u8>> {
         },
         3 => {
             let commit = package.edit_table_lifecycle(0)?.duplicate(0)?.commit()?;
+            leaf_bytes!(commit.package())
+        },
+        4 => {
+            let commit = package.edit_sheet_lifecycle().duplicate(0)?.commit()?;
             leaf_bytes!(commit.package())
         },
         _ => {
@@ -524,5 +531,17 @@ fn numbers_builder_cost_abba() -> TestResult {
     black_box(leaf_builder()?);
     black_box(leaf_builder()?);
     black_box(host_builder()?);
+    Ok(())
+}
+
+/// Duplicating the first sheet of `basic.numbers`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_sheet_duplicate_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    black_box(host_lifecycle(&input.bytes, 4)?);
+    black_box(leaf_lifecycle(&input.bytes, 4)?);
+    black_box(leaf_lifecycle(&input.bytes, 4)?);
+    black_box(host_lifecycle(&input.bytes, 4)?);
     Ok(())
 }

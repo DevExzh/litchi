@@ -2771,7 +2771,7 @@ canonical `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` set and
 
 - `sheet::lifecycle` — `Package::{edit_sheet_lifecycle,
   apply_sheet_lifecycle}`; `Edit::{add, remove}` (one operation per edit),
-  plus `sheet::lifecycle::InvalidName`.
+  plus `sheet::lifecycle::InvalidName`; `Edit::duplicate` since record 0370j.
 - `table::lifecycle` — `Package::{edit_table_lifecycle,
   apply_table_lifecycle}` over one sheet selector; `Edit::{add, remove,
   duplicate}` (`duplicate` since record 0370h).
@@ -2809,6 +2809,8 @@ Both profiles now register 30 families.
 | `litchi_keynote::slide::table::format::{Edit, Patch, Commit, Diagnostics, Error, Refusal, LimitKind, DataFormat, At}` | Registered family in `keynote-minimal` / `keynote-full`; `Package::{slide_table_cell_format, edit_slide_table_cell_format, apply_slide_table_cell_format}`; the same verbs and engine as the Pages family; the dedicated `edit_slide_table_cell_number_format` family stays | ✅ 0379 |
 | `litchi_iwa_table::{TableSource, ResolvedObject, ResolveError}`, `litchi_iwa_table::cell_format::{Target, Path, Error, Refusal, LimitKind, TransactionBudget, ListKeys, control, display, data_format, publish, pop_up_menu, pop_up_menu_native, pop_up_menu_metadata}` | Format-neutral table-family engines over one resolved table model (profile `iwa-table`); private to the three leaves, never re-exported by a facade | ✅ 0379 |
 | `litchi_iwa_table::structure::{Working, Published, TableLeaf, ReopenError, Fault, FaultLimit, budget, collect, formula, metadata, plan, references}` | The exact-source structural working set and its phases, moved from `litchi-numbers`; Numbers keeps `type Working<'p> = Working<'p, Package>` | ✅ 0379 |
+| `litchi_iwa_table::hidden_axes::{Leaf, Budget, Target, Graph, Published, Error, Refusal, LimitKind, resolve_graph, publish, verify_replay, previews, support}` | The hidden-row/hidden-column engine, moved from `litchi-pages` (`body_table_hidden_axes`); the leaf supplies its selector, budget and strict reopen | ✅ 0379 |
+| `litchi_keynote::slide::table::hidden_axes::{AxisIndex, HiddenAxes, transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}}` | Registered family in `keynote-minimal` / `keynote-full`; `Package::{slide_table_hidden_axes, edit_slide_table_hidden_axes, apply_slide_table_hidden_axes}`; `Edit::{set, clear}` over the shared `litchi_iwa_table::hidden_axes` engine (`hidden_axes::WireBudget`, root previews kept) | ✅ 0379 |
 | `litchi_pages::section::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Run, CharacterProperties}` | Registered family in `pages`; `Package::{edit_section_text_style, apply_section_text_style, section_text_runs}`; `Edit::set(TextSpan, CharacterProperties)` (UTF-16, several per edit) | ✅ 0309 |
 
 ## iWork lazy tables and section lifecycle (record 0312)
