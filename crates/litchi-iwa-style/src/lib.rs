@@ -15,7 +15,9 @@
 //!   edits of style variations;
 //! - [`series`]: the style-variation graph engine of per-series chart
 //!   overrides (allocating, registering and releasing the override objects
-//!   a property write needs) and the per-series properties.
+//!   a property write needs) and the per-series properties;
+//! - [`shape`]: the shape-style variation graph engine (copy-on-write
+//!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke.
 //!
 //! Every entry point that reads untrusted bytes takes explicit limits.
 
@@ -25,3 +27,4 @@ pub mod drawing;
 pub mod graph;
 pub mod media;
 pub mod series;
+pub mod shape;
