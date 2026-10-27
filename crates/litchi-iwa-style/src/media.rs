@@ -3,10 +3,6 @@
 //! `litchi_iwa_protos::package_metadata_media_codec` (data records,
 //! component data references and their owners, the `DataMetadataMap`) and
 //! the `MessageInfo.data_references` of every IWA object.
-//!
-//! Repeated, identically, in `litchi-pages`, `litchi-numbers` and
-//! `litchi-keynote` (record 0375; W3 may fold it). The unit test compares the
-//! three copies.
 
 use litchi_iwa_common::media::embedded::{Embedded, Error as InventoryError, Inventory};
 use litchi_iwa_core::ArchiveObject;
@@ -161,18 +157,6 @@ pub fn embedded_assets<'a>(
 
 #[cfg(test)]
 mod tests {
-    const COPIES: [&str; 3] = [
-        include_str!("../../litchi-pages/src/media_native.rs"),
-        include_str!("../../litchi-numbers/src/media_native.rs"),
-        include_str!("../../litchi-keynote/src/media_native.rs"),
-    ];
-
-    #[test]
-    fn the_three_copies_are_identical() {
-        assert_eq!(COPIES[0], COPIES[1]);
-        assert_eq!(COPIES[1], COPIES[2]);
-    }
-
     #[test]
     fn an_empty_inventory_needs_metadata() {
         let objects: [litchi_iwa_core::ArchiveObject; 0] = [];

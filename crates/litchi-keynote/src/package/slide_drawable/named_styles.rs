@@ -389,7 +389,7 @@ fn create(
     Ok(())
 }
 
-fn rename(
+fn rename_style(
     workspace: &mut Workspace<'_>,
     storage: u64,
     target: ParagraphStyleId,
@@ -545,7 +545,7 @@ pub(super) fn change(
     match change {
         NamedChange::Apply(target) => apply(workspace, storage, *target),
         NamedChange::Create(source, name) => create(workspace, storage, *source, name),
-        NamedChange::Rename(target, name) => rename(workspace, storage, *target, name),
+        NamedChange::Rename(target, name) => rename_style(workspace, storage, *target, name),
         NamedChange::Delete(target) => delete(workspace, storage, *target),
         NamedChange::DeleteApplied(target, replacement) => {
             let limits = workspace.wire;

@@ -280,8 +280,8 @@ fn property_write(value: Property) -> property::PropertyWrite<'static> {
 
 /// Every IWA component of a package, decoded once.
 pub(crate) struct Components {
-    catalog: PackageCatalog,
-    archives: Vec<(String, IwaArchive)>,
+    pub(crate) catalog: PackageCatalog,
+    pub(crate) archives: Vec<(String, IwaArchive)>,
 }
 
 impl Components {
