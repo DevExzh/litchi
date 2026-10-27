@@ -188,6 +188,7 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | table resize (`body-table-catalog-native` table 0 to 7×6) | 2,531,579,334 | — | 50,760,582 | −98.0% |
 | table resize, after the owner-extents fix (both sides) | 2,541,546,946 | — | 51,157,126 | −98.0% |
 | table add (`body-table-catalog-native`, 3×4 at offset 0) | 3,262,277,019 | — | 147,383,467 | −95.5% |
+| table add, after W1-A's one-pass UID-map encoder (trunk `e658e4676e`; parity re-run, tier B) | 3,262,401,911 | — | 147,276,483 | −95.5% |
 | cell fill set (table 0, cell 1,1) | 3,555,552,959 | — | 130,637,922 | −96.3% |
 | cell layout reset (host-styled cell 1,1) | 2,813,295,373 | — | 209,686,265 | −92.5% |
 | cell border set (table 0, top edge of cell 1,1) | 3,381,823,315 | — | 89,096,263 | −97.4% |
