@@ -48,6 +48,7 @@ mod movie_playback;
 // The drawable-properties family reads and rewrites movie playback through
 // the same owner module, so it is compiled without the host seam feature as
 // well; only the hidden `__*` re-exports stay behind the feature.
+mod locale;
 #[cfg(not(feature = "internal-iwork-source"))]
 #[path = "package/movie_playback.rs"]
 mod movie_playback;
@@ -245,6 +246,14 @@ pub enum PackageError {
     /// ([`crate::builder::Identity`]).
     #[error("a fresh Pages document needs an explicit identity")]
     MissingIdentity,
+    /// A fresh document's language is not a valid language tag
+    /// ([`crate::builder::Builder::language`]).
+    #[error("invalid Pages document language: {0}")]
+    InvalidLanguage(#[source] litchi_iwa_text::LanguageError),
+    /// A fresh document's locale is empty or holds a NUL character
+    /// ([`crate::builder::Builder::locale`]).
+    #[error("a Pages document locale must be non-empty text without NUL")]
+    InvalidLocale,
     /// A limit profile was built with a value outside `1..=maximum`.
     #[error("invalid Pages {kind} limit {value} (allowed 1..={maximum})")]
     InvalidLimit {

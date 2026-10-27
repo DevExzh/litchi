@@ -1386,11 +1386,11 @@ package.rs	with_input_bytes	1	shared	keynote.build	host-only	litchi-iwa-archive 
 package.rs	with_iwa_stream_bytes	1	shared	keynote.build	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	write_to	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 pages/creation.rs	body_table	1	pages	builder	host-only	litchi-pages	-	-	-	-
-pages/creation.rs	body_text	1	pages	builder	host-only	litchi-pages	-	-	-	-
-pages/creation.rs	build	1	pages	builder	host-only	litchi-pages	-	-	-	-
-pages/creation.rs	language	1	pages	builder	host-only	litchi-pages	-	-	-	-
-pages/creation.rs	locale	1	pages	builder	host-only	litchi-pages	-	-	-	-
-pages/creation.rs	new	1	pages	builder	host-only	litchi-pages	-	-	-	-
+pages/creation.rs	body_text	1	pages	builder	migrated	litchi_pages::builder::Builder::body_text	pages_builder_language_locale_parity	B	-	-
+pages/creation.rs	build	1	pages	builder	migrated	litchi_pages::builder::Builder::build	pages_builder_language_locale_parity	B	-	-
+pages/creation.rs	language	1	pages	builder	migrated	litchi_pages::builder::Builder::language	pages_builder_language_locale_parity	B	-	-
+pages/creation.rs	locale	1	pages	builder	migrated	litchi_pages::builder::Builder::locale	pages_builder_language_locale_parity	B	-	-
+pages/creation.rs	new	1	pages	builder	migrated	litchi_pages::builder::Builder::new	pages_builder_language_locale_parity	B	-	-
 pages/editor.rs	add_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	add_text_box_comment	1	pages	text.comment	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	add_text_box_comment_reply	1	pages	text.comment	host-only	litchi-pages	-	-	-	-

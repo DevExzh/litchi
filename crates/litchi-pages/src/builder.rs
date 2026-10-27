@@ -46,11 +46,13 @@ use crate::{Package, PackageError, PackageResult};
 pub(crate) const TEMPLATE: &[u8] = include_bytes!("../assets/blank.pages");
 
 /// The identity of a fresh Pages document: its document UUID (also the
-/// `DocumentIdentifier`, `stableDocumentUUID` and `shareUUID`) and its
-/// private UUID.
+/// `DocumentIdentifier`, `stableDocumentUUID` and `shareUUID`), its version
+/// UUID (the properties' `versionUUID` and `revision` and the package
+/// metadata's revision) and its private UUID.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Identity {
     document: [u8; 16],
+    version: [u8; 16],
     private: [u8; 16],
 }
 
@@ -77,23 +79,38 @@ impl Identity {
     pub fn generate() -> Self {
         Self {
             document: litchi_core::id::generate_guid_bytes(),
+            version: litchi_core::id::generate_guid_bytes(),
             private: litchi_core::id::generate_guid_bytes(),
         }
     }
 
     /// A fixed identity: the document UUID is `bytes` (with the version-4
-    /// bits forced) and the private UUID is derived from it, so equal inputs
-    /// give byte-identical documents.
+    /// bits forced) and the version and private UUIDs are derived from it,
+    /// so equal inputs give byte-identical documents.
     #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         let mut private = bytes;
+        let mut version = bytes;
         let mut index = 0;
         while index < 16 {
             private[index] = bytes[15 - index] ^ 0x5a;
+            version[index] = bytes[(index + 7) % 16] ^ 0xc3;
             index += 1;
         }
         Self {
             document: version_four(bytes),
+            version: version_four(version),
+            private: version_four(private),
+        }
+    }
+
+    /// A fixed identity from both UUIDs (the version-4 bits forced), for a
+    /// document that must carry an identity authored elsewhere.
+    #[must_use]
+    pub const fn from_parts(document: [u8; 16], version: [u8; 16], private: [u8; 16]) -> Self {
+        Self {
+            document: version_four(document),
+            version: version_four(version),
             private: version_four(private),
         }
     }
@@ -102,6 +119,12 @@ impl Identity {
     #[must_use]
     pub fn document_uuid(&self) -> String {
         uuid(self.document)
+    }
+
+    /// The version UUID in Pages' uppercase hyphenated form.
+    #[must_use]
+    pub fn version_uuid(&self) -> String {
+        uuid(self.version)
     }
 
     /// The private UUID in Pages' uppercase hyphenated form.
@@ -128,6 +151,8 @@ fn uuid(bytes: [u8; 16]) -> String {
 pub struct Builder {
     identity: Option<Identity>,
     body_text: String,
+    language: Option<String>,
+    locale: Option<String>,
 }
 
 impl Builder {
@@ -148,28 +173,71 @@ impl Builder {
         self
     }
 
+    /// Set the document language (a BCP 47 tag such as `"fr"`), written to
+    /// the document, its settings and the body's language, as Pages does.
+    /// Unset, the template's `"en"` stays.
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    /// Set the document locale (for example `"fr_FR"`), written to the
+    /// document's current and creation locale and the settings' creation
+    /// and last locale. Unset, the template's `"en_US"` stays.
+    pub fn locale(mut self, locale: impl Into<String>) -> Self {
+        self.locale = Some(locale.into());
+        self
+    }
+
     /// Build the document.
     ///
     /// # Errors
     ///
-    /// [`PackageError::MissingIdentity`] without an identity; a typed text
-    /// error ([`PackageError::InvalidFormat`]) when the body text holds a
-    /// reserved Pages marker character.
+    /// [`PackageError::MissingIdentity`] without an identity;
+    /// [`PackageError::InvalidLanguage`] and [`PackageError::InvalidLocale`]
+    /// for an invalid language tag or locale; a typed text error
+    /// ([`PackageError::InvalidFormat`]) when the body text holds a reserved
+    /// Pages marker character.
     pub fn build(self) -> PackageResult<Package> {
         let identity = self.identity.ok_or(PackageError::MissingIdentity)?;
-        let package = Package::new()?.with_identity(&identity)?;
-        if self.body_text.is_empty() {
-            return Ok(package);
+        if let Some(language) = self.language.as_deref() {
+            litchi_iwa_text::TextLanguageTag::new(language)
+                .map_err(PackageError::InvalidLanguage)?;
         }
-        let mut edit = package
-            .edit_body_text()
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        edit.set(&self.body_text)
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        let commit = edit
-            .commit()
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        Ok(commit.into_package())
+        if self
+            .locale
+            .as_deref()
+            .is_some_and(|locale| locale.trim().is_empty() || locale.contains('\0'))
+        {
+            return Err(PackageError::InvalidLocale);
+        }
+        let template = Package::new()?;
+        let body_text = if self.body_text.is_empty() {
+            None
+        } else {
+            // The body-text transaction's validation (reserved markers,
+            // limits); its staged edit is not committed: the text goes out
+            // in the one identity publication.
+            template
+                .edit_body_text()
+                .and_then(|mut edit| edit.set(&self.body_text).map(|_| ()))
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+            Some(self.body_text.as_str())
+        };
+        let package = template.with_identity(
+            &identity,
+            self.language.as_deref(),
+            self.locale.as_deref(),
+            body_text,
+        )?;
+        if let Some(text) = body_text
+            && package.text()? != text
+        {
+            return Err(PackageError::InvalidFormat(
+                "the built Pages body text failed verification".to_owned(),
+            ));
+        }
+        Ok(package)
     }
 }
 
@@ -189,10 +257,19 @@ impl Package {
     }
 
     /// The same document with `identity` written into its identity
-    /// sidecars (`Metadata/DocumentIdentifier` and the UUID keys of
-    /// `Metadata/Properties.plist`).
-    fn with_identity(&self, identity: &Identity) -> PackageResult<Self> {
+    /// sidecars (`Metadata/DocumentIdentifier` and the UUID keys and
+    /// revision of `Metadata/Properties.plist`) and the package metadata's
+    /// revision identifier, and with `language`, `locale` and the body text
+    /// written where the host builder writes them, in one publication.
+    fn with_identity(
+        &self,
+        identity: &Identity,
+        language: Option<&str>,
+        locale: Option<&str>,
+        body_text: Option<&str>,
+    ) -> PackageResult<Self> {
         let document = identity.document_uuid();
+        let version = identity.version_uuid();
         let private = identity.private_uuid();
         let properties = super::package::sidecars::properties(self)?;
         let mut dictionary = properties.unwrap_or_default();
@@ -200,7 +277,34 @@ impl Package {
             dictionary.insert(key.to_owned(), plist::Value::String(document.clone()));
         }
         dictionary.insert("privateUUID".to_owned(), plist::Value::String(private));
-        super::package::sidecars::rewrite(self, Some(&dictionary), Some(document.as_bytes()))
+        dictionary.insert(
+            "versionUUID".to_owned(),
+            plist::Value::String(version.clone()),
+        );
+        let sequence = dictionary
+            .get("revision")
+            .and_then(plist::Value::as_string)
+            .and_then(|revision| revision.split_once("::"))
+            .map_or_else(|| "0".to_owned(), |(sequence, _)| sequence.to_owned());
+        dictionary.insert(
+            "revision".to_owned(),
+            plist::Value::String(format!("{sequence}::{version}")),
+        );
+        let encoded = super::package::sidecars::encode(&dictionary)?;
+        let mut rewrites = self.language_and_locale_rewrites(language, locale)?;
+        rewrites.extend(self.revision_rewrite(&version)?);
+        if let Some(text) = body_text {
+            self.body_text_rewrite(&mut rewrites, text)?;
+        }
+        super::package::body_drawable_graph::publish_with_replacements(
+            self,
+            rewrites,
+            &[
+                (super::package::sidecars::PROPERTIES, &encoded),
+                (super::package::sidecars::IDENTIFIER, document.as_bytes()),
+            ],
+        )
+        .map_err(|error| PackageError::InvalidFormat(format!("{error:?}")))
     }
 }
 
@@ -245,6 +349,26 @@ mod tests {
             Builder::new().body_text("x").build(),
             Err(PackageError::MissingIdentity)
         ));
+    }
+
+    #[test]
+    fn invalid_languages_and_locales_are_refused() {
+        let builder = || Builder::new().identity(Identity::from_bytes([3; 16]));
+        assert!(matches!(
+            builder().language(" ").build(),
+            Err(PackageError::InvalidLanguage(_))
+        ));
+        assert!(matches!(
+            builder().locale("").build(),
+            Err(PackageError::InvalidLocale)
+        ));
+        let built = builder()
+            .language("fr")
+            .locale("fr_FR")
+            .body_text("Bonjour")
+            .build()
+            .unwrap_or_else(|error| panic!("build: {error}"));
+        assert_eq!(built.text().ok().as_deref(), Some("Bonjour"));
     }
 
     #[test]

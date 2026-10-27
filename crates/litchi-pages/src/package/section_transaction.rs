@@ -1395,6 +1395,8 @@ pub(super) fn map_package_error(error: PackageError) -> Error {
         PackageError::UnexpectedFormat { .. }
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
         | PackageError::InvalidLimit { .. }
         | PackageError::Limit { .. } => {
             Error::Refused(crate::section::settings::Refusal::UnsupportedSource {
