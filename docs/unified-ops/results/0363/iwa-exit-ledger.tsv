@@ -1891,7 +1891,7 @@ pages/editor/tables/formula.rs	table_formula	1	pages	table.formula	migrated	litc
 pages/editor/tables/semantic.rs	add_table	1	pages	table.lifecycle	migrated	litchi_pages::Package::edit_body_table_creation	pages_body_table_add_parity	B	-	-
 pages/editor/tables/semantic.rs	cell_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	clear_table_cell	1	pages	other	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_clear_parity	A	-	-
-pages/editor/tables/semantic.rs	clear_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	clear_table_cell_border	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_border_clear_parity	A	-	-
 pages/editor/tables/semantic.rs	comment_count	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	duplicate_table	1	pages	table.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	get_cell	1	pages	table.cells	migrated	litchi_pages::Package::body_table_cells	pages_body_table_cells_read_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
@@ -1946,7 +1946,7 @@ pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_
 pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	migrated	litchi_pages::Package::edit_body_table_size	pages_body_table_resize_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_parity	A	-	-
-pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_border_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_custom_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
@@ -1995,7 +1995,7 @@ pages/editor/tables/semantic.rs	set_table_cell_text_shadow	1	pages	table.cell_ri
 pages/editor/tables/semantic.rs	set_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cells	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cells_batch_parity	A	-	-
 pages/editor/tables/semantic.rs	table	1	pages	other	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
-pages/editor/tables/semantic.rs	table_cell_borders	1	pages	table.cell_appearance	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_borders	1	pages	table.cell_appearance	migrated	litchi_pages::Package::body_table_cell_appearance	pages_body_table_cell_appearance_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_checkbox_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_currency_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_custom_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-

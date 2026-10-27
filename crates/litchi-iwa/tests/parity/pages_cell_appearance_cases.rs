@@ -7,7 +7,7 @@ use litchi_iwa::pages;
 use litchi_iwa::shapes::{RgbColorSpace, RgbaColor, ShapeFill};
 use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
 use litchi_pages::Package;
-use litchi_pages::table::cell_appearance::Fill;
+use litchi_pages::table::cell_appearance::{BorderSide, Borders, Fill, Stroke};
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
 use crate::leaf_bytes;
@@ -64,6 +64,7 @@ enum Op {
     ResetFill(u32, u32),
     SetLayout(u32, u32, Layout),
     ResetLayout(u32, u32),
+    Border(u32, u32, BorderSide, Option<Stroke>),
 }
 
 fn host_route(source: &[u8], table: usize, ops: &[Op]) -> TestResult<Vec<u8>> {
@@ -87,6 +88,18 @@ fn host_route(source: &[u8], table: usize, ops: &[Op]) -> TestResult<Vec<u8>> {
             },
             Op::ResetLayout(row, column) => {
                 editor.reset_table_cell_layout(model, *row as usize, *column as usize)?;
+            },
+            Op::Border(row, column, side, Some(stroke)) => {
+                editor.set_table_cell_border(
+                    model,
+                    *row as usize,
+                    *column as usize,
+                    *side,
+                    *stroke,
+                )?;
+            },
+            Op::Border(row, column, side, None) => {
+                editor.clear_table_cell_border(model, *row as usize, *column as usize, *side)?;
             },
         }
     }
@@ -114,6 +127,12 @@ fn leaf_commit(
             Op::ResetLayout(row, column) => {
                 edit.reset_layout(*row, *column);
             },
+            Op::Border(row, column, side, Some(stroke)) => {
+                edit.set_border(*row, *column, *side, *stroke);
+            },
+            Op::Border(row, column, side, None) => {
+                edit.clear_border(*row, *column, *side);
+            },
         }
     }
     Ok(edit.commit()?)
@@ -131,7 +150,7 @@ fn leaf_route(source: &[u8], table: usize, ops: &[Op]) -> TestResult<LeafRun> {
 }
 
 /// Every cell's host fill and layout of table `table`.
-fn host_cells(bytes: &[u8], table: usize) -> TestResult<Vec<(Fill, Layout)>> {
+fn host_cells(bytes: &[u8], table: usize) -> TestResult<Vec<(Fill, Layout, Borders)>> {
     let editor = pages::Draft::from_bytes(bytes)?;
     let info = editor.tables()?.get(table).ok_or("no such table")?.clone();
     let mut cells = Vec::new();
@@ -140,13 +159,14 @@ fn host_cells(bytes: &[u8], table: usize) -> TestResult<Vec<(Fill, Layout)>> {
             cells.push((
                 leaf_fill(&editor.table_cell_fill(info.model_object_id, row, column)?),
                 editor.table_cell_layout(info.model_object_id, row, column)?,
+                editor.table_cell_borders(info.model_object_id, row, column)?,
             ));
         }
     }
     Ok(cells)
 }
 
-fn leaf_cells(bytes: &[u8], table: usize) -> TestResult<Vec<(Fill, Layout)>> {
+fn leaf_cells(bytes: &[u8], table: usize) -> TestResult<Vec<(Fill, Layout, Borders)>> {
     let package = Package::from_bytes(bytes)?;
     let catalog = package.body_tables()?;
     let entry = catalog.get(table).ok_or("no such table")?;
@@ -155,7 +175,7 @@ fn leaf_cells(bytes: &[u8], table: usize) -> TestResult<Vec<(Fill, Layout)>> {
     for row in 0..rows {
         for column in 0..columns {
             let appearance = package.body_table_cell_appearance(table, row, column)?;
-            cells.push((appearance.fill, appearance.layout));
+            cells.push((appearance.fill, appearance.layout, appearance.borders));
         }
     }
     Ok(cells)
@@ -281,6 +301,48 @@ fn pages_body_table_cell_appearance_sequence_parity() -> TestResult {
     )
 }
 
+fn stroke(red: f32, width: f32) -> TestResult<Stroke> {
+    Ok(Stroke::new(
+        color(red, 0.2, 0.2)?,
+        litchi_iwa_common::shape::stroke::Width::new(width)?,
+        litchi_iwa_common::shape::stroke::Pattern::Solid,
+    ))
+}
+
+/// Cell borders: a new layer, a second run in it, an in-place restroke of
+/// the cell's own run, and an explicitly cleared edge.
+#[test]
+fn pages_body_table_cell_border_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture(TABLES)?;
+    run(
+        "pages_body_table_cell_border_parity",
+        Tier::A,
+        &input,
+        0,
+        &[
+            Op::Border(1, 1, BorderSide::Top, Some(stroke(0.9, 2.0)?)),
+            Op::Border(1, 2, BorderSide::Top, Some(stroke(0.5, 1.0)?)),
+            Op::Border(1, 1, BorderSide::Top, Some(stroke(0.1, 3.0)?)),
+            Op::Border(2, 0, BorderSide::Left, None),
+        ],
+    )
+}
+
+/// Clearing one edge of a cell.
+#[test]
+fn pages_body_table_cell_border_clear_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let input = fixture(TABLES)?;
+    run(
+        "pages_body_table_cell_border_clear_parity",
+        Tier::A,
+        &input,
+        1,
+        &[Op::Border(0, 1, BorderSide::Bottom, None)],
+    )
+}
+
 /// Rewriting a cell's own variation in place (the host-styled cell).
 #[test]
 fn pages_body_table_cell_fill_rewrite_parity() -> TestResult {
@@ -348,6 +410,17 @@ fn cell_layout_reset_cost_abba() -> TestResult {
     let ops = [Op::ResetLayout(1, 1)];
     crate::pages_cost_probes::abba(
         &styled()?,
+        |source| host_route(source, 0, &ops),
+        |source| Ok(leaf_bytes!(leaf_commit(source, 0, &ops)?.package())),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn cell_border_set_cost_abba() -> TestResult {
+    let ops = [Op::Border(1, 1, BorderSide::Top, Some(stroke(0.9, 2.0)?))];
+    crate::pages_cost_probes::abba(
+        &fixture(TABLES)?,
         |source| host_route(source, 0, &ops),
         |source| Ok(leaf_bytes!(leaf_commit(source, 0, &ops)?.package())),
     )

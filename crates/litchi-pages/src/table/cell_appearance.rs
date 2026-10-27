@@ -1,8 +1,8 @@
-//! Cell fill and text layout of one body-table cell (record 0371).
+//! Cell fill, text layout and borders of one body-table cell (record 0371).
 //!
 //! [`crate::Package::body_table_cell_appearance`] reads a cell's effective
 //! fill and layout; [`crate::Package::edit_body_table_cell_appearance`]
-//! stages fills and layouts and their resets. A change gives the cell a
+//! stages fills, layouts, their resets and edge strokes. A change gives the cell a
 //! private style variation (or rewrites its own), so every other property
 //! stays inherited from the table's styles.
 
@@ -10,9 +10,11 @@ pub use crate::package::body_table_cell_appearance::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
 };
 pub use litchi_iwa_common::shape::fill::Fill;
+pub use litchi_iwa_common::shape::stroke::Stroke;
 pub use litchi_iwa_common::table::cell::layout::{
     Inset, Insets, Layout, TextWrap, VerticalAlignment,
 };
+pub use litchi_iwa_common::table::cell::{BorderSide, Borders};
 
 /// One cell's effective appearance.
 #[derive(Debug, Clone, PartialEq)]
@@ -22,4 +24,7 @@ pub struct Appearance {
     pub fill: Fill,
     /// Text wrapping, vertical alignment and insets.
     pub layout: Layout,
+    /// The explicit edge strokes (`None`: the table style's edge, or an
+    /// explicitly cleared one).
+    pub borders: Borders,
 }

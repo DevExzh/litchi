@@ -23,9 +23,8 @@ use super::Package;
 use super::body_drawable_graph::{self as graph, GraphError, GraphLimit};
 use super::body_storage_objects as objects;
 use crate::selector::BodyTableSelector;
-use crate::table::cell_appearance::{Appearance, Fill, Layout};
+use crate::table::cell_appearance::{Appearance, BorderSide, Fill, Layout, Stroke};
 
-const CELL_STYLE_MESSAGE_TYPE: u32 = 6_004;
 const METADATA_MESSAGE_TYPE: u32 = 11_006;
 
 /// A finite resource charged by one cell-appearance edit.
@@ -268,6 +267,7 @@ enum Operation {
     ResetFill(u32, u32),
     SetLayout(u32, u32, Layout),
     ResetLayout(u32, u32),
+    Border(u32, u32, BorderSide, Option<Stroke>),
 }
 
 /// Cell appearance changes staged against one body table.
@@ -319,6 +319,27 @@ impl Edit<'_> {
         self
     }
 
+    /// Stage an explicit stroke on one edge of the cell.
+    pub fn set_border(
+        &mut self,
+        row: u32,
+        column: u32,
+        side: BorderSide,
+        stroke: Stroke,
+    ) -> &mut Self {
+        self.operations
+            .push(Operation::Border(row, column, side, Some(stroke)));
+        self
+    }
+
+    /// Stage an explicitly cleared edge (no stroke, overriding the table
+    /// style), as the host's `clear_table_cell_border` writes it.
+    pub fn clear_border(&mut self, row: u32, column: u32, side: BorderSide) -> &mut Self {
+        self.operations
+            .push(Operation::Border(row, column, side, None));
+        self
+    }
+
     /// Apply every staged change in order, publish and reopen.
     ///
     /// # Errors
@@ -338,7 +359,8 @@ impl Edit<'_> {
                 Operation::SetFill(row, column, _)
                 | Operation::ResetFill(row, column)
                 | Operation::SetLayout(row, column, _)
-                | Operation::ResetLayout(row, column) => (*row, *column),
+                | Operation::ResetLayout(row, column)
+                | Operation::Border(row, column, ..) => (*row, *column),
             };
             let target = engine::Target {
                 model_identifier: model,
@@ -362,6 +384,10 @@ impl Edit<'_> {
                         package = next;
                         changes += 1;
                     }
+                },
+                Operation::Border(_, _, side, stroke) => {
+                    package = border(&package, target, *side, *stroke)?;
+                    changes += 1;
                 },
                 Operation::ResetFill(..) => {
                     if let Some(next) = reset(&package, target, Kind::Fill)? {
@@ -548,6 +574,25 @@ fn reset(package: &Package, target: engine::Target, kind: Kind) -> Result<Option
     Ok(Some(publish(package, &plan)?))
 }
 
+fn border(
+    package: &Package,
+    target: engine::Target,
+    side: BorderSide,
+    stroke: Option<Stroke>,
+) -> Result<Package, Error> {
+    let fresh = fresh_identifier(package)?;
+    let plan = {
+        let source = Source::new(package)?;
+        engine::plan_border(&source, target, side, stroke, fresh)?
+    };
+    let candidate = publish(package, &plan)?;
+    let source = Source::new(&candidate)?;
+    if engine::borders(&source, target)?.get(side) != stroke {
+        return Err(Error::Verification);
+    }
+    Ok(candidate)
+}
+
 fn editable<'a>(
     source: &Package,
     archives: &'a mut Vec<(Arc<str>, Archive)>,
@@ -630,17 +675,37 @@ fn publish(source: &Package, plan: &Plan) -> Result<Package, Error> {
             }
         }
     }
+    for field in &plan.field_references {
+        let component = component_name(source, field.object)?;
+        let object = editable(source, &mut archives, &component)?
+            .object_mut(field.object)
+            .ok_or(Error::InvalidSource)?;
+        let index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == field.message_type)
+            .ok_or(Error::InvalidSource)?;
+        for record in &mut object.archive_info.message_infos[index].field_infos {
+            if record.object_references.contains(&field.sibling)
+                && !record.object_references.contains(&field.reference)
+            {
+                record.object_references.push(field.reference);
+            }
+        }
+    }
     let mut style_component = None;
     if let Some(insertion) = &plan.insertion {
-        let component = component_name(source, insertion.stylesheet)?;
+        let component = component_name(source, insertion.beside)?;
         let mut object = objects::new_object(
             source,
             insertion.identifier,
-            CELL_STYLE_MESSAGE_TYPE,
+            insertion.message_type,
             insertion.data.clone(),
         )?;
         let info = &mut object.archive_info.message_infos[0];
-        info.versions = engine::CELL_STYLE_VERSIONS.to_vec().into();
+        if let Some(versions) = insertion.versions {
+            info.versions = versions.to_vec().into();
+        }
         info.object_references
             .extend(insertion.object_references.iter().copied());
         editable(source, &mut archives, &component)?
@@ -757,6 +822,7 @@ fn appearance(package: &Package, model: u64, row: u32, column: u32) -> Result<Ap
     Ok(Appearance {
         fill,
         layout: Layout::new(text_wrap, vertical_alignment, insets),
+        borders: engine::borders(&source, target)?,
     })
 }
 
