@@ -1,11 +1,15 @@
 # 0379 — W1-G: the shared iWork table-family crate `litchi-iwa-table`
 
-- Status: group 1 (cell formats) landed on branch `uo2/iwa-w1g`, cut from
-  trunk `feat/unified-ops-api` at `ca202291ca`: the crate and the Numbers
-  move (`35908bbc0a`, merge-ready at `7ea1e295b1`), then the Pages and
-  Keynote families (this record's commit). Groups 2–5 (comments, rich text,
-  topology, conditional highlights) are not started (§5).
-- Date: 2026-10-26.
+- Status: groups 1 (cell formats) and 6 (hidden axes) landed on branch
+  `uo2/iwa-w1g`, cut from trunk `feat/unified-ops-api` at `ca202291ca`.
+  Group 1: the crate and the Numbers move (`35908bbc0a`, merge-ready at
+  `7ea1e295b1`), then the Pages and Keynote families (`73f6fa976a`).
+  Group 6 (§2a): the engine lift with the Pages owner (`e6e946e72b`), the
+  Keynote family (`c4a13cadfa`), then the engine changes, the host builder
+  change and the Numbers family (`3a9ef1b692`, `c0ec8404f2`,
+  `1544f10604`). Groups 2–5 (comments, rich text, topology, conditional
+  highlights) are not started (§5).
+- Date: 2026-10-26; group 6 completed 2026-10-27.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (W1 table families, §3.2
   "one family taking a format enum"), the W1-A Numbers table records
   [0370](0370-iwa-w1a-numbers-tables.md)–[0370c](0370c-iwa-w1a-row-column-removal.md),
@@ -14,7 +18,9 @@
 - `performance_claim`: the Numbers format, control and Pop-Up Menu routes
   are unchanged under callgrind (+0.09%, −0.03%, +0.01%); the new Pages
   family runs 88.2% below its host route and the Keynote family 0.9% above
-  its host route (§4).
+  its host route (§4). Hidden axes (§2a): the engine lift leaves the Pages
+  route unchanged (+0.008%); the Keynote and Numbers families run 60.4%
+  and 18.1% below their host routes.
 
 ## 1. Why a new crate
 
@@ -201,9 +207,83 @@ the first slide table of `table-discovery.key` and
 
 Ledger: `set_slide_table_hidden_axes` (B) and `slide_table_hidden_axes`
 (A) migrate, with two macOS queue rows. The engine refuses
-`slide-table-read-native.key`'s table as an invalid source (§5).
+`slide-table-read-native.key`'s table as an invalid source: its formula
+owner has dependencies (§2a.3, §5).
 Callgrind (`keynote_hidden_axes_cost_abba`, host A B B A leaf): host
 852,289,662, leaf 337,487,517, **−60.4%**.
+
+### 2a.3 Numbers
+
+`litchi_numbers::table::hidden_axes` with `Package::{table_hidden_axes,
+edit_table_hidden_axes, apply_table_hidden_axes}`, the Keynote facade's
+shape over the sheet and table selectors (`table_headers::resolve` gives
+the model and drawable routes), keeping root previews as the Numbers
+cell-level families do.
+
+Two engine changes, both from the Numbers parity:
+
+- **Owners that record the table's extents.** A table owner's spanning
+  envelopes (`FormulaOwnerDependenciesArchive` fields 7 and 8) may hold
+  `total_range_for_table` and `body_range_for_table` and nothing else; the
+  engine used to refuse any non-empty envelope. Extents carry no
+  dependency and hidden axes leave the geometry alone, so they are now
+  admitted. A spanning reference (`coord_refers_to_spans`) or a repeated
+  extent is still `UnsupportedDependency`, a malformed range coordinate
+  `InvalidSource` (`owner_extent_tests`).
+- **Identity allocation follows the host.** Owner creation allocates the
+  two filter sets before the two formula owners, as the host does (it was
+  the other way round); every `litchi-pages` test still passes.
+
+**Host builder change.** The host builder's `without_owner_extents` (the
+Pages bootstrap's workaround, record 0370i) is removed (`c0ec8404f2`): the
+host Pages builder now writes the owner extents that native files and the
+host Numbers builder store. Only the host Pages bootstrap of a first table
+uses it (`Builder::body_table`, and `Draft::add_table` on a table-less
+source-built document); the Keynote host builder has its own calculation
+archive. Checked against the parity harness's builder cases on the merged
+tree:
+
+- No tier-A builder case asserts anything this change touches. The leaf
+  Pages builder (W1-B, record 0371) has no `body_table` (a record 0371
+  gap), and the one Pages builder case,
+  `pages_builder_language_locale_parity` (tier B), builds without a table,
+  so the host route never bootstraps one.
+- `pages_body_table_add_parity` (tier B) adds a table to
+  `body-table-catalog-native.pages`, where the host clones the native
+  table instead of bootstrapping.
+- The Numbers builder cases (`numbers_builder_*_parity`, tier B) are
+  unchanged: the host Numbers builder always wrote the extents (0370i).
+- Every builder case and every `litchi-iwa` test passes (§6).
+
+When W1-B ports `body_table`, the host oracle it compares against writes
+the owner extents, as native files do.
+
+Parity (`numbers_hidden_axes_cases.rs`) on `basic.numbers`,
+`custom-number-native.numbers` and a host-built 6×4 workbook:
+
+| Test | Route | Tier |
+|---|---|---|
+| `numbers_table_hidden_axes_set_parity` | hide row 1 and column 0 on the natives; then hide more on each host output | B |
+| `numbers_table_hidden_axes_read_parity` | reads on the sources and the host's outputs | A |
+| `numbers_table_hidden_axes_clear_divergence_is_reported` | as Keynote | pinned |
+| `numbers_table_hidden_axes_creation_divergence_is_reported` | owner creation on the host-built workbook: the engine registers the new objects' UUIDs and writes empty filter offsets; the host does neither | pinned |
+
+Ledger: `set_table_hidden_axes` (B) and `table_hidden_axes` (A), two macOS
+queue rows. Callgrind (`numbers_hidden_axes_cost_abba`): host 62,615,742,
+leaf 51,289,709, **−18.1%**.
+
+**Why `slide-table-read-native.key` (and nine Numbers fixtures) stay
+refused.** The graph profiles are not the cause: every refused table has
+the same version tuples (`[1, 0, 5]` info, `[3, 2, 10]` model) as the
+admitted ones. The engine refuses them in
+`validate_native_formula_owner_metadata`: their formula owner references
+objects other than the table drawable, because the table holds formulas
+or feeds a chart (`slide-table-read-native.key`'s D2 = B2 + 1). The
+engine admits only owners whose dependency graph it proves empty, so a
+hidden-state change cannot leave a formula or chart dependency stale. Lifting
+that needs the formula-dependency engine (W1-F, record 0376) to re-plan the
+owner's spanning and cell dependencies under the new hidden state; it is a
+follow-up, not a profile calibration.
 
 ## 3. Tools and docs
 
@@ -258,7 +338,8 @@ inventory; it stays inside the 5% bar.
 | Date and Time, Duration, Text on number cells | the host writes a number under a date or duration kind, which the engine reads as an invalid cell; the host refuses Text on a number cell (pinned by `*_divergence_is_reported`) | decide with the macOS run which shape native files store |
 | Custom, numeral system, controls, Pop-Up Menu for Pages and Keynote | read only; writes need the metadata transition and the control facade's publication | lift the Numbers control/Pop-Up Menu publication (`rewrite_transaction`, save tokens, preview policy) into the crate |
 | empty cells | the engine edits stored cells only (`CellNotFound` on an empty slot); the host first stores the cell | reuse `table_write` to store a style-only cell first |
-| Keynote hidden axes on `slide-table-read-native.key` | the engine's graph profiles (Pages-calibrated version tuples) refuse its table as an invalid source; the host edits it | classify the Keynote native profile with that fixture |
+| hidden axes on tables whose formula owner has dependencies (`slide-table-read-native.key`, nine Numbers fixtures) | refused (`InvalidSource`): the engine proves an empty dependency graph before changing hidden state (§2a.3); the host edits them | re-plan the owner's dependencies with the W1-F formula engine |
+| hidden-axis owner creation | the engine registers the new objects' UUIDs and writes empty filter offsets; the host does neither (pinned on Numbers) | macOS run decides |
 | clearing hidden axes | the engine keeps cleared state records, the host drops them (pinned) | macOS run decides |
 | groups 2–5 | cell comments (coordinator addition), cell rich text, topology orchestration and conditional highlights are not started | next W1-G slices, in that order |
 
