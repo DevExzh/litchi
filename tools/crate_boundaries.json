@@ -129,6 +129,14 @@
       "litchi-iwa-core",
       "litchi-iwa-protos"
     ],
+    "litchi-iwa-table": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "litchi-numbers-wire"
+    ],
     "litchi-iwa-text": [
       "litchi-iwa-common"
     ],
@@ -158,6 +166,7 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
+      "litchi-iwa-table",
       "litchi-iwa-text",
       "litchi-iwa-text-wire",
       "litchi-numbers-wire"
@@ -576,6 +585,7 @@
     "litchi-iwa-protos",
     "litchi-iwa-structured",
     "litchi-iwa-style",
+    "litchi-iwa-table",
     "litchi-iwa-text",
     "litchi-iwa-text-wire",
     "litchi-keynote",

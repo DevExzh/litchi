@@ -189,6 +189,12 @@ impl From<popup::Error> for Error {
     }
 }
 
+impl From<litchi_iwa_table::cell_format::Error> for Error {
+    fn from(error: litchi_iwa_table::cell_format::Error) -> Self {
+        map_popup_error(error)
+    }
+}
+
 /// A selector-first Number-format edit staged against one exact package
 /// snapshot.
 pub struct Edit<'a> {
@@ -437,8 +443,8 @@ impl Package {
             self,
             target,
             native_path(Path::Cell {
-                sheet: target.sheet_position,
-                table: target.table_position,
+                sheet: target.scope,
+                table: target.table,
                 position,
             }),
         )
@@ -446,8 +452,8 @@ impl Package {
             map_number_read_error(
                 error,
                 Path::Cell {
-                    sheet: target.sheet_position,
-                    table: target.table_position,
+                    sheet: target.scope,
+                    table: target.table,
                     position,
                 },
             )
@@ -463,8 +469,8 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position).map_err(map_popup_error)?;
         let path = Path::Cell {
-            sheet: target.sheet_position,
-            table: target.table_position,
+            sheet: target.scope,
+            table: target.table,
             position,
         };
         let before = native::read_number_format(self, target, native_path(path))
@@ -829,15 +835,15 @@ fn rewrite(
     })
 }
 
-fn native_path(path: Path) -> popup::Path {
+fn native_path(path: Path) -> litchi_iwa_table::cell_format::Path {
     match path {
-        Path::Package => popup::Path::Package,
+        Path::Package => litchi_iwa_table::cell_format::Path::Package,
         Path::Cell {
             sheet,
             table,
             position,
-        } => popup::Path::Cell {
-            sheet,
+        } => litchi_iwa_table::cell_format::Path::Cell {
+            scope: sheet,
             table,
             position,
         },
@@ -868,8 +874,8 @@ fn map_number_read_error(error: native::NumberFormatReadError, path: Path) -> Er
     }
 }
 
-fn map_popup_error(error: popup::Error) -> Error {
-    match error {
+fn map_popup_error(error: impl Into<popup::Error>) -> Error {
+    match error.into() {
         popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::SheetNotFound) => {
             Error::Refused(Refusal::SheetNotFound)
         },

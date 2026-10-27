@@ -5038,4 +5038,40 @@ no facade re-exports it (ADR 0028's rule for focused low-level crates). The
 package is runtime-neutral and iWork-only, so the non-iWork release gate
 counts it among the iWork and excluded packages (17 to 18, 20 to 21).
 `tools/check_crate_boundaries.py` reports 69 workspace packages with 12
-migration debts.
+migration debts. Reconciled with `litchi-iwa-table` (record 0379, below),
+which landed in parallel: 70 workspace packages, 19 iWork and 22 excluded
+packages for the non-iWork gate.
+
+## 2026-10-26 amendment: `litchi-iwa-table` shared table-family engines (record 0379)
+
+Unified-ops record [0379](../unified-ops/0379-iwa-w1g-shared-table-crate.md)
+adds the focused package `litchi-iwa-table`. Numbers sheets, Pages body
+tables and Keynote slide tables store the same TST table graph, but the
+table-family engines that edit it (cell formats and controls first; cell
+rich text, comments, topology orchestration and conditional highlights
+follow) lived only inside `litchi-numbers`, tied to its selectors and
+package state. The new package holds them in format-neutral form: each
+engine operates on one resolved table model, which a leaf supplies through
+the `TableSource` trait (component catalog, exact physical source, object
+index and ingress limits) and a resolved `cell_format::Target`. The leaves
+keep selectors, publication and their public transaction types.
+
+Edges added, all downward and runtime-neutral:
+
+- `litchi-iwa-table -> litchi-iwa-archive` (component catalog, exact
+  physical source, ZIP reassembly), `-> litchi-iwa-core` (archives, Snappy,
+  object references), `-> litchi-iwa-protos` (the bounded table, control
+  and format codecs), `-> litchi-numbers-wire` (BNC cells and the Pop-Up
+  Menu BNC planner), `-> litchi-iwa-common` (the neutral
+  `table::cell::data_format` values and wire views) and `-> litchi-core`
+  (fresh custom-format UUIDs);
+- `litchi-numbers -> litchi-iwa-table`: the Numbers format, control and
+  Pop-Up Menu facades call the moved engines through their previous module
+  names; their public API and behaviour are unchanged.
+
+The package is never re-exported by a facade: its signatures name native
+archive positions, which the supported APIs do not expose. It is an iWork
+package for the non-iWork release gate (18 iWork packages, 21 excluded).
+`tools/check_crate_boundaries.py` reports 69 workspace packages and 300
+internal dependency declarations (trunk at this branch point), with the
+same 11 migration debts.

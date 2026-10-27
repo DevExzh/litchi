@@ -1,9 +1,9 @@
-//! Private native seam for the unified cell-control owner.
+//! Native seam of the cell-control owners.
 //!
-//! The selector/transaction facade lives in [`super::table_cell_control`].
-//! This module intentionally contains no public archive or generated types;
-//! scalar-control graph surgery will be added here as the source-preserving
-//! list transition is shared with the audited Pop-Up Menu engine.
+//! The selector/transaction facades live in the leaf crates (Numbers:
+//! `package::table_cell_control`). This module contains no public generated
+//! types; the scalar-control graph surgery shares its list transition with
+//! the audited Pop-Up Menu engine.
 
 use std::mem::size_of;
 
@@ -22,15 +22,14 @@ use litchi_iwa_protos::{
 };
 use litchi_numbers_wire::{BncCell, BncCellView, CellDataFormatKind};
 
-use super::table_cell_pop_up_menu_native::NativePopUpError;
+use super::pop_up_menu_native::NativePopUpError;
 use super::{
-    Package, table_cell_pop_up_menu as popup,
-    table_cell_pop_up_menu::{CellTarget, Error, Path, TransactionBudget},
-    table_cell_pop_up_menu_metadata as popup_metadata,
-    table_cell_pop_up_menu_native as popup_native,
+    Error, Path, Target, TransactionBudget, pop_up_menu as popup,
+    pop_up_menu_metadata as popup_metadata, pop_up_menu_native as popup_native,
 };
-use crate::cell::data_format::CellControl;
-use crate::cell::data_format::{
+use crate::TableSource;
+use litchi_iwa_common::table::cell::data_format::CellControl;
+use litchi_iwa_common::table::cell::data_format::{
     control::DisplayFormat,
     number::{CurrencyStyle, DecimalPlaces, FractionAccuracy, NegativeStyle, ThousandsSeparator},
     numeral_system::{NegativeStyle as NumeralNegativeStyle, Places},
@@ -95,7 +94,7 @@ const BNC_FIELD_LAYOUT: &[(u32, usize)] = &[
 /// identifier dangling.  Shared generic identifiers are allowed only in the
 /// native kinds where they are a primary/secondary edge; Text's marker and
 /// generic-value rules are checked by its focused metadata validator.
-pub(super) fn validate_bnc_format_metadata(
+pub fn validate_bnc_format_metadata(
     source: &[u8],
     cell: &BncCell,
     path: Path,
@@ -116,7 +115,7 @@ fn validate_bnc_format_metadata_kind(
 
     if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0 {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
 
@@ -138,7 +137,7 @@ fn validate_bnc_format_metadata_kind(
         litchi_numbers_wire::CHECKBOX_CELL_FORMAT_KIND,
     ) {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
 
@@ -157,7 +156,7 @@ fn validate_bnc_format_metadata_kind(
         )
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
 
@@ -186,7 +185,7 @@ fn text_secondary_identifier_for_census_view(
         || flags & BNC_FORMAT_FLAGS & !BNC_TEXT_ALLOWED_FORMAT_FLAGS != 0
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
 
@@ -236,7 +235,7 @@ fn text_secondary_identifier_for_census_view(
         || text_identifier.is_none_or(|identifier| identifier == 0)
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT {
@@ -274,7 +273,7 @@ fn validate_native_cell_metadata(
                 || !currency_cell_type_matches_view(cell)
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             Ok(Some((primary, NativePrimaryFormatKind::Currency)))
@@ -294,7 +293,7 @@ fn validate_native_cell_metadata(
                 || !cell.is_duration_format_compatible()
             {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             Ok(Some((primary, NativePrimaryFormatKind::Duration)))
@@ -318,7 +317,7 @@ fn currency_cell_type_matches_view(cell: &BncCellView<'_>) -> bool {
 /// Marker used by the generic owner to keep native failures content-free.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
-pub(super) enum NativeControlKind {
+pub enum NativeControlKind {
     Checkbox,
     StarRating,
     Slider,
@@ -327,40 +326,38 @@ pub(super) enum NativeControlKind {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct NativeControlMember {
-    pub(super) member_name: String,
-    pub(super) archive_bytes: Vec<u8>,
+pub struct NativeControlMember {
+    pub member_name: String,
+    pub archive_bytes: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct NativeControlOutput {
-    pub(super) members: Vec<NativeControlMember>,
-    pub(super) component_indices: Vec<usize>,
-    pub(super) changed_objects: Vec<(usize, u64)>,
+pub struct NativeControlOutput {
+    pub members: Vec<NativeControlMember>,
+    pub component_indices: Vec<usize>,
+    pub changed_objects: Vec<(usize, u64)>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct NativePreflight {
-    pub(super) archive_bytes: usize,
-    pub(super) compressed_bytes: usize,
+pub struct NativePreflight {
+    pub archive_bytes: usize,
+    pub compressed_bytes: usize,
 }
 
 /// Precharge the source archive and a conservative private scalar candidate
 /// bound before archive cloning, list staging, or BNC rewrites allocate.
-pub(super) fn preflight_copy_on_write_scalar_control(
-    source: &Package,
-    target: CellTarget,
+pub fn preflight_copy_on_write_scalar_control(
+    source: &dyn TableSource,
+    target: Target,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<NativePreflight, Error> {
     let component = source
-        .state
-        .components
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
-    let physical = source.state.components.physical().ok_or(Error::Refused(
-        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+    let physical = source.physical().ok_or(Error::Refused(
+        crate::cell_format::Refusal::UnsupportedSource,
     ))?;
     let member = physical
         .package()
@@ -373,9 +370,7 @@ pub(super) fn preflight_copy_on_write_scalar_control(
     // decompressed/native bound, otherwise a highly-compressible member can
     // bypass the decoded payload ceiling.
     let archive_limits = source
-        .state
-        .options
-        .archive()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let source_archive_bound = archive_serialized_bound(archive, archive_limits, path)?;
@@ -386,7 +381,7 @@ pub(super) fn preflight_copy_on_write_scalar_control(
     // the native rewrite debits each actual member separately before it is
     // cloned or serialized.
     let mut graph_archive_bound = source_archive_bound;
-    for candidate in source.state.components.catalog().iter() {
+    for candidate in source.catalog().iter() {
         graph_archive_bound = graph_archive_bound.max(archive_serialized_bound(
             candidate.archive(),
             archive_limits,
@@ -394,8 +389,6 @@ pub(super) fn preflight_copy_on_write_scalar_control(
         )?);
     }
     let graph_member_bound = source
-        .state
-        .components
         .physical()
         .map(|physical| {
             physical
@@ -414,7 +407,7 @@ pub(super) fn preflight_copy_on_write_scalar_control(
         .snappy_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let compressed_bytes = SnappyStream::maximum_compressed_len(archive_bytes, snappy_limits)
-        .map_err(|error| popup::map_core_error(error, path))?;
+        .map_err(|error| super::map_core_error(error, path))?;
     // These are operation-local private staging reservations.  The exact
     // prepared list requirements are charged by `apply_list_mutation`'s
     // resource-aware wrapper below; this allowance covers archive COW, tile
@@ -442,7 +435,7 @@ pub(super) fn preflight_copy_on_write_scalar_control(
     })
 }
 
-pub(super) fn archive_serialized_bound(
+pub fn archive_serialized_bound(
     archive: &Archive,
     limits: ArchiveLimits,
     path: Path,
@@ -461,29 +454,27 @@ pub(super) fn archive_serialized_bound(
 /// Rewrite a scalar control using the same strict list/storage primitives as
 /// the Pop-Up Menu owner.  Popup-bearing transitions are deliberately left to
 /// that owner so their model UUID/metadata lifecycle cannot be bypassed.
-pub(super) fn rewrite_scalar_control(
-    source: &Package,
-    target: CellTarget,
+pub fn rewrite_scalar_control(
+    source: &dyn TableSource,
+    target: Target,
     before: Option<&CellControl>,
     after: Option<&CellControl>,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<NativeControlOutput, Error> {
     if target.locked {
-        return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path },
-        ));
+        return Err(Error::Refused(crate::cell_format::Refusal::TableLocked {
+            path,
+        }));
     }
     if before.is_some_and(|value| matches!(value, CellControl::PopUpMenu(_)))
         || after.is_some_and(|value| matches!(value, CellControl::PopUpMenu(_)))
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let model_component = source
-        .state
-        .components
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
@@ -532,18 +523,14 @@ pub(super) fn rewrite_scalar_control(
         .iter()
         .find(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference)
-        .ok_or(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
-        ))?;
+        .ok_or(Error::Refused(crate::cell_format::Refusal::CellNotFound))?;
     if tile_identifier == target.model_identifier {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     let tile_component_index = resolved_component_index(source, tile_identifier, path)?;
     let tile_archive = source
-        .state
-        .components
         .catalog()
         .get_index(tile_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -560,7 +547,7 @@ pub(super) fn rewrite_scalar_control(
     .map_err(|_| Error::InvalidSource { path })?;
     let cell = BncCell::parse(
         cell_source,
-        &crate::cell::wire::limits_for_source(cell_source),
+        &crate::cell_format::bnc_limits_for_source(cell_source),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let old_format = cell.format_identifier();
@@ -580,16 +567,12 @@ pub(super) fn rewrite_scalar_control(
         .identifier();
     let format_component_index = resolved_component_index(source, format_table_identifier, path)?;
     let format_archive = source
-        .state
-        .components
         .catalog()
         .get_index(format_component_index)
         .ok_or(Error::InvalidSource { path })?
         .archive();
     let control_component_index = resolved_component_index(source, control_table_identifier, path)?;
     let control_archive = source
-        .state
-        .components
         .catalog()
         .get_index(control_component_index)
         .ok_or(Error::InvalidSource { path })?
@@ -667,8 +650,6 @@ pub(super) fn rewrite_scalar_control(
         )?;
         popup_ownership.push((popup_component_index, identifier));
         let popup_archive = source
-            .state
-            .components
             .catalog()
             .get_index(popup_component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -769,7 +750,7 @@ pub(super) fn rewrite_scalar_control(
         ),
         Some(CellControl::PopUpMenu(_)) => {
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         },
         None => (NativeControlKind::Checkbox, Vec::new(), Vec::new()),
@@ -804,23 +785,23 @@ pub(super) fn rewrite_scalar_control(
             new_format_key.ok_or(Error::InvalidSource { path })?,
             new_control_key.ok_or(Error::InvalidSource { path })?,
         );
-        let limits = crate::cell::wire::limits_for_source(cell_source);
+        let limits = crate::cell_format::bnc_limits_for_source(cell_source);
         let mut cell =
             BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource { path })?;
         let (kind, _control) = native_kind(after, path)?;
         cell.set_data_format_identifier(format_key, kind, Some(control_key))
             .map_err(|_| {
-                Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-                )
+                Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path })
             })?;
-        crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource { path })?
+        cell.encode(&limits)
+            .map_err(|_| Error::InvalidSource { path })?
     } else {
-        let limits = crate::cell::wire::limits_for_source(cell_source);
+        let limits = crate::cell_format::bnc_limits_for_source(cell_source);
         let mut cell =
             BncCell::parse(cell_source, &limits).map_err(|_| Error::InvalidSource { path })?;
         cell.clear_explicit_format();
-        crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource { path })?
+        cell.encode(&limits)
+            .map_err(|_| Error::InvalidSource { path })?
     };
     let patched_tile = popup_native::patch_tile_cell(
         &tile_payload,
@@ -830,9 +811,7 @@ pub(super) fn rewrite_scalar_control(
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let archive_limits = source
-        .state
-        .options
-        .archive()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let mut component_indices = vec![
@@ -846,8 +825,6 @@ pub(super) fn rewrite_scalar_control(
         .iter()
         .map(|&component_index| {
             let component = source
-                .state
-                .components
                 .catalog()
                 .get_index(component_index)
                 .ok_or(Error::InvalidSource { path })?;
@@ -904,8 +881,6 @@ pub(super) fn rewrite_scalar_control(
     let mut candidate_serialized_bytes = 0usize;
     for (component_index, candidate) in &archives {
         let source_archive = source
-            .state
-            .components
             .catalog()
             .get_index(*component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -954,8 +929,6 @@ pub(super) fn rewrite_scalar_control(
         .collect::<Vec<_>>();
         popup_native::verify_archive_object_locality(
             source
-                .state
-                .components
                 .catalog()
                 .get_index(component_index)
                 .ok_or(Error::InvalidSource { path })?
@@ -980,14 +953,12 @@ pub(super) fn rewrite_scalar_control(
         budget
             .charge_payload_bytes(archive_bytes.len(), path)
             .map_err(|_| Error::Limit {
-                kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
+                kind: crate::cell_format::LimitKind::PayloadBytes,
                 observed: archive_bytes.len() as u64,
                 maximum: u64::MAX,
                 path,
             })?;
         let member_name = source
-            .state
-            .components
             .catalog()
             .get_index(component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -1013,22 +984,22 @@ pub(super) fn rewrite_scalar_control(
 /// family-parameterized native owner. Keep the Number spellings stable for
 /// the existing transaction facade; the Percentage facade imports the shared
 /// owner directly.
-pub(super) use super::table_cell_display_format_native::{
+pub use super::display::{
     NumberFormatReadError, TextFormatReadError, read_number_format, read_number_format_with_budget,
     read_text_format, read_text_format_with_budget, rewrite_number_format, rewrite_text_format,
 };
 
 #[derive(Clone)]
-pub(super) struct ListEntry {
-    pub(super) key: u32,
-    pub(super) ref_count: u32,
-    pub(super) payload: Vec<u8>,
-    pub(super) is_format: bool,
+pub struct ListEntry {
+    pub key: u32,
+    pub ref_count: u32,
+    pub payload: Vec<u8>,
+    pub is_format: bool,
 }
 
-pub(super) struct ListFacts {
-    pub(super) next_key: u32,
-    pub(super) entries: Vec<ListEntry>,
+pub struct ListFacts {
+    pub next_key: u32,
+    pub entries: Vec<ListEntry>,
 }
 
 /// Copy a borrowed native payload into transaction-owned staging memory.
@@ -1037,7 +1008,7 @@ pub(super) struct ListFacts {
 /// must be rejected by the transaction ledger before the allocator is asked
 /// to materialize it.  These bytes are retained until the surrounding native
 /// operation has finished, rather than being counted as decoded wire input.
-pub(super) fn copy_payload_with_budget(
+pub fn copy_payload_with_budget(
     source: &[u8],
     budget: &mut TransactionBudget,
     path: Path,
@@ -1100,15 +1071,15 @@ fn visitor_failure(
     Err(storage_codec::DecodeError::allocation(1))
 }
 
-pub(super) struct TileReferenceCollector<'budget> {
-    pub(super) tiles: Vec<(u32, u64)>,
+pub struct TileReferenceCollector<'budget> {
+    pub tiles: Vec<(u32, u64)>,
     budget: &'budget mut TransactionBudget,
     path: Path,
     failure: Option<Error>,
 }
 
 impl<'budget> TileReferenceCollector<'budget> {
-    pub(super) fn new(budget: &'budget mut TransactionBudget, path: Path) -> Self {
+    pub fn new(budget: &'budget mut TransactionBudget, path: Path) -> Self {
         Self {
             tiles: Vec::new(),
             budget,
@@ -1117,7 +1088,7 @@ impl<'budget> TileReferenceCollector<'budget> {
         }
     }
 
-    pub(super) fn finish(self) -> Result<Vec<(u32, u64)>, Error> {
+    pub fn finish(self) -> Result<Vec<(u32, u64)>, Error> {
         if let Some(error) = self.failure {
             Err(error)
         } else {
@@ -1335,7 +1306,8 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
 
 impl BncReferenceCensus<'_> {
     fn count_cell(&mut self, source: &[u8]) -> bool {
-        let Ok(cell) = BncCellView::parse(source, &crate::cell::wire::limits_for_source(source))
+        let Ok(cell) =
+            BncCellView::parse(source, &crate::cell_format::bnc_limits_for_source(source))
         else {
             return false;
         };
@@ -1589,7 +1561,7 @@ impl storage_codec::StorageVisitor for ListVisitor<'_> {
     }
 }
 
-pub(super) fn list_facts(
+pub fn list_facts(
     source: &[u8],
     budget: &mut TransactionBudget,
     path: Path,
@@ -1597,7 +1569,7 @@ pub(super) fn list_facts(
     list_facts_with_input(source, budget, true, path)
 }
 
-pub(super) fn list_facts_without_input(
+pub fn list_facts_without_input(
     source: &[u8],
     budget: &mut TransactionBudget,
     path: Path,
@@ -1635,7 +1607,7 @@ fn list_facts_with_input(
         || entries.windows(2).any(|pair| pair[0].key == pair[1].key)
     {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     // `next_list_id` is the source-authoritative allocation watermark.  A
@@ -1645,7 +1617,7 @@ fn list_facts_with_input(
     let maximum_key = entries.last().map_or(0, |entry| entry.key);
     if list.next_list_id() == 0 || list.next_list_id() <= maximum_key {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     Ok(ListFacts {
@@ -1654,7 +1626,7 @@ fn list_facts_with_input(
     })
 }
 
-pub(super) fn mutate_list(
+pub fn mutate_list(
     source: &[u8],
     old_key: Option<u32>,
     desired_payload: Option<&[u8]>,
@@ -1692,16 +1664,14 @@ pub(super) fn mutate_list(
             // the same prepared source-preserving rewrite.
             if facts.next_key == 0 || candidate > facts.next_key {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             let advance = if candidate == facts.next_key {
                 Some((
                     facts.next_key,
                     facts.next_key.checked_add(1).ok_or(Error::Refused(
-                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
-                            path,
-                        },
+                        crate::cell_format::Refusal::UnsupportedDependency { path },
                     ))?,
                 ))
             } else {
@@ -1789,7 +1759,7 @@ pub(super) fn mutate_list(
     Ok((output, desired_key))
 }
 
-pub(super) fn apply_list_mutation_with_budget(
+pub fn apply_list_mutation_with_budget(
     source: &[u8],
     mutation: storage_codec::TableDataListEntryMutation<'_>,
     budget: &mut TransactionBudget,
@@ -1838,7 +1808,7 @@ pub(super) fn apply_list_mutation_with_budget(
     Ok(output)
 }
 
-pub(super) fn charge_storage_report(
+pub fn charge_storage_report(
     budget: &mut TransactionBudget,
     report: storage_codec::DecodeReport,
     path: Path,
@@ -1847,7 +1817,7 @@ pub(super) fn charge_storage_report(
     charge_storage_report_without_input(budget, report, path)
 }
 
-pub(super) fn charge_storage_report_without_input(
+pub fn charge_storage_report_without_input(
     budget: &mut TransactionBudget,
     report: storage_codec::DecodeReport,
     path: Path,
@@ -1861,34 +1831,34 @@ pub(super) fn charge_storage_report_without_input(
     Ok(())
 }
 
-pub(super) fn map_storage_error(error: storage_codec::DecodeError, path: Path) -> Error {
+pub fn map_storage_error(error: storage_codec::DecodeError, path: Path) -> Error {
     match error.resource_limit() {
         Some(storage_codec::DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireBytes,
+            kind: crate::cell_format::LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(storage_codec::DecodeLimit::References { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::PayloadReferences,
+            kind: crate::cell_format::LimitKind::PayloadReferences,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(storage_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireFields,
+            kind: crate::cell_format::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(storage_codec::DecodeLimit::Work { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireWork,
+            kind: crate::cell_format::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(storage_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireNesting,
+            kind: crate::cell_format::LimitKind::WireNesting,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -1898,13 +1868,13 @@ pub(super) fn map_storage_error(error: storage_codec::DecodeError, path: Path) -
             path,
         },
         Some(storage_codec::DecodeLimit::Retained { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::RetainedBytes,
+            kind: crate::cell_format::LimitKind::RetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(storage_codec::DecodeLimit::Text { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireTextBytes,
+            kind: crate::cell_format::LimitKind::WireTextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -2001,7 +1971,7 @@ fn control_format_write(
             // Currency is handled in `canonical_format`, where the local
             // CurrencyCode copy can safely back the codec's borrowed string.
             return Err(Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                crate::cell_format::Refusal::UnsupportedDependency { path },
             ));
         },
         DisplayFormat::Scientific(value) => {
@@ -2079,14 +2049,14 @@ fn canonical_spec(
     Ok(output.into_bytes())
 }
 
-pub(super) fn control_codec_options(
+pub fn control_codec_options(
     source_len: usize,
     budget: &TransactionBudget,
 ) -> control_codec::DecodeOptions {
     budget.residual_control_options_for_len(source_len)
 }
 
-pub(super) fn charge_control_requirements(
+pub fn charge_control_requirements(
     budget: &mut TransactionBudget,
     requirements: control_codec::RewriteExecutionRequirements,
     path: Path,
@@ -2102,7 +2072,7 @@ pub(super) fn charge_control_requirements(
     budget.charge_transaction_work(requirements.output_bytes(), path)
 }
 
-pub(super) fn charge_control_decode_report(
+pub fn charge_control_decode_report(
     budget: &mut TransactionBudget,
     report: control_codec::DecodeReport,
     path: Path,
@@ -2124,9 +2094,9 @@ pub(super) fn charge_control_decode_report(
 /// whose archive header owns an inbound edge to a mutable tile or format-list
 /// object. A second table sharing either object would make a cell-local
 /// rewrite affect data outside the selected semantic owner.
-pub(super) fn require_exclusive_selected_model_reference(
-    source: &Package,
-    target: CellTarget,
+pub fn require_exclusive_selected_model_reference(
+    source: &dyn TableSource,
+    target: Target,
     identifier: u64,
     path: Path,
     budget: &mut TransactionBudget,
@@ -2156,14 +2126,12 @@ pub(super) fn require_exclusive_selected_model_reference(
     }
 
     let archive_limits = source
-        .state
-        .options
-        .archive()
+        .archive_limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let mut selected = 0usize;
     let mut inspected = 0usize;
-    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+    for (component_index, component) in source.catalog().iter().enumerate() {
         for object in &component.archive().objects {
             let object_identifier = object
                 .archive_info
@@ -2188,11 +2156,7 @@ pub(super) fn require_exclusive_selected_model_reference(
                     archive_limits,
                 )
                 .map_err(|_| {
-                    Error::Refused(
-                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
-                            path,
-                        },
-                    )
+                    Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path })
                 })?;
             inspected = inspected
                 .checked_add(occurrences)
@@ -2200,7 +2164,7 @@ pub(super) fn require_exclusive_selected_model_reference(
             budget.charge_payload_references(occurrences, path)?;
             if probe.unexpected {
                 return Err(Error::Refused(
-                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
                 ));
             }
             selected = selected
@@ -2214,14 +2178,14 @@ pub(super) fn require_exclusive_selected_model_reference(
     // no other message or opaque metadata owns the mutable object.
     if selected == 0 || inspected == 0 {
         return Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         ));
     }
     Ok(())
 }
 
-pub(super) fn validate_format_refcounts(
-    source: &Package,
+pub fn validate_format_refcounts(
+    source: &dyn TableSource,
     tile_references: &[(u32, u64)],
     formats: &[ListEntry],
     budget: &mut TransactionBudget,
@@ -2231,8 +2195,6 @@ pub(super) fn validate_format_refcounts(
     for (_, tile_identifier) in tile_references {
         let component_index = resolved_component_index(source, *tile_identifier, path)?;
         let archive = source
-            .state
-            .components
             .catalog()
             .get_index(component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -2273,7 +2235,7 @@ pub(super) fn validate_format_refcounts(
     Ok(())
 }
 
-pub(super) fn verify_control_report(
+pub fn verify_control_report(
     report: control_codec::DecodeReport,
     requirements: control_codec::RewriteExecutionRequirements,
     _path: Path,
@@ -2294,52 +2256,52 @@ pub(super) fn verify_control_report(
     Ok(())
 }
 
-pub(super) fn map_control_error(error: control_codec::DecodeError, path: Path) -> Error {
+pub fn map_control_error(error: control_codec::DecodeError, path: Path) -> Error {
     match error.resource_limit() {
         Some(control_codec::DecodeLimit::InputBytes { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireBytes,
+            kind: crate::cell_format::LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireOutputBytes,
+            kind: crate::cell_format::LimitKind::WireOutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireFields,
+            kind: crate::cell_format::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::Work { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireWork,
+            kind: crate::cell_format::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireNesting,
+            kind: crate::cell_format::LimitKind::WireNesting,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::References { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::PayloadReferences,
+            kind: crate::cell_format::LimitKind::PayloadReferences,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::Items { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::PayloadItems,
+            kind: crate::cell_format::LimitKind::PayloadItems,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::Text { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireTextBytes,
+            kind: crate::cell_format::LimitKind::WireTextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -2349,13 +2311,13 @@ pub(super) fn map_control_error(error: control_codec::DecodeError, path: Path) -
             path,
         },
         Some(control_codec::DecodeLimit::Retained { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::RetainedBytes,
+            kind: crate::cell_format::LimitKind::RetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(control_codec::DecodeLimit::Scratch { observed, maximum }) => Error::Limit {
-            kind: super::table_cell_pop_up_menu::LimitKind::ScratchBytes,
+            kind: crate::cell_format::LimitKind::ScratchBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -2394,19 +2356,18 @@ fn native_kind(value: &CellControl, path: Path) -> Result<(CellDataFormatKind, u
             4,
         )),
         CellControl::PopUpMenu(_) => Err(Error::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            crate::cell_format::Refusal::UnsupportedDependency { path },
         )),
     }
 }
 
-pub(super) fn validate_metadata_ownership<'source>(
-    source: &'source Package,
+pub fn validate_metadata_ownership<'source>(
+    source: &'source dyn TableSource,
     component_indices: &[usize],
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<popup_metadata::RegistryFacts<'source>, Error> {
-    let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::InvalidSource { path })?;
+    let catalog = super::physical_source(source).map_err(|_| Error::InvalidSource { path })?;
     let bytes = catalog
         .package()
         .iter()
@@ -2454,7 +2415,7 @@ pub(super) fn validate_metadata_ownership<'source>(
     Ok(facts)
 }
 
-pub(super) fn validate_cross_component_reference(
+pub fn validate_cross_component_reference(
     facts: &popup_metadata::RegistryFacts<'_>,
     source_component_index: usize,
     target_component_index: usize,
@@ -2471,14 +2432,10 @@ pub(super) fn validate_cross_component_reference(
             Some(object_identifier),
             Some(false),
         )
-        .map_err(|_| {
-            Error::Refused(
-                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
-            )
-        })
+        .map_err(|_| Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path }))
 }
 
-pub(super) fn unique_object(
+pub fn unique_object(
     archive: &Archive,
     identifier: u64,
     path: Path,
@@ -2494,7 +2451,7 @@ pub(super) fn unique_object(
     Ok(object)
 }
 
-pub(super) fn unique_message_index(
+pub fn unique_message_index(
     object: &ArchiveObject,
     type_: u32,
     path: Path,
@@ -2514,7 +2471,7 @@ pub(super) fn unique_message_index(
     Ok(index)
 }
 
-pub(super) fn archive_for_mut(
+pub fn archive_for_mut(
     archives: &mut [(usize, Archive)],
     component_index: usize,
     path: Path,
@@ -2526,26 +2483,24 @@ pub(super) fn archive_for_mut(
         .ok_or(Error::InvalidSource { path })
 }
 
-pub(super) fn resolved_component_index(
-    source: &Package,
+pub fn resolved_component_index(
+    source: &dyn TableSource,
     identifier: u64,
     path: Path,
 ) -> Result<usize, Error> {
     source
-        .state
-        .index
-        .resolve_ref_id(&source.state.components, identifier)
+        .resolve_object(identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .map(|resolved| resolved.component_index)
         .ok_or(Error::InvalidSource { path })
 }
 
-pub(super) struct ListMessage<'a> {
-    pub(super) message_index: usize,
-    pub(super) payload: &'a [u8],
+pub struct ListMessage<'a> {
+    pub message_index: usize,
+    pub payload: &'a [u8],
 }
 
-pub(super) fn unique_list_message<'a>(
+pub fn unique_list_message<'a>(
     object: &'a ArchiveObject,
     list_type: i32,
     budget: &mut TransactionBudget,
@@ -2577,7 +2532,7 @@ pub(super) fn unique_list_message<'a>(
 }
 
 fn validate_refcounts(
-    source: &Package,
+    source: &dyn TableSource,
     tile_references: &[(u32, u64)],
     formats: &[ListEntry],
     controls: &[ListEntry],
@@ -2588,8 +2543,6 @@ fn validate_refcounts(
     for (_, tile_identifier) in tile_references {
         let component_index = resolved_component_index(source, *tile_identifier, path)?;
         let archive = source
-            .state
-            .components
             .catalog()
             .get_index(component_index)
             .ok_or(Error::InvalidSource { path })?
@@ -2649,6 +2602,6 @@ fn validate_refcounts(
 /// existing strict native owner.  Scalar controls are admitted only after
 /// their corresponding source-preserving list transition is available.
 #[allow(dead_code)]
-pub(super) fn unsupported_scalar_control() -> NativePopUpError {
+pub fn unsupported_scalar_control() -> NativePopUpError {
     NativePopUpError::UnsupportedDependency
 }
