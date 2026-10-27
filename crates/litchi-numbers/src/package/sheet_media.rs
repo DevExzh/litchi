@@ -363,7 +363,7 @@ fn assets(package: &Package, root: u64) -> Result<Vec<Embedded>, Error> {
     };
     let all: Vec<_> = package.state.components.iter_objects().collect();
     let objects = || all.iter().copied();
-    let embedded = crate::media_native::embedded_assets(&metadata_payload, objects(), |path| {
+    let embedded = litchi_iwa_style::media::embedded_assets(&metadata_payload, objects(), |path| {
         member_size(package, path)
     })
     .map_err(|_error| Error::InvalidSource)?;
