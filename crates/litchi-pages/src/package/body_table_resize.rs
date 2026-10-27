@@ -7,8 +7,9 @@
 //! extent, the row/column UID map gains or drops identities at its end (a
 //! new identity is one above the largest lower and upper halves, as the
 //! host allocates it), the stroke sidecar records the new dimensions and the
-//! model records the new counts. Nothing else (header counts, formulas,
-//! merges) is touched, as in the host.
+//! model records the new counts, and the table's own formula owner moves its
+//! table and body extents (record 0370e). Nothing else (header counts,
+//! formulas, merges) is touched, as in the host.
 
 use std::fmt;
 use std::num::NonZeroU64;
@@ -18,6 +19,7 @@ use litchi_iwa_common::wire::{
     WireView, patch_varint_field, repeated_length_delimited_payloads, repeated_varint_values,
     rewrite_repeated_length_delimited_fields, rewrite_repeated_varint_fields,
 };
+use litchi_numbers_wire::table_topology::extents::{Extents, resize_extents};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -38,6 +40,12 @@ const MODEL_COLUMNS_FIELD: u32 = 7;
 const MODEL_UID_MAP_FIELD: u32 = 46;
 const MODEL_STROKE_SIDECAR_FIELD: u32 = 49;
 const STORE_ROW_HEADERS_FIELD: u32 = 1;
+const MODEL_HEADER_ROWS_FIELD: u32 = 9;
+const MODEL_HEADER_COLUMNS_FIELD: u32 = 10;
+const MODEL_FOOTER_ROWS_FIELD: u32 = 11;
+const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
+/// `TSCE.FormulaOwnerDependenciesArchive.formula_owner`.
+const OWNER_FORMULA_OWNER_FIELD: u32 = 11;
 const STORE_COLUMN_HEADERS_FIELD: u32 = 2;
 const STORE_TILES_FIELD: u32 = 3;
 const HEADER_STORAGE_BUCKETS_FIELD: u32 = 2;
@@ -490,13 +498,13 @@ fn resize(source: &Package, table: usize, rows: usize, columns: usize) -> Result
     let selector = BodyTableSelector::index(table);
     let mut budget = Budget::new(source)?;
     let index = ObjectIndex::new(source, &mut budget)?;
-    let model_identifier = {
+    let (model_identifier, info_identifier) = {
         let mut lock_budget = super::table_lock::WireBudget::new(source.state.source.limits())
             .map_err(|_error| Error::InvalidSource)?;
-        source
+        let target = source
             .resolve_body_table_with_budget(selector, &mut lock_budget)
-            .map_err(|_error| Error::InvalidSource)?
-            .model_identifier
+            .map_err(|_error| Error::InvalidSource)?;
+        (target.model_identifier, target.drawable_identifier)
     };
     let (model_component, model_message, model_type, model) =
         located_message(&index, model_identifier, &[TABLE_MODEL_MESSAGE_TYPE])?;
@@ -662,6 +670,61 @@ fn resize(source: &Package, table: usize, rows: usize, columns: usize) -> Result
             message_type,
             data,
         });
+    }
+
+    // The table's own formula owner: its table and body extents (record
+    // 0370e fixed the host to move them).
+    let count = |number: u32| -> Result<u32, Error> {
+        u32::try_from(varint(&model_view, number)?.unwrap_or(0))
+            .map_err(|_error| Error::InvalidSource)
+    };
+    let (header_rows, header_columns, footer_rows) = (
+        count(MODEL_HEADER_ROWS_FIELD)?,
+        count(MODEL_HEADER_COLUMNS_FIELD)?,
+        count(MODEL_FOOTER_ROWS_FIELD)?,
+    );
+    let extents = |rows: usize, columns: usize| -> Result<Extents, Error> {
+        Ok(Extents::of(
+            u32::try_from(rows).map_err(|_error| Error::InvalidSource)?,
+            u32::try_from(columns).map_err(|_error| Error::InvalidSource)?,
+            header_rows,
+            header_columns,
+            footer_rows,
+        ))
+    };
+    let (before, after) = (extents(old_rows, old_columns)?, extents(rows, columns)?);
+    for (component_index, archive) in source.state.source.components().iter().enumerate() {
+        for object in &archive.archive().objects {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != FORMULA_OWNER_MESSAGE_TYPE {
+                    continue;
+                }
+                budget.work(message.data.len())?;
+                let view = budget.parse(&message.data, 1)?;
+                if reference(&view, OWNER_FORMULA_OWNER_FIELD, &mut budget)?
+                    != Some(info_identifier)
+                {
+                    continue;
+                }
+                let Some(data) = resize_extents(&message.data, before, after)
+                    .map_err(|_error| Error::InvalidSource)?
+                else {
+                    continue;
+                };
+                let object = object
+                    .archive_info
+                    .identifier
+                    .and_then(NonZeroU64::new)
+                    .ok_or(Error::InvalidSource)?;
+                rewrites.push(MessageRewrite {
+                    component: index.component_name(component_index)?,
+                    object,
+                    message_index,
+                    message_type: message.type_,
+                    data,
+                });
+            }
+        }
     }
 
     // The model's counts.
