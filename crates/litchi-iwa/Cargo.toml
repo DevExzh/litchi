@@ -16,6 +16,7 @@ litchi-iwa-archive = { workspace = true }
 litchi-iwa-common = { workspace = true }
 litchi-iwa-index = { workspace = true }
 litchi-iwa-protos = { workspace = true }
+litchi-iwa-style = { workspace = true }
 litchi-iwa-text = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-keynote = { workspace = true, features = ["internal-iwork-source"] }

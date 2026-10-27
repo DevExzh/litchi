@@ -248,7 +248,7 @@ fn engine_embedded(bytes: &[u8]) -> TestResult<String> {
                 .find(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
         })
         .ok_or("no package metadata")?;
-    let assets = litchi_keynote::media_native::embedded_assets(
+    let assets = litchi_iwa_style::media::embedded_assets(
         metadata.data.as_slice(),
         components.objects(),
         |name| components.member_size(name),
@@ -406,7 +406,7 @@ fn extraction_digests(bytes: &[u8], host: bool) -> TestResult<Vec<(String, u64)>
                     .find(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
             })
             .ok_or("no package metadata")?;
-        let embedded = litchi_keynote::media_native::embedded_assets(
+        let embedded = litchi_iwa_style::media::embedded_assets(
             metadata.data.as_slice(),
             components.objects(),
             |name| components.member_size(name),
