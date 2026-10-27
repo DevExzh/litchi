@@ -608,6 +608,7 @@ impl<'p> Working<'p> {
         }
         let mut deleted: Vec<&str> = previews.clone();
         deleted.extend(emptied.iter().map(String::as_str));
+        deleted.extend(registry.deleted_entries());
         let edits: Vec<EntryEdit<'_>> = encoded
             .iter()
             .map(|(name, data)| EntryEdit::new(name, data))

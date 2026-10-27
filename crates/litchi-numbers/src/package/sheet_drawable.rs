@@ -520,6 +520,9 @@ fn publish_structural(
         for identifier in &list {
             working.remove(*identifier)?;
         }
+        if let Some(registry) = &registry {
+            transition.release_unreferenced_data(&working, registry)?;
+        }
     }
     let published = working.publish(&transition)?;
     verify_removed(&published.package, &closure)?;
