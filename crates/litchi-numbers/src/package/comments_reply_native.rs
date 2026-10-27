@@ -33,12 +33,11 @@ use litchi_iwa_protos::{
 };
 use litchi_numbers_wire::BncCell;
 
-use super::{
-    table_cell_pop_up_menu::{
-        Error as BudgetError, LimitKind as BudgetLimitKind, Path as BudgetPath, TransactionBudget,
-    },
-    table_cell_pop_up_menu_native as popup_native,
+use litchi_iwa_table::cell_format::{
+    Error as BudgetError, LimitKind as BudgetLimitKind, Path as BudgetPath, TransactionBudget,
 };
+
+use super::table_cell_pop_up_menu_native as popup_native;
 
 const BUDGET_PATH: BudgetPath = BudgetPath::Package;
 
@@ -3275,7 +3274,7 @@ pub(super) fn rewrite_native_comment_reply(
 
 #[cfg(test)]
 mod tests {
-    use crate::package::table_cell_pop_up_menu_native::NativePopUpError;
+    use litchi_iwa_table::cell_format::pop_up_menu_native::NativePopUpError;
 
     use super::{
         BudgetError, BudgetLimitKind, BudgetPath, IdIndex, NativeReplyError, ReplyProbe,

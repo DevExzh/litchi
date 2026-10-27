@@ -4121,3 +4121,42 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
     );
     Ok(())
 }
+
+/// Callgrind probe (record 0379): set each of the five controls on empty
+/// cells and clear the first, serializing each output. Measured before and
+/// after the shared `litchi-iwa-table` engine move with
+/// `--toggle-collect=*table_cell_control::control_probe_routes*`.
+#[inline(never)]
+fn control_probe_routes(source: &[u8]) -> TestResult<usize> {
+    let package = Package::from_bytes(source)?;
+    let positions = [
+        At::new(0, 0),
+        At::new(0, 1),
+        At::new(0, 2),
+        At::new(1, 1),
+        At::new(1, 2),
+    ];
+    let mut total = 0;
+    for (position, value) in positions.into_iter().zip(controls()?) {
+        let commit = package
+            .edit_table_cell_control_format(0usize, 0usize, position)?
+            .set(value)
+            .commit()?;
+        total += commit.package().exact_bytes().len();
+        let cleared = commit
+            .package()
+            .edit_table_cell_control_format(0usize, 0usize, position)?
+            .clear()
+            .commit()?;
+        total += cleared.package().exact_bytes().len();
+    }
+    Ok(total)
+}
+
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn control_cost_probe() -> TestResult {
+    let source = fixture(FixtureMode::Empty)?;
+    assert!(control_probe_routes(&source)? > 0);
+    Ok(())
+}
