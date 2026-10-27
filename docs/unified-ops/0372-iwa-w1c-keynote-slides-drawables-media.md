@@ -1,10 +1,10 @@
 # 0372 — W1-C: Keynote slides, drawables and media out of `litchi-iwa`
 
-- Status: wave W1-C on branch `uo2/iwa-w1c`, second landing (cut from
+- Status: wave W1-C on branch `uo2/iwa-w1c`, third landing (cut from
   trunk `feat/unified-ops-api` at `f35f1c9f55`; trunk last merged at
-  `b40420c389`). The remaining Keynote rows wait on shared engines that other
+  `dc9902fe5a`). The remaining Keynote rows wait on shared engines that other
   waves are building (§6).
-- Date: 2026-10-26.
+- Date: 2026-10-27.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave row W1-C (§0), API shape
   §3.2, parity §4; harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
   codecs and the D4 gap [0368](0368-iwa-w0b-codecs-formula-graph-table-vocabulary.md);
@@ -47,19 +47,27 @@
 | `bf33443e98` | `litchi-keynote`, tests | `Package::{media_assets, slide_media_assets, media_asset_data}` through a Keynote-owned `MediaAsset` handle; package lifecycle parity |
 | `5004b3e019` | tests | slide text-storage and drawable-inventory parity |
 | `2dbc2f59aa` | tests | the cost probe covers six more routes |
+| `231c08a016`, `368ac34ae8` | `litchi-keynote`, tests | third landing: drawing and frame styles over `litchi_iwa_style::shape` (`slide::drawable::Edit::{set_shape_style, reset_shape_style, set_image_fill, add_shape_with_style, add_line_with_style}`, `Package::slide_drawable_shape_style`, `slide::drawable::shape_style`) |
+| `0dac327e07`, `850aab7420` | `litchi-keynote`, tests | `Package::slide_shape_preset`; the shape list |
+| `7a6128df01` | `litchi-iwa` (host) | shape title/caption registers theme edges and invalidates the slide thumbnail (the image fix of `9045c9f3f4`, applied to shapes) |
+| `044ade3caa`, `e6867f9f03` | `litchi-keynote`, tests | `Package::{slide_shape_text, edit_slide_shape_text}` on the shared caption seam |
+| `99cc3301cb`, `755a2598b4` | `litchi-keynote`, tests | `slide::table::cell_appearance` over `litchi_iwa_table::cell_appearance` |
+| `b81571e316`, `9bd41fa35a` | tests | the cost probe covers shape fill, shape caption, text-box columns and the table cell fill |
 
 The host keeps every route as the oracle. Host behaviour changed only to fix
-the two defects of §3 and the caption seam's missing theme reference
-(`9045c9f3f4`). No ops dispatch file changed. The crate's one new edge,
+the two defects of §3 and the caption seam's missing theme references
+(`9045c9f3f4` for images, `7a6128df01` for shapes). No ops dispatch file changed. The crate's one new edge,
 `litchi-keynote -> litchi-iwa-style`, came from trunk (`3b9b92ac03`) after
 0375a moved the embedded-media feed into that crate.
 
 ## 2. Ledger
 
-The Keynote ledger now has 262 `migrated`, 5 `retired` and 372 `host-only`
-rows. Wave W1-C migrated about 245 of them, including the 22 of the first
-landing. A few `table.*` rows were migrated by W1-F. Every migrated route
-without host native evidence has a `0363-mac-queue.md` row (119 W1-C rows).
+The Keynote ledger now has 322 `migrated`, 5 `retired` and 312 `host-only`
+rows. Wave W1-C migrated about 290 of them: 22 in the first landing, about
+223 in the second and 44 in the third (35 shape-style, column, text-layout,
+preset and caption rows; 9 table cell-appearance rows). W1-F and W1-G
+migrated some of the other `table.*` rows (W1-G's Keynote hidden-axes facade, `4d55e0b052`, migrated the last two). Every migrated route without host
+native evidence has a `0363-mac-queue.md` row (135 W1-C rows).
 
 The first landing's rows:
 
@@ -92,6 +100,15 @@ in the ledger's `parity_test` column):
 | `chart.lifecycle` | 8 | `chart::lifecycle::Edit` |
 | `text.paragraph_style` | 8 | `slide::drawable::Edit` named-style verbs and reads |
 | `slide.lifecycle`, `io`, `media.asset`, `text.storage` | 13 | `Package::{from_bytes, open, save, write_to, slides, media_assets, slide_media_assets, media_asset_data, slide_drawable_list}` |
+
+Rows migrated by the third landing:
+
+| Family | Rows | Leaf destination |
+|---|---:|---|
+| `drawable.shape` (fill, stroke, shadow, effects, text layout, line endpoints, image fill, add-with-style, preset, list) | 24 | `slide::drawable::Edit::{set,reset}_shape_style`, `set_image_fill`, `add_shape_with_style`, `add_line_with_style`; `Package::{slide_drawable_shape_style, slide_shape_preset, slide_drawable_list}` |
+| `drawable.shape` (title and caption) | 5 | `Package::{edit_slide_shape_text, slide_shape_text}` |
+| `drawable.text_box_properties`, `text.character` (text-box columns and text layout) | 6 | `slide::drawable::Edit::{set,reset}_shape_style`, `Package::slide_drawable_shape_style` |
+| `table.cell_appearance` | 9 | `slide::table::cell_appearance` |
 
 Read cases compute the host and leaf projections inside one read and fail
 on any disagreement. The harness then compares each read across the two
@@ -146,6 +163,25 @@ Second-landing findings:
 - `archive_diff` now also applies the metadata policy to a registry the
   host left untouched (`d57a6bfb26`).
 
+Third-landing findings:
+
+- Keynote theme shadows: on most decks (`chart-data-native.key`,
+  `basic.key` and others) the theme's disabled shadow still carries
+  enabled-shadow fields. The host's shadow routes refuse it ("disabled iWork
+  shadow unexpectedly retains enabled-shadow properties"), and the leaf
+  refuses it the same way through the shared decoder
+  (`Unsupported::ShapeStyle`), for reads and writes. The behaviours match,
+  so no mac-queue row is needed. Shadow parity runs on
+  `chart-grid-authored-native.key`, whose theme shadow both sides read. Shapes
+  whose style inherits such a shadow stay a known gap (§6).
+- Shape and line captions reuse the image and movie caption seam. A
+  ShapeInfo's drawable is the super of its ShapeArchive, so the movie edge
+  codec reads the nested ShapeArchive and needs no new codec. The new graph
+  root keeps the old edge's header slot, as for images.
+- Cell-appearance edits with several operations publish one candidate per
+  operation, as the host applies them. Each candidate advances the source's
+  save token (`Registry::advance_from`), so the transaction advances it once.
+
 Divergence found and not migrated: `slide::drawable::Edit::set_table_cell`
 against the corrected host cell writer (W1-B, on trunk) on
 `table-discovery.key`: the leaf leaves the column-header bucket's
@@ -176,6 +212,17 @@ are kept out of the tree until then.
   and `slide::media::assets::{MediaAsset, Kind, Error}`. A media asset is an
   opaque handle. Native data identifiers and `litchi_iwa_common` types stay
   out of the public API (`check_crate_boundaries`).
+
+- Third landing: `slide::drawable::shape_style::{Property, PropertyKind,
+  ImageFill}` with the shared drawing vocabulary re-exported;
+  `slide::drawable::Edit::{set_shape_style, reset_shape_style, set_image_fill,
+  add_shape_with_style, add_line_with_style}`; `Package::{
+  slide_drawable_shape_style, slide_shape_preset, slide_shape_text,
+  edit_slide_shape_text}`; `slide::table::cell_appearance` (`Edit`, `Patch`,
+  `Commit`, `Appearance`, `Package::{slide_table_cell_appearance,
+  edit_slide_table_cell_appearance, apply_slide_table_cell_appearance}`);
+  `slide::drawable::Unsupported::ShapeStyle`. An image fill reads back as an
+  `ImageFill` (layout and colors), never as a native data identifier.
 
 The first landing's glossary profiles passed unchanged: no new banned names
 and no new family. `set_layout` joined the registered `slide::creation`
@@ -215,6 +262,16 @@ as the control: 248,624,844 / 71,874,210, −71.1%):
 | text style (text property) | 467,498,853 | 123,319,648 | −73.6% |
 | image duplicate (`image-adjustments-native.key`) | 452,448,983 | 81,959,059 | −81.9% |
 
+Third landing (`b81571e316`, `9bd41fa35a`, same method; the shape routes run
+on a host-added rectangle on `basic.key`):
+
+| Route (fixture) | Host Ir | Leaf Ir | Δ |
+|---|---:|---:|---:|
+| shape fill set | 367,757,259 | 122,341,999 | −66.7% |
+| shape caption create | 605,529,588 | 190,552,808 | −68.5% |
+| text-box columns set | 398,367,503 | 122,301,083 | −69.3% |
+| table cell fill set (`slide-table-read-native.key`) | 1,044,210,750 | 281,599,637 | −73.0% |
+
 Before `3d006110be`/`ba7155292b` the z-order move was **+9.4%** (leaf
 120,550,699 vs host 110,203,188): the structural reopen parsed every
 component again (22.5M Ir of the 60M leaf route). Reusing the base's parsed
@@ -223,25 +280,25 @@ further ~40M Ir.
 
 ## 6. Gaps and follow-ups
 
-The remaining 372 Keynote `host-only` rows all wait on shared engines that
-other waves own. The coordinator ruled that W1-C must not build its own copy
-of any of them.
+The remaining 312 Keynote `host-only` rows all wait on shared engines or
+harness work that other waves own. The coordinator ruled that W1-C must not
+build its own copy of any of them.
 
 | Gap | Rows | Owner and next step |
 |---|---:|---|
-| Chart style families | 160 | W1-E/W2 `litchi-iwa-style` (series engine landed in 0375a); Keynote facades after it |
-| Table rich text, formats, appearance, comments, conditional highlights, topology | 150 | W1-G `litchi-iwa-table` (formats in progress); thin Keynote facades after each group |
+| Chart style families | 160 | W1-E/W2 `litchi-iwa-style`; Keynote facades after it |
+| Table rich text, formats, comments, conditional highlights, topology | 127 | W1-G `litchi-iwa-table`; thin Keynote facades after each group |
 | Table lifecycle and cell reads (`add/duplicate/remove/resize_slide_table`, geometry, cells, comments, merges) | 14 | W1-G and W1-A table engines |
-| Table hidden axes | 2 | W1-G lifts Pages' `body_table_hidden_axes` into `litchi-iwa-table`; Keynote and Numbers get facades |
-| Shape style (fill, stroke, shadow, effects, line endpoints), shape title/caption | 29 | W1-E shape-style variation engine in `litchi-iwa-style`; title/caption also needs a path-[1,1] edge codec |
-| Text-box columns and text layout | 6 | the same W1-E variation engine (W1-E has been told these must be covered) |
 | Builder rows (including `language`/`locale`, implemented in `fc445c1aa3`) | 10 | the host builder draws random UUIDs; the rows wait for the harness to normalise builder identities |
-| `replace_media` | 1 | the media-replacement transaction (`slide::media::data`) covers movies; the image and audio routes join after W1-E's media engine |
+| `replace_media` | 1 | the media-replacement transaction (`slide::media::data`) covers movies; image and audio routes join after W1-E's media engine |
+| Shapes whose style inherits a disabled theme shadow that keeps enabled-shadow fields (most decks) | — (known gap, inside migrated rows) | both the host and the leaf refuse their shadow reads and writes (§3); supporting them needs a native-evidence decision on how such a shadow reads |
 
 ## 7. Verification
 
-Final run of the second landing, at `2dbc2f59aa` with trunk merged
-(`b40420c389`). Build environment from the coordinator rules
+Final run of the third landing. The cargo gates ran at `9bd41fa35a` (trunk
+`d6b7f850cf` merged). After trunk `dc9902fe5a` was merged, clippy, the
+Keynote parity cases (238), the `litchi-keynote` tests and every Python gate
+were re-run. Build environment from the coordinator rules
 (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`).
 
 | Command | Exit |
@@ -249,8 +306,8 @@ Final run of the second landing, at `2dbc2f59aa` with trunk merged
 | `cargo fmt --all --check` | 0 |
 | `cargo clippy -p litchi-keynote -p litchi-iwa-archive -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features keynote` | 0, 0 |
-| `cargo test -p litchi-keynote --all-features` (1,190) / `-p litchi-iwa-archive` (215) / `-p litchi-iwa` (2,299; `parity` target 506 passed, 50 ignored probes) / `-p litchi` (209) | 0 / 0 / 0 / 0 |
-| `cargo test -p litchi-ops --all-features`: `--lib` (1,022), `--doc` (217), nine groups of ≤20 `--test` targets (1,485) | 0 each |
+| `cargo test -p litchi-keynote --all-features` (1,194) / `-p litchi-iwa-archive` (215) / `-p litchi-iwa` (2,402; `parity` target 609 passed, 58 ignored probes) / `-p litchi` (209) | 0 / 0 / 0 / 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, nine groups of ≤20 `--test` targets | 0 each |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-keynote -p litchi-iwa-archive` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (73 profiles) | 0 |
 | `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0; 0 |
