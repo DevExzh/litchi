@@ -152,5 +152,30 @@ scratch (`.coord/iwa-w2a/cg/`), not in the repository.
 
 ## 7. Verification
 
-See the gate table appended at the end of this slice's verification run
-(§7.1).
+Run on the branch with trunk merged (`8c2b44e22e` merged at the slice head),
+build env of the coordinator rules (`CARGO_BUILD_JOBS=6`,
+`RUST_TEST_THREADS=8`), test executables pruned after each test chunk. No
+litchi-ops dispatch arm changed, so the capability/registry goldens and the
+OfficeCLI corpus were not re-blessed.
+
+| Command | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-numbers -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features numbers` | 0, 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-numbers` | 0 |
+| `cargo test -p litchi-numbers --all-features`; `-p litchi-iwa --all-features` (parity: 568 passed, 53 ignored probes); `-p litchi --all-features` | 0; 0; 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, nine groups of ≤20 `--test` targets (167 targets) | 0 each |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 0 |
+| `python3 tools/check_crate_boundaries.py` | 0 (after `b1359ee999`: the first run refused a normal `prost` dependency of `litchi-numbers`; the media payloads now use the leaf's canonical writer) |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` | 0 |
+| `python3 tools/iwa_exit_ledger.py --check`; `officecli_capability_delta.py --check`; `officecli_corpus.py --check`; `unified_bench_matrix.py --check`; `check_feature_matrix.py` | 0 each |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+
+After `b1359ee999` the affected gates were re-run: clippy (`litchi-numbers`,
+`litchi-iwa`, `litchi`), `cargo test -p litchi-numbers`, the parity target,
+the crate-boundary check and the perf-baseline check, all 0. Both pre-commit
+size checks printed nothing for every commit. Target directory: 14 GB after
+pruning.
