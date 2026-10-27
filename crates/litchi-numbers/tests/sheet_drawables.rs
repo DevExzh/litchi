@@ -487,3 +487,31 @@ fn a_new_image_embeds_its_data_and_bad_media_is_refused() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn chart_series_values_round_trip_and_name_every_series() -> TestResult {
+    use litchi_numbers::sheet::chart::series::{Property, PropertyKind, Refusal, error_bar};
+
+    let package = open("chart-data-native.numbers")?;
+    let Property::ErrorBars(bars) = package.sheet_chart_series(0, 0, PropertyKind::ErrorBars)?
+    else {
+        return Err("error bars".into());
+    };
+    let mut edit = package.edit_sheet_chart_series(0, 0)?;
+    edit.set(Property::ErrorBars(bars.clone()))?;
+    assert!(!edit.commit()?.diagnostics().changed());
+
+    let mut wrong = bars.clone();
+    wrong.push(error_bar::Series::None);
+    let mut edit = package.edit_sheet_chart_series(0, 0)?;
+    edit.set(Property::ErrorBars(wrong))?;
+    let Err(litchi_numbers::sheet::chart::series::Error::Refused(Refusal::SeriesCount {
+        expected,
+        given,
+    })) = edit.commit()
+    else {
+        return Err("a value for another series count must be refused".into());
+    };
+    assert_eq!((expected, given), (bars.len(), bars.len() + 1));
+    Ok(())
+}
