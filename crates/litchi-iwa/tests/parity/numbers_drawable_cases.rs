@@ -759,6 +759,9 @@ fn structural_case(
                     match kind {
                         Kind::TextBox => drop(editor.remove_sheet_text_box(sheet, id)?),
                         Kind::Shape => drop(editor.remove_sheet_shape(sheet, id)?),
+                        Kind::Image => drop(editor.remove_sheet_image(sheet, id)?),
+                        Kind::Movie => drop(editor.remove_sheet_movie(sheet, id)?),
+                        Kind::Audio => drop(editor.remove_sheet_audio(sheet, id)?),
                         _ => return Err("no host removal for this kind".into()),
                     }
                 },
@@ -849,6 +852,58 @@ fn numbers_sheet_shape_remove_parity() -> TestResult {
         &input,
         Structural::Remove(Kind::Shape, 0),
     )
+}
+
+#[test]
+fn numbers_sheet_media_remove_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for (input, kind) in [
+        (authored_fixture()?, Kind::Movie),
+        (
+            fixture("iwork/numbers/image-adjustments-native.numbers")?,
+            Kind::Image,
+        ),
+        (
+            fixture("iwork/numbers/audio-playback-native.numbers")?,
+            Kind::Audio,
+        ),
+    ] {
+        structural_case(
+            "numbers_sheet_media_remove_parity",
+            Tier::B,
+            Evidence::Queued,
+            &input,
+            Structural::Remove(kind, 0),
+        )
+        .map_err(|error| format!("{kind:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+/// Removing a commented drawable clears its comment graph first.
+#[test]
+fn numbers_sheet_commented_drawable_remove_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = authored_fixture()?;
+    for kind in [Kind::TextBox, Kind::Movie] {
+        let mut editor = numbers::Draft::from_bytes(&input.bytes)?;
+        let (sheet, id) = host_drawable(&editor, kind, 0)?;
+        editor.set_sheet_drawable_comment(sheet, id, "Doomed")?;
+        editor.add_sheet_drawable_comment_reply(sheet, id, "Reply")?;
+        let commented = Fixture {
+            path: "authored + host drawable comment",
+            bytes: editor.to_bytes()?,
+        };
+        structural_case(
+            "numbers_sheet_commented_drawable_remove_parity",
+            Tier::B,
+            Evidence::Queued,
+            &commented,
+            Structural::Remove(kind, 0),
+        )
+        .map_err(|error| format!("{kind:?}: {error}"))?;
+    }
+    Ok(())
 }
 
 /// `set_sheet_drawable_order` with the reversed list, against the leaf's
