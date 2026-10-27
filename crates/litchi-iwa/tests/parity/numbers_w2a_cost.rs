@@ -219,6 +219,8 @@ const ROUTES_2: &[&str] = &[
     "image_add",
     "chart_error_bars",
     "chart_series_fills",
+    "chart_border",
+    "chart_axis_line",
 ];
 
 fn png() -> TestResult<Vec<u8>> {
@@ -296,6 +298,13 @@ fn w2a_host_route_2(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResu
                 })
                 .collect::<Vec<_>>(),
         )?,
+        "chart_border" => e.set_sheet_chart_border_visible(sheet, id, true)?,
+        "chart_axis_line" => e.set_sheet_chart_axis_line_visible(
+            sheet,
+            id,
+            litchi_iwa_common::chart::axis::Axis::Category,
+            litchi_iwa_common::chart::axis::style::Visibility::Visible,
+        )?,
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(e.to_bytes()?)
@@ -360,6 +369,18 @@ fn w2a_leaf_route_2(route: &str, source: &[u8], selector: DrawableSelector) -> T
             })?;
             edit.commit()?.into_package()
         },
+        "chart_border" => {
+            use litchi_numbers::sheet::chart::style::Property as Style;
+            let mut edit = package.edit_sheet_chart_style(0, 0)?;
+            edit.set(Style::BorderVisible(true))?;
+            edit.commit()?.into_package()
+        },
+        "chart_axis_line" => {
+            use litchi_numbers::sheet::chart::axis::{Axis, Property as AxisProperty, Visibility};
+            let mut edit = package.edit_sheet_chart_axis(0, 0)?;
+            edit.set(Axis::Category, AxisProperty::Line(Visibility::Visible))?;
+            edit.commit()?.into_package()
+        },
         _ => return Err(format!("unknown route {route}").into()),
     };
     let mut output = Vec::new();
@@ -389,7 +410,9 @@ fn numbers_w2a_route_cost_abba_2() -> TestResult {
                 (fixture(IMAGES)?.bytes, Kind::Image)
             },
             "image_add" => (fixture(IMAGES)?.bytes, Kind::Image),
-            "chart_error_bars" | "chart_series_fills" => (charts.clone(), Kind::Chart),
+            "chart_error_bars" | "chart_series_fills" | "chart_border" | "chart_axis_line" => {
+                (charts.clone(), Kind::Chart)
+            },
             _ => (authored.clone(), Kind::TextBox),
         };
         let (sheet, id) = host_drawable(&numbers::Draft::from_bytes(&input)?, kind, 0)?;

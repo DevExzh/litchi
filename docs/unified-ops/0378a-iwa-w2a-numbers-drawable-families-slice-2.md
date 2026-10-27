@@ -41,6 +41,9 @@ chart}.rs`) plus separated hunks in `package.rs` and the shared files below.
 | `8165b4cbdc` *(shared)*, `195bab4975`, `394d86ebef` | `sheet::drawable::Edit::{add_image, add_movie, add_audio}` | new media drawables with new embedded assets (3) |
 | `21de340ac8`, `b6da31414f` | `sheet::chart::series` | per-series connection lines, wedge explosions, label distances, symbols, trendlines, error bars, pie labels, value-label visibility on `litchi_iwa_style::series` (32) |
 | `b1a59e777e`, `136b8ffc57` | `sheet::chart::series` | series strokes, fills, symbol fills, symbol outlines and their resets (20) |
+| `efa56edae5`, `bcc47a7ae3` | `sheet::chart::style`, new `sheet::chart::axis` | chart options (legend visible, border visible, hidden data, 3D bar shape, radar grid shape, gap spacing); axis-style switches (line, gridlines, minor ticks, minimum label) and tick-mark location (24) |
+| `19fbd0abcc`, `3ab94c863d` | `sheet::chart::axis` | axis labels and category-axis series names (axis non-style) (4) |
+| `b1359ee999` | infra | media payloads written by the leaf's canonical writer (no normal `prost` dependency, as the boundary check requires) |
 | `e5627c4d74`, `7a830ad315`, `0dc8c6e3fe` | shared / infra | structure watermark-only patch; media inventory through `litchi_iwa_style::media` after the trunk merge (edge `litchi-numbers -> litchi-iwa-style`, fuzz locks); cost probe |
 
 **Shared files changed (small hunks, for W1-A and the coordinator):**
@@ -67,7 +70,7 @@ chart}.rs`) plus separated hunks in `package.rs` and the shared files below.
 
 ## 2. Ledger
 
-141 rows flipped to `migrated` in this slice (275 for W2-A so far);
+169 rows flipped to `migrated` in this slice (303 for W2-A so far);
 `python3 tools/iwa_exit_ledger.py --check` passes. Every Tier B route has a
 `docs/unified-ops/0363-mac-queue.md` row (no host native evidence; leaf
 UUIDs derived deterministically, host random — the documented policy).
@@ -127,6 +130,8 @@ calls each; open + operation + commit + serialize):
 | image add | 320,048,159 | 111,588,495 | −65% |
 | chart error bars | 288,100,479 | 152,154,432 | −47% |
 | chart series fills | 266,225,618 | 43,777,457 | −84% |
+| chart border visible | 181,184,544 | 43,278,713 | −76% |
+| chart category axis line | 136,098,179 | 34,536,619 | −75% |
 
 ```sh
 CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --test parity --all-features --no-run
@@ -143,7 +148,7 @@ scratch (`.coord/iwa-w2a/cg/`), not in the repository.
 | Capability | Rows | Next |
 |---|---:|---|
 | shape styles (`sheet_shapes.rs`: fill, stroke, shadow, effects, line ends, presets) | 29 | the shape-style variation graph (0375a §5) |
-| chart legend, axis, gridlines, ticks, labels, fonts, value-label affixes/formats/locations, pie leader lines, reference lines, 3D, radar | ~75 | per-property patches on the same engine (0375a §5) and chart-level codec rules |
+| chart legend fill/font/shadow/stroke, axis title, bounds, scale, steps, number format, label affixes and angle, 3D label position, gridline stroke, background fill, border stroke, category labels, fonts, value-label affixes/formats/locations/auto-fit, error-bar auto-fit, pie leader lines, reference lines, lighting, radar series style, shadow | ~55 | per-property patches on the chart style codec (as `sheet::chart::{style, axis}` do) and the graph engine |
 | titles and captions of shapes, images, movies, charts | 18 | the caption graph (CaptionInfo, storage, style) |
 | chart lifecycle (add, duplicate, remove, data, direction, kind, list) | 7 | chart authoring |
 | text-box columns and text layout | 6 | the shape-style variation graph |
