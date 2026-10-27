@@ -29,6 +29,8 @@ pub mod cell_format;
 /// (record 0371).
 pub mod cell_appearance;
 
+pub mod hidden_axes;
+
 pub mod structure;
 
 /// A located native object: its messages and its position in the component

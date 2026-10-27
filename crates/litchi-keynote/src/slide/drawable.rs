@@ -77,6 +77,22 @@ pub mod list {
     pub use litchi_iwa_text::position::TextPosition;
     pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
 }
+/// Drawing and frame styles of text boxes, shapes and lines
+/// ([`Edit::set_shape_style`], [`Edit::reset_shape_style`],
+/// [`Edit::set_image_fill`] and the style read), over the shared
+/// shape-style variation engine and the shared iWork drawing vocabulary.
+pub mod shape_style {
+    pub use crate::package::slide_drawable::shape_style::{ImageFill, Property, PropertyKind};
+    pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    pub use litchi_iwa_common::shape::effects::Effects;
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient, ImageTechnique};
+    pub use litchi_iwa_common::shape::geometry::Size;
+    pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+    pub use litchi_iwa_common::shape::shadow::Shadow;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_common::text::layout::Layout;
+    pub use litchi_iwa_text::columns::Columns;
+}
 /// A straight line's segment ([`Edit::set_line_segment`]).
 pub use litchi_iwa_common::shape::line::Segment;
 /// Validated preset parameters ([`Preset::RegularPolygon`], [`Preset::Star`]),
