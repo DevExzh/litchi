@@ -184,7 +184,7 @@ fn embedded(package: &Package) -> Result<Vec<Embedded>, Error> {
         .iter()
         .flat_map(|component| component.archive().objects.iter())
         .collect::<Vec<_>>();
-    crate::media_native::embedded_assets(&metadata.data, objects.iter().copied(), |name| {
+    litchi_iwa_style::media::embedded_assets(&metadata.data, objects.iter().copied(), |name| {
         package
             .structure_member_bytes(name)
             .map(|bytes| bytes.len() as u64)
