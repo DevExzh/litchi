@@ -16,6 +16,8 @@
 //! - [`series`]: the style-variation graph engine of per-series chart
 //!   overrides (allocating, registering and releasing the override objects
 //!   a property write needs) and the per-series properties;
+//! - [`reference_line`]: the reference-line graph engine of a chart's
+//!   primary value axis;
 //! - [`shape`]: the shape-style variation graph engine (copy-on-write
 //!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke.
 //!
@@ -26,5 +28,6 @@
 pub mod drawing;
 pub mod graph;
 pub mod media;
+pub mod reference_line;
 pub mod series;
 pub mod shape;
