@@ -61,6 +61,17 @@ pub mod drop_cap {
     };
 }
 
+/// Exact-source named paragraph-style transactions for the text a sheet
+/// text box or shape owns: [`crate::Package::edit_sheet_text_box_named_styles`].
+pub mod named_style {
+    pub use crate::package::sheet_drawable_named_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::paragraph::style::{
+        NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    };
+}
+
 /// Exact-source highlight, comment and reply transactions for the text a
 /// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_annotations`].
 pub mod annotation {

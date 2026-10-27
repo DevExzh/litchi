@@ -432,11 +432,11 @@ fn exclusive(
 
 /// Bring `infos` in line with the variation's managed paths (the host
 /// editor's `sync_managed_field_info`).
-fn sync_managed(
+pub(super) fn sync_managed(
     infos: &mut Vec<FieldInfo>,
     managed: ManagedFields,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), Error> {
+) -> FaultResult<()> {
     for (present, path) in [
         (managed.text_fill(), [11, 46]),
         (managed.text_stroke(), [11, 44]),
@@ -447,10 +447,10 @@ fn sync_managed(
         if present {
             if !infos.iter().any(is_path) {
                 let mut info = FieldInfo::new(
-                    FieldPath::new(path.to_vec(), limits).map_err(|_| Error::InvalidSource)?,
+                    FieldPath::new(path.to_vec(), limits).map_err(|_| Fault::Invalid)?,
                     limits,
                 )
-                .map_err(|_| Error::InvalidSource)?;
+                .map_err(|_| Fault::Invalid)?;
                 info.r#type = Some(FieldType::Message);
                 info.unknown_field_rule = Some(UnknownFieldRule::IgnoreAndPreserve);
                 structure::reserve(infos, 1)?;
@@ -466,7 +466,7 @@ fn sync_managed(
 /// Replace message `index` of `object`, rewriting every header reference to
 /// `from` into `to` in place (the storage's style repoint; the header is
 /// re-encoded canonically, as the host editor's repoint does).
-fn replace_repointing(
+pub(super) fn replace_repointing(
     object: &mut ArchiveObject,
     index: usize,
     data: Vec<u8>,

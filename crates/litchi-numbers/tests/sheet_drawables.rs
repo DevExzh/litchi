@@ -225,3 +225,82 @@ fn a_created_text_box_takes_text_properties_and_can_be_removed() -> TestResult {
     assert_eq!(removed.sheet_drawable_list(0)?.len(), before);
     Ok(())
 }
+
+#[test]
+fn a_text_box_named_style_is_created_applied_renamed_and_deleted() -> TestResult {
+    use litchi_numbers::sheet::drawable::named_style::{ParagraphStyleName, Refusal};
+    use litchi_numbers::sheet::drawable::{Geometry, Size, named_style};
+
+    let package = open("basic.numbers")?;
+    let mut edit = package.edit_sheet_drawables(0)?;
+    edit.add_text_box(
+        Geometry::new(
+            Point { x: 40.0, y: 60.0 },
+            Size {
+                width: 200.0,
+                height: 50.0,
+            },
+        ),
+        "Named",
+    )?;
+    let created = edit.commit()?.into_package();
+    let text_box = DrawableSelector::text_box(0);
+    let styles = created.sheet_text_box_named_styles(0, text_box)?;
+    let (applied, overridden) = created.sheet_text_box_applied_named_style(0, text_box)?;
+    assert!(!overridden);
+    assert!(styles.contains(&applied));
+
+    let mut edit = created.edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.create(applied.id(), ParagraphStyleName::new("Leaf Copy")?)?;
+    let copied = edit.commit()?;
+    let copy = copied
+        .package()
+        .sheet_text_box_named_styles(0, text_box)?
+        .into_iter()
+        .find(|style| style.name().as_str() == "Leaf Copy")
+        .ok_or("no copy")?;
+    let restored = copied
+        .package()
+        .apply_sheet_text_box_named_styles(&copied.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&created)?);
+
+    let mut edit = copied
+        .package()
+        .edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.apply(copy.id())?
+        .rename(copy.id(), ParagraphStyleName::new("Leaf Renamed")?)?;
+    let renamed = edit.commit()?;
+    let (now, _) = renamed
+        .package()
+        .sheet_text_box_applied_named_style(0, text_box)?;
+    assert_eq!(now.id(), copy.id());
+    assert_eq!(now.name().as_str(), "Leaf Renamed");
+
+    let mut edit = renamed
+        .package()
+        .edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.delete(copy.id())?;
+    let Err(named_style::Error::Refused(refusal)) = edit.commit() else {
+        return Err("deleting an applied style must be refused".into());
+    };
+    assert_eq!(refusal, Refusal::StyleInUse);
+    assert_eq!(refusal.kind(), RefusalKind::UnsupportedContent);
+
+    let mut edit = renamed
+        .package()
+        .edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.delete_applied(copy.id(), applied.id())?;
+    let deleted = edit.commit()?.into_package();
+    assert_eq!(deleted.sheet_text_box_named_styles(0, text_box)?, styles);
+    assert_eq!(
+        deleted.sheet_text_box_applied_named_style(0, text_box)?,
+        (applied, false)
+    );
+
+    let mut edit = deleted.edit_sheet_text_box_named_styles(0, text_box)?;
+    edit.redefine()?;
+    let Err(named_style::Error::Refused(Refusal::NoOverrides)) = edit.commit() else {
+        return Err("redefining without overrides must be refused".into());
+    };
+    Ok(())
+}
