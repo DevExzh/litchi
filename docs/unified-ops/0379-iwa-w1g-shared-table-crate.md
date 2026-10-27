@@ -149,6 +149,34 @@ same probes as 0370/0370a (A before, B after, A B B A):
 | leaf topology insertion (`cost_probes::numbers_topology_insert_cost_abba`) | 415,361,948 | 415,363,167 | +0.0003% |
 | leaf whole-cell text style (`cost_probes::numbers_text_style_cost_abba`) | 323,242,772 | 323,187,077 | −0.02% |
 
+## 2a. Group 6: hidden axes
+
+Ordered before rich text because W1-C waits on the Keynote family.
+
+### 2a.1 The engine lift and the Pages facade
+
+`litchi-pages` `package/body_table_hidden_axes.rs` (graph proof, profile
+classification, extent and filter validation) and
+`body_table_hidden_axes/rewrite.rs` (owner creation, UID-map and metadata
+rewrite, git mv) move to `litchi_iwa_table::hidden_axes`. The engine is
+generic over a `Leaf` (its selector type, its wire `Budget`, its target
+resolution and strict reopen); its `Error`, `Refusal` and `LimitKind` keep
+the Pages shapes, so the Pages owner converts both ways losslessly. The
+page-layout and table-lock helpers the engine called (exact source,
+editable component, recompression, selected-message metadata checks,
+fingerprint, compressed bounds) are copied into `hidden_axes::support`
+with the same error mapping; the Pages originals stay for their other users.
+
+Pages keeps `table::hidden_axes::transaction::{Edit, Patch, Commit,
+Diagnostics, Error, LimitKind, Path, Refusal}` and the three `Package`
+methods unchanged, and implements the engine over a private `Leaf(Package)`
+wrapper (its `table_lock::WireBudget` stays crate-private), so resolution,
+proof and rewrite still share one budget. Every `litchi-pages` test passes
+unchanged (754 with the crate's). Callgrind,
+`native_hidden_axes::hidden_axes_cost_probe` (set then clear on
+`body-table-hidden-axes-native.pages`, A B B A): 34,109,338 before,
+34,112,098 after, +0.008%.
+
 ## 3. Tools and docs
 
 - `tools/crate_boundaries.json`: the package with six edges (archive, core,
