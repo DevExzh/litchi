@@ -7,6 +7,8 @@
 //! wire codecs of `litchi-iwa-protos` and the IWA objects of
 //! `litchi-iwa-core`:
 //!
+//! - [`chart_font`]: the chart-font graph engine (paragraph-style font
+//!   variations of a chart's text);
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
 //!   directions;
 //! - [`media`]: the embedded-media inventory of a package;
@@ -25,6 +27,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod chart_font;
 pub mod drawing;
 pub mod graph;
 pub mod media;
