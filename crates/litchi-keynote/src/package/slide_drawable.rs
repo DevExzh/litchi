@@ -686,6 +686,12 @@ enum Operation {
         storage: u64,
         change: text_comments::CommentChange,
     },
+    Language {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        change: litchi_iwa_text_wire::language::Change,
+    },
     DropCap {
         slide: u64,
         drawable: u64,
@@ -1102,6 +1108,7 @@ impl<'a> Edit<'a> {
             | Operation::Comment { .. }
             | Operation::DateTime { .. }
             | Operation::DropCap { .. }
+            | Operation::Language { .. }
             | Operation::TableCell { .. }
             | Operation::TableFormula { .. } => false,
             Operation::Remove { slide, .. }
@@ -1367,6 +1374,32 @@ impl<'a> Edit<'a> {
             drawable: item.identifier,
             storage,
             change: litchi_iwa_text_wire::paragraph_style::Change::Reset(kind),
+        });
+        Ok(self)
+    }
+
+    /// Stage one language-run change of the text of a text box or shape:
+    /// set a language from a position, remove a boundary, or reset every
+    /// explicit language (host `set_slide_text_box_text_language`,
+    /// `remove_slide_text_box_text_language_boundary`,
+    /// `reset_slide_text_box_text_languages`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`];
+    /// [`Self::commit`] refuses a position that is not a text boundary.
+    pub fn set_text_language<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        change: litchi_iwa_text_wire::language::Change,
+    ) -> Result<&mut Self, Error> {
+        let (selected, item, storage) = self.text_storage(slide.into(), drawable.into())?;
+        self.operations.push(Operation::Language {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            change,
         });
         Ok(self)
     }
@@ -3053,6 +3086,50 @@ impl Package {
             }))
     }
 
+    /// Read the language runs of the text of one text box or shape (host
+    /// `slide_text_box_text_languages`, `slide_text_box_text_language`).
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
+    pub fn slide_drawable_text_languages<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+    ) -> Result<Vec<litchi_iwa_text::language::TextLanguageRun>, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        let workspace = Workspace::new(self).map_err(lift)?;
+        let (_, payload) = text_properties::storage_payload(&workspace, storage)?;
+        litchi_iwa_text_wire::language::runs(&payload, workspace.wire).map_err(|_| {
+            Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            })
+        })
+    }
+
+    /// Read the language effective at `position` of the text of one text box
+    /// or shape (host `slide_text_box_text_language`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::slide_drawable_text_languages`]; a position that is not a
+    /// text boundary is refused.
+    pub fn slide_drawable_text_language<'s>(
+        &self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        position: litchi_iwa_text::position::TextPosition,
+    ) -> Result<litchi_iwa_text::language::TextLanguage, Error> {
+        let storage = self.text_storage_of(slide.into(), drawable.into())?;
+        let workspace = Workspace::new(self).map_err(lift)?;
+        let (_, payload) = text_properties::storage_payload(&workspace, storage)?;
+        litchi_iwa_text_wire::language::at(&payload, position, workspace.wire).map_err(|_| {
+            Error::Refused(Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            })
+        })
+    }
+
     /// Read the paragraph Drop Caps of the text of one text box or shape
     /// (host `slide_text_box_paragraph_drop_caps`,
     /// `slide_text_box_paragraph_drop_cap`).
@@ -3915,6 +3992,27 @@ fn commit_operations(
                     != *properties
                 {
                     return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
+            Operation::Language {
+                slide,
+                drawable,
+                storage,
+                change,
+            } => {
+                let wire = workspace.wire;
+                let (index, payload) = text_properties::storage_payload(&workspace, *storage)?;
+                if let Some(rewritten) = litchi_iwa_text_wire::language::rewrite(
+                    &payload, change, wire,
+                )
+                .map_err(|_| {
+                    Error::Refused(Refusal::Unsupported {
+                        reason: Unsupported::TextStyling,
+                    })
+                })? {
+                    stage::replace_payload(&mut workspace, *storage, index, 2_001, rewritten)
+                        .map_err(lift)?;
                 }
                 touched.entry(*slide).or_default().insert(*drawable);
             },
