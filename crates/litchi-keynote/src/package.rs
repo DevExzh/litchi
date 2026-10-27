@@ -46,6 +46,7 @@ pub(crate) mod slide_movie_title;
 pub(crate) mod slide_notes;
 pub(crate) mod slide_order;
 pub(crate) mod slide_table_appearance;
+pub(crate) mod slide_table_cell_format;
 pub(crate) mod slide_table_cell_number_format;
 pub(crate) mod slide_table_cells;
 pub(crate) mod slide_table_core;
@@ -451,6 +452,64 @@ impl fmt::Display for TextStorageFailure {
 #[derive(Clone)]
 pub struct Package {
     state: Arc<State>,
+}
+
+/// The shared table engines (`litchi-iwa-table`, record 0379) read the
+/// package through its catalog, object index and ingress limits.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.source.components()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        match &self.state.source {
+            PhysicalSource::Package(source) => Some(source),
+            PhysicalSource::Semantic(_) => None,
+        }
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> Result<Option<litchi_iwa_table::ResolvedObject<'_>>, litchi_iwa_table::ResolveError> {
+        let Ok(position) = self
+            .state
+            .object_index
+            .binary_search_by_key(&identifier, |locator| locator.identifier)
+        else {
+            return Ok(None);
+        };
+        let locator = self.state.object_index[position];
+        let object = self
+            .state
+            .source
+            .components()
+            .get_index(locator.component)
+            .and_then(|component| component.archive().objects.get(locator.object))
+            .filter(|object| object.archive_info.identifier == Some(identifier))
+            .ok_or(litchi_iwa_table::ResolveError)?;
+        Ok(Some(litchi_iwa_table::ResolvedObject {
+            messages: &object.messages,
+            component_index: locator.component,
+            object_index: locator.object,
+        }))
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        Self::source_bytes(self)
+    }
+
+    fn archive_limits(&self) -> ArchiveLimits {
+        self.state.options.archive()
+    }
+
+    fn max_objects(&self) -> usize {
+        self.state.options.semantic().max_objects()
+    }
+
+    fn max_references(&self) -> usize {
+        self.state.options.semantic().max_references()
+    }
 }
 
 impl fmt::Debug for Package {

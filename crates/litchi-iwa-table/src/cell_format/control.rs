@@ -1646,7 +1646,11 @@ pub fn mutate_list(
         if let Some(existing) = matches {
             (Some(existing), None)
         } else {
-            let mut candidate = 1u32;
+            let mut candidate = if budget.list_keys == super::ListKeys::Append {
+                facts.next_key.max(1)
+            } else {
+                1u32
+            };
             for entry in &facts.entries {
                 if entry.key < candidate {
                     continue;
@@ -1683,6 +1687,7 @@ pub fn mutate_list(
         (None, None)
     };
     let mut output = copy_payload_with_budget(source, budget, path)?;
+    let mut released = false;
     if old_key != desired_key {
         if let Some(old_key) = old_key {
             let entry = facts
@@ -1718,6 +1723,7 @@ pub fn mutate_list(
                     ),
                 )
             };
+            released = entry.ref_count == 1;
             output = apply_list_mutation_with_budget(&output, mutation, budget, path)?;
         }
         if let (Some(desired_key), Some(payload)) = (desired_key, desired_payload) {
@@ -1756,7 +1762,30 @@ pub fn mutate_list(
             }
         }
     }
+    if released && budget.list_keys == super::ListKeys::Append {
+        if let Some(old_key) = old_key {
+            output = hand_back_last_key(output, old_key, budget, path)?;
+        }
+    }
     Ok((output, desired_key))
+}
+
+/// Lower `next_list_id` to `key` when `key` was the last allocated key and
+/// no entry holds it any more.
+fn hand_back_last_key(
+    list: Vec<u8>,
+    key: u32,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let facts = list_facts_without_input(&list, budget, path)?;
+    if facts.next_key != key.saturating_add(1) || facts.entries.iter().any(|entry| entry.key == key)
+    {
+        return Ok(list);
+    }
+    budget.charge_scratch_bytes(list.len(), path)?;
+    litchi_iwa_common::wire::patch_varint_field(&list, 2, true, Some(u64::from(key)))
+        .map_err(|_| Error::InvalidSource { path })
 }
 
 pub fn apply_list_mutation_with_budget(

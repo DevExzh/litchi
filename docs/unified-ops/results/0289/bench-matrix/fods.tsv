@@ -1,3 +1,4 @@
 format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
 fods	open	File open get (fods, 0358a head vs 0358 head)		after/before		2207.0	2188.2	µs	0.992		1.05 (no regression above 5%, record 0358a)	meets	0358a	parsed:0358a/w6-after-2.json (+3 more)	
 fods	open	File open get (fods, W6 head vs base)		after/before		2153.3	2210.5	µs	1.027		1.05 (no regression above 5%, record 0358)	meets	0358	parsed:0358/probe-after-2.json (+3 more)	
+fods	open	odf_w6_probe fods/open_get (unified, candidate vs pre-program baseline)		after/before (callgrind Ir per round)		224194620.0	229367039.0	Ir	1.023		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/odf-w6-callgrind.tsv	

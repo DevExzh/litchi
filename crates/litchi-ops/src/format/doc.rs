@@ -470,6 +470,25 @@ impl Doc {
         Ok(package.shared_source().file_size())
     }
 
+    /// [`Self::write_to`] into an owned buffer: the leaf's single sized
+    /// copy of the retained compound file.
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
+        let DocSource::Retained(package) = &self.0.source else {
+            return Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "the DOC source was released before publication",
+            )
+            .with_format(FileFormat::Doc));
+        };
+        if self.0.signature() == Signature::RemovalAuthorized {
+            return signature::unsign_compound_file(
+                package.to_bytes()?,
+                litchi_sign::cfb::Format::Doc,
+            );
+        }
+        Ok(package.to_bytes()?)
+    }
+
     fn with_package(&self, package: litchi_doc::Package) -> Self {
         Self::from_package(package, true).with_origin(self.origin())
     }

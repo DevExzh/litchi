@@ -29,6 +29,8 @@ pub mod cell_format;
 /// (record 0371).
 pub mod cell_appearance;
 
+pub mod structure;
+
 /// A located native object: its messages and its position in the component
 /// catalog.
 #[derive(Debug, Clone, Copy)]

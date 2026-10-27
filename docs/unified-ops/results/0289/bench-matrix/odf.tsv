@@ -1,4 +1,7 @@
 format	operation	scenario	size	comparison	stage	leaf	unified	unit	ratio	ratio_range	budget	status	record	source	explanation
+odf	batch	odf_default_token_text_set_batch1000 (instructions)		unified/leaf (callgrind Ir; budgets judged on wall)		33973547416.0	33980952071.0	Ir	1.000		none	no-budget	0377	parsed:0377/callgrind.tsv	
+odf	batch	odf_default_token_text_set_batch1000 (leaf leg, candidate vs pre-program baseline)		after/before (callgrind Ir)		33850081907.0	33973547416.0	Ir	1.004		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/callgrind.tsv	
+odf	batch	odf_default_token_text_set_batch1000 (unified leg, candidate vs pre-program baseline)		after/before (callgrind Ir)		33829589532.0	33980952071.0	Ir	1.004		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/callgrind.tsv	
 odf	batch	token text sets on distinct tokens (default owner; one File::batch vs one leaf edit, fixture of 1,000)	100 ops	unified/leaf		89992.8	90161.9	µs	1.005	0.999–1.005	scaling (no ratio budget)	no-budget	0337	parsed:0337/abba/batch-B-before-1.json (+2 more)	
 odf	batch	token text sets on distinct tokens (default owner; one File::batch vs one leaf edit, fixture of 1,000)	1000 ops	unified/leaf		935498.5	935317.8	µs	1.005	0.997–1.005	2.0 (batch vs one leaf edit)	meets	0337	parsed:0337/abba/batch-B-before-1.json (+2 more)	
 odf	batch set	batch 10 (token text), one leaf Edit vs one File::edit	1000 tokens	unified/leaf		8405.4	8400.5	µs	0.999		scaling (no ratio budget)	no-budget	0288	parsed:0288/odf_gaps_bench.txt	
@@ -12,6 +15,10 @@ odf	batch set	batch 1000 (token text), one leaf Edit vs one File::edit	1000 toke
 odf	batch set	batch 1000 (token text), one leaf Edit vs one File::edit	1000 tokens	unified/leaf		805460.2	808631.4	µs	1.004		2.0 (batch vs one leaf edit)	meets	0292	parsed:0292/odf_gaps_bench-rerun.txt	
 odf	move	formula element move	50 tokens	unified/leaf		164.25	165.20	µs	1.006		1.10 (single-op write)	meets	0292	parsed:0292/odf_verbs_bench-run1.txt (+1 more)	
 odf	open	open_first_get		unified/leaf		66.68	78.27	µs	1.184	1.166–1.184	1.05 or +20 µs (open)	meets	0282	parsed:0282/odf_leaves_bench.json	meets the open budget through the ≤20 µs alternative (+11.6 µs)
+odf	set	odf_default_token_text_set_single (instructions)		unified/leaf (callgrind Ir; budgets judged on wall)		45360445.0	45395784.0	Ir	1.001		none	no-budget	0377	parsed:0377/callgrind.tsv	
+odf	set	odf_default_token_text_set_single (leaf leg, candidate vs pre-program baseline)		after/before (callgrind Ir)		45213087.0	45360445.0	Ir	1.003		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/callgrind.tsv	
+odf	set	odf_default_token_text_set_single (unified leg, candidate vs pre-program baseline)		after/before (callgrind Ir)		45227065.0	45395784.0	Ir	1.004		1.05 (no regression above 5%, record 0377)	meets	0377	parsed:0377/callgrind.tsv	
+odf	set	odf_default_token_text_set_single (wall)		unified/leaf (wall, ABBA blocks)		1583.9	1575.7	µs	0.993		1.10 (single-op write)	meets	0377	parsed:0377/abba.json	
 odf	set	single_set		unified/leaf		309.74	323.16	µs	1.046	1.043–1.046	1.10 (single-op write)	meets	0282	parsed:0282/odf_leaves_bench.json	
 odf	set (batch of 1)	batch 1 (token text), one leaf Edit vs one File::edit	1000 tokens	unified/leaf		1590.0	1585.7	µs	0.997		1.10 (single-op write)	meets	0288	parsed:0288/odf_gaps_bench.txt	
 odf	set (batch of 1)	batch 1 (token text), one leaf Edit vs one File::edit	1000 tokens	unified/leaf		1544.3	1548.0	µs	1.005	1.000–1.005	1.10 (single-op write)	meets	0291	parsed:0291/odf_gaps_bench-after-1.txt (+1 more)	

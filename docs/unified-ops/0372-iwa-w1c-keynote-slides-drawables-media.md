@@ -1,17 +1,17 @@
 # 0372 — W1-C: Keynote slides, drawables and media out of `litchi-iwa`
 
-- Status: partial landing of wave W1-C on branch `uo2/iwa-w1c` (cut from
-  trunk `feat/unified-ops-api` at `f35f1c9f55`; trunk merged at
-  `112689d58e`, `8f0f66c80f`, `8dd006ef12` and after the W1-B cell-writer
-  fix).
+- Status: wave W1-C on branch `uo2/iwa-w1c`, second landing (cut from
+  trunk `feat/unified-ops-api` at `f35f1c9f55`; trunk last merged at
+  `b40420c389`). The remaining Keynote rows wait on shared engines that other
+  waves are building (§6).
 - Date: 2026-10-26.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave row W1-C (§0), API shape
   §3.2, parity §4; harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
   codecs and the D4 gap [0368](0368-iwa-w0b-codecs-formula-graph-table-vocabulary.md);
   owner decision D1 and the [macOS queue](0363-mac-queue.md).
-- `performance_claim`: every migrated route is 28–92% cheaper than its host
-  route (callgrind, §5); the one miss found (z-order move, +9.4%) was fixed,
-  not carried.
+- `performance_claim`: every measured route is 28–92% cheaper than its
+  host route (callgrind, §5). The one regression found (z-order move, +9.4%)
+  was fixed before landing.
 
 ## 1. What landed
 
@@ -28,15 +28,40 @@
 | `4e85d30500` | `litchi-iwa` tests, ledger, queue | layout-reassignment parity on 48 layout pairs |
 | `fc445c1aa3` | `litchi-keynote` | `Builder::language`, `Builder::locale` |
 | `a760655e92` | `litchi-iwa` tests | builder language/locale field differential |
+| `29c9cce6df`, `ecb7cfcf6c` | `litchi-keynote`, tests | slide builds: create, update, remove and read (`slide::build`), 26 constructor families |
+| `e6f00e6e50`, `620e43344e`, `437c73282d`, `1acbf4c9e5`, `a7dea05f89` | `litchi-keynote`, tests | `chart::lifecycle`: kind, series direction, frame, remove, duplicate, grid replacement |
+| `e17f8bf676`, `7b355eff95` | `litchi-keynote`, tests | `chart::lifecycle::Edit::add`: a source-free chart written field by field in tag order |
+| `c04114289c`, `86c2da7b8f` | `litchi-keynote`, tests | `slide::image::lifecycle`: duplicate, flip, original size, properties, data replacement, image reads |
+| `4a8114b408`, `caf70ad617` | `litchi-keynote`, tests | `slide::image::text`: image title and caption on the shared caption seam |
+| `5943c976ed`, `33bad9f784`, `9485d716a3` | `litchi-keynote`, tests | `slide::drawable` duplicate, flip and properties for text boxes, shapes and lines; shape text set/replace/clear |
+| `498940f8f3`, `e7aaa469ef` | `litchi-keynote`, tests | `slide::drawable::Edit::set_preset` |
+| `4aa08c0f1a`, `95602e161b` | `litchi-keynote`, tests | line segment read and move on the W1-E line codec |
+| `7795070ea7`, `1619274c84` | `litchi-keynote`, tests | `slide::drawable::Edit::add_line` |
+| `2bfdf7309e`, `e3357f7baa` | `litchi-keynote`, tests | 23 whole-text character and paragraph properties of text boxes and shapes (W1-D engine): set, rewrite, reset, read |
+| `b44031f527`, `6c83e9c562` | `litchi-keynote`, tests | paragraph lists (W1-D list engine) |
+| `af21c5ea69`, `8eaa28bb29` | `litchi-keynote`, tests | named paragraph styles: apply, create, rename, delete, read |
+| `0ea6e25f8e`, `f06ee9a689` | `litchi-keynote`, tests | hyperlinks, highlights, comments and replies (W1-D smart-field and annotation engines) |
+| `9f0a2904ef`, `b205f50e4c` | `litchi-keynote`, tests | Date & Time fields and Drop Caps |
+| `6060e43192`, `a59220f0bd` | `litchi-keynote`, tests | language runs |
+| `ade498d1ae` | `litchi-keynote` | named-style rename helper renamed so the `fs::rename` boundary check no longer matches it |
+| `bf33443e98` | `litchi-keynote`, tests | `Package::{media_assets, slide_media_assets, media_asset_data}` through a Keynote-owned `MediaAsset` handle; package lifecycle parity |
+| `5004b3e019` | tests | slide text-storage and drawable-inventory parity |
+| `2dbc2f59aa` | tests | the cost probe covers six more routes |
 
-The host keeps every route as the oracle; no host behaviour changed except
-the two defects of §3. No manifest, crate edge or ops dispatch file changed.
+The host keeps every route as the oracle. Host behaviour changed only to fix
+the two defects of §3 and the caption seam's missing theme reference
+(`9045c9f3f4`). No ops dispatch file changed. The crate's one new edge,
+`litchi-keynote -> litchi-iwa-style`, came from trunk (`3b9b92ac03`) after
+0375a moved the embedded-media feed into that crate.
 
 ## 2. Ledger
 
-22 Keynote rows flipped to `migrated` (25 with the three W0-C merge rows);
-614 Keynote rows stay `host-only`. Each migrated route without host native
-evidence has a `0363-mac-queue.md` row (12 W1-C rows).
+The Keynote ledger now has 262 `migrated`, 5 `retired` and 372 `host-only`
+rows. Wave W1-C migrated about 245 of them, including the 22 of the first
+landing. A few `table.*` rows were migrated by W1-F. Every migrated route
+without host native evidence has a `0363-mac-queue.md` row (119 W1-C rows).
+
+The first landing's rows:
 
 | Host fn | Leaf destination | Parity test | Tier |
 |---|---|---|---|
@@ -52,8 +77,25 @@ evidence has a `0363-mac-queue.md` row (12 W1-C rows).
 | `slide_layouts`, `default_slide_layout` | `Package::{slide_layouts, default_slide_layout}` | `keynote_slide_layouts_read_parity` | A |
 | `set_slide_layout` | `slide::creation::Edit::set_layout` | `keynote_slide_layout_set_parity` (48 reassignments) | B |
 
-Read cases compute host and leaf projections inside one read and fail on
-any disagreement (the harness compares each read across the two outputs).
+Rows migrated by the second landing, by family (each parity case is named
+in the ledger's `parity_test` column):
+
+| Family | Rows | Leaf destination |
+|---|---:|---|
+| `keynote.build` | 47 (+5 retired) | `slide::build::Edit`, `Package::slide_builds` |
+| `text.character`, `text.paragraph` | 69 | `slide::drawable::Edit::{set,reset}_text_property`, `Package::slide_drawable_text_property` |
+| `text.paragraph_list` | 30 | `slide::drawable::Edit` list verbs and reads |
+| `drawable.shape`, `drawable.text_box_*`, `drawable.list` | 18 | `slide::drawable::Edit::{duplicate, duplicate_with_text, flip, set_properties, set_preset, set_text, set_line_segment, add_line}`, `Package::slide_drawables` |
+| `drawable.image` | 16 | `slide::image::{lifecycle, text}` |
+| `text.comment`, `text.highlight`, `text.hyperlink` | 16 | `slide::drawable::Edit` annotation verbs and reads |
+| `text.date_time_field`, `text.drop_cap`, `text.language` | 14 | `slide::drawable::Edit` field, drop-cap and language verbs and reads |
+| `chart.lifecycle` | 8 | `chart::lifecycle::Edit` |
+| `text.paragraph_style` | 8 | `slide::drawable::Edit` named-style verbs and reads |
+| `slide.lifecycle`, `io`, `media.asset`, `text.storage` | 13 | `Package::{from_bytes, open, save, write_to, slides, media_assets, slide_media_assets, media_asset_data, slide_drawable_list}` |
+
+Read cases compute the host and leaf projections inside one read and fail
+on any disagreement. The harness then compares each read across the two
+outputs.
 
 ## 3. Parity findings
 
@@ -86,6 +128,24 @@ Leaf changes made to reach parity: data culling and watermark release on
 removal (as the host), the five missing shape presets, `natural_size` from
 the image's pixels (the host case passes the same value).
 
+Second-landing findings:
+
+- Image caption seam: the host left the caption's theme dependency
+  unregistered. The defect was fixed in the host (`9045c9f3f4`), and the leaf
+  registers it the same way.
+- Image captions: the core requires new references to form a suffix of the
+  header list, so the leaf adds the new graph root and then moves it into
+  the old edge's slot, which is where the host writes it.
+- Byte parity of authored payloads (charts, colors, series styles) needs
+  fields in tag-number order, which is how prost encodes them.
+- Title and body placeholders are written through `Package::edit_slide_title`
+  and `edit_slide_body`, which also invalidate the slide node's rendered
+  preview. The host's `set_slide_text_storage` leaves that preview stale, so
+  the storage cases run on text boxes. That invalidation is the slide-text
+  family's documented policy.
+- `archive_diff` now also applies the metadata policy to a registry the
+  host left untouched (`d57a6bfb26`).
+
 Divergence found and not migrated: `slide::drawable::Edit::set_table_cell`
 against the corrected host cell writer (W1-B, on trunk) on
 `table-discovery.key`: the leaf leaves the column-header bucket's
@@ -110,8 +170,16 @@ are kept out of the tree until then.
 - `litchi_iwa_archive::SourceCatalog::reopen(&self, candidate)`
   (public, documented; physical-layer reopen of a derived candidate).
 
-The Keynote glossary profiles pass unchanged (no new banned names, no new
-family; `set_layout` joins the registered `slide::creation` family).
+- Second landing: `slide::build`, `chart::lifecycle` (`add`, `remove`,
+  `duplicate`, `set_data`, kind, direction, frame), `slide::image::{lifecycle,
+  text}`, the `slide::drawable::Edit` verbs listed in §2 with their reads,
+  and `slide::media::assets::{MediaAsset, Kind, Error}`. A media asset is an
+  opaque handle. Native data identifiers and `litchi_iwa_common` types stay
+  out of the public API (`check_crate_boundaries`).
+
+The first landing's glossary profiles passed unchanged: no new banned names
+and no new family. `set_layout` joined the registered `slide::creation`
+family. Each second-landing family is registered in `tools/api_glossary.json`.
 
 ## 5. Performance
 
@@ -135,6 +203,18 @@ serialize); selectors resolved outside the measured functions.
 | slide add | 647,829,045 | 224,380,200 | −65.3% |
 | layout reassignment (to "Title & Photo") | 1,115,466,103 | 83,864,581 | −92.5% |
 
+Second landing (`2dbc2f59aa`, same method, `text_box_remove` re-measured
+as the control: 248,624,844 / 71,874,210, −71.1%):
+
+| Route (fixture) | Host Ir | Leaf Ir | Δ |
+|---|---:|---:|---:|
+| text set (`basic.key` text box) | 108,993,937 | 71,575,548 | −34.3% |
+| text-box duplicate | 349,229,239 | 74,133,313 | −78.8% |
+| line add | 330,487,679 | 75,139,401 | −77.3% |
+| hyperlink add | 249,579,847 | 71,879,996 | −71.2% |
+| text style (text property) | 467,498,853 | 123,319,648 | −73.6% |
+| image duplicate (`image-adjustments-native.key`) | 452,448,983 | 81,959,059 | −81.9% |
+
 Before `3d006110be`/`ba7155292b` the z-order move was **+9.4%** (leaf
 120,550,699 vs host 110,203,188): the structural reopen parsed every
 component again (22.5M Ir of the 60M leaf route). Reusing the base's parsed
@@ -143,41 +223,42 @@ further ~40M Ir.
 
 ## 6. Gaps and follow-ups
 
-| Gap | Rows | Next |
-|---|---|---|
-| Builds and effects (`add/set/remove_slide_build`, 48 build value constructors) | 52 | leaf build editing family over `build::semantic` values (no donor) |
-| Chart lifecycle (`add/duplicate/remove_slide_chart`, kind, direction, geometry) | 8 | port donor `repair/keynote-chart-deploy-20261024` (11k + 2.7k lines) |
-| Shape lifecycle beyond add/remove/geometry (duplicate, flip, lines and endpoints, text set/replace/clear, title/caption) and shape style (fill, stroke, shadow, effects, text layout) | 45 | donor `refactor/keynote-shape-text-repair-20261024-r5`; style codecs are W1-E |
-| Image lifecycle beyond add/remove/geometry (duplicate, flip, title/caption, properties, data replacement, original size) | 11 | extend `slide::media::lifecycle` to images (integration-line donor) |
-| Text-box duplicate, properties and columns | 9 | with W2-C text boxes |
-| Table families (cells, rich text, formats, appearance, comments, highlights, formulas, hidden axes, topology, lifecycle) | 147 | after W1-A's engine pieces; the cell-writer divergence of §3 first |
-| Builder `language`/`locale` (implemented, `fc445c1aa3`) | 2 (+8 builder rows) | the host builder's random UUIDs defeat a tiered case; the field differential `keynote_builder_language_locale_differential` proves the written fields. The rows stay `host-only` until the harness can normalise builder identities |
-| Chart style families | 160 | W2-C |
-| Slide text-box rich text and paragraph families | ~140 | W2-C/W1-D |
+The remaining 372 Keynote `host-only` rows all wait on shared engines that
+other waves own. The coordinator ruled that W1-C must not build its own copy
+of any of them.
+
+| Gap | Rows | Owner and next step |
+|---|---:|---|
+| Chart style families | 160 | W1-E/W2 `litchi-iwa-style` (series engine landed in 0375a); Keynote facades after it |
+| Table rich text, formats, appearance, comments, conditional highlights, topology | 150 | W1-G `litchi-iwa-table` (formats in progress); thin Keynote facades after each group |
+| Table lifecycle and cell reads (`add/duplicate/remove/resize_slide_table`, geometry, cells, comments, merges) | 14 | W1-G and W1-A table engines |
+| Table hidden axes | 2 | W1-G lifts Pages' `body_table_hidden_axes` into `litchi-iwa-table`; Keynote and Numbers get facades |
+| Shape style (fill, stroke, shadow, effects, line endpoints), shape title/caption | 29 | W1-E shape-style variation engine in `litchi-iwa-style`; title/caption also needs a path-[1,1] edge codec |
+| Text-box columns and text layout | 6 | the same W1-E variation engine (W1-E has been told these must be covered) |
+| Builder rows (including `language`/`locale`, implemented in `fc445c1aa3`) | 10 | the host builder draws random UUIDs; the rows wait for the harness to normalise builder identities |
+| `replace_media` | 1 | the media-replacement transaction (`slide::media::data`) covers movies; the image and audio routes join after W1-E's media engine |
 
 ## 7. Verification
 
-Final run on the merged branch (trunk `31c87001d6` merged), build env of
-the coordinator rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`).
+Final run of the second landing, at `2dbc2f59aa` with trunk merged
+(`b40420c389`). Build environment from the coordinator rules
+(`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`).
 
 | Command | Exit |
 |---|---|
 | `cargo fmt --all --check` | 0 |
 | `cargo clippy -p litchi-keynote -p litchi-iwa-archive -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features keynote` | 0, 0 |
-| `cargo test -p litchi-keynote --all-features` (1,181) / `-p litchi-iwa-archive` (214) / `-p litchi-iwa` (1,836, `parity` target 44) / `-p litchi` (209) | 0 / 0 / 0 / 0 |
+| `cargo test -p litchi-keynote --all-features` (1,190) / `-p litchi-iwa-archive` (215) / `-p litchi-iwa` (2,299; `parity` target 506 passed, 50 ignored probes) / `-p litchi` (209) | 0 / 0 / 0 / 0 |
 | `cargo test -p litchi-ops --all-features`: `--lib` (1,022), `--doc` (217), nine groups of ≤20 `--test` targets (1,485) | 0 each |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-keynote -p litchi-iwa-archive` | 0 |
-| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (71 profiles) | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (73 profiles) | 0 |
 | `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0; 0 |
-| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` (1,289) | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` | 0 |
 | `python3 tools/iwa_exit_ledger.py --check` | 0 |
-| `python3 tools/officecli_capability_delta.py --check`, `officecli_corpus.py --check`, `unified_bench_matrix.py --check` (after regenerating `results/0289/bench-matrix.md`, which was stale on trunk and now lists this record) | 0, 0, 0 |
-| `python3 tools/check_feature_matrix.py` (31 legs) | 0 |
-| `crates/pyo3-litchi/tests/run_tests.sh` (301) | 0 |
-| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `python3 tools/officecli_capability_delta.py --check`, `officecli_corpus.py --check`, `unified_bench_matrix.py --check` | 0, 0, 0 |
+| `python3 tools/check_feature_matrix.py` | 0 |
 
-No capability or corpus-visible behaviour of `litchi-ops` changed (no ops
-dispatch arm, D7), so the capability/registry goldens and the OfficeCLI
-corpus were not re-blessed; their tests pass unchanged inside the litchi-ops
-groups. Both pre-commit size checks printed nothing for every commit.
+`litchi-ops` capability and corpus behaviour did not change: no ops
+dispatch arm was added (D7), so the goldens and the OfficeCLI corpus were not
+re-blessed. Both pre-commit size checks printed nothing for every commit.
