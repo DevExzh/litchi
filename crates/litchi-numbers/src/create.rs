@@ -193,6 +193,15 @@ pub enum Error {
     /// A requested sheet or table name was refused by the names transaction.
     #[error(transparent)]
     Name(#[from] crate::names::Error),
+    /// The document language is not a valid language tag.
+    #[error("invalid Numbers document language: {0}")]
+    InvalidLanguage(#[source] litchi_iwa_text::LanguageError),
+    /// The document locale is empty or contains a NUL character.
+    #[error("a Numbers document locale must be non-empty text without NUL")]
+    InvalidLocale,
+    /// The table could not take the requested dimensions.
+    #[error(transparent)]
+    Dimensions(#[from] crate::table::resize::Error),
     /// The template could not be rewritten or reopened.
     #[error(transparent)]
     Package(#[from] crate::Error),
@@ -211,6 +220,9 @@ pub struct Builder {
     identity: Option<Identity>,
     sheet_name: Option<String>,
     table_name: Option<String>,
+    dimensions: Option<(u32, u32)>,
+    language: Option<String>,
+    locale: Option<String>,
 }
 
 impl Builder {
@@ -237,14 +249,66 @@ impl Builder {
         self
     }
 
+    /// Size the sheet's table (default 10 rows × 5 columns, headers
+    /// included).
+    pub const fn table_dimensions(mut self, rows: u32, columns: u32) -> Self {
+        self.dimensions = Some((rows, columns));
+        self
+    }
+
+    /// Set the document language, a BCP 47 tag such as `"fr"` (default
+    /// `en`).
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    /// Set the document locale, such as `"fr_FR"` (default `en_US`):
+    /// the document's current and creation locale and the calculation
+    /// engine's.
+    pub fn locale(mut self, locale: impl Into<String>) -> Self {
+        self.locale = Some(locale.into());
+        self
+    }
+
     /// Build the workbook.
     ///
     /// # Errors
     ///
     /// [`Error::MissingIdentity`] without an identity; [`Error::Name`] when
     /// a requested name is refused (empty, or otherwise invalid for
-    /// Numbers); [`Error::Package`] when the template cannot be rewritten.
+    /// Numbers); [`Error::InvalidLanguage`], [`Error::InvalidLocale`];
+    /// [`Error::Dimensions`] when the table cannot take the requested size;
+    /// [`Error::Package`] when the template cannot be rewritten.
     pub fn build(self) -> Result<Package> {
+        if let Some(language) = self.language.as_deref() {
+            litchi_iwa_text::TextLanguageTag::new(language).map_err(Error::InvalidLanguage)?;
+        }
+        if self
+            .locale
+            .as_deref()
+            .is_some_and(|locale| locale.trim().is_empty() || locale.contains('\0'))
+        {
+            return Err(Error::InvalidLocale);
+        }
+        let package = self.named()?;
+        let package = match self.dimensions {
+            Some((rows, columns)) => package
+                .edit_table_resize(0usize, 0usize)?
+                .resize(rows, columns)?
+                .commit()?
+                .into_package(),
+            None => package,
+        };
+        Ok(package.with_builder_options(
+            self.language.as_deref(),
+            self.locale.as_deref(),
+            self.dimensions,
+        )?)
+    }
+
+    /// The template with the identity and names applied.
+    fn named(&self) -> Result<Package> {
         let identity = self.identity.ok_or(Error::MissingIdentity)?;
         let package = if identity == Identity::BLANK {
             Package::new()
