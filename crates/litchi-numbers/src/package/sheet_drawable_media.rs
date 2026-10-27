@@ -9,10 +9,9 @@
 
 use litchi_iwa_common::media::Type;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
-use litchi_iwa_protos::{tsd, tsp};
-use prost::Message as _;
 
 use super::Package;
+use super::sheet_drawable_author::Writer;
 use super::sheet_drawable_graph as graph;
 use super::structure::{
     self, Fault, FaultResult, Working,
@@ -210,55 +209,79 @@ fn materialized_name(preferred: &str, identifier: u64) -> FaultResult<String> {
     )
 }
 
-fn reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        ..Default::default()
-    }
+fn size(writer: Writer, number: u32, size: Size) -> Writer {
+    writer.message(
+        number,
+        &Writer::new().float(1, size.width).float(2, size.height),
+    )
 }
 
-fn size(size: Size) -> tsp::Size {
-    tsp::Size {
-        width: size.width,
-        height: size.height,
-    }
+fn data_reference(identifier: u64) -> Writer {
+    Writer::new().varint(1, identifier)
 }
 
-/// The host's `DrawableArchive` of a new media drawable.
+/// The host's `DrawableArchive` of a new media drawable, in its generated
+/// encoder's field order.
 fn drawable(
     sheet: u64,
     (title, caption): (u64, u64),
     position: Point,
     displayed: Size,
     aspect_ratio_locked: bool,
-) -> tsd::DrawableArchive {
-    tsd::DrawableArchive {
-        geometry: Some(tsd::GeometryArchive {
-            position: Some(tsp::Point {
-                x: position.x,
-                y: position.y,
-            }),
-            size: Some(size(displayed)),
-            flags: Some(DEFAULT_DRAWABLE_FLAGS),
-            angle: Some(0.0),
-        }),
-        parent: Some(reference(sheet)),
-        exterior_text_wrap: Some(tsd::ExteriorTextWrapArchive {
-            r#type: Some(TEXT_WRAP_SQUARE),
-            direction: Some(TEXT_WRAP_BOTH_SIDES),
-            fit_type: Some(TEXT_WRAP_FIT_TEXT),
-            margin: Some(TEXT_WRAP_MARGIN_POINTS),
-            alpha_threshold: Some(TEXT_WRAP_ALPHA_THRESHOLD),
-            is_html_wrap: Some(false),
-        }),
-        locked: Some(false),
-        aspect_ratio_locked: Some(aspect_ratio_locked),
-        title: Some(reference(title)),
-        caption: Some(reference(caption)),
-        title_hidden: Some(false),
-        caption_hidden: Some(false),
-        ..Default::default()
+) -> Writer {
+    let frame = size(
+        Writer::new().message(1, &Writer::new().float(1, position.x).float(2, position.y)),
+        2,
+        displayed,
+    )
+    .varint(3, u64::from(DEFAULT_DRAWABLE_FLAGS))
+    .float(4, 0.0);
+    Writer::new()
+        .message(1, &frame)
+        .reference(2, sheet)
+        .message(
+            3,
+            &Writer::new()
+                .varint(1, u64::from(TEXT_WRAP_SQUARE))
+                .varint(2, u64::from(TEXT_WRAP_BOTH_SIDES))
+                .varint(3, u64::from(TEXT_WRAP_FIT_TEXT))
+                .float(4, TEXT_WRAP_MARGIN_POINTS)
+                .float(5, TEXT_WRAP_ALPHA_THRESHOLD)
+                .boolean(6, false),
+        )
+        .boolean(5, false)
+        .boolean(7, aspect_ratio_locked)
+        .reference(10, title)
+        .reference(11, caption)
+        .boolean(12, false)
+        .boolean(13, false)
+}
+
+/// The host's `TSD.MovieArchive` of a new movie (`poster`) or audio clip.
+fn movie(
+    drawable: &Writer,
+    style: u64,
+    data: u64,
+    poster: Option<u64>,
+    duration: f32,
+    natural: Size,
+) -> Writer {
+    let mut movie = Writer::new()
+        .message(1, drawable)
+        .float(3, 0.0)
+        .float(4, duration)
+        .float(5, 0.0)
+        .float(7, 1.0)
+        .boolean(9, poster.is_none())
+        .varint(13, 0)
+        .message(14, &data_reference(data));
+    if let Some(poster) = poster {
+        movie = movie.message(15, &data_reference(poster));
     }
+    let movie = movie.boolean(18, false).reference(19, style);
+    size(size(movie, 20, natural), 21, natural)
+        .boolean(23, poster.is_some())
+        .varint(24, 0)
 }
 
 fn new_object(
@@ -343,61 +366,42 @@ pub(super) fn author(
         structure::reserve(&mut data_ids, 1)?;
         data_ids.push(identifier);
     }
-    let data_reference = |identifier: u64| tsp::DataReference { identifier };
     let labels = (title, caption);
     let payload = match media {
-        NewMedia::Image { options, .. } => tsd::ImageArchive {
-            super_: drawable(sheet, labels, options.position, options.size, false),
-            data: Some(data_reference(data_ids[0])),
-            style: Some(reference(style)),
-            original_size: Some(size(options.natural_size)),
-            natural_size: Some(size(options.natural_size)),
-            flags: Some(0),
-            ..Default::default()
-        }
-        .encode_to_vec(),
-        NewMedia::Movie { options, .. } => tsd::MovieArchive {
-            super_: drawable(sheet, labels, options.position, options.size, true),
-            movie_data: Some(data_reference(data_ids[0])),
-            start_time: Some(0.0),
-            end_time: Some(seconds(options.duration).map_err(|_error| Fault::Invalid)?),
-            poster_time: Some(0.0),
-            loop_option: Some(tsd::movie_archive::MovieLoopOption::None as i32),
-            volume: Some(1.0),
-            audio_only: Some(false),
-            streaming: Some(false),
-            poster_image_data: Some(data_reference(data_ids[1])),
-            poster_image_generated_with_alpha_support: Some(true),
-            flags: Some(0),
-            style: Some(reference(style)),
-            original_size: Some(size(options.natural_size)),
-            natural_size: Some(size(options.natural_size)),
-            ..Default::default()
-        }
-        .encode_to_vec(),
+        NewMedia::Image { options, .. } => {
+            let drawable = drawable(sheet, labels, options.position, options.size, false);
+            let image = Writer::new().message(1, &drawable).reference(3, style);
+            size(
+                size(image, 4, options.natural_size).varint(7, 0),
+                9,
+                options.natural_size,
+            )
+            .message(11, &data_reference(data_ids[0]))
+            .finish()
+        },
+        NewMedia::Movie { options, .. } => movie(
+            &drawable(sheet, labels, options.position, options.size, true),
+            style,
+            data_ids[0],
+            Some(data_ids[1]),
+            seconds(options.duration).map_err(|_error| Fault::Invalid)?,
+            options.natural_size,
+        )
+        .finish(),
         NewMedia::Audio { options, .. } => {
             let zero = Size {
                 width: 0.0,
                 height: 0.0,
             };
-            tsd::MovieArchive {
-                super_: drawable(sheet, labels, options.position, zero, true),
-                movie_data: Some(data_reference(data_ids[0])),
-                start_time: Some(0.0),
-                end_time: Some(seconds(options.duration).map_err(|_error| Fault::Invalid)?),
-                poster_time: Some(0.0),
-                loop_option: Some(tsd::movie_archive::MovieLoopOption::None as i32),
-                volume: Some(1.0),
-                audio_only: Some(true),
-                streaming: Some(false),
-                poster_image_generated_with_alpha_support: Some(false),
-                flags: Some(0),
-                style: Some(reference(style)),
-                original_size: Some(size(zero)),
-                natural_size: Some(size(zero)),
-                ..Default::default()
-            }
-            .encode_to_vec()
+            movie(
+                &drawable(sheet, labels, options.position, zero, true),
+                style,
+                data_ids[0],
+                None,
+                seconds(options.duration).map_err(|_error| Fault::Invalid)?,
+                zero,
+            )
+            .finish()
         },
     };
     let message_type = if matches!(media, NewMedia::Image { .. }) {
@@ -419,7 +423,7 @@ pub(super) fn author(
         new_object(
             title,
             STANDIN_MESSAGE_TYPE,
-            tsd::StandinCaptionArchive::default().encode_to_vec(),
+            Vec::new(),
             STANDIN_VERSION,
             Vec::new(),
             Vec::new(),
@@ -428,7 +432,7 @@ pub(super) fn author(
         new_object(
             caption,
             STANDIN_MESSAGE_TYPE,
-            tsd::StandinCaptionArchive::default().encode_to_vec(),
+            Vec::new(),
             STANDIN_VERSION,
             Vec::new(),
             Vec::new(),

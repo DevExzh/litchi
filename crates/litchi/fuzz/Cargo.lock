@@ -732,7 +732,6 @@ dependencies = [
  "litchi-numbers-wire",
  "phf",
  "plist",
- "prost",
  "ryu",
  "sha1",
  "thiserror",
