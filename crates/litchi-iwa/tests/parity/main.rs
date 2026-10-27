@@ -46,6 +46,7 @@ mod keynote_w1c_cost;
 mod numbers_cases;
 mod numbers_cell_list_cases;
 mod numbers_cell_text_cases;
+mod numbers_chart_series_cases;
 mod numbers_chart_style_cases;
 mod numbers_conditional_highlight_cases;
 mod numbers_drawable_cases;
