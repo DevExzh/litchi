@@ -66,6 +66,7 @@ mod pages_media_lifecycle_cases;
 mod pages_table_cases;
 mod pages_text_cases;
 mod physical_cases;
+mod reference_line_cases;
 mod self_test;
 mod series_graph_cases;
 mod series_style_cases;

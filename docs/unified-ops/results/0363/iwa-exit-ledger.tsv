@@ -1,8 +1,8 @@
 path	name	occurrence	format	family	status	destination	parity_test	tier	native_evidence	reason
-charts/archive.rs	decode	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/archive.rs	encode	1	shared	chart	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
-charts/archive.rs	new	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-charts/archive.rs	reference_lines	1	shared	drawable.shape	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+charts/archive.rs	decode	1	shared	chart	retired	-	-	-	-	retired: Prost-typed host codec of the chart drawable; the leaves edit the drawable through the raw litchi_iwa_protos::chart_style_codec projections and rewrites (references, legend_frame, rewrite_series_non_styles, reference_lines, rewrite_reference_lines) and litchi_iwa_style (record 0375a)
+charts/archive.rs	encode	1	shared	chart	retired	-	-	-	-	retired: Prost-typed host codec of the chart drawable; the leaves edit the drawable through the raw litchi_iwa_protos::chart_style_codec projections and rewrites (references, legend_frame, rewrite_series_non_styles, reference_lines, rewrite_reference_lines) and litchi_iwa_style (record 0375a)
+charts/archive.rs	new	1	shared	io	retired	-	-	-	-	retired: Prost-typed host codec of the chart drawable; the leaves edit the drawable through the raw litchi_iwa_protos::chart_style_codec projections and rewrites (references, legend_frame, rewrite_series_non_styles, reference_lines, rewrite_reference_lines) and litchi_iwa_style (record 0375a)
+charts/archive.rs	reference_lines	1	shared	drawable.shape	migrated	litchi_iwa_style::reference_line::lines	keynote_chart_reference_lines_patch_parity	A	-	-
 charts/depth_3d.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart3d::Depth::from_percent	keynote_chart_3d_depth_parity	A	-	-
 charts/donut_inner_radius.rs	from_percent	1	shared	chart	migrated	litchi_iwa_common::chart::donut::InnerRadius::from_percent	keynote_chart_donut_inner_radius_parity	A	-	-
 charts/donut_inner_radius.rs	percent	1	shared	chart	migrated	litchi_iwa_common::chart::donut::InnerRadius::percent	numbers_chart_donut_inner_radius_parity	A	-	-
