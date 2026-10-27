@@ -35,7 +35,8 @@
 | `6c58f19db1` | `Package::body_media` → `drawable::lifecycle::Media` (selector, anchor, data/thumbnail/poster assets, original and natural sizes; frame, properties and playback through `body_drawable_properties`) replaces the host's `body_{images,movies,audio}` | 3 |
 | `d67dd4a62a` | `drawable::lifecycle` `Edit::{add_image, add_movie, add_audio}`: the host's typed graph (drawable with the theme's first image or movie style preset, two caption stand-ins, attachment), the drawable z-order created when the document has none, new `Data/` members and `DataInfo` records (`stem-identifier.extension`), UUIDs, data-reference owners, the stylesheet external reference and the watermark | 3 |
 | `84edbd367d` | `section::lifecycle` `Edit::insert(source, TextPosition, name)`: a section break anywhere in the body, the new section copying the source section's masters (the host's `insert_section`) | 1 |
-| (body storage commit, below) | `Package::{body_storage, body_text}`: the rooted body storage (`litchi_iwa_text::storage::Storage`) and its complete native text, replacing the host reads of the same names | 2 |
+| `2365445db4` | `Package::{body_storage, body_text}`: the rooted body storage (`litchi_iwa_text::storage::Storage`) and its complete native text, replacing the host reads of the same names | 2 |
+| (sort execution commit, below) | `table::sort::execution` — `Package::{edit_body_table_sort_execution, apply_body_table_sort_execution}`; `Edit::{apply, apply_to_rows}`: the host's scalar executor at wire level (stable permutation by the shared planner; tile row records, row header buckets, row UID map and stroke layers move; user-hidden rows restored to their positions in the active hidden-state extent). The payload rewrites take only payloads and a permutation, for the shared table crate | 2 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -72,6 +73,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | titles and captions (image, movie, shape × title, caption) | set: create on an unlabelled drawable, then replace on a host-labelled one; remove on a host-labelled one | B (fresh UUIDs; the replace runs are byte-identical) | queued |
 | section append/insert/remove, sections read | 3 | B (UUIDs, save token) | queued |
 | body-table remove | 1 | A | queued |
+| table sort execution (keys; borders; hidden axes; selected rows) | 2 | A | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
 | media replace (image data, movie data and poster, audio data, asset) and asset reads | 5 + read sweep over 6 documents | movie/poster/audio A, image and asset B (ZIP layout), reads A | queued |
@@ -169,6 +171,7 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | image data replace (`image-adjustments-native`) | 234,144,941 | — | 51,627,431 | −78.0% |
 | media assets read (open + list) | 55,302,013 | — | 45,294,193 | −18.1% |
 | image add (`image-adjustments-native`) | 428,092,047 | — | 79,769,917 | −81.4% |
+| table sort apply (`body-table-catalog-native` table 0) | 3,397,895,357 | — | 54,905,570 | −98.4% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight

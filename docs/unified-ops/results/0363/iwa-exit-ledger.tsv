@@ -2045,8 +2045,8 @@ pages/editor/tables/semantic.rs	table_cell_text_shadow	1	pages	table.cell_rich_t
 pages/editor/tables/semantic.rs	table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	tables	1	pages	table.lifecycle	migrated	litchi_pages::Package::body_tables	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	unmerge_table_cells	1	pages	table.merge	migrated	litchi_pages::Package::edit_body_table_merges	pages_body_table_unmerge_parity	A	-	-
-pages/editor/tables/sort.rs	apply_table_sort_order	1	pages	table.sort	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/sort.rs	apply_table_sort_order_to_rows	1	pages	table.sort	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/sort.rs	apply_table_sort_order	1	pages	table.sort	migrated	litchi_pages::Package::edit_body_table_sort_execution	pages_body_table_sort_apply_parity	A	-	-
+pages/editor/tables/sort.rs	apply_table_sort_order_to_rows	1	pages	table.sort	migrated	litchi_pages::Package::edit_body_table_sort_execution	pages_body_table_sort_apply_to_rows_parity	A	-	-
 pages/editor/tables/topology.rs	insert_table_column	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/topology.rs	insert_table_row	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/topology.rs	remove_table_column	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
