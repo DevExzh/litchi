@@ -27,13 +27,13 @@ use super::super::comments_reply_native::{
     NativeReplyMember, NativeReplyObjectRoute, NativeReplyOperation, NativeReplyRequest,
     NativeReplyStorageIdentity, rewrite_native_comment_reply,
 };
-use super::super::table_cell_pop_up_menu::{
-    Error as BudgetError, LimitKind as BudgetLimitKind, Path as BudgetPath, TransactionBudget,
-};
 use super::{
     Comment, CommentAuthor, CommentReply, CommentTimestamp, Error as RootError,
     LimitKind as RootLimitKind, Located, Package, Path as RootPath, census_comment_ownership,
     physical_source, resolve_comment,
+};
+use litchi_iwa_table::cell_format::{
+    Error as BudgetError, LimitKind as BudgetLimitKind, Path as BudgetPath, TransactionBudget,
 };
 
 /// A checked zero-based ordinal in one comment's direct-reply list.
@@ -739,20 +739,16 @@ fn map_budget_error(error: BudgetError, path: Path) -> Error {
             path,
         },
         BudgetError::Allocation { amount, .. } => Error::Allocation { amount, path },
-        BudgetError::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
-        ) => Error::Refused(Refusal::UnsupportedSource),
-        BudgetError::Refused(
-            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { .. },
-        ) => Error::Refused(Refusal::UnsupportedDependency { path }),
+        BudgetError::Refused(litchi_iwa_table::cell_format::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        BudgetError::Refused(litchi_iwa_table::cell_format::Refusal::UnsupportedDependency {
+            ..
+        }) => Error::Refused(Refusal::UnsupportedDependency { path }),
         BudgetError::Verification => Error::Verification,
         BudgetError::PatchConflict => Error::PatchConflict,
-        BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::SheetNotFound)
-        | BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableNotFound)
-        | BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::CellNotFound)
-        | BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableLocked {
-            ..
-        })
+        BudgetError::Refused(litchi_iwa_table::cell_format::Refusal::CellNotFound)
+        | BudgetError::Refused(litchi_iwa_table::cell_format::Refusal::TableLocked { .. })
         | BudgetError::InvalidSource { .. } => Error::InvalidSource { path },
     }
 }
@@ -1897,7 +1893,7 @@ mod tests {
     fn native_limit_payload_reaches_public_error() {
         let error = map_native_error(
             crate::package::comments_reply_native::NativeReplyError::Limit {
-                kind: crate::package::table_cell_pop_up_menu::LimitKind::WireWork,
+                kind: litchi_iwa_table::cell_format::LimitKind::WireWork,
                 observed: 47,
                 maximum: 29,
             },
@@ -1918,11 +1914,11 @@ mod tests {
     fn native_core_limit_axes_reach_public_error() {
         for (kind, expected) in [
             (
-                crate::package::table_cell_pop_up_menu::LimitKind::WireFields,
+                litchi_iwa_table::cell_format::LimitKind::WireFields,
                 LimitKind::Fields,
             ),
             (
-                crate::package::table_cell_pop_up_menu::LimitKind::WireNesting,
+                litchi_iwa_table::cell_format::LimitKind::WireNesting,
                 LimitKind::Nesting,
             ),
         ] {

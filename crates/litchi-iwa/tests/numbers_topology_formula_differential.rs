@@ -522,7 +522,13 @@ fn oracle_texts(
         } else {
             continue;
         };
-        let Some(shifted) = shift_text(&text, row_axis, physical, insert) else {
+        // A reference into another table keeps its text; only its host
+        // cell moves.
+        let shifted = if text.contains("::") && !text.contains(&prefix) {
+            text
+        } else if let Some(shifted) = shift_text(&text, row_axis, physical, insert) {
+            shifted
+        } else {
             continue;
         };
         let (row, column) = if row_axis {

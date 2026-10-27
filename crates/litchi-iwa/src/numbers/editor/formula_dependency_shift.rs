@@ -184,6 +184,22 @@ pub(super) struct TableExtents {
 }
 
 impl TableExtents {
+    /// The spanning dependencies of a new table's own owner: its table and
+    /// body extents, with no span references (record 0370f).
+    pub(super) fn spanning_dependencies(self) -> tsce::SpanningDependenciesExpandedArchive {
+        let range = |[left, top, right, bottom]: [u32; 4]| tsce::RangeCoordinateArchive {
+            top_left_column: left,
+            top_left_row: top,
+            bottom_right_column: right,
+            bottom_right_row: bottom,
+        };
+        tsce::SpanningDependenciesExpandedArchive {
+            coord_refers_to_spans: Vec::new(),
+            total_range_for_table: Some(range(self.total)),
+            body_range_for_table: Some(range(self.body)),
+        }
+    }
+
     /// The extents of a table of `rows` by `columns` with the given section
     /// counts.
     pub(super) fn of(

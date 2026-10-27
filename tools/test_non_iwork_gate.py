@@ -32,6 +32,7 @@ FIXTURE_IWORK_PACKAGES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -53,6 +54,7 @@ FIXTURE_EXCLUDED_PACKAGES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -142,6 +144,7 @@ FIXTURE_WORKSPACE_PACKAGES = frozenset(
         "litchi-iwa-package",
         "litchi-iwa-protos",
         "litchi-iwa-structured",
+        "litchi-iwa-table",
         "litchi-iwa-text",
         "litchi-iwa-text-wire",
         "litchi-keynote",
@@ -424,8 +427,8 @@ class NonIworkGateTests(unittest.TestCase):
 
     def test_exact_package_partition_and_feature_closure(self) -> None:
         self.assertEqual(self.plan.packages.keys(), FIXTURE_WORKSPACE_PACKAGES)
-        self.assertEqual(len(self.plan.packages), 68)
-        self.assertEqual(len(self.plan.iwork_packages), 17)
+        self.assertEqual(len(self.plan.packages), 69)
+        self.assertEqual(len(self.plan.iwork_packages), 18)
         self.assertEqual(self.plan.iwork_packages, FIXTURE_IWORK_PACKAGES)
         self.assertEqual(len(self.plan.unsafe_facade_dependents), 1)
         self.assertEqual(self.plan.unsafe_facade_dependents, {"litchi-py"})
@@ -436,7 +439,7 @@ class NonIworkGateTests(unittest.TestCase):
             self.plan.facade_forbidden_packages,
             self.plan.excluded_packages - {"litchi-cli", "litchi-ops"},
         )
-        self.assertEqual(len(self.plan.excluded_packages), 20)
+        self.assertEqual(len(self.plan.excluded_packages), 21)
         self.assertEqual(self.plan.excluded_packages, FIXTURE_EXCLUDED_PACKAGES)
         self.assertEqual(len(self.plan.bulk_packages), 47)
         self.assertEqual(self.plan.bulk_packages, FIXTURE_BULK_PACKAGES)

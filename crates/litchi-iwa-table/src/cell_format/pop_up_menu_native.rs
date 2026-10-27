@@ -29,10 +29,10 @@ use litchi_numbers_wire::{
     },
 };
 
-use super::table_cell_pop_up_menu::{Path, TransactionBudget};
+use super::{Path, TransactionBudget};
 
-type BudgetError = super::table_cell_pop_up_menu::Error;
-type BudgetLimitKind = super::table_cell_pop_up_menu::LimitKind;
+type BudgetError = super::Error;
+type BudgetLimitKind = crate::cell_format::LimitKind;
 
 const TABLE_MODEL_TYPE: u32 = 6_001;
 const TILE_TYPE: u32 = 6_002;
@@ -44,13 +44,13 @@ const LIST_CONTROL_CELL_SPEC: i32 = 12;
 
 /// A native Pop-Up Menu value after semantic validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct NativePopUpValue<'items> {
+pub struct NativePopUpValue<'items> {
     /// Menu labels, excluding the required native NIL sentinel.
-    pub(super) items: &'items [&'items str],
+    pub items: &'items [&'items str],
     /// Native CellSpecArchive chooser flag.
-    pub(super) starts_with_first: bool,
+    pub starts_with_first: bool,
     /// Existing String table key for the selected first item, if any.
-    pub(super) first_item_string_identifier: Option<u32>,
+    pub first_item_string_identifier: Option<u32>,
 }
 
 /// A fully resolved native graph for the compatibility single-member path.
@@ -60,30 +60,30 @@ pub(super) struct NativePopUpValue<'items> {
 /// calling this module; retaining identifiers here keeps the native helper
 /// independent from facade selectors and generated model types.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct NativePopUpInput<'source> {
-    pub(super) archive: &'source Archive,
+pub struct NativePopUpInput<'source> {
+    pub archive: &'source Archive,
     /// Index of the physical component containing `archive`.  Keeping this
     /// beside the member name makes the private output usable by owners that
     /// stage more than one sidecar in one transaction; a name alone is not a
     /// safe component identity when effective locators are involved.
-    pub(super) component_index: usize,
-    pub(super) model_identifier: u64,
-    pub(super) tile_identifier: u64,
-    pub(super) tile_row: u32,
-    pub(super) tile_column: u32,
-    pub(super) control_table_identifier: u64,
-    pub(super) format_table_identifier: u64,
+    pub component_index: usize,
+    pub model_identifier: u64,
+    pub tile_identifier: u64,
+    pub tile_row: u32,
+    pub tile_column: u32,
+    pub control_table_identifier: u64,
+    pub format_table_identifier: u64,
     /// The physical component/member name containing `archive`.
-    pub(super) member_name: &'source str,
+    pub member_name: &'source str,
     /// FormatStructArchive bytes used when a format-list entry is created.
-    pub(super) format_payload: &'source [u8],
+    pub format_payload: &'source [u8],
     /// Identifier reserved by the package metadata allocator for a new
     /// PopUpMenuModel object. It is unused when an identical model is reused.
-    pub(super) new_popup_model_identifier: Option<u64>,
-    pub(super) desired: Option<NativePopUpValue<'source>>,
-    pub(super) limits: Limits,
-    pub(super) snappy_limits: SnappyLimits,
-    pub(super) path: Path,
+    pub new_popup_model_identifier: Option<u64>,
+    pub desired: Option<NativePopUpValue<'source>>,
+    pub limits: Limits,
+    pub snappy_limits: SnappyLimits,
+    pub path: Path,
 }
 
 /// A physical IWA member supplied to the multi-member native transition.
@@ -93,17 +93,17 @@ pub(super) struct NativePopUpInput<'source> {
 /// member name; either value alone is insufficient when a package contains
 /// versioned or explicitly-located component records.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct NativePopUpMember<'source> {
-    pub(super) archive: &'source Archive,
-    pub(super) component_index: usize,
-    pub(super) member_name: &'source str,
+pub struct NativePopUpMember<'source> {
+    pub archive: &'source Archive,
+    pub component_index: usize,
+    pub member_name: &'source str,
 }
 
 /// A rooted object route into one of [`NativePopUpMember`]s.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct NativePopUpObjectRoute {
-    pub(super) member_index: usize,
-    pub(super) identifier: u64,
+pub struct NativePopUpObjectRoute {
+    pub member_index: usize,
+    pub identifier: u64,
 }
 
 /// The resolved physical graph for a split Pop-Up Menu transaction.
@@ -115,27 +115,27 @@ pub(super) struct NativePopUpObjectRoute {
 /// ownership map.  This keeps cross-member references visible to refcount and
 /// cull checks without ever publishing a merged archive.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct NativePopUpGraphInput<'source> {
+pub struct NativePopUpGraphInput<'source> {
     /// All current physical members that can contain rooted table/storage
     /// objects, not merely the members named by the selected cell.  The
     /// merged working archive uses this complete set to census BNC/list
     /// references before a refcount decrement or popup cull.
-    pub(super) members: &'source [NativePopUpMember<'source>],
-    pub(super) model: NativePopUpObjectRoute,
-    pub(super) tile: NativePopUpObjectRoute,
-    pub(super) control_table_identifier: u64,
-    pub(super) format_table_identifier: u64,
+    pub members: &'source [NativePopUpMember<'source>],
+    pub model: NativePopUpObjectRoute,
+    pub tile: NativePopUpObjectRoute,
+    pub control_table_identifier: u64,
+    pub format_table_identifier: u64,
     /// Member in which a newly-created PopUpMenuModel is allowed to live.
     /// Existing models are assigned to their resolved source member.
-    pub(super) creation_member_index: usize,
-    pub(super) tile_row: u32,
-    pub(super) tile_column: u32,
-    pub(super) format_payload: &'source [u8],
-    pub(super) new_popup_model_identifier: Option<u64>,
-    pub(super) desired: Option<NativePopUpValue<'source>>,
-    pub(super) limits: Limits,
-    pub(super) snappy_limits: SnappyLimits,
-    pub(super) path: Path,
+    pub creation_member_index: usize,
+    pub tile_row: u32,
+    pub tile_column: u32,
+    pub format_payload: &'source [u8],
+    pub new_popup_model_identifier: Option<u64>,
+    pub desired: Option<NativePopUpValue<'source>>,
+    pub limits: Limits,
+    pub snappy_limits: SnappyLimits,
+    pub path: Path,
 }
 
 /// One private physical-member candidate produced by a native owner.
@@ -145,14 +145,14 @@ pub(super) struct NativePopUpGraphInput<'source> {
 /// identity used for metadata save-token selection.  The two values must
 /// agree with the source catalog before publication.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct NativeMemberEdit {
-    pub(super) component_index: usize,
-    pub(super) member_name: String,
-    pub(super) member_bytes: Vec<u8>,
+pub struct NativeMemberEdit {
+    pub component_index: usize,
+    pub member_name: String,
+    pub member_bytes: Vec<u8>,
 }
 
 impl NativeMemberEdit {
-    pub(super) fn new(
+    pub fn new(
         component_index: usize,
         member_name: impl Into<String>,
         member_bytes: Vec<u8>,
@@ -172,12 +172,12 @@ impl NativeMemberEdit {
 /// reassembler's last-write-wins behavior hide an ownership bug.  The same
 /// rule applies to a member name that was resolved to two component indices.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct NativeControlOutput {
-    pub(super) edits: Vec<NativeMemberEdit>,
+pub struct NativeControlOutput {
+    pub edits: Vec<NativeMemberEdit>,
 }
 
 impl NativeControlOutput {
-    pub(super) fn from_edits(edits: Vec<NativeMemberEdit>) -> Result<Self> {
+    pub fn from_edits(edits: Vec<NativeMemberEdit>) -> Result<Self> {
         let mut deduplicated: Vec<NativeMemberEdit> = Vec::new();
         deduplicated
             .try_reserve_exact(edits.len())
@@ -212,7 +212,7 @@ impl NativeControlOutput {
         })
     }
 
-    pub(super) fn single(
+    pub fn single(
         component_index: usize,
         member_name: impl Into<String>,
         member_bytes: Vec<u8>,
@@ -224,7 +224,7 @@ impl NativeControlOutput {
         )])
     }
 
-    pub(super) fn member_names(&self) -> impl Iterator<Item = &str> + '_ {
+    pub fn member_names(&self) -> impl Iterator<Item = &str> + '_ {
         self.edits.iter().map(|edit| edit.member_name.as_str())
     }
 }
@@ -236,18 +236,18 @@ impl NativeControlOutput {
 /// final private ZIP candidate. `cell_bytes` is exposed separately so callers
 /// can perform an object-level locality assertion for the selected BNC cell.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct NativePopUpOutput {
+pub struct NativePopUpOutput {
     /// Deduplicated physical edits.  The compatibility path normally emits
     /// one edit; the split path emits one edit for each changed member so a
     /// format/control graph can stage all changed members atomically.
-    pub(super) member_edits: NativeControlOutput,
-    pub(super) cell_bytes: Vec<u8>,
-    pub(super) format_identifier: Option<u32>,
-    pub(super) control_cell_spec_identifier: Option<u32>,
-    pub(super) popup_model_identifier: Option<u64>,
-    pub(super) added_object_identifiers: Vec<u64>,
-    pub(super) removed_object_identifiers: Vec<u64>,
-    pub(super) changed_member_names: Vec<String>,
+    pub member_edits: NativeControlOutput,
+    pub cell_bytes: Vec<u8>,
+    pub format_identifier: Option<u32>,
+    pub control_cell_spec_identifier: Option<u32>,
+    pub popup_model_identifier: Option<u64>,
+    pub added_object_identifiers: Vec<u64>,
+    pub removed_object_identifiers: Vec<u64>,
+    pub changed_member_names: Vec<String>,
 }
 
 /// Candidate archive transition before it is serialized into one or more
@@ -270,7 +270,7 @@ struct NativePopUpTransition {
 /// error reports the resource and exact observed/maximum values that caused
 /// the refusal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum NativePopUpError {
+pub enum NativePopUpError {
     InvalidSource,
     UnsupportedDependency,
     Allocation,
@@ -307,7 +307,7 @@ impl fmt::Display for NativePopUpError {
 
 impl std::error::Error for NativePopUpError {}
 
-pub(super) type Result<T> = std::result::Result<T, NativePopUpError>;
+pub type Result<T> = std::result::Result<T, NativePopUpError>;
 
 fn map_budget_error(error: BudgetError) -> NativePopUpError {
     match error {
@@ -515,7 +515,7 @@ fn rewrite_native_popup_menu_transition(
     let cell_source = tile_cell(tile_payload, input.tile_row, input.tile_column)?;
     let cell = BncCell::parse(
         cell_source,
-        &crate::cell::wire::limits_for_source(cell_source),
+        &crate::cell_format::bnc_limits_for_source(cell_source),
     )
     .map_err(|_| NativePopUpError::InvalidSource)?;
     let old_format = cell.format_identifier();
@@ -805,7 +805,7 @@ fn rewrite_native_popup_menu_transition(
 /// already proved all graph objects share one member.  Split-component callers
 /// should use [`rewrite_native_popup_menu_multi`], which emits one edit per
 /// changed member.
-pub(super) fn rewrite_native_popup_menu(
+pub fn rewrite_native_popup_menu(
     input: NativePopUpInput<'_>,
     budget: &mut TransactionBudget,
 ) -> Result<NativePopUpOutput> {
@@ -838,7 +838,7 @@ pub(super) fn rewrite_native_popup_menu(
 /// candidate back to the exact source member that owned every object.  Object
 /// identifiers must be globally unique across the supplied members; accepting
 /// an alias here would make a cull or a refcount transition ambiguous.
-pub(super) fn rewrite_native_popup_menu_multi(
+pub fn rewrite_native_popup_menu_multi(
     input: NativePopUpGraphInput<'_>,
     budget: &mut TransactionBudget,
 ) -> Result<NativePopUpOutput> {
@@ -947,7 +947,7 @@ pub(super) fn rewrite_native_popup_menu_multi(
 /// This mirrors [`existing_popup_model_identifiers`] but first builds the same
 /// private merged view used by the write path, so the facade can preflight UUID
 /// ownership without silently ignoring a sidecar member.
-pub(super) fn existing_popup_model_identifiers_multi(
+pub fn existing_popup_model_identifiers_multi(
     input: NativePopUpGraphInput<'_>,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u64>> {
@@ -1438,7 +1438,7 @@ fn split_popup_candidate(
 /// without cloning or rewriting the archive.  The facade runs this pass
 /// before native candidate allocation so metadata can prove exact current
 /// UUID ownership for every reused model.
-pub(super) fn existing_popup_model_identifiers(
+pub fn existing_popup_model_identifiers(
     input: NativePopUpInput<'_>,
     budget: &mut TransactionBudget,
     path: Path,
@@ -1793,7 +1793,7 @@ fn census_bnc_row(
         // A minimal automatic BNC cell has an empty payload, so adjacent
         // materialized columns may legitimately share the same start offset.
         // Decreasing offsets remain invalid; equal offsets describe a
-        // zero-length cell and are parsed through `BncCell::parse(&[], &crate::cell::wire::limits_for_source(&[]))`.
+        // zero-length cell and are parsed through `BncCell::parse(&[], &crate::cell_format::bnc_limits_for_source(&[]))`.
         if start > storage.len() || previous.is_some_and(|prior| prior > start) {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -1815,7 +1815,7 @@ fn census_bnc_row(
 }
 
 fn census_bnc_cell(bytes: &[u8], counts: &mut BncReferenceCounts) -> Result<()> {
-    let cell = BncCell::parse(bytes, &crate::cell::wire::limits_for_source(bytes))
+    let cell = BncCell::parse(bytes, &crate::cell_format::bnc_limits_for_source(bytes))
         .map_err(|_| NativePopUpError::InvalidSource)?;
     match (
         cell.format_identifier(),
@@ -2596,7 +2596,7 @@ fn map_bnc_error(error: PopUpMenuRewriteError) -> NativePopUpError {
     }
 }
 
-pub(super) fn replace_message_preserving_header(
+pub fn replace_message_preserving_header(
     archive: &mut Archive,
     object_identifier: u64,
     message_index: usize,
@@ -2628,7 +2628,7 @@ pub(super) fn replace_message_preserving_header(
 /// references.  The payload is still rewritten with the core raw-header
 /// primitive, but stale aggregate or nested FieldInfo ownership must fail
 /// before a private candidate can be published.
-pub(super) fn validate_message_without_object_references(
+pub fn validate_message_without_object_references(
     archive: &Archive,
     object_identifier: u64,
     message_index: usize,
@@ -2650,7 +2650,7 @@ pub(super) fn validate_message_without_object_references(
     Ok(())
 }
 
-pub(super) fn replace_control_message_with_transition(
+pub fn replace_control_message_with_transition(
     archive: &mut Archive,
     object_identifier: u64,
     message_index: usize,
@@ -2981,7 +2981,7 @@ fn popup_references_from_list(source: &[u8]) -> Result<Vec<u64>> {
 /// points at a popup model.  The facade calls this over every package member
 /// before allowing a cull; the native candidate still repeats the selected
 /// archive check after its list rewrite.
-pub(super) fn archive_has_popup_reference(archive: &Archive, identifier: u64) -> Result<bool> {
+pub fn archive_has_popup_reference(archive: &Archive, identifier: u64) -> Result<bool> {
     for object in &archive.objects {
         for info in &object.archive_info.message_infos {
             if info.object_references.contains(&identifier)
@@ -3027,7 +3027,7 @@ pub(super) fn archive_has_popup_reference(archive: &Archive, identifier: u64) ->
 /// ownership risk.  Callers use this only for non-selected package members so
 /// a future opaque producer cannot keep a model alive while the selected native
 /// archive is being rewritten.
-pub(super) fn archive_has_popup_reference_strict(
+pub fn archive_has_popup_reference_strict(
     archive: &Archive,
     identifier: u64,
     limits: Limits,
@@ -3056,7 +3056,7 @@ pub(super) fn archive_has_popup_reference_strict(
 /// its complete source representation, including raw ArchiveInfo framing,
 /// MessageInfo aggregate/FieldInfo records, unknown fields, and payload bytes.
 /// The candidate may not silently add or remove an unlisted object.
-pub(super) fn verify_archive_object_locality(
+pub fn verify_archive_object_locality(
     source: &Archive,
     candidate: &Archive,
     changed_identifiers: &[u64],
@@ -3121,7 +3121,7 @@ fn duplicate_entry_keys<T>(values: &[(u32, T)]) -> bool {
         .any(|(index, (key, _))| values[index + 1..].iter().any(|(other, _)| other == key))
 }
 
-pub(super) fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8]> {
+pub fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8]> {
     let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
         .map_err(|_| NativePopUpError::InvalidSource)?;
     let mut selected = None;
@@ -3170,7 +3170,7 @@ pub(super) fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8]> {
     selected.ok_or(NativePopUpError::InvalidSource)
 }
 
-pub(super) fn patch_tile_cell(
+pub fn patch_tile_cell(
     source: &[u8],
     row: u32,
     column: u32,
