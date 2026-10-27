@@ -1054,7 +1054,7 @@ numbers/editor/semantic/workbook.rs	set_formula	1	numbers	table.formula	host-onl
 numbers/editor/semantic/workbook.rs	set_formula_with_cached_value	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::sheets	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	migrated	litchi_numbers::Sheet::tables	numbers_workbook_catalog_read_parity	A	-	-
-numbers/editor/sheet_audio.rs	add_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_audio.rs	add_sheet_audio	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::Edit::add_audio	numbers_sheet_media_add_parity	B	-	-
 numbers/editor/sheet_audio.rs	duplicate_sheet_audio	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_audio.rs	remove_sheet_audio	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_media_remove_parity	B	-	-
 numbers/editor/sheet_audio.rs	replace_sheet_audio_data	1	numbers	drawable.audio	migrated	litchi_numbers::sheet::drawable::media::Edit::replace_data	numbers_sheet_media_replace_data_parity	B	-	-
@@ -1253,7 +1253,7 @@ numbers/editor/sheet_charts/title.rs	set_sheet_chart_title	1	numbers	chart.text	
 numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_delete.rs	remove_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_remove_parity	B	-	-
 numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_images.rs	add_sheet_image	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_images.rs	add_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::add_image	numbers_sheet_media_add_parity	B	-	-
 numbers/editor/sheet_images.rs	duplicate_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_images.rs	flip_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_image_flip_parity	A	-	-
 numbers/editor/sheet_images.rs	remove_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_media_remove_parity	B	-	-
@@ -1269,7 +1269,7 @@ numbers/editor/sheet_images.rs	sheet_image_geometry	1	numbers	drawable.image	mig
 numbers/editor/sheet_images.rs	sheet_image_properties	1	numbers	drawable.image	migrated	litchi_numbers::Package::sheet_drawable_properties	numbers_sheet_image_properties_parity	A	-	-
 numbers/editor/sheet_images.rs	sheet_image_title_caption	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_images.rs	sheet_images	1	numbers	drawable.image	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_movies.rs	add_sheet_movie	1	numbers	drawable.movie	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_movies.rs	add_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::Edit::add_movie	numbers_sheet_media_add_parity	B	-	-
 numbers/editor/sheet_movies.rs	duplicate_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::Edit::duplicate	numbers_sheet_media_duplicate_parity	B	-	-
 numbers/editor/sheet_movies.rs	flip_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::properties::Edit::flip	numbers_sheet_movie_flip_parity	A	-	-
 numbers/editor/sheet_movies.rs	remove_sheet_movie	1	numbers	drawable.movie	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_media_remove_parity	B	-	-
