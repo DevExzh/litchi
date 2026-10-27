@@ -10,7 +10,7 @@ use super::{Fault, FaultLimit};
 
 /// The aggregate codec and payload work of one phase.
 #[derive(Debug)]
-pub(in crate::package) struct WireBudget {
+pub struct WireBudget {
     limits: WireLimits,
     work: usize,
     maximum_work: usize,
@@ -28,7 +28,7 @@ fn exceeded(observed: usize, maximum: usize) -> Fault {
 
 impl WireBudget {
     /// A budget proportional to `source_bytes` (decoded package size).
-    pub(in crate::package) fn new(source_bytes: usize) -> Self {
+    pub fn new(source_bytes: usize) -> Self {
         let maximum_work = source_bytes
             .saturating_mul(64)
             .clamp(1 << 20, WireLimits::MAX_REWRITE_WORK.saturating_mul(16));
@@ -41,23 +41,23 @@ impl WireBudget {
         }
     }
 
-    pub(in crate::package) const fn wire_limits(&self) -> WireLimits {
+    pub const fn wire_limits(&self) -> WireLimits {
         self.limits
     }
 
-    pub(in crate::package) fn remaining_wire_fields(&self) -> usize {
+    pub fn remaining_wire_fields(&self) -> usize {
         WireLimits::MAX_FIELDS.saturating_sub(self.fields)
     }
 
-    pub(in crate::package) fn remaining_wire_work(&self) -> usize {
+    pub fn remaining_wire_work(&self) -> usize {
         self.maximum_work.saturating_sub(self.work)
     }
 
-    pub(in crate::package) fn remaining_payload_references(&self) -> usize {
+    pub fn remaining_payload_references(&self) -> usize {
         WireLimits::MAX_FIELDS.saturating_sub(self.references)
     }
 
-    pub(in crate::package) fn charge_payload_work(&mut self, amount: usize) -> Result<(), Fault> {
+    pub fn charge_payload_work(&mut self, amount: usize) -> Result<(), Fault> {
         self.work = self.work.saturating_add(amount);
         if self.work > self.maximum_work {
             return Err(exceeded(self.work, self.maximum_work));
@@ -65,20 +65,20 @@ impl WireBudget {
         Ok(())
     }
 
-    pub(in crate::package) fn charge_payload_bytes(&mut self, amount: usize) -> Result<(), Fault> {
+    pub fn charge_payload_bytes(&mut self, amount: usize) -> Result<(), Fault> {
         self.charge_payload_work(amount)
     }
 
-    pub(in crate::package) fn charge_output_bytes(&mut self, amount: usize) -> Result<(), Fault> {
+    pub fn charge_output_bytes(&mut self, amount: usize) -> Result<(), Fault> {
         self.charge_payload_work(amount)
     }
 
-    pub(in crate::package) fn charge_sort_work(&mut self, items: usize) -> Result<(), Fault> {
+    pub fn charge_sort_work(&mut self, items: usize) -> Result<(), Fault> {
         let steps = usize::BITS - items.leading_zeros();
         self.charge_payload_work(items.saturating_mul(steps as usize))
     }
 
-    pub(in crate::package) fn charge_codec_report(
+    pub fn charge_codec_report(
         &mut self,
         fields: usize,
         work: usize,

@@ -45,13 +45,11 @@ use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
 
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_core::SnappyStream;
 use thiserror::Error as ThisError;
 
 use crate::package::{Package, Profile};
-use crate::{SheetSelector, TableSelector};
 
 /// The blank workbook every [`Package::new`] returns.
 const BLANK: &[u8] = include_bytes!("create/blank.numbers");
@@ -281,6 +279,8 @@ impl Builder {
     /// [`Error::Dimensions`] when the table cannot take the requested size;
     /// [`Error::Package`] when the template cannot be rewritten.
     pub fn build(self) -> Result<Package> {
+        use crate::package::builder_synthesis::{self as synthesis, Failure, Options};
+        let identity = self.identity.ok_or(Error::MissingIdentity)?;
         if let Some(language) = self.language.as_deref() {
             litchi_iwa_text::TextLanguageTag::new(language).map_err(Error::InvalidLanguage)?;
         }
@@ -291,42 +291,45 @@ impl Builder {
         {
             return Err(Error::InvalidLocale);
         }
-        let package = self.named()?;
-        let package = match self.dimensions {
-            Some((rows, columns)) => package
-                .edit_table_resize(0usize, 0usize)?
-                .resize(rows, columns)?
-                .commit()?
-                .into_package(),
-            None => package,
+        for name in [self.sheet_name.as_deref(), self.table_name.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            crate::package::names::validate_requested_name(name)?;
+        }
+        let options = Options {
+            sheet_name: self.sheet_name.as_deref(),
+            table_name: self.table_name.as_deref(),
+            dimensions: self.dimensions,
+            language: self.language.as_deref(),
+            locale: self.locale.as_deref(),
         };
-        Ok(package.with_builder_options(
-            self.language.as_deref(),
-            self.locale.as_deref(),
-            self.dimensions,
-        )?)
-    }
-
-    /// The template with the identity and names applied.
-    fn named(&self) -> Result<Package> {
-        let identity = self.identity.ok_or(Error::MissingIdentity)?;
-        let package = if identity == Identity::BLANK {
-            Package::new()
-        } else {
+        let unchanged = options.sheet_name.is_none()
+            && options.table_name.is_none()
+            && options.dimensions.is_none()
+            && options.language.is_none()
+            && options.locale.is_none();
+        if unchanged && identity == Identity::BLANK {
+            return Ok(Package::new());
+        }
+        if unchanged {
             let bytes = with_identity(BLANK, identity)?;
-            Package::from_shared_profile(Arc::from(bytes), Profile::default())?
-        };
-        if self.sheet_name.is_none() && self.table_name.is_none() {
-            return Ok(package);
+            return Ok(Package::from_shared_profile(
+                Arc::from(bytes),
+                Profile::default(),
+            )?);
         }
-        let mut edit = package.edit_names();
-        if let Some(name) = self.sheet_name.as_deref() {
-            edit = edit.rename_sheet(SheetSelector::index(0), name)?;
-        }
-        if let Some(name) = self.table_name.as_deref() {
-            edit = edit.rename_table(SheetSelector::index(0), TableSelector::index(0), name)?;
-        }
-        Ok(edit.commit()?.into_package())
+        // One pass over the template's archives, opened once (record 0370i).
+        let identity = (identity != Identity::BLANK).then_some(identity);
+        synthesis::synthesize(BLANK, identity, &options).map_err(|failure| match failure {
+            Failure::InvalidSize => Error::Dimensions(crate::table::resize::Error::Refused(
+                crate::table::resize::Refusal::InvalidSize,
+            )),
+            Failure::Template => Error::Package(crate::Error::InvalidFormat(
+                "the Numbers template could not take the builder options".to_owned(),
+            )),
+            Failure::Package(error) => Error::Package(error),
+        })
     }
 }
 
@@ -358,8 +361,23 @@ impl Default for Package {
 pub(crate) fn with_identity(source: &[u8], identity: Identity) -> crate::Result<Vec<u8>> {
     let profile = Profile::default();
     let limits = profile.archive();
-    let catalog = SourceCatalog::from_bytes(source, limits)?;
-    let package = catalog.package();
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source, limits)?;
+    let members = identity_members(&catalog, identity)?;
+    let edits: Vec<EntryEdit<'_>> = members
+        .iter()
+        .map(|(name, data)| EntryEdit::new(name, data))
+        .collect();
+    Ok(catalog.reassemble_with_deletions_to_bytes(&edits, &[], limits)?)
+}
+
+/// The three identity carriers of the template `package` rewritten for
+/// `identity`: the document identifier, the properties plist and the
+/// package metadata.
+pub(crate) fn identity_members(
+    package: &litchi_iwa_archive::package::Catalog,
+    identity: Identity,
+) -> crate::Result<[(&'static str, Vec<u8>); 3]> {
+    let limits = Profile::default().archive();
     let member = |name: &str| {
         package
             .iter()
@@ -425,12 +443,11 @@ pub(crate) fn with_identity(source: &[u8], identity: Identity) -> crate::Result<
     let metadata = SnappyStream::compress(&decoded, snappy_limits)
         .map_err(|error| crate::Error::Archive(litchi_iwa_archive::Error::Iwa(error)))?;
 
-    let edits = [
-        EntryEdit::new(DOCUMENT_IDENTIFIER, &identifier),
-        EntryEdit::new(PROPERTIES, &properties),
-        EntryEdit::new(PACKAGE_METADATA, &metadata),
-    ];
-    Ok(package.reassemble_with_deletions_to_bytes(&edits, &[], limits)?)
+    Ok([
+        (DOCUMENT_IDENTIFIER, identifier),
+        (PROPERTIES, properties),
+        (PACKAGE_METADATA, metadata),
+    ])
 }
 
 #[cfg(test)]
