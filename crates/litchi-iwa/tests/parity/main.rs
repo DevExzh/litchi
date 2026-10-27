@@ -54,6 +54,7 @@ mod numbers_cell_text_cases;
 mod numbers_chart_style_cases;
 mod numbers_conditional_highlight_cases;
 mod numbers_drawable_cases;
+mod numbers_hidden_axes_cases;
 mod numbers_lifecycle_cases;
 mod numbers_owner_allocation;
 mod numbers_text_box_cases;

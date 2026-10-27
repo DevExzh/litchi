@@ -115,6 +115,16 @@ impl KnownFields {
                     6_000,
                     "TST.TableInfoArchive",
                     decode_as::<tst::TableInfoArchive>,
+                )
+                .with(
+                    6_204,
+                    "TST.HiddenStateFormulaOwnerArchive",
+                    decode_as::<tst::HiddenStateFormulaOwnerArchive>,
+                )
+                .with(
+                    6_220,
+                    "TST.FilterSetArchive",
+                    decode_as::<tst::FilterSetArchive>,
                 ),
             Format::Pages => known
                 .with(

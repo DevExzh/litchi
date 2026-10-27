@@ -92,6 +92,7 @@ pub(crate) mod table_cell_text_style;
 pub(crate) mod table_cells;
 pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
+pub(crate) mod table_hidden_axes;
 pub(crate) mod table_lifecycle;
 pub(crate) mod table_lock;
 pub(crate) mod table_merges;
