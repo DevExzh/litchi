@@ -1,12 +1,16 @@
 # 0377a — bounded API-debt performance follow-up
 
-- Status: measured on `uo2/fin-perf`; coordinator review and final integrated
+- Status: bounded source-bound qualification is recorded on `uo2/fin-perf`;
+  coordinator review, trunk synchronization, and final integrated
   qualification remain pending.
 - Date: 2026-10-28.
 - Baseline: `839212fa9da2e4eff14dcae9c3aa242e49f25729`.
-- Candidate source: `187863518e` plus the recorded `extra.rs` working-tree
-  change; the source hashes and release binary hashes are in
-  `results/0377a/cli.json`.
+- Candidate source for the F1/F3/F4/F5 and CLI measurements:
+  `187863518e` plus the recorded `extra.rs` working-tree change; the source
+  hashes and release binary hashes are in `results/0377a/cli.json`.
+- Candidate source for the source-bound F2 remeasurement:
+  `123409faecd8f6d5451e4d368ff21617e89f8289`; its compact artifact manifest
+  is `results/0377a/manifest.json`.
 - Scope: finish the bounded 0377a checks for F1 DOC first-paragraph parsing,
   F2 OOXML metadata publication, F3 XLSX snapshot/leaf-vs-unified cost, and
   F4/F5 ODC admission and lazy object-tree behavior. ODT/ODP remain explicitly
@@ -14,9 +18,15 @@
 
 ## Contract and correctness
 
-This follow-up changes no public API. The existing selector-first transaction
-contracts remain in force. The two added tests close the evidence gaps called
-out by the review:
+This follow-up adds no supported public API. The opaque package identity and
+revision accessors are `doc(hidden)` implementation proof, and the duplicate
+`new_with_own_snapshot` constructor was removed. The existing selector-first
+transaction contracts remain in force. Snapshot fast paths now require the
+captured package identity, an unchanged package revision, and sealed built-in
+parts. Caller-defined `Part` implementations always use exact
+`Patch::apply` authentication, including `Edit::new_with_options`,
+`Edit::new_with_snapshot`, and core-only publication. The added tests close
+the evidence gaps called out by the review:
 
 - `doc_eager_first_paragraph_text_set` compares the leaf and unified output
   byte-for-byte in the perf harness. The unified route still opens and commits
@@ -27,6 +37,14 @@ out by the review:
   the exact patch to the original source, and applies `inverse()` to restore
   all three original members. This is the exact-source/readback proof for the
   core-only publication path; it is not a synthetic `Patch::check` shortcut.
+- The snapshot constructor regressions cover a snapshot from another package,
+  a same-handle payload mutation, and a content-type mutation. A custom
+  interior-mutable `Part` can change its observable payload through shared
+  interior state without a package seam; both edit constructors and the
+  core-only publisher must refuse the stale snapshot through typed patch
+  conflict authentication. The built-in fast path is guarded independently
+  of this fixture, so arbitrary custom `Part` projections remain on exact
+  `Patch::apply` authentication.
 - The ODF tree test retains lazy construction for infallible ODC/ODG/ODI/formula
   trees, but creates a malformed ODB catalog that the leaf admits and the
   unified route must reject during open. This preserves the prior admission and
@@ -42,10 +60,14 @@ The baseline and candidate use the corrected `fin_perf_region` harness source
 (SHA-256 `551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d`)
 with the warm-up call outside the counted region on both builds. Callgrind was
 run in release mode with three counted calls per route (one for the 1,000-cell
-batch), and the results are per-call Ir. Raw callgrind captures remain outside
-the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-0377a-20261028/` and
-`f1-20261028/`; the compact committed receipt is
+batch), and the results are per-call Ir. F1/F3/F4/F5 retain the earlier
+corrected-warmup run from the candidate source above. F2 was rebuilt from
+source commit `123409faecd8` after the provenance repair and rerun for all
+three OOXML metadata routes. The F2 raw captures are outside the repository
+at
+`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-f2-final2-20261028/`;
+the complete compact artifact manifest is
+`results/0377a/manifest.json`. The committed receipt is
 `results/0377a/callgrind.tsv`.
 
 Leaf/unified wall checks used pinned CPU 47, ABBA binary order, five blocks,
@@ -62,15 +84,15 @@ The primary callgrind ratios are candidate/baseline; all are within the 1.05
 regression bar. Wall ratios are candidate unified/leaf and use the normal
 single or batch budget.
 
-| family | route | leaf Ir | unified Ir | leaf ratio | unified ratio | wall unified/leaf |
+| family | route | leaf candidate Ir | unified candidate Ir | leaf ratio | unified ratio | wall unified/leaf |
 |---|---|---:|---:|---:|---:|---:|
-| F1 | DOC first paragraph set | 0.763 | 0.764 | 0.763 | 0.764 | 1.019 |
-| F2 | DOCX metadata title set | 0.938 | 0.951 | 0.938 | 0.951 | — |
-| F2 | XLSX metadata title set | 0.995 | 1.023 | 0.995 | 1.023 | — |
-| F2 | PPTX metadata title set | 0.948 | 0.945 | 0.948 | 0.945 | — |
-| F3 | XLSX single cell set | 1.000 | 1.018 | 1.000 | 1.018 | 1.081 |
-| F3 | XLSX 1,000-cell batch | 0.988 | 1.032 | 0.988 | 1.032 | 1.775 |
-| F4/F5 | ODC open | 0.991 | 0.924 | 0.991 | 0.924 | 0.999 |
+| F1 | DOC first paragraph set | 42,086,073 | 42,646,284 | 0.763 | 0.764 | 1.019 |
+| F2 | DOCX metadata title set | 66,417 | 70,696 | 0.939 | 0.966 | — |
+| F2 | XLSX metadata title set | 135,060 | 142,310 | 0.999 | 1.025 | — |
+| F2 | PPTX metadata title set | 1,338,478 | 1,349,360 | 0.947 | 0.951 | — |
+| F3 | XLSX single cell set | 332,510 | 352,752 | 1.000 | 1.018 | 1.081 |
+| F3 | XLSX 1,000-cell batch | 20,232,379 | 30,951,182 | 0.988 | 1.032 | 1.775 |
+| F4/F5 | ODC open | 26,440,028 | 26,419,395 | 0.991 | 0.924 | 0.999 |
 
 The F3 single-cell wall route is below the 1.10 leaf/unified budget, and the
 batch route is below 2.0. ODC is below the 1.05 open budget. The F2 and F3
@@ -87,8 +109,9 @@ and carry no unified leaf budget.
 Scoped correctness checks passed before this record was written:
 
 ```text
-cargo test -p litchi-ooxml-common --lib properties::transaction_tests -- --nocapture  # 35 passed
-cargo test -p litchi-ops --all-features --lib format::odf_tree::tests::opened_trees_that_cannot_fail_are_built_on_first_read -- --nocapture  # passed
+cargo test -p litchi-ooxml-common --lib properties::transaction_tests -- --nocapture  # 40 passed
+cargo test -p litchi-ops --all-features --lib format::odf_tree:: -- --nocapture  # passed
+cargo test -p litchi-ops --no-default-features --features odc --all-targets  # passed
 cargo test -p litchi-docx --lib metadata::tests -- --nocapture  # 13 passed
 cargo test -p litchi-xlsx --lib metadata::tests -- --nocapture  # 11 passed
 ```

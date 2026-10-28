@@ -404,6 +404,10 @@ impl Cell {
 
     /// Append this address in relative A1 notation to `output` without an
     /// intermediate allocation; the bytes [`Self::a1`] returns.
+    ///
+    /// This is an internal XLSX serialization helper. Use [`Self::a1`] as the
+    /// supported public rendering API.
+    #[doc(hidden)]
     pub fn append_a1(self, output: &mut Vec<u8>) {
         let mut letters = [0u8; 3];
         let mut count = 0;
