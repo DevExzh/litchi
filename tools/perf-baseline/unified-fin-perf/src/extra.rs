@@ -1,8 +1,9 @@
 //! The non-batch routes of record 0351 §5 per format: open (default and
 //! eager unified owner), first and second save of one freshly opened owner,
-//! metadata title set, DOCX paragraph add, DOC paragraph get and the PPTX
-//! structure edits. The fixture is the document the format's batch builder
-//! made (`fixture` targets), published once by its unified handle.
+//! metadata title set, DOCX paragraph add, DOC paragraph get, the DOC open
+//! with its first paragraph set (record 0377a) and the PPTX structure edits.
+//! The fixture is the document the format's batch builder made (`fixture`
+//! targets), published once by its unified handle.
 
 #![allow(unused_imports, unused_variables)]
 
@@ -419,6 +420,36 @@ pub fn cases(format: &str, bytes: &'static [u8], fixture: usize) -> Result<Vec<C
             let unified: UnifiedEdit = leak(|f: &File| Ok(f.set("/metadata", title())?));
             cases.push(edit_case(o, "metadata_title_set", leaf, unified)?);
             cases.extend(save_cases(o, leaf, unified));
+            // The first edit of a freshly opened document: the open and one
+            // paragraph text set inside the clock (record 0377a, F1).
+            let leaf_first = |bytes: &[u8]| -> Result<litchi_doc::Package> {
+                let package = litchi_doc::Package::from_bytes(bytes)?;
+                let mut edit = package.edit()?;
+                edit.replace_paragraph(Position::new(0), "changed paragraph")?;
+                Ok(edit.commit()?.into_package())
+            };
+            let unified_first = |bytes: Vec<u8>| -> Result<File> {
+                let file = litchi_ops::open_bytes_with(bytes, &eager_options())?;
+                let text = Props::new().with("text", "changed paragraph");
+                Ok(file.set("/body/p[1]", text)?)
+            };
+            cases.push(case(
+                "doc",
+                "first_paragraph_text_set",
+                "eager",
+                Box::new(move || {
+                    let leaf = leaf_first(bytes)?.to_bytes()?;
+                    let unified = unified_first(bytes.to_vec())?.to_bytes()?;
+                    Ok(checked(compare(&leaf, &unified)?))
+                }),
+                Box::new(move || timed_ref(|| Ok(()), |_| leaf_first(bytes))),
+                Box::new(move || {
+                    timed_ref(
+                        || Ok(Some(bytes.to_vec())),
+                        |b| unified_first(b.take().ok_or("bytes")?),
+                    )
+                }),
+            ));
             let package: &'static litchi_doc::Package =
                 leak(litchi_doc::Package::from_bytes(bytes)?);
             let file: &'static File = leak(unified_open(bytes, true)?);

@@ -735,14 +735,13 @@ impl Sheet<'_> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
-        let authored_cell = content.as_cell();
         let source = if self.edit.capture_budgeted() {
             self.source_storage(address)?
         } else {
             None
         };
         let source_cell = source.as_ref().map(|(cell, _, _)| cell);
-        let source_same = source_cell.is_some_and(|source| source == &authored_cell);
+        let source_same = source_cell.is_some_and(|source| content.same_as_cell(source));
         let source_has_rich_text = if source_same {
             match source.as_ref() {
                 Some((_, true, _)) => true,

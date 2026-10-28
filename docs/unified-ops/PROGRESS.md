@@ -6686,3 +6686,26 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Next-wave preparation is read-only while this candidate is qualified:
   W1-G shared cell comments and W1-E 0375b shared chart text/caption graphs.
   No new shared-engine slice will integrate before the current frozen gate.
+- Post-merge checks on `c650ba53f3` passed with an unchanged clean HEAD:
+  workspace, all 20 locked offline fuzz workspaces, boundaries and ledger.
+- Accepted 0377a at `32f77fec2c`: bounded DOC/XLSX/OOXML/ODC performance
+  changes and corrected measurement harness. Snapshot shortcuts require
+  package identity, an unchanged revision and built-in OPC parts; caller-defined
+  parts retain exact patch authentication. Foreign/stale/custom-part tests and
+  core-only replay/inverse/readback tests pass. Strict scoped Clippy now passes
+  without a command-line lint allowance, alongside scoped tests, formatting,
+  rustdoc, glossary, matrix, ledger and boundaries. Historical costs remain
+  bound to the sources in 0377a; final integrated measurements are pending.
+- The candidate is closed to new feature integration while final performance
+  qualification and all 53 gate rows run on one integrated commit. Raw results
+  remain outside the checkout under `.coord/resume-20261028/`; historical
+  scoped green results do not establish the final candidate's gate status.
+- Next-wave implementation is isolated and initially limited to code/test
+  edits: W1-E shared chart title/caption/axis-title graphs and facades; W1-G
+  shared table-cell root comments and direct replies; W2-A Numbers shape
+  style and text-box layout. Builds wait for the measurement interval, and
+  none will integrate before the frozen gate completes. W2-D test/example
+  relocation has a separate read-only inventory assignment.
+- The exit ledger remains 1,146 migrated, 40 retired and 1,042 host-only rows.
+  All 451 pending native routes still block W3. Leaf slices do not complete
+  D7 unified dispatch/schema/capability exposure.

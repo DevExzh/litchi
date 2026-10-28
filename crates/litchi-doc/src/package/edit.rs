@@ -425,11 +425,14 @@ fn commit_from_body(source: Package, body_commit: body_text::PackageCommit) -> R
     let diagnostics = Diagnostics::from_patch(&patch.inner);
     let package = match validated {
         None => source,
+        // The commit validated the candidate's document strictly under the
+        // snapshot's source limits, whatever leniency the source retains.
         Some(validated) => Package::from_validated_ole(
             validated.ole,
             validated.document,
             snapshot.source_limits(),
             source.leniency(),
+            true,
         )
         .map_err(Error::Package)?,
     };
@@ -932,8 +935,10 @@ impl Package {
             return Ok(snapshot);
         }
         let bytes = self.to_bytes().map_err(Error::Package)?;
-        let snapshot = body_text::Snapshot::from_bytes_with_options(bytes, options.clone())
-            .map_err(Error::from)?;
+        // `options` carry this package's source limits (`body_snapshot`).
+        let snapshot =
+            body_text::Snapshot::from_package_bytes(bytes, options.clone(), self.strict_document)
+                .map_err(Error::from)?;
         *memo() = Some((options, snapshot.clone()));
         Ok(snapshot)
     }
@@ -1259,6 +1264,49 @@ mod tests {
         // A fresh open publishes the same bytes.
         let fresh = crate::Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
         assert_eq!(commit(&fresh, EditOptions::default()), first);
+    }
+
+    /// Record 0377a: a package whose document is the strict reader's parse of
+    /// its bytes opens its body snapshot without parsing them again, and gets
+    /// the snapshot a full open of those bytes returns. A lenient open keeps
+    /// the full reader gate; a commit's document is the commit's strict parse.
+    #[test]
+    fn a_strictly_parsed_package_opens_its_body_snapshot_without_a_second_parse() {
+        let source = package_with_paragraphs(3);
+        let bytes = source.to_bytes().unwrap();
+        assert!(source.strict_document);
+        assert!(crate::Package::from_bytes(&bytes).unwrap().strict_document);
+
+        let options = EditOptions::default();
+        let opened = source.body_snapshot(&options).expect("package snapshot");
+        let full = body_text::Snapshot::from_bytes_with_options(
+            bytes.clone(),
+            body_text::OpenOptions::default()
+                .source_limits(source.source_limits())
+                .revision_limits(options.revision_limits)
+                .transaction_limits(options.transaction_limits)
+                .protection_policy(options.protection_policy.clone()),
+        )
+        .expect("full snapshot");
+        assert_eq!(opened.bytes(), full.bytes());
+        assert_eq!(opened.fingerprint(), full.fingerprint());
+        assert_eq!(opened.source_limits(), full.source_limits());
+
+        let lenient = crate::Package::from_bytes_with_options(
+            &bytes,
+            super::OpenOptions::default().leniency(crate::Leniency::TolerateStylesheetDefects),
+        )
+        .unwrap();
+        assert!(!lenient.strict_document);
+        let mut edit = lenient.edit().expect("edit");
+        edit.replace_paragraph(Position::new(1), "after")
+            .expect("replacement");
+        let committed = edit.commit().expect("commit").into_package();
+        assert_eq!(
+            committed.leniency(),
+            crate::Leniency::TolerateStylesheetDefects
+        );
+        assert!(committed.strict_document);
     }
 
     #[test]
