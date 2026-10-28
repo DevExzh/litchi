@@ -7,8 +7,8 @@
 - **Scope:** repair only the row-28 Clippy `items_after_test_module` findings.
   The existing `#[cfg(test)]` modules were moved, unchanged, to the ends of
   `body_drawable_graph.rs` and `sheet_chart_text.rs`, after the production
-  helpers. No runtime, public API, ledger, native queue, parity, or
-  performance behavior changed.
+  helpers. No runtime logic or public API changed; no new performance claim
+  is made, and final integrated requalification remains required.
 
 ## Verification
 
