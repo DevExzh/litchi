@@ -20,7 +20,6 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
-use std::mem::size_of;
 
 use litchi_iwa_common::wire::{self, WireField};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
@@ -55,6 +54,15 @@ pub trait Components {
     fn component(&self, index: usize) -> Option<(&str, &Archive)>;
 }
 
+/// Resource dimensions owned by graph-level bounded allocation adapters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphLimitKind {
+    /// Temporary scratch bytes reserved by a graph rewrite.
+    ScratchBytes,
+    /// Fallible allocation events admitted by a graph rewrite.
+    AllocationEvents,
+}
+
 impl Components for [(String, Archive)] {
     fn count(&self) -> usize {
         self.len()
@@ -86,6 +94,16 @@ pub enum Error {
     Wire(litchi_iwa_common::Error),
     /// A chart style codec failed.
     Codec(litchi_iwa_protos::chart_style_codec::Error),
+    /// A graph adapter exhausted a resource that the wire layer does not
+    /// model (for example scratch capacity or allocation events).
+    Limit {
+        /// Resource dimension.
+        kind: GraphLimitKind,
+        /// Attempted aggregate consumption.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
     /// A package metadata registry rewrite failed.
     Registry(RewriteError),
     /// Object `0` is missing (or the edit names no object).
@@ -104,6 +122,11 @@ impl fmt::Display for Error {
             Self::Archive(error) => write!(formatter, "IWA archive: {error}"),
             Self::Wire(error) => write!(formatter, "IWA wire: {error}"),
             Self::Codec(error) => write!(formatter, "chart style codec: {error}"),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "graph {kind:?} limit: {observed} > {maximum}"),
             Self::Registry(error) => write!(formatter, "package metadata: {error}"),
             Self::MissingObject(identifier) => write!(formatter, "object {identifier} is missing"),
             Self::AmbiguousObject(identifier) => {
@@ -219,35 +242,13 @@ impl<'s> Workspace<'s> {
         let mut index = HashMap::new();
         let mut ambiguous = HashSet::new();
         let mut registry = None;
-        let mut source_work = 0usize;
+        let mut source_objects = 0usize;
         for position in 0..source.count() {
             let (name, archive) = source
                 .component(position)
                 .ok_or(Error::Invalid("a component vanished"))?;
-            source_work = source_work.saturating_add(name.len()).saturating_add(
-                archive
-                    .objects
-                    .len()
-                    .saturating_mul(size_of::<ArchiveObject>()),
-            );
+            source_objects = source_objects.saturating_add(archive.objects.len());
             for object in &archive.objects {
-                source_work = source_work
-                    .saturating_add(
-                        object
-                            .messages
-                            .len()
-                            .saturating_mul(size_of::<RawMessage>()),
-                    )
-                    .saturating_add(
-                        object
-                            .archive_info
-                            .message_infos
-                            .len()
-                            .saturating_mul(size_of::<litchi_iwa_core::MessageInfo>()),
-                    );
-                for message in &object.messages {
-                    source_work = source_work.saturating_add(message.data.len());
-                }
                 let identifier = object
                     .archive_info
                     .identifier
@@ -271,6 +272,10 @@ impl<'s> Workspace<'s> {
                 }
             }
         }
+        // Workspace construction already owns the parsed component bytes;
+        // charge the bounded index census by component/object visits rather
+        // than re-billing every borrowed payload byte to each style read.
+        let source_work = source.count().saturating_add(source_objects);
         Ok(Self {
             source,
             limits,
