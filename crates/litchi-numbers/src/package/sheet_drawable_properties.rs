@@ -54,6 +54,10 @@ pub enum LimitKind {
     PayloadBytes,
     /// Native object identifiers.
     Identifiers,
+    /// Temporary graph scratch bytes.
+    ScratchBytes,
+    /// Fallible graph allocation events.
+    AllocationEvents,
 }
 
 impl fmt::Display for LimitKind {
@@ -62,6 +66,8 @@ impl fmt::Display for LimitKind {
             Self::PackageBytes => "package bytes",
             Self::PayloadBytes => "payload bytes",
             Self::Identifiers => "object identifiers",
+            Self::ScratchBytes => "scratch bytes",
+            Self::AllocationEvents => "allocation events",
         })
     }
 }
@@ -181,6 +187,18 @@ impl From<Fault> for Error {
                     FaultLimit::PackageBytes => LimitKind::PackageBytes,
                     FaultLimit::PayloadBytes => LimitKind::PayloadBytes,
                     FaultLimit::Identifiers => LimitKind::Identifiers,
+                },
+                observed,
+                maximum,
+            },
+            Fault::GraphLimit {
+                kind,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind: match kind {
+                    structure::GraphLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                    structure::GraphLimitKind::AllocationEvents => LimitKind::AllocationEvents,
                 },
                 observed,
                 maximum,

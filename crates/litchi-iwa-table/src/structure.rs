@@ -71,6 +71,15 @@ pub enum Fault {
         /// The ceiling.
         maximum: u64,
     },
+    /// A graph adapter resource outside the structural fault dimensions.
+    GraphLimit {
+        /// Resource dimension.
+        kind: GraphLimitKind,
+        /// Attempted aggregate consumption.
+        observed: u64,
+        /// Configured ceiling.
+        maximum: u64,
+    },
     /// A bounded allocation failed.
     Allocation {
         /// The requested amount.
@@ -89,9 +98,14 @@ pub enum FaultLimit {
     PayloadBytes,
     /// Object identifiers.
     Identifiers,
-    /// Temporary graph scratch bytes.
+}
+
+/// Graph-level resource dimensions retained through structural adapters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphLimitKind {
+    /// Temporary scratch bytes.
     ScratchBytes,
-    /// Fallible graph allocation events.
+    /// Fallible allocation events.
     AllocationEvents,
 }
 

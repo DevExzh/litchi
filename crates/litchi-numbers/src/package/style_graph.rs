@@ -13,6 +13,18 @@ use litchi_iwa_style::graph::{Changes, Components, Error as GraphError};
 use super::Package;
 use super::structure::{self, Fault, FaultResult, Published};
 
+/// Graph faults retained by the style-family adapters without widening the
+/// shared structural fault taxonomy.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum StyleGraphFault {
+    Shared(Fault),
+    Limit {
+        kind: litchi_iwa_style::graph::GraphLimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+}
+
 /// The package's parsed components, in package order.
 pub(super) struct LeafComponents<'p> {
     components: Vec<(&'p str, &'p Archive)>,
@@ -43,21 +55,21 @@ impl Components for LeafComponents<'_> {
 }
 
 /// The fault a graph-engine failure maps to.
-pub(super) fn fault(error: &GraphError) -> Fault {
+pub(super) fn fault(error: &GraphError) -> StyleGraphFault {
     match error {
-        GraphError::Archive(error) => structure::map_core(error),
-        GraphError::Wire(error) => structure::map_wire(error),
-        GraphError::IdentifierOverflow => Fault::Limit {
+        GraphError::Archive(error) => StyleGraphFault::Shared(structure::map_core(error)),
+        GraphError::Wire(error) => StyleGraphFault::Shared(structure::map_wire(error)),
+        GraphError::IdentifierOverflow => StyleGraphFault::Shared(Fault::Limit {
             kind: structure::FaultLimit::Identifiers,
             observed: u64::MAX,
             maximum: u64::MAX,
-        },
+        }),
         GraphError::Limit {
             kind: litchi_iwa_style::graph::GraphLimitKind::ScratchBytes,
             observed,
             maximum,
-        } => Fault::Limit {
-            kind: structure::FaultLimit::ScratchBytes,
+        } => StyleGraphFault::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::ScratchBytes,
             observed: *observed as u64,
             maximum: *maximum as u64,
         },
@@ -65,12 +77,12 @@ pub(super) fn fault(error: &GraphError) -> Fault {
             kind: litchi_iwa_style::graph::GraphLimitKind::AllocationEvents,
             observed,
             maximum,
-        } => Fault::Limit {
-            kind: structure::FaultLimit::AllocationEvents,
+        } => StyleGraphFault::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::AllocationEvents,
             observed: *observed as u64,
             maximum: *maximum as u64,
         },
-        _ => Fault::Invalid,
+        _ => StyleGraphFault::Shared(Fault::Invalid),
     }
 }
 

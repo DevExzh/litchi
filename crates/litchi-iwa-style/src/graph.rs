@@ -56,7 +56,6 @@ pub trait Components {
 
 /// Resource dimensions owned by graph-level bounded allocation adapters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum GraphLimitKind {
     /// Temporary scratch bytes reserved by a graph rewrite.
     ScratchBytes,
