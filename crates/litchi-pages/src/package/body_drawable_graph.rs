@@ -19,8 +19,8 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{pages_body_codec, pages_media_codec};
 
 use super::Package;
-use crate::PackageError;
 use crate::selector::DrawableSelector;
+use crate::{Error as SemanticError, PackageError};
 
 pub(crate) const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
 pub(crate) const ROOT_OBJECT_IDENTIFIER: u64 = 1;
@@ -791,6 +791,24 @@ fn map_package_error(error: PackageError) -> GraphError {
             observed,
             limit: maximum,
         } => GraphError::Limit {
+            kind: GraphLimit::InputBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        PackageError::Semantic(
+            SemanticError::TooManySections {
+                actual: observed,
+                limit: maximum,
+            }
+            | SemanticError::TooManyBodyStorages {
+                actual: observed,
+                limit: maximum,
+            }
+            | SemanticError::TextTooLarge {
+                observed,
+                limit: maximum,
+            },
+        ) => GraphError::Limit {
             kind: GraphLimit::InputBytes,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
