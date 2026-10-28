@@ -779,7 +779,7 @@ pub fn plan_set(
             },
         ],
         cell_updates: vec![(target, key)],
-        batch_compatible: old_key.is_none(),
+        batch_compatible: old_key.is_none() || exclusive,
         ..Plan::default()
     }))
 }
