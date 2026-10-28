@@ -13,9 +13,11 @@
 //! payloads are `litchi_iwa_text_wire::paragraph_style::font_variation`.
 
 use std::collections::{BTreeMap, HashSet};
+use std::fmt;
+use std::mem::size_of;
 
-use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire;
+use litchi_iwa_common::{LimitKind as WireLimitKind, WireLimits};
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::chart_style_codec::{self as codec, Limits as CodecLimits};
 use litchi_iwa_text::character::{TextPointSize, TextStyle};
@@ -24,8 +26,9 @@ use litchi_iwa_text_wire::paragraph_style::{
     self as text_style, FontOverrides, Property, PropertyKind, Styles,
 };
 
-use crate::graph::{self, Error, Result, Workspace};
+use crate::graph::{self, Workspace};
 use crate::shape;
+use thiserror::Error as ThisError;
 
 const CHART_MESSAGE_TYPE: u32 = 5_021;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
@@ -62,68 +65,764 @@ pub enum Change {
     ResetSize,
 }
 
-fn text_error(_: litchi_iwa_text_wire::paragraph_style::Error) -> Error {
-    Error::Invalid("a chart paragraph style is invalid")
+/// The finite resources admitted by one chart-font operation.
+///
+/// The format owner derives this profile from its residual package budget;
+/// the engine never restores a process-wide default after a caller supplies a
+/// narrower profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_input_bytes: usize,
+    max_fields: usize,
+    max_output_bytes: usize,
+    max_nesting: u32,
+    max_work_bytes: usize,
+    max_text_bytes: usize,
+    max_allocations: usize,
+    max_retained_bytes: usize,
+    max_scratch_bytes: usize,
 }
 
-struct ParagraphStyles<'w, 's>(&'w Workspace<'s>);
+impl Limits {
+    /// Build an explicit finite chart-font policy.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: usize,
+        max_fields: usize,
+        max_output_bytes: usize,
+        max_nesting: u32,
+        max_work_bytes: usize,
+        max_text_bytes: usize,
+        max_allocations: usize,
+        max_retained_bytes: usize,
+        max_scratch_bytes: usize,
+    ) -> Self {
+        Self {
+            max_input_bytes,
+            max_fields,
+            max_output_bytes,
+            max_nesting,
+            max_work_bytes,
+            max_text_bytes,
+            max_allocations,
+            max_retained_bytes,
+            max_scratch_bytes,
+        }
+    }
+
+    /// Derive a conservative finite profile from one chart payload.
+    #[must_use]
+    pub fn for_source(source: &[u8]) -> Self {
+        let bytes = source.len().max(1);
+        Self::new(
+            bytes.saturating_mul(256).max(1),
+            bytes.saturating_mul(128).max(1),
+            bytes.saturating_mul(128).max(1),
+            64,
+            bytes.saturating_mul(2048).max(1),
+            bytes.saturating_mul(8).max(1),
+            bytes.saturating_mul(1024).max(8),
+            bytes.saturating_mul(256).max(1),
+            bytes.saturating_mul(128).max(1),
+        )
+    }
+
+    /// Maximum complete source payload bytes admitted.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+
+    /// Maximum aggregate wire fields admitted.
+    #[must_use]
+    pub const fn max_fields(self) -> usize {
+        self.max_fields
+    }
+
+    /// Maximum candidate payload bytes admitted.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    /// Maximum paragraph-style inheritance depth.
+    #[must_use]
+    pub const fn max_nesting(self) -> u32 {
+        self.max_nesting
+    }
+
+    /// Maximum aggregate graph and wire work.
+    #[must_use]
+    pub const fn max_work_bytes(self) -> usize {
+        self.max_work_bytes
+    }
+
+    /// Maximum retained font-name bytes.
+    #[must_use]
+    pub const fn max_text_bytes(self) -> usize {
+        self.max_text_bytes
+    }
+
+    /// Maximum admitted collection allocations.
+    #[must_use]
+    pub const fn max_allocations(self) -> usize {
+        self.max_allocations
+    }
+
+    /// Maximum source and candidate bytes retained together.
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.max_retained_bytes
+    }
+
+    /// Maximum scratch bytes reserved while preparing a candidate.
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.max_scratch_bytes
+    }
+}
+
+/// Resource dimension reported by the chart-font engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete chart payload bytes inspected.
+    InputBytes,
+    /// Strict wire fields visited.
+    Fields,
+    /// Candidate chart/style payload bytes emitted.
+    OutputBytes,
+    /// Paragraph-style inheritance depth.
+    Nesting,
+    /// Aggregate graph and wire work.
+    Work,
+    /// Font-name bytes retained.
+    TextBytes,
+    /// Collection allocations.
+    Allocations,
+    /// Source and candidate bytes retained.
+    RetainedBytes,
+    /// Candidate scratch bytes.
+    ScratchBytes,
+    /// Physical archive resource from the graph layer.
+    Archive(litchi_iwa_core::LimitKind),
+    /// Wire resource from a graph adapter.
+    Wire(WireLimitKind),
+    /// Generated chart-style codec resource.
+    Codec(codec::LimitKind),
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InputBytes => formatter.write_str("input bytes"),
+            Self::Fields => formatter.write_str("wire fields"),
+            Self::OutputBytes => formatter.write_str("output bytes"),
+            Self::Nesting => formatter.write_str("wire nesting"),
+            Self::Work => formatter.write_str("work"),
+            Self::TextBytes => formatter.write_str("text bytes"),
+            Self::Allocations => formatter.write_str("allocations"),
+            Self::RetainedBytes => formatter.write_str("retained bytes"),
+            Self::ScratchBytes => formatter.write_str("scratch bytes"),
+            Self::Archive(kind) => write!(formatter, "archive {kind}"),
+            Self::Wire(kind) => write!(formatter, "wire {kind}"),
+            Self::Codec(kind) => write!(formatter, "codec {kind:?}"),
+        }
+    }
+}
+
+/// A typed chart-font engine failure.
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Error {
+    /// The selected chart graph or payload is malformed.
+    #[error("invalid chart-font source: {0}")]
+    InvalidSource(&'static str),
+    /// A finite operation resource was exhausted.
+    #[error("chart font {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource dimension.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded collection allocation failed.
+    #[error("could not allocate {amount} chart-font units")]
+    Allocation {
+        /// Requested bytes or collection items.
+        amount: usize,
+    },
+    /// A text-wire operation refused a well-formed request.
+    #[error("chart-font request refused: {0:?}")]
+    Refused(litchi_iwa_text_wire::paragraph_style::Refusal),
+    /// A graph operation failed after preserving its typed resource details.
+    #[error("chart-font graph operation failed: {0}")]
+    Graph(#[source] Box<graph::Error>),
+    /// A generated chart-style codec rejected the source.
+    #[error("chart-font codec: {0}")]
+    Codec(codec::Error),
+    /// A shared wire operation rejected the source.
+    #[error("chart-font wire: {0}")]
+    Wire(#[source] litchi_iwa_common::Error),
+    /// The package-wide object identifier space is exhausted.
+    #[error("chart-font object identifier overflow")]
+    IdentifierOverflow,
+}
+
+/// Exact bounded accounting for one chart-font operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Report {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    text_bytes: usize,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+    changed: bool,
+}
+
+impl Report {
+    /// Whether the selected chart payload changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+    /// Source payload bytes inspected.
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+    /// Candidate payload bytes emitted.
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+    /// Wire fields visited.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+    /// Aggregate graph and wire work.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+    /// Maximum inheritance depth observed.
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+    /// Font-name bytes retained.
+    #[must_use]
+    pub const fn text_bytes(self) -> usize {
+        self.text_bytes
+    }
+    /// Collection allocation units admitted.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+    /// Source and candidate bytes retained.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+    /// Scratch bytes reserved.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Budget {
+    limits: Limits,
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    text_bytes: usize,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+impl Budget {
+    const fn new(limits: Limits) -> Self {
+        Self {
+            limits,
+            input_bytes: 0,
+            output_bytes: 0,
+            fields: 0,
+            work_bytes: 0,
+            max_depth: 0,
+            text_bytes: 0,
+            allocations: 0,
+            retained_bytes: 0,
+            scratch_bytes: 0,
+        }
+    }
+
+    fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+        Error::Limit {
+            kind,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        }
+    }
+
+    fn add(
+        &mut self,
+        kind: LimitKind,
+        current: usize,
+        amount: usize,
+        maximum: usize,
+    ) -> Result<usize, Error> {
+        let observed = current
+            .checked_add(amount)
+            .ok_or_else(|| Self::limit(kind, usize::MAX, maximum))?;
+        if observed > maximum {
+            return Err(Self::limit(kind, observed, maximum));
+        }
+        Ok(observed)
+    }
+
+    fn source(&mut self, bytes: usize) -> Result<(), Error> {
+        self.input_bytes = self.add(
+            LimitKind::InputBytes,
+            self.input_bytes,
+            bytes,
+            self.limits.max_input_bytes(),
+        )?;
+        self.retained_bytes = self.add(
+            LimitKind::RetainedBytes,
+            self.retained_bytes,
+            bytes,
+            self.limits.max_retained_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn reserve_output(&mut self, bytes: usize) -> Result<(), Error> {
+        if bytes > self.limits.max_output_bytes() {
+            return Err(Self::limit(
+                LimitKind::OutputBytes,
+                bytes,
+                self.limits.max_output_bytes(),
+            ));
+        }
+        self.retained_bytes = self.add(
+            LimitKind::RetainedBytes,
+            self.retained_bytes,
+            bytes,
+            self.limits.max_retained_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn finish_output(&mut self, bytes: usize) {
+        self.output_bytes = bytes;
+    }
+
+    fn fields(&mut self, fields: usize) -> Result<(), Error> {
+        self.fields = self.add(
+            LimitKind::Fields,
+            self.fields,
+            fields,
+            self.limits.max_fields(),
+        )?;
+        Ok(())
+    }
+
+    fn work(&mut self, bytes: usize) -> Result<(), Error> {
+        self.work_bytes = self.add(
+            LimitKind::Work,
+            self.work_bytes,
+            bytes,
+            self.limits.max_work_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn text(&mut self, bytes: usize) -> Result<(), Error> {
+        self.text_bytes = self.add(
+            LimitKind::TextBytes,
+            self.text_bytes,
+            bytes,
+            self.limits.max_text_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn allocation(&mut self, units: usize) -> Result<(), Error> {
+        self.allocations = self.add(
+            LimitKind::Allocations,
+            self.allocations,
+            units,
+            self.limits.max_allocations(),
+        )?;
+        Ok(())
+    }
+
+    fn scratch(&mut self, bytes: usize) -> Result<(), Error> {
+        self.scratch_bytes = self.add(
+            LimitKind::ScratchBytes,
+            self.scratch_bytes,
+            bytes,
+            self.limits.max_scratch_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn wire_limits(self) -> Result<WireLimits, Error> {
+        let input = self
+            .limits
+            .max_input_bytes()
+            .saturating_sub(self.input_bytes)
+            .max(1);
+        let fields = self.limits.max_fields().saturating_sub(self.fields).max(1);
+        let output = self
+            .limits
+            .max_output_bytes()
+            .saturating_sub(self.output_bytes)
+            .max(1);
+        let nesting = (self.limits.max_nesting() as usize)
+            .saturating_sub(self.max_depth as usize)
+            .max(1);
+        let work = self
+            .limits
+            .max_work_bytes()
+            .saturating_sub(self.work_bytes)
+            .max(1);
+        WireLimits::DEFAULT
+            .with_input_bytes(input)
+            .and_then(|limits| limits.with_fields(fields))
+            .and_then(|limits| limits.with_output_bytes(output))
+            .and_then(|limits| limits.with_nesting(nesting))
+            .and_then(|limits| limits.with_rewrite_work(work))
+            .map_err(map_wire_error)
+    }
+
+    fn codec_limits(self) -> Result<CodecLimits, Error> {
+        let bytes = self
+            .limits
+            .max_output_bytes()
+            .saturating_sub(self.output_bytes)
+            .max(1);
+        let fields = self.limits.max_fields().saturating_sub(self.fields).max(1);
+        CodecLimits::DEFAULT
+            .with_max_bytes(bytes)
+            .and_then(|limits| limits.with_max_fields(fields))
+            .map_err(map_codec_error)
+    }
+
+    fn report(self, changed: bool) -> Report {
+        Report {
+            input_bytes: self.input_bytes,
+            output_bytes: self.output_bytes,
+            fields: self.fields,
+            work_bytes: self.work_bytes,
+            max_depth: self.max_depth,
+            text_bytes: self.text_bytes,
+            allocations: self.allocations,
+            retained_bytes: self.retained_bytes,
+            scratch_bytes: self.scratch_bytes,
+            changed,
+        }
+    }
+}
+
+struct ParagraphStyles<'w, 's> {
+    workspace: &'w Workspace<'s>,
+    error: std::cell::RefCell<Option<Error>>,
+    budget: std::cell::RefCell<Budget>,
+}
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+impl<'w, 's> ParagraphStyles<'w, 's> {
+    fn new(workspace: &'w Workspace<'s>, limits: Limits) -> Self {
+        Self {
+            workspace,
+            error: std::cell::RefCell::new(None),
+            budget: std::cell::RefCell::new(Budget::new(limits)),
+        }
+    }
+
+    fn take_error(&self) -> Option<Error> {
+        self.error.borrow_mut().take()
+    }
+
+    fn limits(&self) -> Result<WireLimits> {
+        self.budget.borrow().wire_limits()
+    }
+
+    fn into_budget(self) -> Budget {
+        self.budget.into_inner()
+    }
+
+    fn charge_style(&self, identifier: u64, payload: &[u8]) -> Result<()> {
+        let mut budget = self.budget.borrow_mut();
+        budget.work(payload.len())?;
+        budget.source(payload.len())?;
+        budget.fields(payload.len().max(1))?;
+        let _ = identifier;
+        Ok(())
+    }
+}
 
 impl Styles for ParagraphStyles<'_, '_> {
     fn paragraph_style(&self, identifier: u64) -> Option<&[u8]> {
-        self.0
+        match self
+            .workspace
             .unique_payload(identifier, PARAGRAPH_STYLE_MESSAGE_TYPE, "")
-            .ok()
-            .map(|(_, payload)| payload)
+        {
+            Ok((_, payload)) => {
+                if let Err(error) = self.charge_style(identifier, payload) {
+                    *self.error.borrow_mut() = Some(error);
+                    None
+                } else {
+                    Some(payload)
+                }
+            },
+            Err(error) => {
+                *self.error.borrow_mut() = Some(map_graph_error(error));
+                None
+            },
+        }
     }
 }
 
-fn limits() -> WireLimits {
-    WireLimits::DEFAULT
+fn map_wire_limit(kind: WireLimitKind) -> LimitKind {
+    LimitKind::Wire(kind)
 }
 
-fn chart_message(workspace: &Workspace<'_>, chart: u64) -> Result<(usize, Vec<u8>)> {
-    let (message, payload) = workspace.unique_payload(
-        chart,
-        CHART_MESSAGE_TYPE,
-        "a chart must have exactly one chart payload",
-    )?;
-    Ok((message, payload.to_vec()))
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: map_wire_limit(kind),
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        error => Error::Wire(error),
+    }
 }
 
-fn paragraph_styles(workspace: &Workspace<'_>, chart: u64) -> Result<Vec<u64>> {
-    let (_, payload) = chart_message(workspace, chart)?;
-    let styles = codec::references(&payload, CodecLimits::DEFAULT)?
-        .paragraph_styles()
-        .to_vec();
+fn map_codec_error(error: codec::Error) -> Error {
+    match error {
+        codec::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::Codec(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        codec::Error::Allocation { bytes } => Error::Allocation { amount: bytes },
+        error => Error::Codec(error),
+    }
+}
+
+fn map_text_error(error: litchi_iwa_text_wire::paragraph_style::Error) -> Error {
+    use litchi_iwa_common::LimitKind as WireKind;
+    match error {
+        litchi_iwa_text_wire::paragraph_style::Error::InvalidSource { reason } => {
+            Error::InvalidSource(reason)
+        },
+        litchi_iwa_text_wire::paragraph_style::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                WireKind::InputBytes => LimitKind::InputBytes,
+                WireKind::Fields => LimitKind::Fields,
+                WireKind::OutputBytes => LimitKind::OutputBytes,
+                WireKind::Nesting => LimitKind::Nesting,
+                WireKind::RewriteWork => LimitKind::Work,
+                other => LimitKind::Wire(other),
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_text_wire::paragraph_style::Error::Allocation { amount } => {
+            Error::Allocation { amount }
+        },
+        litchi_iwa_text_wire::paragraph_style::Error::Refused(reason) => Error::Refused(reason),
+        litchi_iwa_text_wire::paragraph_style::Error::Internal => {
+            Error::InvalidSource("paragraph-style read-back failed")
+        },
+        _ => Error::InvalidSource("unsupported paragraph-style failure"),
+    }
+}
+
+fn map_graph_error(error: graph::Error) -> Error {
+    match error {
+        graph::Error::Archive(error) => match error {
+            litchi_iwa_core::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: LimitKind::Archive(kind),
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            litchi_iwa_core::Error::Allocation { requested, .. } => {
+                Error::Allocation { amount: requested }
+            },
+            error => Error::Graph(Box::new(graph::Error::Archive(error))),
+        },
+        graph::Error::Wire(error) => map_wire_error(error),
+        graph::Error::Codec(error) => map_codec_error(error),
+        error => Error::Graph(Box::new(error)),
+    }
+}
+
+impl From<graph::Error> for Error {
+    fn from(error: graph::Error) -> Self {
+        map_graph_error(error)
+    }
+}
+
+impl From<litchi_iwa_common::Error> for Error {
+    fn from(error: litchi_iwa_common::Error) -> Self {
+        map_wire_error(error)
+    }
+}
+
+impl From<codec::Error> for Error {
+    fn from(error: codec::Error) -> Self {
+        map_codec_error(error)
+    }
+}
+
+impl From<litchi_iwa_text_wire::paragraph_style::Error> for Error {
+    fn from(error: litchi_iwa_text_wire::paragraph_style::Error) -> Self {
+        map_text_error(error)
+    }
+}
+
+impl From<litchi_iwa_core::Error> for Error {
+    fn from(error: litchi_iwa_core::Error) -> Self {
+        map_graph_error(graph::Error::Archive(error))
+    }
+}
+
+fn chart_message(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    budget: &mut Budget,
+) -> Result<(usize, Vec<u8>)> {
+    let (message, payload) = workspace
+        .unique_payload(
+            chart,
+            CHART_MESSAGE_TYPE,
+            "a chart must have exactly one chart payload",
+        )
+        .map_err(map_graph_error)?;
+    budget.source(payload.len())?;
+    budget.work(payload.len())?;
+    budget.scratch(payload.len())?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(payload.len())
+        .map_err(|_| Error::Allocation {
+            amount: payload.len(),
+        })?;
+    output.extend_from_slice(payload);
+    Ok((message, output))
+}
+
+fn paragraph_styles(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    budget: &mut Budget,
+) -> Result<Vec<u64>> {
+    let (_, payload) = chart_message(workspace, chart, budget)?;
+    let limits = budget.codec_limits()?;
+    let references = codec::references(&payload, limits).map_err(map_codec_error)?;
+    let source = references.paragraph_styles();
+    budget.fields(source.len().max(1))?;
+    budget.allocation(source.len().max(1))?;
+    budget.scratch(source.len().saturating_mul(size_of::<u64>()))?;
+    let mut styles = Vec::new();
+    styles
+        .try_reserve_exact(source.len())
+        .map_err(|_| Error::Allocation {
+            amount: source.len(),
+        })?;
+    styles.extend_from_slice(source);
     if styles.is_empty() {
-        return Err(Error::Invalid("a chart has no paragraph styles"));
+        return Err(Error::InvalidSource("a chart has no paragraph styles"));
     }
     if styles.contains(&0) {
-        return Err(Error::Invalid(
+        return Err(Error::InvalidSource(
             "a chart has a zero paragraph-style reference",
         ));
     }
     Ok(styles)
 }
 
-fn unique(identifiers: &[u64]) -> Vec<u64> {
+fn unique(identifiers: &[u64], budget: &mut Budget) -> Result<Vec<u64>> {
+    budget.allocation(identifiers.len().max(1))?;
+    budget.scratch(identifiers.len().saturating_mul(size_of::<u64>()))?;
     let mut seen = HashSet::new();
-    identifiers
-        .iter()
-        .copied()
-        .filter(|identifier| seen.insert(*identifier))
-        .collect()
+    seen.try_reserve(identifiers.len())
+        .map_err(|_| Error::Allocation {
+            amount: identifiers.len(),
+        })?;
+    let mut unique = Vec::new();
+    unique
+        .try_reserve(identifiers.len())
+        .map_err(|_| Error::Allocation {
+            amount: identifiers.len(),
+        })?;
+    for identifier in identifiers {
+        budget.work(size_of::<u64>())?;
+        if seen.insert(*identifier) {
+            unique.push(*identifier);
+        }
+    }
+    Ok(unique)
 }
 
-fn effective_font(workspace: &Workspace<'_>, style: u64) -> Result<ChartFont> {
-    let styles = ParagraphStyles(workspace);
-    let font = match text_style::effective(&styles, style, PropertyKind::TextFont, limits())
-        .map_err(text_error)?
-    {
+fn effective_property(
+    workspace: &Workspace<'_>,
+    style: u64,
+    kind: PropertyKind,
+    budget: &mut Budget,
+) -> Result<Property> {
+    let styles = ParagraphStyles::new(workspace, budget.limits);
+    let limits = styles.limits()?;
+    let result = text_style::effective(&styles, style, kind, limits);
+    let error = styles.take_error();
+    *budget = styles.into_budget();
+    if let Some(error) = error {
+        return Err(error);
+    }
+    result.map_err(map_text_error)
+}
+
+fn effective_font(workspace: &Workspace<'_>, style: u64, budget: &mut Budget) -> Result<ChartFont> {
+    let font = match effective_property(workspace, style, PropertyKind::TextFont, budget)? {
         Property::TextFont(font) => font,
-        _ => return Err(Error::Invalid("an unexpected effective font")),
+        _ => return Err(Error::InvalidSource("an unexpected effective font")),
     };
-    let style = text_style_of(workspace, style)?;
+    let style = text_style_of(workspace, style, budget)?;
+    budget.text(font_name_bytes(&font))?;
     Ok(ChartFont {
         font,
         bold: style.bold,
@@ -131,30 +830,31 @@ fn effective_font(workspace: &Workspace<'_>, style: u64) -> Result<ChartFont> {
     })
 }
 
-fn text_style_of(workspace: &Workspace<'_>, style: u64) -> Result<TextStyle> {
-    match text_style::effective(
-        &ParagraphStyles(workspace),
-        style,
-        PropertyKind::TextStyle,
-        limits(),
-    )
-    .map_err(text_error)?
-    {
+fn text_style_of(workspace: &Workspace<'_>, style: u64, budget: &mut Budget) -> Result<TextStyle> {
+    match effective_property(workspace, style, PropertyKind::TextStyle, budget)? {
         Property::TextStyle(style) => Ok(style),
-        _ => Err(Error::Invalid("an unexpected effective text style")),
+        _ => Err(Error::InvalidSource("an unexpected effective text style")),
+    }
+}
+
+fn font_name_bytes(font: &Font) -> usize {
+    match font {
+        Font::Named(name) => name.as_str().len(),
+        _ => 0,
     }
 }
 
 fn uniform<T: PartialEq>(
     workspace: &Workspace<'_>,
     chart: u64,
-    read: impl Fn(&Workspace<'_>, u64) -> Result<T>,
+    budget: &mut Budget,
+    read: impl Fn(&Workspace<'_>, u64, &mut Budget) -> Result<T>,
 ) -> Result<T> {
-    let styles = paragraph_styles(workspace, chart)?;
-    let first = read(workspace, styles[0])?;
+    let styles = paragraph_styles(workspace, chart, budget)?;
+    let first = read(workspace, styles[0], budget)?;
     for style in &styles[1..] {
-        if read(workspace, *style)? != first {
-            return Err(Error::Invalid("a chart has mixed effective fonts"));
+        if read(workspace, *style, budget)? != first {
+            return Err(Error::InvalidSource("a chart has mixed effective fonts"));
         }
     }
     Ok(first)
@@ -165,8 +865,10 @@ fn uniform<T: PartialEq>(
 /// # Errors
 ///
 /// An invalid chart or paragraph style, or mixed fonts.
-pub fn font(workspace: &Workspace<'_>, chart: u64) -> Result<ChartFont> {
-    uniform(workspace, chart, effective_font)
+pub fn font(workspace: &Workspace<'_>, chart: u64, limits: Limits) -> Result<(ChartFont, Report)> {
+    let mut budget = Budget::new(limits);
+    let value = uniform(workspace, chart, &mut budget, effective_font)?;
+    Ok((value, budget.report(false)))
 }
 
 /// The uniform effective point size of chart drawable `chart`.
@@ -174,35 +876,56 @@ pub fn font(workspace: &Workspace<'_>, chart: u64) -> Result<ChartFont> {
 /// # Errors
 ///
 /// An invalid chart or paragraph style, or mixed sizes.
-pub fn size(workspace: &Workspace<'_>, chart: u64) -> Result<TextPointSize> {
-    uniform(workspace, chart, |workspace, style| {
-        Ok(text_style_of(workspace, style)?.point_size)
-    })
+pub fn size(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    limits: Limits,
+) -> Result<(TextPointSize, Report)> {
+    let mut budget = Budget::new(limits);
+    let value = uniform(workspace, chart, &mut budget, |workspace, style, budget| {
+        Ok(text_style_of(workspace, style, budget)?.point_size)
+    })?;
+    Ok((value, budget.report(false)))
 }
 
 /// `(parent, stylesheet)` of a paragraph-style payload.
-fn style_links(payload: &[u8]) -> Result<(Option<u64>, Option<u64>)> {
-    let Some(base) = graph::repeated(payload, STYLE_SUPER_FIELD)?
+fn style_links(payload: &[u8], budget: &mut Budget) -> Result<(Option<u64>, Option<u64>)> {
+    budget.source(payload.len())?;
+    budget.work(payload.len())?;
+    budget.fields(payload.len().max(1))?;
+    let Some(base) = graph::repeated(payload, STYLE_SUPER_FIELD)
+        .map_err(map_graph_error)?
         .first()
         .copied()
     else {
-        return Err(Error::Invalid("a paragraph style has no style parent"));
+        return Err(Error::InvalidSource(
+            "a paragraph style has no style parent",
+        ));
     };
     let link = |number| -> Result<Option<u64>> {
-        Ok(match graph::repeated(base, number)?.last() {
-            Some(reference) => graph::varint(reference, REFERENCE_IDENTIFIER_FIELD)?,
-            None => None,
-        })
+        Ok(
+            match graph::repeated(base, number)
+                .map_err(map_graph_error)?
+                .last()
+            {
+                Some(reference) => {
+                    graph::varint(reference, REFERENCE_IDENTIFIER_FIELD).map_err(map_graph_error)?
+                },
+                None => None,
+            },
+        )
     };
     Ok((link(STYLE_PARENT_FIELD)?, link(STYLE_STYLESHEET_FIELD)?))
 }
 
 fn style_payload<'w>(workspace: &'w Workspace<'_>, style: u64) -> Result<(usize, &'w [u8])> {
-    workspace.unique_payload(
-        style,
-        PARAGRAPH_STYLE_MESSAGE_TYPE,
-        "a paragraph style must have exactly one payload",
-    )
+    workspace
+        .unique_payload(
+            style,
+            PARAGRAPH_STYLE_MESSAGE_TYPE,
+            "a paragraph style must have exactly one payload",
+        )
+        .map_err(map_graph_error)
 }
 
 struct Addition {
@@ -212,8 +935,20 @@ struct Addition {
     variation: text_style::Variation,
 }
 
-fn font_only(workspace: &Workspace<'_>, style: u64) -> Result<Option<FontOverrides>> {
-    text_style::font_overrides(&ParagraphStyles(workspace), style, limits()).map_err(text_error)
+fn font_only(
+    workspace: &Workspace<'_>,
+    style: u64,
+    budget: &mut Budget,
+) -> Result<Option<FontOverrides>> {
+    let styles = ParagraphStyles::new(workspace, budget.limits);
+    let limits = styles.limits()?;
+    let result = text_style::font_overrides(&styles, style, limits);
+    let error = styles.take_error();
+    *budget = styles.into_budget();
+    if let Some(error) = error {
+        return Err(error);
+    }
+    result.map_err(map_text_error)
 }
 
 fn apply(
@@ -235,6 +970,23 @@ fn apply(
     }
 }
 
+fn font_variation(
+    parent: u64,
+    stylesheet: u64,
+    overrides: &FontOverrides,
+    budget: &mut Budget,
+) -> Result<text_style::Variation> {
+    // The paragraph-style encoder admits its output before allocating. The
+    // estimate covers the fixed envelope and the caller's font name; the
+    // codec then applies the stricter wire limits to the exact candidate.
+    let estimate =
+        font_name_bytes(overrides.font.as_ref().unwrap_or(&Font::default())).saturating_add(256);
+    budget.allocation(1)?;
+    budget.scratch(estimate)?;
+    let limits = budget.wire_limits()?;
+    text_style::font_variation(parent, stylesheet, overrides, limits).map_err(map_text_error)
+}
+
 /// Apply `change` to chart drawable `chart`. Returns `false` when nothing
 /// changes (the value is already the requested one, or nothing to reset).
 ///
@@ -242,26 +994,55 @@ fn apply(
 ///
 /// An invalid chart, paragraph style, stylesheet or registry; a write that
 /// does not read back.
-pub fn set(workspace: &mut Workspace<'_>, chart: u64, change: &Change) -> Result<bool> {
+pub fn set(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    change: &Change,
+    limits: Limits,
+) -> Result<Report> {
+    let mut budget = Budget::new(limits);
     match change {
-        Change::Font(target) if font(workspace, chart)? == *target => return Ok(false),
-        Change::Size(target) if size(workspace, chart)? == *target => return Ok(false),
+        Change::Font(target) => {
+            let current = uniform(workspace, chart, &mut budget, effective_font)?;
+            if current == *target {
+                return Ok(budget.report(false));
+            }
+        },
+        Change::Size(target) => {
+            let current = uniform(workspace, chart, &mut budget, |workspace, style, budget| {
+                Ok(text_style_of(workspace, style, budget)?.point_size)
+            })?;
+            if current == *target {
+                return Ok(budget.report(false));
+            }
+        },
         _ => {},
     }
-    let unique = unique(&paragraph_styles(workspace, chart)?);
+    let references = paragraph_styles(workspace, chart, &mut budget)?;
+    let unique = unique(&references, &mut budget)?;
+    budget.allocation(unique.len().saturating_mul(2).max(1))?;
+    budget.scratch(unique.len().saturating_mul(64))?;
     let mut next = workspace.next_object_identifier()?;
     let mut replacements = BTreeMap::new();
     let mut additions = Vec::new();
+    additions
+        .try_reserve(unique.len())
+        .map_err(|_| Error::Allocation {
+            amount: unique.len(),
+        })?;
     let mut candidates = 0usize;
     for &style in &unique {
         let (_, payload) = style_payload(workspace, style)?;
-        let (parent, stylesheet) = style_links(payload)?;
-        let stylesheet = stylesheet.ok_or(Error::Invalid("a paragraph style has no stylesheet"))?;
-        let direct = font_only(workspace, style)?;
+        let (parent, stylesheet) = style_links(payload, &mut budget)?;
+        let stylesheet =
+            stylesheet.ok_or(Error::InvalidSource("a paragraph style has no stylesheet"))?;
+        let direct = font_only(workspace, style, &mut budget)?;
         let (base, mut overrides) = match change {
             Change::Font(_) | Change::Size(_) => match direct {
                 Some(overrides) => (
-                    parent.ok_or(Error::Invalid("a paragraph-style variation has no parent"))?,
+                    parent.ok_or(Error::InvalidSource(
+                        "a paragraph-style variation has no parent",
+                    ))?,
                     overrides,
                 ),
                 None => (style, FontOverrides::default()),
@@ -285,15 +1066,17 @@ pub fn set(workspace: &mut Workspace<'_>, chart: u64, change: &Change) -> Result
                     continue;
                 }
                 (
-                    parent.ok_or(Error::Invalid("a paragraph-style variation has no parent"))?,
+                    parent.ok_or(Error::InvalidSource(
+                        "a paragraph-style variation has no parent",
+                    ))?,
                     overrides,
                 )
             },
         };
         candidates += 1;
         if matches!(change, Change::Font(_) | Change::Size(_)) {
-            let inherited_font = effective_font(workspace, base)?;
-            let inherited_size = text_style_of(workspace, base)?.point_size;
+            let inherited_font = effective_font(workspace, base, &mut budget)?;
+            let inherited_size = text_style_of(workspace, base, &mut budget)?.point_size;
             apply(&mut overrides, &inherited_font, inherited_size, change);
         }
         if overrides.is_empty() {
@@ -302,8 +1085,7 @@ pub fn set(workspace: &mut Workspace<'_>, chart: u64, change: &Change) -> Result
         }
         let identifier = next;
         next = next.checked_add(1).ok_or(Error::IdentifierOverflow)?;
-        let variation = text_style::font_variation(base, stylesheet, &overrides, limits())
-            .map_err(text_error)?;
+        let variation = font_variation(base, stylesheet, &overrides, &mut budget)?;
         replacements.insert(style, identifier);
         additions.push(Addition {
             identifier,
@@ -313,27 +1095,37 @@ pub fn set(workspace: &mut Workspace<'_>, chart: u64, change: &Change) -> Result
         });
     }
     if candidates == 0 {
-        return Ok(false);
+        return Ok(budget.report(false));
     }
     let chart_location = workspace.locate(chart)?;
     let chart_member = workspace.member(chart_location).to_owned();
-    repoint(workspace, chart, &replacements)?;
+    repoint(workspace, chart, &replacements, &mut budget)?;
     let last = additions.last().map(|addition| addition.identifier);
     for addition in additions {
-        insert(workspace, &chart_member, addition)?;
+        insert(workspace, &chart_member, addition, &mut budget)?;
     }
     if let Some(last) = last {
         workspace.set_last_object_identifier(last)?;
     }
-    prune(workspace, &chart_member, &unique)?;
+    prune(workspace, &chart_member, &unique, &mut budget)?;
     match change {
-        Change::Font(target) if font(workspace, chart)? != *target => {
-            Err(Error::Invalid("a chart-font write does not read back"))
+        Change::Font(target)
+            if uniform(workspace, chart, &mut budget, effective_font)? != *target =>
+        {
+            Err(Error::InvalidSource(
+                "a chart-font write does not read back",
+            ))
         },
-        Change::Size(target) if size(workspace, chart)? != *target => {
-            Err(Error::Invalid("a chart font-size write does not read back"))
+        Change::Size(target)
+            if uniform(workspace, chart, &mut budget, |workspace, style, budget| {
+                Ok(text_style_of(workspace, style, budget)?.point_size)
+            })? != *target =>
+        {
+            Err(Error::InvalidSource(
+                "a chart font-size write does not read back",
+            ))
         },
-        _ => Ok(true),
+        _ => Ok(budget.report(true)),
     }
 }
 
@@ -341,8 +1133,14 @@ fn repoint(
     workspace: &mut Workspace<'_>,
     chart: u64,
     replacements: &BTreeMap<u64, u64>,
+    budget: &mut Budget,
 ) -> Result<()> {
-    let (message, payload) = chart_message(workspace, chart)?;
+    let (message, payload) = chart_message(workspace, chart, budget)?;
+    let projected = payload
+        .len()
+        .saturating_add(replacements.len().saturating_mul(16));
+    budget.reserve_output(projected)?;
+    budget.allocation(replacements.len().max(1))?;
     let data = wire::transform_length_delimited_fields_at_path(
         &payload,
         &[CHART_EXTENSION_FIELD, CHART_PARAGRAPH_STYLES_FIELD],
@@ -354,22 +1152,32 @@ fn repoint(
                     REFERENCE_IDENTIFIER_FIELD,
                     true,
                     Some(*replacement),
-                )?),
-                None => Ok(reference.to_vec()),
+                )
+                .map_err(map_wire_error)?),
+                None => {
+                    let mut copy = Vec::new();
+                    copy.try_reserve_exact(reference.len())
+                        .map_err(|_| Error::Allocation {
+                            amount: reference.len(),
+                        })?;
+                    copy.extend_from_slice(reference);
+                    Ok(copy)
+                },
             }
         },
     )?;
+    budget.finish_output(data.len());
     workspace.replace_payload(chart, message, data)?;
-    let next = paragraph_styles(workspace, chart)?;
+    let next = paragraph_styles(workspace, chart, budget)?;
     let references = &mut workspace
         .object_mut(chart)?
         .archive_info
         .message_infos
         .get_mut(message)
-        .ok_or(Error::Invalid("a chart payload has no metadata"))?
+        .ok_or(Error::InvalidSource("a chart payload has no metadata"))?
         .object_references;
     references.retain(|identifier| !replacements.contains_key(identifier));
-    for identifier in unique(&next) {
+    for identifier in unique(&next, budget)? {
         if !references.contains(&identifier) {
             references.push(identifier);
         }
@@ -377,32 +1185,57 @@ fn repoint(
     Ok(())
 }
 
-fn insert(workspace: &mut Workspace<'_>, chart_member: &str, addition: Addition) -> Result<()> {
+fn insert(
+    workspace: &mut Workspace<'_>,
+    chart_member: &str,
+    addition: Addition,
+    budget: &mut Budget,
+) -> Result<()> {
     let (message, sheet) = workspace.unique_payload(
         addition.stylesheet,
         STYLESHEET_MESSAGE_TYPE,
         "a stylesheet must have exactly one payload",
     )?;
+    budget.source(sheet.len())?;
+    budget.work(sheet.len())?;
+    budget.reserve_output(
+        sheet
+            .len()
+            .saturating_add(addition.variation.payload().len())
+            .saturating_add(64),
+    )?;
     let data = shape::stylesheet_with_variation(sheet, addition.parent, addition.identifier)?;
+    budget.finish_output(data.len());
     workspace.replace_payload(addition.stylesheet, message, data)?;
     let info = workspace
         .object_mut(addition.stylesheet)?
         .archive_info
         .message_infos
         .get_mut(message)
-        .ok_or(Error::Invalid("a stylesheet payload has no metadata"))?;
+        .ok_or(Error::InvalidSource("a stylesheet payload has no metadata"))?;
     if info.object_references.contains(&addition.identifier) {
-        return Err(Error::Invalid(
+        return Err(Error::InvalidSource(
             "the stylesheet metadata already references a new style",
         ));
     }
     info.object_references.push(addition.identifier);
-    let references = addition.variation.references().to_vec();
+    let reference_count = addition.variation.references().len();
+    budget.allocation(reference_count.saturating_add(1))?;
+    budget.scratch(reference_count.saturating_mul(size_of::<u64>()))?;
+    let mut references = Vec::new();
+    references
+        .try_reserve_exact(reference_count)
+        .map_err(|_| Error::Allocation {
+            amount: reference_count,
+        })?;
+    references.extend_from_slice(addition.variation.references());
+    let variation_payload = addition.variation.into_payload();
+    budget.reserve_output(variation_payload.len().saturating_add(64))?;
     let mut object = ArchiveObject::new(
         addition.identifier,
         vec![RawMessage {
             type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
-            data: addition.variation.into_payload(),
+            data: variation_payload,
         }],
         workspace.limits(),
     )?;
@@ -425,9 +1258,11 @@ fn insert(workspace: &mut Workspace<'_>, chart_member: &str, addition: Addition)
 
 /// Whether any object other than its stylesheet or child styles references
 /// `style` in its metadata.
-fn has_consumers(workspace: &Workspace<'_>, style: u64) -> Result<bool> {
+fn has_consumers(workspace: &Workspace<'_>, style: u64, budget: &mut Budget) -> Result<bool> {
     for location in workspace.locations() {
+        budget.work(size_of::<u64>())?;
         for object in &workspace.archive_at(location)?.objects {
+            budget.work(object.messages.len().saturating_mul(size_of::<u64>()))?;
             for (message, info) in object
                 .messages
                 .iter()
@@ -439,7 +1274,7 @@ fn has_consumers(workspace: &Workspace<'_>, style: u64) -> Result<bool> {
                     continue;
                 }
                 if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE
-                    && style_links(&message.data)?.0 == Some(style)
+                    && style_links(&message.data, budget)?.0 == Some(style)
                 {
                     continue;
                 }
@@ -455,6 +1290,7 @@ fn owner_reference_if_unused(
     chart_member: &str,
     style_member: &str,
     style: u64,
+    budget: &mut Budget,
 ) -> Result<()> {
     let Some(style_component) = workspace.component_for_member(style_member)? else {
         return Ok(());
@@ -466,6 +1302,7 @@ fn owner_reference_if_unused(
         return Ok(());
     }
     for location in workspace.locations() {
+        budget.work(size_of::<u64>())?;
         let member = workspace.member(location).to_owned();
         if workspace.component_for_member(&member)? == Some(owner)
             && workspace
@@ -483,35 +1320,57 @@ fn owner_reference_if_unused(
             return Ok(());
         }
     }
-    workspace.remove_external_reference(owner, style_component, style)
+    Ok(workspace.remove_external_reference(owner, style_component, style)?)
 }
 
-fn prune(workspace: &mut Workspace<'_>, chart_member: &str, previous: &[u64]) -> Result<()> {
+fn prune(
+    workspace: &mut Workspace<'_>,
+    chart_member: &str,
+    previous: &[u64],
+    budget: &mut Budget,
+) -> Result<()> {
+    budget.allocation(previous.len().max(1))?;
+    budget.scratch(previous.len().saturating_mul(size_of::<u64>()))?;
     let mut removed = Vec::new();
+    removed
+        .try_reserve(previous.len())
+        .map_err(|_| Error::Allocation {
+            amount: previous.len(),
+        })?;
     for &style in previous {
+        budget.work(size_of::<u64>())?;
         let location = workspace.locate(style)?;
         let style_member = workspace.member(location).to_owned();
-        if font_only(workspace, style)?.is_none() || has_consumers(workspace, style)? {
-            owner_reference_if_unused(workspace, chart_member, &style_member, style)?;
+        if font_only(workspace, style, budget)?.is_none()
+            || has_consumers(workspace, style, budget)?
+        {
+            owner_reference_if_unused(workspace, chart_member, &style_member, style, budget)?;
             continue;
         }
         let (_, payload) = style_payload(workspace, style)?;
-        let (parent, stylesheet) = style_links(payload)?;
-        let parent = parent.ok_or(Error::Invalid("a paragraph-style variation has no parent"))?;
-        let stylesheet = stylesheet.ok_or(Error::Invalid("a paragraph style has no stylesheet"))?;
+        let (parent, stylesheet) = style_links(payload, budget)?;
+        let parent = parent.ok_or(Error::InvalidSource(
+            "a paragraph-style variation has no parent",
+        ))?;
+        let stylesheet =
+            stylesheet.ok_or(Error::InvalidSource("a paragraph style has no stylesheet"))?;
         let (message, sheet) = workspace.unique_payload(
             stylesheet,
             STYLESHEET_MESSAGE_TYPE,
             "a stylesheet must have exactly one payload",
         )?;
+        budget.source(sheet.len())?;
+        budget.work(sheet.len())?;
+        budget.reserve_output(sheet.len().saturating_add(64))?;
         let data = shape::stylesheet_without_variation(sheet, parent, style)?;
+        budget.finish_output(data.len());
         workspace.replace_payload(stylesheet, message, data)?;
         let info = workspace
             .object_mut(stylesheet)?
             .archive_info
             .message_infos
             .get_mut(message)
-            .ok_or(Error::Invalid("a stylesheet payload has no metadata"))?;
+            .ok_or(Error::InvalidSource("a stylesheet payload has no metadata"))?;
         if info
             .object_references
             .iter()
@@ -519,7 +1378,7 @@ fn prune(workspace: &mut Workspace<'_>, chart_member: &str, previous: &[u64]) ->
             .count()
             != 1
         {
-            return Err(Error::Invalid(
+            return Err(Error::InvalidSource(
                 "the stylesheet metadata must reference a removed style once",
             ));
         }

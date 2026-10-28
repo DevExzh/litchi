@@ -96,7 +96,23 @@ fn host_read(bytes: &[u8], target: Target, chart: u64) -> TestResult<String> {
 fn engine_write(source: &[u8], chart: u64, change: &Change) -> TestResult<Vec<u8>> {
     let components = Components::read(source)?;
     let mut workspace = Workspace::new(&components.archives, CoreLimits::default())?;
-    chart_font::set(&mut workspace, chart, change)?;
+    let payload = components
+        .objects()
+        .find(|object| object.archive_info.identifier == Some(chart))
+        .and_then(|object| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 5_021)
+                .map(|message| message.data.as_slice())
+        })
+        .ok_or("missing chart payload")?;
+    chart_font::set(
+        &mut workspace,
+        chart,
+        change,
+        chart_font::Limits::for_source(payload),
+    )?;
     publish_changes(source, &components, workspace.finish())
 }
 
