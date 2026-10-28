@@ -259,10 +259,10 @@ pub(super) fn duplicate(
     let package = published.package;
 
     // The copy reads back at the anchor with its name and size.
-    let mut budget = table_lock::WireBudget::new(package.state.source.limits())
-        .map_err(|_error| Error::Verification)?;
+    let mut budget =
+        table_lock::WireBudget::new(package.state.source.limits()).map_err(lock_error)?;
     let after = table_lock::native_body_table_targets_with_budget(&package, &mut budget)
-        .map_err(|_error| Error::Verification)?;
+        .map_err(lock_error)?;
     let position = after
         .iter()
         .position(|candidate| candidate.drawable_identifier.get() == new_info)

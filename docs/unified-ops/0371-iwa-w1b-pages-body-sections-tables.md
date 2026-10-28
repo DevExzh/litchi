@@ -1,9 +1,9 @@
 # 0371 — W1-B: Pages body media, shapes, text fields and table cells out of the host
 
-- Status: resumed merge-ready slice on branch `uo2/iwa-w1b` (cut from trunk
-  `feat/unified-ops-api` at `f35f1c9f55`; the branch is rebased by merge onto
-  the coordinator's current trunk before handoff). The wave continues (§6).
-- Date: 2026-10-26.
+- Status: resumed merge-ready slice on branch `uo2/iwa-w1b` (the branch was
+  merged with coordinator trunk `7973aef0e6` before this handoff). The wave
+  continues (§6).
+- Date: 2026-10-28 (record opened 2026-10-26).
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave W1-B (§0, §3.2, §4, §7);
   harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
   shared engines from W0-B [0368](0368-iwa-w0b-codecs-formula-graph-table-vocabulary.md),
@@ -232,6 +232,8 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*probe_host*' \
 | `cargo clippy -p litchi-pages -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and `--features pages` | 0, 0 |
 | `cargo test -p litchi-pages --all-features` (729) / `-p litchi-iwa --all-features` (1,963, parity target 169 + 15 ignored probes) / `-p litchi --all-features` (209) | 0 / 0 / 0 |
+| resumed boundedness follow-up: `cargo test -p litchi-pages --all-features`; `cargo test -p litchi-iwa-style --all-features` (7 + doctests); focused parity `pages_body_line_endpoints` (2) and `pages_body_table_duplicate` (3, including 18 corpus routes + 4 typed refusals) | 0 / 0 / 0 |
+| resumed `cargo clippy -p litchi-pages -p litchi-iwa-style -p litchi-iwa --all-targets --all-features -- -D warnings` | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pages` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages` | 0 |
 | `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` (1,289) | 0 |
@@ -250,6 +252,17 @@ the full glossary gate 0) after merging trunk `32f2c3ad77`.
 No litchi-ops code, capability or corpus-visible behaviour changed, so the
 capability/registry goldens and the OfficeCLI corpus were not re-blessed.
 Both pre-commit size checks printed nothing for every commit.
+
+The resumed hardening keeps the same public route contract while closing two
+boundedness holes found during coordinator review: body line-end field scans
+now use the owning `Budget` (including the flip varint and retained endpoint
+copies), and the shared line-end codec has one bounded `decode(payload,
+limits)` entry point whose structured error keeps semantic unknown-endpoint,
+wire-limit and allocation failures distinct. The Pages facade maps those wire
+failures to its typed `Limit`/`Allocation` errors; malformed endpoint semantics
+remain the terminal `UnsupportedStyle` refusal. Duplicate-table candidate
+readback now preserves `table_lock` limit and allocation failures instead of
+turning them into `Verification`.
 
 ## 6. Gaps and follow-ups (rest of W1-B)
 

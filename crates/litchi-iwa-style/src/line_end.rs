@@ -7,7 +7,8 @@
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::shape::line::Endpoint;
 use litchi_iwa_common::varint::encode_varint_into;
-use litchi_iwa_common::wire::{WireView, repeated_length_delimited_payloads};
+use litchi_iwa_common::wire::WireView;
+use thiserror::Error as ThisError;
 
 const LINE_END_PATH: u32 = 1;
 const LINE_END_JOIN: u32 = 2;
@@ -46,6 +47,18 @@ impl std::fmt::Display for UnknownLineEnd {
 }
 
 impl std::error::Error for UnknownLineEnd {}
+
+/// A bounded line-end decode failure.
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum DecodeError {
+    /// The payload is malformed or names an endpoint outside the standard set.
+    #[error(transparent)]
+    Unknown(#[from] UnknownLineEnd),
+    /// The caller's finite wire profile rejected the payload.
+    #[error(transparent)]
+    Wire(#[from] litchi_iwa_common::Error),
+}
 
 #[derive(Default)]
 struct Writer(Vec<u8>);
@@ -278,20 +291,27 @@ pub fn encode(endpoint: Endpoint) -> Vec<u8> {
 ///
 /// # Errors
 ///
-/// [`UnknownLineEnd`] for a malformed payload or an identifier outside the
-/// standard set.
-pub fn decode(payload: Option<&[u8]>) -> Result<Endpoint, UnknownLineEnd> {
+/// Decode a line-end payload under the caller's finite wire limits.
+///
+/// The identifier is the only semantic field needed by the public endpoint
+/// value, but the complete payload is still parsed so oversized or malformed
+/// nested geometry cannot bypass the owning package's budget.
+pub fn decode(payload: Option<&[u8]>, limits: WireLimits) -> Result<Endpoint, DecodeError> {
     let Some(payload) = payload else {
         return Ok(Endpoint::None);
     };
-    WireView::parse(payload, WireLimits::DEFAULT).map_err(|_error| UnknownLineEnd)?;
-    let identifiers = repeated_length_delimited_payloads(payload, LINE_END_IDENTIFIER)
-        .map_err(|_error| UnknownLineEnd)?;
-    let identifier = match identifiers.as_slice() {
-        [] => "none",
-        [one] => std::str::from_utf8(one).map_err(|_error| UnknownLineEnd)?,
-        _ => return Err(UnknownLineEnd),
-    };
+    let view = WireView::parse(payload, limits)?;
+    let mut identifier = None;
+    for field in view.fields() {
+        if field.number() != LINE_END_IDENTIFIER {
+            continue;
+        }
+        if field.wire_type() != 2 || identifier.is_some() {
+            return Err(UnknownLineEnd.into());
+        }
+        identifier = Some(std::str::from_utf8(field.payload()).map_err(|_error| UnknownLineEnd)?);
+    }
+    let identifier = identifier.unwrap_or("none");
     Ok(match identifier {
         "none" => Endpoint::None,
         "simple arrow" => Endpoint::SimpleArrow,
@@ -304,12 +324,14 @@ pub fn decode(payload: Option<&[u8]>) -> Result<Endpoint, UnknownLineEnd> {
         "open circle" => Endpoint::OpenCircle,
         "inverted arrow" => Endpoint::InvertedArrow,
         "line" => Endpoint::Line,
-        _ => return Err(UnknownLineEnd),
+        _ => return Err(UnknownLineEnd.into()),
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use litchi_iwa_common::WireLimits;
+
     use super::{Endpoint, decode, encode};
 
     #[test]
@@ -327,8 +349,21 @@ mod tests {
             Endpoint::InvertedArrow,
             Endpoint::Line,
         ] {
-            assert_eq!(decode(Some(&encode(endpoint))), Ok(endpoint));
+            assert_eq!(
+                decode(Some(&encode(endpoint)), WireLimits::DEFAULT),
+                Ok(endpoint)
+            );
         }
-        assert_eq!(decode(None), Ok(Endpoint::None));
+        assert_eq!(decode(None, WireLimits::DEFAULT), Ok(Endpoint::None));
+    }
+
+    #[test]
+    fn bounded_decode_rejects_an_oversized_payload_before_projection() {
+        let payload = encode(Endpoint::Line);
+        let limits = WireLimits::default()
+            .with_input_bytes(payload.len().saturating_sub(1))
+            .expect("positive input limit");
+
+        assert!(decode(Some(&payload), limits).is_err());
     }
 }
