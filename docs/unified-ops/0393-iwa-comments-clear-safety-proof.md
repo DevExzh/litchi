@@ -24,6 +24,7 @@ regression evidence for the coordinator's W1-G repair; the proof must not be
 weakened to accept that behavior.
 
 Test module: `crates/litchi-iwa/tests/parity/comment_clear_safety_cases.rs`.
+The clean evidence commit is `1a63ac0919d19d3107cc9addec533ae157ea2729`.
 The scoped command was:
 
 ```text
@@ -32,5 +33,11 @@ CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_T
 
 Result: 2 baseline tests passed and 4 mutation tests failed because the
 candidate published a lossy clear before reaching the typed-refusal match. The
-proof assertions are therefore red for the intended runtime defect. No
-performance or native acceptance claim is made here.
+proof assertions are therefore red for the intended runtime defect. The raw
+stdout/stderr receipt is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proof-295b-red-raw-1a63.log`
+(19,599 bytes, SHA-256
+`30517c22262999d0fab50b4ff97ead59373bc95662d17bd435d49f8ab9b1c1a7`). It
+records source `1a63ac0919d19d3107cc9addec533ae157ea2729`, clean status before
+and after, exit `101`, and all four `unexpectedly published a lossy candidate`
+failures. No performance or native acceptance claim is made here.
