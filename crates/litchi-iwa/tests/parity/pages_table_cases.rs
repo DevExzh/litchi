@@ -329,10 +329,33 @@ fn narrow_metadata_last(bytes: &[u8]) -> TestResult<u64> {
     }
 }
 
-fn narrow_selected_root(bytes: &[u8], leaf: bool) -> TestResult<u64> {
+fn narrow_metadata_payload(bytes: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
+    let mut payload = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
+        for object in archive.objects {
+            for message in object.messages {
+                if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
+                    continue;
+                }
+                if payload.replace(message.data).is_some() {
+                    return Err("Pages package has multiple metadata payloads".into());
+                }
+            }
+        }
+    }
+    payload.ok_or_else(|| "Pages package has no metadata payload".into())
+}
+
+fn narrow_selected_root(bytes: &[u8], leaf: bool, row: usize, column: usize) -> TestResult<u64> {
     if leaf {
         let comment = Package::from_bytes(bytes)?
-            .body_table_cell_comment(TABLE, comment_position()?)?
+            .body_table_cell_comment(TABLE, At::new(u32::try_from(row)?, u32::try_from(column)?))?
             .ok_or("Pages leaf create did not persist the selected root")?;
         if comment.text() != "W1-G create" {
             return Err("Pages leaf selected root text differs".into());
@@ -344,7 +367,7 @@ fn narrow_selected_root(bytes: &[u8], leaf: bool) -> TestResult<u64> {
     let editor = pages::Draft::from_bytes(bytes)?;
     let model = host_model(&editor)?;
     let comment = editor
-        .table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?
+        .table_cell_comment(model, row, column)?
         .ok_or("Pages selected-cell reader did not persist the root")?;
     if comment.comment.text != "W1-G create" {
         return Err("Pages selected-cell reader returned the wrong root text".into());
@@ -738,6 +761,282 @@ fn narrow_validate_selected_comment_author(
         .clone())
 }
 
+/// Existing comment-storage payloads, including neighboring roots and
+/// replies, are source-owned bytes. The creation-only decoder below must
+/// never mask a change to one of these objects, so compare every source
+/// type-3056 payload byte-for-byte in both outputs before using the broader
+/// archive diff.
+fn narrow_validate_surviving_comment_storage(
+    source: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+) -> TestResult<usize> {
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let host_catalog = Catalog::from_bytes(host, Default::default())?;
+    let leaf_catalog = Catalog::from_bytes(leaf, Default::default())?;
+    let mut checked = 0;
+    for source_entry in source_catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let host_entry = host_catalog
+            .iter()
+            .find(|entry| entry.name() == source_entry.name())
+            .ok_or("Pages create host dropped a source IWA member")?;
+        let leaf_entry = leaf_catalog
+            .iter()
+            .find(|entry| entry.name() == source_entry.name())
+            .ok_or("Pages create leaf dropped a source IWA member")?;
+        let source_stream = SnappyStream::decompress(source_entry.data(), Default::default())?;
+        let host_stream = SnappyStream::decompress(host_entry.data(), Default::default())?;
+        let leaf_stream = SnappyStream::decompress(leaf_entry.data(), Default::default())?;
+        let source_archive = Archive::parse(source_stream.as_bytes(), Default::default())?;
+        let host_archive = Archive::parse(host_stream.as_bytes(), Default::default())?;
+        let leaf_archive = Archive::parse(leaf_stream.as_bytes(), Default::default())?;
+        for source_object in &source_archive.objects {
+            let identifier = source_object
+                .archive_info
+                .identifier
+                .ok_or("Pages source comment object has no identifier")?;
+            for (index, source_info) in source_object.archive_info.message_infos.iter().enumerate()
+            {
+                if source_info.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+                    continue;
+                }
+                let source_message = source_object
+                    .messages
+                    .get(index)
+                    .ok_or("Pages source comment message-info index is out of range")?;
+                let host_object = host_archive
+                    .objects
+                    .iter()
+                    .find(|object| object.archive_info.identifier == Some(identifier))
+                    .ok_or("Pages create host dropped a source comment object")?;
+                let leaf_object = leaf_archive
+                    .objects
+                    .iter()
+                    .find(|object| object.archive_info.identifier == Some(identifier))
+                    .ok_or("Pages create leaf dropped a source comment object")?;
+                for (label, output_object) in [("host", host_object), ("leaf", leaf_object)] {
+                    let output_info = output_object
+                        .archive_info
+                        .message_infos
+                        .get(index)
+                        .ok_or_else(|| format!("Pages {label} dropped a source comment info"))?;
+                    let output_message = output_object
+                        .messages
+                        .get(index)
+                        .ok_or_else(|| format!("Pages {label} dropped a source comment message"))?;
+                    if output_info.type_ != source_info.type_
+                        || output_info.object_references != source_info.object_references
+                        || output_info.data_references != source_info.data_references
+                        || output_message.type_ != source_message.type_
+                        || output_message.data != source_message.data
+                    {
+                        return Err(format!(
+                            "Pages {label} changed source-owned type-3056 payload {identifier} in {}",
+                            source_entry.name()
+                        )
+                        .into());
+                    }
+                }
+                checked += 1;
+            }
+        }
+    }
+    if checked == 0 {
+        return Err("Pages create source has no surviving type-3056 comment payload".into());
+    }
+    Ok(checked)
+}
+
+fn narrow_first_comment_storage(source: &[u8]) -> TestResult<(String, u64)> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
+        for object in archive.objects {
+            if object
+                .archive_info
+                .message_infos
+                .iter()
+                .any(|info| info.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+            {
+                return Ok((
+                    entry.name().to_owned(),
+                    object
+                        .archive_info
+                        .identifier
+                        .ok_or("Pages source comment object has no identifier")?,
+                ));
+            }
+        }
+    }
+    Err("Pages source has no type-3056 comment object".into())
+}
+
+fn narrow_corrupt_existing_comment(
+    bytes: &[u8],
+    member_name: &str,
+    identifier: u64,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == member_name)
+        .ok_or("Pages surviving comment member disappeared for negative control")?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
+    let mut changed = 0;
+    for object in &mut archive.objects {
+        if object.archive_info.identifier != Some(identifier) {
+            continue;
+        }
+        for message in &mut object.messages {
+            if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE {
+                message.data = litchi_iwa_common::wire::patch_length_delimited_field(
+                    &message.data,
+                    1,
+                    true,
+                    Some(b"W1-G surviving-comment negative-control"),
+                )?;
+                changed += 1;
+            }
+        }
+    }
+    if changed != 1 {
+        return Err(
+            format!("Pages surviving-comment negative control patched {changed} payloads").into(),
+        );
+    }
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(member_name, &replacement)],
+        Default::default(),
+    )?)
+}
+
+fn narrow_corrupt_metadata_watermark(bytes: &[u8], replacement: u64) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
+    let mut edits = Vec::new();
+    let mut changed = 0;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
+        let mut archive_changed = false;
+        for object in &mut archive.objects {
+            for message in &mut object.messages {
+                if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
+                    continue;
+                }
+                message.data = litchi_iwa_common::wire::patch_varint_field(
+                    &message.data,
+                    1,
+                    true,
+                    Some(replacement),
+                )?;
+                changed += 1;
+                archive_changed = true;
+            }
+        }
+        if archive_changed {
+            edits.push((
+                entry.name().to_owned(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?,
+            ));
+        }
+    }
+    if changed != 1 {
+        return Err(format!(
+            "Pages metadata watermark negative control patched {changed} messages"
+        )
+        .into());
+    }
+    let entry_edits = edits
+        .iter()
+        .map(|(name, data)| EntryEdit::new(name, data))
+        .collect::<Vec<_>>();
+    Ok(catalog.reassemble_to_bytes(&entry_edits, Default::default())?)
+}
+
+fn narrow_add_extra_author_object(
+    bytes: &[u8],
+    member_name: &str,
+    source_author_id: u64,
+    extra_author_id: u64,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == member_name)
+        .ok_or("Pages author component disappeared for extra-allocation control")?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
+    let source = archive
+        .objects
+        .iter()
+        .find(|object| object.archive_info.identifier == Some(source_author_id))
+        .ok_or("Pages generated author disappeared for extra-allocation control")?;
+    let extra = source.clone_with_identity_remap(
+        extra_author_id,
+        &[],
+        &source.messages,
+        Default::default(),
+    )?;
+    archive.objects.push(extra);
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(member_name, &replacement)],
+        Default::default(),
+    )?)
+}
+
+fn narrow_corrupt_author_info_reference(
+    bytes: &[u8],
+    member_name: &str,
+    author_id: u64,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == member_name)
+        .ok_or("Pages author component disappeared for reference-shape control")?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
+    let mut changed = 0;
+    for object in &mut archive.objects {
+        if object.archive_info.identifier != Some(author_id) {
+            continue;
+        }
+        for info in &mut object.archive_info.message_infos {
+            if info.type_ == AUTHOR_MESSAGE_TYPE {
+                info.object_references.push(u64::MAX);
+                changed += 1;
+            }
+        }
+    }
+    if changed != 1 {
+        return Err(format!(
+            "Pages author reference-shape control changed {changed} message infos"
+        )
+        .into());
+    }
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(member_name, &replacement)],
+        Default::default(),
+    )?)
+}
+
 fn narrow_pages_create_policy(
     source: &[u8],
     host: &[u8],
@@ -853,6 +1152,18 @@ fn narrow_pages_create_policy(
     if author_object.messages.len() != 1 || author_object.messages[0].type_ != 212 {
         return Err("Pages host-only allocation is not exactly one author object".into());
     }
+    if author_object.archive_info.message_infos.len() != 1 {
+        return Err("Pages host-only author object has an unexpected message-info count".into());
+    }
+    let author_info = &author_object.archive_info.message_infos[0];
+    if author_info.type_ != 212
+        || !author_info.object_references.is_empty()
+        || !author_info.data_references.is_empty()
+    {
+        return Err(
+            "Pages host-only author object has an unexpected archive reference shape".into(),
+        );
+    }
     narrow_validate_generated_author(author_object.messages[0].data.as_slice())?;
     let author_storage_object = narrow_single_message_object(source, author_member, 213)?;
     narrow_validate_author_storage(
@@ -937,6 +1248,92 @@ fn narrow_remap_selected_list(data: &[u8], from: u64, to: u64) -> TestResult<Vec
         return Err(format!("selected list reference matched {matches} entries").into());
     }
     Ok(output)
+}
+
+fn narrow_corrupt_unrelated_list_reference(
+    data: &[u8],
+    selected_root: u64,
+) -> TestResult<Option<Vec<u8>>> {
+    let mut matches = 0;
+    let output = litchi_iwa_common::wire::transform_length_delimited_fields_at_path(
+        data,
+        &[3, 10],
+        |reference| -> Result<Vec<u8>, litchi_iwa_common::Error> {
+            let values = litchi_iwa_common::wire::repeated_varint_values(reference, 1)?;
+            if values.len() == 1 && values[0] != selected_root {
+                matches += 1;
+                litchi_iwa_common::wire::patch_varint_field(reference, 1, true, Some(u64::MAX))
+            } else {
+                Ok(reference.to_vec())
+            }
+        },
+    )?;
+    if matches == 0 {
+        return Ok(None);
+    }
+    if matches != 1 {
+        return Err(format!("unrelated 6005 negative control changed {matches} references").into());
+    }
+    Ok(Some(output))
+}
+
+fn narrow_corrupt_selected_list(
+    bytes: &[u8],
+    member_name: &str,
+    selected_object: u64,
+    selected_root: u64,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == member_name)
+        .ok_or("Pages selected list member disappeared for negative control")?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
+    let mut changed = 0;
+    for object in &mut archive.objects {
+        if object.archive_info.identifier != Some(selected_object) {
+            continue;
+        }
+        let mut changed_payload = false;
+        for message in &mut object.messages {
+            if message.type_ == TABLE_DATA_LIST_MESSAGE_TYPE
+                && let Some(data) =
+                    narrow_corrupt_unrelated_list_reference(&message.data, selected_root)?
+            {
+                message.data = data;
+                changed_payload = true;
+            }
+        }
+        if !changed_payload {
+            let mut changed_info = 0;
+            for info in &mut object.archive_info.message_infos {
+                if info.type_ == TABLE_DATA_LIST_MESSAGE_TYPE {
+                    info.object_references.push(u64::MAX);
+                    changed_info += 1;
+                }
+            }
+            if changed_info != 1 {
+                return Err(format!(
+                    "Pages unrelated 6005 negative control found {changed_info} list infos"
+                )
+                .into());
+            }
+        }
+        changed += 1;
+    }
+    if changed != 1 {
+        return Err(format!(
+            "Pages unrelated 6005 negative control patched {changed} list payloads"
+        )
+        .into());
+    }
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(member_name, &replacement)],
+        Default::default(),
+    )?)
 }
 
 fn narrow_selected_list_payload(
@@ -1236,21 +1633,174 @@ fn narrow_corrupt_author_storage(
     )?)
 }
 
+fn raw_comment_fields<'a>(
+    data: &'a [u8],
+) -> Result<Vec<litchi_iwa_common::wire::RawWireField<'a>>, String> {
+    let mut parser = litchi_iwa_common::wire::RawWireFields::new(
+        data,
+        litchi_iwa_common::wire::RawWireLimits::default(),
+    );
+    let mut fields = Vec::new();
+    while let Some(field) = parser.next().map_err(|error| error.to_string())? {
+        fields.push(field);
+    }
+    Ok(fields)
+}
+
+fn validate_comment_reference_wire(data: &[u8]) -> Result<(), String> {
+    let fields = raw_comment_fields(data)?;
+    let mut seen = BTreeSet::new();
+    for field in fields {
+        if !field.key_is_canonical() || !field.value_is_canonical() {
+            return Err("comment reference is not canonically encoded".to_owned());
+        }
+        if !matches!(field.number(), 1..=3) || field.wire_type() != 0 {
+            return Err("comment reference has an unknown or wrong-type field".to_owned());
+        }
+        if !seen.insert(field.number()) {
+            return Err("comment reference has a duplicate field".to_owned());
+        }
+    }
+    if !seen.contains(&1) {
+        return Err("comment reference has no identifier".to_owned());
+    }
+    Ok(())
+}
+
+fn validate_comment_date_wire(data: &[u8]) -> Result<(), String> {
+    let fields = raw_comment_fields(data)?;
+    if fields.len() != 1 {
+        return Err("comment date has unknown or duplicate fields".to_owned());
+    }
+    let field = fields[0];
+    if field.number() != 1
+        || field.wire_type() != 1
+        || !field.key_is_canonical()
+        || !field.value_is_canonical()
+    {
+        return Err("comment date has an unknown or noncanonical field".to_owned());
+    }
+    Ok(())
+}
+
+fn validate_comment_uuid_wire(data: &[u8]) -> Result<(), String> {
+    let fields = raw_comment_fields(data)?;
+    let mut seen = BTreeSet::new();
+    for field in fields {
+        if !field.key_is_canonical() || !field.value_is_canonical() {
+            return Err("comment UUID is not canonically encoded".to_owned());
+        }
+        if !matches!(field.number(), 1..=2) || field.wire_type() != 0 {
+            return Err("comment UUID has an unknown or wrong-type field".to_owned());
+        }
+        if !seen.insert(field.number()) {
+            return Err("comment UUID has a duplicate field".to_owned());
+        }
+    }
+    if seen != BTreeSet::from([1, 2]) {
+        return Err("comment UUID is missing a required field".to_owned());
+    }
+    Ok(())
+}
+
+fn validate_new_comment_storage_wire(data: &[u8]) -> Result<(), String> {
+    let fields = raw_comment_fields(data)?;
+    let mut seen = BTreeSet::new();
+    for field in fields {
+        if !field.key_is_canonical() || !field.length_is_canonical() {
+            return Err("new comment has noncanonical wire framing".to_owned());
+        }
+        match field.number() {
+            1 => {
+                if field.wire_type() != 2 || !seen.insert(1) {
+                    return Err("new comment has an invalid or duplicate text field".to_owned());
+                }
+            },
+            2 => {
+                if field.wire_type() != 2 || !seen.insert(2) {
+                    return Err("new comment has an invalid or duplicate date field".to_owned());
+                }
+                validate_comment_date_wire(field.payload())?;
+            },
+            3 => {
+                if field.wire_type() != 2 || !seen.insert(3) {
+                    return Err("new comment has an invalid or duplicate author field".to_owned());
+                }
+                validate_comment_reference_wire(field.payload())?;
+            },
+            4 => {
+                if field.wire_type() != 2 {
+                    return Err("new comment has an invalid replies field".to_owned());
+                }
+                validate_comment_reference_wire(field.payload())?;
+            },
+            5 => {
+                if field.wire_type() != 2 || !seen.insert(5) {
+                    return Err("new comment has an invalid or duplicate UUID field".to_owned());
+                }
+                validate_comment_uuid_wire(field.payload())?;
+            },
+            number => return Err(format!("new comment has unknown field {number}")),
+        }
+    }
+    if !seen.contains(&2) || !seen.contains(&5) {
+        return Err("new comment is missing creation date or storage UUID".to_owned());
+    }
+    Ok(())
+}
+
+#[allow(deprecated)]
 fn masked_new_pages_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
-    let mut message = tsd::CommentStorageArchive::decode(data)?;
-    if message.creation_date.is_some() {
-        message.creation_date = Some(tsp::Date { seconds: 0.0 });
-    }
-    if message.storage_uuid.is_some() {
-        message.storage_uuid = Some(tsp::Uuid { lower: 1, upper: 1 });
-    }
-    let mut decoded =
-        crate::known_fields::decode_as::<tsd::CommentStorageArchive>(&message.encode_to_vec())?;
+    validate_new_comment_storage_wire(data).map_err(prost::DecodeError::new)?;
+    // Patch only the two creation-time fields in place. This keeps the
+    // selected payload's field order and every untouched byte intact while
+    // rejecting unknown or duplicate fields (including nested date, UUID and
+    // reference fields) before normalization.
+    let date = tsp::Date { seconds: 0.0 }.encode_to_vec();
+    let uuid = tsp::Uuid { lower: 1, upper: 1 }.encode_to_vec();
+    let normalized =
+        litchi_iwa_common::wire::patch_length_delimited_field(data, 2, true, Some(&date))
+            .and_then(|data| {
+                litchi_iwa_common::wire::patch_length_delimited_field(&data, 5, true, Some(&uuid))
+            })
+            .map_err(|error| prost::DecodeError::new(error.to_string()))?;
+    let mut decoded = crate::known_fields::decode_as::<tsd::CommentStorageArchive>(&normalized)?;
     decoded.unknown_fields = top_level_fields(data)
         .difference(&top_level_fields(&decoded.canonical))
         .copied()
         .collect();
     Ok(decoded)
+}
+
+fn narrow_append_raw_at_path(
+    data: &[u8],
+    path: &[u32],
+    bytes: &[u8],
+) -> TestResult<(Vec<u8>, usize)> {
+    let mut matches = 0;
+    let output = litchi_iwa_common::wire::transform_length_delimited_fields_at_path(
+        data,
+        path,
+        |nested| -> Result<Vec<u8>, litchi_iwa_common::Error> {
+            matches += 1;
+            let mut output = nested.to_vec();
+            output.extend_from_slice(bytes);
+            Ok(output)
+        },
+    )?;
+    Ok((output, matches))
+}
+
+fn narrow_append_nested_comment_bytes(
+    data: &[u8],
+    field: u32,
+    bytes: &[u8],
+) -> TestResult<Vec<u8>> {
+    let (output, matches) = narrow_append_raw_at_path(data, &[field], bytes)?;
+    if matches == 0 {
+        return Err(format!("comment nested field {field} was not present").into());
+    }
+    Ok(output)
 }
 
 fn host_model(editor: &pages::Draft) -> TestResult<u64> {
@@ -1620,8 +2170,8 @@ fn pages_body_table_comment_create_parity() -> TestResult {
             return Err("Pages leaf create did not persist the stored target cell".into());
         }
     }
-    let host_root = narrow_selected_root(&host, false)?;
-    let leaf_root = narrow_selected_root(&leaf_run.output, true)?;
+    let host_root = narrow_selected_root(&host, false, CREATE_ROW, CREATE_COLUMN)?;
+    let leaf_root = narrow_selected_root(&leaf_run.output, true, CREATE_ROW, CREATE_COLUMN)?;
     let (
         selected_member,
         selected_object,
@@ -1634,10 +2184,84 @@ fn pages_body_table_comment_create_parity() -> TestResult {
         narrow_selected_list_payload(&leaf_run.output, &selected_member, selected_object)?;
     assert!(
         narrow_remap_selected_list(&selected_list_payload, u64::MAX, host_root).is_err(),
-        "Pages unrelated 6005 reference was accepted as the selected cell"
+        "Pages list remapper accepted a payload without the selected root"
     );
     let normalized_leaf = narrow_remap_leaf(
         &leaf_run.output,
+        &selected_member,
+        selected_object,
+        &author_member,
+        author_storage_object,
+        *excluded
+            .iter()
+            .next()
+            .ok_or("missing generated author id")?,
+        leaf_root,
+        host_root,
+        host_last,
+    )?;
+    let generated_author_id = *excluded
+        .iter()
+        .next()
+        .ok_or("missing generated author id")?;
+    let nested_unknown = [0x9a, 0x06, 0x01, b'x'];
+    let (unknown_list, list_matches) =
+        narrow_append_raw_at_path(&selected_list_payload, &[3, 10], &nested_unknown)?;
+    assert_eq!(
+        list_matches, 1,
+        "Pages selected 6005 payload did not expose one comment reference"
+    );
+    let remapped_unknown_list = narrow_remap_selected_list(&unknown_list, leaf_root, host_root)?;
+    assert!(
+        remapped_unknown_list
+            .windows(nested_unknown.len())
+            .any(|window| window == nested_unknown),
+        "Pages selected 6005 normalization dropped an unknown nested field"
+    );
+    let leaf_metadata = narrow_metadata_payload(&leaf_run.output)?;
+    let mut metadata_unknown_output = None;
+    let metadata_paths: &[&[u32]] = &[
+        &[3, 6],
+        &[3, 18],
+        &[11, 6],
+        &[11, 18],
+        &[3, 7, 2],
+        &[11, 7, 2],
+        &[3, 11],
+        &[11, 11],
+        &[10],
+    ];
+    for path in metadata_paths {
+        let (candidate, matches) =
+            narrow_append_raw_at_path(&leaf_metadata, path, &nested_unknown)?;
+        if matches != 0 {
+            metadata_unknown_output = Some(narrow_remap_metadata(
+                &candidate, leaf_root, host_root, host_last,
+            )?);
+            break;
+        }
+    }
+    let metadata_unknown_output = metadata_unknown_output
+        .ok_or("Pages metadata had no selected nested reference path for preservation control")?;
+    assert!(
+        metadata_unknown_output
+            .windows(nested_unknown.len())
+            .any(|window| window == nested_unknown),
+        "Pages metadata normalization dropped an unknown nested field"
+    );
+    let corrupted_list = narrow_corrupt_selected_list(
+        &leaf_run.output,
+        &selected_member,
+        selected_object,
+        leaf_root,
+    )?;
+    assert!(
+        narrow_pages_create_policy(&input.bytes, &host, &corrupted_list, host_root, leaf_root)
+            .is_err(),
+        "Pages unrelated 6005 mutation bypassed the full graph policy"
+    );
+    let corrupted_list_leaf = narrow_remap_leaf(
+        &corrupted_list,
         &selected_member,
         selected_object,
         &author_member,
@@ -1668,15 +2292,87 @@ fn pages_body_table_comment_create_parity() -> TestResult {
         &excluded,
         &[],
     )?;
+    let unrelated_list_diff = archive_diff::compare_with_policies_except_objects_and_members(
+        &input.bytes,
+        &host,
+        &corrupted_list_leaf,
+        &known,
+        &[],
+        MetadataPolicy {
+            save_token: true,
+            fresh_uuids: true,
+        },
+        &excluded,
+        &[],
+    )?;
+    assert!(
+        !unrelated_list_diff.violations.is_empty(),
+        "Pages unrelated 6005 mutation was hidden by the archive comparison policy"
+    );
+    let corrupted_watermark = narrow_corrupt_metadata_watermark(
+        &host,
+        host_last
+            .checked_add(1)
+            .ok_or("watermark negative control overflow")?,
+    )?;
+    assert!(
+        narrow_pages_create_policy(
+            &input.bytes,
+            &corrupted_watermark,
+            &leaf_run.output,
+            host_root,
+            leaf_root,
+        )
+        .is_err(),
+        "Pages metadata watermark mutation bypassed allocation validation"
+    );
+    let host_ids = narrow_object_ids(&host)?;
+    let mut extra_author_id = host_last
+        .checked_add(1)
+        .ok_or("extra author negative control overflow")?;
+    while host_ids
+        .values()
+        .any(|identifiers| identifiers.contains(&extra_author_id))
+    {
+        extra_author_id = extra_author_id
+            .checked_add(1)
+            .ok_or("extra author negative control overflow")?;
+    }
+    let extra_author = narrow_add_extra_author_object(
+        &host,
+        &author_member,
+        generated_author_id,
+        extra_author_id,
+    )?;
+    assert!(
+        narrow_pages_create_policy(
+            &input.bytes,
+            &extra_author,
+            &leaf_run.output,
+            host_root,
+            leaf_root
+        )
+        .is_err(),
+        "Pages extra type-212 allocation bypassed graph scope validation"
+    );
+    let extra_author_reference =
+        narrow_corrupt_author_info_reference(&host, &author_member, generated_author_id)?;
+    assert!(
+        narrow_pages_create_policy(
+            &input.bytes,
+            &extra_author_reference,
+            &leaf_run.output,
+            host_root,
+            leaf_root,
+        )
+        .is_err(),
+        "Pages generated type-212 archive reference mutation bypassed locality validation"
+    );
     assert!(
         diff.violations.is_empty(),
         "Pages fresh create had an unapproved difference after the pinned author-storage identity policy:\n{}",
         diff.render()
     );
-    let generated_author_id = *excluded
-        .iter()
-        .next()
-        .ok_or("missing generated author id")?;
     for append_unknown in [false, true] {
         let corrupted_leaf = narrow_corrupt_selected_comment(
             &normalized_leaf,
@@ -1733,6 +2429,46 @@ fn pages_body_table_comment_create_parity() -> TestResult {
         "parity case pages_body_table_comment_create_parity [Pages, tier B, evidence Queued] on {}: passed\n{}",
         input.path,
         diff.render()
+    );
+    Ok(())
+}
+
+#[test]
+fn pages_body_table_comment_surviving_storage_exact_parity() -> TestResult {
+    let input = fixture(COMMENTS)?;
+    let host = pages::Draft::from_bytes(&input.bytes)?.to_bytes()?;
+    let leaf = Package::from_bytes(&input.bytes)?.to_bytes()?;
+    let checked = narrow_validate_surviving_comment_storage(&input.bytes, &host, &leaf)?;
+    let (member, object) = narrow_first_comment_storage(&input.bytes)?;
+    let comment = narrow_archive_object(&input.bytes, &member, object)?
+        .messages
+        .into_iter()
+        .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+        .ok_or("Pages source comment payload disappeared")?
+        .data;
+    let corrupted = narrow_corrupt_existing_comment(&leaf, &member, object)?;
+    assert!(
+        narrow_validate_surviving_comment_storage(&input.bytes, &host, &corrupted).is_err(),
+        "Pages source-owned neighboring/reply comment corruption bypassed exact storage validation"
+    );
+    let nested_unknown = [0x9a, 0x06, 0x01, b'x'];
+    let nested_noncanonical = [0x9a, 0x86, 0x00, 0x01, b'x'];
+    for field in [2, 3, 4, 5] {
+        let unknown = narrow_append_nested_comment_bytes(&comment, field, &nested_unknown)?;
+        assert!(
+            masked_new_pages_comment_storage(&unknown).is_err(),
+            "Pages nested unknown field {field} bypassed creation-only comment validation"
+        );
+        let noncanonical =
+            narrow_append_nested_comment_bytes(&comment, field, &nested_noncanonical)?;
+        assert!(
+            masked_new_pages_comment_storage(&noncanonical).is_err(),
+            "Pages nested noncanonical field {field} bypassed creation-only comment validation"
+        );
+    }
+    eprintln!(
+        "parity case pages_body_table_comment_surviving_storage_exact_parity [Pages, proof-only] on {}: passed ({} source type-3056 payloads checked)",
+        input.path, checked
     );
     Ok(())
 }

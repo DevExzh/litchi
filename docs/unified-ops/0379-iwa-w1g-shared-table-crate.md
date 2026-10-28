@@ -350,8 +350,10 @@ The public leaf surfaces retain their selector-first shape:
 - Numbers: `table_cell_comment_replies`, `set_table_cell_comment`,
   `clear_table_cell_comment`, and the existing reply methods.
 
-Reply reads remain supported through the root `Comment::replies()` projection.
-Reply mutations remain explicit terminal
+Reply reads remain supported through the root `Comment::replies()` projection
+for Pages and Keynote; Numbers retains its existing selector-first
+`Package::table_cell_comment_replies` reader and the parity case compares that
+reader directly with the host result. Reply mutations remain explicit terminal
 `UnsupportedDependency` refusals in the Pages and Keynote focused route, and
 Numbers preserves its existing reply-bearing replacement refusal. Clearing or
 replacing a root that has replies is therefore not claimed as a complete host
@@ -778,16 +780,25 @@ repeat them on the final integrated trunk candidate.
 
 Continuation proof checkpoint (source commit `481862ddca`, after the Numbers
 parity checkpoint `63d96fcfbf` was handed to F): the Pages comment target ran
-with `parity-host-oracle` and passed all five focused routes (read, populated
-reply read, root replacement, root create and root clear; 5 passed, 4 ignored
-cost probes). The create witness is the stored B2 cell in
+with `parity-host-oracle` and passed the six focused checks (read, populated
+reply read, root replacement, root create, root clear, and the exact surviving
+storage witness; 6 passed, 4 ignored cost probes). The create witness is the
+stored B2 cell in
 `body-table-cells-native.pages`; it uses the selected-cell host and leaf
 readers, validates the exact generated type-212 author profile and existing
 empty type-213 update, proves source-wide fresh identities and exact metadata
-watermarks, and exercises wrong-root, selected-comment unknown/text and
-author-storage corruption controls. The feature-enabled all-target parity
-Clippy command passed after replacing the obfuscated reference normalizer;
-the default-feature parity target also compiled with `--no-run`, and
+watermarks, and exercises wrong-root, unrelated 6005/header-reference,
+metadata-watermark, extra-author-allocation, generated-author archive-shape,
+selected-comment unknown/text, and author-storage corruption controls. Its
+creation-only 3056 mask rewrites only date/UUID bytes after rejecting unknown,
+duplicate and noncanonical nested date/reference/UUID/reply fields; raw
+unknowns in selected 6005 and metadata reference paths are explicitly shown
+to survive normalization. A separate proof-only read witness on
+`body-table-comment-hidden-native-saved.pages` checks both source-owned roots
+and replies (two type-3056 payloads) byte-for-byte on host and leaf and rejects
+an altered surviving payload. The feature-enabled all-target parity Clippy
+command passed after replacing the obfuscated reference normalizer; the
+default-feature parity target also compiled with `--no-run`, and
 `cargo fmt --all -- --check` passed. The queue correction in this checkpoint
 records the actual D2 Keynote/native and generated host-authored reply
 fixtures, names only the folded Numbers
