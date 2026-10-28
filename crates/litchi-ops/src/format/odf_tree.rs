@@ -992,22 +992,11 @@ mod tests {
         assert!(lazy.contains("SELECT 20"));
     }
 
-    /// Record 0377a: an opened chart builds its tree on the first read, and
-    /// that tree is the one the leaf owner builds; an opened database builds
-    /// (and so validates) its tree at open.
-    #[cfg(feature = "odc")]
+    /// Record 0377a: an opened database builds (and so validates) its tree at
+    /// open.  The ODB-only portion stays behind this module's `odb` gate so
+    /// the ODC-only build never names the optional database owner.
     #[test]
-    fn opened_trees_that_cannot_fail_are_built_on_first_read() {
-        let chart = crate::create(FileFormat::Odc).expect("create chart");
-        let opened = crate::open_bytes(chart.to_bytes().expect("bytes")).expect("open chart");
-        let File::Odc(handle) = &opened else {
-            panic!("not a chart");
-        };
-        assert!(handle.0.tree.get().is_none(), "open built the chart tree");
-        assert_eq!(
-            format!("{:?}", handle.tree()),
-            format!("{:?}", handle.0.owner.tree().expect("chart tree"))
-        );
+    fn opened_database_trees_validate_at_open() {
         let database = crate::create(FileFormat::Odb).expect("create database");
         let opened = crate::open_bytes(database.to_bytes().expect("bytes")).expect("open database");
         assert!(
@@ -1072,5 +1061,28 @@ mod tests {
         );
         assert_eq!(mapped.code(), Code::LimitExceeded);
         assert!(matches!(mapped.leaf(), Source::Core(_)));
+    }
+}
+
+#[cfg(all(test, feature = "odc"))]
+mod odc_tests {
+    use litchi_core::detection::FileFormat;
+
+    use crate::File;
+
+    /// Record 0377a: an opened chart builds its tree on the first read, and
+    /// that tree is the one the leaf owner builds.
+    #[test]
+    fn opened_chart_trees_are_built_on_first_read() {
+        let chart = crate::create(FileFormat::Odc).expect("create chart");
+        let opened = crate::open_bytes(chart.to_bytes().expect("bytes")).expect("open chart");
+        let File::Odc(handle) = &opened else {
+            panic!("not a chart");
+        };
+        assert!(handle.0.tree.get().is_none(), "open built the chart tree");
+        assert_eq!(
+            format!("{:?}", handle.tree()),
+            format!("{:?}", handle.0.owner.tree().expect("chart tree"))
+        );
     }
 }

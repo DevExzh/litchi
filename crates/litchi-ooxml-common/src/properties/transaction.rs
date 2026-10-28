@@ -43,7 +43,8 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::rel::TargetMode;
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, PreparedTopology, SourceBackedPackage, SourceTopologyPlan,
+    OpcError, OpcPackage, PackURI, PackageIdentity, PreparedTopology, SourceBackedPackage,
+    SourceTopologyPlan,
 };
 
 use super::package_graph::{
@@ -495,6 +496,13 @@ pub struct Snapshot {
     custom_value: custom::Props,
     /// The package-level relationship IDs in use.
     relationship_ids: BTreeSet<String>,
+    /// Opaque identity of the owning package handle, when this snapshot was
+    /// captured from an owning package. Source-backed snapshots deliberately
+    /// have no owning-handle proof and therefore always take the checked
+    /// replay path.
+    package_identity: Option<PackageIdentity>,
+    /// Mutation stamp paired with `package_identity`.
+    package_revision: Option<u64>,
 }
 
 impl Snapshot {
@@ -519,7 +527,7 @@ impl Snapshot {
                 .map_err(|error| source_error(crate::Error::Opc(error)))?
                 .blob_arc())
         };
-        Self::capture(
+        let mut snapshot = Self::capture(
             package,
             host,
             Graphs {
@@ -532,7 +540,10 @@ impl Snapshot {
                 custom: (custom_graph.part_name, custom_graph.relationship_id),
             },
             bytes,
-        )
+        )?;
+        snapshot.package_identity = Some(package.package_identity());
+        snapshot.package_revision = Some(package.package_revision());
+        Ok(snapshot)
     }
 
     /// Capture only the core-properties family of an owning package; the
@@ -595,6 +606,8 @@ impl Snapshot {
             custom,
             custom_value: custom::Props::new(),
             relationship_ids,
+            package_identity: Some(package.package_identity()),
+            package_revision: Some(package.package_revision()),
         })
     }
 
@@ -690,6 +703,8 @@ impl Snapshot {
             custom,
             custom_value,
             relationship_ids,
+            package_identity: None,
+            package_revision: None,
         })
     }
 
@@ -808,6 +823,27 @@ impl Snapshot {
             remove_custom: false,
             options,
         }
+    }
+
+    /// Prove that this owning-package snapshot is still attached to the
+    /// package handle it captured. The opaque handle identity rejects a
+    /// snapshot from another package, while the package mutation stamp rejects
+    /// a built-in package changed after capture. Caller-defined parts are
+    /// always sent through exact patch authentication because their trait
+    /// methods can vary through interior state without a package seam. Every
+    /// mutable owning-package seam advances the stamp before exposing graph,
+    /// content-type, relationship, or payload changes. A failed proof is
+    /// deliberately a boolean: callers fall back to the ordinary exact patch
+    /// authentication path, which retains its typed conflict/error behavior.
+    fn belongs_to(&self, package: &OpcPackage) -> bool {
+        let Some(identity) = self.package_identity.as_ref() else {
+            return false;
+        };
+        if !package.has_package_identity(identity) {
+            return false;
+        }
+        self.package_revision == Some(package.package_revision())
+            && package.holds_only_built_in_parts()
     }
 
     /// Read the snapshot that would result from replaying `patch` over a
@@ -2080,7 +2116,10 @@ impl Edit {
         Ok(Self {
             package: package.clone(),
             plan: snapshot.plan_with_options(options),
-            own_snapshot: true,
+            // Caller-defined parts can vary through interior state without a
+            // package mutation seam. Only sealed built-in parts have the
+            // stable behavior needed by the no-replay path.
+            own_snapshot: package.holds_only_built_in_parts(),
         })
     }
 
@@ -2095,26 +2134,11 @@ impl Edit {
         snapshot: Snapshot,
         options: EditOptions,
     ) -> Self {
+        let own_snapshot = snapshot.belongs_to(package);
         Self {
             package: package.clone(),
             plan: snapshot.plan_with_options(options),
-            own_snapshot: false,
-        }
-    }
-
-    /// [`Self::new_with_snapshot`] for a snapshot the caller has just read
-    /// from `package` itself with [`Snapshot::read`], so commit can skip
-    /// re-authenticating the patch against `package` (record 0377a).
-    #[doc(hidden)]
-    pub fn new_with_own_snapshot(
-        package: &OpcPackage,
-        snapshot: Snapshot,
-        options: EditOptions,
-    ) -> Self {
-        Self {
-            package: package.clone(),
-            plan: snapshot.plan_with_options(options),
-            own_snapshot: true,
+            own_snapshot,
         }
     }
 
@@ -2305,6 +2329,14 @@ pub fn publish_core_metadata(
         return Ok((commit, core));
     }
     refuse_signed_change(package)?;
+    if !package.holds_only_built_in_parts() {
+        // A caller-defined part can change while this core-only plan is being
+        // prepared, or its clone can have different observable behavior. The
+        // checked path must authenticate the current family before cloning;
+        // only sealed built-in parts may use the direct change application.
+        let commit = patch.apply(package)?;
+        return Ok((commit, after.core_value.as_ref().map(Core::metadata)));
+    }
     let mut candidate = package.clone();
     patch.apply_changes(&mut candidate)?;
     let core = after.core_value.as_ref().map(Core::metadata);

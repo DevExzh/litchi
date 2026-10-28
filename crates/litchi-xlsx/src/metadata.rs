@@ -217,7 +217,7 @@ impl Edit {
                 common_options
             };
             // The snapshot was read from this very package just above.
-            self.inner = Some(properties::Edit::new_with_own_snapshot(
+            self.inner = Some(properties::Edit::new_with_snapshot(
                 self.package.opc(),
                 snapshot,
                 common_options,

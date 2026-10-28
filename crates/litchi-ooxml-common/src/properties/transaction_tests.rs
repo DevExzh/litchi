@@ -4,10 +4,13 @@
     reason = "unit tests panic on fixture failure"
 )]
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use litchi_core::metadata::{Field, Metadata, Timestamp};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::part::{BlobPart, Part};
+use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, Relationships, TargetMode};
 
 use super::{
     Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, publish_core_metadata,
@@ -18,6 +21,106 @@ use crate::leniency::ToleranceReport;
 
 const APP: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Producer</Application><TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>Sheet1</vt:lpstr></vt:vector></TitlesOfParts><Company>Old</Company></Properties>"#;
+
+/// A deliberately unsealed part whose observable state can change without a
+/// package mutation seam. The transaction fast path must therefore reject a
+/// snapshot from a package containing it and use exact patch authentication.
+#[derive(Clone)]
+struct InteriorMutablePart {
+    name: PackURI,
+    old_blob: Vec<u8>,
+    new_blob: Vec<u8>,
+    old_content_type: String,
+    new_content_type: String,
+    old_rels: Relationships,
+    new_rels: Relationships,
+    changed: Arc<AtomicBool>,
+    flip_after_blob_arc: Arc<AtomicBool>,
+}
+
+impl Part for InteriorMutablePart {
+    fn blob(&self) -> &[u8] {
+        if self.changed.load(Ordering::Relaxed) {
+            &self.new_blob
+        } else {
+            &self.old_blob
+        }
+    }
+
+    fn blob_arc(&self) -> Arc<Vec<u8>> {
+        let blob = Arc::new(self.blob().to_vec());
+        if self.flip_after_blob_arc.swap(false, Ordering::Relaxed) {
+            self.changed.store(true, Ordering::Relaxed);
+        }
+        blob
+    }
+
+    fn content_type(&self) -> &str {
+        if self.changed.load(Ordering::Relaxed) {
+            &self.new_content_type
+        } else {
+            &self.old_content_type
+        }
+    }
+
+    fn partname(&self) -> &PackURI {
+        &self.name
+    }
+
+    fn rels(&self) -> &Relationships {
+        if self.changed.load(Ordering::Relaxed) {
+            &self.new_rels
+        } else {
+            &self.old_rels
+        }
+    }
+
+    fn rels_mut(&mut self) -> &mut Relationships {
+        if self.changed.load(Ordering::Relaxed) {
+            &mut self.new_rels
+        } else {
+            &mut self.old_rels
+        }
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.old_blob = blob.clone();
+        self.new_blob = blob;
+    }
+}
+
+fn package_with_interior_mutable_core() -> (OpcPackage, Arc<AtomicBool>) {
+    package_with_interior_mutable_core_and(false)
+}
+
+fn package_with_interior_mutable_core_and(
+    flip_after_blob_arc: bool,
+) -> (OpcPackage, Arc<AtomicBool>) {
+    let mut package = full();
+    let core_name = PackURI::new("/docProps/core.xml").unwrap();
+    let source = package.get_part(&core_name).unwrap();
+    let old_blob = source.blob().to_vec();
+    let new_blob = String::from_utf8(old_blob.clone())
+        .unwrap()
+        .replace("Before", "Changed")
+        .into_bytes();
+    let old_content_type = source.content_type().to_owned();
+    let old_rels = source.rels().clone();
+    package.remove_part(&core_name);
+    let changed = Arc::new(AtomicBool::new(false));
+    package.add_part(Box::new(InteriorMutablePart {
+        name: core_name,
+        old_blob,
+        new_blob,
+        old_content_type: old_content_type.clone(),
+        new_content_type: old_content_type,
+        old_rels: old_rels.clone(),
+        new_rels: old_rels,
+        changed: Arc::clone(&changed),
+        flip_after_blob_arc: Arc::new(AtomicBool::new(flip_after_blob_arc)),
+    }));
+    (package, changed)
+}
 
 /// A package holding all three families, as a producer wrote them.
 fn full() -> OpcPackage {
@@ -170,6 +273,105 @@ fn core_only_publication_replays_exactly_and_preserves_unread_families() {
         bytes(&restored, "/docProps/custom.xml").unwrap(),
         custom_before
     );
+}
+
+#[test]
+fn snapshot_constructor_reauthenticates_a_mismatched_package() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+
+    let mut other_edit = Edit::new(&full(), Host::Word).unwrap();
+    other_edit.set_metadata(Metadata {
+        title: Some("Other source".to_owned()),
+        ..Metadata::default()
+    });
+    let other = other_edit.commit().unwrap().into_package();
+
+    let mut edit = Edit::new_with_snapshot(&other, snapshot, EditOptions::default());
+    edit.set_metadata(Metadata {
+        title: Some("Candidate".to_owned()),
+        ..Metadata::default()
+    });
+    assert!(matches!(edit.commit(), Err(Error::PatchConflict)));
+}
+
+#[test]
+fn snapshot_constructor_reauthenticates_a_same_handle_change() {
+    let mut package = full();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let mut changed_edit = Edit::new(&package, Host::Word).unwrap();
+    changed_edit.set_metadata(Metadata {
+        title: Some("Changed after capture".to_owned()),
+        ..Metadata::default()
+    });
+    let changed = changed_edit.commit().unwrap().into_package();
+    let core = PackURI::new("/docProps/core.xml").unwrap();
+    package
+        .get_part_mut(&core)
+        .unwrap()
+        .set_blob(bytes(&changed, "/docProps/core.xml").unwrap());
+
+    let mut edit = Edit::new_with_snapshot(&package, snapshot, EditOptions::default());
+    edit.set_metadata(Metadata {
+        title: Some("Candidate".to_owned()),
+        ..Metadata::default()
+    });
+    assert!(matches!(edit.commit(), Err(Error::PatchConflict)));
+}
+
+#[test]
+fn snapshot_constructor_reauthenticates_a_content_type_change() {
+    let mut package = full();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let core = PackURI::new("/docProps/core.xml").unwrap();
+    package
+        .get_part_mut(&core)
+        .unwrap()
+        .set_content_type(ct::OFC_EXTENDED_PROPERTIES.to_owned())
+        .unwrap();
+
+    let mut edit = Edit::new_with_snapshot(&package, snapshot, EditOptions::default());
+    edit.set_metadata(Metadata {
+        title: Some("Candidate".to_owned()),
+        ..Metadata::default()
+    });
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn custom_part_interior_mutation_never_uses_the_own_snapshot_fast_path() {
+    let (package, changed) = package_with_interior_mutable_core();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    changed.store(true, Ordering::Relaxed);
+    edit.set_metadata(Metadata {
+        title: Some("Candidate".to_owned()),
+        ..Metadata::default()
+    });
+    assert!(matches!(edit.commit(), Err(Error::PatchConflict)));
+
+    let (package, changed) = package_with_interior_mutable_core();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let mut edit = Edit::new_with_snapshot(&package, snapshot, EditOptions::default());
+    changed.store(true, Ordering::Relaxed);
+    edit.set_metadata(Metadata {
+        title: Some("Candidate".to_owned()),
+        ..Metadata::default()
+    });
+    assert!(matches!(edit.commit(), Err(Error::PatchConflict)));
+}
+
+#[test]
+fn core_only_publication_reauthenticates_custom_parts_after_snapshot() {
+    let (package, _) = package_with_interior_mutable_core_and(true);
+    let result = publish_core_metadata(
+        &package,
+        Host::Word,
+        Some(Metadata {
+            title: Some("Candidate".to_owned()),
+            ..Metadata::default()
+        }),
+    );
+    assert!(matches!(result, Err(Error::PatchConflict)));
 }
 
 #[test]

@@ -75,9 +75,9 @@ pub use package::{
     CanonicalRelationshipsPlan, CompressedPartTransfer, ContentTypeEdit, ContentTypeFragment,
     ContentTypeFragmentEdit, ContentTypeFragmentKey, ContentTypeFragmentPlan, ContentTypeFragments,
     ContentTypesEditPlan, FontEmbedding, OpcPackage, OwnedContentTypes, OwnedRelationships,
-    RelationshipEdit, RelationshipFragment, RelationshipFragmentEdit, RelationshipFragmentPlan,
-    RelationshipFragments, RelationshipSourcePlan, RelationshipsEditPlan, RetainedArchiveMetrics,
-    SaveOptions,
+    PackageIdentity, RelationshipEdit, RelationshipFragment, RelationshipFragmentEdit,
+    RelationshipFragmentPlan, RelationshipFragments, RelationshipSourcePlan, RelationshipsEditPlan,
+    RetainedArchiveMetrics, SaveOptions,
 };
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, PartMetadata, XmlPart};
