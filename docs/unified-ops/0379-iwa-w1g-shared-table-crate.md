@@ -16,7 +16,8 @@
   The pre-repair WP source/probe receipt is `e09f2269d0`; its twelve-route
   read/create/Set/clear matrix is retained as historical evidence in §4.4,
   but does not qualify the repaired public API. Final clean-source and
-  integrated performance and native verification remain pending (§2b, §6).
+  clean-source matrix is now recorded in §4.5; integrated-tree performance and
+  native verification remain pending (§2b, §6).
   Groups 3–5 (rich text, topology, conditional highlights) are not started
   (§5).
 - Date: 2026-10-28 continuation; group 6 completed 2026-10-27.
@@ -654,7 +655,54 @@ API. A fresh matrix must be captured after the repair and recorded against
 one clean source commit. The final route set is Pages, Keynote and Numbers
 read/create/Set/clear (twelve full facade routes), with Pages/Keynote writes
 using `Package::edit_*().set/clear()?.commit()` and read replies projected
-from the root `Comment::replies()` snapshot.
+from the root `Comment::replies()` snapshot. The completed clean-source matrix
+is recorded below.
+
+### 4.5 Final clean-source twelve-route matrix
+
+The final matrix ran on clean source commit
+`9d9666b7824bd6e10acbcb42af624c98077ebad2` using one release-derived parity
+binary. The binary is archived outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/bin/9d9666b7824bd6e10acbcb42af624c98077ebad2/parity-de33078d71de6252`,
+size 41,247,376 bytes, SHA-256
+`e13587d38f53e96c13d8a471ac457f4c5141ec60790ad0cbf7931b3848ad2e8d`. The
+immutable capture manifest, 24 Callgrind files and 36 matching-test logs are
+under
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/final-9d9666b7824bd6e10acbcb42af624c98077ebad2/RECEIPT.md`.
+Receipt SHA-256: `d0e7ffdc3b5309d3a751e906533e58b5db6299346a9abe9c45d7995505cfb057`
+(5,680 bytes).
+The 24 captures are exactly one `probe_host` and one `probe_leaf` capture for
+each route, collected on CPU 3 with Callgrind; the table reports each file's
+inclusive `Ir` summary. All twelve matching ignored tests passed directly and
+again under each capture.
+
+| Route | Host Ir | Leaf Ir | Delta |
+|---|---:|---:|---:|
+| Pages read | 1,235,275,227 | 33,548,090 | -97.284% |
+| Pages create | 2,736,216,452 | 99,950,732 | -96.347% |
+| Pages set | 2,591,981,263 | 90,382,121 | -96.513% |
+| Pages clear | 2,741,797,525 | 117,221,217 | -95.725% |
+| Keynote read | 20,326,924 | 8,040,071 | -60.446% |
+| Keynote create | 905,083,430 | 429,776,633 | -52.515% |
+| Keynote set | 658,076,349 | 417,222,658 | -36.600% |
+| Keynote clear | 58,029,391 | 37,576,697 | -35.245% |
+| Numbers read | 3,716,665 | 2,963,909 | -20.254% |
+| Numbers create | 169,308,692 | 82,570,456 | -51.231% |
+| Numbers set | 73,253,973 | 73,975,007 | +0.984% |
+| Numbers clear | 128,298,545 | 74,386,439 | -42.021% |
+
+Every route meets the normal no-more-than-5%-slower bar; the worst case is
+Numbers set at +0.984%. Numbers create and clear use the corrected
+forward-only leaf closures (open/edit/commit/serialize), without inverse
+application. The build command was the release `cargo test --locked --release
+-p litchi-iwa --test parity --features parity-host-oracle --no-run` with
+`CARGO_INCREMENTAL=0`, release debug information disabled and two build jobs.
+The source remained clean before and after measurement. Current-source
+formatting, merged parity Clippy, default parity compilation, rustdoc,
+glossary, ledger, boundary, no-`3rdparty`, and all three affected fuzz locks
+also passed; the gate receipts are in the external manifest's `gates/`
+directory. The glossary checker ran its own 73-profile Cargo matrix with its
+documented profile defaults; it is not claimed as a debug-off measurement.
 
 ## 5. Gaps
 
@@ -804,9 +852,8 @@ records the actual D2 Keynote/native and generated host-authored reply
 fixtures, names only the folded Numbers
 `numbers_table_cell_comment_replies_read_parity` semantic case, and separates
 supported root create/set/clear native acceptance from deferred host-only
-reply operations. No new release performance capture was made here: the
-historical captures in §§4.2–4.4 remain non-qualifying until F's reviewed
-Numbers proof and the coordinator's final clean-source twelve-route matrix.
+reply operations. No release capture was made in that proof checkpoint; the
+final clean-source qualification is the matrix in §4.5.
 
 Combined handoff source `444c331122` is a real merge of the Pages proof
 follow-up and F's accepted Numbers proof tip `4b1f3000bc`. On that merged
