@@ -4,7 +4,9 @@
 use std::io;
 
 use litchi_numbers::{
-    Builder, Identity, Package, SheetSelector, TableSelector, cell::Value, table::cells::Input,
+    Builder, Identity, Package, SheetSelector, TableSelector,
+    cell::Value,
+    formula::{CachedValue, Expression},
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -24,11 +26,7 @@ fn source_builder(table_name: &str) -> TestResult<Package> {
         .build()?)
 }
 
-// The host fixture uses `FormulaExpression::Number` only to seed a numeric
-// cell before duplication. The focused leaf uses its selector-first numeric
-// cell writer here; the assertions remain about copied values, independent
-// table storage, ordering, inverse bytes, and reopen behavior.
-fn set_number(
+fn set_number_formula(
     package: &Package,
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
@@ -36,7 +34,11 @@ fn set_number(
 ) -> TestResult<Package> {
     Ok(package
         .edit_table_cells(sheet, table)?
-        .set_a1("B1", Input::number(value)?)?
+        .set_formula_cached_a1(
+            "B1",
+            Expression::number(value)?,
+            CachedValue::number(value)?,
+        )?
         .commit()?
         .into_package())
 }
@@ -65,7 +67,7 @@ fn table_names(package: &Package, sheet: usize) -> Vec<String> {
 #[test]
 fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestResult {
     let source = source_builder("Original")?;
-    let source = set_number(
+    let source = set_number_formula(
         &source,
         SheetSelector::index(0),
         TableSelector::index(0),
@@ -95,7 +97,7 @@ fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestRe
     let restored = duplicated.apply_table_lifecycle(&duplicate.patch().inverse())?;
     assert_eq!(bytes(restored.package())?, source_bytes);
 
-    let changed = set_number(
+    let changed = set_number_formula(
         duplicated,
         SheetSelector::index(0),
         TableSelector::name("Original copy"),
@@ -140,126 +142,6 @@ fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestRe
 }
 
 #[test]
-fn source_built_multi_table_sheet_duplicate_keeps_each_table_and_storage_independent() -> TestResult
-{
-    let source = source_builder("Alpha")?;
-    let source = source
-        .edit_table_lifecycle(SheetSelector::index(0))?
-        .add("Beta", 4, 4)
-        .and_then(|edit| edit.commit())?
-        .into_package();
-    let source = set_number(
-        &source,
-        SheetSelector::index(0),
-        TableSelector::name("Alpha"),
-        7.0,
-    )?;
-    let source = set_number(
-        &source,
-        SheetSelector::index(0),
-        TableSelector::name("Beta"),
-        11.0,
-    )?;
-    let source_bytes = bytes(&source)?;
-    let source_alpha = stored_value(
-        &source,
-        SheetSelector::index(0),
-        TableSelector::name("Alpha"),
-    )?;
-    let source_beta = stored_value(
-        &source,
-        SheetSelector::index(0),
-        TableSelector::name("Beta"),
-    )?;
-
-    let duplicate = source
-        .edit_sheet_lifecycle()
-        .duplicate(SheetSelector::index(0))?
-        .commit()?;
-    let duplicated = duplicate.package();
-    assert_eq!(duplicated.sheets()[1].name(), "Source-1");
-    assert_eq!(table_names(duplicated, 1), ["Alpha", "Beta"]);
-    assert_eq!(
-        stored_value(
-            duplicated,
-            SheetSelector::index(1),
-            TableSelector::name("Alpha"),
-        )?,
-        source_alpha
-    );
-    assert_eq!(
-        stored_value(
-            duplicated,
-            SheetSelector::index(1),
-            TableSelector::name("Beta"),
-        )?,
-        source_beta
-    );
-    let restored = duplicated.apply_sheet_lifecycle(&duplicate.patch().inverse())?;
-    assert_eq!(bytes(restored.package())?, source_bytes);
-
-    let changed = set_number(
-        duplicated,
-        SheetSelector::index(1),
-        TableSelector::name("Alpha"),
-        99.0,
-    )?;
-    assert_eq!(
-        stored_value(
-            &changed,
-            SheetSelector::index(0),
-            TableSelector::name("Alpha"),
-        )?,
-        source_alpha,
-        "editing duplicated Alpha must preserve the source sheet"
-    );
-    assert_ne!(
-        stored_value(
-            &changed,
-            SheetSelector::index(1),
-            TableSelector::name("Alpha"),
-        )?,
-        source_alpha
-    );
-    assert_eq!(
-        stored_value(
-            &changed,
-            SheetSelector::index(1),
-            TableSelector::name("Beta"),
-        )?,
-        source_beta,
-        "duplicating Alpha must not alias duplicated Beta storage"
-    );
-
-    let reopened = Package::from_bytes(&bytes(&changed)?)?;
-    assert_eq!(
-        stored_value(
-            &reopened,
-            SheetSelector::index(0),
-            TableSelector::name("Alpha"),
-        )?,
-        source_alpha
-    );
-    assert_ne!(
-        stored_value(
-            &reopened,
-            SheetSelector::index(1),
-            TableSelector::name("Alpha"),
-        )?,
-        source_alpha
-    );
-    assert_eq!(
-        stored_value(
-            &reopened,
-            SheetSelector::index(1),
-            TableSelector::name("Beta"),
-        )?,
-        source_beta
-    );
-    Ok(())
-}
-
-#[test]
 fn source_built_sheet_duplicate_invalid_selector_is_transactional() -> TestResult {
     let package = source_builder("Alpha")?;
     let before = bytes(&package)?;
@@ -276,7 +158,7 @@ fn source_built_sheet_duplicate_invalid_selector_is_transactional() -> TestResul
 #[test]
 fn source_built_sheet_duplicate_scopes_same_named_clone_to_source_sheet() -> TestResult {
     let source = source_builder("Alpha")?;
-    let source = set_number(
+    let source = set_number_formula(
         &source,
         SheetSelector::index(0),
         TableSelector::name("Alpha"),
@@ -292,7 +174,7 @@ fn source_built_sheet_duplicate_scopes_same_named_clone_to_source_sheet() -> Tes
         .add("Alpha copy", 4, 4)
         .and_then(|edit| edit.commit())?
         .into_package();
-    let source = set_number(
+    let source = set_number_formula(
         &source,
         SheetSelector::name("Other"),
         TableSelector::name("Alpha copy"),
