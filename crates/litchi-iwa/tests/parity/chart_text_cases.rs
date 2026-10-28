@@ -160,6 +160,19 @@ fn read_numbers(source: &[u8], property: Property) -> TestResult<Option<String>>
     })
 }
 
+fn host_read_numbers(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    property: Property,
+) -> TestResult<Option<String>> {
+    let editor = numbers::Draft::from_bytes(source)?;
+    Ok(match property {
+        Property::Title => editor.sheet_chart_title(sheet, chart)?,
+        Property::Axis(axis) => editor.sheet_chart_axis_title(sheet, chart, axis)?,
+    })
+}
+
 fn host_pages(source: &[u8], chart: u64, property: Property) -> TestResult<Vec<u8>> {
     let mut editor = pages::Draft::from_bytes(source)?;
     match property {
@@ -212,20 +225,44 @@ fn read_pages(source: &[u8], property: Property) -> TestResult<Option<String>> {
     })
 }
 
+fn host_read_pages(source: &[u8], chart: u64, property: Property) -> TestResult<Option<String>> {
+    let editor = pages::Draft::from_bytes(source)?;
+    Ok(match property {
+        Property::Title => editor.body_chart_title(chart)?,
+        Property::Axis(axis) => editor.body_chart_axis_title(chart, axis)?,
+    })
+}
+
+fn assert_read_equal(label: &str, host: &Option<String>, leaf: &Option<String>) -> TestResult {
+    if host == leaf {
+        Ok(())
+    } else {
+        Err(format!("{label}: host {host:?} != leaf {leaf:?}").into())
+    }
+}
+
+fn mismatched_read(value: &Option<String>) -> Option<String> {
+    match value {
+        Some(value) => Some(format!("{value} [mismatched read]")),
+        None => Some("W1-E mismatched read".to_owned()),
+    }
+}
+
 fn host_numbers_remove(
     source: &[u8],
     sheet: u64,
     chart: u64,
     property: Property,
 ) -> TestResult<Vec<u8>> {
+    // The caller has already authored the common populated input through the
+    // host setter.  This route is intentionally clear-only so the
+    // differential case proves the same operation on the same source.
     let mut editor = numbers::Draft::from_bytes(source)?;
     match property {
         Property::Title => {
-            editor.set_sheet_chart_title(sheet, chart, "W1-E remove")?;
             let _ = editor.remove_sheet_chart_title(sheet, chart)?;
         },
         Property::Axis(axis) => {
-            editor.set_sheet_chart_axis_title(sheet, chart, axis, "W1-E remove")?;
             let _ = editor.remove_sheet_chart_axis_title(sheet, chart, axis)?;
         },
     }
@@ -233,46 +270,28 @@ fn host_numbers_remove(
 }
 
 fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
+    // Match host_numbers_remove: clear the caller-provided populated source,
+    // then apply that exact commit's inverse to prove restoration.
     let package = NumbersPackage::from_bytes(source)?;
     match property {
         Property::Title => {
-            let first = package
-                .edit_sheet_chart_title(
-                    SheetSelector::index(0),
-                    ChartSelector::index(NUMBERS_CHART),
-                )?
-                .set("W1-E remove")?
-                .commit()?;
-            let second = first
-                .package()
+            let commit = package
                 .edit_sheet_chart_title(
                     SheetSelector::index(0),
                     ChartSelector::index(NUMBERS_CHART),
                 )?
                 .clear()?
                 .commit()?;
-            let restored_first = second
+            let restored = commit
                 .package()
-                .apply_sheet_chart_title(&second.patch().inverse())?;
-            let restored = restored_first
-                .package()
-                .apply_sheet_chart_title(&first.patch().inverse())?;
+                .apply_sheet_chart_title(&commit.patch().inverse())?;
             Ok(LeafRun::with_inverse(
-                leaf_bytes!(second.package()),
+                leaf_bytes!(commit.package()),
                 leaf_bytes!(restored.package()),
             ))
         },
         Property::Axis(axis) => {
-            let first = package
-                .edit_sheet_chart_axis_title(
-                    SheetSelector::index(0),
-                    ChartSelector::index(NUMBERS_CHART),
-                    axis,
-                )?
-                .set("W1-E remove")?
-                .commit()?;
-            let second = first
-                .package()
+            let commit = package
                 .edit_sheet_chart_axis_title(
                     SheetSelector::index(0),
                     ChartSelector::index(NUMBERS_CHART),
@@ -280,14 +299,11 @@ fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun>
                 )?
                 .clear()?
                 .commit()?;
-            let restored_first = second
+            let restored = commit
                 .package()
-                .apply_sheet_chart_axis_title(&second.patch().inverse())?;
-            let restored = restored_first
-                .package()
-                .apply_sheet_chart_axis_title(&first.patch().inverse())?;
+                .apply_sheet_chart_axis_title(&commit.patch().inverse())?;
             Ok(LeafRun::with_inverse(
-                leaf_bytes!(second.package()),
+                leaf_bytes!(commit.package()),
                 leaf_bytes!(restored.package()),
             ))
         },
@@ -295,14 +311,14 @@ fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun>
 }
 
 fn host_pages_remove(source: &[u8], chart: u64, property: Property) -> TestResult<Vec<u8>> {
+    // The caller has already authored the common populated input through the
+    // host setter; this route only clears the selected property.
     let mut editor = pages::Draft::from_bytes(source)?;
     match property {
         Property::Title => {
-            editor.set_body_chart_title(chart, "W1-E remove")?;
             let _ = editor.remove_body_chart_title(chart)?;
         },
         Property::Axis(axis) => {
-            editor.set_body_chart_axis_title(chart, axis, "W1-E remove")?;
             let _ = editor.remove_body_chart_axis_title(chart, axis)?;
         },
     }
@@ -310,47 +326,33 @@ fn host_pages_remove(source: &[u8], chart: u64, property: Property) -> TestResul
 }
 
 fn leaf_pages_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
+    // Match host_pages_remove: clear the caller-provided populated source and
+    // verify the exact inverse restores it.
     let package = PagesPackage::from_bytes(source)?;
     match property {
         Property::Title => {
-            let first = package
-                .edit_body_chart_title(BodyChartSelector::index(PAGES_CHART))?
-                .set("W1-E remove")?
-                .commit()?;
-            let second = first
-                .package()
+            let commit = package
                 .edit_body_chart_title(BodyChartSelector::index(PAGES_CHART))?
                 .clear()?
                 .commit()?;
-            let restored_first = second
+            let restored = commit
                 .package()
-                .apply_body_chart_title(&second.patch().inverse())?;
-            let restored = restored_first
-                .package()
-                .apply_body_chart_title(&first.patch().inverse())?;
+                .apply_body_chart_title(&commit.patch().inverse())?;
             Ok(LeafRun::with_inverse(
-                leaf_bytes!(second.package()),
+                leaf_bytes!(commit.package()),
                 leaf_bytes!(restored.package()),
             ))
         },
         Property::Axis(axis) => {
-            let first = package
-                .edit_body_chart_axis_title(BodyChartSelector::index(PAGES_CHART), axis)?
-                .set("W1-E remove")?
-                .commit()?;
-            let second = first
-                .package()
+            let commit = package
                 .edit_body_chart_axis_title(BodyChartSelector::index(PAGES_CHART), axis)?
                 .clear()?
                 .commit()?;
-            let restored_first = second
+            let restored = commit
                 .package()
-                .apply_body_chart_axis_title(&second.patch().inverse())?;
-            let restored = restored_first
-                .package()
-                .apply_body_chart_axis_title(&first.patch().inverse())?;
+                .apply_body_chart_axis_title(&commit.patch().inverse())?;
             Ok(LeafRun::with_inverse(
-                leaf_bytes!(second.package()),
+                leaf_bytes!(commit.package()),
                 leaf_bytes!(restored.package()),
             ))
         },
@@ -358,23 +360,66 @@ fn leaf_pages_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
 }
 
 fn run_numbers_reads(input: &Fixture, sheet: u64, chart: u64, property: Property) -> TestResult {
-    let source = read_numbers(&input.bytes, property)?;
-    let host = host_numbers(&input.bytes, sheet, chart, property)?;
-    let leaf = leaf_numbers(&input.bytes, property)?.output;
+    let source = input.bytes.clone();
+    let host_read = host_read_numbers(&source, sheet, chart, property)?;
+    let leaf_read = read_numbers(&source, property)?;
+    assert_read_equal("Numbers direct chart-text read", &host_read, &leaf_read)?;
     assert_eq!(
-        read_numbers(&host, property)?,
-        read_numbers(&leaf, property)?
+        source, input.bytes,
+        "chart-text read changed the source bytes"
     );
-    assert_eq!(source, read_numbers(&input.bytes, property)?);
     Ok(())
 }
 
 fn run_pages_reads(input: &Fixture, chart: u64, property: Property) -> TestResult {
-    let source = read_pages(&input.bytes, property)?;
-    let host = host_pages(&input.bytes, chart, property)?;
-    let leaf = leaf_pages(&input.bytes, property)?.output;
-    assert_eq!(read_pages(&host, property)?, read_pages(&leaf, property)?);
-    assert_eq!(source, read_pages(&input.bytes, property)?);
+    let source = input.bytes.clone();
+    let host_read = host_read_pages(&source, chart, property)?;
+    let leaf_read = read_pages(&source, property)?;
+    assert_read_equal("Pages direct chart-text read", &host_read, &leaf_read)?;
+    assert_eq!(
+        source, input.bytes,
+        "chart-text read changed the source bytes"
+    );
+    Ok(())
+}
+
+#[test]
+fn chart_text_read_negative_control_rejects_mismatched_values() -> TestResult {
+    let (numbers, sheet, chart) = numbers_input()?;
+    let (pages, pages_chart) = pages_input()?;
+    let values = vec![
+        (
+            "Numbers title",
+            host_read_numbers(&numbers.bytes, sheet, chart, Property::Title)?,
+        ),
+        (
+            "Numbers category axis",
+            host_read_numbers(&numbers.bytes, sheet, chart, Property::Axis(Axis::Category))?,
+        ),
+        (
+            "Numbers value axis",
+            host_read_numbers(&numbers.bytes, sheet, chart, Property::Axis(Axis::Value))?,
+        ),
+        (
+            "Pages title",
+            host_read_pages(&pages.bytes, pages_chart, Property::Title)?,
+        ),
+        (
+            "Pages category axis",
+            host_read_pages(&pages.bytes, pages_chart, Property::Axis(Axis::Category))?,
+        ),
+        (
+            "Pages value axis",
+            host_read_pages(&pages.bytes, pages_chart, Property::Axis(Axis::Value))?,
+        ),
+        ("present value", Some("W1-E title".to_owned())),
+    ];
+    for (label, value) in values {
+        let mismatch = mismatched_read(&value);
+        if assert_read_equal(label, &value, &mismatch).is_ok() {
+            return Err(format!("chart-text read comparison accepted a mismatched {label}").into());
+        }
+    }
     Ok(())
 }
 
@@ -429,7 +474,7 @@ fn numbers_chart_title_and_axis_title_remove_parity() -> TestResult {
         Case::new(
             "numbers_chart_text_title_axis_remove_parity",
             Format::Numbers,
-            Tier::A,
+            Tier::B,
             Evidence::Queued,
             &input,
         )
@@ -494,7 +539,7 @@ fn pages_chart_title_and_axis_title_remove_parity() -> TestResult {
         Case::new(
             "pages_chart_text_title_axis_remove_parity",
             Format::Pages,
-            Tier::A,
+            Tier::B,
             Evidence::Queued,
             &input,
         )

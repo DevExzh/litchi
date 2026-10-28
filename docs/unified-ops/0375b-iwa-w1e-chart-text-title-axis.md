@@ -311,6 +311,37 @@ manifest is `/tmp/litchi-w1e-final-gates-20261028/log-manifest.tsv`,
 2,244 bytes, SHA-256
 `1d0e7b87c3e58fc11a1b4dcd4fa196bb3d7aad5292b35443e1bf86d9eae7eaea`.
 
+### 5.2 Test-only proof recheck
+
+The post-queue proof audit found that the original read vectors compared leaf
+reads from host- and leaf-mutated outputs, but did not directly compare the
+host reader with the leaf reader on one common source. It also found that the
+remove helpers authored a temporary value and then cleared it independently,
+instead of proving a clear on the caller's common populated input.
+
+`chart_text_cases.rs` now closes those gaps without changing the runtime
+facades or the cost-probe routes:
+
+- `run_numbers_reads` and `run_pages_reads` call the host `Draft` reader and
+  leaf `Package` reader directly on the same host-authored, populated chart
+  input for title, category-axis and value-axis selections. They assert equal
+  values and byte-identical source preservation. The negative-control test
+  exercises every selected family plus a present value and must reject a
+  deliberately mismatched read.
+- Each Numbers and Pages remove route now only clears the caller-provided
+  common input. The leaf route applies that clear commit's inverse, and the
+  removal cases use Tier B so the archive comparator checks untouched ZIP
+  members and IWA objects in addition to the exact inverse restoration.
+
+This is a proof/test-only append. `chart_text_cost.rs` and the eighteen-route
+measurement are unchanged; `integrated-callgrind.json` remains bound to the
+clean measured source commit
+`4aa57b3c19c24ce625f31cdd5489ff0a1d39bc68`. No new timing claim was made;
+no raw captures or binaries were added to the repository. Focused
+verification was rerun with rustfmt, the
+`chart_text_cases::` parity filter and the parity-test Clippy profile; logs
+remain outside the checkout under `/tmp/litchi-w1e-chart-text-proof-20261028/`.
+
 ## 5. Native evidence and verification
 
 No native-authored read receipt proves a Litchi-mutated title or axis title
