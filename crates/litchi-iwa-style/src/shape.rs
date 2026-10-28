@@ -140,7 +140,7 @@ mod registration_tests {
         output
     }
 
-    fn stylesheet() -> Vec<u8> {
+    fn stylesheet_with_child(extra_child: Option<u64>) -> Vec<u8> {
         let mut output = Vec::new();
         push_message_field(&mut output, 1, &reference(11));
         push_message_field(&mut output, 1, &reference(12));
@@ -148,6 +148,9 @@ mod registration_tests {
         push_message_field(&mut children, 1, &reference(10));
         push_message_field(&mut children, 2, &reference(11));
         push_message_field(&mut children, 2, &reference(12));
+        if let Some(extra_child) = extra_child {
+            push_message_field(&mut children, 2, &reference(extra_child));
+        }
         crate::graph::push_varint_field(&mut children, 99, 8);
         push_message_field(&mut output, 5, &children);
         let mut second_parent = Vec::new();
@@ -156,6 +159,10 @@ mod registration_tests {
         push_message_field(&mut output, 5, &second_parent);
         crate::graph::push_varint_field(&mut output, 99, 7);
         output
+    }
+
+    fn stylesheet() -> Vec<u8> {
+        stylesheet_with_child(None)
     }
 
     fn limits() -> RegistrationLimits {
@@ -205,6 +212,14 @@ mod registration_tests {
             },
             other => panic!("unexpected output refusal: {other:?}"),
         }
+    }
+
+    #[test]
+    fn bounded_registration_refuses_style_already_listed_as_child() {
+        let source = stylesheet_with_child(Some(13));
+        let error = stylesheet_with_variation_admitted(&source, 10, 13, limits())
+            .expect_err("a style already listed by any parent must be refused");
+        assert!(matches!(error, RegistrationError::Invalid(_)));
     }
 
     #[test]
@@ -439,6 +454,44 @@ fn registration_admit(
     if observed > maximum {
         return Err(registration_limit(kind, observed, maximum));
     }
+    Ok(())
+}
+
+fn registration_reserve_scan(
+    scan: &mut RegistrationScan,
+    requirement: RegistrationScan,
+    limits: RegistrationLimits,
+) -> RegistrationResult<()> {
+    registration_add(
+        &mut scan.input_bytes,
+        requirement.input_bytes,
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_add(
+        &mut scan.fields,
+        requirement.fields,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        requirement.work_bytes,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        requirement.allocations,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        requirement.scratch_bytes,
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
     Ok(())
 }
 
@@ -993,6 +1046,7 @@ fn bounded_register(
 ) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
     let mut scan = RegistrationScan::empty();
     scan_stylesheet(stylesheet, limits, &mut scan)?;
+    let writer_requirement = scan;
     let styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
     for payload in &styles {
         if bounded_reference_identifier(payload, limits, &mut scan)? == style {
@@ -1013,6 +1067,13 @@ fn bounded_register(
         if entry_parent == parent {
             parent_matches += 1;
         }
+        for child in bounded_repeated_payloads(entry, CHILDREN, limits, &mut scan)? {
+            if bounded_reference_identifier(&child, limits, &mut scan)? == style {
+                return Err(RegistrationError::Invalid(
+                    "the stylesheet already lists a new style as a child",
+                ));
+            }
+        }
     }
     if parent_matches > 1 {
         return Err(RegistrationError::Invalid(
@@ -1020,11 +1081,11 @@ fn bounded_register(
         ));
     }
     // The shared text-wire writer preserves insertion-after-last-style and
-    // unknown/order bytes exactly. Carry the existing ledger into a cloned
-    // writer admission pass; never replace it with a fresh scan.
+    // unknown/order bytes exactly. Reserve the initial scan's traversal cost
+    // for the writer phase without executing a second preflight traversal.
     let scan_before_writer = scan;
     let mut admitted_scan = scan;
-    scan_stylesheet(stylesheet, limits, &mut admitted_scan)?;
+    registration_reserve_scan(&mut admitted_scan, writer_requirement, limits)?;
     let output_remaining = limits
         .max_output_bytes
         .checked_sub(scan_before_writer.output_bytes)
