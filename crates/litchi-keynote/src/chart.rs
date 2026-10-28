@@ -438,18 +438,17 @@ pub mod data {
 /// and face traits.
 pub mod font {
     pub use crate::package::slide_chart_font::{
-        ChartFont, Diagnostics, Error, FontCommit as Commit, FontEdit as Edit, FontPatch as Patch,
-        LimitKind, Refusal,
+        ChartFont, Diagnostics, Error, Font, FontCommit as Commit, FontEdit as Edit, FontNameError,
+        FontPatch as Patch, LimitKind, Refusal,
     };
-    pub use litchi_iwa_text::font::{Font, NameError as FontNameError};
 
     /// Exact-source transactions for one slide chart's effective point size.
     pub mod size {
+        pub use crate::package::slide_chart_font::TextPointSize;
         pub use crate::package::slide_chart_font::{
             Diagnostics, Error, FontSizeCommit as Commit, FontSizeEdit as Edit,
             FontSizePatch as Patch, LimitKind, Refusal,
         };
-        pub use litchi_iwa_text::character::TextPointSize;
     }
 }
 

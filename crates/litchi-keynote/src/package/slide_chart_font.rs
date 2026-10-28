@@ -26,7 +26,8 @@ use litchi_iwa_style::{
     chart_font::{self as engine, Change as EngineChange},
     graph::{self, Components, Workspace},
 };
-use litchi_iwa_text::{character::TextPointSize, font::Font};
+pub use litchi_iwa_text::character::TextPointSize;
+pub use litchi_iwa_text::font::{Font, NameError as FontNameError};
 use thiserror::Error as ThisError;
 
 use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
