@@ -6668,3 +6668,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   use 55.744%, 68.599% and 55.761% fewer instructions than the host.
   Two formula rows migrate and two raw member-lookup helpers retire.
   Native mutation acceptance and final integrated qualification remain open.
+- Post-merge checks on `e43104db24` passed with an unchanged clean HEAD:
+  workspace, all 20 locked offline fuzz workspaces, boundaries and ledger.
+- Accepted W1-A `02e71e0e55` (record 0370k): generic Numbers DataFormat and
+  numeral-system writes, plus Pages/Keynote numeral reads. Immutable package
+  proof caches retain strict unknown-metadata admission; cold references are
+  charged before inspection, candidate ingress is preflighted, and readback
+  uses the original transaction budget. Candidate resource errors stay typed.
+  Scoped tests/parity, Clippy, rustdoc, glossary, boundaries and four affected
+  fuzz locks pass. The latest source-bound numeral probe is +2.49% versus the
+  host; earlier Pages/Keynote probes are explicitly pre-final-root evidence.
+  Seven ledger rows migrate and native routes remain queued.
+- The separate 0377a performance branch remains in review: the revision-based
+  snapshot proof must exclude caller-defined OPC parts from every unchecked
+  fast path. Ordinary mutable seams were audited; custom-part regressions and
+  the final guarded-source cost/gate receipt are required before integration.
+- Next-wave preparation is read-only while this candidate is qualified:
+  W1-G shared cell comments and W1-E 0375b shared chart text/caption graphs.
+  No new shared-engine slice will integrate before the current frozen gate.

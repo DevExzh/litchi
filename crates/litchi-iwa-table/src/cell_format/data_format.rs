@@ -17,11 +17,7 @@
 use litchi_iwa_common::table::cell::data_format::{CellControl, DataFormat};
 
 use super::control::NativeControlOutput;
-use super::display::{
-    self, CurrencyFormatReadError, CustomFormatReadError, DateTimeFormatReadError,
-    DurationFormatReadError, FractionFormatReadError, NumberFormatReadError,
-    PercentageFormatReadError, ScientificFormatReadError, TextFormatReadError,
-};
+use super::display::{self, CustomFormatReadError};
 use super::{Error, Path, Refusal, Target, TransactionBudget, pop_up_menu};
 use crate::TableSource;
 
@@ -78,46 +74,12 @@ pub const fn family(format: &DataFormat) -> Option<Family> {
 }
 
 /// Whether the engine can rewrite this family without a metadata
-/// transition: the nine display families. Controls and Pop-Up Menus also
-/// rewrite the package metadata registry, and numeral systems have no
-/// engine yet.
+/// transition: the ten display families, numeral systems included since
+/// record 0370k. Controls and Pop-Up Menus also rewrite the package metadata
+/// registry.
 #[must_use]
 pub const fn is_display_family(family: Family) -> bool {
-    !matches!(
-        family,
-        Family::NumeralSystem | Family::ScalarControl | Family::PopUpMenu
-    )
-}
-
-/// One family read: `Some(None)` reports an automatic cell, `None` a cell of
-/// another family.
-fn family_read<T, E>(
-    result: Result<Option<T>, E>,
-    wrong: impl Fn(&E) -> bool,
-    native: impl Fn(E) -> Error,
-) -> Result<Option<Option<T>>, Error> {
-    match result {
-        Ok(value) => Ok(Some(value)),
-        Err(error) if wrong(&error) => Ok(None),
-        Err(error) => Err(native(error)),
-    }
-}
-
-macro_rules! read_family {
-    ($reader:ident, $error:ident, $variant:ident, $source:expr, $target:expr, $path:expr, $automatic:ident) => {
-        match family_read(
-            display::$reader($source, $target, $path),
-            |error| matches!(error, $error::WrongFormatFamily),
-            |error| match error {
-                $error::WrongFormatFamily => Error::Verification,
-                $error::Native(error) => error,
-            },
-        )? {
-            Some(Some(value)) => return Ok(DataFormat::$variant(value)),
-            Some(None) => $automatic = true,
-            None => {},
-        }
-    };
+    !matches!(family, Family::ScalarControl | Family::PopUpMenu)
 }
 
 /// Read the selected stored cell's display format.
@@ -125,9 +87,23 @@ macro_rules! read_family {
 /// # Errors
 ///
 /// The engine's typed failures; [`Refusal::UnsupportedDependency`] when the
-/// cell holds a format no family reader admits (a numeral system, or a
-/// native shape outside the engines).
+/// cell holds a format no family reader admits (a native shape outside the
+/// engines).
 pub fn read(source: &dyn TableSource, target: Target, path: Path) -> Result<DataFormat, Error> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_with_budget(source, target, path, &mut budget)
+}
+
+/// Read the selected cell's complete format against a caller-owned
+/// transaction ledger.  Candidate verification uses this entry point so its
+/// semantic readback cannot create a fresh budget after publication work has
+/// already consumed the operation's original one.
+pub fn read_with_budget(
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<DataFormat, Error> {
     if let Some(control) = pop_up_menu::read_cell_control(source, target)? {
         return Ok(match control {
             CellControl::Checkbox(value) => DataFormat::Checkbox(value),
@@ -137,92 +113,18 @@ pub fn read(source: &dyn TableSource, target: Target, path: Path) -> Result<Data
             CellControl::PopUpMenu(value) => DataFormat::PopUpMenu(value),
         });
     }
-    let mut automatic = false;
-    read_family!(
-        read_number_format,
-        NumberFormatReadError,
-        Number,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_currency_format,
-        CurrencyFormatReadError,
-        Currency,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_percentage_format,
-        PercentageFormatReadError,
-        Percentage,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_scientific_format,
-        ScientificFormatReadError,
-        Scientific,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_fraction_format,
-        FractionFormatReadError,
-        Fraction,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_date_time_format,
-        DateTimeFormatReadError,
-        DateTime,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_duration_format,
-        DurationFormatReadError,
-        Duration,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_text_format,
-        TextFormatReadError,
-        Text,
-        source,
-        target,
-        path,
-        automatic
-    );
-    read_family!(
-        read_custom_format,
-        CustomFormatReadError,
-        Custom,
-        source,
-        target,
-        path,
-        automatic
-    );
-    if automatic {
-        Ok(DataFormat::Automatic)
-    } else {
-        Err(Error::Refused(Refusal::UnsupportedDependency { path }))
+    // One validation pass for the ten display families (record 0370k); a
+    // cell outside them is a custom format or unsupported.
+    if let Some(format) = display::read_any_display_format(source, target, path, budget)? {
+        return Ok(format);
+    }
+    match display::read_custom_format_with_budget(source, target, path, budget) {
+        Ok(Some(value)) => Ok(DataFormat::Custom(value)),
+        Ok(None) => Ok(DataFormat::Automatic),
+        Err(CustomFormatReadError::WrongFormatFamily) => {
+            Err(Error::Refused(Refusal::UnsupportedDependency { path }))
+        },
+        Err(CustomFormatReadError::Native(error)) => Err(error),
     }
 }
 
@@ -275,7 +177,8 @@ pub fn rewrite(
         Family::Duration => rewrite_with!(rewrite_duration_format, Duration),
         Family::Text => rewrite_with!(rewrite_text_format, Text),
         Family::Custom => rewrite_with!(rewrite_custom_format, Custom),
-        Family::NumeralSystem | Family::ScalarControl | Family::PopUpMenu => Err(unsupported),
+        Family::NumeralSystem => rewrite_with!(rewrite_numeral_system_format, NumeralSystem),
+        Family::ScalarControl | Family::PopUpMenu => Err(unsupported),
     }
 }
 

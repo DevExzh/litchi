@@ -8,6 +8,8 @@
 //! publishing a ZIP candidate.
 
 use core::mem::size_of;
+use core::ops::Deref;
+use std::sync::Arc;
 
 use litchi_iwa_protos::package_metadata_codec::{
     AdditionSaveTokenBatch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor,
@@ -209,6 +211,13 @@ struct DataOwnerFact {
 #[derive(Debug)]
 pub struct RegistryFacts<'source> {
     source: MetadataSource<'source>,
+    registry: Arc<Registry>,
+}
+
+/// The payload-independent part of [`RegistryFacts`], shared by the proofs
+/// a leaf memoizes for one package (record 0370k).
+#[derive(Debug)]
+pub struct Registry {
     components: Vec<ComponentFact>,
     uuids: Vec<UuidFact>,
     external_references: Vec<ExternalFact>,
@@ -223,6 +232,17 @@ pub struct RegistryFacts<'source> {
 }
 
 impl<'source> RegistryFacts<'source> {
+    /// Facts over `source` from a registry inspected on the same package.
+    #[must_use]
+    pub const fn from_shared(source: MetadataSource<'source>, registry: Arc<Registry>) -> Self {
+        Self { source, registry }
+    }
+
+    #[must_use]
+    pub const fn shared(&self) -> &Arc<Registry> {
+        &self.registry
+    }
+
     #[must_use]
     pub const fn payload(&self) -> &'source [u8] {
         self.source.payload
@@ -231,6 +251,26 @@ impl<'source> RegistryFacts<'source> {
     #[must_use]
     pub const fn route(&self) -> metadata::MessageRoute {
         self.source.route
+    }
+}
+
+impl Deref for RegistryFacts<'_> {
+    type Target = Registry;
+
+    fn deref(&self) -> &Registry {
+        &self.registry
+    }
+}
+
+impl Registry {
+    /// Whether a current component has no physical member: the strict
+    /// census ([`inspect`]) refuses such a registry, the cross-component
+    /// read census ([`inspect_cross_component_read`]) admits it.
+    #[must_use]
+    pub fn has_unmapped_current_component(&self) -> bool {
+        self.components
+            .iter()
+            .any(|component| component.current && component.component_index.is_none())
     }
 
     #[must_use]
@@ -809,7 +849,9 @@ impl<'source> RegistryFacts<'source> {
             uuid,
         ))
     }
+}
 
+impl RegistryFacts<'_> {
     /// Allocate fresh object identifiers and deterministic nonzero UUID pairs.
     /// The starting point is above physical objects and all metadata-owned
     /// identifiers, not merely the advisory root watermark.
@@ -852,7 +894,9 @@ impl<'source> RegistryFacts<'source> {
         }
         Ok(identifiers)
     }
+}
 
+impl Registry {
     fn has_non_uuid_owner(&self, identifier: u64) -> bool {
         self.external_references.iter().any(|reference| {
             reference.object_identifier == Some(identifier)
@@ -1031,20 +1075,22 @@ impl<'source> RegistryVisitor<'source> {
             .maximum_identifier
             .max(self.maximum_identifier)
             .max(inspection.last_object_identifier());
-        Ok(RegistryFacts {
+        Ok(RegistryFacts::from_shared(
             source,
-            components: self.components,
-            uuids: self.uuids,
-            external_references: self.external_references,
-            data_owners: self.data_owners,
-            ambiguous_identifiers: self.ambiguous_identifiers,
-            root_data_map_identifier: self.root_data_map_identifier,
-            last_object_identifier: inspection.last_object_identifier(),
-            maximum_identifier,
-            physical_identifiers: physical.identifiers,
-            physical_alias: physical.duplicate_identifier,
-            report: inspection.report(),
-        })
+            Arc::new(Registry {
+                components: self.components,
+                uuids: self.uuids,
+                external_references: self.external_references,
+                data_owners: self.data_owners,
+                ambiguous_identifiers: self.ambiguous_identifiers,
+                root_data_map_identifier: self.root_data_map_identifier,
+                last_object_identifier: inspection.last_object_identifier(),
+                maximum_identifier,
+                physical_identifiers: physical.identifiers,
+                physical_alias: physical.duplicate_identifier,
+                report: inspection.report(),
+            }),
+        ))
     }
 }
 
