@@ -220,10 +220,6 @@ pub struct Builder {
     columns: usize,
     language: String,
     locale: String,
-    /// Whether the table's owner records its extents (record 0370i). The
-    /// Pages builder borrows this graph without them: the Pages body-table
-    /// engines refuse an owner with spanning extents.
-    owner_extents: bool,
 }
 
 impl Default for Builder {
@@ -235,7 +231,6 @@ impl Default for Builder {
             columns: DEFAULT_COLUMNS,
             language: DEFAULT_LANGUAGE.to_owned(),
             locale: DEFAULT_LOCALE.to_owned(),
-            owner_extents: true,
         }
     }
 }
@@ -272,12 +267,6 @@ impl Builder {
         self
     }
 
-    /// Leave the table owner's extents out, as the Pages bootstrap needs.
-    pub(crate) const fn without_owner_extents(mut self) -> Self {
-        self.owner_extents = false;
-        self
-    }
-
     /// Build a mutable editor for the generated spreadsheet.
     pub fn build(self) -> Result<Draft> {
         Draft::from_package(self.build_package()?)
@@ -295,11 +284,7 @@ impl Builder {
         )?;
         package.replace_archive(
             CALCULATION_ARCHIVE_ENTRY,
-            &calculation_archive(
-                &self.locale,
-                &table_uuid,
-                self.owner_extents.then_some((self.rows, self.columns)),
-            )?,
+            &calculation_archive(&self.locale, &table_uuid, (self.rows, self.columns))?,
         )?;
         package.replace_archive(STYLESHEET_ARCHIVE_ENTRY, &stylesheet_archive()?)?;
         package.replace_archive(VIEW_STATE_ARCHIVE_ENTRY, &view_state_archive()?)?;
@@ -838,26 +823,24 @@ fn document_metadata_archive() -> Result<Archive> {
 fn calculation_archive(
     locale: &str,
     table_uuid: &tsp::Uuid,
-    extents: Option<(usize, usize)>,
+    (rows, columns): (usize, usize),
 ) -> Result<Archive> {
     let mut formula_owner =
         empty_table_formula_owner(table_uuid, TABLE_INFO, TABLE_FORMULA_OWNER_INTERNAL_ID);
     // Host defect fixed with record 0370i: the table's owner carried no
     // table or body extents; native table owners (and tables added by the
     // editor since record 0370f) record both.
-    if let Some((rows, columns)) = extents {
-        let count = |value: usize| u32::try_from(value).unwrap_or(u32::MAX);
-        let extents = super::editor::formula_dependency_shift::TableExtents::of(
-            count(rows),
-            count(columns),
-            1,
-            1,
-            0,
-        );
-        let spanning = extents.spanning_dependencies();
-        formula_owner.spanning_column_dependencies = Some(spanning.clone());
-        formula_owner.spanning_row_dependencies = Some(spanning);
-    }
+    let count = |value: usize| u32::try_from(value).unwrap_or(u32::MAX);
+    let extents = super::editor::formula_dependency_shift::TableExtents::of(
+        count(rows),
+        count(columns),
+        1,
+        1,
+        0,
+    );
+    let spanning = extents.spanning_dependencies();
+    formula_owner.spanning_column_dependencies = Some(spanning.clone());
+    formula_owner.spanning_row_dependencies = Some(spanning);
     Ok(Archive {
         objects: vec![
             object(
