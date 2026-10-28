@@ -209,11 +209,14 @@ fn populated_read_fixture(kind: Kind, property: PropertyKind) -> TestResult<Fixt
     })
 }
 
-fn reader_values_match(host: &str, leaf: &str) -> TestResult {
+fn reader_values_match(kind: Kind, property: PropertyKind, host: &str, leaf: &str) -> TestResult {
     if host == leaf {
         Ok(())
     } else {
-        Err(format!("host and leaf reader values differ: host={host:?}, leaf={leaf:?}").into())
+        Err(format!(
+            "host and leaf reader values differ for {kind:?}/{property:?}: host={host:?}, leaf={leaf:?}"
+        )
+        .into())
     }
 }
 
@@ -348,11 +351,9 @@ fn numbers_shape_style_read_parity() -> TestResult {
         (Kind::TextBox, PropertyKind::TextLayout),
     ] {
         let input = populated_read_fixture(kind, property)?;
-        assert_eq!(
-            host_read(&input.bytes, kind, property)?,
-            leaf_read(&input.bytes, kind, property)?,
-            "host and leaf readers must agree on the host-authored source"
-        );
+        let host_value = host_read(&input.bytes, kind, property)?;
+        let leaf_value = leaf_read(&input.bytes, kind, property)?;
+        reader_values_match(kind, property, &host_value, &leaf_value)?;
         Case::new(
             "numbers_shape_style_read_parity",
             Format::Numbers,
@@ -380,12 +381,12 @@ fn numbers_shape_style_read_parity_rejects_mismatched_reader_values() -> TestRes
     let host = host_read(&input.bytes, Kind::Shape, PropertyKind::Fill)?;
     let mut mismatched_leaf = leaf_read(&input.bytes, Kind::Shape, PropertyKind::Fill)?;
     mismatched_leaf.push_str(" (negative-control mismatch)");
-    let error = reader_values_match(&host, &mismatched_leaf)
+    let error = reader_values_match(Kind::Shape, PropertyKind::Fill, &host, &mismatched_leaf)
         .expect_err("the read proof must reject mismatched reader values");
     assert!(
         error
             .to_string()
-            .contains("host and leaf reader values differ"),
+            .contains("host and leaf reader values differ for Shape/Fill"),
         "unexpected mismatch error: {error}"
     );
     Ok(())
