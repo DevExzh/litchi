@@ -87,10 +87,30 @@ bounded graph algorithm and native evidence.
 crates/litchi-iwa/tests/parity/chart_text_cost.rs contains the source-bound
 host/leaf ABBA probe for Numbers and Pages title/category/value routes. It
 includes open, selector resolution, mutation, commit, candidate reopen and
-serialization on both routes. The ignored probe was run once as a functional
-smoke check (one passing test); it intentionally records no wall-clock data
-and does not qualify performance. Final integrated release-mode, pinned-CPU
-measurement remains required.
+serialization on both routes. The ignored probe passed as a functional smoke
+check, and a pre-integration release callgrind run recorded these instruction
+counts (six calls per route; route totals, not an engine-only extrapolation):
+
+| Route | Host Ir | Leaf Ir | Difference |
+|---|---:|---:|---:|
+| Numbers title/category/value | 453,131,860 | 217,590,505 | -52.0% |
+| Pages title/category/value | 326,433,860 | 14,267,859 | -95.6% |
+
+The raw callgrind files remain outside the checkout under `/tmp`:
+`litchi-w1e-chart-text-{host-numbers,host-pages,leaf-numbers,leaf-pages}.callgrind`
+(117,751 / 121,749 / 106,267 / 92,341 bytes; SHA-256 respectively
+`22f03fbd3c95ac8da61cf7544f9daf12db532afde3b64865e93efef8ac2c5448`,
+`cf40c745b4a3b00dc015e25a8028c6fc1a5e743da3beeb545e1626b2ac185fe0`,
+`93b8c74e53dc84400eff742be10a762318744ff0fb99cfde01e185e7a2135973`,
+`599ea051b8f04c745e8db05fd8fba1e173d9630f89901d35656125a10c4f50ce`).
+The release probe binary was built from ae062046d5 with
+`CARGO_BUILD_JOBS=4 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 cargo
+test --release --offline -p litchi-iwa --test parity chart_text_cost_abba
+--no-run`; its 39,643,816-byte SHA-256 is
+`8adc4f35bf5a254663efe3108ee99b09fd88db101e0c8a7d09fb81cf74117cbe`.
+These counts are branch diagnostics only: later merges invalidate them, no
+wall-clock result is claimed, and final integrated release-mode, pinned-CPU
+qualification remains required.
 
 The coordinator should run the final integrated candidate with release
 debug-info, CPU pinning and callgrind, collecting
