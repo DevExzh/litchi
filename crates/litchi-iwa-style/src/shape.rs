@@ -40,6 +40,7 @@
 //! families' own values.
 
 use std::collections::{BTreeMap, HashSet};
+use std::mem::size_of;
 
 use litchi_iwa_common::wire;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
@@ -73,6 +74,1294 @@ const HEAD_LINE_END: u32 = 6;
 const TAIL_LINE_END: u32 = 7;
 const SHAPE_PROPERTY_FIELDS: std::ops::RangeInclusive<u32> = 1..=7;
 const TEXT_PROPERTY_FIELDS: std::ops::RangeInclusive<u32> = 1..=6;
+
+/// Residual resources admitted by one stylesheet registration transition.
+///
+/// This is crate-private because format owners consume the shared graph
+/// engine rather than exposing a second public stylesheet API. The helper
+/// keeps the existing shape byte-rewrite path, but all nested scans,
+/// fallible-vector capacity and candidate output are admitted first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RegistrationLimits {
+    pub(crate) max_input_bytes: usize,
+    pub(crate) max_fields: usize,
+    pub(crate) max_output_bytes: usize,
+    pub(crate) max_work_bytes: usize,
+    pub(crate) max_allocations: usize,
+    pub(crate) max_scratch_bytes: usize,
+}
+
+/// Resource dimensions owned by the stylesheet registration seam.
+///
+/// `litchi_iwa_common::LimitKind` has no allocation or scratch dimensions;
+/// keeping those dimensions private avoids coercing them into rewrite work
+/// until the chart-font owner has a matching typed adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RegistrationLimitKind {
+    InputBytes,
+    Fields,
+    OutputBytes,
+    Work,
+    Allocations,
+    ScratchBytes,
+}
+
+/// Typed failure from a bounded stylesheet registration transition.
+#[derive(Debug)]
+pub(crate) enum RegistrationError {
+    Limit {
+        kind: RegistrationLimitKind,
+        observed: usize,
+        maximum: usize,
+    },
+    Allocation {
+        resource: &'static str,
+        amount: usize,
+    },
+    Wire(litchi_iwa_common::Error),
+    Graph(Error),
+    Invalid(&'static str),
+}
+
+type RegistrationResult<T> = std::result::Result<T, RegistrationError>;
+
+#[cfg(test)]
+mod registration_tests {
+    use super::{
+        RegistrationError, RegistrationLimitKind, RegistrationLimits,
+        stylesheet_with_variation_admitted, stylesheet_without_variation_admitted,
+        stylesheet_writer_output_bound,
+    };
+    use crate::graph::push_message_field;
+
+    fn reference(identifier: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        crate::graph::push_varint_field(&mut output, 1, identifier);
+        output
+    }
+
+    fn stylesheet_with_child(extra_child: Option<u64>) -> Vec<u8> {
+        let mut output = Vec::new();
+        push_message_field(&mut output, 1, &reference(11));
+        push_message_field(&mut output, 1, &reference(12));
+        let mut children = Vec::new();
+        push_message_field(&mut children, 1, &reference(10));
+        push_message_field(&mut children, 2, &reference(11));
+        push_message_field(&mut children, 2, &reference(12));
+        if let Some(extra_child) = extra_child {
+            push_message_field(&mut children, 2, &reference(extra_child));
+        }
+        crate::graph::push_varint_field(&mut children, 99, 8);
+        push_message_field(&mut output, 5, &children);
+        let mut second_parent = Vec::new();
+        push_message_field(&mut second_parent, 1, &reference(20));
+        push_message_field(&mut second_parent, 2, &reference(21));
+        push_message_field(&mut output, 5, &second_parent);
+        crate::graph::push_varint_field(&mut output, 99, 7);
+        output
+    }
+
+    fn stylesheet() -> Vec<u8> {
+        stylesheet_with_child(None)
+    }
+
+    fn limits() -> RegistrationLimits {
+        RegistrationLimits {
+            max_input_bytes: 4096,
+            max_fields: 4096,
+            max_output_bytes: 4096,
+            max_work_bytes: 32_768,
+            max_allocations: 4096,
+            max_scratch_bytes: 32_768,
+        }
+    }
+
+    #[test]
+    fn bounded_registration_preserves_unknowns_and_multiple_children() {
+        let source = stylesheet();
+        let (registered, report) = stylesheet_with_variation_admitted(&source, 10, 13, limits())
+            .expect("bounded registration");
+        assert!(registered.windows(2).any(|window| window == [0x98, 0x06]));
+        assert!(report.fields > 5);
+        assert!(report.work_bytes > 0);
+        assert!(report.allocations > 1);
+        assert!(report.scratch_bytes > 0);
+        assert!(report.output_bytes > 0);
+        let (restored, removal) =
+            stylesheet_without_variation_admitted(&registered, 10, 13, limits())
+                .expect("bounded unregistration");
+        assert_eq!(restored, source);
+        assert!(removal.allocations > 1);
+    }
+
+    #[test]
+    fn bounded_registration_refuses_output_before_candidate_buffer() {
+        let source = stylesheet();
+        let mut limited = limits();
+        limited.max_output_bytes = 0;
+        let error = stylesheet_with_variation_admitted(&source, 10, 13, limited)
+            .expect_err("zero output must refuse before a candidate is allocated");
+        match error {
+            RegistrationError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => {
+                assert_eq!(kind, RegistrationLimitKind::OutputBytes);
+                assert!(observed > maximum);
+            },
+            other => panic!("unexpected output refusal: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bounded_registration_refuses_style_already_listed_as_child() {
+        let source = stylesheet_with_child(Some(13));
+        let error = stylesheet_with_variation_admitted(&source, 10, 13, limits())
+            .expect_err("a style already listed by any parent must be refused");
+        assert!(matches!(error, RegistrationError::Invalid(_)));
+    }
+
+    #[test]
+    fn bounded_registration_writer_boundary_is_admitted_once() {
+        let source = stylesheet();
+        let bound = stylesheet_writer_output_bound(&source, 10, 13, 1).expect("writer bound");
+        let mut exact = limits();
+        exact.max_output_bytes = bound;
+        stylesheet_with_variation_admitted(&source, 10, 13, exact)
+            .expect("the pre-admitted writer bound fits exactly once");
+
+        let mut short = limits();
+        short.max_output_bytes = bound.saturating_sub(1);
+        let error = stylesheet_with_variation_admitted(&source, 10, 13, short)
+            .expect_err("validation may fit while the writer phase does not");
+        assert!(matches!(
+            error,
+            RegistrationError::Limit {
+                kind: RegistrationLimitKind::OutputBytes,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn bounded_registration_refuses_each_zero_dimension_before_rewrite() {
+        fn zero_fields(limits: &mut RegistrationLimits) {
+            limits.max_fields = 0;
+        }
+        fn zero_work(limits: &mut RegistrationLimits) {
+            limits.max_work_bytes = 0;
+        }
+        fn zero_allocations(limits: &mut RegistrationLimits) {
+            limits.max_allocations = 0;
+        }
+        fn zero_scratch(limits: &mut RegistrationLimits) {
+            limits.max_scratch_bytes = 0;
+        }
+        let source = stylesheet();
+        let cases: &[(RegistrationLimitKind, fn(&mut RegistrationLimits))] = &[
+            (RegistrationLimitKind::Fields, zero_fields),
+            (RegistrationLimitKind::Work, zero_work),
+            (RegistrationLimitKind::Allocations, zero_allocations),
+            (RegistrationLimitKind::ScratchBytes, zero_scratch),
+        ];
+        for &(expected, mutate) in cases {
+            let mut limited = limits();
+            mutate(&mut limited);
+            let error = stylesheet_with_variation_admitted(&source, 10, 13, limited)
+                .expect_err("zero resource must refuse before rewriting");
+            match error {
+                RegistrationError::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                } => {
+                    assert_eq!(kind, expected);
+                    assert!(observed > maximum);
+                },
+                other => panic!("unexpected registration refusal: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_registration_reports_nonzero_insufficient_dimensions() {
+        fn one_fields(limits: &mut RegistrationLimits) {
+            limits.max_fields = 1;
+        }
+        fn one_work(limits: &mut RegistrationLimits) {
+            limits.max_work_bytes = 1;
+        }
+        fn one_allocations(limits: &mut RegistrationLimits) {
+            limits.max_allocations = 1;
+        }
+        fn one_scratch(limits: &mut RegistrationLimits) {
+            limits.max_scratch_bytes = 1;
+        }
+        let source = stylesheet();
+        let cases: &[(RegistrationLimitKind, fn(&mut RegistrationLimits))] = &[
+            (RegistrationLimitKind::Fields, one_fields),
+            (RegistrationLimitKind::Work, one_work),
+            (RegistrationLimitKind::Allocations, one_allocations),
+            (RegistrationLimitKind::ScratchBytes, one_scratch),
+        ];
+        for &(expected, mutate) in cases {
+            let mut limited = limits();
+            mutate(&mut limited);
+            let error = stylesheet_with_variation_admitted(&source, 10, 13, limited)
+                .expect_err("insufficient resource must refuse before rewriting");
+            match error {
+                RegistrationError::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                } => {
+                    assert_eq!(kind, expected);
+                    assert!(observed > maximum);
+                },
+                other => panic!("unexpected registration refusal: {other:?}"),
+            }
+        }
+    }
+}
+
+/// Bounded work consumed by one stylesheet registration transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RegistrationReport {
+    pub(crate) input_bytes: usize,
+    pub(crate) output_bytes: usize,
+    pub(crate) fields: usize,
+    pub(crate) work_bytes: usize,
+    pub(crate) allocations: usize,
+    pub(crate) scratch_bytes: usize,
+}
+
+impl RegistrationLimits {
+    pub(crate) const PERMISSIVE: Self = Self {
+        max_input_bytes: litchi_iwa_common::WireLimits::MAX_INPUT_BYTES,
+        max_fields: litchi_iwa_common::WireLimits::MAX_FIELDS,
+        max_output_bytes: litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES,
+        max_work_bytes: litchi_iwa_common::WireLimits::MAX_REWRITE_WORK,
+        max_allocations: litchi_iwa_common::WireLimits::MAX_FIELDS,
+        max_scratch_bytes: litchi_iwa_common::WireLimits::MAX_INPUT_BYTES,
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RegistrationScan {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    allocations: usize,
+    scratch_bytes: usize,
+}
+
+impl RegistrationScan {
+    const fn empty() -> Self {
+        Self {
+            input_bytes: 0,
+            output_bytes: 0,
+            fields: 0,
+            work_bytes: 0,
+            allocations: 0,
+            scratch_bytes: 0,
+        }
+    }
+}
+
+fn registration_limit(
+    kind: RegistrationLimitKind,
+    observed: usize,
+    maximum: usize,
+) -> RegistrationError {
+    RegistrationError::Limit {
+        kind,
+        observed,
+        maximum,
+    }
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error) -> RegistrationError {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => match kind {
+            litchi_iwa_common::LimitKind::InputBytes => {
+                registration_limit(RegistrationLimitKind::InputBytes, observed, limit)
+            },
+            litchi_iwa_common::LimitKind::Fields => {
+                registration_limit(RegistrationLimitKind::Fields, observed, limit)
+            },
+            litchi_iwa_common::LimitKind::OutputBytes => {
+                registration_limit(RegistrationLimitKind::OutputBytes, observed, limit)
+            },
+            litchi_iwa_common::LimitKind::RewriteWork => {
+                registration_limit(RegistrationLimitKind::Work, observed, limit)
+            },
+            other => RegistrationError::Wire(litchi_iwa_common::Error::LimitExceeded {
+                kind: other,
+                observed,
+                limit,
+            }),
+        },
+        litchi_iwa_common::Error::Allocation { resource, amount } => {
+            RegistrationError::Allocation { resource, amount }
+        },
+        other => RegistrationError::Wire(other),
+    }
+}
+
+impl From<litchi_iwa_common::Error> for RegistrationError {
+    fn from(error: litchi_iwa_common::Error) -> Self {
+        map_wire_error(error)
+    }
+}
+
+impl From<Error> for RegistrationError {
+    fn from(error: Error) -> Self {
+        Self::Graph(error)
+    }
+}
+
+fn registration_add(
+    current: &mut usize,
+    amount: usize,
+    maximum: usize,
+    kind: RegistrationLimitKind,
+) -> RegistrationResult<()> {
+    let observed = current
+        .checked_add(amount)
+        .ok_or_else(|| registration_limit(kind, usize::MAX, maximum))?;
+    if observed > maximum {
+        return Err(registration_limit(kind, observed, maximum));
+    }
+    *current = observed;
+    Ok(())
+}
+
+fn registration_admit(
+    current: usize,
+    amount: usize,
+    maximum: usize,
+    kind: RegistrationLimitKind,
+) -> RegistrationResult<()> {
+    let observed = current
+        .checked_add(amount)
+        .ok_or_else(|| registration_limit(kind, usize::MAX, maximum))?;
+    if observed > maximum {
+        return Err(registration_limit(kind, observed, maximum));
+    }
+    Ok(())
+}
+
+fn registration_reserve_scan(
+    scan: &mut RegistrationScan,
+    requirement: RegistrationScan,
+    limits: RegistrationLimits,
+) -> RegistrationResult<()> {
+    registration_add(
+        &mut scan.input_bytes,
+        requirement.input_bytes,
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_add(
+        &mut scan.fields,
+        requirement.fields,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        requirement.work_bytes,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        requirement.allocations,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        requirement.scratch_bytes,
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    Ok(())
+}
+
+fn registration_remaining(
+    current: usize,
+    maximum: usize,
+    kind: RegistrationLimitKind,
+) -> RegistrationResult<usize> {
+    maximum
+        .checked_sub(current)
+        .filter(|remaining| *remaining > 0)
+        .ok_or_else(|| registration_limit(kind, current.saturating_add(1), maximum))
+}
+
+fn registration_wire_limits(
+    limits: RegistrationLimits,
+    scan: &RegistrationScan,
+) -> RegistrationResult<litchi_iwa_common::WireLimits> {
+    let input = registration_remaining(
+        scan.input_bytes,
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    let fields = registration_remaining(
+        scan.fields,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    let work = registration_remaining(
+        scan.work_bytes,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?
+    .min(litchi_iwa_common::WireLimits::MAX_REWRITE_WORK);
+    litchi_iwa_common::WireLimits::DEFAULT
+        .with_input_bytes(input)
+        .and_then(|value| value.with_fields(fields))
+        .and_then(|value| value.with_rewrite_work(work))
+        .map_err(map_wire_error)
+}
+
+fn registration_fields(
+    data: &[u8],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<Vec<wire::WireField>> {
+    registration_admit(
+        scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_admit(
+        scan.work_bytes,
+        data.len(),
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    let wire_limits = registration_wire_limits(limits, scan)?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        size_of::<wire::WireField>(),
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    let mut field_count = 0usize;
+    wire::visit_wire_fields(data, wire_limits, |_field| {
+        field_count = field_count.saturating_add(1);
+        Ok(())
+    })
+    .map_err(map_wire_error)?;
+    let second_work = data.len().checked_add(field_count).ok_or_else(|| {
+        registration_limit(
+            RegistrationLimitKind::Work,
+            usize::MAX,
+            limits.max_work_bytes,
+        )
+    })?;
+    let first_work = second_work;
+    registration_add(
+        &mut scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_add(
+        &mut scan.fields,
+        field_count,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        first_work,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_admit(
+        scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_admit(
+        scan.fields,
+        field_count,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_admit(
+        scan.work_bytes,
+        second_work,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    let second_wire_limits = registration_wire_limits(limits, scan)?;
+    let field_storage = field_count
+        .checked_mul(size_of::<wire::WireField>())
+        .ok_or_else(|| {
+            registration_limit(
+                RegistrationLimitKind::ScratchBytes,
+                usize::MAX,
+                limits.max_scratch_bytes,
+            )
+        })?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        field_storage,
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    let fields = wire::parse_wire_fields(data, second_wire_limits).map_err(map_wire_error)?;
+    registration_add(
+        &mut scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_add(
+        &mut scan.fields,
+        field_count,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        second_work,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    Ok(fields)
+}
+
+fn scan_reference(
+    data: &[u8],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<()> {
+    let fields = registration_fields(data, limits, scan)?;
+    if fields
+        .iter()
+        .any(|field| field.number() == REFERENCE_IDENTIFIER && field.wire_type() != 0)
+    {
+        return Err(RegistrationError::Invalid(
+            "a stylesheet reference has the wrong wire type",
+        ));
+    }
+    Ok(())
+}
+
+fn scan_stylesheet(
+    stylesheet: &[u8],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<()> {
+    let fields = registration_fields(stylesheet, limits, scan)?;
+    for field in fields {
+        if field.wire_type() != 2
+            || !matches!(
+                field.number(),
+                STYLESHEET_STYLES | STYLESHEET_PARENT_CHILDREN
+            )
+        {
+            continue;
+        }
+        let payload = field.payload(stylesheet).map_err(map_wire_error)?;
+        if field.number() == STYLESHEET_STYLES {
+            scan_reference(payload, limits, scan)?;
+        } else {
+            let children = registration_fields(payload, limits, scan)?;
+            for child in children {
+                if child.number() == CHILDREN && child.wire_type() == 2 {
+                    scan_reference(
+                        child.payload(payload).map_err(map_wire_error)?,
+                        limits,
+                        scan,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn bounded_copy(
+    bytes: &[u8],
+    scan: &mut RegistrationScan,
+    limits: RegistrationLimits,
+    resource: &'static str,
+) -> RegistrationResult<Vec<u8>> {
+    registration_add(
+        &mut scan.scratch_bytes,
+        bytes.len(),
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|_| RegistrationError::Allocation {
+            resource,
+            amount: bytes.len(),
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(output)
+}
+
+fn registration_reserve<T>(
+    output: &mut Vec<T>,
+    additional: usize,
+    scan: &mut RegistrationScan,
+    limits: RegistrationLimits,
+    resource: &'static str,
+) -> RegistrationResult<()> {
+    if additional == 0 {
+        return Ok(());
+    }
+    let bytes = additional.checked_mul(size_of::<T>()).ok_or_else(|| {
+        registration_limit(
+            RegistrationLimitKind::ScratchBytes,
+            usize::MAX,
+            limits.max_scratch_bytes,
+        )
+    })?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        bytes,
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    output
+        .try_reserve_exact(additional)
+        .map_err(|_| RegistrationError::Allocation {
+            resource,
+            amount: additional,
+        })?;
+    Ok(())
+}
+
+fn bounded_reference_identifier(
+    data: &[u8],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<u64> {
+    let fields = registration_fields(data, limits, scan)?;
+    let field = fields
+        .iter()
+        .find(|field| field.number() == REFERENCE_IDENTIFIER)
+        .ok_or(RegistrationError::Invalid(
+            "a stylesheet reference has no identifier",
+        ))?;
+    if field.wire_type() != 0 {
+        return Err(RegistrationError::Invalid(
+            "a stylesheet reference has the wrong wire type",
+        ));
+    }
+    let (identifier, _) = litchi_iwa_common::decode_varint_from_bytes(
+        &data[field.key_end()..field.end()],
+    )
+    .map_err(|_| RegistrationError::Invalid("a stylesheet reference identifier is malformed"))?;
+    Ok(identifier)
+}
+
+fn bounded_repeated_payloads(
+    data: &[u8],
+    number: u32,
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<Vec<Vec<u8>>> {
+    let fields = registration_fields(data, limits, scan)?;
+    let count = fields
+        .iter()
+        .filter(|field| field.number() == number)
+        .count();
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    let mut payloads = Vec::new();
+    payloads
+        .try_reserve_exact(count)
+        .map_err(|_| RegistrationError::Allocation {
+            resource: "stylesheet repeated payloads",
+            amount: count,
+        })?;
+    for field in fields {
+        if field.number() != number {
+            continue;
+        }
+        if field.wire_type() != 2 {
+            return Err(RegistrationError::Invalid(
+                "a repeated stylesheet field has the wrong wire type",
+            ));
+        }
+        payloads.push(bounded_copy(
+            field.payload(data).map_err(map_wire_error)?,
+            scan,
+            limits,
+            "stylesheet repeated payload",
+        )?);
+    }
+    Ok(payloads)
+}
+
+fn encoded_message_len(number: u32, payload_len: usize) -> RegistrationResult<usize> {
+    let key = (u64::from(number) << 3) | 2;
+    let length = u64::try_from(payload_len)
+        .map_err(|_| RegistrationError::Invalid("stylesheet payload is too large"))?;
+    litchi_iwa_common::varint::encoded_len(key)
+        .checked_add(litchi_iwa_common::varint::encoded_len(length))
+        .and_then(|value| value.checked_add(payload_len))
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet output length overflow",
+        ))
+}
+
+fn stylesheet_writer_output_bound(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    parent_matches: usize,
+) -> RegistrationResult<usize> {
+    let reference_len = litchi_iwa_common::varint::encoded_len(REFERENCE_IDENTIFIER as u64)
+        .checked_add(litchi_iwa_common::varint::encoded_len(style))
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet writer reference length overflow",
+        ))?;
+    let style_field = encoded_message_len(STYLESHEET_STYLES, reference_len)?;
+    let child_field = encoded_message_len(CHILDREN, reference_len)?;
+    let parent_change = if parent_matches == 0 {
+        let parent_ref = litchi_iwa_common::varint::encoded_len(REFERENCE_IDENTIFIER as u64)
+            .checked_add(litchi_iwa_common::varint::encoded_len(parent))
+            .ok_or(RegistrationError::Invalid(
+                "stylesheet parent reference length overflow",
+            ))?;
+        let entry = encoded_message_len(CHILDREN_PARENT, parent_ref)?
+            .checked_add(child_field)
+            .ok_or(RegistrationError::Invalid(
+                "stylesheet parent entry length overflow",
+            ))?;
+        encoded_message_len(STYLESHEET_PARENT_CHILDREN, entry)?
+    } else {
+        // The existing field is rewritten with one additional child. Allow
+        // for a changed length-prefix width as well as the new child field.
+        child_field.saturating_add(2)
+    };
+    stylesheet
+        .len()
+        .checked_add(style_field)
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet writer output bound overflow",
+        ))?
+        .checked_add(parent_change)
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet writer output bound overflow",
+        ))
+}
+
+fn prepare_output(
+    output_len: usize,
+    scan: &mut RegistrationScan,
+    limits: RegistrationLimits,
+) -> RegistrationResult<Vec<u8>> {
+    registration_add(
+        &mut scan.output_bytes,
+        output_len,
+        limits.max_output_bytes,
+        RegistrationLimitKind::OutputBytes,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        output_len,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| RegistrationError::Allocation {
+            resource: "stylesheet candidate output",
+            amount: output_len,
+        })?;
+    Ok(output)
+}
+
+fn bounded_rewrite_repeated(
+    data: &[u8],
+    number: u32,
+    replacements: &[Vec<u8>],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<Vec<u8>> {
+    let fields = registration_fields(data, limits, scan)?;
+    let matches = fields
+        .iter()
+        .filter(|field| field.number() == number)
+        .count();
+    for field in fields.iter().filter(|field| field.number() == number) {
+        if field.wire_type() != 2 {
+            return Err(RegistrationError::Invalid(
+                "a repeated stylesheet field has the wrong wire type",
+            ));
+        }
+    }
+    let removed = fields
+        .iter()
+        .filter(|field| field.number() == number)
+        .try_fold(0usize, |total, field| {
+            total.checked_add(field.end() - field.start())
+        })
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet output length overflow",
+        ))?;
+    let mut replacement_len = 0usize;
+    for payload in replacements {
+        replacement_len = replacement_len
+            .checked_add(encoded_message_len(number, payload.len())?)
+            .ok_or(RegistrationError::Invalid(
+                "stylesheet output length overflow",
+            ))?;
+    }
+    let output_len = data
+        .len()
+        .checked_sub(removed)
+        .and_then(|value| value.checked_add(replacement_len))
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet output length overflow",
+        ))?;
+    let mut output = prepare_output(output_len, scan, limits)?;
+    let mut replacement_index = 0usize;
+    for field in fields {
+        if field.number() == number {
+            if let Some(payload) = replacements.get(replacement_index) {
+                output.extend_from_slice(field.key(data).map_err(map_wire_error)?);
+                push_varint(&mut output, payload.len() as u64);
+                output.extend_from_slice(payload);
+            }
+            replacement_index += 1;
+        } else {
+            output.extend_from_slice(field.raw(data).map_err(map_wire_error)?);
+        }
+    }
+    if matches == 0 {
+        for payload in replacements {
+            push_message_field(&mut output, number, payload);
+        }
+    } else if replacement_index < replacements.len() {
+        for payload in &replacements[replacement_index..] {
+            push_message_field(&mut output, number, payload);
+        }
+    }
+    debug_assert_eq!(output.len(), output_len);
+    Ok(output)
+}
+
+fn map_char_style_error(error: litchi_iwa_text_wire::CharStyleError) -> RegistrationError {
+    match error {
+        litchi_iwa_text_wire::CharStyleError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => match kind {
+            litchi_iwa_common::LimitKind::InputBytes => {
+                registration_limit(RegistrationLimitKind::InputBytes, observed, maximum)
+            },
+            litchi_iwa_common::LimitKind::Fields => {
+                registration_limit(RegistrationLimitKind::Fields, observed, maximum)
+            },
+            litchi_iwa_common::LimitKind::OutputBytes => {
+                registration_limit(RegistrationLimitKind::OutputBytes, observed, maximum)
+            },
+            litchi_iwa_common::LimitKind::RewriteWork => {
+                registration_limit(RegistrationLimitKind::Work, observed, maximum)
+            },
+            other => RegistrationError::Wire(litchi_iwa_common::Error::LimitExceeded {
+                kind: other,
+                observed,
+                limit: maximum,
+            }),
+        },
+        litchi_iwa_text_wire::CharStyleError::Allocation { amount } => {
+            RegistrationError::Allocation {
+                resource: "stylesheet text-wire output",
+                amount,
+            }
+        },
+        litchi_iwa_text_wire::CharStyleError::Invalid
+        | litchi_iwa_text_wire::CharStyleError::Span => {
+            RegistrationError::Invalid("invalid stylesheet text-wire payload")
+        },
+        _ => RegistrationError::Invalid("unsupported stylesheet text-wire failure"),
+    }
+}
+
+fn bounded_register(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
+    let mut scan = RegistrationScan::empty();
+    scan_stylesheet(stylesheet, limits, &mut scan)?;
+    let writer_requirement = scan;
+    let styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
+    for payload in &styles {
+        if bounded_reference_identifier(payload, limits, &mut scan)? == style {
+            return Err(RegistrationError::Invalid(
+                "the stylesheet already lists a new style",
+            ));
+        }
+    }
+    let parent_entries =
+        bounded_repeated_payloads(stylesheet, STYLESHEET_PARENT_CHILDREN, limits, &mut scan)?;
+    let mut parent_matches = 0usize;
+    for entry in &parent_entries {
+        let entry_parent = bounded_repeated_payloads(entry, CHILDREN_PARENT, limits, &mut scan)?
+            .first()
+            .map(|payload| bounded_reference_identifier(payload, limits, &mut scan))
+            .transpose()?
+            .unwrap_or(0);
+        if entry_parent == parent {
+            parent_matches += 1;
+        }
+        for child in bounded_repeated_payloads(entry, CHILDREN, limits, &mut scan)? {
+            if bounded_reference_identifier(&child, limits, &mut scan)? == style {
+                return Err(RegistrationError::Invalid(
+                    "the stylesheet already lists a new style as a child",
+                ));
+            }
+        }
+    }
+    if parent_matches > 1 {
+        return Err(RegistrationError::Invalid(
+            "the stylesheet repeats a parent style",
+        ));
+    }
+    // The shared text-wire writer preserves insertion-after-last-style and
+    // unknown/order bytes exactly. Reserve the initial scan's traversal cost
+    // for the writer phase without executing a second preflight traversal.
+    let scan_before_writer = scan;
+    let mut admitted_scan = scan;
+    registration_reserve_scan(&mut admitted_scan, writer_requirement, limits)?;
+    let output_remaining = limits
+        .max_output_bytes
+        .checked_sub(scan_before_writer.output_bytes)
+        .ok_or(RegistrationError::Limit {
+            kind: RegistrationLimitKind::OutputBytes,
+            observed: scan_before_writer.output_bytes.saturating_add(1),
+            maximum: limits.max_output_bytes,
+        })?;
+    if output_remaining == 0 {
+        return Err(registration_limit(
+            RegistrationLimitKind::OutputBytes,
+            scan_before_writer.output_bytes.saturating_add(1),
+            limits.max_output_bytes,
+        ));
+    }
+    let wire_limits = registration_wire_limits(limits, &scan_before_writer)?
+        .with_output_bytes(output_remaining)
+        .map_err(map_wire_error)?;
+    let output_bound = stylesheet_writer_output_bound(stylesheet, parent, style, parent_matches)?;
+    registration_add(
+        &mut admitted_scan.output_bytes,
+        output_bound,
+        limits.max_output_bytes,
+        RegistrationLimitKind::OutputBytes,
+    )?;
+    registration_add(
+        &mut admitted_scan.work_bytes,
+        output_bound,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_add(
+        &mut admitted_scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    registration_add(
+        &mut admitted_scan.scratch_bytes,
+        stylesheet.len(),
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    scan = admitted_scan;
+    let output =
+        litchi_iwa_text_wire::stylesheet_with_style(stylesheet, style, Some(parent), wire_limits)
+            .map_err(map_char_style_error)?;
+    Ok((
+        output,
+        RegistrationReport {
+            input_bytes: scan.input_bytes,
+            output_bytes: scan.output_bytes,
+            fields: scan.fields,
+            work_bytes: scan.work_bytes,
+            allocations: scan.allocations,
+            scratch_bytes: scan.scratch_bytes,
+        },
+    ))
+}
+
+fn bounded_unregister(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
+    let mut scan = RegistrationScan::empty();
+    scan_stylesheet(stylesheet, limits, &mut scan)?;
+    let styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
+    let mut listed = 0usize;
+    let mut kept_styles = Vec::new();
+    registration_reserve(
+        &mut kept_styles,
+        styles.len(),
+        &mut scan,
+        limits,
+        "stylesheet kept styles",
+    )?;
+    for payload in styles {
+        if bounded_reference_identifier(&payload, limits, &mut scan)? == style {
+            listed += 1;
+        } else {
+            kept_styles.push(payload);
+        }
+    }
+    if listed != 1 {
+        return Err(RegistrationError::Invalid(
+            "the stylesheet must list a removed style once",
+        ));
+    }
+    let data = bounded_rewrite_repeated(
+        stylesheet,
+        STYLESHEET_STYLES,
+        &kept_styles,
+        limits,
+        &mut scan,
+    )?;
+    let entries = bounded_repeated_payloads(&data, STYLESHEET_PARENT_CHILDREN, limits, &mut scan)?;
+    let mut removed = 0usize;
+    let mut kept_entries = Vec::new();
+    registration_reserve(
+        &mut kept_entries,
+        entries.len(),
+        &mut scan,
+        limits,
+        "stylesheet kept parent entries",
+    )?;
+    for entry in entries {
+        let entry_parent = bounded_repeated_payloads(&entry, CHILDREN_PARENT, limits, &mut scan)?
+            .first()
+            .map(|payload| bounded_reference_identifier(payload, limits, &mut scan))
+            .transpose()?
+            .unwrap_or(0);
+        let children = bounded_repeated_payloads(&entry, CHILDREN, limits, &mut scan)?;
+        let mut kept_children = Vec::new();
+        registration_reserve(
+            &mut kept_children,
+            children.len(),
+            &mut scan,
+            limits,
+            "stylesheet kept children",
+        )?;
+        let mut found = false;
+        for child in children {
+            if bounded_reference_identifier(&child, limits, &mut scan)? == style {
+                found = true;
+                removed += 1;
+            } else {
+                kept_children.push(child);
+            }
+        }
+        if found && entry_parent != parent {
+            return Err(RegistrationError::Invalid(
+                "the stylesheet maps a removed style under another parent",
+            ));
+        }
+        if found && kept_children.is_empty() {
+            continue;
+        }
+        kept_entries.push(if found {
+            bounded_rewrite_repeated(&entry, CHILDREN, &kept_children, limits, &mut scan)?
+        } else {
+            entry
+        });
+    }
+    if removed != 1 {
+        return Err(RegistrationError::Invalid(
+            "the stylesheet must map a removed style once",
+        ));
+    }
+    let output = bounded_rewrite_repeated(
+        &data,
+        STYLESHEET_PARENT_CHILDREN,
+        &kept_entries,
+        limits,
+        &mut scan,
+    )?;
+    Ok((
+        output,
+        RegistrationReport {
+            input_bytes: scan.input_bytes,
+            output_bytes: scan.output_bytes,
+            fields: scan.fields,
+            work_bytes: scan.work_bytes,
+            allocations: scan.allocations,
+            scratch_bytes: scan.scratch_bytes,
+        },
+    ))
+}
+
+/// Bounded stylesheet registration used by shape and chart-font owners.
+pub(crate) fn stylesheet_with_variation_admitted(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
+    bounded_register(stylesheet, parent, style, limits)
+}
+
+pub(crate) fn stylesheet_without_variation_admitted(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
+    bounded_unregister(stylesheet, parent, style, limits)
+}
+
+fn registration_error_to_graph(error: RegistrationError) -> Error {
+    match error {
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::InputBytes,
+            observed,
+            maximum,
+        } => Error::Wire(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::InputBytes,
+            observed,
+            limit: maximum,
+        }),
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::Fields,
+            observed,
+            maximum,
+        } => Error::Wire(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::Fields,
+            observed,
+            limit: maximum,
+        }),
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::OutputBytes,
+            observed,
+            maximum,
+        } => Error::Wire(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::OutputBytes,
+            observed,
+            limit: maximum,
+        }),
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::Work,
+            observed,
+            maximum,
+        } => Error::Wire(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::RewriteWork,
+            observed,
+            limit: maximum,
+        }),
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::Allocations,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: graph::GraphLimitKind::AllocationEvents,
+            observed,
+            maximum,
+        },
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::ScratchBytes,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: graph::GraphLimitKind::ScratchBytes,
+            observed,
+            maximum,
+        },
+        RegistrationError::Allocation { resource, amount } => {
+            Error::Wire(litchi_iwa_common::Error::Allocation { resource, amount })
+        },
+        RegistrationError::Wire(error) => Error::Wire(error),
+        RegistrationError::Graph(error) => error,
+        RegistrationError::Invalid(reason) => Error::Invalid(reason),
+    }
+}
+
+/// Compatibility adapter for existing shape callers. New bounded owners
+/// should consume [`stylesheet_with_variation_admitted`] to retain allocation
+/// and scratch dimensions instead of this legacy graph-error projection.
+pub(crate) fn stylesheet_with_variation_bounded(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> Result<(Vec<u8>, RegistrationReport)> {
+    stylesheet_with_variation_admitted(stylesheet, parent, style, limits)
+        .map_err(registration_error_to_graph)
+}
+
+pub(crate) fn stylesheet_without_variation_bounded(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> Result<(Vec<u8>, RegistrationReport)> {
+    stylesheet_without_variation_admitted(stylesheet, parent, style, limits)
+        .map_err(registration_error_to_graph)
+}
 
 /// One drawing property of `TSD.ShapeStylePropertiesArchive`.
 pub trait ShapeProperty {
@@ -794,123 +2083,15 @@ pub fn repoint(shape_info: &[u8], from: u64, to: u64) -> Result<Vec<u8>> {
     })
 }
 
-/// Register `style` in a `TSS.StylesheetArchive` payload: appended to its
-/// styles and to `parent`'s children entry (created when the parent has
-/// none). The stylesheet message's metadata gains `style` as an object
-/// reference.
-///
-/// # Errors
-///
-/// A malformed stylesheet, one that already registers `style` or repeats
-/// `parent`.
+/// Register one stylesheet variation under an explicit residual budget.
 pub fn stylesheet_with_variation(stylesheet: &[u8], parent: u64, style: u64) -> Result<Vec<u8>> {
-    let mut children_ids = Vec::new();
-    for entry in graph::repeated(stylesheet, STYLESHEET_PARENT_CHILDREN)? {
-        children_ids.extend(style_ids(entry, CHILDREN)?);
-    }
-    if style_ids(stylesheet, STYLESHEET_STYLES)?.contains(&style) || children_ids.contains(&style) {
-        return Err(Error::Invalid("the stylesheet already lists a new style"));
-    }
-    let data = wire::append_repeated_length_delimited_field(
-        stylesheet,
-        STYLESHEET_STYLES,
-        &reference(style),
-    )?;
-    let mut matches = 0usize;
-    let mut entries = Vec::new();
-    for entry in graph::repeated(&data, STYLESHEET_PARENT_CHILDREN)? {
-        let entry_parent = single(entry, CHILDREN_PARENT)?
-            .map(reference_identifier)
-            .transpose()?;
-        if entry_parent == Some(parent) {
-            matches += 1;
-            entries.push(wire::append_repeated_length_delimited_field(
-                entry,
-                CHILDREN,
-                &reference(style),
-            )?);
-        } else {
-            entries.push(entry.to_vec());
-        }
-    }
-    if matches > 1 {
-        return Err(Error::Invalid("the stylesheet repeats a parent style"));
-    }
-    if matches == 0 {
-        let mut entry = Vec::new();
-        push_message_field(&mut entry, CHILDREN_PARENT, &reference(parent));
-        push_message_field(&mut entry, CHILDREN, &reference(style));
-        entries.push(entry);
-    }
-    Ok(wire::rewrite_repeated_length_delimited_fields(
-        &data,
-        STYLESHEET_PARENT_CHILDREN,
-        &entries,
-    )?)
+    stylesheet_with_variation_bounded(stylesheet, parent, style, RegistrationLimits::PERMISSIVE)
+        .map(|(output, _report)| output)
 }
 
-/// Unregister `style` (a child of `parent`) from a `TSS.StylesheetArchive`
-/// payload; a children entry left empty is dropped. The stylesheet
-/// message's metadata loses `style` as an object reference.
-///
-/// # Errors
-///
-/// A stylesheet that does not register `style` exactly once under
-/// `parent`.
 pub fn stylesheet_without_variation(stylesheet: &[u8], parent: u64, style: u64) -> Result<Vec<u8>> {
-    let mut kept = Vec::new();
-    let mut listed = 0usize;
-    for entry in graph::repeated(stylesheet, STYLESHEET_STYLES)? {
-        if reference_identifier(entry)? == style {
-            listed += 1;
-        } else {
-            kept.push(entry.to_vec());
-        }
-    }
-    if listed != 1 {
-        return Err(Error::Invalid(
-            "the stylesheet must list a removed style once",
-        ));
-    }
-    let data =
-        wire::rewrite_repeated_length_delimited_fields(stylesheet, STYLESHEET_STYLES, &kept)?;
-    let mut removed = 0usize;
-    let mut entries = Vec::new();
-    for entry in graph::repeated(&data, STYLESHEET_PARENT_CHILDREN)? {
-        let entry_parent = single(entry, CHILDREN_PARENT)?
-            .map(reference_identifier)
-            .transpose()?;
-        let mut children = Vec::new();
-        let mut found = false;
-        for child in graph::repeated(entry, CHILDREN)? {
-            if reference_identifier(child)? == style {
-                found = true;
-                removed += 1;
-            } else {
-                children.push(child.to_vec());
-            }
-        }
-        if found && entry_parent != Some(parent) {
-            return Err(Error::Invalid(
-                "the stylesheet maps a removed style under another parent",
-            ));
-        }
-        if !children.is_empty() {
-            entries.push(wire::rewrite_repeated_length_delimited_fields(
-                entry, CHILDREN, &children,
-            )?);
-        }
-    }
-    if removed != 1 {
-        return Err(Error::Invalid(
-            "the stylesheet must map a removed style once",
-        ));
-    }
-    Ok(wire::rewrite_repeated_length_delimited_fields(
-        &data,
-        STYLESHEET_PARENT_CHILDREN,
-        &entries,
-    )?)
+    stylesheet_without_variation_bounded(stylesheet, parent, style, RegistrationLimits::PERMISSIVE)
+        .map(|(output, _report)| output)
 }
 
 fn shape_style_reference(workspace: &Workspace<'_>, drawable: u64) -> Result<(usize, u64)> {
@@ -1086,13 +2267,6 @@ fn repoint_drawable(
         ));
     }
     Ok(())
-}
-
-fn style_ids(data: &[u8], number: u32) -> Result<Vec<u64>> {
-    graph::repeated(data, number)?
-        .into_iter()
-        .map(reference_identifier)
-        .collect()
 }
 
 fn register(workspace: &mut Workspace<'_>, stylesheet: u64, parent: u64, style: u64) -> Result<()> {

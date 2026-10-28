@@ -390,6 +390,10 @@ pub enum LimitKind {
     TextStorages,
     /// Rich-text fragments read during verification.
     TextFragments,
+    /// Temporary graph scratch bytes.
+    ScratchBytes,
+    /// Fallible graph allocation events.
+    AllocationEvents,
 }
 
 impl fmt::Display for LimitKind {
@@ -409,6 +413,8 @@ impl fmt::Display for LimitKind {
             Self::References => "references",
             Self::TextStorages => "text storages",
             Self::TextFragments => "text fragments",
+            Self::ScratchBytes => "scratch bytes",
+            Self::AllocationEvents => "allocation events",
         })
     }
 }
