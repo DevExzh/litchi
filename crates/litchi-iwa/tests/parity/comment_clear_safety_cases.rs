@@ -10,19 +10,21 @@ use litchi_iwa::pages;
 use litchi_iwa_archive::iwa::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::table::coordinate::At;
+use litchi_keynote::slide::table::comments::Error as KeynoteCommentError;
 use litchi_keynote::{Package as KeynotePackage, SlideSelector, TableSelector};
+use litchi_pages::table::comments::Error as PagesCommentError;
 use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 use crate::harness::{TestResult, fixture};
 
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const OPAQUE_SIBLING_MESSAGE_TYPE: u32 = 99_999;
-const UNKNOWN_HEADER_FIELD: u32 = 99;
+const UNKNOWN_PAYLOAD_FIELD: u32 = 99;
 
 #[derive(Clone, Copy)]
 enum StorageMutation {
     OpaqueSibling,
-    UnknownHeader,
+    UnknownPayload,
 }
 
 fn pages_root_source() -> TestResult<(Vec<u8>, At)> {
@@ -135,10 +137,10 @@ fn mutate_selected_storage(source: &[u8], mutation: StorageMutation) -> TestResu
                         Default::default(),
                     )?;
                 },
-                StorageMutation::UnknownHeader => {
+                StorageMutation::UnknownPayload => {
                     litchi_iwa_common::wire::append_varint_field(
                         &mut message.data,
-                        UNKNOWN_HEADER_FIELD,
+                        UNKNOWN_PAYLOAD_FIELD,
                         1,
                     )?;
                 },
@@ -171,36 +173,35 @@ fn keynote_bytes(package: &KeynotePackage) -> TestResult<Vec<u8>> {
     Ok(bytes)
 }
 
-fn assert_typed_refusal(debug: String, family: &str) {
-    assert!(
-        debug.contains("InvalidSource")
-            || debug.contains("UnsupportedDependency")
-            || debug.contains("UnsupportedSource"),
-        "{family} clear returned an untyped/unexpected error: {debug}"
-    );
-}
-
 fn assert_pages_clear_refuses(source: &[u8], position: At) -> TestResult {
     let package = PagesPackage::from_bytes(source)?;
     let before = pages_bytes(&package)?;
+    assert_eq!(
+        before, source,
+        "Pages mutation did not preserve its source bytes"
+    );
+    let selected_before = package
+        .body_table_cell_comment(BodyTableSelector::index(0), position)?
+        .ok_or("Pages mutation lost the selected root before clear")?;
     let result = package
         .edit_body_table_cell_comment(BodyTableSelector::index(0), position)?
         .clear()?
         .commit();
     match result {
         Ok(_) => panic!("Pages clear unexpectedly published a lossy candidate"),
-        Err(error) => assert_typed_refusal(format!("{error:?}"), "Pages"),
+        Err(PagesCommentError::UnsupportedDependency) => {},
+        Err(error) => panic!("Pages clear returned the wrong typed error: {error:?}"),
     }
     assert_eq!(
         pages_bytes(&package)?,
         before,
         "Pages refusal mutated source"
     );
-    assert!(
+    assert_eq!(
         PagesPackage::from_bytes(source)?
-            .body_table_cell_comment(BodyTableSelector::index(0), position)?
-            .is_some(),
-        "Pages refusal lost the selected root"
+            .body_table_cell_comment(BodyTableSelector::index(0), position,)?,
+        Some(selected_before),
+        "Pages refusal changed the selected root"
     );
     Ok(())
 }
@@ -208,24 +209,35 @@ fn assert_pages_clear_refuses(source: &[u8], position: At) -> TestResult {
 fn assert_keynote_clear_refuses(source: &[u8], position: At) -> TestResult {
     let package = KeynotePackage::from_bytes(source)?;
     let before = keynote_bytes(&package)?;
+    assert_eq!(
+        before, source,
+        "Keynote mutation did not preserve its source bytes"
+    );
+    let selected_before = package
+        .slide_table_cell_comment(SlideSelector::index(0), TableSelector::index(0), position)?
+        .ok_or("Keynote mutation lost the selected root before clear")?;
     let result = package
         .edit_slide_table_cell_comment(SlideSelector::index(0), TableSelector::index(0), position)?
         .clear()?
         .commit();
     match result {
         Ok(_) => panic!("Keynote clear unexpectedly published a lossy candidate"),
-        Err(error) => assert_typed_refusal(format!("{error:?}"), "Keynote"),
+        Err(KeynoteCommentError::UnsupportedDependency) => {},
+        Err(error) => panic!("Keynote clear returned the wrong typed error: {error:?}"),
     }
     assert_eq!(
         keynote_bytes(&package)?,
         before,
         "Keynote refusal mutated source"
     );
-    assert!(
-        KeynotePackage::from_bytes(source)?
-            .slide_table_cell_comment(SlideSelector::index(0), TableSelector::index(0), position,)?
-            .is_some(),
-        "Keynote refusal lost the selected root"
+    assert_eq!(
+        KeynotePackage::from_bytes(source)?.slide_table_cell_comment(
+            SlideSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        Some(selected_before),
+        "Keynote refusal changed the selected root"
     );
     Ok(())
 }
@@ -264,9 +276,9 @@ fn pages_root_clear_refuses_opaque_storage_sibling() -> TestResult {
 }
 
 #[test]
-fn pages_root_clear_refuses_unknown_storage_header() -> TestResult {
+fn pages_root_clear_refuses_unknown_storage_payload() -> TestResult {
     let (source, position) = pages_root_source()?;
-    let corrupted = mutate_selected_storage(&source, StorageMutation::UnknownHeader)?;
+    let corrupted = mutate_selected_storage(&source, StorageMutation::UnknownPayload)?;
     assert_pages_clear_refuses(&corrupted, position)
 }
 
@@ -304,8 +316,8 @@ fn keynote_root_clear_refuses_opaque_storage_sibling() -> TestResult {
 }
 
 #[test]
-fn keynote_root_clear_refuses_unknown_storage_header() -> TestResult {
+fn keynote_root_clear_refuses_unknown_storage_payload() -> TestResult {
     let (source, position) = keynote_root_source()?;
-    let corrupted = mutate_selected_storage(&source, StorageMutation::UnknownHeader)?;
+    let corrupted = mutate_selected_storage(&source, StorageMutation::UnknownPayload)?;
     assert_keynote_clear_refuses(&corrupted, position)
 }

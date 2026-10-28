@@ -9,9 +9,11 @@ The tests build a root-only comment through the existing host editor over the
 tracked Pages and Keynote table fixtures. The baseline clear must publish, read
 back no root comment, and apply its inverse to restore the exact source bytes.
 Separate negative controls append either an opaque sibling message to the
-selected type-3056 object or an unknown payload field. Each control requires a
-typed terminal refusal, unchanged package bytes, and the selected root still
-present after reopening.
+selected type-3056 object or an unknown payload field. Each control requires an
+exact `UnsupportedDependency` refusal, unchanged serialized mutated bytes, and
+the selected semantic root still equal after reopening. A malformed metadata
+control is intentionally left to the runtime repair owner and is not conflated
+with these well-formed payload controls.
 
 ## Frozen-candidate result
 
@@ -29,5 +31,6 @@ CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_T
 ```
 
 Result: 2 baseline tests passed and 4 mutation tests failed because the
-candidate published a lossy clear. No performance or native acceptance claim
-is made here.
+candidate published a lossy clear before reaching the typed-refusal match. The
+proof assertions are therefore red for the intended runtime defect. No
+performance or native acceptance claim is made here.
