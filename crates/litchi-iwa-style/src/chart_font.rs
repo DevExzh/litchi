@@ -812,7 +812,44 @@ fn map_graph_error(error: graph::Error) -> Error {
         },
         graph::Error::Wire(error) => map_wire_error(error),
         graph::Error::Codec(error) => map_codec_error(error),
+        graph::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                graph::GraphLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                graph::GraphLimitKind::AllocationEvents => LimitKind::Allocations,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
         error => Error::Graph(Box::new(error)),
+    }
+}
+
+fn map_registration_error(error: shape::RegistrationError) -> Error {
+    match error {
+        shape::RegistrationError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                shape::RegistrationLimitKind::InputBytes => LimitKind::InputBytes,
+                shape::RegistrationLimitKind::Fields => LimitKind::Fields,
+                shape::RegistrationLimitKind::OutputBytes => LimitKind::OutputBytes,
+                shape::RegistrationLimitKind::Work => LimitKind::Work,
+                shape::RegistrationLimitKind::Allocations => LimitKind::Allocations,
+                shape::RegistrationLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        shape::RegistrationError::Allocation { amount, .. } => Error::Allocation { amount },
+        shape::RegistrationError::Wire(error) => map_wire_error(error),
+        shape::RegistrationError::Graph(error) => map_graph_error(error),
+        shape::RegistrationError::Invalid(_) => Error::InvalidSource("stylesheet registration"),
     }
 }
 
@@ -1374,13 +1411,13 @@ fn insert(
         "a stylesheet must have exactly one payload",
     )?;
     let registration_limits = budget.registration_limits()?;
-    let (data, registration_report) = shape::stylesheet_with_variation_bounded(
+    let (data, registration_report) = shape::stylesheet_with_variation_admitted(
         sheet,
         addition.parent,
         addition.identifier,
         registration_limits,
     )
-    .map_err(map_graph_error)?;
+    .map_err(map_registration_error)?;
     budget.charge_registration(registration_report)?;
     workspace.replace_payload(addition.stylesheet, message, data)?;
     let info = workspace
@@ -1539,8 +1576,8 @@ fn prune(
         )?;
         let registration_limits = budget.registration_limits()?;
         let (data, registration_report) =
-            shape::stylesheet_without_variation_bounded(sheet, parent, style, registration_limits)
-                .map_err(map_graph_error)?;
+            shape::stylesheet_without_variation_admitted(sheet, parent, style, registration_limits)
+                .map_err(map_registration_error)?;
         budget.charge_registration(registration_report)?;
         workspace.replace_payload(stylesheet, message, data)?;
         let info = workspace
