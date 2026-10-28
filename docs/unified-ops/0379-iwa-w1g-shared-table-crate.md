@@ -11,8 +11,10 @@
   engine and three facade slices on the continuation branch; focused code,
   parity, fuzz-lock and documentation gates pass, while the current boundary
   checker passes after removing the newly introduced root-level comment
-  exports; final integrated performance and native verification remain pending
-  (§2b, §6). Groups 3–5 (rich text, topology, conditional highlights) are not
+  exports. The resource-dimension repair is committed as `03f991fcf6`; its
+  current-source read/create/clear instruction probes are recorded in §4.3.
+  Final integrated performance and native verification remain pending (§2b,
+  §6). Groups 3–5 (rich text, topology, conditional highlights) are not
   started (§5).
 - Date: 2026-10-28 continuation; group 6 completed 2026-10-27.
 - Review follow-up (`828d02cad9`): owner-extents coordinates require
@@ -352,17 +354,25 @@ The differential cases currently run are:
 
 | Format | Cases | Tier |
 |---|---|---|
-| Pages | `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity`, `pages_body_table_comment_replies_read_parity` | B for root writes; A for populated root/reply read |
+| Pages | `pages_body_table_comment_read_parity`, `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity`, `pages_body_table_comment_replies_read_parity` | B for root writes; A for populated root/reply read |
 | Keynote | `keynote_slide_table_comment_set_parity`, `keynote_slide_table_comment_clear_parity`, `keynote_slide_table_comment_replace_preserves_source_metadata`, `keynote_slide_table_comment_patch_rejects_unrelated_metadata_change`, `keynote_slide_table_comment_read_parity`, `keynote_slide_table_comment_replies_read_parity` | B for root writes; A for reads |
-| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity` | B for root write; A for populated root/reply read |
+| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity`, `numbers_table_cell_comment_replies_semantic_parity` | B for root write; A for populated root/reply read |
 
-The host remains the differential oracle. The 17 table-comment ledger rows
-were reviewed: five focused read rows are migrated with these tests, while
-the twelve root/reply mutation rows remain `host-only` because reply-bearing
-threads are outside this profile. The 0363 macOS queue retains the routes as
-pending planning entries with that boundary called out; no E3/E4 native claim
-is made. Native-authored fixtures and synthetic/self-round-trip tests are not
-Apple open/save evidence.
+The host remains the differential oracle. The original slice plan covered 17
+candidate rows. The current ledger has 22 rows: five migrated reads (including
+the two Pages comments reads), fourteen host-only mutation/reply rows, and
+three retired Numbers parity-only seams (read, set and the clear oracle). The
+clean 1fbd handoff snapshot had 21 rows and two retired seams; the third is
+the explicit clear seam required for the independent lifecycle probes in §4.3.
+The 0363 macOS queue retains the routes as pending planning entries with that
+boundary called out; no E3/E4 native claim is made. Native-authored fixtures
+and synthetic/self-round-trip tests are not Apple open/save evidence.
+
+The Numbers mutation oracle is deliberately feature-gated
+(`parity-host-oracle`) and calls the existing private legacy writer through
+doc-hidden parity seams; the focused leaf route is therefore measured and
+tested against an independent host path. It is not a supported Numbers editor
+API and does not change the default parity target's existing coverage.
 
 ## 3. Tools and docs
 
@@ -525,6 +535,88 @@ Use `*probe_leaf*` for the paired leaf capture; `<parity-test>` is one of
 `keynote_table_cases::keynote_slide_table_comment_cost_abba` and
 `numbers_table_comment_cases::numbers_table_cell_comment_cost_abba`.
 
+### 4.3 Root-comment read/create/clear rerun
+
+The remaining supported root lifecycle routes were measured on clean source
+commit `03f991fcf6`, after the typed comment/table resource-limit repair and
+before the proof-only Pages read witness/ledger correction in `a5795869a8`.
+That later commit changes no route implementation; the coordinator must still
+repeat the captures on the final integrated tree. The
+release binary was built with `CARGO_INCREMENTAL=0`, release debug information
+disabled, and four build jobs:
+
+```sh
+PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/bin:/bin \
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling \
+CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_BUILD_JOBS=4 \
+cargo test --locked --release -p litchi-iwa --test parity \
+  --features parity-host-oracle --no-run
+```
+
+The profiling binary is
+`/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/release/deps/parity-de33078d71de6252`,
+40,900,464 bytes, SHA-256
+`bc2e5ff92bf69cb0e88365b18f3bee0bb036e4a19798a00c7432d21e421871e0`.
+Each ignored test ran on CPU 3 with `taskset`, Callgrind collection toggled
+to the host or leaf probe, and the shared ABBA helper's host/leaf/leaf/host
+order. The Pages read fixture and Keynote/Numbers populated read fixtures are
+host-authored before the ABBA loop; create starts from a stored no-comment
+cell; clear starts from one host-authored populated root prepared outside the
+loop. Numbers' host side uses only the explicit feature-gated legacy oracle
+described in §2b. These are full facade instruction counts, not wall time and
+not Apple open/save evidence.
+
+| Route | Host instructions | Leaf instructions | Δ |
+|---|---:|---:|---:|
+| Pages read | 1,232,839,805 | 34,536,873 | **−97.199%** |
+| Pages create | 2,736,619,111 | 99,911,833 | **−96.349%** |
+| Pages clear | 2,739,510,163 | 117,166,862 | **−95.723%** |
+| Keynote read | 20,343,949 | 13,296,054 | **−34.644%** |
+| Keynote create | 905,136,065 | 429,732,092 | **−52.523%** |
+| Keynote clear | 58,029,332 | 37,518,767 | **−35.345%** |
+| Numbers read | 3,699,962 | 2,973,596 | **−19.632%** |
+| Numbers create | 169,394,744 | 115,553,384 | **−31.785%** |
+| Numbers clear | 128,331,491 | 107,325,718 | **−16.368%** |
+
+All nine leaf routes are below their paired host route and therefore meet the
+normal instruction-cost bar. The coordinator must repeat these probes on the
+final integrated trunk candidate; this WP result does not qualify a later
+merge.
+
+The raw captures remain outside the repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/comments-read-create-clear/`:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `pages-read-host.callgrind.out` | 112,982 bytes | `fdcc5a78012e6bde66c938ae4e48a16dcd23a1df97fc070dec9e79d521e14844` |
+| `pages-read-leaf.callgrind.out` | 103,085 bytes | `5b3506631e2e46dad82e42f8446fb21bf8956d1838608fb363f8886c1d42278b` |
+| `pages-create-host.callgrind.out` | 188,117 bytes | `7ceb2eca367ee5d6ffa1476862e897ef6dfe9bf087f8204ba176190d51a3892d` |
+| `pages-create-leaf.callgrind.out` | 172,982 bytes | `53710f9fc80cfeb95c3e385224f2f1a7ae4c8e96e6e015df4ee35853320f1e9a` |
+| `pages-clear-host.callgrind.out` | 175,901 bytes | `9f36ec5c83315133772fc0e22dc9c3a2618405a4846dafe54c0b559a5b3f9eda` |
+| `pages-clear-leaf.callgrind.out` | 176,429 bytes | `2347b3a5f8429bf34c6653ef68ca918258553ed0d0732614e6ff85275e4448bf` |
+| `keynote-read-host.callgrind.out` | 121,434 bytes | `7d7edbc8219aa98e7e41f1d14b49b59f0e66f8b6958b89661357a333381824cb` |
+| `keynote-read-leaf.callgrind.out` | 90,999 bytes | `57d74a521cbf9eb6c63527fa2ce2cc6b801fed0be169cb57ccf08171470db6cc` |
+| `keynote-create-host.callgrind.out` | 227,311 bytes | `fa42dcbabd470f0d3a670d102adb857bc65a559f02cd64d3c2d1ff67468a64c8` |
+| `keynote-create-leaf.callgrind.out` | 176,155 bytes | `c47577a5f79385878919b7e22661c3c5e925ac02dd235eebb80d1b3e01f0b686` |
+| `keynote-clear-host.callgrind.out` | 174,022 bytes | `32d8a703b537e5fc9a4aa0c49d639f9ab4275d779bc664286e11e00ac49b2686` |
+| `keynote-clear-leaf.callgrind.out` | 158,398 bytes | `e7742c629eeea91c113f429015861121af92ae20316768ec9e0e7028df0c64e8` |
+| `numbers-read-host.callgrind.out` | 89,085 bytes | `7b0c7214436e917775d2d8c8f84c781337b3c717b494b2d7949054bbf4e33ce3` |
+| `numbers-read-leaf.callgrind.out` | 90,650 bytes | `794786b03bfa316f7e925cd7ab5d36a20e214abf2e6304b5485e8c0072f8bbd0` |
+| `numbers-create-host.callgrind.out` | 168,655 bytes | `1a346e2a4097f825d237ce8306c9bd98162f2b3a0e21e7662a8844163e27f199` |
+| `numbers-create-leaf.callgrind.out` | 149,413 bytes | `c50dee29f05b368164e1592a5f5c8228320fb36bb198241ab681ad034c5b32f7` |
+| `numbers-clear-host.callgrind.out` | 157,398 bytes | `7da66a7a7ece4160cc47865dfc38ada8172726f03a9a44dec6bd6f3570083d7e` |
+| `numbers-clear-leaf.callgrind.out` | 140,080 bytes | `4da8e64c76118ddebaa7dbcf59b641d6b3e9f32e6652d9021a7a15f0cbd951ee` |
+
+To regenerate the captures, build the binary with the command above and run
+each test with `taskset -c 3 valgrind --tool=callgrind --quiet
+--error-exitcode=1 --callgrind-out-file=<external-output> <binary> --ignored
+--exact <test> --test-threads=1`. Use
+`--toggle-collect='*probe_host*'` for the host capture and
+`--toggle-collect='*probe_leaf*'` for the paired leaf capture, changing the
+output and toggle for each route. The exact test names are the nine
+`*_comment_{read,create,clear}_cost_abba` functions in the Pages, Keynote and
+Numbers parity modules.
+
 ## 5. Gaps
 
 | Gap | Finding | Next step |
@@ -629,3 +721,20 @@ no-`3rdparty`, and focused formatting checks also pass on the merged tree.
 Those post-merge checks do not requalify the §4.2 measurements: the
 coordinator must repeat the full gate and final performance on one integrated
 trunk commit, and native verification remains pending.
+
+On the current source commit `ac9f1e8e2b` (a rustfmt-only follow-up to the
+proof witness), the focused comment parity target passed 14 cases with zero
+failures, including the dedicated Pages comments
+read witness and the populated Numbers semantic reply comparison; the
+low-limit transaction/readback regression passed 1/1
+and preserved the exact source while returning `TextBytes`. The all-target,
+all-feature compile passed, as did library Clippy and the directly affected
+Numbers comment-reply and `litchi-iwa` parity Clippy targets. The three
+affected fuzz-lock manifests, exit ledger, crate-boundary, no-`3rdparty`,
+formatting and rustdoc/glossary checks are rerun for the final handoff. The
+broad all-target Clippy command still reports the pre-existing
+`items_after_test_module` lint in Pages'
+`package/body_drawable_graph.rs`; that file is outside this slice and was not
+changed. The nine current-source read/create/clear Callgrind ABBA pairs and
+their exact external artifacts are recorded in §4.3; the coordinator must
+repeat them on the final integrated trunk candidate.
