@@ -10,6 +10,10 @@
   `1544f10604`). Groups 2–5 (comments, rich text, topology, conditional
   highlights) are not started (§5).
 - Date: 2026-10-26; group 6 completed 2026-10-27.
+- Review follow-up (`828d02cad9`): owner-extents coordinates require
+  canonical value varints, and the Numbers facade preserves typed resolver
+  and candidate-ingress limits/refusals. Numbers and Keynote hidden-axis
+  parity plus the focused engine and facade tests pass after this fix.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (W1 table families, §3.2
   "one family taking a format enum"), the W1-A Numbers table records
   [0370](0370-iwa-w1a-numbers-tables.md)–[0370c](0370c-iwa-w1a-row-column-removal.md),
@@ -229,7 +233,10 @@ Two engine changes, both from the Numbers parity:
   dependency and hidden axes leave the geometry alone, so they are now
   admitted. A spanning reference (`coord_refers_to_spans`) or a repeated
   extent is still `UnsupportedDependency`, a malformed range coordinate
-  `InvalidSource` (`owner_extent_tests`).
+  `InvalidSource` (`owner_extent_tests`); every coordinate key and varint
+  must use canonical wire framing. The Numbers facade also preserves
+  resolver and candidate-ingress limit/refusal classifications at the engine
+  boundary.
 - **Identity allocation follows the host.** Owner creation allocates the
   two filter sets before the two formula owners, as the host does (it was
   the other way round); every `litchi-pages` test still passes.
@@ -243,20 +250,29 @@ source-built document); the Keynote host builder has its own calculation
 archive. Checked against the parity harness's builder cases on the merged
 tree:
 
-- No tier-A builder case asserts anything this change touches. The leaf
-  Pages builder (W1-B, record 0371) has no `body_table` (a record 0371
-  gap), and the one Pages builder case,
-  `pages_builder_language_locale_parity` (tier B), builds without a table,
-  so the host route never bootstraps one.
-- `pages_body_table_add_parity` (tier B) adds a table to
-  `body-table-catalog-native.pages`, where the host clones the native
-  table instead of bootstrapping.
-- The Numbers builder cases (`numbers_builder_*_parity`, tier B) are
-  unchanged: the host Numbers builder always wrote the extents (0370i).
-- Every builder case and every `litchi-iwa` test passes (§6).
+- The harness has no tier-A builder case: the Pages and Numbers builder
+  cases are tier B and the Keynote builder comparison is an untiered
+  differential (record 0372). The leaf Pages builder (W1-B, record 0371)
+  has no `body_table` (a record 0371 gap), and the one Pages builder case,
+  `pages_builder_language_locale_parity`, builds without a table, so the
+  host route never bootstraps one.
+- No other parity case reaches the bootstrap. The table lifecycle cases
+  (`pages_body_table_add_parity`, tier B; `pages_body_table_remove_parity`,
+  tier A) run on `body-table-catalog-native.pages`, where the host clones
+  a native table, and the leaf table creation refuses a document without
+  a body table (`Refusal::NoTemplate`).
+- The Numbers builder cases (`numbers_builder_*_parity`) are unchanged:
+  the host Numbers builder always wrote the extents (0370i).
+- Every builder case and every `litchi-iwa` test passes on the merged
+  tree (§6), including the host tests that bootstrap a first Pages table
+  (`repeated_body_table_calls_append_independent_tables`,
+  `inserts_and_removes_first_table_without_a_template`, and the
+  `pages_drawable_comment_registry` and
+  `pages_source_built_stylesheet_closure` suites).
 
-When W1-B ports `body_table`, the host oracle it compares against writes
-the owner extents, as native files do.
+When W1-B ports `body_table` or table creation on a table-less document,
+the host oracle it compares against writes the owner extents, as native
+files do.
 
 Parity (`numbers_hidden_axes_cases.rs`) on `basic.numbers`,
 `custom-number-native.numbers` and a host-built 6×4 workbook:
