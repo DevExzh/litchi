@@ -51,6 +51,8 @@ pub enum LimitKind {
     PayloadItems,
     /// Native references inspected by the root proof.
     References,
+    /// Resolved formula-owner entries inspected by a merge formula.
+    OwnerEntries,
     /// Wire fields inspected by the selected merge path.
     WireFields,
     /// Maximum nested wire depth inspected by the selected merge path.
@@ -79,6 +81,7 @@ impl fmt::Display for LimitKind {
             Self::PayloadMessages => "payload messages",
             Self::PayloadItems => "payload items",
             Self::References => "references",
+            Self::OwnerEntries => "formula owner entries",
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting depth",
             Self::WireWork => "wire work",
@@ -306,6 +309,13 @@ fn charge_attempted(budget: &mut core::Budget, error: &MergeReadError) {
 }
 
 fn map_merge_error(error: MergeReadError) -> Error {
+    if let Some(owner_limit) = error.owner_entries_limit() {
+        return Error::Limit {
+            kind: LimitKind::OwnerEntries,
+            observed: owner_limit.observed() as u64,
+            maximum: owner_limit.maximum() as u64,
+        };
+    }
     match error.error() {
         litchi_iwa_common::Error::LimitExceeded {
             kind,

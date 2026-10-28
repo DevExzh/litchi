@@ -92,6 +92,12 @@ coerced into protobuf fields. The other adapter mappings to existing reference
 dimensions are documented at their mapping sites because those adapters count
 resolved owner entries as retained formula references.
 
+The formula-cache evaluator now pre-admits the actual table-owner registry
+cardinality against `CacheLimits::wire_references`, charges it once, and passes
+that exact cardinality to every resolved-reader decode. It no longer derives an
+owner ceiling from `formula_work` or `graph_work`; those remain AST/evaluation
+and graph-operation ceilings respectively.
+
 ## Verification on this WP
 
 All commands used offline with `CARGO_BUILD_JOBS=2`,

@@ -570,6 +570,7 @@ pub struct StrictEvaluator<'source> {
     formulas: &'source [FormulaPayload<'source>],
     tables: &'source [TableGeometry],
     registry: formula_codec::ResolvedFormulaReadRegistry,
+    owner_entries_limit: usize,
 }
 
 impl<'source> StrictEvaluator<'source> {
@@ -607,11 +608,19 @@ impl<'source> StrictEvaluator<'source> {
                 table.columns,
             ));
         }
+        let owner_entries_limit = owners.len();
+        charge(
+            &mut usage.wire_references,
+            owner_entries_limit,
+            limits.wire_references,
+            LimitKind::WireReferences,
+        )?;
         let mut internal_order: Vec<_> = (0..owners.len()).collect();
         scratch_allocation::<usize>(&mut usage, internal_order.len(), limits)?;
         graph_step(&mut usage, sort_work(internal_order.len())?, limits)?;
         internal_order.sort_unstable_by_key(|index| owners[*index].internal_owner());
-        let registry_options = Self::options(remaining_limits(limits, &usage)?);
+        let registry_options =
+            Self::options(remaining_limits(limits, &usage)?, owner_entries_limit);
         let registry_plan = formula_codec::plan_resolved_formula_read_registry(
             &owners,
             &internal_order,
@@ -646,6 +655,7 @@ impl<'source> StrictEvaluator<'source> {
                 formulas,
                 tables,
                 registry,
+                owner_entries_limit,
             },
             usage,
         ))
@@ -671,7 +681,7 @@ impl<'source> StrictEvaluator<'source> {
         ))
     }
 
-    fn options(limits: CacheLimits) -> formula_codec::DecodeOptions {
+    fn options(limits: CacheLimits, owner_entries_limit: usize) -> formula_codec::DecodeOptions {
         formula_codec::DecodeOptions::new(
             limits.wire_bytes,
             limits.wire_fields,
@@ -680,6 +690,7 @@ impl<'source> StrictEvaluator<'source> {
             limits.formula_work.min(limits.graph_work),
             limits.wire_text,
         )
+        .with_max_owner_entries(owner_entries_limit)
     }
 }
 
@@ -699,7 +710,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         };
         let payload = self.payload(formula)?;
         let context = self.context(formula)?;
-        let options = Self::options(work_limits);
+        let options = Self::options(work_limits, self.owner_entries_limit);
         // Global AST-to-edge proof must not require the scalar evaluator to
         // understand every canonical local node.  Run the strict
         // dependency-only projection twice: first allocation-free for exact
@@ -807,7 +818,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
         };
         let payload = self.payload(formula)?;
         let context = self.context(formula)?;
-        let options = Self::options(work_limits);
+        let options = Self::options(work_limits, self.owner_entries_limit);
         let probe = formula_codec::inspect_resolved_formula_dependencies_with_visitor(
             payload.bytes,
             context,
@@ -7364,6 +7375,62 @@ mod tests {
                 Err(Error::UnsupportedDependency(Unsupported::Formula))
             ));
         }
+    }
+
+    #[test]
+    fn strict_evaluator_pre_admits_owner_registry_with_independent_formula_work() {
+        let tables = [
+            TableGeometry {
+                identity: TableIdentity {
+                    owner: 1,
+                    uuid_lower: 1,
+                    uuid_upper: 11,
+                },
+                rows: 4,
+                columns: 4,
+                header_rows: 0,
+                header_columns: 0,
+                footer_rows: 0,
+            },
+            TableGeometry {
+                identity: TableIdentity {
+                    owner: 2,
+                    uuid_lower: 2,
+                    uuid_upper: 12,
+                },
+                rows: 4,
+                columns: 4,
+                header_rows: 0,
+                header_columns: 0,
+                footer_rows: 0,
+            },
+            TableGeometry {
+                identity: TableIdentity {
+                    owner: 3,
+                    uuid_lower: 3,
+                    uuid_upper: 13,
+                },
+                rows: 4,
+                columns: 4,
+                header_rows: 0,
+                header_columns: 0,
+                footer_rows: 0,
+            },
+        ];
+        let mut independent = limits();
+        independent.formula_work = 1;
+        independent.wire_references = tables.len();
+        StrictEvaluator::new(&[], &[], &tables, independent)
+            .expect("owner registry admission is independent from AST work");
+
+        independent.wire_references = tables.len() - 1;
+        assert!(matches!(
+            StrictEvaluator::new(&[], &[], &tables, independent),
+            Err(Error::Limit {
+                kind: LimitKind::WireReferences,
+                ..
+            })
+        ));
     }
 
     #[test]

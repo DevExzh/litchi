@@ -1416,6 +1416,10 @@ fn validate_read_resolution<'registry>(
     registry: &'registry ResolvedFormulaReadRegistry,
     budget: &mut Budget,
 ) -> Result<ReadResolution<'registry>, DecodeError> {
+    validate_owner_entries(
+        registry.owners.len().max(registry.internal_order.len()),
+        budget.options,
+    )?;
     if context.internal_owner == 0
         || context.rows == 0
         || context.columns == 0
@@ -8344,6 +8348,101 @@ mod tests {
                 maximum: 2,
             })
         ));
+    }
+
+    #[test]
+    fn resolved_read_entrypoints_recheck_owner_ceiling_before_callbacks() {
+        let context = FormulaWriteContext::new(7, 0, 0, 4, 4);
+        let owners = [
+            ResolvedFormulaWriteOwner::new(FormulaWriteOwnerUid::from_halves(1, 1), 8, 4, 4),
+            ResolvedFormulaWriteOwner::new(FormulaWriteOwnerUid::from_halves(2, 2), 9, 4, 4),
+            ResolvedFormulaWriteOwner::new(FormulaWriteOwnerUid::from_halves(3, 3), 10, 4, 4),
+        ];
+        let write_options = broad_write_options().with_max_owner_entries(owners.len());
+        let write_plan = plan_resolved_formula_archive(
+            &[FormulaWriteNode::Number(7.0)],
+            context,
+            &owners,
+            FormulaWriteDependencyLimits::new(0, 0),
+            write_options,
+        )
+        .unwrap();
+        let (source, _) = execute_formula_archive_plan(write_plan, write_options).unwrap();
+        let registry = read_registry(&owners);
+        let lowered = broad_write_options().with_max_owner_entries(2);
+
+        let mut dependency_facts = ResolvedReadFacts::default();
+        assert!(matches!(
+            inspect_resolved_formula_dependencies_with_visitor(
+                &source,
+                context,
+                &registry,
+                lowered,
+                &mut dependency_facts,
+            )
+            .unwrap_err()
+            .resource_limit(),
+            Some(DecodeLimit::Owners {
+                observed: 3,
+                maximum: 2,
+            })
+        ));
+        assert!(dependency_facts.nodes.is_empty());
+        assert!(dependency_facts.precedents.is_empty());
+        assert!(dependency_facts.ranges.is_empty());
+
+        let mut evaluator_facts = ResolvedReadFacts::default();
+        assert!(matches!(
+            decode_resolved_formula_archive_with_visitor(
+                &source,
+                context,
+                &registry,
+                lowered,
+                &mut evaluator_facts,
+            )
+            .unwrap_err()
+            .resource_limit(),
+            Some(DecodeLimit::Owners {
+                observed: 3,
+                maximum: 2,
+            })
+        ));
+        assert!(evaluator_facts.nodes.is_empty());
+        assert!(evaluator_facts.precedents.is_empty());
+        assert!(evaluator_facts.ranges.is_empty());
+
+        let zero_context = FormulaWriteContext::new(7, 0, 0, 4, 4);
+        let zero_options = broad_write_options().with_max_owner_entries(1);
+        let zero_plan = plan_resolved_formula_archive(
+            &[FormulaWriteNode::Number(7.0)],
+            zero_context,
+            &[],
+            FormulaWriteDependencyLimits::new(0, 0),
+            zero_options,
+        )
+        .unwrap();
+        let (zero_source, _) = execute_formula_archive_plan(zero_plan, zero_options).unwrap();
+        // A read registry includes the selected local owner even when there
+        // are zero external owners; the one-entry ceiling is exact.
+        let zero_local_owner = [ResolvedFormulaWriteOwner::new(
+            FormulaWriteOwnerUid::from_halves(4, 4),
+            7,
+            4,
+            4,
+        )];
+        let zero_registry = read_registry(&zero_local_owner);
+        let mut zero_facts = ResolvedReadFacts::default();
+        decode_resolved_formula_archive_with_visitor(
+            &zero_source,
+            zero_context,
+            &zero_registry,
+            zero_options,
+            &mut zero_facts,
+        )
+        .unwrap();
+        assert_eq!(zero_facts.nodes.len(), 1);
+        assert!(zero_facts.precedents.is_empty());
+        assert!(zero_facts.ranges.is_empty());
     }
 
     #[derive(Default)]
