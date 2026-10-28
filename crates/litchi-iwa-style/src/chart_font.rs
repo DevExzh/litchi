@@ -1672,6 +1672,7 @@ fn prune(
         if let Some(style_component) = workspace.component_for_member(&style_member)? {
             budget.admit_registry(workspace, 64)?;
             workspace.remove_object_uuids(style_component, &[style])?;
+            budget.admit_registry(workspace, 64)?;
             workspace.remove_external_references_to(style_component, style)?;
             budget.work(workspace.registry_inspection_work())?;
             if let Some(owner) = workspace.component_for_member(chart_member)?
