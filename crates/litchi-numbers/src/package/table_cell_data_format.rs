@@ -17,6 +17,7 @@
 //! has no dedicated numeral-system transaction.
 
 use std::fmt;
+use std::sync::Arc;
 
 use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_table::cell_format::{self as engine, data_format};
@@ -571,17 +572,146 @@ fn engine_rewrite(
         path,
         &mut budget,
     )?;
+    let candidate_bytes: Arc<[u8]> = bytes.into();
+    preflight_candidate_ingress(catalog, &candidate_bytes, path, &mut budget)?;
     let candidate = source
-        .reopen_candidate(std::sync::Arc::from(bytes))
-        .map_err(|_error| Error::Verification)?;
+        .reopen_candidate(candidate_bytes)
+        .map_err(map_candidate_error)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
-        .map_err(|_error| Error::Verification)?;
+        .map_err(|_error| Error::InvalidSource)?;
     budget.charge_candidate_reopen(candidate_catalog, path)?;
     let candidate_target = popup::resolve_cell(&candidate, sheet, table, at)?;
     if data_format::read_with_budget(&candidate, candidate_target, path, &mut budget)? != after {
         return Err(Error::Verification);
     }
     Ok(candidate)
+}
+
+/// Admit the allocation-free physical candidate census before the Numbers
+/// package constructs its ZIP/catalog vectors.  The package reopen still
+/// performs the authoritative parse and semantic checks; this phase only
+/// charges the bounded ZIP-directory and member-materialization work that
+/// otherwise used to be observed after allocation.
+fn preflight_candidate_ingress(
+    source: &litchi_iwa_archive::SourceCatalog,
+    candidate: &[u8],
+    path: engine::Path,
+    budget: &mut engine::TransactionBudget,
+) -> Result<(), Error> {
+    use litchi_iwa_archive::unstable::CandidateIngressPlan;
+
+    let plan = CandidateIngressPlan::from_bytes(candidate, source.limits())
+        .map_err(map_archive_candidate_error)?;
+    plan.admit_zip_directory(&mut |charge| budget.charge_candidate_ingress(charge, path))
+        .map_err(map_candidate_ingress_error)?;
+    for entry in plan.entries() {
+        let entry = entry.map_err(map_archive_candidate_error)?;
+        plan.admit_entry(entry, &mut |charge| {
+            budget.charge_candidate_ingress(charge, path)
+        })
+        .map_err(map_candidate_ingress_error)?;
+    }
+    Ok(())
+}
+
+fn map_candidate_ingress_error(
+    error: litchi_iwa_archive::unstable::CandidateIngressError<engine::Error>,
+) -> Error {
+    use litchi_iwa_archive::unstable::CandidateIngressError;
+    match error {
+        CandidateIngressError::Physical(error) => map_archive_candidate_error(error),
+        CandidateIngressError::Admission(error) => error.into(),
+        CandidateIngressError::CloneArithmetic { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_archive_candidate_error(error: litchi_iwa_archive::Error) -> Error {
+    match error {
+        litchi_iwa_archive::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed,
+            maximum,
+        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::Iwa(error) => map_core_candidate_error(error),
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_core_candidate_error(error: litchi_iwa_core::Error) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_common_candidate_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            observed, limit, ..
+        } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_workbook_candidate_error(error: crate::workbook::Error) -> Error {
+    match error {
+        crate::workbook::Error::TooManySheets { actual, limit }
+        | crate::workbook::Error::TooManyTables { actual, limit }
+        | crate::workbook::Error::TooManyMaterializedCells { actual, limit } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::try_from(actual).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        crate::workbook::Error::TextTooLarge { observed, limit } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        crate::workbook::Error::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_candidate_error(error: crate::package::Error) -> Error {
+    match error {
+        crate::package::Error::Archive(error) => map_archive_candidate_error(error),
+        crate::package::Error::Common(error) => map_common_candidate_error(error),
+        crate::package::Error::Semantic(error) => map_workbook_candidate_error(error),
+        crate::package::Error::SemanticLimit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        crate::package::Error::InputTooLarge { observed, maximum } => Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed,
+            maximum,
+        },
+        crate::package::Error::UnexpectedFormat { .. }
+        | crate::package::Error::InvalidLimit { .. } => Error::Refused(Refusal::UnsupportedSource),
+        _ => Error::InvalidSource,
+    }
 }
 
 fn read(package: &Package, sheet: usize, table: usize, at: At) -> Result<DataFormat, Error> {
@@ -673,5 +803,65 @@ impl Package {
                 rewrites: 1,
             },
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, LimitKind, Refusal, map_candidate_error};
+
+    #[test]
+    fn candidate_ingress_preserves_typed_limits_and_allocations() {
+        let archive_limit = map_candidate_error(crate::package::Error::Archive(
+            litchi_iwa_archive::Error::Limit {
+                kind: litchi_iwa_archive::LimitKind::Entries,
+                observed: 9,
+                maximum: 8,
+            },
+        ));
+        assert_eq!(
+            archive_limit,
+            Error::Limit {
+                kind: LimitKind::TransactionWork,
+                observed: 9,
+                maximum: 8,
+            }
+        );
+
+        let core_allocation = map_candidate_error(crate::package::Error::Archive(
+            litchi_iwa_archive::Error::Iwa(litchi_iwa_core::Error::Allocation {
+                resource: "candidate archive",
+                requested: 17,
+            }),
+        ));
+        assert_eq!(core_allocation, Error::Allocation { amount: 17 });
+
+        let semantic_limit = map_candidate_error(crate::package::Error::SemanticLimit {
+            kind: crate::package::SemanticLimitKind::References,
+            observed: 12,
+            maximum: 11,
+            path: crate::package::SemanticPath::Package,
+        });
+        assert_eq!(
+            semantic_limit,
+            Error::Limit {
+                kind: LimitKind::TransactionWork,
+                observed: 12,
+                maximum: 11,
+            }
+        );
+
+        let common_allocation = map_candidate_error(crate::package::Error::Common(
+            litchi_iwa_common::Error::Allocation {
+                resource: "candidate wire",
+                amount: 23,
+            },
+        ));
+        assert_eq!(common_allocation, Error::Allocation { amount: 23 });
+
+        let unsupported = map_candidate_error(crate::package::Error::UnexpectedFormat {
+            detected: litchi_core::FileFormat::Pages,
+        });
+        assert_eq!(unsupported, Error::Refused(Refusal::UnsupportedSource));
     }
 }
