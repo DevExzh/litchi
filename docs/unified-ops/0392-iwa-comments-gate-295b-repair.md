@@ -83,9 +83,11 @@ per command):
   and `tools.test_no_3rdparty_references`;
 - locked Numbers and iwa-protos fuzz-workspace `cargo check --bins` checks.
 
-The full workspace glossary check was launched against `target/api-glossary`
-with `RUSTC_BOOTSTRAP=1`; its completion and result must be copied into the
-coordinator receipt rather than inferred from the earlier source snapshot.
+The full workspace glossary check completed against `target/api-glossary` with
+`RUSTC_BOOTSTRAP=1`. The affected generated documents were then checked
+explicitly with `--profile iwa-table`, `--profile numbers-minimal`, and
+`--profile numbers-full`; all three passed. The coordinator should retain the
+full-workspace command output/exit receipt with the integrated handoff.
 
 ## Evidence boundaries and remaining qualification
 
