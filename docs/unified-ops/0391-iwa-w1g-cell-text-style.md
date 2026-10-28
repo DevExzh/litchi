@@ -4,7 +4,8 @@
   started and no ledger rows are migrated. The current clean tip is
   `941553f2f4`.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
-  `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`.
+  `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
+  trunk `295b421bcd3d9ec0b0b9208e4039de22623685bc`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -26,7 +27,11 @@ The planner preserves the current supported profile: it does not blanket
 refuse shared or segmented graphs. Root and segment style-list entries are
 read with ownership retained; unsupported or ambiguous graph shapes refuse
 typed. Zero ceilings are not raised, and the shared parser does not expose
-native identifiers through supported APIs.
+native identifiers through supported APIs. `Limits::from_source` pre-admits
+object/reference/work ceilings and derives wire input/output limits before
+table/style traversal or leaf identifier allocation; a zero residual ceiling
+returns a typed limit refusal. Plans carry a bounded `Report` seam for gate
+receipts.
 
 Numbers now routes whole-cell style reads and writes through the shared
 planner. Fresh-cell batches, exclusive existing-style batches, and supported
@@ -62,3 +67,10 @@ including malformed/duplicate references, unknown locality, low-limit refusal
 before wire work, inverse/no-op and candidate reopen. Only after that
 acceptance should the six Pages/Keynote facade rows and native queue entries
 be added. Timing remains held until the coordinator grants the slot.
+
+Current frozen-trunk correctness evidence: the integrated parity target passed
+the direct CharacterProperties read/set/shared/corpus routes (36 corpus reads)
+and all 17 generic text-property set/reset/read vectors (595 reader
+comparisons). The Numbers text-style target has five local tests, including
+fresh-cell, inverse/no-op, exclusive existing-style batch and 33-cell corpus
+coverage; shared residual-budget tests include the zero-reference refusal.

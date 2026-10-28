@@ -405,6 +405,7 @@ fn text_style(
     table: usize,
     position: At,
 ) -> Result<CharacterProperties, Error> {
+    let limits = shared::Limits::from_source(package).map_err(from_shared)?;
     let working = Working::new(package)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
     shared::read(
@@ -414,6 +415,7 @@ fn text_style(
             row: position.row(),
             column: position.column(),
         },
+        &limits,
     )
     .map_err(from_shared)
 }
@@ -455,6 +457,7 @@ fn publish(
     table: usize,
     cells: &[(At, CharacterProperties)],
 ) -> Result<structure::Published, Error> {
+    let limits = shared::Limits::from_source(source).map_err(from_shared)?;
     let mut working = Working::new(source)?;
     working.keep_previews();
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
@@ -465,11 +468,11 @@ fn publish(
             row: position.row(),
             column: position.column(),
         };
-        let plan = match shared::plan_set(source, shared_target, properties, None) {
+        let plan = match shared::plan_set(source, shared_target, properties, None, &limits) {
             Ok(plan) => plan,
             Err(shared::Error::NeedsIdentifier) => {
                 let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
-                shared::plan_set(source, shared_target, properties, Some(fresh))
+                shared::plan_set(source, shared_target, properties, Some(fresh), &limits)
                     .map_err(from_shared)?
             },
             Err(error) => return Err(from_shared(error)),
@@ -488,7 +491,7 @@ fn publish(
             row: position.row(),
             column: position.column(),
         };
-        let fresh = match shared::plan_set(source, shared_target, properties, None) {
+        let fresh = match shared::plan_set(source, shared_target, properties, None, &limits) {
             Ok(None) => None,
             Ok(Some(_)) => None,
             Err(shared::Error::NeedsIdentifier) => {
@@ -502,7 +505,7 @@ fn publish(
             fresh,
         });
     }
-    let plan = match shared::plan_set_many(source, &requests) {
+    let plan = match shared::plan_set_many(source, &requests, &limits) {
         Ok(plan) => plan,
         Err(shared::Error::BatchUnsupported) => {
             return Err(from_shared(shared::Error::BatchUnsupported));

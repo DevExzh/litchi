@@ -33,7 +33,6 @@ const MODEL_HEADER_ROWS: u32 = 9;
 const MODEL_HEADER_COLUMNS: u32 = 10;
 const MODEL_FOOTER_ROWS: u32 = 11;
 const STORE_TILES: u32 = 3;
-const MAX_STYLE_DEPTH: usize = 16;
 
 /// One table cell selected by a leaf facade.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -122,6 +121,118 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// Caller-selected residual budget for one whole-cell style transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Wire input/output limits derived from the opened archive profile.
+    pub wire: WireLimits,
+    /// Maximum object inventory admitted by the leaf.
+    pub max_objects: usize,
+    /// Maximum references admitted by the leaf.
+    pub max_references: usize,
+    /// Maximum cumulative planner work.
+    pub max_work: usize,
+    /// Maximum parent-chain depth.
+    pub max_style_depth: usize,
+}
+
+impl Limits {
+    /// Pre-admit the caller's residual package budget before graph traversal.
+    pub fn from_source(source: &dyn TableSource) -> Result<Self, Error> {
+        let max_objects = source.max_objects();
+        let max_references = source.max_references();
+        if max_objects == 0 {
+            return Err(Error::Limit {
+                kind: LimitKind::MaterializedCells,
+                observed: 1,
+                maximum: 0,
+            });
+        }
+        if max_references == 0 {
+            return Err(Error::Limit {
+                kind: LimitKind::Fields,
+                observed: 1,
+                maximum: 0,
+            });
+        }
+        let maximum = usize::try_from(source.archive_limits().max_entry_bytes())
+            .map_err(|_| invalid("archive entry limit exceeds usize"))?;
+        let wire = WireLimits::default()
+            .with_input_bytes(maximum.min(WireLimits::MAX_INPUT_BYTES))
+            .and_then(|limits| limits.with_output_bytes(maximum.min(WireLimits::MAX_OUTPUT_BYTES)))
+            .map_err(|_| invalid("source message limits are invalid"))?;
+        let max_work = wire
+            .max_input_bytes()
+            .saturating_add(wire.max_output_bytes())
+            .max(1);
+        let mut objects = 0_usize;
+        let mut references = 0_usize;
+        let mut work = 0_usize;
+        for component in source.catalog().iter() {
+            for object in &component.archive().objects {
+                objects = objects.checked_add(1).ok_or(Error::Limit {
+                    kind: LimitKind::MaterializedCells,
+                    observed: u64::MAX,
+                    maximum: max_objects as u64,
+                })?;
+                if objects > max_objects {
+                    return Err(Error::Limit {
+                        kind: LimitKind::MaterializedCells,
+                        observed: objects as u64,
+                        maximum: max_objects as u64,
+                    });
+                }
+                for info in &object.archive_info.message_infos {
+                    let count = info.object_references.len().saturating_add(
+                        info.field_infos
+                            .iter()
+                            .map(|field| field.object_references.len())
+                            .sum::<usize>(),
+                    );
+                    references = references.checked_add(count).ok_or(Error::Limit {
+                        kind: LimitKind::Fields,
+                        observed: u64::MAX,
+                        maximum: max_references as u64,
+                    })?;
+                    if references > max_references {
+                        return Err(Error::Limit {
+                            kind: LimitKind::Fields,
+                            observed: references as u64,
+                            maximum: max_references as u64,
+                        });
+                    }
+                    work = work.saturating_add(1).saturating_add(count);
+                    if work > max_work {
+                        return Err(Error::Limit {
+                            kind: LimitKind::RewriteWork,
+                            observed: work as u64,
+                            maximum: max_work as u64,
+                        });
+                    }
+                }
+            }
+        }
+        Ok(Self {
+            wire,
+            max_objects,
+            max_references,
+            max_work,
+            max_style_depth: 16,
+        })
+    }
+}
+
+/// Bounded work accounting returned with a shared plan.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Report {
+    /// Parsed wire fields.
+    pub fields: usize,
+    /// References admitted by the graph plan.
+    pub references: usize,
+    /// Cumulative planner work.
+    pub work: usize,
+}
 
 fn invalid(reason: &'static str) -> Error {
     Error::InvalidSource(reason)
@@ -460,12 +571,16 @@ fn stylesheet_of(source: &dyn TableSource, style: u64) -> Result<u64, Error> {
 }
 
 /// Read effective character properties through the parent chain.
-pub fn effective(source: &dyn TableSource, style: u64) -> Result<CharacterProperties, Error> {
-    let wire = WireLimits::default();
+pub fn effective(
+    source: &dyn TableSource,
+    style: u64,
+    limits: &Limits,
+) -> Result<CharacterProperties, Error> {
+    let wire = limits.wire;
     let mut properties = CharacterProperties::new();
     let mut current = Some(style);
     let mut seen = BTreeSet::new();
-    for _ in 0..MAX_STYLE_DEPTH {
+    for _ in 0..limits.max_style_depth {
         let Some(identifier) = current else { break };
         if !seen.insert(identifier) {
             return Err(invalid("character-style parent cycle"));
@@ -481,15 +596,19 @@ pub fn effective(source: &dyn TableSource, style: u64) -> Result<CharacterProper
     if current.is_some() {
         return Err(Error::Limit {
             kind: LimitKind::Nesting,
-            observed: (MAX_STYLE_DEPTH + 1) as u64,
-            maximum: MAX_STYLE_DEPTH as u64,
+            observed: (limits.max_style_depth + 1) as u64,
+            maximum: limits.max_style_depth as u64,
         });
     }
     Ok(properties)
 }
 
 /// Read the effective character properties of one target cell.
-pub fn read(source: &dyn TableSource, target: Target) -> Result<CharacterProperties, Error> {
+pub fn read(
+    source: &dyn TableSource,
+    target: Target,
+    limits: &Limits,
+) -> Result<CharacterProperties, Error> {
     let table = Table::read(source, target)?;
     let cell = locate_cell(source, &table, target)?;
     let key = style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()))?;
@@ -513,7 +632,7 @@ pub fn read(source: &dyn TableSource, target: Target) -> Result<CharacterPropert
             reference(&table.model, field)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?
         },
     };
-    effective(source, style)
+    effective(source, style, limits)
 }
 
 /// The reduced direct character overrides to apply to a current style.
@@ -606,6 +725,8 @@ pub struct Plan {
     pub cell_updates: Vec<(Target, u32)>,
     /// Whether this plan can be combined with sibling fresh-cell plans.
     pub batch_compatible: bool,
+    /// Bounded work report for audit and gate receipts.
+    pub report: Report,
     /// Existing style-list entries released by this plan, grouped by owner.
     pub releases: Vec<(u64, u32)>,
 }
@@ -628,6 +749,7 @@ pub fn plan_set(
     target: Target,
     requested: &CharacterProperties,
     fresh: Option<u64>,
+    limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
     let table = Table::read(source, target)?;
     let cell = locate_cell(source, &table, target)?;
@@ -653,18 +775,18 @@ pub fn plan_set(
             reference(&table.model, field)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?
         },
     };
-    let inherited = effective(source, parent)?;
+    let inherited = effective(source, parent, limits)?;
     let reduced = minimal(requested, &inherited);
     if reduced == CharacterProperties::new() {
         return Ok(None);
     }
-    let wire = WireLimits::default();
+    let wire = limits.wire;
     let stylesheet = stylesheet_of(source, parent)?;
     let exclusive = old_key.is_some_and(|key| {
         list.entry(key)
             .ok()
             .is_some_and(|entry| entry.refcount == 1)
-    }) && style_is_exclusive(source, parent, table.style_list)?;
+    }) && style_is_exclusive(source, parent, table.style_list, limits)?;
     if exclusive {
         let data = litchi_iwa_text_wire::character_style_variation(
             Some(parent),
@@ -673,7 +795,7 @@ pub fn plan_set(
             wire,
         )
         .map_err(|_| invalid("character-style variation encoding failed"))?;
-        let data = with_paragraph_properties(data)?;
+        let data = with_paragraph_properties(data, wire)?;
         return Ok(Some(Plan {
             rewrites: vec![Rewrite {
                 identifier: parent,
@@ -689,7 +811,7 @@ pub fn plan_set(
     let data =
         litchi_iwa_text_wire::character_style_variation(Some(parent), stylesheet, &reduced, wire)
             .map_err(|_| invalid("character-style variation encoding failed"))?;
-    let data = with_paragraph_properties(data)?;
+    let data = with_paragraph_properties(data, wire)?;
     let (sheet_type, sheet_payload) =
         unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE])?;
     let sheet_data =
@@ -795,10 +917,17 @@ pub fn plan_set(
 pub fn plan_set_many(
     source: &dyn TableSource,
     requests: &[Request],
+    limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
     let mut plans = Vec::new();
     for request in requests {
-        let Some(plan) = plan_set(source, request.target, &request.properties, request.fresh)?
+        let Some(plan) = plan_set(
+            source,
+            request.target,
+            &request.properties,
+            request.fresh,
+            limits,
+        )?
         else {
             continue;
         };
@@ -879,7 +1008,7 @@ pub fn plan_set_many(
                         &existing.data,
                         insertion.identifier,
                         insertion.object_references.first().copied(),
-                        WireLimits::default(),
+                        limits.wire,
                     )
                     .map_err(|_| invalid("batch stylesheet variation encoding failed"))?;
                     existing.add_references.push(insertion.identifier);
@@ -908,7 +1037,7 @@ pub fn plan_set_many(
         root_data =
             patch_varint_field(&root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
         for entry in &list_entries {
-            append_length_delimited_field(&mut root_data, 3, entry, WireLimits::default())
+            append_length_delimited_field(&mut root_data, 3, entry, limits.wire)
                 .map_err(map_wire)?;
         }
         let mut root_rewrite = Rewrite {
@@ -987,20 +1116,20 @@ fn rewrite_list_key(data: &[u8], old: u32, new: u32) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
-fn with_paragraph_properties(mut data: Vec<u8>) -> Result<Vec<u8>, Error> {
+fn with_paragraph_properties(mut data: Vec<u8>, limits: WireLimits) -> Result<Vec<u8>, Error> {
     if bytes(&data, PARAGRAPH_PROPERTIES_FIELD)?.is_none() {
-        append_length_delimited_field(
-            &mut data,
-            PARAGRAPH_PROPERTIES_FIELD,
-            &[],
-            WireLimits::DEFAULT,
-        )
-        .map_err(map_wire)?;
+        append_length_delimited_field(&mut data, PARAGRAPH_PROPERTIES_FIELD, &[], limits)
+            .map_err(map_wire)?;
     }
     Ok(data)
 }
 
-fn style_is_exclusive(source: &dyn TableSource, style: u64, list: u64) -> Result<bool, Error> {
+fn style_is_exclusive(
+    source: &dyn TableSource,
+    style: u64,
+    list: u64,
+    limits: &Limits,
+) -> Result<bool, Error> {
     let mut found = false;
     for component in source.catalog().iter() {
         for object in &component.archive().objects {
@@ -1019,12 +1148,9 @@ fn style_is_exclusive(source: &dyn TableSource, style: u64, list: u64) -> Result
             }
             for message in &object.messages {
                 if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE
-                    && litchi_iwa_text_wire::character_style_parent(
-                        &message.data,
-                        WireLimits::default(),
-                    )
-                    .ok()
-                    .flatten()
+                    && litchi_iwa_text_wire::character_style_parent(&message.data, limits.wire)
+                        .ok()
+                        .flatten()
                         == Some(style)
                 {
                     return Ok(false);
@@ -1040,7 +1166,62 @@ fn style_is_exclusive(source: &dyn TableSource, style: u64, list: u64) -> Result
 #[cfg(test)]
 mod tests {
     use super::minimal;
+    use super::{Error, Limits, TableSource};
     use litchi_iwa_text_wire::CharacterProperties;
+
+    struct LimitedSource {
+        catalog: litchi_iwa_archive::SourceCatalog,
+        max_objects: usize,
+        max_references: usize,
+    }
+
+    impl TableSource for LimitedSource {
+        fn catalog(&self) -> &litchi_iwa_archive::ComponentCatalog {
+            self.catalog.components()
+        }
+
+        fn physical(&self) -> Option<&litchi_iwa_archive::SourceCatalog> {
+            Some(&self.catalog)
+        }
+
+        fn resolve_object(
+            &self,
+            _identifier: u64,
+        ) -> Result<Option<crate::ResolvedObject<'_>>, crate::ResolveError> {
+            Ok(None)
+        }
+
+        fn source_bytes(&self) -> &[u8] {
+            self.catalog.source_bytes()
+        }
+
+        fn archive_limits(&self) -> litchi_iwa_archive::Limits {
+            litchi_iwa_archive::Limits::default()
+        }
+
+        fn max_objects(&self) -> usize {
+            self.max_objects
+        }
+
+        fn max_references(&self) -> usize {
+            self.max_references
+        }
+    }
+
+    fn limited_source(max_objects: usize, max_references: usize) -> LimitedSource {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/basic.numbers");
+        let bytes = std::fs::read(path).expect("text-style fixture");
+        LimitedSource {
+            catalog: litchi_iwa_archive::SourceCatalog::from_bytes(
+                &bytes,
+                litchi_iwa_archive::Limits::default(),
+            )
+            .expect("text-style catalog"),
+            max_objects,
+            max_references,
+        }
+    }
 
     #[test]
     fn minimal_keeps_only_values_that_differ_from_inheritance() {
@@ -1069,5 +1250,18 @@ mod tests {
         requested.bold = Some(false);
         let inherited = CharacterProperties::new();
         assert!(minimal(&requested, &inherited).is_empty());
+    }
+
+    #[test]
+    fn zero_residual_ceiling_refuses_before_graph_admission() {
+        let source = limited_source(1_000_000, 0);
+        assert!(matches!(
+            Limits::from_source(&source),
+            Err(Error::Limit {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed: 1,
+                maximum: 0,
+            })
+        ));
     }
 }
