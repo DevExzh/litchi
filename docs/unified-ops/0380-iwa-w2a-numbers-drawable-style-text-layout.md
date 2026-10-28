@@ -2,9 +2,9 @@
 
 - Status: implementation slice prepared on `uo2/iwa-w2a`; coordinator
   integration is held until the current integrated 53-row gate completes.
-  The ledger destinations are provisional: no parity, scoped gate, native
-  acceptance or performance result has been executed or accepted for this
-  slice.
+  Scoped facade, host differential, static, rustdoc, ledger, boundary and
+  fuzz-lock checks pass on the current branch; native acceptance and final
+  integrated qualification remain pending.
 - Scope: the 18 Numbers host rows for shape fill, stroke, effects and frame
   text layout, plus text-box columns and frame text layout (set, reset and
   read). Numbers shadow rows remain excluded because the host does not read a
@@ -43,9 +43,9 @@ routes with the leaf on a source-built `basic.numbers` fixture containing a
 text box and rectangle. Set/allocation cases are Tier B because fresh style
 identities and the save-token policy differ; resets, rewrites and reads are
 declared Tier A where the host and leaf retain the same exact graph. The
-parity cases include inverse restoration and strict leaf reopen, but the cases
-remain unexecuted under the build hold and therefore are not differential
-proof. They are queued for native open/save/close/reopen evidence in
+parity cases include inverse restoration and strict leaf reopen; the scoped
+run passes all 18 vectors (six reads, six resets and six sets). They remain
+queued for native open/save/close/reopen evidence in
 `docs/unified-ops/0363-mac-queue.md`; no E3/E4 claim is made by this slice.
 
 The shared parity harness does not include Numbers shadow rows here: a
@@ -56,13 +56,15 @@ Apple-authored fixture and a separate owner decision exist.
 
 `numbers_w2a_cost.rs` adds ignored full-facade ABBA probes for all 18 routes.
 The probes measure open, selector resolution, read or edit, commit and
-serialization together. They must be run later in release mode on pinned CPU
-3 under the established callgrind/wall-clock methodology; the target is no
-more than 5% or 20 microseconds slower than the paired host route. No cost
-claim is made here and no raw capture is committed.
+serialization together. The release binary was measured under callgrind on
+pinned CPU 3 in the fixed A1/B1/B2/A2 order; raw callgrind captures and a
+compact summary remain outside the checkout. Wall-clock qualification was
+intentionally not run, so no 5%/20-microsecond performance claim is made.
 
-Under the coordinator's quiet build hold, the following are intentionally
-pending: formatting, Clippy, unit/integration/parity tests, rustdoc and
-glossary/ledger/boundary gates, fuzz-lock checks, and performance execution.
-The working tree contains no untracked upstream-fixture references, generated
-binaries or large evidence artifacts.
+Scoped verification: rustfmt, strict Numbers Clippy, 8 facade tests, 18
+host-vs-leaf parity vectors, Numbers API glossary, ledger, crate boundaries,
+Numbers fuzz-lock compile and Numbers rustdoc all pass. The integrated 53-row
+gate, native open/save/close/reopen evidence, and final wall-clock
+qualification remain coordinator-owned. The working tree contains no
+untracked upstream-fixture references, generated binaries or large evidence
+artifacts.

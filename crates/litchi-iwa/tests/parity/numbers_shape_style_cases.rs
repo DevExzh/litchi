@@ -89,7 +89,7 @@ fn host_route(source: &[u8], kind: Kind, operation: &Op) -> TestResult<Vec<u8>> 
             editor.set_sheet_shape_stroke(sheet, identifier, *stroke)?
         },
         Op::Set(Property::Stroke(None)) => {
-            return Err("hidden stroke is not part of this host parity vector".into())
+            return Err("hidden stroke is not part of this host parity vector".into());
         },
         Op::Set(Property::Effects(value)) => {
             editor.set_sheet_shape_effects(sheet, identifier, *value)?
@@ -121,6 +121,7 @@ fn host_route(source: &[u8], kind: Kind, operation: &Op) -> TestResult<Vec<u8>> 
         Op::Reset(PropertyKind::Columns) => {
             editor.reset_sheet_text_box_columns(sheet, identifier)?;
         },
+        _ => return Err("unsupported Numbers drawable style parity vector".into()),
     }
     Ok(editor.to_bytes()?)
 }
@@ -160,7 +161,10 @@ fn host_read(source: &[u8], kind: Kind, property: PropertyKind) -> TestResult<St
             format!("{:?}", editor.sheet_shape_text_layout(sheet, identifier)?)
         },
         (Kind::TextBox, PropertyKind::TextLayout) => {
-            format!("{:?}", editor.sheet_text_box_text_layout(sheet, identifier)?)
+            format!(
+                "{:?}",
+                editor.sheet_text_box_text_layout(sheet, identifier)?
+            )
         },
         (Kind::TextBox, PropertyKind::Columns) => {
             format!("{:?}", editor.sheet_text_box_columns(sheet, identifier)?)
@@ -181,6 +185,7 @@ fn leaf_read(source: &[u8], kind: Kind, property: PropertyKind) -> TestResult<St
         Property::Effects(value) => format!("{value:?}"),
         Property::TextLayout(value) => format!("{value:?}"),
         Property::Columns(value) => format!("{value:?}"),
+        _ => return Err("unsupported Numbers drawable style parity property".into()),
     })
 }
 
@@ -205,8 +210,12 @@ fn run_case(
     let mut case = Case::new(name, Format::Numbers, tier, Evidence::Queued, &input)
         .host(move |source| host_route(source, kind, &host_operation))
         .leaf(move |source| leaf_route(source, kind, &leaf_operation))
-        .read("host style", move |source| host_read(source, kind, property))
-        .read("leaf style", move |source| leaf_read(source, kind, property));
+        .read("host style", move |source| {
+            host_read(source, kind, property)
+        })
+        .read("leaf style", move |source| {
+            leaf_read(source, kind, property)
+        });
     if tier == Tier::B {
         case = case.leaf_structural_metadata();
     }
@@ -216,6 +225,7 @@ fn run_case(
 
 #[test]
 fn numbers_shape_style_set_parity() -> TestResult {
+    let _ = Evidence::Queued;
     run_case(
         "numbers_shape_style_set_parity",
         Kind::Shape,
@@ -266,6 +276,7 @@ fn numbers_shape_style_set_parity() -> TestResult {
 
 #[test]
 fn numbers_shape_style_reset_parity() -> TestResult {
+    let _ = Evidence::Queued;
     for (kind, property) in [
         (Kind::Shape, PropertyKind::Fill),
         (Kind::Shape, PropertyKind::Stroke),
@@ -284,6 +295,7 @@ fn numbers_shape_style_reset_parity() -> TestResult {
             PropertyKind::Effects => Property::Effects(effects()?),
             PropertyKind::TextLayout => Property::TextLayout(layout()?),
             PropertyKind::Columns => Property::Columns(columns()?),
+            _ => return Err("unsupported Numbers drawable style parity property kind".into()),
         };
         run_case(
             "numbers_shape_style_reset_parity",
@@ -298,6 +310,7 @@ fn numbers_shape_style_reset_parity() -> TestResult {
 
 #[test]
 fn numbers_shape_style_read_parity() -> TestResult {
+    let _ = Evidence::Queued;
     for (kind, property) in [
         (Kind::Shape, PropertyKind::Fill),
         (Kind::Shape, PropertyKind::Stroke),
@@ -317,8 +330,12 @@ fn numbers_shape_style_read_parity() -> TestResult {
         .read_only()
         .host(|source| Ok(numbers::Draft::from_bytes(source)?.to_bytes()?))
         .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
-        .read("host style", move |source| host_read(source, kind, property))
-        .read("leaf style", move |source| leaf_read(source, kind, property))
+        .read("host style", move |source| {
+            host_read(source, kind, property)
+        })
+        .read("leaf style", move |source| {
+            leaf_read(source, kind, property)
+        })
         .run()?;
     }
     Ok(())

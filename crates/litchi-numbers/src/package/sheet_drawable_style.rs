@@ -12,22 +12,22 @@
 )]
 
 use std::fmt;
+use std::mem::{size_of, size_of_val};
 
 use litchi_iwa_core::Limits;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::shape::{
-    self as engine,
+    self as engine, ShapeProperty, Slot, Styles,
     property::{Fills, ShapeEffects, Strokes, TextColumns, TextLayout},
-    ShapeProperty, Slot, Styles,
 };
 use thiserror::Error as ThisError;
 
 use super::Package;
 use super::sheet_drawable_graph::{self as graph, SHAPE_INFO_MESSAGE_TYPE};
-use super::{style_graph as numbers_style_graph, structure};
+use super::{structure, style_graph as numbers_style_graph};
 use crate::selector::SheetSelector;
-use crate::sheet::drawable::{DrawableSelector, Kind};
 use crate::sheet::drawable::style::{Columns, Fill, Property, PropertyKind};
+use crate::sheet::drawable::{DrawableSelector, Kind};
 
 structure::structural_family!("sheet drawable style", Wire(litchi_iwa_common::LimitKind));
 
@@ -81,9 +81,7 @@ impl Refusal {
             Self::ImageFill
             | Self::UnsupportedStyle
             | Self::UnsupportedDependency
-            | Self::UnsupportedSource => {
-                RefusalKind::UnsupportedContent
-            },
+            | Self::UnsupportedSource => RefusalKind::UnsupportedContent,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
         }
     }
@@ -154,23 +152,21 @@ const STAGED_ENTRY_OVERHEAD: usize = 128;
 
 fn property_heap_bytes(property: &Property) -> usize {
     match property {
-        Property::Fill(Fill::Gradient(gradient)) => {
-            gradient
-                .stops()
-                .len()
-                .saturating_mul(std::mem::size_of::<litchi_iwa_common::shape::fill::Stop>())
-        },
+        Property::Fill(Fill::Gradient(gradient)) => gradient
+            .stops()
+            .len()
+            .saturating_mul(size_of::<litchi_iwa_common::shape::fill::Stop>()),
         Property::Columns(Columns::Variable(columns)) => columns
             .following()
             .len()
-            .saturating_mul(std::mem::size_of::<litchi_iwa_text::columns::Following>()),
+            .saturating_mul(size_of::<litchi_iwa_text::columns::Following>()),
         _ => 0,
     }
 }
 
 fn change_cost(change: &Change) -> usize {
     STAGED_ENTRY_OVERHEAD
-        .saturating_add(std::mem::size_of_val(change))
+        .saturating_add(size_of_val(change))
         .saturating_add(match change {
             Change::Set(property) => property_heap_bytes(property),
             Change::Reset(_) => 0,
@@ -280,15 +276,11 @@ fn workspace(
     Ok((components, limits))
 }
 
-fn read(
-    workspace: &Workspace<'_>,
-    drawable: u64,
-    kind: PropertyKind,
-) -> Result<Property, Error> {
+fn read(workspace: &Workspace<'_>, drawable: u64, kind: PropertyKind) -> Result<Property, Error> {
     Ok(match kind {
         PropertyKind::Fill => {
             let fill = engine::value(workspace, drawable, &Fills)?;
-            if matches!(fill, litchi_iwa_common::shape::fill::Fill::Image(_)) {
+            if matches!(fill, Fill::Image(_)) {
                 return Err(Refusal::ImageFill.into());
             }
             Property::Fill(fill)
@@ -313,7 +305,9 @@ fn apply_change(
 ) -> Result<bool, Error> {
     Ok(match change {
         Change::Set(Property::Fill(fill)) => engine::set(workspace, drawable, &Fills, fill)?,
-        Change::Set(Property::Stroke(stroke)) => engine::set(workspace, drawable, &Strokes, stroke)?,
+        Change::Set(Property::Stroke(stroke)) => {
+            engine::set(workspace, drawable, &Strokes, stroke)?
+        },
         Change::Set(Property::Effects(effects)) => {
             engine::set(workspace, drawable, &ShapeEffects, effects)?
         },
@@ -326,9 +320,7 @@ fn apply_change(
         Change::Reset(PropertyKind::Fill) => engine::reset(workspace, drawable, &Fills)?,
         Change::Reset(PropertyKind::Stroke) => engine::reset(workspace, drawable, &Strokes)?,
         Change::Reset(PropertyKind::Effects) => engine::reset(workspace, drawable, &ShapeEffects)?,
-        Change::Reset(PropertyKind::TextLayout) => {
-            engine::reset(workspace, drawable, &TextLayout)?
-        },
+        Change::Reset(PropertyKind::TextLayout) => engine::reset(workspace, drawable, &TextLayout)?,
         Change::Reset(PropertyKind::Columns) => engine::reset(workspace, drawable, &TextColumns)?,
     })
 }
@@ -363,9 +355,7 @@ fn inherited_reset_value(
     };
     Ok(match kind {
         PropertyKind::Fill => Property::Fill(inherited_property(workspace, parent, &Fills)?),
-        PropertyKind::Stroke => {
-            Property::Stroke(inherited_property(workspace, parent, &Strokes)?)
-        },
+        PropertyKind::Stroke => Property::Stroke(inherited_property(workspace, parent, &Strokes)?),
         PropertyKind::Effects => {
             Property::Effects(inherited_property(workspace, parent, &ShapeEffects)?)
         },
@@ -417,11 +407,7 @@ fn verify_reset_graph(
     if before.exclusive() {
         // An exclusive variation can be rewritten or collapsed; either way
         // the selected property must no longer be a direct override.
-        if direct.is_some_and(|slots| {
-            slots
-                .iter()
-                .any(|slot| reset_slots(kind).contains(slot))
-        }) {
+        if direct.is_some_and(|slots| slots.iter().any(|slot| reset_slots(kind).contains(slot))) {
             return Err(Error::Verification);
         }
     } else {
@@ -438,10 +424,7 @@ fn verify_reset_graph(
         let Some(slots) = direct else {
             return Err(Error::Verification);
         };
-        if !slots
-            .iter()
-            .any(|slot| reset_slots(kind).contains(slot))
-        {
+        if !slots.iter().any(|slot| reset_slots(kind).contains(slot)) {
             return Err(Error::Verification);
         }
     }
@@ -466,11 +449,7 @@ fn verify_reset_candidate(
         .ok_or(Error::Verification)?;
     let direct = engine::direct_slots(payload)?;
     if expectation.was_exclusive {
-        if direct.is_some_and(|slots| {
-            slots
-                .iter()
-                .any(|slot| reset_slots(kind).contains(slot))
-        }) {
+        if direct.is_some_and(|slots| slots.iter().any(|slot| reset_slots(kind).contains(slot))) {
             return Err(Error::Verification);
         }
     } else {
@@ -480,10 +459,7 @@ fn verify_reset_candidate(
         let Some(slots) = direct else {
             return Err(Error::Verification);
         };
-        if !slots
-            .iter()
-            .any(|slot| reset_slots(kind).contains(slot))
-        {
+        if !slots.iter().any(|slot| reset_slots(kind).contains(slot)) {
             return Err(Error::Verification);
         }
     }
@@ -542,7 +518,7 @@ impl Edit<'_> {
     /// Stage a semantic style value.
     pub fn set(&mut self, property: Property) -> Result<&mut Self, Error> {
         ensure_property(self.kind, property.kind())?;
-        if matches!(property, Property::Fill(litchi_iwa_common::shape::fill::Fill::Image(_))) {
+        if matches!(property, Property::Fill(Fill::Image(_))) {
             return Err(Refusal::ImageFill.into());
         }
         self.stage(Change::Set(property))
@@ -582,8 +558,7 @@ impl Edit<'_> {
                         was_exclusive: before.exclusive(),
                     };
                     verify_reset_graph(&working, self.drawable, *kind, &expectation, before)?;
-                    final_states[property_index(*kind)] =
-                        Some(FinalState::Reset(expectation));
+                    final_states[property_index(*kind)] = Some(FinalState::Reset(expectation));
                 },
             }
         }

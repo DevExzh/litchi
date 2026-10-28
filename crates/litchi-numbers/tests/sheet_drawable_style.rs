@@ -128,9 +128,11 @@ fn shape_style_round_trips_and_inverse_restores_exact_source() -> TestResult {
     assert!(commit.diagnostics().changed());
     assert!(commit.diagnostics().touched_components() >= 1);
     assert!(matches!(
-        commit
-            .package()
-            .sheet_drawable_style(0, DrawableSelector::shape(0), PropertyKind::Effects)?,
+        commit.package().sheet_drawable_style(
+            0,
+            DrawableSelector::shape(0),
+            PropertyKind::Effects
+        )?,
         Property::Effects(_)
     ));
 
@@ -153,9 +155,11 @@ fn text_box_columns_and_layout_are_selector_first() -> TestResult {
         .set(Property::TextLayout(layout()?))?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit
-            .package()
-            .sheet_drawable_style(0, DrawableSelector::text_box(0), PropertyKind::Columns)?,
+        commit.package().sheet_drawable_style(
+            0,
+            DrawableSelector::text_box(0),
+            PropertyKind::Columns
+        )?,
         Property::Columns(columns()?)
     );
     let restored = commit
@@ -168,15 +172,11 @@ fn text_box_columns_and_layout_are_selector_first() -> TestResult {
 #[test]
 fn unchanged_style_is_an_exact_no_op() -> TestResult {
     let package = authored()?;
-    let current = package.sheet_drawable_style(
-        0,
-        DrawableSelector::shape(0),
-        PropertyKind::Effects,
-    )?;
-    let commit = package
-        .edit_sheet_drawable_style(0, DrawableSelector::shape(0))?
-        .set(current)?
-        .commit()?;
+    let current =
+        package.sheet_drawable_style(0, DrawableSelector::shape(0), PropertyKind::Effects)?;
+    let mut edit = package.edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
+    edit.set(current)?;
+    let commit = edit.commit()?;
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(bytes(commit.package())?, bytes(&package)?);
@@ -195,7 +195,9 @@ fn unsupported_targets_and_empty_commits_are_typed() -> TestResult {
     };
     assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
     assert!(matches!(
-        package.edit_sheet_drawable_style(0, DrawableSelector::shape(0))?.commit(),
+        package
+            .edit_sheet_drawable_style(0, DrawableSelector::shape(0))?
+            .commit(),
         Err(style::Error::Refused(style::Refusal::NoStagedOperation))
     ));
     assert!(matches!(
@@ -204,7 +206,9 @@ fn unsupported_targets_and_empty_commits_are_typed() -> TestResult {
     ));
     assert!(matches!(
         package.sheet_drawable_style(0, DrawableSelector::shape(9), PropertyKind::Fill),
-        Err(style::Error::Refused(style::Refusal::DrawableNotFound { .. }))
+        Err(style::Error::Refused(
+            style::Refusal::DrawableNotFound { .. }
+        ))
     ));
     Ok(())
 }
@@ -258,11 +262,9 @@ fn repeated_set_reset_rewrite_uses_the_final_property_state() -> TestResult {
         .set(Property::Fill(final_fill.clone()))?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.package().sheet_drawable_style(
-            0,
-            DrawableSelector::shape(0),
-            PropertyKind::Fill,
-        )?,
+        commit
+            .package()
+            .sheet_drawable_style(0, DrawableSelector::shape(0), PropertyKind::Fill,)?,
         Property::Fill(final_fill),
     );
     let restored = commit
@@ -275,21 +277,14 @@ fn repeated_set_reset_rewrite_uses_the_final_property_state() -> TestResult {
 #[test]
 fn reset_proves_inherited_value_and_preserves_the_sibling_drawable() -> TestResult {
     let package = authored()?;
-    let baseline = package.sheet_drawable_style(
-        0,
-        DrawableSelector::shape(0),
-        PropertyKind::Fill,
-    )?;
-    let sibling_layout = package.sheet_drawable_style(
-        0,
-        DrawableSelector::text_box(0),
-        PropertyKind::TextLayout,
-    )?;
+    let baseline =
+        package.sheet_drawable_style(0, DrawableSelector::shape(0), PropertyKind::Fill)?;
+    let sibling_layout =
+        package.sheet_drawable_style(0, DrawableSelector::text_box(0), PropertyKind::TextLayout)?;
     let before_list = package.sheet_drawable_list(0)?;
-    let styled = package
-        .edit_sheet_drawable_style(0, DrawableSelector::shape(0))?
-        .set(Property::Fill(Fill::Solid(color(0.7, 0.3, 0.2)?)))?
-        .commit()?;
+    let mut style_edit = package.edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
+    style_edit.set(Property::Fill(Fill::Solid(color(0.7, 0.3, 0.2)?)))?;
+    let styled = style_edit.commit()?;
     let mut reset = styled
         .package()
         .edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
