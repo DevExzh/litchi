@@ -6916,3 +6916,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   checkouts with an external inventory. Integration source was unchanged by
   cleanup; future completed work packages receive the same ancestry and
   local-state checks before retirement.
+
+- Post-merge checks on `1e3978082b` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger. The completed W1-G and
+  Numbers-proof worktrees and branches were then retired after artifact
+  preservation, bringing this continuation's cleanup to 35 worktrees and
+  29 branches.
+- Accepted W2-D `021bfd23ff` (code `3525ba2180`, record 0388), synchronized
+  with the comments integration. The Numbers hidden-axis create and visible
+  row/column insertion examples now live in the leaf crate and use focused
+  selectors and transactions. The insertion example checks 6×4 to 7×5
+  extents, shifted hidden indices and saved-file reopen. The host physical
+  deletion example remains byte-identical: clearing visibility is not a
+  replacement for deletion. Both examples build and run on the synchronized
+  source; strict scoped Clippy, formatting and repository guards pass.
+  No runtime, ledger, native-evidence or performance disposition changes.
