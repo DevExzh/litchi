@@ -56,6 +56,12 @@ pub enum LimitKind {
     WireNesting,
     /// Strict codec work.
     WireWork,
+    /// Logical output allocations reserved by one strict codec operation.
+    WireAllocations,
+    /// Retained bytes charged by one strict codec operation.
+    WireRetainedBytes,
+    /// Scratch bytes charged by one strict codec operation.
+    WireScratchBytes,
     /// Aggregate transaction work.
     TransactionWork,
 }
@@ -368,6 +374,12 @@ const fn map_header_limit_kind(kind: super::table_headers::LimitKind) -> engine:
         H::WireFields => E::WireFields,
         H::WireNesting => E::WireNesting,
         H::WireWork => E::WireWork,
+        // The hidden-axis engine predates the table-info codec's distinct
+        // allocation/retained/scratch ceilings and reports those legacy
+        // adapter failures under its aggregate wire-work budget.  The
+        // focused comments and table-header routes retain the dimensions
+        // before this unrelated adapter boundary.
+        H::WireAllocations | H::WireRetainedBytes | H::WireScratchBytes => E::WireWork,
         H::TransactionWork => E::TransactionWork,
     }
 }
