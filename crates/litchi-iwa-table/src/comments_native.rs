@@ -1113,11 +1113,10 @@ fn validate_archive_header_shape(object: &ArchiveObject) -> FaultResult<()> {
     if object.archive_info.message_infos.len() != object.messages.len() {
         return Err(Fault::Invalid);
     }
-    for (_message_index, (message, info)) in object
+    for (message, info) in object
         .messages
         .iter()
         .zip(&object.archive_info.message_infos)
-        .enumerate()
     {
         if info.type_ != message.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
