@@ -70,6 +70,75 @@ per-route receipt is `summary.tsv` (2,321 bytes, SHA-256
 `e0f8b9ac630508291c40d4de0eee6a60acef2feee85c4f902955d33eb5441126`) and
 contains each host/leaf Ir count, delta, capture size and capture SHA-256.
 
+The release binary can be regenerated from the recorded source with this
+command (the target and temporary directories are external):
+
+```sh
+cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a
+env -u LITCHI_BLESS -u LITCHI_CAPPED \
+  PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+  LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
+  CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 \
+  CARGO_PROFILE_TEST_DEBUG=0 CARGO_NET_OFFLINE=true RUST_TEST_THREADS=1 \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-target-20261028 \
+  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-tmp-20261028 \
+  cargo test --offline --locked -p litchi-iwa --all-features \
+    --test parity --release --no-run
+```
+
+The 18 captures and their per-route test logs can be regenerated without
+changing the checkout as follows. `ROUTES_3` is the 18-entry list in
+`numbers_w2a_cost.rs`; each selected test executes the same ABBA order
+`A1(host), B1(leaf), B2(leaf), A2(host)`.
+
+```sh
+cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a
+probe_dir=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-cost-20261028
+binary=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-target-20261028/release/deps/parity-5e410c7ba68c5074
+for route in \
+  shape_style_fill_set shape_style_fill_reset shape_style_fill_read \
+  shape_style_stroke_set shape_style_stroke_reset shape_style_stroke_read \
+  shape_style_effects_set shape_style_effects_reset shape_style_effects_read \
+  shape_style_layout_set shape_style_layout_reset shape_style_layout_read \
+  text_box_style_columns_set text_box_style_columns_reset text_box_style_columns_read \
+  text_box_style_layout_set text_box_style_layout_reset text_box_style_layout_read
+do
+  W2A_ROUTE="$route" taskset -c 3 valgrind --tool=callgrind --quiet \
+    --dump-instr=yes --collect-jumps=yes \
+    --callgrind-out-file="$probe_dir/$route.callgrind" "$binary" \
+    --ignored --exact numbers_w2a_cost::numbers_w2a_route_cost_abba_3 \
+    --test-threads=1 >"$probe_dir/$route.stdout" \
+    2>"$probe_dir/$route.stderr"
+done
+```
+
+Instruction counts are attributed only from the direct `#[inline(never)]`
+symbol rows for `w2a_host_route_3` and `w2a_leaf_route_3`; `PROGRAM TOTALS`
+is not used for the comparison. The receipt used this method, removing the
+thousands separators from the first field and taking the first exact symbol
+row:
+
+```sh
+cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a
+callgrind_annotate --auto=no --inclusive=yes --tree=none --show-percs=no \
+  /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-cost-20261028/shape_style_fill_set.callgrind \
+  | rg 'w2a_(host|leaf)_route_3|PROGRAM TOTALS'
+```
+
+Representative output (the first line is context only; the next two are the
+separately attributed route symbols) is:
+
+```text
+836,112,805  PROGRAM TOTALS
+258,070,899  ???:parity::numbers_w2a_cost::w2a_host_route_3 [.../parity-5e410c7ba68c5074]
+150,250,623  ???:parity::numbers_w2a_cost::w2a_leaf_route_3 [.../parity-5e410c7ba68c5074]
+```
+
+The instruction-count bar passes independently: all 18 leaf Ir counts are
+below their paired host rows in `summary.tsv`. Wall-clock qualification is
+still pending, as are native open/save/close/reopen evidence and the final
+integrated 53-row root gate.
+
 Scoped verification: rustfmt, strict Numbers Clippy, 8 facade tests, 18
 host-vs-leaf parity vectors, Numbers API glossary, ledger, crate boundaries,
 Numbers fuzz-lock compile and Numbers rustdoc all pass. The integrated 53-row
