@@ -61,6 +61,7 @@ mod numbers_chart_style_cases;
 mod numbers_conditional_highlight_cases;
 mod numbers_drawable_cases;
 mod numbers_drawable_comment_cases;
+mod numbers_formula_author_cases;
 mod numbers_hidden_axes_cases;
 mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;

@@ -256,7 +256,7 @@ pub(super) fn commit_sparse_scalar_tiles(
     let tile_template = message_payload(source, template_route, path)?;
     let component_capacity = changes
         .len()
-        .checked_add(4)
+        .checked_add(5)
         .ok_or(Error::InvalidSource { path })?;
     let mut edits = Vec::new();
     edits
@@ -273,6 +273,20 @@ pub(super) fn commit_sparse_scalar_tiles(
             amount: changes.len(),
         })?;
     let mut observed = metadata_usage(&inspected, &metadata_output, &cells, &header_sources)?;
+    let column_capacity = changes.len().min(
+        usize::try_from(target.native.columns).map_err(|_error| Error::InvalidSource { path })?,
+    );
+    merge_usage(
+        &mut observed,
+        budget::Usage {
+            retained_elements: usize_u64(column_capacity),
+            retained_bytes: usize_u64(column_capacity * size_of::<(u32, i64)>()),
+            allocation_events: u64::from(column_capacity != 0),
+            ..budget::Usage::default()
+        },
+        path,
+    )?;
+    let mut column_deltas = super::column_counts::Deltas::with_capacity(column_capacity)?;
 
     let mut start = 0usize;
     while start < changes.len() {
@@ -332,6 +346,9 @@ pub(super) fn commit_sparse_scalar_tiles(
                     },
                 ));
             }
+        }
+        for transition in &outcome.transitions {
+            column_deltas.record(transition, path)?;
         }
         for row in &outcome.final_rows {
             let global_row = tile_id
@@ -415,6 +432,31 @@ pub(super) fn commit_sparse_scalar_tiles(
             .map_err(|error| map_sparse_error(error, path))?;
         if let Some(payload) = payload {
             push_message(&mut edits, route, payload, None, component_capacity, path)?;
+        }
+    }
+    if column_deltas.changes() {
+        let bucket = message_payload(source, target.storage.column_headers, path)?;
+        merge_usage(
+            &mut observed,
+            column_deltas.envelope(bucket.len(), path)?,
+            path,
+        )?;
+        let payload = match column_deltas.apply(bucket, &target.storage, path) {
+            Ok(payload) => payload,
+            Err(error) => {
+                budget.cancel_authorization();
+                return Err(error);
+            },
+        };
+        if let Some(payload) = payload {
+            push_message(
+                &mut edits,
+                target.storage.column_headers,
+                payload,
+                None,
+                component_capacity,
+                path,
+            )?;
         }
     }
     let (data_rewrite, data_report) =
