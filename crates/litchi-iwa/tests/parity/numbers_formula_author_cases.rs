@@ -137,8 +137,7 @@ fn decode_tile_without_formula_cache(data: &[u8]) -> Result<Decoded, prost::Deco
     if matches != 1 {
         return Err(tile_decode_error());
     }
-    let normalized = tile.encode_to_vec();
-    Ok(decoded(tile, &normalized))
+    Ok(decoded(tile, data))
 }
 
 fn tile_payload_with_cell(bytes: &[u8], row: u32, column: u32) -> TestResult<Vec<u8>> {
@@ -152,10 +151,9 @@ fn tile_payload_with_cell(bytes: &[u8], row: u32, column: u32) -> TestResult<Vec
                 .messages
                 .iter()
                 .find(|message| message.type_ == 6_002)
+                && table_write::tile_cell(&message.data, row, column, &Limits::DEFAULT)?.is_some()
             {
-                if table_write::tile_cell(&message.data, row, column, &Limits::DEFAULT)?.is_some() {
-                    return Ok(message.data.clone());
-                }
+                return Ok(message.data.clone());
             }
         }
     }
