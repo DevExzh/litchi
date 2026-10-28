@@ -60,6 +60,15 @@ serialization together. The release binary was measured under callgrind on
 pinned CPU 3 in the fixed A1/B1/B2/A2 order; raw callgrind captures and a
 compact summary remain outside the checkout. Wall-clock qualification was
 intentionally not run, so no 5%/20-microsecond performance claim is made.
+The source is commit `d1b11fed01f66dfe322cca3048289a01bbd57d1f`; the probe
+source SHA-256 is `ca4306d4d601dc1894b618e253cda05e38a1a3ef2720a96a3d0ea6752131d460`.
+The release test binary is 39,638,264 bytes with SHA-256
+`3d3bce24be93efe0af38503108b61f26c613c2f504c1b25907cac69c24ca7737`.
+The 18 raw captures total 39,853,563 bytes under
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-cost-20261028/`; the compact
+per-route receipt is `summary.tsv` (2,321 bytes, SHA-256
+`e0f8b9ac630508291c40d4de0eee6a60acef2feee85c4f902955d33eb5441126`) and
+contains each host/leaf Ir count, delta, capture size and capture SHA-256.
 
 Scoped verification: rustfmt, strict Numbers Clippy, 8 facade tests, 18
 host-vs-leaf parity vectors, Numbers API glossary, ledger, crate boundaries,
