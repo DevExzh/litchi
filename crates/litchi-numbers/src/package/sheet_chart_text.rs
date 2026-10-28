@@ -23,8 +23,9 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_arrangement::{
-    self, ChartBudget, map_package_error, object_from_resolved, select_chart_with_budget,
-    selected_chart_payload, unique_typed_message, validate_message_metadata,
+    self, ChartBudget, map_package_error as map_arrangement_package_error, object_from_resolved,
+    select_chart_with_budget, selected_chart_payload, unique_typed_message,
+    validate_message_metadata,
 };
 use crate::selector::{ChartSelector, SheetSelector};
 
@@ -297,7 +298,7 @@ pub(super) fn resolve<'sheet>(
         .state
         .index
         .resolve_ref_id(&package.state.components, identifier)
-        .map_err(|error| map_arrangement_error(map_package_error(error)))?
+        .map_err(|error| map_arrangement_error(map_arrangement_package_error(error)))?
         .ok_or(Error::InvalidSource)?;
     let object = object_from_resolved(package, resolved).map_err(map_arrangement_error)?;
     validate_message_metadata(object).map_err(map_arrangement_error)?;
@@ -529,6 +530,46 @@ fn count(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
+fn map_candidate_error(error: super::Error) -> Error {
+    if let Some(resource) = error.resource_error() {
+        return match resource {
+            super::ResourceError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: match kind {
+                    super::PayloadLimitKind::InputBytes => LimitKind::PayloadBytes,
+                    super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                    super::PayloadLimitKind::OutputBytes => LimitKind::OutputBytes,
+                    super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                    super::PayloadLimitKind::RewriteWork => LimitKind::WireWork,
+                    _ => LimitKind::PayloadBytes,
+                },
+                observed: count(observed),
+                maximum: count(maximum),
+            },
+            super::ResourceError::Allocation { amount } => Error::Allocation { amount },
+        };
+    }
+    match error {
+        super::Error::Archive(error) => map_archive_error(error),
+        super::Error::InputTooLarge { observed, maximum } => Error::Limit {
+            kind: LimitKind::PackageBytes,
+            observed,
+            maximum,
+        },
+        super::Error::SemanticLimit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: count(observed),
+            maximum: count(maximum),
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
 fn map_arrangement_error(error: chart_arrangement::Error) -> Error {
     match error {
         chart_arrangement::Error::Refused(chart_arrangement::Refusal::UnsupportedSource) => {
@@ -610,7 +651,7 @@ fn publish(source: &Package, target: &Target, rewritten: Vec<u8>) -> Result<Pack
         .execute(execution_limits)
         .map_err(map_archive_error)?;
     Package::from_owned_bytes_with_options(output, source.state.options)
-        .map_err(|_| Error::Verification)
+        .map_err(map_candidate_error)
 }
 
 /// The immutable chart-text edit shared by title and axis-title facades.

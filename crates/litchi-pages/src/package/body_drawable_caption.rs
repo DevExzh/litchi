@@ -668,7 +668,7 @@ fn drawable_width(
 
 /// The theme's document stylesheet and first caption paragraph-style
 /// preset, and the document language (the host's `image_caption_theme`).
-fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
+pub(crate) fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
     let mut budget = Budget::new(package)?;
     let (theme, language) = graph::root_theme(package, &mut budget)?;
     let index = ObjectIndex::new(package, &mut budget)?;

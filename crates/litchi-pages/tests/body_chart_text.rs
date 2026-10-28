@@ -1,7 +1,8 @@
 //! Focused selector and exact-no-op coverage for body-chart text facades.
 
 use litchi_iwa_common::chart::axis::Axis;
-use litchi_pages::{BodyChartSelector, Package};
+use litchi_pages::chart::title;
+use litchi_pages::{BodyChartSelector, OpenOptions, Package, SourceLimits};
 
 const NATIVE: &[u8] =
     include_bytes!("../../../test-data/iwork/pages/chart-arrangement-native.pages");
@@ -65,5 +66,38 @@ fn body_chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
             .apply_body_chart_axis_title(&commit.patch().inverse())?;
         assert_eq!(exact_bytes(restored.package())?, NATIVE);
     }
+    Ok(())
+}
+
+fn incompressible_text(length: usize) -> String {
+    let mut state = 0x9e37_79b9_u32;
+    (0..length)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            char::from(b'!' + (state % 94) as u8)
+        })
+        .collect()
+}
+
+#[test]
+fn body_chart_title_candidate_keeps_the_original_package_budget() -> TestResult {
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(NATIVE.len() as u64)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(NATIVE, OpenOptions::new().source_limits(source_limits))?;
+    let result = package
+        .edit_body_chart_title(BodyChartSelector::index(0))?
+        .set(incompressible_text(256))?
+        .commit();
+    assert!(matches!(
+        result,
+        Err(title::Error::Limit {
+            kind: title::LimitKind::OutputBytes,
+            ..
+        })
+    ));
     Ok(())
 }

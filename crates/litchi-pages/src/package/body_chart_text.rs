@@ -463,9 +463,17 @@ fn resolve(package: &Package, selector: BodyChartSelector, kind: Kind) -> Result
 fn map_graph_error(error: graph::GraphError) -> Error {
     match error {
         graph::GraphError::Limit {
-            observed, maximum, ..
+            kind,
+            observed,
+            maximum,
         } => Error::Limit {
-            kind: LimitKind::PayloadBytes,
+            kind: match kind {
+                graph::GraphLimit::InputBytes => LimitKind::PayloadBytes,
+                graph::GraphLimit::OutputBytes => LimitKind::OutputBytes,
+                graph::GraphLimit::WireFields => LimitKind::WireFields,
+                graph::GraphLimit::WireNesting => LimitKind::WireNesting,
+                graph::GraphLimit::WireWork => LimitKind::WireWork,
+            },
             observed,
             maximum,
         },

@@ -19,6 +19,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{pages_body_codec, pages_media_codec};
 
 use super::Package;
+use crate::PackageError;
 use crate::selector::DrawableSelector;
 
 pub(crate) const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
@@ -711,7 +712,8 @@ pub(crate) fn publish_changes(
         .source
         .reopen(output.into())
         .map_err(map_archive_error)?;
-    Package::from_source_catalog(catalog).map_err(|_| GraphError::InvalidSource)
+    Package::from_source_catalog_with_semantic_limits(catalog, source.state.semantic_limits)
+        .map_err(map_package_error)
 }
 
 /// Reopen the target artifact of an exact patch under the source's limits.
@@ -721,7 +723,8 @@ pub(crate) fn reopen(source: &Package, target: Arc<[u8]>) -> GraphResult<Package
         .source
         .reopen(target)
         .map_err(map_archive_error)?;
-    Package::from_source_catalog(catalog).map_err(|_| GraphError::InvalidSource)
+    Package::from_source_catalog_with_semantic_limits(catalog, source.state.semantic_limits)
+        .map_err(map_package_error)
 }
 
 pub(crate) fn map_wire_error(error: litchi_iwa_common::Error) -> GraphError {
@@ -762,6 +765,37 @@ pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> GraphError 
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => GraphError::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
+        _ => GraphError::InvalidSource,
+    }
+}
+
+fn map_package_error(error: PackageError) -> GraphError {
+    match error {
+        PackageError::Archive(error) => map_archive_error(error),
+        PackageError::Limit {
+            observed, maximum, ..
+        } => GraphError::Limit {
+            kind: GraphLimit::InputBytes,
+            observed,
+            maximum,
+        },
+        PackageError::PayloadLimit {
+            observed,
+            limit: maximum,
+        }
+        | PackageError::SectionNamesTooLarge {
+            observed,
+            limit: maximum,
+        }
+        | PackageError::ObjectLimit {
+            observed,
+            limit: maximum,
+        } => GraphError::Limit {
+            kind: GraphLimit::InputBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        PackageError::Allocation { amount } => GraphError::Allocation { amount },
         _ => GraphError::InvalidSource,
     }
 }
