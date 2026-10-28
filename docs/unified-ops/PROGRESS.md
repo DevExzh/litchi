@@ -6847,3 +6847,23 @@ See [0063](0063-source-pptx-modern-comments.md).
   and Pages/Keynote resource mappings, but Numbers resource mappings and
   read/create/clear performance coverage still need completion. All 465
   pending native entries continue to block W3.
+
+- Post-merge checks on `177ef72ce0` passed on unchanged clean source.
+  Its fresh full gate completed thirty rows: twenty-nine passed and leaf
+  Clippy row 28 failed because production helpers followed test modules in
+  Pages `body_drawable_graph` and Numbers `sheet_chart_text`. The coordinator
+  stopped the failed run during row 30, preserved its logs and partial
+  receipt, and will rerun all 53 rows after repair. This is not a full-gate
+  green result. All 56 iWork instruction routes (111 captures) and all 14 FIN
+  instruction comparisons (56 captures) passed on `177ef72ce0`, with source
+  and binary integrity checked before and after. Those receipts remain
+  source-bound; wall/CLI timing has not run.
+- Accepted ordering repair `4611d08f19` (source `1b66a078fc`, record 0384).
+  The two existing test modules now follow all production helpers; their
+  bodies and runtime logic are unchanged. Strict Clippy for both affected
+  crates now includes all targets and features, including library tests.
+  The three affected unit tests, full formatting and repository guards pass.
+  Earlier targeted Clippy had missed these library-test configurations.
+  No API, ledger or native disposition changes. The next integrated source
+  receives fresh post-merge checks, all 53 gate rows, the complete 56-route
+  iWork and 14-comparison FIN instruction matrices, then quiet wall/CLI runs.
