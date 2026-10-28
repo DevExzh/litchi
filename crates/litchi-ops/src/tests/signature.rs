@@ -1061,6 +1061,54 @@ fn signed_xlsx_sheet_setter_preserves_exact_noops_and_refuses_changes() {
             assert!(commit.file().is_signed());
             assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
         }
+        // Keep a signed cancellation run on the native reservation path even
+        // after it returns to the immutable source. A tight budget makes the
+        // following read/write exercise the worksheet admission again rather
+        // than relying on a stale coalescer cache.
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let cell_path = "/sheet[1]/A1";
+            let cell_text = candidate
+                .get(cell_path)
+                .unwrap_or_else(|error| panic!("{} ({route}): resolve cell: {error:?}", input.label))
+                .view()
+                .text()
+                .unwrap_or_else(|error| panic!("{} ({route}): read cell: {error:?}", input.label))
+                .unwrap_or_default()
+                .into_owned();
+            let original = crate::props! { "value" => cell_text.as_str() };
+            let changed = format!("{cell_text} changed again");
+            let probe = candidate
+                .edit(|edit| {
+                    edit.set(cell_path, crate::props! { "value" => changed.as_str() })?;
+                    edit.set(cell_path, original.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): signed cancellation probe: {error:?}", input.label)
+                });
+            let snapshot_budget = probe.diagnostics().snapshot_bytes();
+            assert!(snapshot_budget > 0, "{} ({route}): empty signed capture", input.label);
+            let limits = crate::transaction::SemanticLimits::builder()
+                .max_snapshot_bytes(snapshot_budget)
+                .unwrap_or_else(|error| panic!("{} ({route}): snapshot bound: {error:?}", input.label))
+                .build()
+                .unwrap_or_else(|error| panic!("{} ({route}): snapshot profile: {error:?}", input.label));
+            let repeated = candidate
+                .edit_with_options(
+                    crate::EditOptions::new().semantic_limits(limits),
+                    |edit| {
+                        edit.set(cell_path, crate::props! { "value" => changed.as_str() })?;
+                        edit.set(cell_path, original.clone())?;
+                        edit.set(cell_path, crate::props! { "value" => changed.as_str() })?;
+                        edit.set(cell_path, original.clone())
+                    },
+                )
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): signed cancellation under tight budget: {error:?}", input.label)
+                });
+            assert!(!repeated.diagnostics().changed());
+            assert!(repeated.file().is_signed());
+            assert_eq!(repeated.file().to_bytes().unwrap(), input.bytes);
+        }
         for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
             let cell_path = "/sheet[1]/A1";
             let cell_text = candidate

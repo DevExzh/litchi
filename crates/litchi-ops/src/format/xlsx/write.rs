@@ -3168,6 +3168,10 @@ pub(crate) mod coalesce {
         charges: HashMap<CellTarget, usize>,
         initial: Option<HashMap<CellTarget, xlsx::State>>,
         final_states: Option<HashMap<CellTarget, xlsx::State>>,
+        /// The last sheet whose worksheet before-image was admitted. A
+        /// semantic no-op can release that admission, so `stage_native`
+        /// clears this after an unchanged operation before the next read.
+        capture_sheet: Option<usize>,
         staged_bytes: usize,
         max_staged_bytes: usize,
         max_snapshot_bytes: usize,
@@ -3343,6 +3347,7 @@ pub(crate) mod coalesce {
                 charges: HashMap::new(),
                 initial: (base.signature() == Signature::Signed).then(HashMap::new),
                 final_states: (base.signature() == Signature::Signed).then(HashMap::new),
+                capture_sheet: None,
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
                 max_snapshot_bytes: remaining_snapshot,
@@ -3431,9 +3436,15 @@ pub(crate) mod coalesce {
             // the native before-image before that read; the concrete setter
             // below replaces this coarse authored charge with its final
             // semantic payload.
-            self.edit
-                .reserve_cell_capture(plan.target.sheet, plan.target.address, plan.charge())
-                .map_err(native_error)?;
+            // Signed runs intentionally permit repeated targets while they
+            // prove cancellation endpoints. A repeated setter can release
+            // the last capture even when its projected before/after states
+            // differ, so keep those runs on the native reservation path.
+            if self.allow_repeated || self.capture_sheet != Some(plan.target.sheet) {
+                self.edit
+                    .reserve_cell_capture(plan.target.sheet, plan.target.address, plan.charge())
+                    .map_err(native_error)?;
+            }
             let mut worksheet = self
                 .edit
                 .sheet(plan.target.sheet)
@@ -3465,7 +3476,13 @@ pub(crate) mod coalesce {
             if let Some(final_states) = self.final_states.as_mut() {
                 final_states.insert(key, after.clone());
             }
-            Ok(before != after)
+            let changed = before != after;
+            // A bounded setter may release the capture it just admitted when
+            // it proves an exact source no-op. Do not carry the sheet cache
+            // across that release; the next projected read must re-admit the
+            // worksheet before decoding it.
+            self.capture_sheet = (!self.allow_repeated && changed).then_some(plan.target.sheet);
+            Ok(changed)
         }
 
         /// Commit one native patch for the run.  Native aggregate failures
