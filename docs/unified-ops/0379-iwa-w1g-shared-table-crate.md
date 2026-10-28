@@ -358,23 +358,40 @@ replacing a root that has replies is therefore not claimed as a complete host
 migration in this slice; the host-only ledger rows stay host-only until the
 reply-thread lifecycle is lifted. No refusal falls through to the legacy host.
 
+The Pages create witness pins the format-specific root-only profile rather
+than masking a broad object class: on a stored, previously un-commented cell,
+the host allocates one fresh type-212 author archive with the exact generated
+`litchi-iwa` profile and appends its reference to the source's existing empty
+type-213 author storage and the selected type-3056 comment. The leaf keeps the
+existing type-213 payload empty and omits the author reference. The proof
+selects the root from the host and leaf selected-cell readers, requires both
+roots to be fresh against every source component, checks the selected 6005
+list entry and exact allocation-derived metadata watermarks, and compares
+all untouched objects and wire bytes. Only the selected new comment's date and
+storage UUID are creation-time differences; unknown fields, existing comment
+metadata, unrelated references and author-storage bytes are strict. Wrong
+root/list, selected-text/unknown-field, and author-storage corruption are
+negative controls. This is a Tier-B differential proof, not native Apple
+acceptance evidence.
+
 The differential cases currently run are:
 
 | Format | Cases | Tier |
 |---|---|---|
-| Pages | `pages_body_table_comment_read_parity`, `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity`, `pages_body_table_comment_replies_read_parity` | B for root writes; A for populated root/reply read |
+| Pages | `pages_body_table_comment_read_parity`, `pages_body_table_comment_set_parity`, `pages_body_table_comment_create_parity`, `pages_body_table_comment_clear_parity`, `pages_body_table_comment_replies_read_parity` | B for root writes; A for populated root/reply read |
 | Keynote | `keynote_slide_table_comment_set_parity`, `keynote_slide_table_comment_clear_parity`, `keynote_slide_table_comment_replace_preserves_source_metadata`, `keynote_slide_table_comment_patch_rejects_unrelated_metadata_change`, `keynote_slide_table_comment_read_parity`, `keynote_slide_table_comment_replies_read_parity` | B for root writes; A for reads |
-| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity` (the case also performs the direct semantic comparison) | B for root write; A for populated root/reply read |
+| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_create_parity`, `numbers_table_cell_comment_clear_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity` (the read case also performs the direct semantic comparison) | B for root writes; A for populated root/reply read |
 
 The host remains the differential oracle. The original slice plan covered 17
-candidate rows. The current ledger has 22 rows: five migrated reads (including
-the two Pages comments reads), fourteen host-only mutation/reply rows, and
-three retired Numbers parity-only seams (read, set and the clear oracle). The
-clean 1fbd handoff snapshot had 21 rows and two retired seams; the third is
-the explicit clear seam required for the independent lifecycle probes in §4.3.
-The 0363 macOS queue retains the routes as pending planning entries with that
-boundary called out; no E3/E4 native claim is made. Native-authored fixtures
-and synthetic/self-round-trip tests are not Apple open/save evidence.
+candidate rows. The final handoff disposition is 21 rows: five migrated reads
+(including the two pre-existing Pages comment reads), fourteen host-only
+mutation/reply rows, and two retired parity-only seams. The explicit
+clear-oracle helper used only to prepare the independent lifecycle probes in
+§4.3 is test provenance, not a supported capability or an additional
+migration row. The 0363 macOS queue retains supported root create/set/clear
+and deferred reply operations as separate pending planning entries; no E3/E4
+native claim is made. Native-authored fixtures and synthetic/self-round-trip
+tests are not Apple open/save evidence.
 
 The Numbers mutation oracle is deliberately feature-gated
 (`parity-host-oracle`) and calls the existing private legacy writer through
@@ -758,3 +775,24 @@ broad all-target Clippy command still reports the pre-existing
 changed. The nine current-source read/create/clear Callgrind ABBA pairs and
 their exact external artifacts are recorded in §4.3; the coordinator must
 repeat them on the final integrated trunk candidate.
+
+Continuation proof checkpoint (source commit `481862ddca`, after the Numbers
+parity checkpoint `63d96fcfbf` was handed to F): the Pages comment target ran
+with `parity-host-oracle` and passed all five focused routes (read, populated
+reply read, root replacement, root create and root clear; 5 passed, 4 ignored
+cost probes). The create witness is the stored B2 cell in
+`body-table-cells-native.pages`; it uses the selected-cell host and leaf
+readers, validates the exact generated type-212 author profile and existing
+empty type-213 update, proves source-wide fresh identities and exact metadata
+watermarks, and exercises wrong-root, selected-comment unknown/text and
+author-storage corruption controls. The feature-enabled all-target parity
+Clippy command passed after replacing the obfuscated reference normalizer;
+the default-feature parity target also compiled with `--no-run`, and
+`cargo fmt --all -- --check` passed. The queue correction in this checkpoint
+records the actual D2 Keynote/native and generated host-authored reply
+fixtures, names only the folded Numbers
+`numbers_table_cell_comment_replies_read_parity` semantic case, and separates
+supported root create/set/clear native acceptance from deferred host-only
+reply operations. No new release performance capture was made here: the
+historical captures in §§4.2–4.4 remain non-qualifying until F's reviewed
+Numbers proof and the coordinator's final clean-source twelve-route matrix.
