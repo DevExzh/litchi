@@ -226,6 +226,76 @@ qualification remains required. The final coordinator run must keep all
 eighteen routes independent rather than reintroducing an aggregate axis or
 format total.
 
+### 4.1 Post-merge integrated-source receipt
+
+After the frozen coordinator trunk `39e4bf101ca51f269e9352f8fed868cb84799113`
+was merged without conflicts, the accepted source was measured from the clean
+merge commit `4aa57b3c19c24ce625f31cdd5489ff0a1d39bc68`. This is a separate
+receipt update; it does not amend or alter the measured source commit. The
+release binary is
+`/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1e/target/release/deps/parity-25144fe4e83e134e`,
+39,688,944 bytes, SHA-256
+`26883da1062e498de6461693d8c9a3c350990a21d125fe587ce1713eff56c9cb`.
+
+All eighteen routes were rerun independently on CPU 3 with the ABBA helper
+sequence already encoded by each ignored test. The route process was
+fail-closed: it required a zero Valgrind/test exit, exactly one selected
+`--exact` test pass, a `1 passed; 0 failed; 0 ignored` summary, successful
+annotation, and a positive `Ir` for the selected helper. The integrated values
+are:
+
+| Format | Exact test | Host Ir | Leaf Ir | Delta | Check |
+|---|---|---:|---:|---:|---|
+| Numbers | `numbers_chart_title_read_cost_abba` | 69,581,656 | 33,924,667 | -51.24% | pass |
+| Numbers | `numbers_chart_title_set_cost_abba` | 151,034,431 | 72,929,450 | -51.71% | pass |
+| Numbers | `numbers_chart_title_clear_cost_abba` | 151,045,301 | 72,939,949 | -51.71% | pass |
+| Numbers | `numbers_chart_category_axis_read_cost_abba` | 69,589,373 | 33,908,327 | -51.27% | pass |
+| Numbers | `numbers_chart_category_axis_set_cost_abba` | 151,021,222 | 72,975,760 | -51.68% | pass |
+| Numbers | `numbers_chart_category_axis_clear_cost_abba` | 151,030,859 | 72,974,591 | -51.68% | pass |
+| Numbers | `numbers_chart_value_axis_read_cost_abba` | 69,569,524 | 33,915,891 | -51.25% | pass |
+| Numbers | `numbers_chart_value_axis_set_cost_abba` | 151,043,932 | 72,993,476 | -51.67% | pass |
+| Numbers | `numbers_chart_value_axis_clear_cost_abba` | 151,054,313 | 72,977,238 | -51.69% | pass |
+| Pages | `pages_chart_title_read_cost_abba` | 53,367,762 | 2,167,655 | -95.94% | pass |
+| Pages | `pages_chart_title_set_cost_abba` | 108,902,248 | 4,865,970 | -95.53% | pass |
+| Pages | `pages_chart_title_clear_cost_abba` | 108,930,205 | 4,903,084 | -95.50% | pass |
+| Pages | `pages_chart_category_axis_read_cost_abba` | 53,306,309 | 2,170,575 | -95.93% | pass |
+| Pages | `pages_chart_category_axis_set_cost_abba` | 108,962,545 | 4,883,069 | -95.52% | pass |
+| Pages | `pages_chart_category_axis_clear_cost_abba` | 108,871,297 | 4,917,896 | -95.48% | pass |
+| Pages | `pages_chart_value_axis_read_cost_abba` | 53,280,581 | 2,173,875 | -95.92% | pass |
+| Pages | `pages_chart_value_axis_set_cost_abba` | 108,792,690 | 4,883,510 | -95.51% | pass |
+| Pages | `pages_chart_value_axis_clear_cost_abba` | 108,815,600 | 4,913,829 | -95.48% | pass |
+
+The complete machine-readable receipt, including all 18 route specifications,
+36 callgrind artifact sizes and full hashes, the full source and binary
+identities, and the exact build/probe/annotation templates is
+`docs/unified-ops/results/0375b/integrated-callgrind.json`. Reproduction used:
+
+```sh
+env CARGO_BUILD_JOBS=4 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
+  CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G \
+  cargo test --release --offline -p litchi-iwa --test parity chart_text_cost --no-run
+
+taskset -c 3 valgrind --tool=callgrind --quiet \
+  --callgrind-out-file="$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.callgrind" \
+  "--toggle-collect=*chart_text_cost::${HELPER}*" "$PARITY_BIN" \
+  "chart_text_cost::${ROUTE}" --ignored --exact --test-threads=1 \
+  >"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.stdout.log" \
+  2>"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.stderr.log"
+
+callgrind_annotate --inclusive=yes \
+  "$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.callgrind" \
+  >"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.annotate.log" \
+  2>"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.annotate.stderr.log"
+```
+
+The external evidence directory is
+`/tmp/litchi-w1e-chart-text-integrated-20261028/`. Its 186-file manifest
+including build, route stdout/stderr, callgrind, and annotation streams is
+24,706 bytes with SHA-256
+`3ece5ae7f940c51510f1e12c7b59e8d85059a00a72ae5baadb2a5286ee9a6751`.
+No evidence or binary was added to the repository, and no wall-clock result is
+claimed.
+
 ## 5. Native evidence and verification
 
 No native-authored read receipt proves a Litchi-mutated title or axis title
