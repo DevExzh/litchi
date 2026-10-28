@@ -48,6 +48,9 @@ use litchi_iwa_common::table::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
     Percentage, Scientific, ThousandsSeparator,
 };
+use litchi_iwa_common::table::cell::data_format::numeral_system::{
+    Base as NumeralBase, NegativeStyle as NumeralNegativeStyle, NumeralSystem, Places,
+};
 use litchi_iwa_common::table::cell::data_format::{DateTime, Text};
 
 const NUMBER_FORMAT_TYPE: u32 = number_codec::NATIVE_NUMBER_FORMAT_TYPE;
@@ -57,6 +60,8 @@ const SCIENTIFIC_FORMAT_TYPE: u32 = scientific_codec::NATIVE_SCIENTIFIC_FORMAT_T
 const FRACTION_FORMAT_TYPE: u32 = fraction_codec::NATIVE_FRACTION_FORMAT_TYPE;
 const DATE_TIME_FORMAT_TYPE: u32 = date_time_codec::NATIVE_DATE_TIME_FORMAT_TYPE;
 const DURATION_FORMAT_TYPE: u32 = duration_codec::NATIVE_DURATION_FORMAT_TYPE;
+/// `TSK.FormatStructArchive.format_type` of a positional numeral system.
+const NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
 // Numbers stores the plain Text display format in the same
 // `FormatStructArchive` family as the scalar formats.  The strict control
 // codec accepts this native discriminator while this private owner keeps it
@@ -129,6 +134,8 @@ pub enum DisplayFormatFamily {
     DateTime,
     Duration,
     Text,
+    /// A positional numeral system (record 0370k).
+    NumeralSystem,
 }
 
 impl DisplayFormatFamily {
@@ -142,6 +149,7 @@ impl DisplayFormatFamily {
             Self::DateTime => DATE_TIME_FORMAT_TYPE,
             Self::Duration => DURATION_FORMAT_TYPE,
             Self::Text => TEXT_FORMAT_TYPE,
+            Self::NumeralSystem => NUMERAL_SYSTEM_FORMAT_TYPE,
         }
     }
 }
@@ -223,6 +231,19 @@ impl From<Error> for FractionFormatReadError {
     }
 }
 
+/// Typed native failure returned to a numeral-system facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumeralSystemFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for NumeralSystemFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 /// Typed native failure returned to the Date & Time package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DateTimeFormatReadError {
@@ -272,6 +293,7 @@ enum NativeDisplayValue {
     DateTime(DateTime),
     Duration(Duration),
     Text(Text),
+    NumeralSystem(NumeralSystem),
 }
 
 impl NativeDisplayValue {
@@ -285,6 +307,7 @@ impl NativeDisplayValue {
             Self::DateTime(_) => DisplayFormatFamily::DateTime,
             Self::Duration(_) => DisplayFormatFamily::Duration,
             Self::Text(_) => DisplayFormatFamily::Text,
+            Self::NumeralSystem(_) => DisplayFormatFamily::NumeralSystem,
         }
     }
 
@@ -364,7 +387,9 @@ impl NativeDisplayValue {
             DisplayFormatFamily::Fraction => return Err(Error::InvalidSource { path }),
             DisplayFormatFamily::DateTime => return Err(Error::InvalidSource { path }),
             DisplayFormatFamily::Duration => return Err(Error::InvalidSource { path }),
-            DisplayFormatFamily::Text => return Err(Error::InvalidSource { path }),
+            DisplayFormatFamily::Text | DisplayFormatFamily::NumeralSystem => {
+                return Err(Error::InvalidSource { path });
+            },
         };
         Ok(value)
     }
@@ -1071,6 +1096,7 @@ pub fn read_number_format_with_budget(
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
     }
@@ -1110,6 +1136,7 @@ pub fn read_currency_format_with_budget(
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(CurrencyFormatReadError::WrongFormatFamily)
         },
@@ -1151,6 +1178,7 @@ pub fn read_percentage_format_with_budget(
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
         },
@@ -1192,6 +1220,7 @@ pub fn read_scientific_format_with_budget(
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(ScientificFormatReadError::WrongFormatFamily)
         },
@@ -1233,6 +1262,7 @@ pub fn read_fraction_format_with_budget(
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(FractionFormatReadError::WrongFormatFamily)
         },
@@ -1274,6 +1304,7 @@ pub fn read_date_time_format_with_budget(
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(DateTimeFormatReadError::WrongFormatFamily)
         },
@@ -1315,6 +1346,7 @@ pub fn read_duration_format_with_budget(
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(DurationFormatReadError::WrongFormatFamily)
         },
@@ -1349,6 +1381,7 @@ pub fn read_text_format_with_budget(
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Duration(_)))
+        | Ok(Some(NativeDisplayValue::NumeralSystem(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(TextFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(TextFormatReadError::Native(error)),
     }
@@ -1431,6 +1464,62 @@ pub fn rewrite_scientific_format(
         target,
         before.copied().map(NativeDisplayValue::Scientific),
         after.copied().map(NativeDisplayValue::Scientific),
+        path,
+        budget,
+    )
+}
+
+/// Read one existing numeral-system format with a fresh transaction ledger
+/// (record 0370k).
+pub fn read_numeral_system_format(
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+) -> Result<Option<NumeralSystem>, NumeralSystemFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_numeral_system_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing numeral-system format against a caller-owned
+/// transaction ledger.
+pub fn read_numeral_system_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<NumeralSystem>, NumeralSystemFormatReadError> {
+    match read_display_format_with_budget(
+        DisplayFormatFamily::NumeralSystem,
+        source,
+        target,
+        path,
+        budget,
+    ) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::NumeralSystem(value))) => Ok(Some(value)),
+        Ok(Some(_)) | Err(DisplayReadError::WrongFormatFamily) => {
+            Err(NumeralSystemFormatReadError::WrongFormatFamily)
+        },
+        Err(DisplayReadError::Native(error)) => Err(NumeralSystemFormatReadError::Native(error)),
+    }
+}
+
+/// Rewrite one ordinary numeral-system cell without manufacturing a
+/// CellSpec graph (record 0370k).
+pub fn rewrite_numeral_system_format(
+    source: &dyn TableSource,
+    target: Target,
+    before: Option<&NumeralSystem>,
+    after: Option<&NumeralSystem>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::NumeralSystem,
+        source,
+        target,
+        before.copied().map(NativeDisplayValue::NumeralSystem),
+        after.copied().map(NativeDisplayValue::NumeralSystem),
         path,
         budget,
     )
@@ -1520,6 +1609,95 @@ pub fn rewrite_text_format(
 
 fn read_display_format_with_budget(
     family: DisplayFormatFamily,
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<NativeDisplayValue>, DisplayReadError> {
+    read_display_format_resolved(Some(family), source, target, path, budget)
+}
+
+/// The display family a native format discriminator names.
+const fn family_of_native_type(format_type: u64) -> Option<DisplayFormatFamily> {
+    Some(match format_type {
+        256 => DisplayFormatFamily::Number,
+        257 => DisplayFormatFamily::Currency,
+        258 => DisplayFormatFamily::Percentage,
+        259 => DisplayFormatFamily::Scientific,
+        260 => DisplayFormatFamily::Text,
+        261 => DisplayFormatFamily::DateTime,
+        262 => DisplayFormatFamily::Fraction,
+        268 => DisplayFormatFamily::Duration,
+        269 => DisplayFormatFamily::NumeralSystem,
+        _ => return None,
+    })
+}
+
+const fn is_decimal_family(family: DisplayFormatFamily) -> bool {
+    matches!(
+        family,
+        DisplayFormatFamily::Number
+            | DisplayFormatFamily::Percentage
+            | DisplayFormatFamily::Scientific
+            | DisplayFormatFamily::Fraction
+            | DisplayFormatFamily::NumeralSystem
+    )
+}
+
+/// Read the selected cell's display format whatever its family, in one
+/// validation pass (record 0370k): `Ok(None)` is an automatic cell, and
+/// [`DisplayReadError::WrongFormatFamily`] a cell outside the display
+/// families (a control, a custom format).
+fn read_any_display_format_with_budget(
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<NativeDisplayValue>, DisplayReadError> {
+    read_display_format_resolved(None, source, target, path, budget)
+}
+
+/// The display format of the selected cell as the neutral
+/// [`litchi_iwa_common::table::cell::data_format::DataFormat`]:
+/// `Ok(Some(DataFormat::Automatic))` for an automatic cell, `Ok(None)` for a
+/// cell outside the display families (record 0370k).
+///
+/// # Errors
+///
+/// The engine's typed failures.
+pub fn read_any_display_format(
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<litchi_iwa_common::table::cell::data_format::DataFormat>, Error> {
+    use litchi_iwa_common::table::cell::data_format::DataFormat;
+    Ok(Some(
+        match read_any_display_format_with_budget(source, target, path, budget) {
+            Ok(None) => DataFormat::Automatic,
+            Ok(Some(value)) => match value {
+                NativeDisplayValue::Number(value) => DataFormat::Number(value),
+                NativeDisplayValue::Currency(value) => DataFormat::Currency(value),
+                NativeDisplayValue::Percentage(value) => DataFormat::Percentage(value),
+                NativeDisplayValue::Scientific(value) => DataFormat::Scientific(value),
+                NativeDisplayValue::Fraction(value) => DataFormat::Fraction(value),
+                NativeDisplayValue::DateTime(value) => DataFormat::DateTime(value),
+                NativeDisplayValue::Duration(value) => DataFormat::Duration(value),
+                NativeDisplayValue::Text(value) => DataFormat::Text(value),
+                NativeDisplayValue::NumeralSystem(value) => DataFormat::NumeralSystem(value),
+            },
+            Err(DisplayReadError::WrongFormatFamily) => return Ok(None),
+            Err(DisplayReadError::Native(error)) => return Err(error),
+        },
+    ))
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "one validation pass over the cell, its tile and its format list"
+)]
+fn read_display_format_resolved(
+    requested: Option<DisplayFormatFamily>,
     source: &dyn TableSource,
     target: Target,
     path: Path,
@@ -1620,12 +1798,26 @@ fn read_display_format_with_budget(
         } else {
             cell.secondary_format_identifier()
         };
+    // Without a requested family, the cell's format kind selects the family
+    // group; the decimal group's member is the stored format's discriminator,
+    // checked below.
+    let family = match requested {
+        Some(family) => family,
+        None => match cell.cell_format_kind() {
+            Some(litchi_numbers_wire::DATE_TIME_CELL_FORMAT_KIND) => DisplayFormatFamily::DateTime,
+            Some(litchi_numbers_wire::DURATION_CELL_FORMAT_KIND) => DisplayFormatFamily::Duration,
+            Some(litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND) => DisplayFormatFamily::Currency,
+            Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) => DisplayFormatFamily::Text,
+            _ => DisplayFormatFamily::Number,
+        },
+    };
     match (family, cell.cell_format_kind()) {
         (
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
             | DisplayFormatFamily::Scientific
-            | DisplayFormatFamily::Fraction,
+            | DisplayFormatFamily::Fraction
+            | DisplayFormatFamily::NumeralSystem,
             Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
         ) => {
             if secondary_identifier.is_some() || !cell.has_only_decimal_format_metadata() {
@@ -1635,7 +1827,7 @@ fn read_display_format_with_budget(
             {
                 return Err(DisplayReadError::WrongFormatFamily);
             }
-            if family == DisplayFormatFamily::Scientific
+            if requested == Some(DisplayFormatFamily::Scientific)
                 && !scientific_cell_type_matches_value(&cell)
             {
                 return Err(Error::InvalidSource { path }.into());
@@ -1807,6 +1999,37 @@ fn read_display_format_with_budget(
             return Err(Error::InvalidSource { path }.into());
         }
     }
+    let family = match requested {
+        Some(family) => family,
+        None => {
+            let format_type =
+                WireView::parse(&entry.payload, litchi_iwa_common::WireLimits::DEFAULT)
+                    .map_err(|_| Error::InvalidSource { path })?
+                    .fields()
+                    .filter(|field| field.number() == 1 && field.wire_type() == 0)
+                    .last()
+                    .map(|field| decode_varint_from_bytes(field.payload()).map(|(value, _)| value))
+                    .transpose()
+                    .map_err(|_| Error::InvalidSource { path })?;
+            let stored = format_type
+                .and_then(family_of_native_type)
+                .ok_or(DisplayReadError::WrongFormatFamily)?;
+            let consistent = if is_decimal_family(family) {
+                is_decimal_family(stored)
+            } else {
+                stored == family
+            };
+            if !consistent {
+                return Err(DisplayReadError::WrongFormatFamily);
+            }
+            if stored == DisplayFormatFamily::Scientific
+                && !scientific_cell_type_matches_value(&cell)
+            {
+                return Err(Error::InvalidSource { path }.into());
+            }
+            stored
+        },
+    };
     let value = decode_display_payload(family, &entry.payload, budget, path)?;
     if explicit_flags == 0 {
         Ok(None)
@@ -1951,7 +2174,8 @@ fn rewrite_display_format(
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
             | DisplayFormatFamily::Scientific
-            | DisplayFormatFamily::Fraction,
+            | DisplayFormatFamily::Fraction
+            | DisplayFormatFamily::NumeralSystem,
             Some(identifier),
             Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
         ) if identifier != 0 => {
@@ -2171,7 +2395,8 @@ fn rewrite_display_format(
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
             | DisplayFormatFamily::Scientific
-            | DisplayFormatFamily::Fraction => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
+            | DisplayFormatFamily::Fraction
+            | DisplayFormatFamily::NumeralSystem => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
             DisplayFormatFamily::DateTime => litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT,
             DisplayFormatFamily::Duration => {
                 litchi_numbers_wire::explicit_duration_format_flags(old_secondary.is_some())
@@ -4559,6 +4784,9 @@ fn decode_display_payload(
             )?;
             Ok(value)
         },
+        DisplayFormatFamily::NumeralSystem => Ok(NativeDisplayValue::NumeralSystem(
+            decode_numeral_system(source, path)?,
+        )),
         DisplayFormatFamily::Fraction => {
             let (snapshot, report) =
                 match fraction_codec::decode_fraction_format_with_report(source, options) {
@@ -4768,6 +4996,14 @@ fn prepare_display_rewrite(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_scientific_rewrite(prepared, budget, path)
         },
+        DisplayFormatFamily::NumeralSystem => {
+            let NativeDisplayValue::NumeralSystem(value) = value else {
+                return Err(Error::Refused(
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
+                ));
+            };
+            rewrite_numeral_system_payload(source, value, budget, path)
+        },
         DisplayFormatFamily::Fraction => {
             let NativeDisplayValue::Fraction(value) = value else {
                 return Err(Error::Refused(
@@ -4906,6 +5142,14 @@ fn prepare_display_append(
             )
             .map_err(|error| native::map_control_error(error, path))?;
             execute_scientific_append(prepared, budget, path)
+        },
+        DisplayFormatFamily::NumeralSystem => {
+            let NativeDisplayValue::NumeralSystem(value) = value else {
+                return Err(Error::Refused(
+                    crate::cell_format::Refusal::UnsupportedDependency { path },
+                ));
+            };
+            canonical_numeral_system_payload(value, budget, path)
         },
         DisplayFormatFamily::Fraction => {
             let NativeDisplayValue::Fraction(value) = value else {
@@ -5861,6 +6105,125 @@ pub fn rewrite_custom_format(
             ),
         ],
     })
+}
+
+/// The `TSK.FormatStructArchive` fields a numeral system owns: its
+/// discriminator, base, places and negative style (the host editor's
+/// codec). Every other numeric option must be absent.
+const NUMERAL_SYSTEM_FIELDS: [u32; 4] = [1, 8, 9, 10];
+/// Numeric options a numeral-system format must not carry (decimal places,
+/// currency code, negative style, thousands separator, accounting style,
+/// fraction accuracy, date suppression and the date-time pattern).
+const NUMERAL_SYSTEM_FORBIDDEN_FIELDS: [u32; 9] = [2, 3, 4, 5, 6, 11, 12, 13, 14];
+
+/// Decode a numeral-system `TSK.FormatStructArchive` (record 0370k), as the
+/// host editor's codec admits it.
+fn decode_numeral_system(source: &[u8], path: Path) -> Result<NumeralSystem, DisplayReadError> {
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource { path })?;
+    // Another family's payload is not this family's to judge.
+    let format_type = view
+        .fields()
+        .filter(|field| field.number() == 1 && field.wire_type() == 0)
+        .last()
+        .map(|field| decode_varint_from_bytes(field.payload()).map(|(value, _)| value));
+    if !matches!(format_type, Some(Ok(value)) if value == u64::from(NUMERAL_SYSTEM_FORMAT_TYPE)) {
+        return Err(DisplayReadError::WrongFormatFamily);
+    }
+    let mut values = [None; 4];
+    for field in view.fields() {
+        if NUMERAL_SYSTEM_FORBIDDEN_FIELDS.contains(&field.number()) {
+            return Err(Error::InvalidSource { path }.into());
+        }
+        let Some(slot) = NUMERAL_SYSTEM_FIELDS
+            .iter()
+            .position(|number| *number == field.number())
+        else {
+            continue;
+        };
+        if field.wire_type() != 0 || values[slot].is_some() {
+            return Err(Error::InvalidSource { path }.into());
+        }
+        let (value, _) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource { path })?;
+        values[slot] = Some(value);
+    }
+    if values[0] != Some(u64::from(NUMERAL_SYSTEM_FORMAT_TYPE)) {
+        return Err(DisplayReadError::WrongFormatFamily);
+    }
+    let invalid = || DisplayReadError::Native(Error::InvalidSource { path });
+    let base = u8::try_from(values[1].ok_or_else(invalid)?).map_err(|_| invalid())?;
+    let base = NumeralBase::new(base).map_err(|_| invalid())?;
+    let places = match values[2].ok_or_else(invalid)? {
+        0 => Places::Minimum,
+        value => {
+            Places::fixed(u8::try_from(value).map_err(|_| invalid())?).map_err(|_| invalid())?
+        },
+    };
+    let negative_style = match values[3].ok_or_else(invalid)? {
+        1 => NumeralNegativeStyle::MinusSign,
+        0 => NumeralNegativeStyle::TwosComplement,
+        _ => return Err(invalid()),
+    };
+    NumeralSystem::new(base, places, negative_style).map_err(|_| invalid())
+}
+
+/// The numeral-system field values in field order.
+fn numeral_system_fields(value: NumeralSystem) -> [(u32, u64); 4] {
+    [
+        (1, u64::from(NUMERAL_SYSTEM_FORMAT_TYPE)),
+        (8, u64::from(value.base().value())),
+        (
+            9,
+            match value.places() {
+                Places::Minimum => 0,
+                Places::Fixed(places) => u64::from(places.value()),
+            },
+        ),
+        (
+            10,
+            u64::from(matches!(
+                value.negative_style(),
+                NumeralNegativeStyle::MinusSign
+            )),
+        ),
+    ]
+}
+
+/// A canonical numeral-system format payload, as the host editor encodes
+/// it (fields 1, 8, 9 and 10 in order).
+fn canonical_numeral_system_payload(
+    value: NumeralSystem,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let mut output = Vec::new();
+    for (number, value) in numeral_system_fields(value) {
+        litchi_iwa_common::wire::append_varint_field(&mut output, number, value)
+            .map_err(|_| Error::InvalidSource { path })?;
+    }
+    budget.charge_output(output.len(), path)?;
+    budget.charge_allocations(1, path)?;
+    Ok(output)
+}
+
+/// A numeral-system format payload with its base, places and negative
+/// style replaced; every other field is kept byte for byte.
+fn rewrite_numeral_system_payload(
+    source: &[u8],
+    value: NumeralSystem,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let mut output = source.to_vec();
+    for (number, value) in numeral_system_fields(value).into_iter().skip(1) {
+        output = litchi_iwa_common::wire::patch_varint_field(&output, number, true, Some(value))
+            .map_err(|_| Error::InvalidSource { path })?;
+    }
+    budget.charge_output(output.len(), path)?;
+    budget.charge_allocations(1, path)?;
+    budget.charge_transaction_work(source.len().saturating_add(output.len()), path)?;
+    Ok(output)
 }
 
 #[cfg(test)]

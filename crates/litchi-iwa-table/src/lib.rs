@@ -81,4 +81,11 @@ pub trait TableSource {
 
     /// The semantic reference ceiling the package was opened with.
     fn max_references(&self) -> usize;
+
+    /// The package-level proofs the leaf memoizes for this package (record
+    /// 0370k); `None` recomputes every proof. The proofs depend only on the
+    /// immutable package, so a leaf keeps one set per opened package.
+    fn proofs(&self) -> Option<&cell_format::control::PackageProofs> {
+        None
+    }
 }
