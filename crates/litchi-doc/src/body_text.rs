@@ -1074,7 +1074,23 @@ impl Snapshot {
     }
 
     fn open_with_options(input: impl Into<Vec<u8>>, options: OpenOptions) -> Result<Self> {
-        let bytes = input.into();
+        Self::open_checked(input.into(), options, false)
+    }
+
+    /// [`Self::from_bytes_with_options`] over the exact bytes of a package.
+    /// With `reader_validated`, the package's document is the strict public
+    /// reader's parse of these bytes under `options`' source limits, so the
+    /// reader gate below does not parse them again; the strict owner still
+    /// opens them (record 0377a).
+    pub(crate) fn from_package_bytes(
+        input: Vec<u8>,
+        options: OpenOptions,
+        reader_validated: bool,
+    ) -> Result<Self> {
+        Self::open_checked(input, options, reader_validated)
+    }
+
+    fn open_checked(bytes: Vec<u8>, options: OpenOptions, reader_validated: bool) -> Result<Self> {
         crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(
             bytes.len(),
             options.source_limits,
@@ -1110,7 +1126,13 @@ impl Snapshot {
                 },
             };
         reject_malformed_signature_containers(&ole)?;
-        crate::raw::Reader::validate_ole_file(&mut ole, source_limits).map_err(Error::Invalid)?;
+        // An unsigned candidate is not the bytes the package's parse covered.
+        if reader_validated && candidate_source.is_none() {
+            crate::raw::Reader::validate_package_ole_file(&ole, source_limits)
+        } else {
+            crate::raw::Reader::validate_ole_file(&mut ole, source_limits)
+        }
+        .map_err(Error::Invalid)?;
         let signed = candidate_source.is_some() || strict_editor.dofr_source_is_signed();
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),

@@ -697,6 +697,11 @@ pub struct Package {
     /// The body-text snapshot of these exact bytes the last edit opened, with
     /// the options it was opened under (record 0311), shared by clones.
     pub(super) body_source: BodySourceMemo,
+    /// Whether `document` is the strict public reader's parse of these bytes
+    /// under `source_limits`: the default leniency, and no credential because
+    /// the document is not encrypted. A body snapshot of these bytes then
+    /// needs no second parse to pass the same reader gate (record 0377a).
+    pub(super) strict_document: bool,
 }
 
 /// See [`Package::body_source`]; one entry, replaced by an edit under other
@@ -714,6 +719,7 @@ impl Clone for Package {
             leniency: self.leniency,
             edit_profile: self.edit_profile.clone(),
             body_source: Arc::clone(&self.body_source),
+            strict_document: self.strict_document,
         }
     }
 }

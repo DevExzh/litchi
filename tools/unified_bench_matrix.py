@@ -3824,6 +3824,92 @@ def p0377():
     return out
 
 
+@needs("0377a")
+def p0377a():
+    """Record 0377a: bounded follow-up remeasurement of F1--F5.
+
+    The callgrind file contains corrected warm-up counts for the timed
+    ``fin_perf_region``.  The ABBA receipt contains the fresh leaf/unified
+    wall legs for F1, F3 and F5, and the CLI receipt compares the four
+    process routes against the same baseline build.
+    """
+    res = RES / "0377a"
+    out = []
+
+    path = res / "callgrind.tsv"
+    with open(path, encoding="utf-8") as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            route = r["route"]
+            fmt = route.split("_", 1)[0]
+            op = p0377_op(route)
+            vals = {k: float(r[k]) for k in (
+                "leaf_base_ir", "leaf_cand_ir", "unified_base_ir", "unified_cand_ir")}
+            for leg in ("leaf", "unified"):
+                before, after = vals[f"{leg}_base_ir"], vals[f"{leg}_cand_ir"]
+                out.append(row(
+                    "0377a", fmt, op,
+                    f"{route} ({leg} leg, candidate vs pre-program baseline)", "",
+                    before, after, [after / before], regression("0377a"),
+                    f"fin_perf_0377a:{route}:{leg}:after-before", src([path]),
+                    comparison="after/before (callgrind Ir)", unit="Ir",
+                    explanation="Corrected-warmup callgrind pair; timed region only."))
+            out.append(row(
+                "0377a", fmt, op, f"{route} (instructions)", "",
+                vals["leaf_cand_ir"], vals["unified_cand_ir"],
+                [vals["unified_cand_ir"] / vals["leaf_cand_ir"]], NONE,
+                f"fin_perf_0377a:{route}:ir", src([path]), unit="Ir",
+                comparison="unified/leaf (callgrind Ir; budgets judged on wall)",
+                explanation="Corrected-warmup callgrind diagnostic; unified/leaf is not a wall budget."))
+
+    path = res / "abba.json"
+    data: dict = {}
+    for run in load_json(path)["runs"]:
+        for c in run["cases"]:
+            data.setdefault(c["route"], {"base": [], "cand": []})[run["build"]].append(c)
+    for route, builds in data.items():
+        if not builds["cand"]:
+            continue
+        case = builds["cand"][0]
+        group = case["group"]
+        fmt = route.split("_", 1)[0]
+        leaf = med(v for c in builds["cand"] for v in c["leaf_block_median_ns"])
+        unified = med(v for c in builds["cand"] for v in c["unified_block_median_ns"])
+        ratios = [u / l for c in builds["cand"] for u, l in zip(
+            c["unified_block_median_ns"], c["leaf_block_median_ns"])]
+        budget = p0377_budget(group, route)
+        out.append(row(
+            "0377a", fmt, p0377_op(route), f"{route} (wall)", "",
+            us(leaf), us(unified), [med(ratios)], budget,
+            f"fin_perf_0377a:{route}:wall", src([path]),
+            comparison="unified/leaf (wall, ABBA blocks)",
+            explanation=(
+                "Fresh corrected-warmup ABBA diagnostic under shared-host load; "
+                "provisional pending a quiet coordinator rerun; every case "
+                "reports exact byte equivalence." if case.get("equivalence") == "exact_bytes" else
+                "Fresh corrected-warmup ABBA diagnostic under shared-host load; "
+                "provisional pending a quiet coordinator rerun; ODC admission "
+                "has no byte-output comparison.")))
+
+    path = res / "cli.json"
+    d = load_json(path)
+    for fixture, baseline in d["baseline"]["cases"].items():
+        candidate = d["candidate"]["cases"].get(fixture)
+        if candidate is None:
+            raise SystemExit(f"0377a CLI fixture missing candidate: {fixture}")
+        fmt = fixture.split("/", 2)[1]
+        for leg in ("in-process", "cli-get", "cli-version"):
+            before = baseline[leg]["median_us"]
+            after = candidate[leg]["median_us"]
+            out.append(row(
+                "0377a", "cli", "get",
+                f"{fixture} {leg} (candidate vs baseline)", "",
+                before, after, [after / before], NONE,
+                f"cli_0377a:{fixture}:{leg}:after-before", src([path]),
+                comparison="after/before (wall, ABBA processes)",
+                explanation="Four-fixture CLI ABBA receipt; process-start diagnostic only."))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -3834,7 +3920,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0377]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0377, p0377a]
 
 
 

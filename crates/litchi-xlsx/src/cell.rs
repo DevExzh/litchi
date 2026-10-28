@@ -372,6 +372,15 @@ impl Content {
         }
     }
 
+    /// Whether `cell` is exactly `self.as_cell()`, without building it.
+    pub(crate) fn same_as_cell(&self, cell: &Cell) -> bool {
+        match (self, cell) {
+            (Self::Value(value), Cell::Value(other)) => value == other,
+            (Self::Formula(formula), Cell::Formula(other)) => formula == other,
+            _ => false,
+        }
+    }
+
     pub(crate) fn as_cell(&self) -> Cell {
         match self {
             Self::Value(value) => Cell::Value(value.clone()),

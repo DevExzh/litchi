@@ -1,0 +1,66 @@
+{
+  "record": "0377a",
+  "schema": "litchi.unified-fin-perf.cli-summary.v1",
+  "cpu": 47,
+  "iterations": 30,
+  "rounds": 10,
+  "samples_per_leg": 600,
+  "order": "ABBA",
+  "fixture_root": "test-data",
+  "baseline": {
+    "source_commit": "839212fa9da2e4eff14dcae9c3aa242e49f25729",
+    "litchi_sha256": "c9dad4de695fae81e56c1b3e3bb2dd50fe2dcc91fd1a41f3b3909b07d7f3a8",
+    "example_sha256": "23aa69b690a5e0f4b93fa84867e8785cf0526d69e00f8e82195afd8b1a49cf08",
+    "cases": {
+      "ole/xls/Simple.xls /sheet[1]": {
+        "cli-get": {"median_us": 978.1, "p10_us": 966.2, "p90_us": 1007.7},
+        "cli-version": {"median_us": 652.6, "p10_us": 638.3, "p90_us": 678.0},
+        "in-process": {"median_us": 32.4, "p10_us": 31.9, "p90_us": 35.3}
+      },
+      "ooxml/docx/drawing.docx /body/p[2]": {
+        "cli-get": {"median_us": 4566.0, "p10_us": 4512.9, "p90_us": 7058.9},
+        "cli-version": {"median_us": 675.7, "p10_us": 653.3, "p90_us": 1095.5},
+        "in-process": {"median_us": 3387.7, "p10_us": 3371.7, "p90_us": 3418.0}
+      },
+      "ooxml/pptx/sample.pptx /slide[1]": {
+        "cli-get": {"median_us": 1394.4, "p10_us": 1377.1, "p90_us": 1423.6},
+        "cli-version": {"median_us": 653.5, "p10_us": 640.1, "p90_us": 678.8},
+        "in-process": {"median_us": 284.6, "p10_us": 278.0, "p90_us": 313.0}
+      },
+      "ooxml/xlsx/SimpleMultiCell.xlsx /Sheet1/A1": {
+        "cli-get": {"median_us": 1228.6, "p10_us": 1212.6, "p90_us": 1275.6},
+        "cli-version": {"median_us": 661.1, "p10_us": 648.2, "p90_us": 687.1},
+        "in-process": {"median_us": 133.0, "p10_us": 130.9, "p90_us": 148.1}
+      }
+    }
+  },
+  "candidate": {
+    "source_commit": "187863518e plus the recorded dirty extra.rs change",
+    "harness_main_sha256": "551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d",
+    "extra_rs_sha256": "009e7dd52aa18ef817c82b96e4f77c16c43a968f010881c7119c5e05c7c74dea",
+    "litchi_sha256": "4f39e111080edac8f83bb6fd7c6ba8d1b8260c9e9824682ccc2ca7c906c7b8e4",
+    "example_sha256": "6bc3300e2e7fb94bfadd065a1b60ea28ac94f5e9aa9bbe44efa22ea4fe4ff53a",
+    "cases": {
+      "ole/xls/Simple.xls /sheet[1]": {
+        "cli-get": {"median_us": 938.3, "p10_us": 925.1, "p90_us": 966.9},
+        "cli-version": {"median_us": 622.6, "p10_us": 608.0, "p90_us": 649.8},
+        "in-process": {"median_us": 33.4, "p10_us": 33.0, "p90_us": 36.5}
+      },
+      "ooxml/docx/drawing.docx /body/p[2]": {
+        "cli-get": {"median_us": 4553.3, "p10_us": 4525.3, "p90_us": 4607.5},
+        "cli-version": {"median_us": 625.2, "p10_us": 610.1, "p90_us": 647.2},
+        "in-process": {"median_us": 3475.6, "p10_us": 3454.8, "p90_us": 3513.0}
+      },
+      "ooxml/pptx/sample.pptx /slide[1]": {
+        "cli-get": {"median_us": 1360.3, "p10_us": 1344.4, "p90_us": 1392.9},
+        "cli-version": {"median_us": 621.5, "p10_us": 606.7, "p90_us": 645.4},
+        "in-process": {"median_us": 287.6, "p10_us": 281.6, "p90_us": 318.4}
+      },
+      "ooxml/xlsx/SimpleMultiCell.xlsx /Sheet1/A1": {
+        "cli-get": {"median_us": 1187.1, "p10_us": 1166.6, "p90_us": 1227.4},
+        "cli-version": {"median_us": 623.5, "p10_us": 608.4, "p90_us": 650.0},
+        "in-process": {"median_us": 133.0, "p10_us": 130.9, "p90_us": 148.7}
+      }
+    }
+  }
+}

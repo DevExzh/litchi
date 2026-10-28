@@ -2363,6 +2363,10 @@ pub struct Patch {
     // workbook that happens to share changed-part bytes. Durable patches bind
     // complete package bytes through their wire envelope and do not use this.
     pub(super) authority: Option<PatchAuthority>,
+    /// [`Self::retained_bytes`], computed once: a bounded commit checks it
+    /// and the caller then reads it again for its own snapshot budget, and
+    /// each computation walks both endpoint workbooks (record 0377a).
+    pub(super) retained: std::sync::OnceLock<usize>,
 }
 
 /// Exact final semantic state captured for one selected worksheet picture.
@@ -2856,6 +2860,10 @@ impl Patch {
     /// lazily derived cache allocation.
     #[must_use]
     pub fn retained_bytes(&self) -> usize {
+        *self.retained.get_or_init(|| self.compute_retained_bytes())
+    }
+
+    fn compute_retained_bytes(&self) -> usize {
         let archive_hint = self
             .source
             .as_ref()
@@ -3039,6 +3047,7 @@ impl Patch {
             source: self.target.clone(),
             target: self.source.clone(),
             authority: self.authority.as_ref().map(PatchAuthority::inverse),
+            retained: std::sync::OnceLock::new(),
             svg_read_guards: self
                 .svg_read_guards
                 .iter()
@@ -3283,20 +3292,13 @@ pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) 
     );
 
     for metadata in package.iter_parts() {
+        // The archive hint covers deferred source payloads.
         bytes = bytes
             .saturating_add(size_of_val(&metadata))
             .saturating_add(metadata.partname().as_str().len())
             .saturating_add(metadata.content_type().len())
-            .saturating_add(relationship_retained_bytes(metadata.rels()));
-        if metadata.payload_is_decoded() {
-            // `payload_is_decoded` makes this lookup non-blocking and
-            // infallible in the normal built-in package. Keep a failed
-            // lookup conservative by retaining the endpoint overhead; the
-            // archive hint covers deferred source payloads.
-            if let Ok(part) = package.get_part(metadata.partname()) {
-                bytes = bytes.saturating_add(part.blob_arc().capacity());
-            }
-        }
+            .saturating_add(relationship_retained_bytes(metadata.rels()))
+            .saturating_add(metadata.decoded_payload_capacity().unwrap_or(0));
     }
     bytes.saturating_add(relationship_retained_bytes(package.rels()))
 }
