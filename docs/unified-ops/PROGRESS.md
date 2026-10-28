@@ -6763,3 +6763,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   will rerun all 53 rows and the expanded performance matrix on one source.
   W1-G comments remain outside this candidate while resource/admission,
   oracle and metadata-preservation findings and performance are resolved.
+
+- Post-merge checks on `5d878047d9` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted the selected-chart reference-line parity correction at
+  `5caf04d919` (code `de367c1b08`, record 0383), synchronized with current
+  trunk. Only the three allocation cases opt into unordered membership for
+  the selected chart's extension-owned dependency references. Unrelated
+  references retain exact order and multiplicity. Existing item UUIDs must
+  match the source, and only known UUID halves of newly allocated items may
+  differ; unknown bytes remain strict. Six comparator controls, ten route
+  tests, three independently started Pages allocation runs, four direct
+  cell-format reader tests, formatting and strict Clippy pass. This changes
+  the differential proof, not a production writer or native-evidence claim.
