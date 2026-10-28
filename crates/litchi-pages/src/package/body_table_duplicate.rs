@@ -92,6 +92,48 @@ pub(super) fn lock_error(error: table_lock::Error) -> Error {
     }
 }
 
+/// Carry the merge-owner preflight's finite-resource failures through the
+/// duplicate family without collapsing them into `InvalidSource`. The merge
+/// reader has a wider limit taxonomy than this creation facade, so archive
+/// ingress ceilings stay `PackageBytes` and selected payload/wire ceilings
+/// stay `PayloadBytes`.
+fn map_merge_error(error: super::body_table_merges::Error) -> Error {
+    use super::body_table_merges::{
+        Error as MergeError, LimitKind as MergeLimit, Refusal as MergeRefusal,
+    };
+    match error {
+        MergeError::Refused(refusal) => match refusal {
+            MergeRefusal::TableNotFound => Error::Refused(Refusal::TableNotFound),
+            MergeRefusal::AmbiguousTableName => Error::Refused(Refusal::AmbiguousTableName),
+            MergeRefusal::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+            MergeRefusal::AmbiguousSelector
+            | MergeRefusal::InvalidRegion
+            | MergeRefusal::OverlappingRegion => Error::Refused(Refusal::Unsupported),
+        },
+        MergeError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                MergeLimit::InputBytes
+                | MergeLimit::OutputBytes
+                | MergeLimit::Entries
+                | MergeLimit::EntryBytes
+                | MergeLimit::TotalEntryBytes
+                | MergeLimit::PackageBytes => LimitKind::PackageBytes,
+                _ => LimitKind::PayloadBytes,
+            },
+            observed,
+            maximum,
+        },
+        MergeError::Allocation { amount } => Error::Allocation { amount },
+        MergeError::InvalidSource | MergeError::Verification | MergeError::PatchConflict => {
+            Error::InvalidSource
+        },
+    }
+}
+
 /// The source table `selector` names among the rooted body tables.
 fn select<'t>(
     targets: &'t [BodyTableTarget],
@@ -135,6 +177,18 @@ pub(super) fn duplicate(
     let name = engine::copy_name(&target.table_name, &names).ok_or(Error::InvalidSource)?;
     let info = target.drawable_identifier.get();
     let template_attachment = target.attachment_identifier.get();
+
+    // The shared graph clone currently preserves an existing inline merge
+    // owner verbatim. A copied table UUID would then leave non-empty merged
+    // geometry owned by the source table, so refuse before any allocation or
+    // publication. Empty/absent owners remain safe: their readback is empty.
+    if !source
+        .body_table_merges(target.table_position)
+        .map_err(map_merge_error)?
+        .is_empty()
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
 
     let mut working = Working::new(source)?;
     working.keep_previews();

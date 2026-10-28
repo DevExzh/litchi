@@ -311,6 +311,23 @@ fn last_varint(
     Ok(found)
 }
 
+/// Own one nested line-end payload only after charging its complete wire
+/// traversal and copy against the body-drawable budget.  The endpoint codec
+/// receives this owned payload later; it must not be able to turn a borrowed
+/// native field into an uncharged allocation.
+fn owned_payload(budget: &mut Budget, payload: &[u8], depth: usize) -> Result<Vec<u8>, Error> {
+    budget.parse(payload, depth)?;
+    budget.work(payload.len())?;
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(payload.len())
+        .map_err(|_| Error::Allocation {
+            amount: payload.len(),
+        })?;
+    owned.extend_from_slice(payload);
+    Ok(owned)
+}
+
 fn line_ends(package: &Package, shape: u64) -> Result<LineEnds, Error> {
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
@@ -327,9 +344,17 @@ fn line_ends(package: &Package, shape: u64) -> Result<LineEnds, Error> {
             .is_some_and(|flip| flip != 0),
         None => false,
     };
+    let head = match single(&mut budget, archive, SHAPE_HEAD_LINE_END, 1)? {
+        Some(payload) => Some(owned_payload(&mut budget, payload, 2)?),
+        None => None,
+    };
+    let tail = match single(&mut budget, archive, SHAPE_TAIL_LINE_END, 1)? {
+        Some(payload) => Some(owned_payload(&mut budget, payload, 2)?),
+        None => None,
+    };
     Ok(LineEnds {
-        head: single(&mut budget, archive, SHAPE_HEAD_LINE_END, 1)?.map(<[u8]>::to_vec),
-        tail: single(&mut budget, archive, SHAPE_TAIL_LINE_END, 1)?.map(<[u8]>::to_vec),
+        head,
+        tail,
         flipped,
         limits: budget.wire_limits(),
     })

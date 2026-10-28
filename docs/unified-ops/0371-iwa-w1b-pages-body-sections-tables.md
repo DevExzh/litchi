@@ -44,7 +44,7 @@
 | `689b1cd6d6` | `litchi_pages::builder::Builder::{language, locale}` (the host's fields: the document language and locales, the settings' language and creation/last locales, every storage language table; `PackageError::{InvalidLanguage, InvalidLocale}`); `Identity` gains its version UUID (`from_parts`, `version_uuid`), written to `versionUUID`, the properties' `revision` and the package metadata revision, as the host does — before, every leaf-built document carried the template's version UUID. Identity, revision, language, locale and the body text are one publication (the body-text transaction only validates) | 5 (`new`, `body_text`, `language`, `locale`, `build`) |
 | `923ee3148b` | `drawable::style` — `Package::{body_drawable_style, edit_body_drawable_style, apply_body_drawable_style}`; `Edit::{set, reset}` over `Property::{Fill, Stroke, Shadow, Effects, TextLayout}`: the shared `litchi_iwa_style::shape` engine (W1-E, record 0375a) on a workspace over this package's parsed components, one publication per edit | 15 |
 | `f9ebce8575`, `27619e3f3c` | shared `litchi_iwa_style::line_end` codec and `drawable::style` line-endpoint facade — `PropertyKind::LineEndpoints`, `Endpoints` and `Endpoint`; `Edit::{set, reset}` and `Package::body_drawable_style` replace host `set_body_line_endpoints`, `reset_body_line_endpoints` and `body_line_endpoints`, with fresh variation UUIDs on allocation and exact in-place rewrites/resets | 3 |
-| `7a1b5c4054` | `table::creation::Edit::duplicate(BodyTableSelector, Position)` over `litchi_iwa_table::structure::duplicate`: copies a populated body table's cells, styles, formula lists and owner family, allocates a new drawable/model/storage graph, names it with the next free `"<name> copy"`, anchors its attachment in the body story, and publishes the registry references; typed selector, dependency and position refusals remain terminal | 1 |
+| `7a1b5c4054` plus resumed bounded/refusal hardening | `table::creation::Edit::duplicate(BodyTableSelector, Position)` over `litchi_iwa_table::structure::duplicate`: copies a populated body table's cells, styles, formula lists and owner family, allocates a new drawable/model/storage graph, names it with the next free `"<name> copy"`, anchors its attachment in the body story, and publishes the registry references; typed selector, dependency and position refusals remain terminal. A source with non-empty merged-cell geometry is preflighted through the bounded merge reader and terminally refused as `UnsupportedDependency` until the shared clone can rebind its inline merge owner. | 1 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -96,7 +96,7 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
 | media replace (image data, movie data and poster, audio data, asset) and asset reads | 5 + read sweep over 6 documents | movie/poster/audio A, image and asset B (ZIP layout), reads A | queued |
 | media add (image, movie, audio; native and blank documents) | 3 | B (fresh UUIDs; new members' ZIP layout) | queued |
-| populated body-table duplicate (three focused cases plus corpus sweep) | 3 focused + 18 corpus routes | B (fresh UUIDs and formula-owner identifiers by policy; untouched members exact) | queued |
+| populated body-table duplicate (three focused cases, merge-owner refusal, plus corpus sweep) | 4 focused + 17 corpus routes; 1 merged-table route refused before publish | B (fresh UUIDs and formula-owner identifiers by policy; untouched members exact; merged geometry is a terminal typed refusal pending shared owner rebinding) | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -118,6 +118,7 @@ corpus has no native file with them.
 | Route | Divergence | Owner |
 |---|---|---|
 | `duplicate_table` formula-owner allocation | the Pages host repeats an owner-map internal identifier when the source map already contains the next owner value; the leaf allocates above the complete map. Tier B compares the cloned owner family by form and preserves exact reads; volatile, spanning, whole-owner, error and spill dependencies are refused on both routes | W1-B / policy 0368a |
+| `duplicate_table` merged-cell owner | the shared structural clone currently copies a non-empty inline `TST.TableModelArchive.merge_owner` without rebinding its owner UUID to the new table. Pages preflights merge geometry and returns typed `Refusal::UnsupportedDependency` before allocation/publication, so it cannot publish an unreadable copied merge graph; the focused regression records the host acceptance and leaf safety refusal. Rebinding remains a shared-engine/W1-C follow-up | W1-B / shared duplicate engine |
 
 The `add_table` route was pinned here until W1-A aligned the shared table graph
 (record 0370f); it is now migrated (tier B). The duplicate route's four
@@ -232,7 +233,7 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*probe_host*' \
 | `cargo clippy -p litchi-pages -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and `--features pages` | 0, 0 |
 | `cargo test -p litchi-pages --all-features` (729) / `-p litchi-iwa --all-features` (1,963, parity target 169 + 15 ignored probes) / `-p litchi --all-features` (209) | 0 / 0 / 0 |
-| resumed boundedness follow-up: `cargo test -p litchi-pages --all-features`; `cargo test -p litchi-iwa-style --all-features` (7 + doctests); focused parity `pages_body_line_endpoints` (2) and `pages_body_table_duplicate` (3, including 18 corpus routes + 4 typed refusals) | 0 / 0 / 0 |
+| resumed boundedness follow-up: `cargo test -p litchi-pages --all-features`; `cargo test -p litchi-iwa-style --all-features` (7 + doctests); focused parity `pages_body_line_endpoints` (2), `pages_body_table_duplicate_merge_owner_readback` (1), and `pages_body_table_duplicate_corpus_parity` (17 routes + 5 refusals) | 0 / 0 / 0 |
 | resumed `cargo clippy -p litchi-pages -p litchi-iwa-style -p litchi-iwa --all-targets --all-features -- -D warnings` | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pages` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages` | 0 |
@@ -253,16 +254,20 @@ No litchi-ops code, capability or corpus-visible behaviour changed, so the
 capability/registry goldens and the OfficeCLI corpus were not re-blessed.
 Both pre-commit size checks printed nothing for every commit.
 
-The resumed hardening keeps the same public route contract while closing two
-boundedness holes found during coordinator review: body line-end field scans
-now use the owning `Budget` (including the flip varint and retained endpoint
-copies), and the shared line-end codec has one bounded `decode(payload,
-limits)` entry point whose structured error keeps semantic unknown-endpoint,
-wire-limit and allocation failures distinct. The Pages facade maps those wire
-failures to its typed `Limit`/`Allocation` errors; malformed endpoint semantics
-remain the terminal `UnsupportedStyle` refusal. Duplicate-table candidate
-readback now preserves `table_lock` limit and allocation failures instead of
-turning them into `Verification`.
+The resumed hardening keeps the same public route contract while closing three
+boundedness/safety holes found during coordinator review: body line-end field
+scans now use the owning `Budget` (including the flip varint and retained
+endpoint copies), and the shared line-end codec has one bounded
+`decode(payload, limits)` entry point whose structured error keeps semantic
+unknown-endpoint, wire-limit and allocation failures distinct. The Pages
+facade maps those wire failures to its typed `Limit`/`Allocation` errors;
+malformed endpoint semantics remain the terminal `UnsupportedStyle` refusal.
+Duplicate-table candidate readback now preserves `table_lock` limit and
+allocation failures instead of turning them into `Verification`. Finally,
+duplicate preflight reads the selected table's merge geometry under its own
+bounded reader, preserves merge-reader limit/allocation distinctions, and
+returns `UnsupportedDependency` for non-empty merge owners until the shared
+clone engine can rebind them.
 
 ## 6. Gaps and follow-ups (rest of W1-B)
 
@@ -274,3 +279,4 @@ turning them into `Verification`.
 | image cell fills | — | data-reference registry bookkeeping for a style variation (host `register_style_object` with a data identifier) |
 | table formulas | — | W1-F formula engine (record 0376) |
 | Builder `body_table` | 1 | the host bootstraps the first table graph from its Numbers builder; the leaf `table::creation` needs a template table, so a table-less document needs that bootstrap first |
+| non-empty merged-cell table duplication | 1 focused/corpus route | Pages refuses before publication because the shared duplicate engine does not yet rebind the inline merge-owner UUID; W1-C/shared duplicate-engine work must repair the owner remap before this route can move from the explicit safety refusal to parity |

@@ -305,7 +305,8 @@ fn duplication_refuses_typed() -> TestResult {
 
 /// Every corpus body table is copied, or refused because its formulas carry
 /// dependency state the shared engine does not copy (volatile, spanning,
-/// whole-owner, error or spill), as the host refuses it.
+/// whole-owner, error or spill), or because a merged-cell owner still needs
+/// shared clone-engine rebinding, as the host refuses it.
 #[test]
 fn every_corpus_body_table_duplicates_or_refuses_typed() -> TestResult {
     let (mut duplicated, mut refused) = (0_usize, 0_usize);
@@ -349,6 +350,6 @@ fn every_corpus_body_table_duplicates_or_refuses_typed() -> TestResult {
         }
     }
     eprintln!("duplicated {duplicated}, refused {refused}");
-    assert!(duplicated >= 18 && refused > 0);
+    assert!(duplicated >= 17 && refused > 0);
     Ok(())
 }

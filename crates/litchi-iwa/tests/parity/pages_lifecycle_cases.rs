@@ -18,6 +18,7 @@ use prost::Message as _;
 const SECTIONS: &str = "iwork/pages/body-sections-unicode.pages";
 const TABLES: &str = "iwork/pages/body-table-catalog-native.pages";
 const CELLS: &str = "iwork/pages/body-table-cells-native.pages";
+const MERGES: &str = "iwork/pages/body-table-merges-native.pages";
 
 fn host_sections(bytes: &[u8]) -> TestResult<Vec<(u32, Option<String>)>> {
     Ok(pages::Draft::from_bytes(bytes)?
@@ -421,6 +422,32 @@ fn leaf_duplicate(
     ))
 }
 
+/// A duplicate of a merged Pages table is refused until the shared clone
+/// engine can rebind its inline merge-owner UUID.  This prevents a copied
+/// owner UUID that still names the source table from publishing unreadable
+/// merged-cell storage.
+#[test]
+fn pages_body_table_duplicate_merge_owner_readback() -> TestResult {
+    let input = fixture(MERGES)?;
+    let source = Package::from_bytes(&input.bytes)?;
+    assert!(!source.body_table_merges(0)?.is_empty());
+    // The host accepts the structural duplication request; its copied
+    // inline owner is not a safe readback oracle for this unsupported case.
+    let _host = host_duplicate(&input.bytes, 0, 0)?;
+
+    let result = source
+        .edit_body_table_creation()
+        .duplicate(BodyTableSelector::index(0), Position::new(0))?
+        .commit();
+    assert!(matches!(
+        result,
+        Err(litchi_pages::table::creation::Error::Refused(
+            litchi_pages::table::creation::Refusal::UnsupportedDependency
+        ))
+    ));
+    Ok(())
+}
+
 /// Duplicating a populated body table (record 0371, on the shared
 /// `litchi_iwa_table::structure::duplicate` engine): at the start and the
 /// end of the body, selected by position and by name, with a formula owner
@@ -548,6 +575,14 @@ fn pages_body_table_duplicate_corpus_parity() -> TestResult {
                     ) {
                         failures.push(format!("{path} table {table}: {error}"));
                     }
+                },
+                // The shared clone engine does not yet rebind an inline
+                // merge-owner UUID. Pages refuses this route before publish;
+                // the focused regression above proves the refusal is typed
+                // rather than an unreadable candidate.
+                (Ok(_), Err(error)) if *path == MERGES => {
+                    refused += 1;
+                    eprintln!("{path} table {table}: leaf refuses merge owner ({error})");
                 },
                 (Ok(_), Err(error)) => failures.push(format!(
                     "{path} table {table}: leaf refuses where the host copies: {error}"
