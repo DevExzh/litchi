@@ -1,16 +1,16 @@
 # 0376c — W1-F Numbers formula authoring and cell-writer correctness
 
 - Status: slice complete on `uo2/iwa-w1f`; current trunk
-  `7973aef0e6` is merged at `e912148f32`, with scratch-probe cleanup at
-  `72d414a13a`.
+  `0944b7319f` is merged at `e82bb18991`, with route-attribution and
+  scratch-probe cleanup at `32afc486de` and `72d414a13a`.
 - Date: 2026-10-28.
 - Scope: Numbers cell writes, formula dependency envelopes, formula-list key
   reuse, and `set_formula`/`set_formula_with_cached_value` parity.
 - Native evidence: none. The migrated formula-authoring route is queued in
   `0363-mac-queue.md`; this record does not claim E3/E4.
-- `performance_claim`: the measured leaf facade route is 59.53% lower in
-  callgrind instructions than the host route on the same three-case ABBA
-  probe (§5).
+- `performance_claim`: each measured leaf facade route is at least 55.70%
+  lower in callgrind instructions than its corresponding host route on a
+  separate pinned-CPU ABBA probe (§5).
 
 ## 1. What landed
 
@@ -22,6 +22,8 @@
 | `a03370efdc` | `litchi-iwa`, `litchi-numbers`, ledger and queue | formula-author parity cases, typed bounded-header error mapping, ledger migration and native queue entry |
 | `e912148f32` | branch integration | merge current `feat/unified-ops-api` (`7973aef0e6`) and resolve the parity module registry by unioning trunk's W2 modules with W1-F |
 | `72d414a13a` | parity tests | remove all temporary diagnostic dump probes; retain only the documented cost probe |
+| `32afc486de` | parity attribution | call the actual host `set_formula` for no-cache authoring, add direct cache-policy and reopened semantic projections, normalize only no-cache `TST.Tile` storage fields, and split the release cost probes by route |
+| `e82bb18991` | branch integration | merge current trunk `0944b7319f` and retain the W1-G hidden-axes parity module |
 
 ## 2. Public route and correctness contract
 
@@ -68,18 +70,24 @@ registered by `parity/main.rs`.
 | Test | Fixture and operation | Tier/evidence | Result |
 |---|---|---|---|
 | `numbers_table_formula_author_parity` | `basic.numbers`, C3 = B3 + 1; owner has no dependency tile at the origin | B / queued | pass |
-| `numbers_table_formula_author_graph_parity` | `formula-budget-native.numbers`, C3 = B3 + 1 beside the native formula graph | B / queued | pass |
-| `numbers_table_formula_cached_parity` | `basic.numbers`, C3 = B3 + 1 with an explicit numeric cache | B / queued | pass |
+| `numbers_table_formula_author_graph_parity` | `formula-budget-native.numbers`, C3 = B3 + 1 with explicit cache 2 beside the native formula graph | B / queued | pass |
+| `numbers_table_formula_cached_parity` | `basic.numbers`, C3 = B3 + 1 with an explicit numeric cache 43 | B / queued | pass |
+| `numbers_table_formula_author_host_set_formula_policy` | direct host `set_formula` versus leaf no-cache authoring, reopened formula/value and exact host-zero versus leaf-evaluated cache policy | focused regression | pass |
 
 The cases agree on known formula-owner, cell-record-tile, data-list and
 header fields; untouched members/objects remain exact. Documented Tier-B
 differences are deterministic leaf UUIDs versus host-random UUIDs, leaf root
 preview invalidation, unknown protobuf fields, and ZIP/member-layout changes.
-For the no-cache case, the host differential supplies the host's evaluated
-display cache deliberately: direct host `set_formula` leaves a zero display
-cache while the leaf evaluates and stores the authored scalar. This isolates
-formula/dependency payload parity and is recorded as an intentional cache
-policy difference, not as native proof.
+The no-cache host route now calls the actual host `set_formula`; it leaves a
+zero display cache while the leaf evaluates and stores the authored scalar.
+The Tier-B case normalizes only the raw BNC storage/offset fields in
+`TST.Tile`, and `.read` projections compare the formula/value at C3, the
+precedent at B3, and every materialized table-cell value. The focused policy
+test asserts the exact reopened cache values (`0.0` host versus `43.0` leaf),
+so the normalization does not hide a semantic mismatch. The graph case uses
+explicit cache 2 because the host no-cache setter intentionally leaves that
+fixture's native tile untouched; it therefore exercises the host cached setter
+beside the native formula graph rather than substituting a no-cache call.
 
 The host's `formula-events-native.numbers` dependency shape remains refused by
 the leaf's focused route and is not silently downgraded to a host fallback.
@@ -101,13 +109,17 @@ acceptance.
 
 Prescribed release-mode callgrind measurement: `CARGO_BUILD_JOBS=4`,
 `CARGO_PROFILE_RELEASE_DEBUG=1`, LTO-enabled release profile, CPU 3 pinned,
-one ignored test in ABBA order (host, leaf, leaf, host) for each of the three
-formula-author cases. The probe measures the full host/leaf facade through
-candidate serialization and excludes the parity harness inverse readback.
+one ignored test in ABBA order (host, leaf, leaf, host) for each formula-
+author route. Each probe measures the full host/leaf facade through candidate
+serialization and excludes the parity harness inverse readback. The host
+toggle calls the corresponding host API: direct `set_formula` for the basic
+no-cache case and `set_formula_with_cached_value` for the two cached cases.
 
 | Route | Host Ir | Leaf Ir | Delta |
 |---|---:|---:|---:|
-| Numbers formula authoring, three-case ABBA collection | 539,307,965 | 218,237,275 | **−59.53%** |
+| Basic no-cache `set_formula` (`numbers_table_formula_author_cost_abba`) | 189,837,946 | 84,071,854 | **−55.71%** |
+| Native-graph cached authoring (`numbers_table_formula_author_graph_cost_abba`) | 159,368,557 | 50,034,803 | **−68.60%** |
+| Basic explicit cached authoring (`numbers_table_formula_cached_cost_abba`) | 189,829,123 | 84,084,598 | **−55.71%** |
 
 Reproduction:
 
@@ -116,11 +128,15 @@ CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target/w1f \
   CARGO_PROFILE_RELEASE_DEBUG=1 \
   cargo test --release -p litchi-iwa --test parity --no-run
 taskset -c 3 valgrind --tool=callgrind \
+  '--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f/bench/cg.w1f.formula-author.basic.host.new' \
   '--toggle-collect=*numbers_formula_author_cases::host_route*' \
   target/w1f/release/deps/parity-bf69cf43b955a09c --ignored --exact \
-  numbers_formula_author_cases::numbers_table_formula_author_cost_abba \
-  --test-threads=1
-# repeat with leaf_cost_route as the toggle
+  numbers_formula_author_cases::numbers_table_formula_author_cost_abba --test-threads=1
+# Repeat the command for each test with `host_route`/`leaf_cost_route` and the
+# corresponding output path:
+#   numbers_table_formula_author_cost_abba       basic.host.new/basic.leaf.new
+#   numbers_table_formula_author_graph_cost_abba  graph.host.new/graph.leaf.new
+#   numbers_table_formula_cached_cost_abba        cached.host.new/cached.leaf.new
 ```
 
 The non-committed raw captures are outside the checkout at
@@ -128,13 +144,17 @@ The non-committed raw captures are outside the checkout at
 
 | Artifact | Size | SHA-256 |
 |---|---:|---|
-| `cg.w1f.formula-author.host` | 773,128 bytes | `d2d6ff72826bcc1bb37b40158a5ff2302bbce1f96f894f3b9da85d11d7094f9c` |
-| `cg.w1f.formula-author.leaf` | 1,291,593 bytes | `6d4ec0ffbe41bfb7c36ef5fdc7a6d12d3bda5bea5f838c7f9321e6248b6340ff` |
+| `cg.w1f.formula-author.basic.host.new` | 727,218 bytes | `c996bb2fbda6a8984a9d3e331043c7504857abdc2b8925cda54567c94eaf7d1d` |
+| `cg.w1f.formula-author.basic.leaf.new` | 1,168,537 bytes | `bcf289faa2de04a79afc37e65d8acf20123b67cebc3b563278bf44c73f54e19a` |
+| `cg.w1f.formula-author.graph.host.new` | 669,259 bytes | `21b4808744c5893d03c89c207f57358cc195115536b23e1791f97687a4582770` |
+| `cg.w1f.formula-author.graph.leaf.new` | 1,109,318 bytes | `2b1e070472d535fe07b80d8c84bbb60e0abde256e51ee6c47f6b9bc6e509d0c5` |
+| `cg.w1f.formula-author.cached.host.new` | 727,467 bytes | `4633fd1b31a02aca87a956c00a1b54f4d36a4a75324eef51598b02a8eb53597b` |
+| `cg.w1f.formula-author.cached.leaf.new` | 1,169,813 bytes | `f6d01a84001e289c7c2e5b95c5e3a6aed87e8c67f96582922ac72f5a91ac9e70` |
 
 The measured binary is also outside the repository: source commit
-`72d414a13a`, `target/w1f/release/deps/parity-bf69cf43b955a09c`,
-196,411,152 bytes, SHA-256
-`e48b5f85a5b532aaa8ba68acd661feb2c3ee2e70bc3f6a22319c8ded742c11db`.
+`32afc486de`, `target/w1f/release/deps/parity-bf69cf43b955a09c`,
+196,350,040 bytes, SHA-256
+`2ea089e1e48c5cfe3b48262c851d45e5a0d0f5a72ec9798e428545e4bbf155d9`.
 
 ## 6. Verification on the merged candidate
 
@@ -144,8 +164,8 @@ The measured binary is also outside the repository: source commit
 | `cargo test -p litchi-numbers-wire --lib` | 191 passed |
 | `cargo test -p litchi-numbers --lib table_cell_edit::tests` | 19 passed, 1 intentional ignored |
 | `cargo test -p litchi-numbers --test table_cells` | 17 passed |
-| `cargo test -p litchi-iwa --test parity numbers_formula_author_cases` | 3 passed, 1 intentional cost probe ignored |
-| `python3 tools/iwa_exit_ledger.py --check` | pending coordinator rerun after integration |
+| `cargo test -p litchi-iwa --test parity numbers_formula_author_cases` | 4 passed, 3 intentional cost probes ignored |
+| `python3 tools/iwa_exit_ledger.py --check` | pass on the merged W1-G candidate |
 
 Full 53-row and post-merge gates remain coordinator-owned. The native queue,
 final integrated performance qualification, and D7 unified-operations

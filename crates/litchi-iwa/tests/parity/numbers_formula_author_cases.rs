@@ -219,6 +219,7 @@ const GRAPH_CACHED: Formula = Formula {
 /// (the leaf creates the tile, as the host does).
 #[test]
 fn numbers_table_formula_author_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
     let input = fixture("iwork/numbers/basic.numbers")?;
     run(
         "numbers_table_formula_author_parity",
@@ -231,6 +232,7 @@ fn numbers_table_formula_author_parity() -> TestResult {
 /// A formula beside a native formula graph.
 #[test]
 fn numbers_table_formula_author_graph_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
     let input = fixture("iwork/numbers/formula-budget-native.numbers")?;
     run(
         "numbers_table_formula_author_graph_parity",
@@ -243,6 +245,7 @@ fn numbers_table_formula_author_graph_parity() -> TestResult {
 /// A formula with its display cache.
 #[test]
 fn numbers_table_formula_cached_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
     let input = fixture("iwork/numbers/basic.numbers")?;
     run(
         "numbers_table_formula_cached_parity",
