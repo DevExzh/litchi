@@ -96,6 +96,62 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
 }
 
 #[test]
+fn exclusive_existing_style_batch_rewrites_each_cell() -> TestResult {
+    let package = Package::new()
+        .edit_table_cells(0, 0)?
+        .set(At::new(1, 1), Input::Text("b".into()))?
+        .commit()?
+        .into_package();
+    let package = package
+        .edit_table_cells(0, 0)?
+        .set(At::new(2, 1), Input::Text("c".into()))?
+        .commit()?
+        .into_package();
+    let mut bold = CharacterProperties::new();
+    bold.bold = Some(true);
+    let styled = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(At::new(1, 1), bold)?
+        .commit()?
+        .into_package();
+    let mut italic = CharacterProperties::new();
+    italic.italic = Some(true);
+    let styled = styled
+        .edit_table_cell_text_style(0, 0)?
+        .set(At::new(2, 1), italic)?
+        .commit()?
+        .into_package();
+    let mut second = CharacterProperties::new();
+    second.italic = Some(true);
+    let mut first = CharacterProperties::new();
+    first.bold = Some(true);
+    let commit = styled
+        .edit_table_cell_text_style(0, 0)?
+        .set(At::new(1, 1), second)?
+        .set(At::new(2, 1), first)?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_text_style(0, 0, At::new(1, 1))?
+            .italic,
+        Some(true)
+    );
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_text_style(0, 0, At::new(2, 1))?
+            .bold,
+        Some(true)
+    );
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&styled)?);
+    Ok(())
+}
+
+#[test]
 fn refusals_are_typed() -> TestResult {
     let package = Package::new();
     assert!(matches!(

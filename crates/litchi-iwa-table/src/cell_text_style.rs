@@ -606,6 +606,8 @@ pub struct Plan {
     pub cell_updates: Vec<(Target, u32)>,
     /// Whether this plan can be combined with sibling fresh-cell plans.
     pub batch_compatible: bool,
+    /// Existing style-list entries released by this plan, grouped by owner.
+    pub releases: Vec<(u64, u32)>,
 }
 
 /// One staged request passed to the batch planner.
@@ -725,9 +727,11 @@ pub fn plan_set(
             remove_references: Vec::new(),
         },
     ];
+    let mut releases = Vec::new();
     if let Some(old) = old_key {
         let mut remaining = BTreeMap::from([(old, 1_u32)]);
         let owner = list.entry(old)?.owner;
+        releases.push((owner, old));
         let (released, dropped) = if owner == list.root {
             litchi_numbers_wire::table_topology::lists::release(&rewrites[1].data, &mut remaining)
                 .map_err(|_| Error::Refused(Refusal::UnsupportedStyleList))?
@@ -779,7 +783,8 @@ pub fn plan_set(
             },
         ],
         cell_updates: vec![(target, key)],
-        batch_compatible: old_key.is_none() || exclusive,
+        batch_compatible: true,
+        releases,
         ..Plan::default()
     }))
 }
@@ -806,6 +811,10 @@ pub fn plan_set_many(
         return Ok(None);
     }
     let mut combined = Plan::default();
+    let mut list_entries = Vec::new();
+    let mut list_identifier = None;
+    let mut list_type = None;
+    let mut release_counts: BTreeMap<u64, BTreeMap<u32, u32>> = BTreeMap::new();
     for mut plan in plans {
         if let Some((_, key)) = plan.cell_updates.last_mut() {
             let collides = combined
@@ -833,7 +842,30 @@ pub fn plan_set_many(
         combined.insertions.extend(plan.insertions);
         combined.registrations.extend(plan.registrations);
         combined.cell_updates.extend(plan.cell_updates);
+        for (owner, key) in plan.releases {
+            *release_counts
+                .entry(owner)
+                .or_default()
+                .entry(key)
+                .or_default() += 1;
+        }
         for rewrite in plan.rewrites {
+            if rewrite.message_type == LIST_MESSAGE_TYPE {
+                list_identifier.get_or_insert(rewrite.identifier);
+                list_type.get_or_insert(rewrite.message_type);
+                let key = combined
+                    .cell_updates
+                    .last()
+                    .map(|(_, key)| *key)
+                    .ok_or(invalid("batch list key missing"))?;
+                let entry = repeated_length_delimited_payloads(&rewrite.data, 3)
+                    .map_err(map_wire)?
+                    .into_iter()
+                    .find(|entry| varint(entry, 1).ok() == Some(Some(u64::from(key))))
+                    .ok_or(invalid("batch style-list entry missing"))?;
+                list_entries.push(entry.to_vec());
+                continue;
+            }
             if let Some(existing) = combined.rewrites.iter_mut().find(|candidate| {
                 candidate.identifier == rewrite.identifier
                     && candidate.message_type == rewrite.message_type
@@ -851,24 +883,6 @@ pub fn plan_set_many(
                     )
                     .map_err(|_| invalid("batch stylesheet variation encoding failed"))?;
                     existing.add_references.push(insertion.identifier);
-                } else if rewrite.message_type == LIST_MESSAGE_TYPE {
-                    let key = combined
-                        .cell_updates
-                        .last()
-                        .map(|(_, key)| *key)
-                        .ok_or(invalid("batch list key missing"))?;
-                    let entry = repeated_length_delimited_payloads(&rewrite.data, 3)
-                        .map_err(map_wire)?
-                        .into_iter()
-                        .find(|entry| varint(entry, 1).ok() == Some(Some(u64::from(key))))
-                        .ok_or(invalid("batch style-list entry missing"))?;
-                    append_length_delimited_field(
-                        &mut existing.data,
-                        3,
-                        entry,
-                        WireLimits::default(),
-                    )
-                    .map_err(map_wire)?;
                 } else {
                     return Err(Error::BatchUnsupported);
                 }
@@ -876,6 +890,78 @@ pub fn plan_set_many(
                 combined.rewrites.push(rewrite);
             }
         }
+    }
+    if let Some(list_identifier) = list_identifier {
+        let table = Table::read(source, requests[0].target)?;
+        let list = StyleList::read(source, table.style_list)?;
+        if list.root != list_identifier {
+            return Err(invalid("batch style-list owner changed"));
+        }
+        let mut root_data = list.root_data.clone();
+        let next = list_entries
+            .iter()
+            .filter_map(|entry| varint(entry, 1).ok().flatten())
+            .max()
+            .and_then(|key| key.checked_add(1))
+            .and_then(|key| u32::try_from(key).ok())
+            .unwrap_or(list.next);
+        root_data =
+            patch_varint_field(&root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
+        for entry in &list_entries {
+            append_length_delimited_field(&mut root_data, 3, entry, WireLimits::default())
+                .map_err(map_wire)?;
+        }
+        let mut root_rewrite = Rewrite {
+            identifier: list_identifier,
+            message_type: list_type.unwrap_or(LIST_MESSAGE_TYPE),
+            data: root_data,
+            add_references: combined
+                .insertions
+                .iter()
+                .map(|object| object.identifier)
+                .collect(),
+            remove_references: Vec::new(),
+        };
+        for (owner, mut remaining) in release_counts {
+            if owner == list.root {
+                let (released, dropped) = litchi_numbers_wire::table_topology::lists::release(
+                    &root_rewrite.data,
+                    &mut remaining,
+                )
+                .map_err(|_| Error::Refused(Refusal::UnsupportedStyleList))?;
+                if !remaining.is_empty() {
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
+                }
+                if let Some(released) = released {
+                    root_rewrite.data = released;
+                }
+                root_rewrite.remove_references.extend(dropped);
+            } else {
+                let (_, segment_type, segment_data) = list
+                    .segments
+                    .iter()
+                    .find(|(identifier, _, _)| *identifier == owner)
+                    .ok_or(invalid("batch style-list segment disappeared"))?;
+                let (released, dropped) = litchi_numbers_wire::table_topology::lists::release(
+                    segment_data,
+                    &mut remaining,
+                )
+                .map_err(|_| Error::Refused(Refusal::UnsupportedStyleList))?;
+                if !remaining.is_empty() {
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
+                }
+                if let Some(released) = released {
+                    combined.rewrites.push(Rewrite {
+                        identifier: owner,
+                        message_type: *segment_type,
+                        data: released,
+                        add_references: Vec::new(),
+                        remove_references: dropped,
+                    });
+                }
+            }
+        }
+        combined.rewrites.push(root_rewrite);
     }
     combined.batch_compatible = true;
     Ok(Some(combined))
