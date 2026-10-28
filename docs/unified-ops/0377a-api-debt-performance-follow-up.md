@@ -121,12 +121,12 @@ The candidate release binaries were rebuilt after the harness change; the
 candidate target was 5.0 GiB (below the 30 GiB work-package limit), and no raw
 captures or binaries are committed. Before handoff, this branch completed the
 scoped format check, release harness check, transaction/ODF/DOCX/XLSX tests,
-ODC all-target checks, Clippy with the documented pre-existing ODF
-`manual_range_contains` allowance, rustdoc (including `litchi-sheet`), the
+ODC all-target checks, strict scoped Clippy, rustdoc (including `litchi-sheet`), the
 73-profile API glossary, ledger/matrix checks, and crate-boundary audit. The
 source-bound callgrind and compact manifest identify their exact source and
 binary hashes; F1/F3/F4/F5 wall values remain provisional under shared-host
 load. The coordinator must rerun quiet wall checks and full integrated gates
 on the final trunk candidate; only the coordinator may integrate it into
-trunk. This branch is clean after merge commit
-`b9f5c8bd15f3b670793e3ed2f9d987e0725b8f52`.
+trunk. The synchronized merge commit is
+`b9f5c8bd15f3b670793e3ed2f9d987e0725b8f52`; this handoff adds only the
+narrow lint and matrix-receipt updates described above.

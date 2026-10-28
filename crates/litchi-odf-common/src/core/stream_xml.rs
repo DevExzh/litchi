@@ -1034,7 +1034,7 @@ pub(crate) fn validate_event_bytes(event: &Event<'_>, offset: u64) -> Result<()>
     // without decoding (record 0377a); anything else takes the full check.
     if bytes
         .iter()
-        .all(|&byte| byte >= 0x20 && byte < 0x80 || matches!(byte, b'\t' | b'\n' | b'\r'))
+        .all(|&byte| (0x20..0x80).contains(&byte) || matches!(byte, b'\t' | b'\n' | b'\r'))
     {
         return Ok(());
     }

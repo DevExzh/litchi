@@ -255,7 +255,7 @@ fn blocked_candidate(name: &str, stem: &str) -> Option<u32> {
         return None;
     }
     let index: u32 = rest[..digits].parse().ok()?;
-    (index >= 2 && index <= FREE_PART_CANDIDATES && ends_candidate(&rest[digits..]))
+    ((2..=FREE_PART_CANDIDATES).contains(&index) && ends_candidate(&rest[digits..]))
         .then_some(index)
 }
 

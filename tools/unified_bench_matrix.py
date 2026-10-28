@@ -3883,9 +3883,12 @@ def p0377a():
             f"fin_perf_0377a:{route}:wall", src([path]),
             comparison="unified/leaf (wall, ABBA blocks)",
             explanation=(
-                "Fresh corrected-warmup ABBA run; every case reports exact byte "
-                "equivalence." if case.get("equivalence") == "exact_bytes" else
-                "Fresh corrected-warmup ABBA run; ODC admission has no byte-output comparison.")))
+                "Fresh corrected-warmup ABBA diagnostic under shared-host load; "
+                "provisional pending a quiet coordinator rerun; every case "
+                "reports exact byte equivalence." if case.get("equivalence") == "exact_bytes" else
+                "Fresh corrected-warmup ABBA diagnostic under shared-host load; "
+                "provisional pending a quiet coordinator rerun; ODC admission "
+                "has no byte-output comparison.")))
 
     path = res / "cli.json"
     d = load_json(path)

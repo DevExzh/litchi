@@ -988,7 +988,7 @@ fn namespace_normalized_len(value: &str, context: &str) -> Result<(usize, bool)>
     // replaces the per-character walk below (record 0377).
     // No early exit, so the scan vectorizes.
     if bytes.iter().fold(true, |plain, &byte| {
-        plain & (byte >= 0x20) & (byte < 0x7f) & (byte != b'&')
+        plain & (0x20..0x7f).contains(&byte) & (byte != b'&')
     }) {
         return Ok((bytes.len(), false));
     }
