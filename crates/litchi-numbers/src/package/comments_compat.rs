@@ -137,6 +137,7 @@ fn compatibility_package(bytes: &[u8], options: Profile) -> Result<Package> {
             index,
             document,
             options,
+            proofs: Default::default(),
         }),
     })
 }

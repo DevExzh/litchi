@@ -29,6 +29,15 @@ pub mod text;
 
 pub use litchi_iwa_common::table::cell::data_format::{Checkbox, DataFormat, StarRating, Text};
 
+/// Selector-first exact-source transactions for any display format or
+/// control of one existing table cell, as the neutral [`DataFormat`]
+/// (record 0370k).
+pub mod transaction {
+    pub use crate::package::table_cell_data_format::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
 pub use control::{CellControl, NotCellControl, Slider, Stepper};
 pub use currency::{Currency, CurrencyCode, CurrencyStyle};
 pub use custom::Custom;

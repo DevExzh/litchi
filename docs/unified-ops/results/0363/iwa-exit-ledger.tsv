@@ -645,7 +645,7 @@ keynote/editor/slide_tables.rs	slide_table_cell_fill	1	keynote	table.cell_appear
 keynote/editor/slide_tables.rs	slide_table_cell_fraction_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::slide_table_cell_format	keynote_slide_table_cell_format_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_layout	1	keynote	table.cell_appearance	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_merges	1	keynote	table.merge	migrated	litchi_keynote::Package::slide_table_merges	keynote_slide_table_merges_read_parity	A	test-data/iwork/keynote/slide-table-merges-native-receipt.json	-
-keynote/editor/slide_tables.rs	slide_table_cell_numeral_system_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_numeral_system_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::slide_table_cell_format	keynote_slide_table_cell_numeral_system_format_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
@@ -804,7 +804,7 @@ numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-onl
 numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_list	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_preset_parity	B	-	-
@@ -835,10 +835,10 @@ numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	h
 numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_data_format_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_list	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_lists	numbers_cell_list_preset_parity	B	-	-
@@ -868,11 +868,11 @@ numbers/editor/semantic/table.rs	set_table_cell_text_script	1	numbers	table.cell
 numbers/editor/semantic/table.rs	set_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text_style	numbers_cell_text_style_parity	B	-	-
 numbers/editor/semantic/table.rs	table_cell_borders	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_data_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::table_cell_data_format	numbers_table_cell_data_format_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	table_cell_merges	1	numbers	table.merge	migrated	litchi_numbers::Package::table_merges	numbers_table_merges_read_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	-
-numbers/editor/semantic/table.rs	table_cell_numeral_system_format	1	numbers	table.cell_format	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::table_cell_data_format	numbers_table_cell_data_format_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_list	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_list	numbers_cell_list_read_parity	A	-	-
@@ -2007,7 +2007,7 @@ pages/editor/tables/semantic.rs	table_cell_fraction_format	1	pages	table.cell_fo
 pages/editor/tables/semantic.rs	table_cell_layout	1	pages	table.cell_appearance	migrated	litchi_pages::Package::body_table_cell_appearance	pages_body_table_cell_appearance_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_merges	1	pages	table.merge	migrated	litchi_pages::Package::body_table_merges	pages_body_table_merges_read_parity	A	test-data/iwork/pages/body-table-merges-native-receipt.json	-
 pages/editor/tables/semantic.rs	table_cell_number_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_format	pages_body_table_cell_format_read_parity	A	-	-
-pages/editor/tables/semantic.rs	table_cell_numeral_system_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_numeral_system_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_format	pages_body_table_cell_numeral_system_format_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_paragraph_indents	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_paragraph_list	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-

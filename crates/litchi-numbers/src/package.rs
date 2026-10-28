@@ -74,6 +74,7 @@ pub(crate) mod table_cell_control;
 pub(crate) use litchi_iwa_table::cell_format::control as table_cell_control_native;
 pub(crate) mod table_cell_currency_format;
 pub(crate) mod table_cell_custom_format;
+pub(crate) mod table_cell_data_format;
 pub(crate) mod table_cell_date_time_format;
 pub(crate) use litchi_iwa_table::cell_format::display as table_cell_display_format_native;
 pub(crate) mod table_cell_duration_format;
@@ -127,6 +128,7 @@ use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{numbers_sheet_order_codec, table_info_codec};
+use litchi_iwa_table::cell_format::control::PackageProofs;
 use plist::stream::{Event as PlistEvent, Reader as PlistReader};
 use thiserror::Error;
 
@@ -585,6 +587,10 @@ impl litchi_iwa_table::TableSource for Package {
         self.state.options.archive()
     }
 
+    fn proofs(&self) -> Option<&PackageProofs> {
+        Some(&self.state.proofs)
+    }
+
     fn max_objects(&self) -> usize {
         self.state.options.semantic().max_objects()
     }
@@ -617,6 +623,8 @@ struct State {
     index: Index,
     document: Workbook,
     options: Profile,
+    /// The cell-format engines' package-level proofs (record 0370k).
+    proofs: PackageProofs,
 }
 
 #[derive(Debug)]
@@ -819,7 +827,11 @@ impl Package {
             Some(catalog) => Components::PhysicalShared(Box::new(catalog.reopen(candidate)?)),
             None => Components::from_shared_bytes(candidate, self.state.options.archive())?,
         };
-        Self::from_components_with_options(components, self.state.options)
+        let proofs = self
+            .state
+            .proofs
+            .reopened(self.state.components.catalog(), components.catalog());
+        Self::from_components_with_proofs(components, self.state.options, proofs)
     }
 
     pub(crate) fn from_owned_bytes_with_options(source: Vec<u8>, options: Profile) -> Result<Self> {
@@ -836,6 +848,14 @@ impl Package {
     }
 
     fn from_components_with_options(components: Components, options: Profile) -> Result<Self> {
+        Self::from_components_with_proofs(components, options, PackageProofs::default())
+    }
+
+    fn from_components_with_proofs(
+        components: Components,
+        options: Profile,
+        proofs: PackageProofs,
+    ) -> Result<Self> {
         let source = components
             .physical()
             .ok_or_else(|| {
@@ -858,6 +878,7 @@ impl Package {
                 index,
                 document,
                 options,
+                proofs,
             }),
         })
     }

@@ -1981,10 +1981,12 @@ pub fn prove_cross_component_reference<'source>(
             bytes.saturating_mul(2),
             1,
         );
-        *authority = Some(
-            popup_metadata::inspect_cross_component_read(source, options)
-                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?,
-        );
+        let facts = match source.proofs() {
+            Some(proofs) => proofs.cross_component_read_registry(source, options),
+            None => popup_metadata::inspect_cross_component_read(source, options),
+        };
+        *authority =
+            Some(facts.map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?);
     }
     let facts = authority
         .as_ref()

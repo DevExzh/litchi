@@ -126,6 +126,7 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
             index,
             document,
             options,
+            proofs: Default::default(),
         }),
     })
 }

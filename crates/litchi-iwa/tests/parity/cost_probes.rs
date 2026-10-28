@@ -545,3 +545,35 @@ fn numbers_sheet_duplicate_cost_abba() -> TestResult {
     black_box(host_lifecycle(&input.bytes, 4)?);
     Ok(())
 }
+
+#[inline(never)]
+fn host_data_format(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let numeral = crate::numbers_cell_data_format_cases::numeral_samples()?[1];
+    editor.set_table_cell_numeral_system_format(model, 1, 1, numeral)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_data_format(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let numeral = crate::numbers_cell_data_format_cases::numeral_samples()?[1];
+    let commit = package
+        .edit_table_cell_data_format(0usize, 0usize, litchi_numbers::At::new(1, 1))?
+        .set(numeral)
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// A base-16 numeral system on cell B2 of `custom-retirement-cleared.numbers`.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_cell_data_format_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/custom-retirement-cleared.numbers")?;
+    black_box(host_data_format(&input.bytes)?);
+    black_box(leaf_data_format(&input.bytes)?);
+    black_box(leaf_data_format(&input.bytes)?);
+    black_box(host_data_format(&input.bytes)?);
+    Ok(())
+}
