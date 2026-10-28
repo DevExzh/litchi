@@ -178,8 +178,8 @@ pub enum LimitKind {
     PayloadObjects,
     /// Native messages inspected or retained.
     PayloadMessages,
-    /// Native messages inspected per object.
-    MessagesPerObject,
+    /// Native messages inspected per owning container.
+    MessagesPerContainer,
     /// Native list items inspected or retained.
     PayloadItems,
     /// Native metadata items inspected.
@@ -705,7 +705,7 @@ fn map_root_error(error: RootError, path: Path) -> Error {
                 RootLimitKind::CompressedBytes => LimitKind::CompressedBytes,
                 RootLimitKind::Objects => LimitKind::PayloadObjects,
                 RootLimitKind::Messages => LimitKind::PayloadMessages,
-                RootLimitKind::MessagesPerObject => LimitKind::MessagesPerObject,
+                RootLimitKind::MessagesPerObject => LimitKind::MessagesPerContainer,
                 RootLimitKind::MetadataItems => LimitKind::MetadataItems,
                 RootLimitKind::SnappyFrames => LimitKind::SnappyFrames,
                 RootLimitKind::TableRows => LimitKind::TableRows,
@@ -1959,7 +1959,7 @@ mod tests {
             ),
             (
                 crate::package::comments::LimitKind::MessagesPerObject,
-                LimitKind::MessagesPerObject,
+                LimitKind::MessagesPerContainer,
             ),
             (
                 crate::package::comments::LimitKind::MetadataItems,

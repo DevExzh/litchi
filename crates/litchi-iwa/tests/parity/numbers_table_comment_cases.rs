@@ -356,9 +356,11 @@ fn run(
     Ok(())
 }
 
+#[cfg(feature = "parity-host-oracle")]
 #[test]
 fn numbers_table_cell_comment_replies_read_parity() -> TestResult {
     let input = populated_comment_fixture()?;
+    assert_populated_comment_semantics(&input.bytes)?;
     Case::new(
         "numbers_table_cell_comment_replies_read_parity",
         Format::Numbers,
@@ -373,13 +375,6 @@ fn numbers_table_cell_comment_replies_read_parity() -> TestResult {
     .read("leaf table-cell comment thread", leaf_populated_thread)
     .run()?;
     Ok(())
-}
-
-#[cfg(feature = "parity-host-oracle")]
-#[test]
-fn numbers_table_cell_comment_replies_semantic_parity() -> TestResult {
-    let input = populated_comment_fixture()?;
-    assert_populated_comment_semantics(&input.bytes)
 }
 
 #[cfg(feature = "parity-host-oracle")]

@@ -481,10 +481,14 @@ fn pages_body_table_reads_parity() -> TestResult {
     Ok(())
 }
 
-fn pages_body_table_comment_read_case(name: &'static str) -> TestResult {
+fn pages_body_table_comment_read_case(
+    name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
     let input = fixture(COMMENTS)?;
     assert_populated_comment_semantics(&input.bytes)?;
-    Case::new(name, Format::Pages, Tier::A, Evidence::Queued, &input)
+    Case::new(name, Format::Pages, tier, evidence, &input)
         .read_only()
         .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
         .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
@@ -501,13 +505,21 @@ fn pages_body_table_comment_read_case(name: &'static str) -> TestResult {
 }
 
 #[test]
+#[rustfmt::skip]
 fn pages_body_table_comment_read_parity() -> TestResult {
-    pages_body_table_comment_read_case("pages_body_table_comment_read_parity")
+    let evidence = Evidence::Native("test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json");
+    pages_body_table_comment_read_case("pages_body_table_comment_read_parity", Tier::A, evidence)
 }
 
 #[test]
+#[rustfmt::skip]
 fn pages_body_table_comment_replies_read_parity() -> TestResult {
-    pages_body_table_comment_read_case("pages_body_table_comment_replies_read_parity")
+    let evidence = Evidence::Native("test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json");
+    pages_body_table_comment_read_case(
+        "pages_body_table_comment_replies_read_parity",
+        Tier::A,
+        evidence,
+    )
 }
 
 #[test]
