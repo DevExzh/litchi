@@ -1063,65 +1063,6 @@ fn map_package_error(error: PackageError) -> GraphError {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{GraphError, GraphLimit, map_package_error, zip_record_equal_outside};
-    use crate::{Error as SemanticError, PackageError};
-
-    #[test]
-    fn semantic_package_limits_keep_resource_kinds() {
-        let cases = [
-            (
-                PackageError::Semantic(SemanticError::TooManySections {
-                    actual: 9,
-                    limit: 8,
-                }),
-                GraphLimit::SemanticItems,
-                9,
-                8,
-            ),
-            (
-                PackageError::Semantic(SemanticError::TooManyBodyStorages {
-                    actual: 11,
-                    limit: 10,
-                }),
-                GraphLimit::SemanticItems,
-                11,
-                10,
-            ),
-            (
-                PackageError::Semantic(SemanticError::TextTooLarge {
-                    observed: 257,
-                    limit: 256,
-                }),
-                GraphLimit::SemanticTextBytes,
-                257,
-                256,
-            ),
-        ];
-
-        for (error, expected_kind, observed, maximum) in cases {
-            assert!(matches!(
-                map_package_error(error),
-                GraphError::Limit {
-                    kind,
-                    observed: actual,
-                    maximum: limit,
-                } if kind == expected_kind && actual == observed && limit == maximum
-            ));
-        }
-    }
-
-    #[test]
-    fn locality_negative_control_rejects_unrelated_zip_mutation() {
-        let source = b"untouched-member";
-        let mut candidate = source.to_vec();
-        candidate[3] ^= 1;
-        assert!(!zip_record_equal_outside(source, &candidate, &[]));
-        assert!(zip_record_equal_outside(source, &candidate, &[(3, 4)]));
-    }
-}
-
 pub(crate) fn map_core_error(error: litchi_iwa_core::Error) -> GraphError {
     match error {
         litchi_iwa_core::Error::Limit {
@@ -1307,4 +1248,63 @@ fn ordinary_shape_storage(payload: &[u8], budget: &mut Budget) -> GraphResult<Op
         return Err(GraphError::InvalidSource);
     }
     Ok(Some(owned))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{GraphError, GraphLimit, map_package_error, zip_record_equal_outside};
+    use crate::{Error as SemanticError, PackageError};
+
+    #[test]
+    fn semantic_package_limits_keep_resource_kinds() {
+        let cases = [
+            (
+                PackageError::Semantic(SemanticError::TooManySections {
+                    actual: 9,
+                    limit: 8,
+                }),
+                GraphLimit::SemanticItems,
+                9,
+                8,
+            ),
+            (
+                PackageError::Semantic(SemanticError::TooManyBodyStorages {
+                    actual: 11,
+                    limit: 10,
+                }),
+                GraphLimit::SemanticItems,
+                11,
+                10,
+            ),
+            (
+                PackageError::Semantic(SemanticError::TextTooLarge {
+                    observed: 257,
+                    limit: 256,
+                }),
+                GraphLimit::SemanticTextBytes,
+                257,
+                256,
+            ),
+        ];
+
+        for (error, expected_kind, observed, maximum) in cases {
+            assert!(matches!(
+                map_package_error(error),
+                GraphError::Limit {
+                    kind,
+                    observed: actual,
+                    maximum: limit,
+                } if kind == expected_kind && actual == observed && limit == maximum
+            ));
+        }
+    }
+
+    #[test]
+    fn locality_negative_control_rejects_unrelated_zip_mutation() {
+        let source = b"untouched-member";
+        let mut candidate = source.to_vec();
+        candidate[3] ^= 1;
+        assert!(!zip_record_equal_outside(source, &candidate, &[]));
+        assert!(zip_record_equal_outside(source, &candidate, &[(3, 4)]));
+    }
 }

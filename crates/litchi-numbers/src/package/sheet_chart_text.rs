@@ -1115,6 +1115,32 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
     })
 }
 
+/// Read a selected chart text value.
+pub(super) fn read<'sheet>(
+    package: &Package,
+    sheet: impl Into<SheetSelector<'sheet>>,
+    chart: impl Into<ChartSelector>,
+    kind: Kind,
+) -> Result<Option<String>, Error> {
+    Ok(resolve(package, sheet, chart, kind)?
+        .before
+        .map(|value| value.into()))
+}
+
+/// Begin a selected chart-text edit.
+pub(super) fn edit<'a, 'sheet>(
+    package: &'a Package,
+    sheet: impl Into<SheetSelector<'sheet>>,
+    chart: impl Into<ChartSelector>,
+    kind: Kind,
+) -> Result<Edit<'a>, Error> {
+    Ok(Edit {
+        target: resolve(package, sheet, chart, kind)?,
+        source: package,
+        operation: None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Error, ReferenceOwners, Refusal};
@@ -1145,30 +1171,4 @@ mod tests {
             Err(Error::Refused(Refusal::SharedObject))
         ));
     }
-}
-
-/// Read a selected chart text value.
-pub(super) fn read<'sheet>(
-    package: &Package,
-    sheet: impl Into<SheetSelector<'sheet>>,
-    chart: impl Into<ChartSelector>,
-    kind: Kind,
-) -> Result<Option<String>, Error> {
-    Ok(resolve(package, sheet, chart, kind)?
-        .before
-        .map(|value| value.into()))
-}
-
-/// Begin a selected chart-text edit.
-pub(super) fn edit<'a, 'sheet>(
-    package: &'a Package,
-    sheet: impl Into<SheetSelector<'sheet>>,
-    chart: impl Into<ChartSelector>,
-    kind: Kind,
-) -> Result<Edit<'a>, Error> {
-    Ok(Edit {
-        target: resolve(package, sheet, chart, kind)?,
-        source: package,
-        operation: None,
-    })
 }
