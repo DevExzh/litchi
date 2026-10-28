@@ -1135,7 +1135,7 @@ fn validate_comment_message_header(
 ) -> FaultResult<()> {
     validate_archive_header_shape(object)?;
     if object.archive_info.should_merge == Some(true) {
-        return Err(Fault::Dependency);
+        return Err(Fault::Invalid);
     }
     let info = object
         .archive_info
@@ -1148,7 +1148,7 @@ fn validate_comment_message_header(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(Fault::Dependency);
+        return Err(Fault::Invalid);
     }
     if info.object_references != expected {
         return Err(Fault::Dependency);
@@ -2642,15 +2642,19 @@ fn update_list_metadata<P: TableLeaf>(
                     && field.path.path.len() == 2
                 {
                     let field_key = field.path.path[1];
-                    let field_entry = entry_storages
-                        .iter()
-                        .find(|(entry_key, _)| *entry_key == field_key)
-                        .ok_or(Fault::Dependency)?;
-                    if field_entry.1 != identifier {
-                        return Err(Fault::Dependency);
-                    }
-                    if field_key == key && identifier == root {
+                    if field_key == key {
+                        if identifier != root {
+                            return Err(Fault::Dependency);
+                        }
                         if match_index.replace(index).is_some() {
+                            return Err(Fault::Dependency);
+                        }
+                    } else {
+                        let field_entry = entry_storages
+                            .iter()
+                            .find(|(entry_key, _)| *entry_key == field_key)
+                            .ok_or(Fault::Dependency)?;
+                        if field_entry.1 != identifier {
                             return Err(Fault::Dependency);
                         }
                     }
