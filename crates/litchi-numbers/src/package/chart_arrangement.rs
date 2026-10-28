@@ -53,6 +53,7 @@ const MAX_TRANSACTION_ALLOCATIONS: usize = 64;
 // constructing codec options, so a large package limit cannot become a codec
 // validation error after admission has already succeeded.
 const MAX_CODEC_LIMIT: usize = 64 * 1024 * 1024;
+const CHART_FONT_CODEC_MAX_BYTES: usize = 256 * 1024 * 1024;
 const MAX_CODEC_NESTING: u32 = 64;
 const MAX_METADATA_LABEL_COUNT: usize = 1_000_000;
 // snap 1.1.2 grows Encoder::big to 16,384 u16 entries for a nontrivial
@@ -665,6 +666,52 @@ impl ChartBudget {
             self.max_scratch,
             LimitKind::ScratchBytes,
         )
+    }
+
+    /// Residual chart-font engine limits after selector and package work
+    /// already charged to this transaction.
+    pub(super) fn chart_font_limits(&self) -> litchi_iwa_style::chart_font::Limits {
+        litchi_iwa_style::chart_font::Limits::new(
+            self.max_input
+                .saturating_sub(self.input)
+                .min(WireLimits::MAX_INPUT_BYTES),
+            self.max_fields
+                .saturating_sub(self.fields)
+                .min(WireLimits::MAX_FIELDS),
+            self.max_output
+                .saturating_sub(self.output)
+                .min(WireLimits::MAX_OUTPUT_BYTES)
+                .min(CHART_FONT_CODEC_MAX_BYTES),
+            self.max_nesting as u32,
+            self.max_work
+                .saturating_sub(self.work)
+                .min(WireLimits::MAX_REWRITE_WORK),
+            self.max_input
+                .saturating_sub(self.input)
+                .min(WireLimits::MAX_INPUT_BYTES),
+            self.max_allocations.saturating_sub(self.allocations),
+            self.max_retained
+                .saturating_sub(self.retained)
+                .min(WireLimits::MAX_INPUT_BYTES),
+            self.max_scratch
+                .saturating_sub(self.scratch)
+                .min(WireLimits::MAX_INPUT_BYTES),
+        )
+    }
+
+    /// Charge one chart-font engine report into the same transaction ledger.
+    pub(super) fn charge_chart_font_report(
+        &mut self,
+        report: litchi_iwa_style::chart_font::Report,
+    ) -> Result<(), Error> {
+        self.source(report.input_bytes())?;
+        self.output(report.output_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
+        Ok(())
     }
 
     fn scan(&mut self, payload: &[u8], fields: usize, depth: usize) -> Result<(), Error> {

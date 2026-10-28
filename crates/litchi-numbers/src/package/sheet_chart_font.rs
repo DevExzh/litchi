@@ -200,7 +200,64 @@ impl From<Fault> for Error {
 
 impl From<litchi_iwa_style::graph::Error> for Error {
     fn from(error: litchi_iwa_style::graph::Error) -> Self {
-        style_graph::fault(&error).into()
+        match style_graph::fault(&error) {
+            style_graph::StyleGraphFault::Shared(fault) => fault.into(),
+            style_graph::StyleGraphFault::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind: match kind {
+                    litchi_iwa_style::graph::GraphLimitKind::ScratchBytes => {
+                        LimitKind::ScratchBytes
+                    },
+                    litchi_iwa_style::graph::GraphLimitKind::AllocationEvents => {
+                        LimitKind::Allocations
+                    },
+                },
+                observed,
+                maximum,
+            },
+        }
+    }
+}
+
+fn map_engine_error(error: chart_font::Error) -> Error {
+    use litchi_iwa_style::chart_font::{Error as EngineError, LimitKind as EngineLimitKind};
+    match error {
+        EngineError::InvalidSource(_) | EngineError::Refused(_) => Error::InvalidSource,
+        EngineError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                EngineLimitKind::InputBytes
+                | EngineLimitKind::TextBytes
+                | EngineLimitKind::Wire(_)
+                | EngineLimitKind::Codec(_)
+                | EngineLimitKind::Archive(_) => LimitKind::PayloadBytes,
+                EngineLimitKind::Fields | EngineLimitKind::Nesting | EngineLimitKind::Work => {
+                    LimitKind::WireWork
+                },
+                EngineLimitKind::OutputBytes => LimitKind::OutputBytes,
+                EngineLimitKind::Allocations => LimitKind::Allocations,
+                EngineLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                EngineLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                _ => LimitKind::WireWork,
+            },
+            observed,
+            maximum,
+        },
+        EngineError::Allocation { amount } => Error::Allocation { amount },
+        EngineError::Graph(error) => (*error).into(),
+        EngineError::Codec(_) | EngineError::Wire(_) => Error::InvalidSource,
+        EngineError::IdentifierOverflow => Error::Limit {
+            kind: LimitKind::Identifiers,
+            observed: u64::MAX,
+            maximum: u64::MAX,
+        },
+        _ => Error::InvalidSource,
     }
 }
 
@@ -269,10 +326,17 @@ fn read_workspace(
     workspace: &Workspace<'_>,
     chart: u64,
     kind: PropertyKind,
-) -> Result<Property, Error> {
+    limits: chart_font::Limits,
+) -> Result<(Property, chart_font::Report), chart_font::Error> {
     Ok(match kind {
-        PropertyKind::Font => Property::Font(chart_font::font(workspace, chart)?),
-        PropertyKind::Size => Property::Size(chart_font::size(workspace, chart)?),
+        PropertyKind::Font => {
+            let (value, report) = chart_font::font(workspace, chart, limits)?;
+            (Property::Font(value), report)
+        },
+        PropertyKind::Size => {
+            let (value, report) = chart_font::size(workspace, chart, limits)?;
+            (Property::Size(value), report)
+        },
     })
 }
 
@@ -284,15 +348,14 @@ fn target_from_selection(selection: &ChartSelection) -> Target {
     }
 }
 
-fn resolve<'sheet>(
+fn resolve_with_budget<'sheet>(
     package: &Package,
     sheet: impl Into<SheetSelector<'sheet>>,
     chart: impl Into<ChartSelector>,
+    budget: &mut ChartBudget,
 ) -> Result<Target, Error> {
-    let mut budget = ChartBudget::for_package(package).map_err(map_arrangement)?;
-    let selection =
-        select_chart_with_budget(package, sheet.into(), chart.into(), false, &mut budget)
-            .map_err(map_arrangement)?;
+    let selection = select_chart_with_budget(package, sheet.into(), chart.into(), false, budget)
+        .map_err(map_arrangement)?;
     Ok(target_from_selection(&selection))
 }
 
@@ -300,10 +363,21 @@ fn read_property(
     package: &Package,
     target: &Target,
     kind: PropertyKind,
+    budget: &mut ChartBudget,
 ) -> Result<Property, Error> {
     let components = LeafComponents::new(package).map_err(Error::from)?;
     let workspace = Workspace::new(&components, archive_limits(package)?)?;
-    read_workspace(&workspace, target.chart_identifier, kind)
+    let (value, report) = read_workspace(
+        &workspace,
+        target.chart_identifier,
+        kind,
+        budget.chart_font_limits(),
+    )
+    .map_err(map_engine_error)?;
+    budget
+        .charge_chart_font_report(report)
+        .map_err(map_arrangement)?;
+    Ok(value)
 }
 
 fn property_index(kind: PropertyKind) -> usize {
@@ -364,6 +438,7 @@ pub struct Edit<'a> {
     source: &'a Package,
     target: Target,
     changes: Vec<Change>,
+    budget: ChartBudget,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -387,6 +462,7 @@ impl Edit<'_> {
                 maximum: MAX_STAGED_OPERATIONS as u64,
             });
         }
+        self.budget.allocations(1).map_err(map_arrangement)?;
         structure::reserve(&mut self.changes, 1)?;
         self.changes.push(change_from_property(property));
         Ok(self)
@@ -401,6 +477,7 @@ impl Edit<'_> {
                 maximum: MAX_STAGED_OPERATIONS as u64,
             });
         }
+        self.budget.allocations(1).map_err(map_arrangement)?;
         structure::reserve(&mut self.changes, 1)?;
         self.changes.push(change_from_reset(kind));
         Ok(self)
@@ -411,10 +488,12 @@ impl Edit<'_> {
         if self.changes.is_empty() {
             return Err(Refusal::NoStagedOperation.into());
         }
-        let current = resolve(
+        let mut budget = self.budget;
+        let current = resolve_with_budget(
             self.source,
             SheetSelector::position(self.target.sheet),
             ChartSelector::position(self.target.chart),
+            &mut budget,
         )?;
         if current != self.target {
             return Err(Error::PatchConflict);
@@ -426,23 +505,39 @@ impl Edit<'_> {
             let index = property_index(kind);
             if !touched[index] {
                 touched[index] = true;
-                before_values[index] = Some(read_property(self.source, &self.target, kind)?);
+                before_values[index] =
+                    Some(read_property(self.source, &self.target, kind, &mut budget)?);
             }
         }
         let components = LeafComponents::new(self.source).map_err(Error::from)?;
         let mut workspace = Workspace::new(&components, archive_limits(self.source)?)?;
         for change in &self.changes {
-            chart_font::set(&mut workspace, self.target.chart_identifier, change)?;
+            let report = chart_font::set(
+                &mut workspace,
+                self.target.chart_identifier,
+                change,
+                budget.chart_font_limits(),
+            )
+            .map_err(map_engine_error)?;
+            budget
+                .charge_chart_font_report(report)
+                .map_err(map_arrangement)?;
         }
         let mut after_values: [Option<Property>; 2] = std::array::from_fn(|_| None);
         for kind in [PropertyKind::Font, PropertyKind::Size] {
             let index = property_index(kind);
             if touched[index] {
-                after_values[index] = Some(read_workspace(
+                let (value, report) = read_workspace(
                     &workspace,
                     self.target.chart_identifier,
                     kind,
-                )?);
+                    budget.chart_font_limits(),
+                )
+                .map_err(map_engine_error)?;
+                budget
+                    .charge_chart_font_report(report)
+                    .map_err(map_arrangement)?;
+                after_values[index] = Some(value);
             }
         }
         let changed = touched
@@ -476,11 +571,17 @@ impl Edit<'_> {
         if changes.is_empty() {
             return Err(Error::Verification);
         }
+        let source_bytes = self.source.source_bytes().len();
+        budget.output(source_bytes).map_err(map_arrangement)?;
+        budget.retained(source_bytes).map_err(map_arrangement)?;
+        budget.allocations(1).map_err(map_arrangement)?;
+        budget.scratch(source_bytes).map_err(map_arrangement)?;
         let published = style_graph::publish(self.source, changes).map_err(Error::from)?;
-        let candidate_target = resolve(
+        let candidate_target = resolve_with_budget(
             &published.package,
             SheetSelector::position(self.target.sheet),
             ChartSelector::position(self.target.chart),
+            &mut budget,
         )?;
         if candidate_target.chart_identifier != self.target.chart_identifier {
             return Err(Error::Verification);
@@ -496,7 +597,8 @@ impl Edit<'_> {
                 },
                 PropertyKind::Size => Property::Size(after_size.ok_or(Error::Verification)?),
             };
-            if read_property(&published.package, &candidate_target, kind)? != expected {
+            if read_property(&published.package, &candidate_target, kind, &mut budget)? != expected
+            {
                 return Err(Error::Verification);
             }
         }
@@ -651,8 +753,9 @@ pub(super) fn read<'sheet>(
     chart: impl Into<ChartSelector>,
     kind: PropertyKind,
 ) -> Result<Property, Error> {
-    let target = resolve(package, sheet, chart)?;
-    read_property(package, &target, kind)
+    let mut budget = ChartBudget::for_package(package).map_err(map_arrangement)?;
+    let target = resolve_with_budget(package, sheet, chart, &mut budget)?;
+    read_property(package, &target, kind, &mut budget)
 }
 
 /// Begin a selector-first exact-source chart-font edit.
@@ -661,23 +764,27 @@ pub(super) fn edit<'a, 'sheet>(
     sheet: impl Into<SheetSelector<'sheet>>,
     chart: impl Into<ChartSelector>,
 ) -> Result<Edit<'a>, Error> {
+    let mut budget = ChartBudget::for_package(package).map_err(map_arrangement)?;
     Ok(Edit {
-        target: resolve(package, sheet, chart)?,
+        target: resolve_with_budget(package, sheet, chart, &mut budget)?,
         source: package,
         changes: Vec::new(),
+        budget,
     })
 }
 
 /// Apply one exact-source chart-font patch.
 pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
+    let mut budget = ChartBudget::for_package(package).map_err(map_arrangement)?;
     let source_owner = structure::source_owner(package)?;
     if !patch.artifacts.authorizes_owner(&source_owner) {
         return Err(Error::PatchConflict);
     }
-    let current = resolve(
+    let current = resolve_with_budget(
         package,
         SheetSelector::position(patch.sheet),
         ChartSelector::position(patch.chart),
+        &mut budget,
     )?;
     if current.chart_identifier != patch.chart_identifier {
         return Err(Error::PatchConflict);
@@ -692,7 +799,7 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
             PropertyKind::Size => patch.before_size.map(Property::Size),
         }
         .ok_or(Error::PatchConflict)?;
-        if read_property(package, &current, kind)? != expected {
+        if read_property(package, &current, kind, &mut budget)? != expected {
             return Err(Error::PatchConflict);
         }
     }
@@ -703,15 +810,21 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
             diagnostics: Diagnostics { changed: false },
         });
     }
+    let candidate_bytes = patch.artifacts.target_owner().as_ref().len();
+    budget.output(candidate_bytes).map_err(map_arrangement)?;
+    budget.retained(candidate_bytes).map_err(map_arrangement)?;
+    budget.allocations(1).map_err(map_arrangement)?;
+    budget.scratch(candidate_bytes).map_err(map_arrangement)?;
     let candidate = Package::from_source_owner_with_options(
         patch.artifacts.target_owner(),
         package.state.options,
     )
     .map_err(|_| Error::Verification)?;
-    let verified = resolve(
+    let verified = resolve_with_budget(
         &candidate,
         SheetSelector::position(patch.sheet),
         ChartSelector::position(patch.chart),
+        &mut budget,
     )?;
     if verified.chart_identifier != patch.chart_identifier {
         return Err(Error::Verification);
@@ -726,7 +839,7 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
             PropertyKind::Size => patch.after_size.map(Property::Size),
         }
         .ok_or(Error::Verification)?;
-        if read_property(&candidate, &verified, kind)? != expected {
+        if read_property(&candidate, &verified, kind, &mut budget)? != expected {
             return Err(Error::Verification);
         }
     }
