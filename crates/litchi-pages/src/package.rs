@@ -8,6 +8,7 @@ pub(crate) mod body_bookmarks;
 pub(crate) mod body_chart_arrangement;
 pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_metadata;
+pub(crate) mod body_chart_text;
 pub(crate) mod body_date_time_fields;
 pub(crate) mod body_drawable_caption;
 pub(crate) mod body_drawable_graph;
@@ -440,7 +441,8 @@ impl litchi_iwa_table::structure::TableLeaf for Package {
             .source
             .reopen(candidate)
             .map_err(|error| reopen_fault(PackageError::Archive(error)))?;
-        Self::from_source_catalog(source).map_err(reopen_fault)
+        Self::from_source_catalog_with_semantic_limits(source, self.state.semantic_limits)
+            .map_err(reopen_fault)
     }
 }
 
@@ -521,6 +523,7 @@ struct State {
     document: Document,
     metadata: Metadata,
     object_count: usize,
+    semantic_limits: crate::SemanticLimits,
 }
 
 #[derive(Debug, Default)]
@@ -820,6 +823,17 @@ impl Package {
         Self::from_source_catalog_with(source, crate::SemanticLimits::DEFAULT)
     }
 
+    /// Reopen a candidate with the semantic admission profile selected for
+    /// the immutable source snapshot.  Focused transactions must not widen a
+    /// caller's semantic budget merely because the candidate is parsed from a
+    /// fresh source catalog.
+    pub(crate) fn from_source_catalog_with_semantic_limits(
+        source: SourceCatalog,
+        semantic: crate::SemanticLimits,
+    ) -> PackageResult<Self> {
+        Self::from_source_catalog_with(source, semantic)
+    }
+
     fn from_source_catalog_with(
         source: SourceCatalog,
         semantic: crate::SemanticLimits,
@@ -848,6 +862,7 @@ impl Package {
                 document,
                 metadata,
                 object_count,
+                semantic_limits: semantic,
             }),
         })
     }

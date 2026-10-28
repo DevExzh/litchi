@@ -6777,3 +6777,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   tests, three independently started Pages allocation runs, four direct
   cell-format reader tests, formatting and strict Clippy pass. This changes
   the differential proof, not a production writer or native-evidence claim.
+
+- Post-merge checks on `54cf5d34da` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W1-E chart title/axis-title slice `80f1854acd` (record 0375b),
+  synchronized to current trunk. Numbers and Pages share the bounded chart
+  text engine; Keynote behavior is unchanged and captions remain deferred.
+  Review closed shared-chart ownership, candidate-copy admission, precise
+  resource dimensions and source-relative locality gaps. Populated reads
+  now compare host and leaf directly, and clear-only routes operate on one
+  common input with exact inverses. Seven parity cases, four Numbers and
+  three Pages facade tests, strict Clippy, formatting, ledger and boundary
+  checks pass after synchronization. Eighteen independent CPU-pinned
+  instruction probes passed on measured source `4aa57b3c19`; this historical
+  receipt is preserved and the integrated candidate will be remeasured.
+  Twelve ledger rows migrate and twelve native routes remain queued. These
+  are leaf APIs; unified chart-text dispatch remains a D7 follow-up.
