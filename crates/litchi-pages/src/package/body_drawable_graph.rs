@@ -9,10 +9,11 @@
 //! targets the families keep inside their `Edit` and `Patch` values.
 
 use std::collections::HashMap;
+use std::mem::size_of;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::package::EntryEdit;
+use litchi_iwa_archive::package::{Entry, EntryEdit};
 use litchi_iwa_common::wire::{WireFieldView, WireView};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, varint::encoded_len};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -731,6 +732,244 @@ pub(crate) fn reopen(source: &Package, target: Arc<[u8]>) -> GraphResult<Package
         .map_err(map_package_error)
 }
 
+/// Prove that an exact-source candidate changed only one archive message.
+///
+/// The candidate's semantic readback is necessary but not sufficient: this
+/// witness also compares every ZIP member, every untouched archive object,
+/// and every untouched message in the selected object against the source.
+/// The selected ZIP record is allowed to change only in CRC/size fields.
+pub(crate) fn verify_message_locality(
+    source: &Package,
+    candidate: &Package,
+    component_name: &str,
+    object_index: usize,
+    object_identifier: NonZeroU64,
+    message_index: usize,
+    message_type: u32,
+    expected_payload: &[u8],
+    budget: &mut Budget,
+) -> GraphResult<()> {
+    let source_entries = source.state.source.package();
+    let candidate_entries = candidate.state.source.package();
+    if source_entries.len() != candidate_entries.len() {
+        return Err(GraphError::InvalidSource);
+    }
+    for (before, after) in source_entries.iter().zip(candidate_entries.iter()) {
+        budget.work(zip_entry_work(before)?.saturating_add(zip_entry_work(after)?))?;
+        if before.name() != after.name()
+            || before.raw_name() != after.raw_name()
+            || before.is_opaque() != after.is_opaque()
+            || before.metadata().local() != after.metadata().local()
+            || before.metadata().central() != after.metadata().central()
+        {
+            return Err(GraphError::InvalidSource);
+        }
+        if before.name() == component_name {
+            if !zip_local_header_preserved(
+                before.raw_record().local_record(),
+                after.raw_record().local_record(),
+            ) || !zip_record_equal_outside(
+                before.raw_record().central_directory_record(),
+                after.raw_record().central_directory_record(),
+                &[(16, 28), (42, 46)],
+            ) {
+                return Err(GraphError::InvalidSource);
+            }
+        } else if before.data() != after.data()
+            || before.raw_record().local_record() != after.raw_record().local_record()
+            || !zip_record_equal_outside(
+                before.raw_record().central_directory_record(),
+                after.raw_record().central_directory_record(),
+                &[(42, 46)],
+            )
+            || before.raw_record().compressed_data() != after.raw_record().compressed_data()
+        {
+            return Err(GraphError::InvalidSource);
+        }
+    }
+
+    let source_components = source.state.source.components();
+    let candidate_components = candidate.state.source.components();
+    if source_components.len() != candidate_components.len() {
+        return Err(GraphError::InvalidSource);
+    }
+    let archive_limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let mut selected_seen = false;
+    for (before_component, after_component) in
+        source_components.iter().zip(candidate_components.iter())
+    {
+        if before_component.name() != after_component.name()
+            || before_component.archive().objects.len() != after_component.archive().objects.len()
+        {
+            return Err(GraphError::InvalidSource);
+        }
+        for (index, (before, after)) in before_component
+            .archive()
+            .objects
+            .iter()
+            .zip(&after_component.archive().objects)
+            .enumerate()
+        {
+            budget
+                .work(archive_object_work(before)?.saturating_add(archive_object_work(after)?))?;
+            let selected = before_component.name() == component_name && index == object_index;
+            if !selected {
+                if !before.same_content_ignoring_offsets(after) {
+                    return Err(GraphError::InvalidSource);
+                }
+                continue;
+            }
+            selected_seen = true;
+            if before.archive_info.identifier != Some(object_identifier.get())
+                || after.archive_info.identifier != Some(object_identifier.get())
+            {
+                return Err(GraphError::InvalidSource);
+            }
+            let message = after
+                .messages
+                .get(message_index)
+                .filter(|message| message.type_ == message_type)
+                .ok_or(GraphError::InvalidSource)?;
+            if message.data.as_slice() != expected_payload {
+                return Err(GraphError::InvalidSource);
+            }
+            let mut expected = before.clone();
+            expected
+                .replace_message_preserving_header(
+                    message_index,
+                    RawMessage {
+                        type_: message_type,
+                        data: message.data.clone(),
+                    },
+                    archive_limits,
+                )
+                .map_err(map_core_error)?;
+            expected.header_length = after.header_length;
+            expected.data_length = after.data_length;
+            if !expected.same_content_ignoring_offsets(after) {
+                return Err(GraphError::InvalidSource);
+            }
+        }
+    }
+    if selected_seen {
+        Ok(())
+    } else {
+        Err(GraphError::InvalidSource)
+    }
+}
+
+fn zip_entry_work(entry: &Entry) -> GraphResult<usize> {
+    entry
+        .name()
+        .len()
+        .checked_add(entry.raw_name().len())
+        .and_then(|amount| amount.checked_add(entry.data().len()))
+        .and_then(|amount| amount.checked_add(entry.raw_record().local_record().len()))
+        .and_then(|amount| amount.checked_add(entry.raw_record().central_directory_record().len()))
+        .and_then(|amount| amount.checked_add(entry.raw_record().compressed_data().len()))
+        .ok_or(GraphError::InvalidSource)
+}
+
+fn archive_object_work(object: &ArchiveObject) -> GraphResult<usize> {
+    let mut work = size_of::<ArchiveObject>()
+        .checked_add(object.messages.len())
+        .and_then(|amount| amount.checked_add(object.archive_info.message_infos.len()))
+        .ok_or(GraphError::InvalidSource)?;
+    for message in &object.messages {
+        work = work
+            .checked_add(size_of::<RawMessage>())
+            .and_then(|amount| amount.checked_add(message.data.len()))
+            .ok_or(GraphError::InvalidSource)?;
+    }
+    for info in &object.archive_info.message_infos {
+        work = work
+            .checked_add(size_of::<litchi_iwa_core::MessageInfo>())
+            .and_then(|amount| amount.checked_add(info.versions.len()))
+            .and_then(|amount| amount.checked_add(info.field_infos.len()))
+            .and_then(|amount| amount.checked_add(info.object_references.len()))
+            .and_then(|amount| amount.checked_add(info.data_references.len()))
+            .and_then(|amount| amount.checked_add(info.diff_merge_version.len()))
+            .and_then(|amount| amount.checked_add(info.fields_to_remove.len()))
+            .and_then(|amount| amount.checked_add(info.diff_read_version.len()))
+            .ok_or(GraphError::InvalidSource)?;
+        if let Some(path) = info.diff_field_path.as_ref() {
+            work = work
+                .checked_add(path.path.len())
+                .ok_or(GraphError::InvalidSource)?;
+        }
+        for path in &info.fields_to_remove {
+            work = work
+                .checked_add(path.path.len())
+                .ok_or(GraphError::InvalidSource)?;
+        }
+        for field in &info.field_infos {
+            work = work
+                .checked_add(size_of::<litchi_iwa_core::FieldInfo>())
+                .and_then(|amount| amount.checked_add(field.path.path.len()))
+                .and_then(|amount| amount.checked_add(field.object_references.len()))
+                .and_then(|amount| amount.checked_add(field.data_references.len()))
+                .and_then(|amount| amount.checked_add(field.known_field_version.len()))
+                .ok_or(GraphError::InvalidSource)?;
+            if let Some(identifier) = field.known_field_feature_identifier.as_ref() {
+                work = work
+                    .checked_add(identifier.len())
+                    .ok_or(GraphError::InvalidSource)?;
+            }
+        }
+    }
+    Ok(work)
+}
+
+fn zip_record_equal_outside(before: &[u8], after: &[u8], excluded: &[(usize, usize)]) -> bool {
+    if before.len() != after.len() {
+        return false;
+    }
+    let mut cursor = 0;
+    for &(start, end) in excluded {
+        if start < cursor
+            || end < start
+            || end > before.len()
+            || before[cursor..start] != after[cursor..start]
+        {
+            return false;
+        }
+        cursor = end;
+    }
+    before[cursor..] == after[cursor..]
+}
+
+fn zip_local_header_preserved(before: &[u8], after: &[u8]) -> bool {
+    let Some(before_header) = zip_local_header_len(before) else {
+        return false;
+    };
+    let Some(after_header) = zip_local_header_len(after) else {
+        return false;
+    };
+    before_header == after_header
+        && zip_record_equal_outside(
+            &before[..before_header],
+            &after[..after_header],
+            &[(14, 26)],
+        )
+}
+
+fn zip_local_header_len(record: &[u8]) -> Option<usize> {
+    if record.len() < 30 || record.get(..4) != Some(b"PK\x03\x04") {
+        return None;
+    }
+    let name = usize::from(u16::from_le_bytes([record[26], record[27]]));
+    let extra = usize::from(u16::from_le_bytes([record[28], record[29]]));
+    30usize
+        .checked_add(name)?
+        .checked_add(extra)
+        .filter(|length| *length <= record.len())
+}
+
 pub(crate) fn map_wire_error(error: litchi_iwa_common::Error) -> GraphError {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
@@ -826,7 +1065,7 @@ fn map_package_error(error: PackageError) -> GraphError {
 
 #[cfg(test)]
 mod tests {
-    use super::{GraphError, GraphLimit, map_package_error};
+    use super::{GraphError, GraphLimit, map_package_error, zip_record_equal_outside};
     use crate::{Error as SemanticError, PackageError};
 
     #[test]
@@ -871,6 +1110,15 @@ mod tests {
                 } if kind == expected_kind && actual == observed && limit == maximum
             ));
         }
+    }
+
+    #[test]
+    fn locality_negative_control_rejects_unrelated_zip_mutation() {
+        let source = b"untouched-member";
+        let mut candidate = source.to_vec();
+        candidate[3] ^= 1;
+        assert!(!zip_record_equal_outside(source, &candidate, &[]));
+        assert!(zip_record_equal_outside(source, &candidate, &[(3, 4)]));
     }
 }
 

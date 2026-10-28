@@ -23,13 +23,14 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_arrangement::{
-    self, ChartBudget, map_package_error as map_arrangement_package_error, object_from_resolved,
-    select_chart_with_budget, selected_chart_payload, unique_typed_message,
+    self, ChartBudget, ChartSelection, map_package_error as map_arrangement_package_error,
+    object_from_resolved, select_chart_with_budget, selected_chart_payload, unique_typed_message,
     validate_message_metadata,
 };
 use crate::selector::{ChartSelector, SheetSelector};
 
 const GENERATED_EXTENSION_FIELD: u32 = 10_000;
+const CHART_MESSAGE_TYPE: u32 = 5_021;
 
 /// The chart-text property addressed by a transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -63,6 +64,10 @@ pub enum LimitKind {
     PackageBytes,
     /// One decoded IWA component payload.
     PayloadBytes,
+    /// Semantic graph items inspected during candidate reopen.
+    PayloadItems,
+    /// Native chart references inspected by the ownership proof.
+    PayloadReferences,
     /// Strict generated-extension bytes.
     WireBytes,
     /// Rewritten output bytes.
@@ -88,6 +93,8 @@ impl fmt::Display for LimitKind {
         formatter.write_str(match self {
             Self::PackageBytes => "package bytes",
             Self::PayloadBytes => "payload bytes",
+            Self::PayloadItems => "payload items",
+            Self::PayloadReferences => "payload references",
             Self::WireBytes => "wire bytes",
             Self::OutputBytes => "output bytes",
             Self::WireFields => "wire fields",
@@ -254,8 +261,8 @@ pub(super) fn resolve<'sheet>(
     )
     .map_err(map_arrangement_error)?;
     let payload = selected_chart_payload(package, &selection).map_err(map_arrangement_error)?;
-    let references = chart_codec::references(payload, chart_codec::Limits::DEFAULT)
-        .map_err(map_chart_codec_error)?;
+    let mut reference_budget = budget;
+    let references = decode_references(payload, &mut reference_budget)?;
     let identifier = match kind {
         Kind::Title => references.chart_non_style(),
         Kind::Axis(Axis::Category) => references.category_axis_non_styles().first().copied(),
@@ -266,19 +273,13 @@ pub(super) fn resolve<'sheet>(
         Kind::Title => Error::InvalidSource,
         Kind::Axis(_) => Refusal::UnsupportedAxis.into(),
     })?;
-    let all_references = match kind {
-        Kind::Title => vec![references.chart_non_style().unwrap_or_default()],
-        Kind::Axis(Axis::Category) => references.category_axis_non_styles().to_vec(),
-        Kind::Axis(Axis::Value) => references.value_axis_non_styles().to_vec(),
-    };
-    if all_references
-        .iter()
-        .filter(|candidate| **candidate == identifier)
-        .count()
-        != 1
-    {
-        return Err(Refusal::SharedObject.into());
-    }
+    prove_reference_exclusive(
+        package,
+        &selection,
+        &references,
+        identifier,
+        &mut reference_budget,
+    )?;
     let chart_object = package
         .state
         .components
@@ -359,6 +360,149 @@ fn owns_reference(info: &litchi_iwa_core::MessageInfo, identifier: u64, field: u
         fields = fields.saturating_add(objects);
     }
     fields <= 1
+}
+
+fn reference_count(references: &chart_codec::StyleReferences, identifier: u64) -> usize {
+    let singular = [
+        references.chart_style(),
+        references.chart_non_style(),
+        references.legend_style(),
+        references.legend_non_style(),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|candidate| *candidate == identifier)
+    .count();
+    let repeated = references
+        .value_axis_styles()
+        .iter()
+        .chain(references.value_axis_non_styles())
+        .chain(references.category_axis_styles())
+        .chain(references.category_axis_non_styles())
+        .chain(references.series_theme_styles())
+        .chain(references.paragraph_styles())
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    let sparse = references
+        .series_private_styles()
+        .into_iter()
+        .flat_map(|entries| entries.entries())
+        .chain(
+            references
+                .series_non_styles()
+                .into_iter()
+                .flat_map(|entries| entries.entries()),
+        )
+        .filter(|(_, candidate)| *candidate == identifier)
+        .count();
+    singular
+        .checked_add(repeated)
+        .and_then(|count| count.checked_add(sparse))
+        .unwrap_or(usize::MAX)
+}
+
+#[derive(Debug, Default)]
+struct ReferenceOwners {
+    count: usize,
+}
+
+impl ReferenceOwners {
+    fn add(
+        &mut self,
+        references: &chart_codec::StyleReferences,
+        identifier: u64,
+    ) -> Result<(), Error> {
+        self.count = self
+            .count
+            .checked_add(reference_count(references, identifier))
+            .ok_or(Error::InvalidSource)?;
+        if self.count > 1 {
+            return Err(Refusal::SharedObject.into());
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<(), Error> {
+        if self.count == 1 {
+            Ok(())
+        } else {
+            Err(Refusal::SharedObject.into())
+        }
+    }
+}
+
+fn reference_vector_len(references: &chart_codec::StyleReferences) -> usize {
+    let singular = [
+        references.chart_style(),
+        references.chart_non_style(),
+        references.legend_style(),
+        references.legend_non_style(),
+    ]
+    .into_iter()
+    .filter(Option::is_some)
+    .count();
+    let repeated = references
+        .value_axis_styles()
+        .len()
+        .saturating_add(references.value_axis_non_styles().len())
+        .saturating_add(references.category_axis_styles().len())
+        .saturating_add(references.category_axis_non_styles().len())
+        .saturating_add(references.series_theme_styles().len())
+        .saturating_add(references.paragraph_styles().len());
+    let sparse = references
+        .series_private_styles()
+        .map_or(0, |entries| entries.entries().len())
+        .saturating_add(
+            references
+                .series_non_styles()
+                .map_or(0, |entries| entries.entries().len()),
+        );
+    singular.saturating_add(repeated).saturating_add(sparse)
+}
+
+fn decode_references(
+    payload: &[u8],
+    budget: &mut ChartBudget,
+) -> Result<chart_codec::StyleReferences, Error> {
+    budget
+        .preflight_reference_scan(payload)
+        .map_err(map_arrangement_error)?;
+    let limits = budget
+        .reference_codec_limits(payload)
+        .map_err(map_arrangement_error)?;
+    let references = chart_codec::references(payload, limits).map_err(map_chart_codec_error)?;
+    budget
+        .charge_reference_scan(payload, reference_vector_len(&references))
+        .map_err(map_arrangement_error)?;
+    Ok(references)
+}
+
+fn prove_reference_exclusive(
+    package: &Package,
+    selection: &ChartSelection,
+    selected: &chart_codec::StyleReferences,
+    identifier: u64,
+    budget: &mut ChartBudget,
+) -> Result<(), Error> {
+    let mut owners = ReferenceOwners::default();
+    owners.add(selected, identifier)?;
+    for (component_index, (_name, archive)) in package.state.components.iter_archives().enumerate()
+    {
+        for (object_index, object) in archive.objects.iter().enumerate() {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != CHART_MESSAGE_TYPE
+                    || (component_index == selection.component_index
+                        && object_index == selection.object_index
+                        && message_index == selection.message_index)
+                {
+                    continue;
+                }
+                let references = decode_references(message.data.as_slice(), budget)?;
+                owners.add(&references, identifier)?;
+            }
+        }
+    }
+    owners.finish()
 }
 
 fn read_payload(payload: &[u8], kind: Kind) -> Result<Option<Box<str>>, Error> {
@@ -544,7 +688,10 @@ fn map_candidate_error(error: super::Error) -> Error {
                     super::PayloadLimitKind::OutputBytes => LimitKind::OutputBytes,
                     super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
                     super::PayloadLimitKind::RewriteWork => LimitKind::WireWork,
-                    _ => LimitKind::PayloadBytes,
+                    super::PayloadLimitKind::TableRows
+                    | super::PayloadLimitKind::TableColumns
+                    | super::PayloadLimitKind::TableCells
+                    | super::PayloadLimitKind::MaterializedCells => LimitKind::PayloadItems,
                 },
                 observed: count(observed),
                 maximum: count(maximum),
@@ -588,10 +735,16 @@ fn map_arrangement_error(error: chart_arrangement::Error) -> Error {
             maximum,
         } => Error::Limit {
             kind: match kind {
+                chart_arrangement::LimitKind::WireBytes => LimitKind::WireBytes,
+                chart_arrangement::LimitKind::WireFields => LimitKind::WireFields,
+                chart_arrangement::LimitKind::WireNesting => LimitKind::WireNesting,
+                chart_arrangement::LimitKind::WireWork => LimitKind::WireWork,
                 chart_arrangement::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 chart_arrangement::LimitKind::Allocations => LimitKind::Allocations,
-                chart_arrangement::LimitKind::RetainedBytes => LimitKind::PayloadBytes,
-                _ => LimitKind::WireBytes,
+                chart_arrangement::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                chart_arrangement::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                chart_arrangement::LimitKind::References => LimitKind::PayloadReferences,
+                chart_arrangement::LimitKind::CompressedBytes => LimitKind::PackageBytes,
             },
             observed,
             maximum,
@@ -741,6 +894,21 @@ impl Edit<'_> {
         if verified.before.as_deref() != after.as_deref() {
             return Err(Error::Verification);
         }
+        let mut locality_budget =
+            ChartBudget::for_package(self.source).map_err(map_arrangement_error)?;
+        chart_arrangement::verify_message_locality(
+            self.source,
+            &package,
+            current.component_name.as_ref(),
+            current.component_index,
+            current.object_index,
+            current.object_identifier,
+            current.message_index,
+            current.message_type,
+            verified.payload(&package)?,
+            &mut locality_budget,
+        )
+        .map_err(map_arrangement_error)?;
         Commit::published(self.source, package, current, after)
     }
 }
@@ -911,8 +1079,12 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
         return Ok(Commit::unchanged(package, current, patch.after.clone()));
     }
     let target = patch.artifacts.target_owner();
+    let mut budget = ChartBudget::for_package(package).map_err(map_arrangement_error)?;
+    budget
+        .candidate_reopen(target.len())
+        .map_err(map_arrangement_error)?;
     let candidate = Package::from_source_owner_with_options(target, package.state.options)
-        .map_err(|_| Error::Verification)?;
+        .map_err(map_candidate_error)?;
     let verified = resolve(
         &candidate,
         SheetSelector::position(patch.sheet),
@@ -922,11 +1094,57 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
     if verified.before != patch.after {
         return Err(Error::Verification);
     }
+    let mut locality_budget = ChartBudget::for_package(package).map_err(map_arrangement_error)?;
+    chart_arrangement::verify_message_locality(
+        package,
+        &candidate,
+        current.component_name.as_ref(),
+        current.component_index,
+        current.object_index,
+        current.object_identifier,
+        current.message_index,
+        current.message_type,
+        verified.payload(&candidate)?,
+        &mut locality_budget,
+    )
+    .map_err(map_arrangement_error)?;
     Ok(Commit {
         package: candidate,
         patch: patch.clone(),
         diagnostics: Diagnostics { changed: true },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, ReferenceOwners, Refusal};
+    use litchi_iwa_common::{WireLimits, wire::append_length_delimited_field};
+
+    fn chart_payload(identifier: u64) -> Vec<u8> {
+        let mut reference = Vec::new();
+        litchi_iwa_common::wire::append_varint_field(&mut reference, 1, identifier).unwrap();
+        let mut chart = Vec::new();
+        append_length_delimited_field(&mut chart, 10, &reference, WireLimits::DEFAULT).unwrap();
+        let mut drawable = Vec::new();
+        append_length_delimited_field(&mut drawable, 10_000, &chart, WireLimits::DEFAULT).unwrap();
+        drawable
+    }
+
+    #[test]
+    fn shared_reference_owner_is_refused() {
+        let first =
+            super::chart_codec::references(&chart_payload(77), super::chart_codec::Limits::DEFAULT)
+                .unwrap();
+        let second =
+            super::chart_codec::references(&chart_payload(77), super::chart_codec::Limits::DEFAULT)
+                .unwrap();
+        let mut owners = ReferenceOwners::default();
+        owners.add(&first, 77).unwrap();
+        assert!(matches!(
+            owners.add(&second, 77),
+            Err(Error::Refused(Refusal::SharedObject))
+        ));
+    }
 }
 
 /// Read a selected chart text value.

@@ -17,6 +17,7 @@ use std::sync::Arc;
 use litchi_core::Position;
 use litchi_iwa_archive::package::SharedBytes;
 use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_protos::chart_data_codec;
 use litchi_iwa_protos::chart_style_codec::{self as chart_codec, Archive as ChartArchive};
 use litchi_iwa_style::chart_text::{self, ChartTextKind};
 use thiserror::Error as ThisError;
@@ -25,6 +26,8 @@ use super::Package;
 use super::body_chart_arrangement::{self as arrangement, ArrangementBudget, ChartTarget};
 use super::body_drawable_graph::{self as graph, Budget as GraphBudget, ObjectIndex};
 use crate::selector::BodyChartSelector;
+
+const CHART_MESSAGE_TYPE: u32 = chart_data_codec::MODERN_CHART_DRAWABLE_MESSAGE_TYPE;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum Kind {
@@ -52,12 +55,32 @@ impl Kind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
+    /// Complete package bytes admitted at the source boundary.
+    InputBytes,
+    /// ZIP entries inspected by the source-relative proof.
+    Entries,
+    /// One ZIP entry's bytes inspected.
+    EntryBytes,
+    /// Aggregate ZIP entry bytes inspected.
+    TotalEntryBytes,
+    /// ZIP metadata bytes retained or compared.
+    PackageBytes,
     /// One native payload inspected by the selector or codec.
     PayloadBytes,
+    /// Aggregate native payload bytes inspected.
+    TotalPayloadBytes,
+    /// Native objects inspected by the rooted graph.
+    PayloadObjects,
+    /// Native messages inspected by the rooted graph.
+    PayloadMessages,
     /// Semantic section or body-storage items admitted by candidate reopen.
     PayloadItems,
+    /// Native chart references inspected by the ownership proof.
+    PayloadReferences,
     /// Generated-extension wire bytes.
     WireBytes,
+    /// Generated-codec output bytes.
+    WireOutputBytes,
     /// Strict generated-extension fields visited.
     WireFields,
     /// Strict generated-extension nesting.
@@ -70,26 +93,45 @@ pub enum LimitKind {
     TextBytes,
     /// Bounded temporary allocations.
     Allocations,
+    /// Generated-codec allocations.
+    WireAllocations,
     /// Source and candidate bytes retained together.
     RetainedBytes,
+    /// Generated-codec retained bytes.
+    WireRetainedBytes,
     /// Candidate scratch bytes.
     ScratchBytes,
+    /// Generated-codec scratch bytes.
+    WireScratchBytes,
 }
 
 impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
+            Self::InputBytes => "input bytes",
+            Self::Entries => "ZIP entries",
+            Self::EntryBytes => "ZIP entry bytes",
+            Self::TotalEntryBytes => "total ZIP entry bytes",
+            Self::PackageBytes => "package bytes",
             Self::PayloadBytes => "payload bytes",
+            Self::TotalPayloadBytes => "total payload bytes",
+            Self::PayloadObjects => "payload objects",
+            Self::PayloadMessages => "payload messages",
             Self::PayloadItems => "payload items",
+            Self::PayloadReferences => "payload references",
             Self::WireBytes => "wire bytes",
+            Self::WireOutputBytes => "wire output bytes",
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
             Self::OutputBytes => "output bytes",
             Self::TextBytes => "text bytes",
             Self::Allocations => "allocations",
+            Self::WireAllocations => "wire allocations",
             Self::RetainedBytes => "retained bytes",
+            Self::WireRetainedBytes => "wire retained bytes",
             Self::ScratchBytes => "scratch bytes",
+            Self::WireScratchBytes => "wire scratch bytes",
         })
     }
 }
@@ -236,6 +278,148 @@ fn owns_reference(info: &litchi_iwa_core::MessageInfo, identifier: u64, field: u
     fields <= 1
 }
 
+fn reference_count(references: &chart_codec::StyleReferences, identifier: u64) -> usize {
+    let singular = [
+        references.chart_style(),
+        references.chart_non_style(),
+        references.legend_style(),
+        references.legend_non_style(),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|candidate| *candidate == identifier)
+    .count();
+    let repeated = references
+        .value_axis_styles()
+        .iter()
+        .chain(references.value_axis_non_styles())
+        .chain(references.category_axis_styles())
+        .chain(references.category_axis_non_styles())
+        .chain(references.series_theme_styles())
+        .chain(references.paragraph_styles())
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    let sparse = references
+        .series_private_styles()
+        .into_iter()
+        .flat_map(|entries| entries.entries())
+        .chain(
+            references
+                .series_non_styles()
+                .into_iter()
+                .flat_map(|entries| entries.entries()),
+        )
+        .filter(|(_, candidate)| *candidate == identifier)
+        .count();
+    singular
+        .checked_add(repeated)
+        .and_then(|count| count.checked_add(sparse))
+        .unwrap_or(usize::MAX)
+}
+
+#[derive(Debug, Default)]
+struct ReferenceOwners {
+    count: usize,
+}
+
+impl ReferenceOwners {
+    fn add(
+        &mut self,
+        references: &chart_codec::StyleReferences,
+        identifier: u64,
+    ) -> Result<(), Error> {
+        self.count = self
+            .count
+            .checked_add(reference_count(references, identifier))
+            .ok_or(Error::InvalidSource)?;
+        if self.count > 1 {
+            return Err(Refusal::SharedObject.into());
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<(), Error> {
+        if self.count == 1 {
+            Ok(())
+        } else {
+            Err(Refusal::SharedObject.into())
+        }
+    }
+}
+
+fn reference_vector_len(references: &chart_codec::StyleReferences) -> usize {
+    let singular = [
+        references.chart_style(),
+        references.chart_non_style(),
+        references.legend_style(),
+        references.legend_non_style(),
+    ]
+    .into_iter()
+    .filter(Option::is_some)
+    .count();
+    let repeated = references
+        .value_axis_styles()
+        .len()
+        .saturating_add(references.value_axis_non_styles().len())
+        .saturating_add(references.category_axis_styles().len())
+        .saturating_add(references.category_axis_non_styles().len())
+        .saturating_add(references.series_theme_styles().len())
+        .saturating_add(references.paragraph_styles().len());
+    let sparse = references
+        .series_private_styles()
+        .map_or(0, |entries| entries.entries().len())
+        .saturating_add(
+            references
+                .series_non_styles()
+                .map_or(0, |entries| entries.entries().len()),
+        );
+    singular.saturating_add(repeated).saturating_add(sparse)
+}
+
+fn decode_references(
+    payload: &[u8],
+    budget: &mut ArrangementBudget,
+) -> Result<chart_codec::StyleReferences, Error> {
+    budget
+        .preflight_reference_scan(payload)
+        .map_err(map_arrangement_error)?;
+    let limits = budget
+        .reference_codec_limits(payload)
+        .map_err(map_arrangement_error)?;
+    let references = chart_codec::references(payload, limits).map_err(map_chart_codec_error)?;
+    budget
+        .charge_reference_scan(payload, reference_vector_len(&references))
+        .map_err(map_arrangement_error)?;
+    Ok(references)
+}
+
+fn prove_reference_exclusive(
+    package: &Package,
+    selection: &ChartTarget,
+    selected: &chart_codec::StyleReferences,
+    identifier: u64,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    let mut owners = ReferenceOwners::default();
+    owners.add(selected, identifier)?;
+    for (component_index, component) in package.state.source.components().iter().enumerate() {
+        for (object_index, object) in component.archive().objects.iter().enumerate() {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != CHART_MESSAGE_TYPE
+                    || (component_index == selection.component_index
+                        && object_index == selection.drawable_object_index
+                        && message_index == selection.drawable_message_index)
+                {
+                    continue;
+                }
+                let references = decode_references(message.data.as_slice(), budget)?;
+                owners.add(&references, identifier)?;
+            }
+        }
+    }
+    owners.finish()
+}
+
 fn read_payload(payload: &[u8], kind: Kind) -> Result<Option<Box<str>>, Error> {
     let (snapshot, _report) = chart_text::decode(
         payload,
@@ -358,9 +542,32 @@ fn map_arrangement_error(error: arrangement::Error) -> Error {
             Refusal::UnsupportedSource.into()
         },
         arrangement::Error::Limit {
-            observed, maximum, ..
+            kind,
+            observed,
+            maximum,
         } => Error::Limit {
-            kind: LimitKind::PayloadBytes,
+            kind: match kind {
+                arrangement::LimitKind::InputBytes => LimitKind::InputBytes,
+                arrangement::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                arrangement::LimitKind::Entries => LimitKind::Entries,
+                arrangement::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                arrangement::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+                arrangement::LimitKind::PackageBytes => LimitKind::PackageBytes,
+                arrangement::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+                arrangement::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+                arrangement::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+                arrangement::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+                arrangement::LimitKind::PayloadItems => LimitKind::PayloadItems,
+                arrangement::LimitKind::PayloadReferences => LimitKind::PayloadReferences,
+                arrangement::LimitKind::WireBytes => LimitKind::WireBytes,
+                arrangement::LimitKind::WireOutputBytes => LimitKind::WireOutputBytes,
+                arrangement::LimitKind::WireFields => LimitKind::WireFields,
+                arrangement::LimitKind::WireNesting => LimitKind::WireNesting,
+                arrangement::LimitKind::WireWork => LimitKind::WireWork,
+                arrangement::LimitKind::WireAllocations => LimitKind::WireAllocations,
+                arrangement::LimitKind::WireRetainedBytes => LimitKind::WireRetainedBytes,
+                arrangement::LimitKind::WireScratchBytes => LimitKind::WireScratchBytes,
+            },
             observed,
             maximum,
         },
@@ -375,8 +582,8 @@ fn resolve(package: &Package, selector: BodyChartSelector, kind: Kind) -> Result
         .map_err(map_arrangement_error)?;
     let payload =
         arrangement::selected_chart_payload(package, &chart).map_err(map_arrangement_error)?;
-    let references = chart_codec::references(payload, chart_codec::Limits::DEFAULT)
-        .map_err(map_chart_codec_error)?;
+    let mut reference_budget = arrangement_budget;
+    let references = decode_references(payload, &mut reference_budget)?;
     let identifier = match kind {
         Kind::Title => references.chart_non_style(),
         Kind::Axis(Axis::Category) => references.category_axis_non_styles().first().copied(),
@@ -387,19 +594,13 @@ fn resolve(package: &Package, selector: BodyChartSelector, kind: Kind) -> Result
         Kind::Title => Error::InvalidSource,
         Kind::Axis(_) => Refusal::UnsupportedAxis.into(),
     })?;
-    let all_references: &[u64] = match kind {
-        Kind::Title => std::slice::from_ref(&identifier),
-        Kind::Axis(Axis::Category) => references.category_axis_non_styles(),
-        Kind::Axis(Axis::Value) => references.value_axis_non_styles(),
-    };
-    if all_references
-        .iter()
-        .filter(|candidate| **candidate == identifier)
-        .count()
-        != 1
-    {
-        return Err(Refusal::SharedObject.into());
-    }
+    prove_reference_exclusive(
+        package,
+        &chart,
+        &references,
+        identifier,
+        &mut reference_budget,
+    )?;
     let drawable_component = package
         .state
         .source
@@ -471,7 +672,7 @@ fn map_graph_error(error: graph::GraphError) -> Error {
             maximum,
         } => Error::Limit {
             kind: match kind {
-                graph::GraphLimit::InputBytes => LimitKind::PayloadBytes,
+                graph::GraphLimit::InputBytes => LimitKind::InputBytes,
                 graph::GraphLimit::SemanticItems => LimitKind::PayloadItems,
                 graph::GraphLimit::SemanticTextBytes => LimitKind::TextBytes,
                 graph::GraphLimit::OutputBytes => LimitKind::OutputBytes,
@@ -578,6 +779,19 @@ impl Edit<'_> {
         if !verified.same_identity(&current) || verified.before.as_deref() != after.as_deref() {
             return Err(Error::Verification);
         }
+        let mut locality_budget = GraphBudget::new(self.source).map_err(map_graph_error)?;
+        graph::verify_message_locality(
+            self.source,
+            &candidate,
+            current.component_name.as_ref(),
+            current.object_index,
+            current.object_identifier,
+            current.message_index,
+            current.message_type,
+            verified.payload(&candidate)?,
+            &mut locality_budget,
+        )
+        .map_err(map_graph_error)?;
         Ok(Commit::published(self.source, candidate, current, after))
     }
 }
@@ -759,8 +973,14 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
     if patch.is_noop() {
         return Ok(Commit::unchanged(package, current, patch.after.clone()));
     }
-    let candidate = graph::reopen(package, Arc::from(patch.artifacts.target_owner().as_ref()))
-        .map_err(map_graph_error)?;
+    let target_owner = patch.artifacts.target_owner();
+    let target_len = target_owner.as_ref().len();
+    let mut arrangement_budget = ArrangementBudget::new(package).map_err(map_arrangement_error)?;
+    arrangement_budget
+        .candidate_reopen(target_len)
+        .map_err(map_arrangement_error)?;
+    let candidate =
+        graph::reopen(package, Arc::from(target_owner.as_ref())).map_err(map_graph_error)?;
     let verified = resolve(
         &candidate,
         BodyChartSelector::position(patch.position),
@@ -769,6 +989,19 @@ pub(super) fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Er
     if verified.before != patch.after {
         return Err(Error::Verification);
     }
+    let mut locality_budget = GraphBudget::new(package).map_err(map_graph_error)?;
+    graph::verify_message_locality(
+        package,
+        &candidate,
+        current.component_name.as_ref(),
+        current.object_index,
+        current.object_identifier,
+        current.message_index,
+        current.message_type,
+        verified.payload(&candidate)?,
+        &mut locality_budget,
+    )
+    .map_err(map_graph_error)?;
     Ok(Commit {
         package: candidate,
         patch: patch.clone(),
@@ -818,8 +1051,9 @@ impl Package {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, LimitKind, map_graph_error};
+    use super::{Error, LimitKind, ReferenceOwners, Refusal, map_graph_error};
     use crate::package::body_drawable_graph::{GraphError, GraphLimit};
+    use litchi_iwa_common::{WireLimits, wire::append_length_delimited_field};
 
     #[test]
     fn semantic_candidate_limits_keep_their_resource_kinds() {
@@ -849,6 +1083,32 @@ mod tests {
                 observed: 257,
                 maximum: 256,
             }
+        ));
+    }
+
+    fn chart_payload(identifier: u64) -> Vec<u8> {
+        let mut reference = Vec::new();
+        litchi_iwa_common::wire::append_varint_field(&mut reference, 1, identifier).unwrap();
+        let mut chart = Vec::new();
+        append_length_delimited_field(&mut chart, 10, &reference, WireLimits::DEFAULT).unwrap();
+        let mut drawable = Vec::new();
+        append_length_delimited_field(&mut drawable, 10_000, &chart, WireLimits::DEFAULT).unwrap();
+        drawable
+    }
+
+    #[test]
+    fn shared_reference_owner_is_refused() {
+        let first =
+            super::chart_codec::references(&chart_payload(77), super::chart_codec::Limits::DEFAULT)
+                .unwrap();
+        let second =
+            super::chart_codec::references(&chart_payload(77), super::chart_codec::Limits::DEFAULT)
+                .unwrap();
+        let mut owners = ReferenceOwners::default();
+        owners.add(&first, 77).unwrap();
+        assert!(matches!(
+            owners.add(&second, 77),
+            Err(Error::Refused(Refusal::SharedObject))
         ));
     }
 }
