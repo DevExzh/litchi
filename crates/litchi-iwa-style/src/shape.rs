@@ -1159,12 +1159,26 @@ fn registration_error_to_graph(error: RegistrationError) -> Error {
             observed,
             limit: maximum,
         }),
-        RegistrationError::Limit { .. } => {
-            Error::Invalid("stylesheet registration resource refusal")
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::Allocations,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: graph::GraphLimitKind::AllocationEvents,
+            observed,
+            maximum,
+        },
+        RegistrationError::Limit {
+            kind: RegistrationLimitKind::ScratchBytes,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: graph::GraphLimitKind::ScratchBytes,
+            observed,
+            maximum,
         },
         RegistrationError::Allocation { resource, amount } => {
-            let _ = (resource, amount);
-            Error::Invalid("stylesheet registration allocation failed")
+            Error::Wire(litchi_iwa_common::Error::Allocation { resource, amount })
         },
         RegistrationError::Wire(error) => Error::Wire(error),
         RegistrationError::Graph(error) => error,
