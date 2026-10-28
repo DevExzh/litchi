@@ -271,7 +271,10 @@ pub enum Error {
     IdentifierOverflow,
 }
 
-/// Exact bounded accounting for one chart-font operation.
+    /// Bounded accounting for one chart-font operation. Scratch is a
+    /// conservative parser-buffer admission bound; retained bytes count
+    /// owned candidate/output buffers, while wire fields and output bytes are
+    /// operation totals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Report {
     input_bytes: usize,
@@ -400,12 +403,6 @@ impl Budget {
             bytes,
             self.limits.max_input_bytes(),
         )?;
-        self.retained_bytes = self.add(
-            LimitKind::RetainedBytes,
-            self.retained_bytes,
-            bytes,
-            self.limits.max_retained_bytes(),
-        )?;
         Ok(())
     }
 
@@ -492,21 +489,26 @@ impl Budget {
             self.limits.max_output_bytes(),
             self.output_bytes,
         )?;
-        let nesting = self.remaining(
-            LimitKind::Nesting,
-            self.limits.max_nesting() as usize,
-            self.max_depth as usize,
-        )?;
         let work = self.remaining(
             LimitKind::Work,
             self.limits.max_work_bytes(),
             self.work_bytes,
         )?;
+        if self.max_depth > self.limits.max_nesting() {
+            return Err(Self::limit(
+                LimitKind::Nesting,
+                self.max_depth as usize,
+                self.limits.max_nesting() as usize,
+            ));
+        }
+        if self.limits.max_nesting() == 0 {
+            return Err(Self::limit(LimitKind::Nesting, 1, 0));
+        }
         WireLimits::DEFAULT
             .with_input_bytes(input)
             .and_then(|limits| limits.with_fields(fields))
             .and_then(|limits| limits.with_output_bytes(output))
-            .and_then(|limits| limits.with_nesting(nesting))
+            .and_then(|limits| limits.with_nesting(self.limits.max_nesting() as usize))
             .and_then(|limits| limits.with_rewrite_work(work))
             .map_err(map_wire_error)
     }
@@ -527,7 +529,7 @@ impl Budget {
     fn remaining(self, kind: LimitKind, maximum: usize, used: usize) -> Result<usize, Error> {
         let remaining = maximum.saturating_sub(used);
         if remaining == 0 {
-            return Err(Self::limit(kind, 1, maximum));
+            return Err(Self::limit(kind, used.saturating_add(1), maximum));
         }
         Ok(remaining)
     }
@@ -548,17 +550,30 @@ impl Budget {
                 self.limits.max_nesting() as usize,
             ));
         }
-        // Admit the parser's source-bound scratch and one field-vector
-        // allocation before asking the wire layer to inspect untrusted bytes.
-        self.scratch(source.len())?;
+        let field_storage = source.len().checked_mul(size_of::<WireField>()).ok_or_else(|| {
+            Self::limit(
+                LimitKind::ScratchBytes,
+                usize::MAX,
+                self.limits.max_scratch_bytes(),
+            )
+        })?;
+        self.scratch(field_storage)?;
         self.allocation(1)?;
         let limits = self.wire_limits()?;
-        let fields = wire::parse_wire_fields(source, limits).map_err(map_wire_error)?;
         self.source(source.len())?;
-        self.fields(fields.len())?;
-        self.work(source.len().checked_add(fields.len()).ok_or_else(|| {
+        self.work(source.len())?;
+        let mut field_count = 0usize;
+        wire::visit_wire_fields(source, limits, |_field| {
+            field_count = field_count.saturating_add(1);
+            Ok(())
+        })
+        .map_err(map_wire_error)?;
+        self.fields(field_count)?;
+        self.work(source.len().checked_add(field_count).ok_or_else(|| {
             Self::limit(LimitKind::Work, usize::MAX, self.limits.max_work_bytes())
         })?)?;
+        let fields = wire::parse_wire_fields(source, limits).map_err(map_wire_error)?;
+        debug_assert_eq!(fields.len(), field_count);
         // `parse_wire_fields` validates one message. Nested paragraph-style
         // messages are charged by their own call, so the observed depth is
         // the message level (root = one).
@@ -613,7 +628,13 @@ impl<'w, 's> ParagraphStyles<'w, 's> {
 
     fn charge_style(&self, identifier: u64, payload: &[u8]) -> Result<()> {
         let mut budget = self.budget.borrow_mut();
+        // The paragraph-style reader may materialize a validated font name;
+        // admit one semantic value before delegating to the text-wire codec.
+        budget.allocation(1)?;
         let _ = budget.parse_fields(payload)?;
+        // The text-wire effective-property walk descends through the
+        // paragraph-style envelope after the root payload has been checked.
+        budget.max_depth = budget.max_depth.max(2);
         let _ = identifier;
         Ok(())
     }
@@ -776,6 +797,7 @@ fn chart_message(
         )
         .map_err(map_graph_error)?;
     let _ = budget.parse_fields(payload)?;
+    budget.reserve_output(payload.len())?;
     budget.scratch(payload.len())?;
     budget.allocation(1)?;
     let mut output = Vec::new();
@@ -794,6 +816,8 @@ fn paragraph_styles(
     budget: &mut Budget,
 ) -> Result<Vec<u64>> {
     let (_, payload) = chart_message(workspace, chart, budget)?;
+    budget.allocation(1)?;
+    budget.scratch(payload.len())?;
     let limits = budget.codec_limits()?;
     let references = codec::references(&payload, limits).map_err(map_codec_error)?;
     let source = references.paragraph_styles();
@@ -864,9 +888,6 @@ fn effective_font(workspace: &Workspace<'_>, style: u64, budget: &mut Budget) ->
     };
     let style = text_style_of(workspace, style, budget)?;
     budget.text(font_name_bytes(&font))?;
-    if matches!(&font, Font::Named(_)) {
-        budget.allocation(1)?;
-    }
     Ok(ChartFont {
         font,
         bold: style.bold,
@@ -1037,9 +1058,12 @@ fn apply(
     inherited_font: &ChartFont,
     inherited_size: TextPointSize,
     change: &Change,
-) {
+    budget: &mut Budget,
+) -> Result<()> {
     match change {
         Change::Font(target) => {
+            budget.allocation(1)?;
+            budget.text(font_name_bytes(&target.font))?;
             overrides.font = (inherited_font.font != target.font).then(|| target.font.clone());
             overrides.bold = (inherited_font.bold != target.bold).then_some(target.bold);
             overrides.italic = (inherited_font.italic != target.italic).then_some(target.italic);
@@ -1049,6 +1073,7 @@ fn apply(
         },
         Change::ResetFont | Change::ResetSize => {},
     }
+    Ok(())
 }
 
 fn font_variation(
@@ -1083,10 +1108,6 @@ pub fn set(
 ) -> Result<Report> {
     let mut budget = Budget::new(limits);
     budget.work(workspace.source_work())?;
-    if let Change::Font(target) = change {
-        budget.text(font_name_bytes(&target.font))?;
-        budget.allocation(1)?;
-    }
     match change {
         Change::Font(target) => {
             let current = uniform(workspace, chart, &mut budget, effective_font)?;
@@ -1163,7 +1184,13 @@ pub fn set(
         if matches!(change, Change::Font(_) | Change::Size(_)) {
             let inherited_font = effective_font(workspace, base, &mut budget)?;
             let inherited_size = text_style_of(workspace, base, &mut budget)?.point_size;
-            apply(&mut overrides, &inherited_font, inherited_size, change);
+            apply(
+                &mut overrides,
+                &inherited_font,
+                inherited_size,
+                change,
+                &mut budget,
+            )?;
         }
         if overrides.is_empty() {
             replacements.insert(style, base);
