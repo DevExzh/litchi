@@ -924,20 +924,7 @@ fn prepare_logical<'a>(
     }
     new_formulas.sort_unstable_by(|left, right| left.bytes.cmp(right.bytes));
     new_formulas.dedup_by(|left, right| left.bytes == right.bytes);
-    let mut next_key = root.next_list_id();
-    for formula in &mut new_formulas {
-        if formula_index(&entries, &formula_order, formula.bytes).is_some() {
-            continue;
-        }
-        if next_key == 0 || key_index(&entries, &key_order, next_key).is_some() {
-            return Err(Error::InvalidSource);
-        }
-        formula.key = next_key;
-        next_key = next_key.checked_add(1).ok_or(Error::InvalidSource)?;
-    }
-
-    let mut assignments = exact_vec::<Assignment>(deltas.len())?;
-    for (delta_index, delta) in deltas.iter().enumerate() {
+    for delta in deltas {
         if let Some(old_key) = delta.old_formula_key {
             let entry_index =
                 key_index(&entries, &key_order, old_key).ok_or(Error::InvalidSource)?;
@@ -946,6 +933,42 @@ fn prepare_logical<'a>(
                 .checked_sub(1)
                 .ok_or(Error::InvalidSource)?;
         }
+    }
+    // As the host releases a cell's formula before it stores the new one, a
+    // root entry released just below `nextListID` lowers it and its key is
+    // allocated again (record 0376c); an entry a new formula reuses stays.
+    let mut next_key = root.next_list_id();
+    while let Some(index) = next_key
+        .checked_sub(1)
+        .and_then(|key| key_index(&entries, &key_order, key))
+    {
+        let entry = entries[index];
+        if entry.final_count != 0
+            || entry.owner != 0
+            || new_formulas
+                .binary_search_by(|formula| formula.bytes.cmp(entry.formula))
+                .is_ok()
+        {
+            break;
+        }
+        next_key = entry.key;
+    }
+    for formula in &mut new_formulas {
+        if formula_index(&entries, &formula_order, formula.bytes).is_some() {
+            continue;
+        }
+        if next_key == 0
+            || key_index(&entries, &key_order, next_key)
+                .is_some_and(|index| entries[index].final_count != 0)
+        {
+            return Err(Error::InvalidSource);
+        }
+        formula.key = next_key;
+        next_key = next_key.checked_add(1).ok_or(Error::InvalidSource)?;
+    }
+
+    let mut assignments = exact_vec::<Assignment>(deltas.len())?;
+    for (delta_index, delta) in deltas.iter().enumerate() {
         let key = if let Some(bytes) = delta.new_formula {
             if let Some(entry_index) = formula_index(&entries, &formula_order, bytes) {
                 entries[entry_index].final_count = entries[entry_index]

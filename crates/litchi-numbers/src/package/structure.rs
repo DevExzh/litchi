@@ -34,12 +34,58 @@ pub(super) type Working<'p> = litchi_iwa_table::structure::Working<'p, Package>;
 pub(super) type Published = litchi_iwa_table::structure::Published<Package>;
 
 impl litchi_iwa_table::structure::TableLeaf for Package {
-    fn reopen_candidate(
-        &self,
-        candidate: Arc<[u8]>,
-    ) -> Result<Self, litchi_iwa_table::structure::ReopenError> {
-        Self::reopen_candidate(self, candidate)
-            .map_err(|_error| litchi_iwa_table::structure::ReopenError)
+    fn reopen_candidate(&self, candidate: Arc<[u8]>) -> FaultResult<Self> {
+        Self::reopen_candidate(self, candidate).map_err(reopen_fault)
+    }
+}
+
+/// Preserve bounded candidate-ingress failures at the shared structural
+/// boundary.  The Numbers package error carries richer semantic locations than
+/// the shared table engine needs, so non-resource read failures intentionally
+/// become verification while resource failures retain their public category.
+fn reopen_fault(error: super::Error) -> Fault {
+    match error {
+        super::Error::Archive(error) => match error {
+            litchi_iwa_archive::Error::Limit {
+                observed, maximum, ..
+            } => Fault::Limit {
+                kind: FaultLimit::PackageBytes,
+                observed,
+                maximum,
+            },
+            litchi_iwa_archive::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+            _ => Fault::Verification,
+        },
+        super::Error::Common(error) => match error {
+            litchi_iwa_common::Error::LimitExceeded {
+                observed, limit, ..
+            } => Fault::Limit {
+                kind: FaultLimit::PayloadBytes,
+                observed: observed as u64,
+                maximum: limit as u64,
+            },
+            litchi_iwa_common::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+            _ => Fault::Verification,
+        },
+        super::Error::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Fault::Limit {
+            kind: match kind {
+                crate::limits::SemanticLimitKind::Objects => FaultLimit::Identifiers,
+                _ => FaultLimit::PayloadBytes,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        super::Error::InputTooLarge { observed, maximum } => Fault::Limit {
+            kind: FaultLimit::PackageBytes,
+            observed,
+            maximum,
+        },
+        _ => Fault::Verification,
     }
 }
 
@@ -138,7 +184,7 @@ impl Artifacts {
         }
         Package::from_source_owner_with_options(self.0.target_owner(), package.state.options)
             .map(Some)
-            .map_err(|_error| Fault::Verification)
+            .map_err(reopen_fault)
     }
 }
 

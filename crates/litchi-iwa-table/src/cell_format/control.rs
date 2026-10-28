@@ -6,7 +6,9 @@
 //! the audited Pop-Up Menu engine.
 
 use std::mem::size_of;
+use std::sync::{Arc, OnceLock};
 
+use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
     ArchiveReferencePolicy, ArchiveReferenceVisitor, Limits as ArchiveLimits, SnappyStream,
@@ -2130,87 +2132,507 @@ pub fn require_exclusive_selected_model_reference(
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
-    struct Probe {
-        identifier: u64,
-        allowed: bool,
-        expected_message: usize,
-        matches: usize,
-        unexpected: bool,
+    match source.proofs() {
+        Some(proofs) => {
+            let (census, precharged_references) = proofs.census(source, budget, path)?;
+            census.prove_exclusive_after_preflight(
+                target,
+                identifier,
+                path,
+                budget,
+                precharged_references,
+            )
+        },
+        None => {
+            // Keep the non-memoized Pages/Keynote route under the same
+            // admission ordering as the Numbers proof cache. The census is
+            // built only after all work/allocation charges have succeeded.
+            let precharged_references =
+                preflight_reference_census(source, None, true, budget, path)?;
+            ReferenceCensus::build(source, None).prove_exclusive_after_preflight(
+                target,
+                identifier,
+                path,
+                budget,
+                precharged_references,
+            )
+        },
+    }
+}
+
+/// The package-level proofs of the cell-format engines that a leaf memoizes
+/// for one immutable package (record 0370k): the object-reference census
+/// and the metadata registry inspections.
+///
+/// Each proof is a function of the package's components and limits, so a
+/// memoized proof charges and refuses exactly as a fresh one. A package
+/// reopened from an edited reassembly of its parent ([`Self::reopened`])
+/// keeps the census of every component whose parsed archive it shares with
+/// the parent and inspects only the others.
+#[derive(Debug, Default)]
+pub struct PackageProofs {
+    census: OnceLock<Arc<ReferenceCensus>>,
+    inherited: Option<InheritedCensus>,
+    strict_registry: OnceLock<MemoizedRegistry>,
+    cross_component_read_registry: OnceLock<MemoizedRegistry>,
+}
+
+impl PackageProofs {
+    /// The proofs of `candidate`, a package reopened from an edited
+    /// reassembly of `parent`, the package these proofs belong to. A
+    /// candidate component whose parsed archive is one of the parent's own
+    /// (a reopen shares byte-identical members) inherits that archive's
+    /// census. The parent and candidate catalogs are live for this handoff;
+    /// `SourceCatalog::reopen` keeps unchanged archives alive through their
+    /// shared `Arc`. An inherited cache is never forwarded from a package
+    /// that has not built its own census, so address keys cannot cross a
+    /// stale parent/candidate generation.
+    #[must_use]
+    pub fn reopened(&self, parent: &ComponentCatalog, candidate: &ComponentCatalog) -> Self {
+        // Keep the parent census itself rather than allocating a pointer
+        // index and a per-candidate Vec here. Candidate component matching is
+        // performed after the transaction has charged the bounded census
+        // build, so reopen handoff is allocation-free apart from the existing
+        // Arc reference count.
+        let _ = (parent, candidate);
+        let inherited = self
+            .census
+            .get()
+            .cloned()
+            .map(|census| InheritedCensus { census });
+        Self {
+            inherited,
+            ..Self::default()
+        }
     }
 
-    impl ArchiveReferenceVisitor for Probe {
+    fn census(
+        &self,
+        source: &dyn TableSource,
+        budget: &mut TransactionBudget,
+        path: Path,
+    ) -> Result<(&ReferenceCensus, usize), Error> {
+        let build = self.census.get().is_none();
+        let precharged_references =
+            preflight_reference_census(source, self.inherited.as_ref(), build, budget, path)?;
+        let census = self
+            .census
+            .get_or_init(|| Arc::new(ReferenceCensus::build(source, self.inherited.as_ref())))
+            .as_ref();
+        Ok((census, precharged_references))
+    }
+
+    /// [`popup_metadata::inspect_cross_component_read`], memoized for
+    /// `options`.
+    pub(crate) fn cross_component_read_registry<'source>(
+        &self,
+        source: &'source dyn TableSource,
+        options: MetadataRewriteOptions,
+    ) -> MetadataResult<'source> {
+        if let Some(memoized) = self
+            .cross_component_read_registry
+            .get()
+            .filter(|memoized| memoized.options == options)
+        {
+            return memoized.facts(source);
+        }
+        let facts = popup_metadata::inspect_cross_component_read(source, options)?;
+        let _ = self
+            .cross_component_read_registry
+            .set(MemoizedRegistry::new(options, &facts));
+        Ok(facts)
+    }
+
+    /// [`popup_metadata::inspect`], memoized for `options`. The memoized
+    /// cross-component read registry stands in for a fresh inspection when
+    /// it proves that inspection would succeed with the same facts and
+    /// report ([`MemoizedRegistry::admits_strict`]).
+    fn strict_registry<'source>(
+        &self,
+        source: &'source dyn TableSource,
+        options: MetadataRewriteOptions,
+    ) -> MetadataResult<'source> {
+        if let Some(memoized) = self
+            .strict_registry
+            .get()
+            .filter(|memoized| memoized.options == options)
+        {
+            return memoized.facts(source);
+        }
+        let facts = match self.cross_component_read_registry.get() {
+            Some(read) => {
+                let facts = read.facts(source)?;
+                if read.admits_strict(options, facts.payload().len()) {
+                    facts
+                } else {
+                    popup_metadata::inspect(source, options)?
+                }
+            },
+            None => popup_metadata::inspect(source, options)?,
+        };
+        let _ = self
+            .strict_registry
+            .set(MemoizedRegistry::new(options, &facts));
+        Ok(facts)
+    }
+}
+
+type MetadataResult<'source> =
+    Result<popup_metadata::RegistryFacts<'source>, popup_metadata::MetadataError>;
+
+/// One memoized registry inspection and the options it ran under.
+#[derive(Debug)]
+struct MemoizedRegistry {
+    options: MetadataRewriteOptions,
+    registry: Arc<popup_metadata::Registry>,
+}
+
+impl MemoizedRegistry {
+    fn new(options: MetadataRewriteOptions, facts: &popup_metadata::RegistryFacts<'_>) -> Self {
+        Self {
+            options,
+            registry: Arc::clone(facts.shared()),
+        }
+    }
+
+    fn facts<'source>(&self, source: &'source dyn TableSource) -> MetadataResult<'source> {
+        Ok(popup_metadata::RegistryFacts::from_shared(
+            popup_metadata::strict_source(source)?,
+            Arc::clone(&self.registry),
+        ))
+    }
+
+    /// Whether the strict inspection under `options` of the
+    /// `payload_bytes`-byte metadata payload this cross-component read
+    /// inspected succeeds with the same facts and report.
+    ///
+    /// Both inspections run the same two codec passes and visitor; the strict
+    /// one also refuses a current component without a physical member. The
+    /// codec gates an inspection only on its options' absolute ceiling, the
+    /// payload size, its running counters (whose final values the report
+    /// holds) and the generated decoder's message-size, unknown-field and
+    /// recursion limits.
+    fn admits_strict(&self, options: MetadataRewriteOptions, payload_bytes: usize) -> bool {
+        let read = self.options;
+        let report = self.registry.report();
+        !self.registry.has_unmapped_current_component()
+            // The read's options passed the absolute ceiling.
+            && options.max_input_bytes() <= read.max_input_bytes()
+            && options.max_output_bytes() <= read.max_output_bytes()
+            && options.recursion_limit() == read.recursion_limit()
+            && payload_bytes <= options.max_input_bytes()
+            // Every unknown field takes at least one payload byte.
+            && payload_bytes <= options.max_fields()
+            && report.fields() <= options.max_fields()
+            && report.work_bytes() <= options.max_work_bytes()
+            && report.max_depth() <= options.recursion_limit()
+            && report.components_scanned() <= options.max_components()
+            && report.references_scanned() <= options.max_references()
+    }
+}
+
+/// Every object's strict reference inspection
+/// (`ArchiveReferencePolicy::RejectUnknownMetadata`) by catalog component,
+/// replayed by each exclusivity proof in catalog order, so a proof charges
+/// and refuses exactly as inspecting each object in turn does.
+#[derive(Debug)]
+struct ReferenceCensus {
+    /// The effective archive limits of the inspections; `None` when the
+    /// package's limits admit none.
+    limits: Option<ArchiveLimits>,
+    components: Vec<CensusComponent>,
+}
+
+/// The census of the components a reopened package shares with its parent,
+/// by the reopened package's catalog position.
+#[derive(Debug)]
+struct InheritedCensus {
+    census: Arc<ReferenceCensus>,
+}
+
+/// One component's stable parsed-archive identity and its memoized object
+/// inspections. The identity is stored as an address-sized integer so the
+/// proof cache remains `Send`/`Sync` without retaining a borrow into a
+/// catalog owned by another package snapshot.
+#[derive(Debug)]
+struct CensusComponent {
+    archive_key: usize,
+    objects: Arc<[ObjectCensus]>,
+}
+
+/// One object's header size and strict reference inspection.
+#[derive(Debug)]
+struct ObjectCensus {
+    identifier: Option<u64>,
+    /// The occurrence count and the object references (referenced
+    /// identifier, message index); `None` when the inspection refuses.
+    inspection: Option<(usize, Vec<(u64, usize)>)>,
+}
+
+impl ReferenceCensus {
+    /// Inspect every object of `source`, reusing the inherited components
+    /// inspected under the same limits.
+    fn build(source: &dyn TableSource, inherited: Option<&InheritedCensus>) -> Self {
+        let Ok(limits) = source.archive_limits().effective_archive_limits() else {
+            return Self {
+                limits: None,
+                components: Vec::new(),
+            };
+        };
+        let inherited = inherited.filter(|inherited| inherited.census.limits == Some(limits));
+        let components = source
+            .catalog()
+            .iter()
+            .map(|component| {
+                let archive_key = archive_key(component.archive());
+                let objects = inherited
+                    .and_then(|inherited| {
+                        inherited
+                            .census
+                            .components
+                            .iter()
+                            .find(|component| component.archive_key == archive_key)
+                            .map(|component| Arc::clone(&component.objects))
+                    })
+                    .unwrap_or_else(|| inspect_objects(component.archive(), limits));
+                CensusComponent {
+                    archive_key,
+                    objects,
+                }
+            })
+            .collect();
+        Self {
+            limits: Some(limits),
+            components,
+        }
+    }
+
+    /// The exclusivity proof after `preflight_reference_census` has admitted
+    /// all census work and allocations. The selected model message is the
+    /// only owner of `identifier`, and every object's header is admitted.
+    fn prove_exclusive_after_preflight(
+        &self,
+        target: Target,
+        identifier: u64,
+        path: Path,
+        budget: &mut TransactionBudget,
+        mut precharged_references: usize,
+    ) -> Result<(), Error> {
+        let refused =
+            || Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path });
+        if self.limits.is_none() {
+            return Err(Error::InvalidSource { path });
+        }
+        let mut selected = 0usize;
+        let mut inspected = 0usize;
+        for (component_index, component) in self.components.iter().enumerate() {
+            for object in component.objects.iter() {
+                let object_identifier = object.identifier.ok_or(Error::InvalidSource { path })?;
+                let allowed = component_index == target.component_index
+                    && object_identifier == target.model_identifier;
+                let (occurrences, references) = object.inspection.as_ref().ok_or_else(refused)?;
+                let mut matches = 0usize;
+                let mut unexpected = false;
+                for &(referenced, message_index) in references {
+                    if referenced == identifier {
+                        matches = matches.saturating_add(1);
+                        unexpected |= !allowed || message_index != target.message_index;
+                    }
+                }
+                inspected = inspected
+                    .checked_add(*occurrences)
+                    .ok_or(Error::InvalidSource { path })?;
+                let replay_references = occurrences.saturating_sub(precharged_references);
+                precharged_references = precharged_references.saturating_sub(*occurrences);
+                budget.charge_payload_references(replay_references, path)?;
+                if unexpected {
+                    return Err(refused());
+                }
+                selected = selected
+                    .checked_add(matches)
+                    .ok_or(Error::InvalidSource { path })?;
+            }
+        }
+        // The selected header contains one required aggregate edge and may
+        // mirror it once in a typed FieldInfo.
+        // `validate_selected_model_reference` already proves that exact shape;
+        // this package-wide census proves that no other message or opaque
+        // metadata owns the mutable object.
+        if selected == 0 || inspected == 0 {
+            return Err(refused());
+        }
+        Ok(())
+    }
+}
+
+/// Charge every operation-local resource that the reference census may use
+/// before any archive header is inspected or census storage is allocated.
+///
+/// The previous memoized implementation built the complete census first and
+/// charged the same work only while replaying it. That made a cold, tiny-
+/// budget refusal perform an unadmitted package-wide inspection. This pass is
+/// intentionally structural: it reads only already-parsed object metadata,
+/// charges the complete reference-occurrence and cold-build bounds up front,
+/// and leaves the strict `RejectUnknownMetadata` inspection to the admitted
+/// build below. The returned occurrence count is consumed by the proof replay
+/// so the same reference work is not charged a second time.
+fn preflight_reference_census(
+    source: &dyn TableSource,
+    inherited: Option<&InheritedCensus>,
+    build: bool,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<usize, Error> {
+    let limits = source
+        .archive_limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let inherited = inherited.filter(|inherited| inherited.census.limits == Some(limits));
+    let mut objects = 0usize;
+    let mut work = 0usize;
+    let mut changed_components = 0usize;
+    let mut changed_reference_objects = 0usize;
+    let mut references = 0usize;
+    for component in source.catalog().iter() {
+        let archive_key = archive_key(component.archive());
+        let shared = inherited.and_then(|inherited| {
+            inherited
+                .census
+                .components
+                .iter()
+                .find(|component| component.archive_key == archive_key)
+        });
+        if shared.is_none() {
+            changed_components = changed_components.saturating_add(1);
+        }
+        for object in &component.archive().objects {
+            let identifier = object
+                .archive_info
+                .identifier
+                .ok_or(Error::InvalidSource { path })?;
+            let _ = identifier;
+            let header_bytes = usize::try_from(object.header_length)
+                .ok()
+                .filter(|length| *length != 0)
+                .ok_or(Error::InvalidSource { path })?;
+            objects = objects.saturating_add(1);
+            work = work.saturating_add(header_bytes.saturating_mul(4));
+            references = references.saturating_add(reference_occurrence_count(object));
+            if shared.is_none() && object_reference_capacity(object) != 0 {
+                changed_reference_objects = changed_reference_objects.saturating_add(1);
+            }
+        }
+    }
+
+    // `inspect_references_with_policy` reports every object and data
+    // reference in the already-parsed ArchiveInfo. Charge that complete
+    // bound before strict header inspection so a low reference ceiling
+    // refuses cold work without constructing a census first.
+    budget.charge_payload_references(references, path)?;
+
+    // One logical allocation per replayed object is the existing proof
+    // charge. A cold build additionally retains one object slice per changed
+    // component, the catalog slice and its Arc wrapper; collector vectors are
+    // reserved once for objects carrying references.
+    let mut allocations = objects;
+    if build {
+        allocations = allocations
+            .saturating_add(changed_components)
+            .saturating_add(changed_reference_objects)
+            .saturating_add(2);
+    }
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_transaction_work(work, path)?;
+    Ok(references)
+}
+
+fn archive_key(archive: &Archive) -> usize {
+    core::ptr::from_ref(archive) as usize
+}
+
+fn object_reference_capacity(object: &ArchiveObject) -> usize {
+    object
+        .archive_info
+        .message_infos
+        .iter()
+        .map(|message| {
+            message.object_references.len().saturating_add(
+                message
+                    .field_infos
+                    .iter()
+                    .map(|field| field.object_references.len())
+                    .sum(),
+            )
+        })
+        .sum()
+}
+
+fn reference_occurrence_count(object: &ArchiveObject) -> usize {
+    object
+        .archive_info
+        .message_infos
+        .iter()
+        .map(|message| {
+            message
+                .object_references
+                .len()
+                .saturating_add(message.data_references.len())
+                .saturating_add(
+                    message
+                        .field_infos
+                        .iter()
+                        .map(|field| {
+                            field
+                                .object_references
+                                .len()
+                                .saturating_add(field.data_references.len())
+                        })
+                        .fold(0usize, usize::saturating_add),
+                )
+        })
+        .fold(0usize, usize::saturating_add)
+}
+
+/// Inspect every object of one component archive.
+fn inspect_objects(archive: &Archive, limits: ArchiveLimits) -> Arc<[ObjectCensus]> {
+    struct Collector {
+        references: Vec<(u64, usize)>,
+    }
+
+    impl ArchiveReferenceVisitor for Collector {
         fn visit_reference(
             &mut self,
             occurrence: ArchiveReferenceOccurrence,
         ) -> litchi_iwa_core::Result<()> {
-            if occurrence.kind == ArchiveReferenceKind::Object
-                && occurrence.referenced_identifier == self.identifier
-            {
-                self.matches = self.matches.saturating_add(1);
-                self.unexpected |=
-                    !self.allowed || occurrence.message_index != self.expected_message;
+            if occurrence.kind == ArchiveReferenceKind::Object {
+                self.references
+                    .push((occurrence.referenced_identifier, occurrence.message_index));
             }
             Ok(())
         }
     }
 
-    let archive_limits = source
-        .archive_limits()
-        .effective_archive_limits()
-        .map_err(|_| Error::InvalidSource { path })?;
-    let mut selected = 0usize;
-    let mut inspected = 0usize;
-    for (component_index, component) in source.catalog().iter().enumerate() {
-        for object in &component.archive().objects {
-            let object_identifier = object
-                .archive_info
-                .identifier
-                .ok_or(Error::InvalidSource { path })?;
-            let header_bytes =
-                usize::try_from(object.header_length).map_err(|_| Error::InvalidSource { path })?;
-            budget.charge_allocations(1, path)?;
-            budget.charge_transaction_work(header_bytes.saturating_mul(4), path)?;
-            let mut probe = Probe {
-                identifier,
-                allowed: component_index == target.component_index
-                    && object_identifier == target.model_identifier,
-                expected_message: target.message_index,
-                matches: 0,
-                unexpected: false,
+    archive
+        .objects
+        .iter()
+        .map(|object| {
+            let mut collector = Collector {
+                references: Vec::with_capacity(object_reference_capacity(object)),
             };
-            let occurrences = object
+            let inspection = object
                 .inspect_references_with_policy(
-                    &mut probe,
+                    &mut collector,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
-                    archive_limits,
+                    limits,
                 )
-                .map_err(|_| {
-                    Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path })
-                })?;
-            inspected = inspected
-                .checked_add(occurrences)
-                .ok_or(Error::InvalidSource { path })?;
-            budget.charge_payload_references(occurrences, path)?;
-            if probe.unexpected {
-                return Err(Error::Refused(
-                    crate::cell_format::Refusal::UnsupportedDependency { path },
-                ));
+                .ok()
+                .map(|occurrences| (occurrences, collector.references));
+            ObjectCensus {
+                identifier: object.archive_info.identifier,
+                inspection,
             }
-            selected = selected
-                .checked_add(probe.matches)
-                .ok_or(Error::InvalidSource { path })?;
-        }
-    }
-    // The selected header contains one required aggregate edge and may mirror
-    // it once in a typed FieldInfo. `validate_selected_model_reference`
-    // already proves that exact shape; this package-wide census proves that
-    // no other message or opaque metadata owns the mutable object.
-    if selected == 0 || inspected == 0 {
-        return Err(Error::Refused(
-            crate::cell_format::Refusal::UnsupportedDependency { path },
-        ));
-    }
-    Ok(())
+        })
+        .collect()
 }
 
 pub fn validate_format_refcounts(
@@ -2413,8 +2835,11 @@ pub fn validate_metadata_ownership<'source>(
         bytes.saturating_mul(2),
         1,
     );
-    let facts =
-        popup_metadata::inspect(source, options).map_err(|_| Error::InvalidSource { path })?;
+    let facts = match source.proofs() {
+        Some(proofs) => proofs.strict_registry(source, options),
+        None => popup_metadata::inspect(source, options),
+    }
+    .map_err(|_| Error::InvalidSource { path })?;
     let report = facts.report();
     budget.charge_wire_bytes(report.input_bytes(), path)?;
     budget.charge_wire_fields(report.fields(), path)?;
@@ -2633,4 +3058,504 @@ fn validate_refcounts(
 #[allow(dead_code)]
 pub fn unsupported_scalar_control() -> NativePopUpError {
     NativePopUpError::UnsupportedDependency
+}
+
+#[cfg(test)]
+mod census_tests {
+    use super::*;
+    use litchi_iwa_archive::unstable::EntryEdit;
+    use litchi_iwa_core::RawMessage;
+
+    fn varint(output: &mut Vec<u8>, mut value: u64) {
+        while value >= 0x80 {
+            output.push((value as u8 & 0x7f) | 0x80);
+            value >>= 7;
+        }
+        output.push(value as u8);
+    }
+
+    /// One IWA object whose header carries `extra` header bytes.
+    fn object(identifier: u64, reference: Option<u64>, extra: &[u8]) -> Vec<u8> {
+        let payload = [0x08, 0x01];
+        let mut message_info = Vec::new();
+        varint(&mut message_info, 1 << 3);
+        varint(&mut message_info, 1);
+        varint(&mut message_info, 3 << 3);
+        varint(&mut message_info, payload.len() as u64);
+        if let Some(reference) = reference {
+            let mut packed = Vec::new();
+            varint(&mut packed, reference);
+            varint(&mut message_info, (5 << 3) | 2);
+            varint(&mut message_info, packed.len() as u64);
+            message_info.extend_from_slice(&packed);
+        }
+        let mut header = Vec::new();
+        varint(&mut header, 1 << 3);
+        varint(&mut header, identifier);
+        varint(&mut header, (2 << 3) | 2);
+        varint(&mut header, message_info.len() as u64);
+        header.extend_from_slice(&message_info);
+        header.extend_from_slice(extra);
+        let mut output = Vec::new();
+        varint(&mut output, header.len() as u64);
+        output.extend_from_slice(&header);
+        output.extend_from_slice(&payload);
+        output
+    }
+
+    fn census_of(bytes: &[u8]) -> ReferenceCensus {
+        let limits = ArchiveLimits::default();
+        let archive = Archive::parse(bytes, limits).expect("archive");
+        ReferenceCensus {
+            limits: Some(limits),
+            components: vec![CensusComponent {
+                archive_key: archive_key(&archive),
+                objects: inspect_objects(&archive, limits),
+            }],
+        }
+    }
+
+    fn target() -> Target {
+        Target {
+            scope: 0,
+            table: 0,
+            position: litchi_iwa_common::table::coordinate::At::new(0, 0),
+            model_identifier: 10,
+            component_index: 0,
+            object_index: 0,
+            message_index: 0,
+            message_type: 6_001,
+            locked: false,
+        }
+    }
+
+    fn prove(bytes: &[u8]) -> Result<(), Error> {
+        let source = Memoized::open(&fixture("numbers/basic.numbers"));
+        let mut budget = TransactionBudget::for_cell_control(&source);
+        census_of(bytes).prove_exclusive_after_preflight(
+            target(),
+            20,
+            Path::Package,
+            &mut budget,
+            0,
+        )
+    }
+
+    fn fixture(name: &str) -> Vec<u8> {
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork")
+                .join(name),
+        )
+        .expect("fixture bytes")
+    }
+
+    /// A package opened from bytes that memoizes its proofs, as a leaf does.
+    struct Memoized {
+        catalog: litchi_iwa_archive::SourceCatalog,
+        proofs: PackageProofs,
+    }
+
+    impl Memoized {
+        fn open(bytes: &[u8]) -> Self {
+            Self {
+                catalog: litchi_iwa_archive::SourceCatalog::from_bytes(
+                    bytes,
+                    litchi_iwa_archive::Limits::default(),
+                )
+                .expect("catalog"),
+                proofs: PackageProofs::default(),
+            }
+        }
+
+        /// `bytes` reopened as an edited reassembly of this package.
+        fn reopen(&self, bytes: &[u8]) -> Self {
+            let catalog = self.catalog.reopen(Arc::from(bytes)).expect("reopen");
+            let proofs = self
+                .proofs
+                .reopened(self.catalog.components(), catalog.components());
+            Self { catalog, proofs }
+        }
+    }
+
+    impl TableSource for Memoized {
+        fn catalog(&self) -> &ComponentCatalog {
+            self.catalog.components()
+        }
+
+        fn physical(&self) -> Option<&litchi_iwa_archive::SourceCatalog> {
+            Some(&self.catalog)
+        }
+
+        fn resolve_object(
+            &self,
+            _identifier: u64,
+        ) -> Result<Option<crate::ResolvedObject<'_>>, crate::ResolveError> {
+            Ok(None)
+        }
+
+        fn source_bytes(&self) -> &[u8] {
+            self.catalog.source_bytes()
+        }
+
+        fn archive_limits(&self) -> litchi_iwa_archive::Limits {
+            litchi_iwa_archive::Limits::default()
+        }
+
+        fn max_objects(&self) -> usize {
+            1_000_000
+        }
+
+        fn max_references(&self) -> usize {
+            1_000_000
+        }
+
+        fn proofs(&self) -> Option<&PackageProofs> {
+            Some(&self.proofs)
+        }
+    }
+
+    #[test]
+    fn the_cached_census_proves_an_exclusive_reference() {
+        let mut bytes = object(10, Some(20), &[]);
+        bytes.extend(object(20, None, &[]));
+        bytes.extend(object(30, None, &[]));
+        assert!(prove(&bytes).is_ok());
+    }
+
+    #[test]
+    fn unknown_metadata_on_an_unrelated_object_still_refuses() {
+        let mut bytes = object(10, Some(20), &[]);
+        bytes.extend(object(20, None, &[]));
+        // Field 9 of an ArchiveInfo is unknown header metadata.
+        bytes.extend(object(30, None, &[9 << 3, 1]));
+        assert!(matches!(
+            prove(&bytes),
+            Err(Error::Refused(
+                crate::cell_format::Refusal::UnsupportedDependency { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn a_second_owner_still_refuses() {
+        let mut bytes = object(10, Some(20), &[]);
+        bytes.extend(object(20, None, &[]));
+        bytes.extend(object(30, Some(20), &[]));
+        assert!(prove(&bytes).is_err());
+    }
+
+    #[test]
+    fn a_reopened_package_inherits_the_census_of_shared_archives_only() {
+        let bytes = fixture("numbers/basic.numbers");
+        let parent = Memoized::open(&bytes);
+        let mut budget = TransactionBudget::for_cell_control(&parent);
+        let (census, _) = parent
+            .proofs
+            .census(&parent, &mut budget, Path::Package)
+            .expect("census");
+        let fresh = ReferenceCensus::build(&parent, None);
+        assert_eq!(format!("{census:?}"), format!("{fresh:?}"));
+
+        // Reopening identical bytes shares every parsed archive.
+        let reopened = parent.reopen(&bytes);
+        let mut budget = TransactionBudget::for_cell_control(&reopened);
+        let (inherited, _) = reopened
+            .proofs
+            .census(&reopened, &mut budget, Path::Package)
+            .expect("inherited census");
+        assert_eq!(inherited.components.len(), census.components.len());
+        assert!(
+            inherited
+                .components
+                .iter()
+                .zip(&census.components)
+                .all(|(left, right)| Arc::ptr_eq(&left.objects, &right.objects))
+        );
+
+        // A package parsed afresh shares none and is inspected in full.
+        let mut unrelated = Memoized::open(&bytes);
+        unrelated.proofs = parent
+            .proofs
+            .reopened(parent.catalog(), unrelated.catalog());
+        let mut budget = TransactionBudget::for_cell_control(&unrelated);
+        let (rebuilt, _) = unrelated
+            .proofs
+            .census(&unrelated, &mut budget, Path::Package)
+            .expect("rebuilt census");
+        assert!(
+            rebuilt
+                .components
+                .iter()
+                .zip(&census.components)
+                .all(|(left, right)| !Arc::ptr_eq(&left.objects, &right.objects))
+        );
+        assert!(
+            rebuilt
+                .components
+                .iter()
+                .zip(&census.components)
+                .all(
+                    |(left, right)| format!("{:?}", left.objects) == format!("{:?}", right.objects)
+                )
+        );
+    }
+
+    #[test]
+    fn a_low_budget_refuses_before_cold_or_cached_census_work() {
+        let bytes = fixture("numbers/basic.numbers");
+        let cold = Memoized::open(&bytes);
+        let mut cold_budget = TransactionBudget::for_cell_control(&cold);
+        cold_budget.remaining_allocations = 0;
+        cold_budget.remaining_transaction_work = 0;
+        assert!(matches!(
+            require_exclusive_selected_model_reference(
+                &cold,
+                target(),
+                20,
+                Path::Package,
+                &mut cold_budget,
+            ),
+            Err(Error::Limit { .. })
+        ));
+        assert!(cold.proofs.census.get().is_none());
+
+        let cached = Memoized::open(&bytes);
+        let mut warm_budget = TransactionBudget::for_cell_control(&cached);
+        let _ = require_exclusive_selected_model_reference(
+            &cached,
+            target(),
+            20,
+            Path::Package,
+            &mut warm_budget,
+        );
+        assert!(cached.proofs.census.get().is_some());
+
+        let mut cached_budget = TransactionBudget::for_cell_control(&cached);
+        cached_budget.remaining_allocations = 0;
+        cached_budget.remaining_transaction_work = 0;
+        assert!(matches!(
+            require_exclusive_selected_model_reference(
+                &cached,
+                target(),
+                20,
+                Path::Package,
+                &mut cached_budget,
+            ),
+            Err(Error::Limit { .. })
+        ));
+        assert!(cached.proofs.census.get().is_some());
+    }
+
+    #[test]
+    fn a_low_reference_budget_refuses_before_cold_census_inspection() {
+        let bytes = fixture("numbers/basic.numbers");
+        let cold = Memoized::open(&bytes);
+        let mut budget = TransactionBudget::for_cell_control(&cold);
+        budget.remaining_payload_references = 0;
+        assert!(matches!(
+            require_exclusive_selected_model_reference(
+                &cold,
+                target(),
+                20,
+                Path::Package,
+                &mut budget,
+            ),
+            Err(Error::Limit {
+                kind: crate::cell_format::LimitKind::PayloadReferences,
+                ..
+            })
+        ));
+        assert!(cold.proofs.census.get().is_none());
+    }
+
+    #[test]
+    fn candidate_reopen_budget_is_charged_before_readback() {
+        let bytes = fixture("numbers/basic.numbers");
+        let candidate = Memoized::open(&bytes);
+        let mut budget = TransactionBudget::for_cell_control(&candidate);
+        budget.remaining_payload_objects = 0;
+
+        assert!(matches!(
+            budget.charge_candidate_reopen(&candidate.catalog, Path::Package),
+            Err(Error::Limit {
+                kind: crate::cell_format::LimitKind::PayloadObjects,
+                ..
+            })
+        ));
+        assert_eq!(budget.remaining_payload_objects, 0);
+    }
+
+    #[test]
+    fn a_changed_archive_is_reinspected_while_unchanged_archives_reuse_census() {
+        let bytes = fixture("numbers/basic.numbers");
+        let parent = Memoized::open(&bytes);
+        let mut parent_budget = TransactionBudget::for_cell_control(&parent);
+        let _ = require_exclusive_selected_model_reference(
+            &parent,
+            target(),
+            20,
+            Path::Package,
+            &mut parent_budget,
+        );
+        let parent_census = Arc::clone(parent.proofs.census.get().expect("parent census"));
+
+        let entry = parent
+            .catalog
+            .package()
+            .iter()
+            .find(|entry| entry.name() == "Index/Tables/DataList.iwa")
+            .expect("DataList member");
+        let archive_limits = parent
+            .catalog
+            .limits()
+            .effective_archive_limits()
+            .expect("archive limits");
+        let snappy_limits = parent
+            .catalog
+            .limits()
+            .snappy_limits()
+            .expect("Snappy limits");
+        let decompressed =
+            SnappyStream::decompress(entry.data(), snappy_limits).expect("decompress DataList");
+        let mut archive =
+            Archive::parse(decompressed.as_bytes(), archive_limits).expect("DataList archive");
+        let message = archive.objects[0].messages[0].clone();
+        let mut data = message.data;
+        data.push(0);
+        archive.objects[0]
+            .replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+                archive_limits,
+            )
+            .expect("mutate DataList payload");
+        let changed = archive.to_bytes(archive_limits).expect("encode DataList");
+        let changed = SnappyStream::compress(&changed, snappy_limits).expect("compress DataList");
+        let candidate_bytes = parent
+            .catalog
+            .package()
+            .reassemble_with_changes_to_bytes(
+                &[],
+                &[EntryEdit::new(entry.name(), &changed)],
+                &[],
+                parent.catalog.limits(),
+            )
+            .expect("reassemble candidate");
+        let candidate = parent.reopen(&candidate_bytes);
+        let mut candidate_budget = TransactionBudget::for_cell_control(&candidate);
+        let (candidate_census, _) = candidate
+            .proofs
+            .census(&candidate, &mut candidate_budget, Path::Package)
+            .expect("candidate census");
+
+        let mut reused = 0usize;
+        let mut rebuilt = 0usize;
+        for component in &candidate_census.components {
+            if let Some(parent_component) = parent_census
+                .components
+                .iter()
+                .find(|parent_component| parent_component.archive_key == component.archive_key)
+            {
+                assert!(Arc::ptr_eq(&parent_component.objects, &component.objects));
+                reused = reused.saturating_add(1);
+            } else {
+                rebuilt = rebuilt.saturating_add(1);
+            }
+        }
+        assert!(
+            reused > 0,
+            "candidate should inherit unchanged component proofs"
+        );
+        assert_eq!(
+            rebuilt, 1,
+            "only the edited component should be re-inspected"
+        );
+    }
+
+    /// The options of a cross-component read and of the strict census, as
+    /// `pop_up_menu::prove_cross_component_reference` and
+    /// `validate_metadata_ownership` size them.
+    fn registry_options(package: &Memoized) -> (MetadataRewriteOptions, MetadataRewriteOptions) {
+        let sized = |bytes: usize, components: usize| {
+            MetadataRewriteOptions::new(
+                bytes,
+                bytes * 2,
+                bytes * 16,
+                bytes * 64,
+                64,
+                components,
+                bytes * 2,
+                1,
+            )
+        };
+        let source = package.source_bytes().len();
+        let members = package
+            .catalog
+            .package()
+            .iter()
+            .map(|entry| entry.data().len())
+            .sum::<usize>();
+        (sized(source, source * 2), sized(members, members))
+    }
+
+    #[test]
+    fn a_memoized_cross_component_read_stands_in_for_the_strict_registry() {
+        for name in [
+            "numbers/basic.numbers",
+            "numbers/custom-retirement-cleared.numbers",
+        ] {
+            let package = Memoized::open(&fixture(name));
+            let (read_options, strict_options) = registry_options(&package);
+            let read = package
+                .proofs
+                .cross_component_read_registry(&package, read_options)
+                .expect("read registry");
+            let strict = package
+                .proofs
+                .strict_registry(&package, strict_options)
+                .expect("strict registry");
+            assert!(Arc::ptr_eq(read.shared(), strict.shared()), "{name}");
+            let fresh = popup_metadata::inspect(&package, strict_options).expect("fresh registry");
+            assert_eq!(format!("{:?}", *strict), format!("{:?}", *fresh), "{name}");
+            assert_eq!(strict.payload(), fresh.payload());
+            let again = package
+                .proofs
+                .strict_registry(&package, strict_options)
+                .expect("memoized registry");
+            assert!(Arc::ptr_eq(again.shared(), strict.shared()));
+        }
+    }
+
+    #[test]
+    fn a_cross_component_read_outside_the_strict_limits_does_not_stand_in() {
+        let package = Memoized::open(&fixture("numbers/basic.numbers"));
+        let (read_options, _) = registry_options(&package);
+        package
+            .proofs
+            .cross_component_read_registry(&package, read_options)
+            .expect("read registry");
+        let fields = 1;
+        let strict_options = MetadataRewriteOptions::new(
+            read_options.max_input_bytes(),
+            read_options.max_output_bytes(),
+            fields,
+            read_options.max_work_bytes(),
+            64,
+            read_options.max_components(),
+            read_options.max_references(),
+            1,
+        );
+        assert!(popup_metadata::inspect(&package, strict_options).is_err());
+        assert!(
+            package
+                .proofs
+                .strict_registry(&package, strict_options)
+                .is_err()
+        );
+        assert!(package.proofs.strict_registry.get().is_none());
+    }
 }

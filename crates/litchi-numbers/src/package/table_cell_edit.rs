@@ -2,6 +2,7 @@
 
 mod budget;
 mod cache_commit;
+mod column_counts;
 mod formula_author;
 mod lists;
 mod locality;
@@ -1945,7 +1946,8 @@ fn commit_existing_scalar_tiles(
         .and_then(|count| count.checked_add(changes.len()))
         .and_then(|count| count.checked_add(cache_prepared.tiles.len()))
         .and_then(|count| count.checked_add(final_row_capacity))
-        .and_then(|count| count.checked_add(1))
+        // The string list and the column-header bucket.
+        .and_then(|count| count.checked_add(2))
         .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedElements,
             observed: u64::MAX,
@@ -1970,6 +1972,11 @@ fn commit_existing_scalar_tiles(
             amount: changes.len(),
         })?;
     require_exact_capacity(&releases, changes.len(), path)?;
+    let column_capacity = changes.len().min(
+        usize::try_from(target.native.columns).map_err(|_error| Error::InvalidSource { path })?,
+    );
+    reserve_retained_vec::<(u32, i64)>(&mut budget, column_capacity, path)?;
+    let mut column_deltas = column_counts::Deltas::with_capacity(column_capacity)?;
     let mut final_rows = Vec::new();
     reserve_retained_vec::<sparse::FinalRowCount>(&mut budget, final_row_capacity, path)?;
     final_rows
@@ -2172,6 +2179,14 @@ fn commit_existing_scalar_tiles(
             &mut releases,
             path,
         )?;
+        let mut recorded = Ok(());
+        plan.visit_transitions(|transition| {
+            if recorded.is_ok() {
+                recorded = column_deltas.record(&transition, path);
+            }
+        })
+        .map_err(|error| map_tile_error(error, path))?;
+        recorded?;
         if plan.execution_requirements().output_bytes() == 0
             && (rich_prepared.keys[start..end].iter().any(Option::is_none)
                 || !cache_changes.is_empty())
@@ -2326,6 +2341,26 @@ fn commit_existing_scalar_tiles(
         prepared_string_list = Some(prepared_list);
     }
 
+    if column_deltas.changes() {
+        let bucket = message_payload(source, target.storage.column_headers, path)?;
+        let envelope = column_deltas.envelope(bucket.len(), path)?;
+        budget.authorize(envelope)?;
+        let payload = match column_deltas.apply(bucket, &target.storage, path) {
+            Ok(payload) => payload,
+            Err(error) => {
+                budget.cancel_authorization();
+                return Err(error);
+            },
+        };
+        budget.record_authorized(envelope)?;
+        if let Some(payload) = payload {
+            prepared.push(PreparedReplacement {
+                route: target.storage.column_headers,
+                payload,
+                references: None,
+            });
+        }
+    }
     let future_component_capacity = prepared_capacity
         .checked_add(1)
         .ok_or(Error::InvalidSource { path })?;
@@ -7752,10 +7787,12 @@ mod tests {
         );
         assert_eq!((small.tile_reads, large.tile_reads), (2, 2));
         assert_eq!((small.tile_writes, large.tile_writes), (1, 1));
-        assert_eq!((small.component_encodes, large.component_encodes), (2, 2));
+        // The tile, the row-header bucket and the column-header bucket,
+        // whose columns all gain cells.
+        assert_eq!((small.component_encodes, large.component_encodes), (3, 3));
         assert_eq!(
             (small.components_reassembled, large.components_reassembled),
-            (2, 2)
+            (3, 3)
         );
     }
 
@@ -8210,6 +8247,66 @@ mod tests {
             .iter()
             .find(|header| header.index == row)
             .map(|header| header.number_of_cells)
+    }
+
+    fn column_header_cell_count(package: &Package, column: u32) -> Option<u32> {
+        let (target, _report) =
+            super::resolve::resolve_changed_target(package, 0, 0, &[At::new(2, column)])
+                .expect("column-header target resolves");
+        let payload = super::message_payload(package, target.storage.column_headers, Path::Package)
+            .expect("column-header bucket payload exists");
+        let bucket =
+            tst::HeaderStorageBucket::decode(payload).expect("column-header bucket decodes");
+        bucket
+            .headers
+            .iter()
+            .find(|header| header.index == column)
+            .map(|header| header.number_of_cells)
+    }
+
+    #[test]
+    fn native_column_header_counts_track_value_writes_exactly() -> TestResult {
+        let source = Package::open(fixture())?;
+        let source_bytes = source.source_bytes().to_vec();
+        let counts = |package: &Package| {
+            [1, 2, 5].map(|column: u32| column_header_cell_count(package, column))
+        };
+        // Column B stores B2 and B3; C has no header; F's header carries a
+        // width and counts no cell.
+        assert_eq!(counts(&source), [Some(2), None, Some(0)]);
+        assert_eq!(row_header_cell_count(&source, 2), Some(1));
+
+        // Cleared, B3 keeps its styled record, so both axes still count it.
+        let commit = source
+            .edit_table_cells(0usize, 0usize)?
+            .set_a1("C3", Input::boolean(true))?
+            .clear_a1("B3")?
+            .set_a1("B2", Input::number(7.0)?)?
+            .set_a1("F3", Input::boolean(true))?
+            .commit()?;
+        assert_eq!(counts(commit.package()), [Some(2), Some(1), Some(1)]);
+        assert_eq!(row_header_cell_count(commit.package(), 2), Some(3));
+        assert_eq!(
+            source
+                .apply_table_cells(commit.patch())?
+                .package()
+                .source_bytes(),
+            commit.package().source_bytes()
+        );
+        let restored = commit
+            .package()
+            .apply_table_cells(&commit.patch().inverse())?;
+        assert_eq!(restored.package().source_bytes(), source_bytes);
+
+        // A bare header left counting no cell goes; a sized one stays.
+        let cleared = commit
+            .package()
+            .edit_table_cells(0usize, 0usize)?
+            .clear_a1("C3")?
+            .clear_a1("F3")?
+            .commit()?;
+        assert_eq!(counts(cleared.package()), [Some(2), None, Some(0)]);
+        Ok(())
     }
 
     #[test]

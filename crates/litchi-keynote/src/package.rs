@@ -54,6 +54,7 @@ pub(crate) mod slide_table_core;
 pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_hidden_axes;
+pub(crate) mod slide_table_lifecycle;
 pub(crate) mod slide_table_lock_state;
 pub(crate) mod slide_table_merges;
 pub(crate) mod slide_table_name;

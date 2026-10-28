@@ -6632,3 +6632,57 @@ See [0063](0063-source-pptx-modern-comments.md).
 - The separate 0377a performance owner is auditing and completing the
   existing `uo2/fin-perf` changes alongside the five-agent iWork wave. The
   final full gate has not yet run on this resumed integration.
+- Post-merge checks on `0944b7319f` passed: workspace all-target/all-feature
+  compilation, all 20 fuzz workspaces with locked offline resolution, crate
+  boundaries and the exit ledger.
+- Accepted W1-C repair `ea0352fad2` (implementation `db38bb09f8`, record
+  0372). The shared structural reopen seam retains typed resource errors;
+  Keynote refuses unsafe merged-table duplication before publication.
+  Table-removal parity now compares all surviving known fields, references
+  and untouched bytes with a pinned orphan allowance and a negative control.
+  Scoped lifecycle/parity/Numbers regressions, formatting, Clippy, rustdoc,
+  glossary, ledger, boundaries and affected fuzz locks pass. Fresh branch
+  measurements show duplicate/remove facade costs 84.6%/87.0% below the host.
+  Pages will adopt the shared error seam when W1-B next syncs trunk.
+  Native mutation evidence and final integrated qualification remain pending.
+- Post-merge checks on `aeac888d5f` passed: workspace all-target/all-feature
+  compilation, all 20 locked offline fuzz workspaces, boundaries and ledger.
+- Accepted W1-B `c18ec13139` (record 0371): bounded shared line-end codec,
+  Pages endpoint read/set/reset, and supported populated-table duplication.
+  Non-empty merged tables receive a terminal safety refusal. The Pages
+  structural adapter now preserves typed resource failures through W1-C's
+  shared seam. Current scoped tests/parity, Clippy, rustdoc, glossary,
+  boundaries, fuzz, non-iWork and feature-matrix checks pass. Measurements
+  remain explicitly bound to work-package source `6bb1d58021`: endpoint
+  routes use 66.09–79.78% fewer instructions and duplication 96.70% fewer
+  than the host. Final integrated measurements will use the frozen source.
+- Post-merge workspace, all 20 locked offline fuzz workspaces, boundaries
+  and ledger checks passed on `6f27c738ad`.
+- Accepted W1-F `0256224144` (record 0376c): column-header counts on cell
+  writes, empty formula-dependency envelopes, released formula-list key
+  reuse, and Numbers formula-authoring parity. The uncached case calls the
+  actual host setter and normalizes only C3's numeric cache bytes; a B3
+  mutation negative control and preserved unknown-field census keep the
+  comparison narrow. Current scoped tests, Clippy, docs, glossary,
+  boundaries, fuzz locks and ledger pass. Three source-bound facade probes
+  use 55.744%, 68.599% and 55.761% fewer instructions than the host.
+  Two formula rows migrate and two raw member-lookup helpers retire.
+  Native mutation acceptance and final integrated qualification remain open.
+- Post-merge checks on `e43104db24` passed with an unchanged clean HEAD:
+  workspace, all 20 locked offline fuzz workspaces, boundaries and ledger.
+- Accepted W1-A `02e71e0e55` (record 0370k): generic Numbers DataFormat and
+  numeral-system writes, plus Pages/Keynote numeral reads. Immutable package
+  proof caches retain strict unknown-metadata admission; cold references are
+  charged before inspection, candidate ingress is preflighted, and readback
+  uses the original transaction budget. Candidate resource errors stay typed.
+  Scoped tests/parity, Clippy, rustdoc, glossary, boundaries and four affected
+  fuzz locks pass. The latest source-bound numeral probe is +2.49% versus the
+  host; earlier Pages/Keynote probes are explicitly pre-final-root evidence.
+  Seven ledger rows migrate and native routes remain queued.
+- The separate 0377a performance branch remains in review: the revision-based
+  snapshot proof must exclude caller-defined OPC parts from every unchecked
+  fast path. Ordinary mutable seams were audited; custom-part regressions and
+  the final guarded-source cost/gate receipt are required before integration.
+- Next-wave preparation is read-only while this candidate is qualified:
+  W1-G shared cell comments and W1-E 0375b shared chart text/caption graphs.
+  No new shared-engine slice will integrate before the current frozen gate.

@@ -152,6 +152,56 @@ pub fn compare_with_policies(
     leaf_drops: &[&str],
     policy: MetadataPolicy,
 ) -> TestResult<Diff> {
+    compare_with_policies_except_objects(
+        input,
+        host,
+        leaf,
+        known,
+        leaf_drops,
+        policy,
+        &BTreeSet::new(),
+    )
+}
+
+/// [`compare_with_policies`] with a documented host-only object island.
+///
+/// The excluded identifiers are still subject to the caller's graph proof;
+/// this only permits the host to retain those objects while the leaf removes
+/// them. Every surviving object continues through the normal raw, reference,
+/// and known-field checks, and untouched ZIP members remain byte-exact.
+pub fn compare_with_policies_except_objects(
+    input: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+    known: &KnownFields,
+    leaf_drops: &[&str],
+    policy: MetadataPolicy,
+    excluded_object_ids: &BTreeSet<u64>,
+) -> TestResult<Diff> {
+    compare_with_policies_except_objects_and_members(
+        input,
+        host,
+        leaf,
+        known,
+        leaf_drops,
+        policy,
+        excluded_object_ids,
+        &[],
+    )
+}
+
+/// [`compare_with_policies_except_objects`] with an explicitly documented set
+/// of host-only members belonging to the same allowed orphan island.
+pub fn compare_with_policies_except_objects_and_members(
+    input: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+    known: &KnownFields,
+    leaf_drops: &[&str],
+    policy: MetadataPolicy,
+    excluded_object_ids: &BTreeSet<u64>,
+    allowed_host_members: &[&str],
+) -> TestResult<Diff> {
     let input = members(input)?;
     let mut host = members(host)?;
     let leaf = members(leaf)?;
@@ -178,7 +228,10 @@ pub fn compare_with_policies(
     if host_names != leaf_names {
         let host_set: BTreeSet<_> = host_names.iter().collect();
         let leaf_set: BTreeSet<_> = leaf_names.iter().collect();
-        let only_host: Vec<_> = host_set.difference(&leaf_set).collect();
+        let only_host: Vec<_> = host_set
+            .difference(&leaf_set)
+            .filter(|name| !allowed_host_members.contains(&name.as_str()))
+            .collect();
         let only_leaf: Vec<_> = leaf_set.difference(&host_set).collect();
         if only_host.is_empty() && only_leaf.is_empty() {
             diff.notes.push(format!(
@@ -241,7 +294,7 @@ pub fn compare_with_policies(
                     Some(source) => objects(&source.data)?,
                     None => Vec::new(),
                 };
-                let changed = count_changed(&source_objects, &host_objects);
+                let changed = count_changed(&source_objects, &host_objects, excluded_object_ids);
                 diff.host_changed_objects += changed;
                 diff.leaf_changed_objects += changed;
             }
@@ -273,12 +326,18 @@ pub fn compare_with_policies(
             known,
             policy,
             &mut diff,
+            excluded_object_ids,
+            allowed_host_members,
         );
     }
     Ok(diff)
 }
 
-fn count_changed(source: &[Object], target: &[Object]) -> usize {
+fn count_changed(
+    source: &[Object],
+    target: &[Object],
+    excluded_object_ids: &BTreeSet<u64>,
+) -> usize {
     let source: BTreeMap<_, _> = source.iter().map(|o| (o.identifier, &o.raw)).collect();
     let target: BTreeMap<_, _> = target.iter().map(|o| (o.identifier, &o.raw)).collect();
     source
@@ -286,6 +345,7 @@ fn count_changed(source: &[Object], target: &[Object]) -> usize {
         .chain(target.keys())
         .collect::<BTreeSet<_>>()
         .into_iter()
+        .filter(|id| !excluded_object_ids.contains(*id))
         .filter(|id| source.get(id) != target.get(id))
         .count()
 }
@@ -298,9 +358,11 @@ fn compare_objects(
     known: &KnownFields,
     policy: MetadataPolicy,
     diff: &mut Diff,
+    excluded_object_ids: &BTreeSet<u64>,
+    allowed_host_members: &[&str],
 ) {
-    diff.host_changed_objects += count_changed(input, host);
-    diff.leaf_changed_objects += count_changed(input, leaf);
+    diff.host_changed_objects += count_changed(input, host, excluded_object_ids);
+    diff.leaf_changed_objects += count_changed(input, leaf, excluded_object_ids);
     let index = |objects: &[Object]| -> BTreeMap<u64, usize> {
         objects
             .iter()
@@ -309,8 +371,16 @@ fn compare_objects(
             .collect()
     };
     let (input_at, host_at, leaf_at) = (index(input), index(host), index(leaf));
-    let host_ids: BTreeSet<_> = host_at.keys().copied().collect();
-    let leaf_ids: BTreeSet<_> = leaf_at.keys().copied().collect();
+    let host_ids: BTreeSet<_> = host_at
+        .keys()
+        .filter(|id| !excluded_object_ids.contains(*id))
+        .copied()
+        .collect();
+    let leaf_ids: BTreeSet<_> = leaf_at
+        .keys()
+        .filter(|id| !excluded_object_ids.contains(*id))
+        .copied()
+        .collect();
     if host_ids != leaf_ids {
         diff.violations.push(format!(
             "{member}: object identifiers differ: only in host {:?}, only in leaf {:?}",
@@ -358,7 +428,17 @@ fn compare_objects(
                 "{label}: the host re-encoded an object the leaf kept byte-identical"
             ));
         }
-        compare_known(&label, source, h, l, known, policy, diff);
+        compare_known(
+            &label,
+            source,
+            h,
+            l,
+            known,
+            policy,
+            diff,
+            excluded_object_ids,
+            allowed_host_members,
+        );
     }
 }
 
@@ -379,6 +459,8 @@ fn compare_known(
     known: &KnownFields,
     policy: MetadataPolicy,
     diff: &mut Diff,
+    excluded_object_ids: &BTreeSet<u64>,
+    allowed_host_members: &[&str],
 ) {
     if host.messages.len() != leaf.messages.len() {
         diff.violations.push(format!(
@@ -424,22 +506,27 @@ fn compare_known(
             ));
             continue;
         };
-        let normalised;
-        let leaf_data = if h.type_ == PACKAGE_METADATA && policy.any() {
+        let normalised = if h.type_ == PACKAGE_METADATA && policy.any() {
             let input = source.and_then(|source| {
                 source
                     .messages
                     .iter()
                     .find(|message| message.type_ == PACKAGE_METADATA)
             });
-            match normalise_metadata(input.map(|m| m.data.as_slice()), &h.data, &l.data, policy) {
-                Ok((data, notes)) => {
+            match normalise_metadata(
+                input.map(|m| m.data.as_slice()),
+                &h.data,
+                &l.data,
+                policy,
+                excluded_object_ids,
+                allowed_host_members,
+            ) {
+                Ok((host_data, data, notes)) => {
                     for note in notes {
                         diff.notes
                             .push(format!("{label} payload {position}: {note}"));
                     }
-                    normalised = data;
-                    normalised.as_slice()
+                    Some((host_data, data))
                 },
                 Err(violation) => {
                     diff.violations
@@ -448,12 +535,18 @@ fn compare_known(
                 },
             }
         } else {
-            l.data.as_slice()
+            None
         };
-        if h.data == leaf_data {
+        let host_data = normalised
+            .as_ref()
+            .map_or(h.data.as_slice(), |(data, _)| data.as_slice());
+        let leaf_data = normalised
+            .as_ref()
+            .map_or(l.data.as_slice(), |(_, data)| data.as_slice());
+        if host_data == leaf_data {
             continue;
         }
-        match (decode(&h.data), decode(leaf_data)) {
+        match (decode(host_data), decode(leaf_data)) {
             (Ok(hd), Ok(ld)) => {
                 if hd.canonical != ld.canonical {
                     diff.violations.push(format!(
@@ -478,10 +571,12 @@ fn compare_known(
 
 const PACKAGE_METADATA: u32 = 11_006;
 
-/// Documented leaf metadata policies a case accepts. Each one rewrites the
-/// leaf's `TSP.PackageMetadata` to the host's value for exactly the
-/// difference it names (after checking the leaf value has the documented
-/// shape), so every other field is still compared.
+/// Documented leaf metadata policies a case accepts. Each one normalises the
+/// compared metadata values for exactly the difference it names (after
+/// checking the leaf value has the documented shape), so every other field is
+/// still compared. A caller may additionally provide a pinned host-only
+/// component/member island; those records are removed from the host projection
+/// only after the member-to-component closure is validated.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MetadataPolicy {
     /// The leaf advances the document save token by one and stamps every
@@ -507,14 +602,101 @@ fn normalise_metadata(
     host: &[u8],
     leaf: &[u8],
     policy: MetadataPolicy,
-) -> Result<(Vec<u8>, Vec<String>), String> {
+    excluded_object_ids: &BTreeSet<u64>,
+    allowed_host_members: &[&str],
+) -> Result<(Vec<u8>, Vec<u8>, Vec<String>), String> {
     use litchi_iwa_protos::tsp::PackageMetadata;
     use prost::Message as _;
     let decode = |data: &[u8]| PackageMetadata::decode(data).map_err(|e| e.to_string());
-    let host = decode(host)?;
+    let mut host = decode(host)?;
     let mut leaf = decode(leaf)?;
     let input = input.map(decode).transpose()?;
     let mut notes = Vec::new();
+
+    // A table removal has one documented host-only island.  Its member names
+    // and object identifiers are pinned by the case, so this normalisation
+    // cannot grow to cover an arbitrary new deletion.  Validate the member ->
+    // component relation before removing anything from the metadata graph.
+    let mut orphan_component_ids = BTreeSet::new();
+    for member in allowed_host_members {
+        let locator = member
+            .strip_prefix("Index/")
+            .and_then(|name| name.strip_suffix(".iwa"))
+            .ok_or_else(|| format!("invalid allowed host member {member:?}"))?;
+        let matches = host
+            .components
+            .iter()
+            .filter(|component| {
+                component.locator.as_deref() == Some(locator)
+                    || component.preferred_locator == locator
+            })
+            .map(|component| component.identifier)
+            .collect::<Vec<_>>();
+        let [identifier] = matches.as_slice() else {
+            return Err(format!(
+                "allowed host member {member:?} maps to {} metadata components, expected one",
+                matches.len()
+            ));
+        };
+        orphan_component_ids.insert(*identifier);
+    }
+
+    fn remove_orphan_links(
+        component: &mut litchi_iwa_protos::tsp::ComponentInfo,
+        excluded_object_ids: &BTreeSet<u64>,
+        orphan_component_ids: &BTreeSet<u64>,
+    ) {
+        component
+            .object_uuid_map_entries
+            .retain(|entry| !excluded_object_ids.contains(&entry.identifier));
+        component
+            .ambiguous_object_identifiers
+            .retain(|identifier| !excluded_object_ids.contains(identifier));
+        component.external_references.retain(|reference| {
+            !orphan_component_ids.contains(&reference.component_identifier)
+                && reference
+                    .object_identifier
+                    .is_none_or(|identifier| !excluded_object_ids.contains(&identifier))
+        });
+        component.versioned_external_references.retain(|reference| {
+            !orphan_component_ids.contains(&reference.component_identifier)
+                && reference
+                    .object_identifier
+                    .is_none_or(|identifier| !excluded_object_ids.contains(&identifier))
+        });
+        component.data_references.retain_mut(|reference| {
+            let before = reference.object_reference_list.len();
+            reference
+                .object_reference_list
+                .retain(|object| !excluded_object_ids.contains(&object.object_identifier));
+            before == reference.object_reference_list.len()
+                || !reference.object_reference_list.is_empty()
+        });
+    }
+
+    if !orphan_component_ids.is_empty() {
+        host.components
+            .retain(|component| !orphan_component_ids.contains(&component.identifier));
+        host.versioned_components
+            .retain(|component| !orphan_component_ids.contains(&component.identifier));
+        notes.push(format!(
+            "removed {} host-only metadata component(s) belonging to the pinned orphan island",
+            orphan_component_ids.len()
+        ));
+    }
+    for component in &mut host.components {
+        remove_orphan_links(component, excluded_object_ids, &orphan_component_ids);
+    }
+    for component in &mut host.versioned_components {
+        remove_orphan_links(component, excluded_object_ids, &orphan_component_ids);
+    }
+    for component in &mut leaf.components {
+        remove_orphan_links(component, excluded_object_ids, &orphan_component_ids);
+    }
+    for component in &mut leaf.versioned_components {
+        remove_orphan_links(component, excluded_object_ids, &orphan_component_ids);
+    }
+
     if policy.save_token && leaf.save_token != host.save_token {
         let source = input.as_ref().and_then(|input| input.save_token);
         let advanced = source.zip(leaf.save_token).is_some_and(|(s, l)| l == s + 1);
@@ -633,7 +815,7 @@ fn normalise_metadata(
             ));
         }
     }
-    Ok((leaf.encode_to_vec(), notes))
+    Ok((host.encode_to_vec(), leaf.encode_to_vec(), notes))
 }
 
 /// Offset of the first differing byte, or the shorter length.

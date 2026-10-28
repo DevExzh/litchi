@@ -1,10 +1,10 @@
 # 0372 — W1-C: Keynote slides, drawables and media out of `litchi-iwa`
 
-- Status: wave W1-C on branch `uo2/iwa-w1c`, third landing (cut from
-  trunk `feat/unified-ops-api` at `f35f1c9f55`; trunk last merged at
-  `dc9902fe5a`). The remaining Keynote rows wait on shared engines that other
-  waves are building (§6).
-- Date: 2026-10-27.
+- Status: wave W1-C on branch `uo2/iwa-w1c`, fifth landing (review repair;
+  implementation `db38bb09f8`; coordinator trunk audit `0944b7319f` merged
+  into this work-package branch by `833be6047c`). The remaining Keynote rows
+  wait on shared engines that other waves are building (§6).
+- Date: 2026-10-28.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave row W1-C (§0), API shape
   §3.2, parity §4; harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
   codecs and the D4 gap [0368](0368-iwa-w0b-codecs-formula-graph-table-vocabulary.md);
@@ -62,12 +62,14 @@ the two defects of §3 and the caption seam's missing theme references
 
 ## 2. Ledger
 
-The Keynote ledger now has 322 `migrated`, 5 `retired` and 312 `host-only`
-rows. Wave W1-C migrated about 290 of them: 22 in the first landing, about
-223 in the second and 44 in the third (35 shape-style, column, text-layout,
-preset and caption rows; 9 table cell-appearance rows). W1-F and W1-G
-migrated some of the other `table.*` rows (W1-G's Keynote hidden-axes facade, `4d55e0b052`, migrated the last two). Every migrated route without host
-native evidence has a `0363-mac-queue.md` row (135 W1-C rows).
+The Keynote ledger now has 331 `migrated`, 5 `retired` and 303 `host-only`
+rows. Wave W1-C migrated about 298 of them: 22 in the first landing, about
+223 in the second, 44 in the third (35 shape-style, column, text-layout,
+preset and caption rows; 9 table cell-appearance rows), and 9 in this
+continuation (table lifecycle and cell reads). W1-F and W1-G migrated some of
+the other `table.*` rows (W1-G's Keynote hidden-axes facade, `4d55e0b052`,
+migrated the last two). Every migrated route without host native evidence has
+a `0363-mac-queue.md` row (the continuation adds the lifecycle route).
 
 The first landing's rows:
 
@@ -224,6 +226,18 @@ are kept out of the tree until then.
   `slide::drawable::Unsupported::ShapeStyle`. An image fill reads back as an
   `ImageFill` (layout and colors), never as a native data identifier.
 
+- Fifth landing: the shared `litchi-iwa-table::structure::TableLeaf` reopen
+  seam returns `FaultResult<Self>`, so candidate reopen and exact-patch replay
+  preserve typed payload/selection/package limits and allocation failures.
+  The Numbers and Keynote adapters retain their package-specific resource
+  mapping at that seam. Keynote rejects duplicate requests for tables with
+  existing merges as a typed `UnsupportedDependency` before cloning; a
+  successful unreadable merged-table candidate is therefore not admitted.
+  Removal parity pins the expected orphan object IDs and member names per
+  fixture, verifies the component/member locator closure, known fields,
+  references and untouched bytes, and includes a negative control for an
+  unrelated survivor. The default archive comparison remains strict.
+
 The first landing's glossary profiles passed unchanged: no new banned names
 and no new family. `set_layout` joined the registered `slide::creation`
 family. Each second-landing family is registered in `tools/api_glossary.json`.
@@ -272,6 +286,44 @@ on a host-added rectangle on `basic.key`):
 | text-box columns set | 398,367,503 | 122,301,083 | −69.3% |
 | table cell fill set (`slide-table-read-native.key`) | 1,044,210,750 | 281,599,637 | −73.0% |
 
+Fourth continuation (branch `uo2/iwa-w1c`, same method; two calls per route in
+the ABBA probe):
+
+| Route (fixture) | Host Ir | Leaf Ir | Δ |
+|---|---:|---:|---:|
+| table duplicate (`table-discovery.key`) | 2,545,874,716 | 320,310,251 | −87.4% |
+| table remove (`table-discovery.key`) | 2,077,914,520 | 271,030,659 | −87.0% |
+
+Fifth landing review repair (`db38bb09f855a6fd26b17e89e6a0eb9474a5316f`,
+same release/debug-info, pinned-CPU and ABBA method):
+
+| Route (fixture) | Host Ir | Leaf Ir | Δ |
+|---|---:|---:|---:|
+| table duplicate (`table-discovery.key`) | 2,546,163,008 | 391,866,125 | −84.6% |
+| table remove (`table-discovery.key`) | 2,077,820,837 | 271,058,460 | −87.0% |
+
+The release build was produced by
+`CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --test parity --all-features --release --no-run`
+(exit 0). The measured binary was
+`target/release/deps/parity-25144fe4e83e134e`, 38,223,240 bytes, SHA-256
+`c48a51619a304271f0bd9072410acf8e32e348dd3d4af948617824cfa08b93b2`.
+The duplicate route command was
+`W1C_ROUTE=table_duplicate taskset -c 3 valgrind --tool=callgrind --callgrind-out-file=/tmp/iwa-w1c-table-duplicate-20261028-v2.callgrind target/release/deps/parity-25144fe4e83e134e --ignored --exact keynote_w1c_cost::keynote_w1c_route_cost_abba --test-threads=1`
+(exit 0); its outside-repository artifact is 493,342 bytes with SHA-256
+`6c96c1ea5b4016ff5c8a3e2d134da0b55a8944f2513f6ca353c29f2584838de0`.
+The remove command was the same with `W1C_ROUTE=table_remove` and
+`/tmp/iwa-w1c-table-remove-20261028-v2.callgrind` (exit 0); its artifact is
+443,491 bytes with SHA-256
+`7e7fe92251fff900f245a558aa69236872478333815d22d90a9e4b7da1411e17`.
+Both results were extracted with
+`callgrind_annotate --inclusive=yes /tmp/<route>.callgrind | rg 'w1c_(host|leaf)_route|PROGRAM TOTAL'`.
+The artifacts are intentionally not tracked. These branch-local numbers must
+be repeated on the final integrated trunk candidate.
+
+These figures are branch-local evidence; the coordinator must repeat both
+routes on the final integrated trunk candidate before treating them as the
+qualification result.
+
 Before `3d006110be`/`ba7155292b` the z-order move was **+9.4%** (leaf
 120,550,699 vs host 110,203,188): the structural reopen parsed every
 component again (22.5M Ir of the 60M leaf route). Reusing the base's parsed
@@ -288,7 +340,7 @@ build its own copy of any of them.
 |---|---:|---|
 | Chart style families | 160 | W1-E/W2 `litchi-iwa-style`; Keynote facades after it |
 | Table rich text, formats, comments, conditional highlights, topology | 127 | W1-G `litchi-iwa-table`; thin Keynote facades after each group |
-| Table lifecycle and cell reads (`add/duplicate/remove/resize_slide_table`, geometry, cells, comments, merges) | 14 | W1-G and W1-A table engines |
+| Remaining table lifecycle inventory (`slide_tables`, `slide_table`, `add_slide_table`, `set_slide_table_geometry`, `resize_slide_table`) | 5 | W1-C follow-up; the continuation's cell projections and duplicate/remove route are landed, while add/geometry/resize still need a complete shared graph policy |
 | Builder rows (including `language`/`locale`, implemented in `fc445c1aa3`) | 10 | the host builder draws random UUIDs; the rows wait for the harness to normalise builder identities |
 | `replace_media` | 1 | the media-replacement transaction (`slide::media::data`) covers movies; image and audio routes join after W1-E's media engine |
 | Shapes whose style inherits a disabled theme shadow that keeps enabled-shadow fields (most decks) | — (known gap, inside migrated rows) | both the host and the leaf refuse their shadow reads and writes (§3); supporting them needs a native-evidence decision on how such a shadow reads |
@@ -319,3 +371,112 @@ were re-run. Build environment from the coordinator rules
 `litchi-ops` capability and corpus behaviour did not change: no ops
 dispatch arm was added (D7), so the goldens and the OfficeCLI corpus were not
 re-blessed. Both pre-commit size checks printed nothing for every commit.
+
+Continuation scoped verification (source `db38bb09f855a6fd26b17e89e6a0eb9474a5316f`;
+all commands below returned exit 0; test counts are included where applicable):
+
+| Check | Result |
+|---|---|
+| `cargo fmt --all -- --check` | 0 |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-keynote --test slide_table_lifecycle --all-features -- --nocapture` | 4 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --test parity --all-features keynote_slide_table_remove_divergence_is_reported -- --nocapture` | 1 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --test parity --all-features keynote_slide_table -- --nocapture` | 38 passed, 0 failed, 739 filtered |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-numbers --test table_relocation --all-features -- --nocapture` | 9 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-numbers --test table_cell_number_format --all-features -- --nocapture` | 14 passed |
+| `CARGO_BUILD_JOBS=4 cargo clippy -p litchi-keynote -p litchi-numbers -p litchi-iwa-table --all-targets --all-features -- -D warnings` | 0 (vendor warnings only) |
+| `RUSTDOCFLAGS=-Dwarnings CARGO_BUILD_JOBS=4 cargo doc --no-deps --all-features -p litchi-keynote -p litchi-numbers -p litchi-iwa-table` | 0 (vendor warnings only) |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 0; 73 profiles, 3,957 banned names, 704 families, 125 immutable owners |
+| `python3 tools/iwa_exit_ledger.py --check` | 0 |
+| `python3 tools/check_crate_boundaries.py` | 0; 70 packages, 313 declarations, 12 explicit debt items |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `CARGO_BUILD_JOBS=4 cargo check -q --locked --manifest-path crates/litchi-keynote/fuzz/Cargo.toml --bins` | 0 |
+| `CARGO_BUILD_JOBS=4 cargo check -q --locked --manifest-path crates/litchi-numbers/fuzz/Cargo.toml --bins` | 0 |
+
+The fuzz-lock commands were run independently and their cargo statuses were
+captured directly; no grep-filtered pipeline was used as a success signal.
+
+## 8. Fourth landing — slide-table lifecycle and cell reads (continuation)
+
+The fourth landing ports the bounded Keynote table lifecycle operations that
+can be expressed through the shared `litchi-iwa-table::structure` engine.
+`Package::edit_slide_table_lifecycle` resolves a `SlideSelector` and
+`TableSelector`, stages exactly one `duplicate` or `remove`, publishes an
+exact-source candidate, strictly reopens it, and verifies the selected table
+graph before returning `Commit`. `Patch::inverse` restores the retained source
+bytes exactly; replay on another source is a typed `PatchConflict`. A semantic
+or directory-backed source is refused as `UnsupportedSource`, and malformed or
+ambiguous rooted graphs never fall back to the host.
+
+The duplicate facade uses the shared graph clone and formula-owner remapping,
+then attaches the new `TableInfo` to the slide's owned-drawable and z-order
+lists. It keeps the host's copy-name and ten-point offset rules. Removal uses
+the shared private-closure and formula-owner planner, detaches template-tag
+and instructional-text references, releases a removed identifier suffix, and
+proves that no removed object remains reachable. The host's known orphan-island
+behaviour after `remove_slide_table` remains an explicit Tier-B divergence;
+the leaf's complete private-closure removal is intentional and documented in
+`keynote_slide_table_remove_divergence_is_reported`.
+
+The archive-free `Package::slide_table_cells` and
+`Package::slide_table_merges` reads now have differential coverage over the
+host cell count, comment count, cell/comment accessors, iterators and merge
+projection. The native-authored read receipt proves the read route only; the
+two mutation routes remain in the macOS queue pending native open/save/close/
+reopen evidence. `add_slide_table`, geometry and resize stay host-only because
+their current host scaffolds and shared engines do not yet admit a complete
+selector-first facade.
+
+The parity cases cover `table-discovery.key`, `slide-table-read-native.key` and
+`slide-table-merges-native.key`: duplicate is Tier B with documented preview,
+save-token and fresh-UUID policies; reads are Tier A against the native read
+receipt; removal is Tier B with the intentional orphan-island divergence.
+The release ABBA cost probe adds `table_duplicate` and `table_remove` routes to
+`keynote_w1c_cost.rs`; final instruction-count values are recorded after the
+coordinator's integrated-tree qualification because later merges invalidate
+earlier measurements.
+
+`slide_table_lifecycle::low_selection_budget_is_typed_and_atomic` opens the
+same fixture with `max_references(1)`, observes the selector's typed
+`LimitKind::Selection` refusal, and confirms that the exact source bytes are
+unchanged. The selector verification and exact-patch reopen paths preserve
+selection, payload and package limits plus allocation failures rather than
+collapsing them into `Verification`; removal-side vectors reserve through the
+shared table admission helper before any growth.
+
+The ledger moves `duplicate_slide_table`, `remove_slide_table`, the seven cell
+read accessors and `merges` to their leaf destinations. The lifecycle mutation
+route is queued in [0363-mac-queue.md](0363-mac-queue.md); read evidence cites
+`test-data/iwork/keynote/slide-table-read-native-receipt.json`. No `litchi-ops`
+dispatch or capability schema changed; that remains D7.
+
+### Review repair in the fifth landing
+
+The shared table publisher now exposes `TableLeaf::reopen_candidate` as a
+`FaultResult<Self>`. `Working::publish` and the exact-patch replay path pass
+that result through without converting resource failures to `Verification`.
+Numbers maps archive/common/package limits to its established package
+resource kinds (including `Allocation`), and Keynote applies the equivalent
+mapping for candidate ingress. This is the seam that the Pages adapter must
+adopt when its work-package branch is integrated; it introduces no alias or
+duplicate public API.
+
+Keynote table duplication now inspects the selected table's merge projection
+before cloning. Any existing merge is refused with typed
+`UnsupportedDependency`, because the former successful candidate could not be
+read by either table reader. The merged-table parity case asserts this refusal
+and leaves the source bytes unchanged.
+
+Removal parity no longer derives an allowance from the observed host-minus-
+leaf set. Each tracked fixture has a pinned orphan object-ID set and pinned
+host member list; an allowlisted member is accepted only when its locator maps
+to the corresponding component, and the component/member closure is removed
+from the normalization comparison. All surviving known fields, references,
+object identities and untouched members remain strict. A negative control
+removes an unrelated surviving drawable and asserts that the same fixed
+allowance still reports a violation. The no-policy/default archive helper
+remains strict. Shared admission reserves all removal-side vectors before
+growth, and the low-budget lifecycle case records a typed refusal with exact
+source preservation.
+
+There is still no native mutation open/save/close/reopen receipt for these
+routes, so the queue entry remains pending and the evidence is Tier B only.

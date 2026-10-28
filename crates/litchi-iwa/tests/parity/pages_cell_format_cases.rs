@@ -422,3 +422,36 @@ fn pages_cell_format_cost_abba() -> TestResult {
         },
     )
 }
+
+/// Numeral systems (record 0370k): the leaf reads every numeral system the
+/// host writes. Writing one is refused on these native cells, which name an
+/// implicit Number format entry the engine keeps in place (the host's
+/// compatibility writer interns a new entry instead); a numeral write is
+/// covered on Numbers (`numbers_cell_data_format_cases`).
+#[test]
+fn pages_body_table_cell_numeral_system_format_read_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for numeral in crate::numbers_cell_data_format_cases::numeral_samples()? {
+        let format = DataFormat::from(numeral);
+        let formatted = host_formatted(&input, at, &format)?;
+        Case::new(
+            "pages_body_table_cell_numeral_system_format_read_parity",
+            Format::Pages,
+            Tier::A,
+            Evidence::Queued,
+            &formatted,
+        )
+        .read_only()
+        .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read("host table_cell_data_format", move |bytes| {
+            host_read(bytes, at)
+        })
+        .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+        .run()?;
+        assert_eq!(leaf_read(&formatted.bytes, at)?, format);
+        assert!(leaf_set(&input.bytes, at, &format).is_err());
+    }
+    Ok(())
+}

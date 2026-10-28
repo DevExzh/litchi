@@ -450,6 +450,22 @@ impl TransactionBudget {
         )
     }
 
+    /// Admit one allocation-free physical candidate-ingress phase before the
+    /// corresponding ZIP or decoder work starts.  The archive seam reports
+    /// retained storage, traversal work, and fallible allocation events as
+    /// separate dimensions; keeping those dimensions distinct preserves the
+    /// cell transaction's typed refusal instead of charging the same bytes as
+    /// a second candidate input scan.
+    pub fn charge_candidate_ingress(
+        &mut self,
+        charge: litchi_iwa_archive::unstable::CandidateIngressCharge,
+        path: Path,
+    ) -> Result<(), Error> {
+        self.charge_retained_bytes(charge.retained_bytes(), path)?;
+        self.charge_transaction_work(charge.traversal_bytes(), path)?;
+        self.charge_allocations(charge.allocations(), path)
+    }
+
     pub fn preflight_reassembly(
         &mut self,
         requirements: ReassemblyExecutionRequirements,
