@@ -1,9 +1,9 @@
 # 0372 — W1-C: Keynote slides, drawables and media out of `litchi-iwa`
 
 - Status: wave W1-C on branch `uo2/iwa-w1c`, fifth landing (review repair;
-  implementation `db38bb09f8`; current coordinator trunk audit `0944b7319f`
-  is the next merge target). The remaining Keynote rows wait on shared
-  engines that other waves are building (§6).
+  implementation `db38bb09f8`; coordinator trunk audit `0944b7319f` merged
+  into this work-package branch by `833be6047c`). The remaining Keynote rows
+  wait on shared engines that other waves are building (§6).
 - Date: 2026-10-28.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave row W1-C (§0), API shape
   §3.2, parity §4; harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
