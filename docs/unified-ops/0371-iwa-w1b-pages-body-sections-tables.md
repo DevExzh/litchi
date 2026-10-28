@@ -1,8 +1,8 @@
 # 0371 — W1-B: Pages body media, shapes, text fields and table cells out of the host
 
 - Status: resumed merge-ready slice on branch `uo2/iwa-w1b` (the branch was
-  merged with coordinator trunk `7973aef0e6` before this handoff). The wave
-  continues (§6).
+  merged with coordinator trunk `aeac888d5f17c73a11f6e6f6c0d6bdf2102f248b`
+  before this handoff). The wave continues (§6).
 - Date: 2026-10-28 (record opened 2026-10-26).
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave W1-B (§0, §3.2, §4, §7);
   harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
@@ -258,6 +258,26 @@ manifest makes the receipt reproducible without committing large evidence:
 | `cg/pages_shape_style_cases::line_endpoints_read_cost_abba.leaf.out` | 297,556 | `298db18e0dec06a098f37d1ac0609643e4f4c42f09126ffdd6368df30804192e` |
 | `cg/pages_lifecycle_cases::table_duplicate_cost_abba.host.out` | 830,838 | `5ec3f079e18882862d2e97e78fc63c3795dfd3be0ad54e8ee8efebc5b8283cd` |
 | `cg/pages_lifecycle_cases::table_duplicate_cost_abba.leaf.out` | 780,391 | `b78d89938a5e8c7e42a3c91a75323be088b859bcb950e32688c89771560dfc8a` |
+
+The coordinator then integrated W1-C's typed `TableLeaf::FaultResult` seam at
+`aeac888d5f17c73a11f6e6f6c0d6bdf2102f248b`. Pages now preserves candidate
+resource failures at that boundary: archive limits are `PackageBytes`, Pages
+object-inventory limits are `Identifiers`, payload and semantic ceilings are
+`PayloadBytes`, and bounded allocations remain `Allocation`; malformed or
+shape-invalid candidates remain `Verification`. This adapter qualification is
+scoped to the work-package candidate and does not supersede the performance
+source above: final host-vs-leaf measurement must be rerun after coordinator
+integration.
+
+The resumed scoped checks on the post-W1-C branch passed:
+
+| Check | Result |
+|---|---|
+| `cargo fmt --all --check` | pass |
+| `CARGO_BUILD_JOBS=4 cargo check -p litchi-pages --all-features` | pass |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-pages --all-features --test body_table_creation --quiet` | 7 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --all-features --test parity pages_body_line_endpoints -- --nocapture` | 2 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --all-features --test parity pages_body_table_duplicate -- --nocapture` | 4 passed; 17 corpus routes, 5 refused |
 
 The raw files are relative to `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b`.
 
