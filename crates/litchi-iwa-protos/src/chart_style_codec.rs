@@ -2203,6 +2203,82 @@ pub fn rewrite_series_non_styles<'source>(
     })
 }
 
+/// `TSCH.ChartArchive.reference_lines` (extension field 10005).
+pub const REFERENCE_LINES_FIELD: u32 = 10_005;
+
+/// The payload of a chart's `reference_lines` extension (a
+/// `TSCH.ChartReferenceLinesArchive`), if stored.
+///
+/// # Errors
+///
+/// [`Error::Malformed`] for a chart drawable without a chart extension;
+/// framing, duplicate-field, wire-type and limit errors.
+pub fn reference_lines(chart_drawable: &[u8], limits: Limits) -> Result<Option<&[u8]>, Error> {
+    check_bytes(chart_drawable.len(), limits)?;
+    let mut budget = Budget::new(limits);
+    let chart_field = chart_extension(chart_drawable, &mut budget)?;
+    let chart = chart_field.payload(chart_drawable);
+    let Some(field) = singular(chart, REFERENCE_LINES_FIELD, &mut budget)? else {
+        return Ok(None);
+    };
+    require_wire_type(&field, WIRE_LENGTH_DELIMITED)?;
+    Ok(Some(field.payload(chart)))
+}
+
+/// Set (`Some(payload)`) or remove (`None`) a chart's `reference_lines`
+/// extension: a stored field is replaced in place; an absent one is
+/// inserted before the first chart field numbered above 10005. Every other
+/// byte is kept.
+///
+/// # Errors
+///
+/// The [`reference_lines`] errors; [`Error::Limit`]/[`Error::Allocation`]
+/// for the candidate.
+pub fn rewrite_reference_lines<'source>(
+    chart_drawable: &'source [u8],
+    payload: Option<&[u8]>,
+    limits: Limits,
+) -> Result<Rewrite<'source>, Error> {
+    reference_lines(chart_drawable, limits)?;
+    let mut budget = Budget::new(limits);
+    let chart_field = chart_extension(chart_drawable, &mut budget)?;
+    let chart = chart_field.payload(chart_drawable);
+    let mut existing = None;
+    let mut insert_at = chart.len();
+    visit_fields(chart, &mut budget, |field| {
+        if field.number == REFERENCE_LINES_FIELD {
+            existing = Some(field);
+        } else if field.number > REFERENCE_LINES_FIELD && insert_at == chart.len() {
+            insert_at = field.start;
+        }
+        Ok(())
+    })?;
+    let next_chart = match (existing, payload) {
+        (None, None) => None,
+        (Some(field), None) => Some(remove_field(chart, &field, limits)?),
+        (Some(field), Some(payload)) if field.payload(chart) == payload => None,
+        (Some(field), Some(payload)) => Some(replace_payload(chart, &field, payload, limits)?),
+        (None, Some(payload)) => {
+            let mut output = allocate(chart.len() + payload.len() + 8, limits)?;
+            output.extend_from_slice(&chart[..insert_at]);
+            push_varint(&mut output, (u64::from(REFERENCE_LINES_FIELD) << 3) | 2);
+            push_varint(&mut output, payload.len() as u64);
+            output.extend_from_slice(payload);
+            output.extend_from_slice(&chart[insert_at..]);
+            Some(output)
+        },
+    };
+    let Some(next_chart) = next_chart else {
+        return Ok(Rewrite {
+            bytes: Cow::Borrowed(chart_drawable),
+        });
+    };
+    let output = replace_payload(chart_drawable, &chart_field, &next_chart, limits)?;
+    Ok(Rewrite {
+        bytes: Cow::Owned(output),
+    })
+}
+
 /// The identifier of one `TSP.Reference` field (`None` for 0).
 fn reference(data: &[u8], field: &Field, budget: &mut Budget) -> Result<Option<u64>, Error> {
     require_wire_type(field, WIRE_LENGTH_DELIMITED)?;

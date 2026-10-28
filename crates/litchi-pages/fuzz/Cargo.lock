@@ -621,6 +621,7 @@ dependencies = [
  "litchi-iwa-core",
  "litchi-iwa-protos",
  "litchi-iwa-text",
+ "litchi-iwa-text-wire",
  "thiserror",
 ]
 

@@ -486,7 +486,8 @@ const PACKAGE_METADATA: u32 = 11_006;
 pub struct MetadataPolicy {
     /// The leaf advances the document save token by one and stamps every
     /// component it rewrites with the new token (record 0298 §2.1); the
-    /// host keeps the source token.
+    /// host keeps the source token, or advances it but leaves a component
+    /// it rewrote unstamped (record 0376b).
     pub save_token: bool,
     /// The leaf derives the UUIDs of objects it creates deterministically
     /// (record 0298 §2.1); the host draws random ones. The identifiers must
@@ -548,6 +549,47 @@ fn normalise_metadata(
         notes.push(format!(
             "the leaf advanced the save token to {token:?} and stamped {stamped} component(s) (documented policy)"
         ));
+    } else if policy.save_token {
+        // Both advanced the document token: the leaf also stamps a component
+        // it rewrites that the host leaves at its input token (the host's
+        // volatile conditional-highlight family rewrites the calculation
+        // engine without stamping it, record 0376b).
+        let token = leaf.save_token;
+        let mut stamped = 0;
+        for component in &mut leaf.components {
+            let Some(theirs) = host
+                .components
+                .iter()
+                .find(|c| c.identifier == component.identifier)
+            else {
+                continue;
+            };
+            if component.save_token == theirs.save_token {
+                continue;
+            }
+            let source = input
+                .as_ref()
+                .and_then(|input| {
+                    input
+                        .components
+                        .iter()
+                        .find(|c| c.identifier == component.identifier)
+                })
+                .and_then(|c| c.save_token);
+            if component.save_token != token || theirs.save_token != source {
+                return Err(format!(
+                    "component {} save token: input {source:?}, host {:?}, leaf {:?} (the leaf may only stamp the new document token {token:?} on a component the host left unstamped)",
+                    component.identifier, theirs.save_token, component.save_token
+                ));
+            }
+            component.save_token = theirs.save_token;
+            stamped += 1;
+        }
+        if stamped > 0 {
+            notes.push(format!(
+                "the leaf stamped {stamped} component(s) the host rewrote without stamping (documented policy)"
+            ));
+        }
     }
     if policy.fresh_uuids {
         let known: BTreeSet<u64> = input

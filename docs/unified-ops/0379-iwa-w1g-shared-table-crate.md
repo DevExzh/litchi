@@ -177,6 +177,34 @@ unchanged (754 with the crate's). Callgrind,
 `body-table-hidden-axes-native.pages`, A B B A): 34,109,338 before,
 34,112,098 after, +0.008%.
 
+### 2a.2 Keynote
+
+`litchi_keynote::slide::table::hidden_axes` (values re-exported from
+`litchi_iwa_common::table::axis`, transactions in `transaction`) with
+`Package::{slide_table_hidden_axes, edit_slide_table_hidden_axes,
+apply_slide_table_hidden_axes}`. The facade resolves the slide and table
+through `slide_table_core::select_table` into the engine `Target` (its new
+`scope` is the slide position), runs the engine over a private
+`Leaf(Package)` wrapper with the engine's own `hidden_axes::WireBudget`
+(the Pages table-lock ledger, now a crate type), and keeps root previews
+(`Leaf::DELETES_ROOT_PREVIEWS = false`), as the host does.
+
+Parity (`crates/litchi-iwa/tests/parity/keynote_hidden_axes_cases.rs`), on
+the first slide table of `table-discovery.key` and
+`slide-table-merges-native.key`:
+
+| Test | Route | Tier |
+|---|---|---|
+| `keynote_slide_table_hidden_axes_set_parity` | hide row 1 and column 0 (owner creation) | B |
+| `keynote_slide_table_hidden_axes_read_parity` | reads on the source and on the host's output | A |
+| `keynote_slide_table_hidden_axes_clear_divergence_is_reported` | clear on the host's output: the engine keeps the cleared state records with no user-hidden flag, the host drops them; both outputs read as unhidden | pinned |
+
+Ledger: `set_slide_table_hidden_axes` (B) and `slide_table_hidden_axes`
+(A) migrate, with two macOS queue rows. The engine refuses
+`slide-table-read-native.key`'s table as an invalid source (§5).
+Callgrind (`keynote_hidden_axes_cost_abba`, host A B B A leaf): host
+852,289,662, leaf 337,487,517, **−60.4%**.
+
 ## 3. Tools and docs
 
 - `tools/crate_boundaries.json`: the package with six edges (archive, core,
@@ -230,6 +258,8 @@ inventory; it stays inside the 5% bar.
 | Date and Time, Duration, Text on number cells | the host writes a number under a date or duration kind, which the engine reads as an invalid cell; the host refuses Text on a number cell (pinned by `*_divergence_is_reported`) | decide with the macOS run which shape native files store |
 | Custom, numeral system, controls, Pop-Up Menu for Pages and Keynote | read only; writes need the metadata transition and the control facade's publication | lift the Numbers control/Pop-Up Menu publication (`rewrite_transaction`, save tokens, preview policy) into the crate |
 | empty cells | the engine edits stored cells only (`CellNotFound` on an empty slot); the host first stores the cell | reuse `table_write` to store a style-only cell first |
+| Keynote hidden axes on `slide-table-read-native.key` | the engine's graph profiles (Pages-calibrated version tuples) refuse its table as an invalid source; the host edits it | classify the Keynote native profile with that fixture |
+| clearing hidden axes | the engine keeps cleared state records, the host drops them (pinned) | macOS run decides |
 | groups 2–5 | cell comments (coordinator addition), cell rich text, topology orchestration and conditional highlights are not started | next W1-G slices, in that order |
 
 ## 6. Verification

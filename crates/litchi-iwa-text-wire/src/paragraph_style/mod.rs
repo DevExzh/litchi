@@ -671,6 +671,85 @@ fn variation(
     })
 }
 
+/// The font subset of a variation's overrides: font identity, bold,
+/// italic and point size (the chart-font properties, record 0375a).
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
+pub struct FontOverrides {
+    /// Font identity.
+    pub font: Option<Font>,
+    /// Bold.
+    pub bold: Option<bool>,
+    /// Italic.
+    pub italic: Option<bool>,
+    /// Point size.
+    pub point_size: Option<litchi_iwa_text::character::TextPointSize>,
+}
+
+impl FontOverrides {
+    /// Whether no font property is overridden.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.font.is_none()
+            && self.bold.is_none()
+            && self.italic.is_none()
+            && self.point_size.is_none()
+    }
+}
+
+/// The font overrides of `style` when it is a managed variation that
+/// overrides only font properties (`None` otherwise).
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for a missing or malformed style; resource
+/// errors as configured.
+pub fn font_overrides(
+    styles: &(impl Styles + ?Sized),
+    style: u64,
+    limits: WireLimits,
+) -> Result<Option<FontOverrides>> {
+    let mut budget = Budget::new(limits);
+    let (parsed, raw) = inherit::locate(styles, style, &mut budget)?;
+    let Some(overrides) = overrides::direct_overrides(&parsed, raw, &mut budget)? else {
+        return Ok(None);
+    };
+    let font = FontOverrides {
+        font: overrides.font.clone(),
+        bold: overrides.bold,
+        italic: overrides.italic,
+        point_size: overrides.point_size,
+    };
+    let font_count = u32::from(font.font.is_some())
+        + u32::from(font.bold.is_some())
+        + u32::from(font.italic.is_some())
+        + u32::from(font.point_size.is_some());
+    Ok((font_count > 0 && overrides.count() == font_count).then_some(font))
+}
+
+/// A canonical variation of `parent` in `stylesheet` holding exactly the
+/// font overrides `font`.
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for empty overrides; resource errors as
+/// configured.
+pub fn font_variation(
+    parent: u64,
+    stylesheet: u64,
+    font: &FontOverrides,
+    limits: WireLimits,
+) -> Result<Variation> {
+    let overrides = Overrides {
+        font: font.font.clone(),
+        bold: font.bold,
+        italic: font.italic,
+        point_size: font.point_size,
+        ..Overrides::default()
+    };
+    variation(parent, stylesheet, &overrides, limits)
+}
+
 /// An identifier no package object uses, for reading a derived variation
 /// back before the caller allocates its real identifier.
 const PROVISIONAL_IDENTIFIER: u64 = u64::MAX;

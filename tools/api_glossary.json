@@ -23329,6 +23329,16 @@
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::chart::axis",
+        "litchi_numbers::sheet::chart::series",
+        "litchi_numbers::sheet::drawable::media",
+        "litchi_numbers::sheet::drawable::comment",
+        "litchi_numbers::sheet::drawable::named_style",
+        "litchi_numbers::sheet::drawable::annotation",
+        "litchi_numbers::sheet::drawable::date_time",
+        "litchi_numbers::sheet::drawable::hyperlink",
+        "litchi_numbers::sheet::drawable::drop_cap",
+        "litchi_numbers::sheet::drawable::list",
         "litchi_numbers::sheet::drawable::properties",
         "litchi_numbers::sheet::drawable::text",
         "litchi_numbers::sheet::drawable::plain_text",
@@ -23377,6 +23387,46 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_lifecycle",
           "ok": "litchi_numbers::sheet::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_text_box_lists",
+          "ok": "litchi_numbers::sheet::drawable::list::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_drop_caps",
+          "ok": "litchi_numbers::sheet::drawable::drop_cap::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_hyperlinks",
+          "ok": "litchi_numbers::sheet::drawable::hyperlink::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_date_time_fields",
+          "ok": "litchi_numbers::sheet::drawable::date_time::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_annotations",
+          "ok": "litchi_numbers::sheet::drawable::annotation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_text_box_named_styles",
+          "ok": "litchi_numbers::sheet::drawable::named_style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_comment",
+          "ok": "litchi_numbers::sheet::drawable::comment::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_media",
+          "ok": "litchi_numbers::sheet::drawable::media::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_series",
+          "ok": "litchi_numbers::sheet::chart::series::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_axis",
+          "ok": "litchi_numbers::sheet::chart::axis::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
@@ -24185,6 +24235,16 @@
         "litchi_numbers::names",
         "litchi_numbers::sheet::lifecycle",
         "litchi_numbers::sheet::drawable",
+        "litchi_numbers::sheet::chart::axis",
+        "litchi_numbers::sheet::chart::series",
+        "litchi_numbers::sheet::drawable::media",
+        "litchi_numbers::sheet::drawable::comment",
+        "litchi_numbers::sheet::drawable::named_style",
+        "litchi_numbers::sheet::drawable::annotation",
+        "litchi_numbers::sheet::drawable::date_time",
+        "litchi_numbers::sheet::drawable::hyperlink",
+        "litchi_numbers::sheet::drawable::drop_cap",
+        "litchi_numbers::sheet::drawable::list",
         "litchi_numbers::sheet::drawable::properties",
         "litchi_numbers::sheet::drawable::text",
         "litchi_numbers::sheet::drawable::plain_text",
@@ -24233,6 +24293,46 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_lifecycle",
           "ok": "litchi_numbers::sheet::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_text_box_lists",
+          "ok": "litchi_numbers::sheet::drawable::list::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_drop_caps",
+          "ok": "litchi_numbers::sheet::drawable::drop_cap::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_hyperlinks",
+          "ok": "litchi_numbers::sheet::drawable::hyperlink::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_date_time_fields",
+          "ok": "litchi_numbers::sheet::drawable::date_time::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_annotations",
+          "ok": "litchi_numbers::sheet::drawable::annotation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_text_box_named_styles",
+          "ok": "litchi_numbers::sheet::drawable::named_style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_comment",
+          "ok": "litchi_numbers::sheet::drawable::comment::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_media",
+          "ok": "litchi_numbers::sheet::drawable::media::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_series",
+          "ok": "litchi_numbers::sheet::chart::series::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_axis",
+          "ok": "litchi_numbers::sheet::chart::axis::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
@@ -25895,6 +25995,7 @@
         "litchi_pages::drawable::lifecycle",
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
+        "litchi_pages::drawable::style",
         "litchi_pages::bookmark",
         "litchi_pages::date_time",
         "litchi_pages::number_attachment",
@@ -27449,7 +27550,8 @@
         "litchi_keynote::slide::audio::creation",
         "litchi_keynote::slide::movie::creation",
         "litchi_keynote::slide::media::lifecycle",
-        "litchi_keynote::slide::table::format"
+        "litchi_keynote::slide::table::format",
+        "litchi_keynote::slide::table::hidden_axes::transaction"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -27652,6 +27754,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_cell_format",
           "ok": "litchi_keynote::slide::table::format::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
+          "ok": "litchi_keynote::slide::table::hidden_axes::transaction::Commit"
         }
       ]
     },
@@ -29064,7 +29170,8 @@
         "litchi_keynote::slide::audio::creation",
         "litchi_keynote::slide::movie::creation",
         "litchi_keynote::slide::media::lifecycle",
-        "litchi_keynote::slide::table::format"
+        "litchi_keynote::slide::table::format",
+        "litchi_keynote::slide::table::hidden_axes::transaction"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29267,6 +29374,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_cell_format",
           "ok": "litchi_keynote::slide::table::format::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
+          "ok": "litchi_keynote::slide::table::hidden_axes::transaction::Commit"
         }
       ]
     },
