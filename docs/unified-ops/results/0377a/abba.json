@@ -1,0 +1,208 @@
+{
+  "record": "0377a",
+  "schema": "litchi.unified-fin-perf.abba-summary.v1",
+  "cpu": 47,
+  "order": "ABBA",
+  "runs": [
+    {
+      "build": "base",
+      "label": "f1-base-1",
+      "base_api": true,
+      "blocks": 5,
+      "rounds_per_block": 5,
+      "cases": [
+        {
+          "route": "doc_eager_first_paragraph_text_set",
+          "format": "doc",
+          "group": "extra",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [2449795, 2409779, 2458565, 2447454, 2443130],
+          "unified_block_median_ns": [2507160, 2453110, 2500555, 2494450, 2492240]
+        }
+      ]
+    },
+    {
+      "build": "cand",
+      "label": "f1-cand-2",
+      "base_api": false,
+      "blocks": 5,
+      "rounds_per_block": 5,
+      "cases": [
+        {
+          "route": "doc_eager_first_paragraph_text_set",
+          "format": "doc",
+          "group": "extra",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [2187896, 2273872, 2186561, 2183911, 2189781],
+          "unified_block_median_ns": [2237272, 2347562, 2228756, 2240116, 2248611]
+        }
+      ]
+    },
+    {
+      "build": "cand",
+      "label": "f1-cand-3",
+      "base_api": false,
+      "blocks": 5,
+      "rounds_per_block": 5,
+      "cases": [
+        {
+          "route": "doc_eager_first_paragraph_text_set",
+          "format": "doc",
+          "group": "extra",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [2208708, 2314344, 2304689, 2313419, 2311189],
+          "unified_block_median_ns": [2226469, 2324684, 2345805, 2353075, 2342394]
+        }
+      ]
+    },
+    {
+      "build": "base",
+      "label": "f1-base-4",
+      "base_api": true,
+      "blocks": 5,
+      "rounds_per_block": 5,
+      "cases": [
+        {
+          "route": "doc_eager_first_paragraph_text_set",
+          "format": "doc",
+          "group": "extra",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [3293729, 3339525, 3437380, 3391860, 3228359],
+          "unified_block_median_ns": [3355625, 3425970, 3501836, 3572021, 3283125]
+        }
+      ]
+    },
+    {
+      "build": "base",
+      "label": "f3f5-base-1",
+      "base_api": true,
+      "blocks": 5,
+      "rounds_per_block": 10,
+      "cases": [
+        {
+          "route": "xlsx_eager_cell_value_set_single",
+          "format": "xlsx",
+          "group": "set",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [20175, 20030, 19960, 19865, 19910],
+          "unified_block_median_ns": [21295, 21010, 21075, 21000, 20970]
+        },
+        {
+          "route": "xlsx_eager_cell_value_set_batch1000",
+          "format": "xlsx",
+          "group": "batch",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [1037084, 1030584, 1029409, 1029294, 1027359],
+          "unified_block_median_ns": [1781237, 1776732, 1776642, 1780202, 1778177]
+        },
+        {
+          "route": "odc_default_open",
+          "format": "odc",
+          "group": "extra",
+          "equivalence": "not_applicable",
+          "leaf_block_median_ns": [1167775, 1163694, 1159280, 1155499, 1155765],
+          "unified_block_median_ns": [1244730, 1243775, 1234760, 1232620, 1233315]
+        }
+      ]
+    },
+    {
+      "build": "cand",
+      "label": "f3f5-cand-2",
+      "base_api": false,
+      "blocks": 5,
+      "rounds_per_block": 10,
+      "cases": [
+        {
+          "route": "xlsx_eager_cell_value_set_single",
+          "format": "xlsx",
+          "group": "set",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [19995, 19940, 20015, 20075, 19935],
+          "unified_block_median_ns": [21710, 21560, 21650, 22080, 21585]
+        },
+        {
+          "route": "xlsx_eager_cell_value_set_batch1000",
+          "format": "xlsx",
+          "group": "batch",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [1106079, 1104454, 1106474, 1107479, 1101849],
+          "unified_block_median_ns": [1966842, 1967173, 1961387, 1966703, 1963178]
+        },
+        {
+          "route": "odc_default_open",
+          "format": "odc",
+          "group": "extra",
+          "equivalence": "not_applicable",
+          "leaf_block_median_ns": [1177554, 1180514, 1179220, 1178530, 1176689],
+          "unified_block_median_ns": [1177065, 1176095, 1178710, 1176579, 1178074]
+        }
+      ]
+    },
+    {
+      "build": "cand",
+      "label": "f3f5-cand-3",
+      "base_api": false,
+      "blocks": 5,
+      "rounds_per_block": 10,
+      "cases": [
+        {
+          "route": "xlsx_eager_cell_value_set_single",
+          "format": "xlsx",
+          "group": "set",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [19880, 19850, 19720, 19565, 19590],
+          "unified_block_median_ns": [21290, 21220, 21195, 21175, 21120]
+        },
+        {
+          "route": "xlsx_eager_cell_value_set_batch1000",
+          "format": "xlsx",
+          "group": "batch",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [1106734, 1105584, 1111300, 1100704, 1105524],
+          "unified_block_median_ns": [1957043, 1955878, 1962038, 1959938, 1961493]
+        },
+        {
+          "route": "odc_default_open",
+          "format": "odc",
+          "group": "extra",
+          "equivalence": "not_applicable",
+          "leaf_block_median_ns": [1155140, 1158045, 1160990, 1161480, 1163284],
+          "unified_block_median_ns": [1152645, 1156504, 1163874, 1159504, 1163165]
+        }
+      ]
+    },
+    {
+      "build": "base",
+      "label": "f3f5-base-4",
+      "base_api": true,
+      "blocks": 5,
+      "rounds_per_block": 10,
+      "cases": [
+        {
+          "route": "xlsx_eager_cell_value_set_single",
+          "format": "xlsx",
+          "group": "set",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [19990, 19850, 19840, 19790, 19785],
+          "unified_block_median_ns": [21125, 20990, 20880, 20935, 20880]
+        },
+        {
+          "route": "xlsx_eager_cell_value_set_batch1000",
+          "format": "xlsx",
+          "group": "batch",
+          "equivalence": "exact_bytes",
+          "leaf_block_median_ns": [1035729, 1038524, 1035329, 1038099, 1035694],
+          "unified_block_median_ns": [1765867, 1764737, 1767077, 1769042, 1772127]
+        },
+        {
+          "route": "odc_default_open",
+          "format": "odc",
+          "group": "extra",
+          "equivalence": "not_applicable",
+          "leaf_block_median_ns": [1220905, 1193039, 1196370, 1199084, 1207155],
+          "unified_block_median_ns": [1293320, 1278375, 1279175, 1278635, 1288030]
+        }
+      ]
+    }
+  ]
+}

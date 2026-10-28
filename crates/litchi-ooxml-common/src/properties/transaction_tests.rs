@@ -9,7 +9,10 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
 
-use super::{Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, write_core};
+use super::{
+    Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, publish_core_metadata,
+    write_core,
+};
 use crate::custom::{self, Host, Value};
 use crate::leniency::ToleranceReport;
 
@@ -100,6 +103,73 @@ fn core_only_staging_preserves_application_properties() {
     assert_eq!(metadata.title.as_deref(), Some("After"));
     assert_eq!(metadata.application.as_deref(), Some("Producer"));
     assert_eq!(metadata.company.as_deref(), Some("Old"));
+}
+
+#[test]
+fn core_only_publication_replays_exactly_and_preserves_unread_families() {
+    let package = full();
+    let core_before = bytes(&package, "/docProps/core.xml").unwrap();
+    let app_before = bytes(&package, "/docProps/app.xml").unwrap();
+    let custom_before = bytes(&package, "/docProps/custom.xml").unwrap();
+    let target = Metadata {
+        title: Some("After".to_owned()),
+        author: Some("Ada".to_owned()),
+        keywords: ["alpha", "beta"].map(str::to_owned).to_vec(),
+        ..Metadata::default()
+    };
+
+    let (commit, published) =
+        publish_core_metadata(&package, Host::Word, Some(target.clone())).unwrap();
+    assert_eq!(
+        published.as_ref().and_then(|value| value.title.as_deref()),
+        Some("After")
+    );
+    assert_eq!(
+        bytes(commit.package(), "/docProps/app.xml").unwrap(),
+        app_before
+    );
+    assert_eq!(
+        bytes(commit.package(), "/docProps/custom.xml").unwrap(),
+        custom_before
+    );
+    assert_ne!(
+        bytes(commit.package(), "/docProps/core.xml").unwrap(),
+        core_before
+    );
+
+    let readback = Snapshot::read(commit.package(), Host::Word)
+        .unwrap()
+        .metadata()
+        .unwrap();
+    assert_eq!(readback.title, target.title);
+    assert_eq!(readback.author, target.author);
+    assert_eq!(readback.keywords, target.keywords);
+    assert_eq!(readback.application.as_deref(), Some("Producer"));
+    assert_eq!(readback.company.as_deref(), Some("Old"));
+
+    let replayed = commit.patch().apply(&package).unwrap().into_package();
+    assert_eq!(
+        bytes(&replayed, "/docProps/core.xml"),
+        bytes(commit.package(), "/docProps/core.xml")
+    );
+    assert_eq!(bytes(&replayed, "/docProps/app.xml").unwrap(), app_before);
+    assert_eq!(
+        bytes(&replayed, "/docProps/custom.xml").unwrap(),
+        custom_before
+    );
+
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.package())
+        .unwrap()
+        .into_package();
+    assert_eq!(bytes(&restored, "/docProps/core.xml").unwrap(), core_before);
+    assert_eq!(bytes(&restored, "/docProps/app.xml").unwrap(), app_before);
+    assert_eq!(
+        bytes(&restored, "/docProps/custom.xml").unwrap(),
+        custom_before
+    );
 }
 
 #[test]

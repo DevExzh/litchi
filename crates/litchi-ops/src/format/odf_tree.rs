@@ -1014,6 +1014,23 @@ mod tests {
             tree(&opened).0.tree.get().is_some(),
             "open deferred the catalog"
         );
+
+        // The database leaf admits its content projection without decoding
+        // the catalog, but the unified ODB handle must still reject a
+        // catalog it cannot build at open.  Deferring every object tree would
+        // move this refusal to the first read and change the public contract.
+        let content = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0"><o:body><o:database><d:data-source/><d:forms><d:component d:name="form"/></d:forms></o:database></o:body></o:document-content>"#;
+        let malformed = content.replace("<d:forms>", "").replace("</d:forms>", "");
+        let malformed = litchi_odb::Builder::new()
+            .content_xml(malformed)
+            .build()
+            .expect("leaf package");
+        let malformed_bytes = malformed.as_bytes().to_vec();
+        litchi_odb::Package::from_bytes(&malformed_bytes).expect("leaf admission");
+        assert!(
+            crate::open_bytes(malformed_bytes).is_err(),
+            "catalog was deferred"
+        );
     }
 
     #[test]

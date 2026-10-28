@@ -1267,6 +1267,7 @@ dependencies = [
  "litchi-iwa-core",
  "litchi-iwa-protos",
  "litchi-iwa-text",
+ "litchi-iwa-text-wire",
  "thiserror",
 ]
 
@@ -1279,6 +1280,7 @@ dependencies = [
  "litchi-iwa-common",
  "litchi-iwa-core",
  "litchi-iwa-protos",
+ "litchi-iwa-style",
  "litchi-numbers-wire",
  "thiserror",
 ]
@@ -1336,6 +1338,7 @@ dependencies = [
  "litchi-iwa-core",
  "litchi-iwa-detect",
  "litchi-iwa-protos",
+ "litchi-iwa-style",
  "litchi-iwa-table",
  "litchi-iwa-text",
  "litchi-iwa-text-wire",
@@ -1343,6 +1346,7 @@ dependencies = [
  "phf",
  "plist",
  "ryu",
+ "sha1 0.11.0",
  "thiserror",
 ]
 
