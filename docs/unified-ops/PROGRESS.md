@@ -6656,3 +6656,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   remain explicitly bound to work-package source `6bb1d58021`: endpoint
   routes use 66.09–79.78% fewer instructions and duplication 96.70% fewer
   than the host. Final integrated measurements will use the frozen source.
+- Post-merge workspace, all 20 locked offline fuzz workspaces, boundaries
+  and ledger checks passed on `6f27c738ad`.
+- Accepted W1-F `0256224144` (record 0376c): column-header counts on cell
+  writes, empty formula-dependency envelopes, released formula-list key
+  reuse, and Numbers formula-authoring parity. The uncached case calls the
+  actual host setter and normalizes only C3's numeric cache bytes; a B3
+  mutation negative control and preserved unknown-field census keep the
+  comparison narrow. Current scoped tests, Clippy, docs, glossary,
+  boundaries, fuzz locks and ledger pass. Three source-bound facade probes
+  use 55.744%, 68.599% and 55.761% fewer instructions than the host.
+  Two formula rows migrate and two raw member-lookup helpers retire.
+  Native mutation acceptance and final integrated qualification remain open.
