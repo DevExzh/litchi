@@ -26,6 +26,7 @@ pub(crate) mod body_table_cell_format;
 pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;
+mod body_table_duplicate;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
 pub(crate) mod body_table_merges;
@@ -423,6 +424,83 @@ impl litchi_iwa_table::TableSource for Package {
 
     fn max_references(&self) -> usize {
         TABLE_ENGINE_MAX_REFERENCES
+    }
+}
+
+/// The shared structural working set (`litchi_iwa_table::structure`)
+/// reopens its candidate through this package's strict ingress, reusing the
+/// parsed archive of every byte-identical member.
+impl litchi_iwa_table::structure::TableLeaf for Package {
+    fn reopen_candidate(
+        &self,
+        candidate: Arc<[u8]>,
+    ) -> litchi_iwa_table::structure::FaultResult<Self> {
+        let source = self
+            .state
+            .source
+            .reopen(candidate)
+            .map_err(|error| reopen_fault(PackageError::Archive(error)))?;
+        Self::from_source_catalog(source).map_err(reopen_fault)
+    }
+}
+
+/// Preserve bounded candidate-ingress failures at the shared structural
+/// boundary. Pages has a smaller package error surface than Numbers and
+/// Keynote: archive, payload, object-inventory, semantic and allocation
+/// failures are the only resource-bearing variants. Shape and format
+/// failures intentionally become verification so a transaction cannot turn a
+/// malformed candidate into a successful publish.
+fn reopen_fault(error: PackageError) -> litchi_iwa_table::structure::Fault {
+    use litchi_iwa_table::structure::{Fault, FaultLimit};
+
+    fn limit(kind: FaultLimit, observed: usize, maximum: usize) -> Fault {
+        Fault::Limit {
+            kind,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        }
+    }
+
+    match error {
+        PackageError::Archive(error) => match error {
+            litchi_iwa_archive::Error::Limit {
+                observed, maximum, ..
+            } => Fault::Limit {
+                kind: FaultLimit::PackageBytes,
+                observed,
+                maximum,
+            },
+            litchi_iwa_archive::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+            _ => Fault::Verification,
+        },
+        PackageError::PayloadLimit {
+            observed,
+            limit: maximum,
+        }
+        | PackageError::SectionNamesTooLarge {
+            observed,
+            limit: maximum,
+        } => limit(FaultLimit::PayloadBytes, observed, maximum),
+        PackageError::ObjectLimit {
+            observed,
+            limit: maximum,
+        } => limit(FaultLimit::Identifiers, observed, maximum),
+        PackageError::Semantic(
+            SemanticError::TooManySections {
+                actual: observed,
+                limit: maximum,
+            }
+            | SemanticError::TextTooLarge {
+                observed,
+                limit: maximum,
+            }
+            | SemanticError::TooManyBodyStorages {
+                actual: observed,
+                limit: maximum,
+            },
+        ) => limit(FaultLimit::PayloadBytes, observed, maximum),
+        PackageError::Allocation { amount } => Fault::Allocation { amount },
+        _ => Fault::Verification,
     }
 }
 

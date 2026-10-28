@@ -18,6 +18,11 @@
 //! ([`crate::table::values`]); the patch covers both. No clock or
 //! randomness is consulted: the same insertion into the same source
 //! publishes the same bytes.
+//!
+//! [`Edit::duplicate`] instead copies an existing body table with its
+//! cells, styles, formulas and frame (the host editor's `duplicate_table`,
+//! record 0371) on the shared `litchi_iwa_table::structure::duplicate`
+//! engine, and anchors the copy in the body story the same way.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -218,12 +223,23 @@ pub enum Refusal {
     /// not rewrite.
     #[error("the Pages table template or body is outside the creation transaction")]
     Unsupported,
-    /// The edit already stages its one insertion.
-    #[error("the Pages body-table creation edit already stages an insertion")]
+    /// The edit already stages its one insertion or duplication.
+    #[error("the Pages body-table creation edit already stages an operation")]
     OperationAlreadyStaged,
-    /// The edit was committed without a staged insertion.
-    #[error("the Pages body-table creation edit stages no insertion")]
+    /// The edit was committed without a staged insertion or duplication.
+    #[error("the Pages body-table creation edit stages no operation")]
     NoStagedOperation,
+    /// No rooted body table matched the duplication selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// More than one rooted body table has the selector's exact name.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// The table's formula state cannot be copied without ambiguity
+    /// (volatile, spanning, whole-owner, error or spill dependencies), as
+    /// the host refuses it.
+    #[error("the Pages table's formula dependencies cannot be copied")]
+    UnsupportedDependency,
 }
 
 impl Refusal {
@@ -232,15 +248,18 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::UnsupportedSource { .. } | Self::NoTemplate { .. } | Self::Unsupported { .. } => {
-                RefusalKind::UnsupportedContent
-            },
+            Self::UnsupportedSource { .. }
+            | Self::NoTemplate { .. }
+            | Self::Unsupported { .. }
+            | Self::UnsupportedDependency { .. } => RefusalKind::UnsupportedContent,
             Self::InvalidSize { .. }
             | Self::InvalidCell { .. }
-            | Self::PositionOutOfBounds { .. } => RefusalKind::InvalidValue,
+            | Self::PositionOutOfBounds { .. }
+            | Self::AmbiguousTableName { .. } => RefusalKind::InvalidValue,
             Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
                 RefusalKind::UnsupportedOperation
             },
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
         }
     }
 }
@@ -278,8 +297,8 @@ impl From<Fault> for Error {
 /// Exact-source-checked reversible body-table creation patch.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    artifacts: Artifacts,
-    table: usize,
+    pub(super) artifacts: Artifacts,
+    pub(super) table: usize,
 }
 
 impl fmt::Debug for Patch {
@@ -310,10 +329,10 @@ impl Patch {
 /// Compact evidence for one verified body-table creation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Diagnostics {
-    changed: bool,
-    created_objects: usize,
-    touched_components: usize,
-    seeded_cells: usize,
+    pub(super) changed: bool,
+    pub(super) created_objects: usize,
+    pub(super) touched_components: usize,
+    pub(super) seeded_cells: usize,
 }
 
 impl Diagnostics {
@@ -347,9 +366,9 @@ impl Diagnostics {
 #[must_use]
 #[derive(Debug)]
 pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
+    pub(super) package: Package,
+    pub(super) patch: Patch,
+    pub(super) diagnostics: Diagnostics,
 }
 
 impl Commit {
@@ -391,27 +410,35 @@ impl Commit {
     }
 }
 
-/// One immutable edit that stages exactly one body-table insertion.
+/// One immutable edit that stages exactly one body-table insertion or
+/// duplication.
 ///
 /// Start it with [`Package::edit_body_table_creation`]; the source package is
-/// never changed, and dropping the edit discards the staged insertion.
+/// never changed, and dropping the edit discards the staged operation.
 pub struct Edit<'a> {
     source: &'a Package,
-    insertion: Option<(Position, NewTable)>,
+    operation: Option<Operation>,
+}
+
+/// The one operation an edit stages.
+enum Operation {
+    Insert(Position, NewTable),
+    Duplicate(table_lock::OwnedBodyTableSelector, Position),
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Edit")
-            .field(
-                "insertion",
-                &self
-                    .insertion
-                    .as_ref()
-                    .map(|(anchor, table)| (anchor, table.rows, table.columns)),
-            )
-            .finish_non_exhaustive()
+        let mut debug = formatter.debug_struct("Edit");
+        match &self.operation {
+            Some(Operation::Insert(anchor, table)) => {
+                debug.field("insertion", &(anchor, table.rows, table.columns))
+            },
+            Some(Operation::Duplicate(table, anchor)) => {
+                debug.field("duplication", &(table, anchor))
+            },
+            None => &mut debug,
+        }
+        .finish_non_exhaustive()
     }
 }
 
@@ -424,11 +451,11 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Refusal::OperationAlreadyStaged`] after one insertion,
+    /// [`Refusal::OperationAlreadyStaged`] after one staged operation,
     /// [`Refusal::InvalidSize`] and [`Refusal::InvalidCell`] for a table this
     /// transaction cannot create.
     pub fn insert(mut self, anchor: Position, table: NewTable) -> Result<Self, Error> {
-        if self.insertion.is_some() {
+        if self.operation.is_some() {
             return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         if !table_create::admits_size(table.rows, table.columns) {
@@ -444,39 +471,74 @@ impl Edit<'_> {
         }) {
             return Err(Error::Refused(Refusal::InvalidCell));
         }
-        self.insertion = Some((anchor, table));
+        self.operation = Some(Operation::Insert(anchor, table));
         Ok(self)
     }
 
-    /// Validate, publish and reopen the staged insertion.
+    /// Stage a populated copy of the body table `table` selects, anchored at
+    /// UTF-16 code unit `anchor` of the body story (the host editor's
+    /// `duplicate_table`). The copy is named after its source (`"<name>
+    /// copy"`, then `"<name> copy 2"`, …) and keeps its cells, styles,
+    /// frame and formulas, which are rewritten to address the copy. The
+    /// selector resolves against the source when the edit commits.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::OperationAlreadyStaged`] after one staged operation, and
+    /// limit or allocation errors for a name selector this package's limits
+    /// do not admit.
+    pub fn duplicate<'table>(
+        mut self,
+        table: impl Into<BodyTableSelector<'table>>,
+        anchor: Position,
+    ) -> Result<Self, Error> {
+        if self.operation.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        let table = table_lock::OwnedBodyTableSelector::try_from(self.source, table.into())
+            .map_err(super::body_table_duplicate::lock_error)?;
+        self.operation = Some(Operation::Duplicate(table, anchor));
+        Ok(self)
+    }
+
+    /// Validate, publish and reopen the staged operation.
     ///
     /// # Errors
     ///
     /// [`Refusal::NoStagedOperation`] for an empty edit,
     /// [`Refusal::UnsupportedSource`] for a source that is not exact,
-    /// [`Refusal::NoTemplate`] for a document without a body table,
-    /// [`Refusal::PositionOutOfBounds`], [`Refusal::Unsupported`] for a
-    /// template or body shape outside the transaction, and typed source,
-    /// limit, allocation and verification errors. Failure never publishes a
-    /// partial package.
+    /// [`Refusal::NoTemplate`] for an insertion into a document without a
+    /// body table, [`Refusal::TableNotFound`] and
+    /// [`Refusal::AmbiguousTableName`] for a duplication selector,
+    /// [`Refusal::UnsupportedDependency`] for formula state a copy cannot
+    /// remap, [`Refusal::PositionOutOfBounds`], [`Refusal::Unsupported`] for
+    /// a template, table or body shape outside the transaction, and typed
+    /// source, limit, allocation and verification errors. Failure never
+    /// publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let (anchor, table) = self
-            .insertion
+        let operation = self
+            .operation
             .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         if !self.source.state.source.source_is_exact() {
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
-        create(self.source, anchor.get(), &table)
+        match operation {
+            Operation::Insert(anchor, table) => create(self.source, anchor.get(), &table),
+            Operation::Duplicate(table, anchor) => {
+                super::body_table_duplicate::duplicate(self.source, &table, anchor.get())
+            },
+        }
     }
 }
 
 impl Package {
-    /// Start an immutable single-insertion body-table creation edit.
+    /// Start an immutable single-operation body-table creation edit: one
+    /// new table or one copy of an existing table.
     ///
     /// ```no_run
     /// use litchi_core::Position;
-    /// use litchi_pages::Package;
     /// use litchi_pages::table::creation::NewTable;
+    /// use litchi_pages::{BodyTableSelector, Package};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let package = Package::open("report.pages")?;
@@ -488,6 +550,15 @@ impl Package {
     ///     commit.package().body_tables()?.len(),
     ///     package.body_tables()?.len() + 1
     /// );
+    /// let copy = commit
+    ///     .package()
+    ///     .edit_body_table_creation()
+    ///     .duplicate(BodyTableSelector::index(0), Position::new(0))?
+    ///     .commit()?;
+    /// assert_eq!(
+    ///     copy.package().body_tables()?.get(copy.table().get()).map(|table| table.rows()),
+    ///     Some(3)
+    /// );
     /// # Ok(())
     /// # }
     /// ```
@@ -495,7 +566,7 @@ impl Package {
     pub const fn edit_body_table_creation(&self) -> Edit<'_> {
         Edit {
             source: self,
-            insertion: None,
+            operation: None,
         }
     }
 
@@ -717,7 +788,7 @@ impl References {
 
 /// Insert the anchor character and its attachment-table entry into the
 /// body storage payload.
-fn anchored_body(
+pub(super) fn anchored_body(
     source: &Package,
     payload: &[u8],
     anchor: usize,
@@ -808,7 +879,7 @@ fn anchored_body(
 }
 
 /// The UTF-16 length of a storage payload's text.
-fn prepared_len(payload: &[u8]) -> Result<usize, Error> {
+pub(super) fn prepared_len(payload: &[u8]) -> Result<usize, Error> {
     let texts =
         repeated_length_delimited_payloads(payload, 3).map_err(|_error| Error::InvalidSource)?;
     let mut length = 0_usize;

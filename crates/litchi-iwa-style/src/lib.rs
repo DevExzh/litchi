@@ -32,6 +32,7 @@
 pub mod chart_font;
 pub mod drawing;
 pub mod graph;
+pub mod line_end;
 pub mod media;
 pub mod number_format;
 pub mod reference_line;

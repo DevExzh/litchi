@@ -6645,3 +6645,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   measurements show duplicate/remove facade costs 84.6%/87.0% below the host.
   Pages will adopt the shared error seam when W1-B next syncs trunk.
   Native mutation evidence and final integrated qualification remain pending.
+- Post-merge checks on `aeac888d5f` passed: workspace all-target/all-feature
+  compilation, all 20 locked offline fuzz workspaces, boundaries and ledger.
+- Accepted W1-B `c18ec13139` (record 0371): bounded shared line-end codec,
+  Pages endpoint read/set/reset, and supported populated-table duplication.
+  Non-empty merged tables receive a terminal safety refusal. The Pages
+  structural adapter now preserves typed resource failures through W1-C's
+  shared seam. Current scoped tests/parity, Clippy, rustdoc, glossary,
+  boundaries, fuzz, non-iWork and feature-matrix checks pass. Measurements
+  remain explicitly bound to work-package source `6bb1d58021`: endpoint
+  routes use 66.09–79.78% fewer instructions and duplication 96.70% fewer
+  than the host. Final integrated measurements will use the frozen source.
