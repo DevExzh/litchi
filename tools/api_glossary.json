@@ -23345,6 +23345,7 @@
         "litchi_numbers::sheet::drawable::plain_text",
         "litchi_numbers::sheet::drawable::language",
         "litchi_numbers::sheet::chart::style",
+        "litchi_numbers::sheet::chart::font",
         "litchi_numbers::sheet::order",
         "litchi_numbers::sheet::chart::arrangement",
         "litchi_numbers::sheet::chart::data",
@@ -23439,6 +23440,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_axis_title",
           "ok": "litchi_numbers::sheet::chart::axis_title::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_font",
+          "ok": "litchi_numbers::sheet::chart::font::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
@@ -24271,6 +24276,7 @@
         "litchi_numbers::sheet::drawable::plain_text",
         "litchi_numbers::sheet::drawable::language",
         "litchi_numbers::sheet::chart::style",
+        "litchi_numbers::sheet::chart::font",
         "litchi_numbers::sheet::order",
         "litchi_numbers::sheet::chart::arrangement",
         "litchi_numbers::sheet::chart::data",
@@ -24365,6 +24371,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_axis_title",
           "ok": "litchi_numbers::sheet::chart::axis_title::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_font",
+          "ok": "litchi_numbers::sheet::chart::font::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_drawables",
