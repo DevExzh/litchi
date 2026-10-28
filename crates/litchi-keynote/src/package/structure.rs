@@ -259,20 +259,40 @@ impl Package {
         &self,
         bytes: Vec<u8>,
     ) -> Result<Self, super::ReadError> {
+        self.structure_reopen_shared(Arc::from(bytes))
+    }
+
+    /// [`Self::structure_reopen`] over shared candidate bytes.
+    pub(in crate::package) fn structure_reopen_shared(
+        &self,
+        bytes: Arc<[u8]>,
+    ) -> Result<Self, super::ReadError> {
         // A structural candidate is an edited reassembly of this package:
         // unchanged IWA members reuse their parsed archives (the ZIP and
         // every budget are still checked in full).
         let candidate = match &self.state.source {
             PhysicalSource::Package(base) => {
-                let catalog = base.reopen(Arc::from(bytes))?;
+                let catalog = base.reopen(bytes)?;
                 Self::from_source_catalog(catalog, self.state.options)?
             },
             PhysicalSource::Semantic(_) => {
-                Self::from_source_with_options(Arc::from(bytes), self.state.options)?
+                Self::from_source_with_options(bytes, self.state.options)?
             },
         };
         candidate.validate()?;
         Ok(candidate)
+    }
+}
+
+/// The shared table structure set (`litchi-iwa-table`, record 0379)
+/// reopens its candidates as structural candidates of this package.
+impl litchi_iwa_table::structure::TableLeaf for Package {
+    fn reopen_candidate(
+        &self,
+        candidate: Arc<[u8]>,
+    ) -> Result<Self, litchi_iwa_table::structure::ReopenError> {
+        self.structure_reopen_shared(candidate)
+            .map_err(|_error| litchi_iwa_table::structure::ReopenError)
     }
 }
 

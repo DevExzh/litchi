@@ -27541,7 +27541,8 @@
         "litchi_keynote::slide::movie::creation",
         "litchi_keynote::slide::media::lifecycle",
         "litchi_keynote::slide::table::format",
-        "litchi_keynote::slide::table::hidden_axes::transaction"
+        "litchi_keynote::slide::table::hidden_axes::transaction",
+        "litchi_keynote::slide::table::lifecycle"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -27748,6 +27749,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
           "ok": "litchi_keynote::slide::table::hidden_axes::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_lifecycle",
+          "ok": "litchi_keynote::slide::table::lifecycle::Commit"
         }
       ]
     },
@@ -29161,7 +29166,8 @@
         "litchi_keynote::slide::movie::creation",
         "litchi_keynote::slide::media::lifecycle",
         "litchi_keynote::slide::table::format",
-        "litchi_keynote::slide::table::hidden_axes::transaction"
+        "litchi_keynote::slide::table::hidden_axes::transaction",
+        "litchi_keynote::slide::table::lifecycle"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29368,6 +29374,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
           "ok": "litchi_keynote::slide::table::hidden_axes::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_lifecycle",
+          "ok": "litchi_keynote::slide::table::lifecycle::Commit"
         }
       ]
     },
