@@ -15,7 +15,6 @@ use litchi_iwa_core::ArchiveObject;
 use thiserror::Error;
 
 use super::{Package, PackageError, table_cells, table_lock};
-use crate::ReplySelector;
 use crate::selector::BodyTableSelector;
 use litchi_iwa_common::table::read::{Comment, CommentReply};
 
@@ -63,8 +62,14 @@ pub enum BodyTableCommentLimitKind {
     PayloadObjects,
     /// Native payload messages inspected.
     PayloadMessages,
+    /// Native messages per object inspected.
+    PayloadMessagesPerObject,
     /// Native payload items inspected.
     PayloadItems,
+    /// Native metadata items inspected.
+    PayloadMetadataItems,
+    /// Snappy frames inspected.
+    PayloadSnappyFrames,
     /// Native object and data references inspected.
     PayloadReferences,
     /// Wire fields inspected.
@@ -77,6 +82,16 @@ pub enum BodyTableCommentLimitKind {
     WireNesting,
     /// Aggregate wire work.
     WireWork,
+    /// Addressable table rows inspected.
+    WireTableRows,
+    /// Addressable table columns inspected.
+    WireTableColumns,
+    /// Addressable table cells inspected.
+    WireTableCells,
+    /// Materialized sparse table cells inspected.
+    WireMaterializedCells,
+    /// Repeated Numbers-wire items inspected.
+    WireItems,
     /// Native references inspected.
     References,
     /// Replies inspected.
@@ -104,13 +119,21 @@ impl fmt::Display for BodyTableCommentLimitKind {
             Self::TotalPayloadBytes => "total payload bytes",
             Self::PayloadObjects => "payload objects",
             Self::PayloadMessages => "payload messages",
+            Self::PayloadMessagesPerObject => "payload messages per object",
             Self::PayloadItems => "payload items",
+            Self::PayloadMetadataItems => "payload metadata items",
+            Self::PayloadSnappyFrames => "payload Snappy frames",
             Self::PayloadReferences => "payload references",
             Self::WireFields => "wire fields",
             Self::WireBytes => "wire bytes",
             Self::WireOutputBytes => "wire output bytes",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
+            Self::WireTableRows => "wire table rows",
+            Self::WireTableColumns => "wire table columns",
+            Self::WireTableCells => "wire table cells",
+            Self::WireMaterializedCells => "wire materialized cells",
+            Self::WireItems => "wire items",
             Self::References => "references",
             Self::Replies => "replies",
             Self::TextBytes => "text bytes",
@@ -143,9 +166,6 @@ pub enum BodyTableCommentError {
     /// No root comment is attached to the selected cell.
     #[error("the selected Pages body-table cell has no comment")]
     CommentNotFound,
-    /// The checked reply ordinal is absent.
-    #[error("the Pages body-table comment reply position {position:?} does not exist")]
-    ReplyPositionNotFound { position: litchi_core::Position },
     /// A valid graph dependency is outside the focused writer profile.
     #[error("the Pages body-table comment graph has an unsupported dependency")]
     UnsupportedDependency,
@@ -201,17 +221,10 @@ struct TableCommentSnapshot {
     comment: Option<Comment>,
 }
 
-#[allow(
-    dead_code,
-    reason = "reply variants remain explicit host-only refusals in this slice"
-)]
 #[derive(Debug, Clone)]
 enum Operation {
     Set(Box<str>),
     Clear,
-    AddReply(Box<str>),
-    SetReply { index: usize, text: Box<str> },
-    RemoveReply { index: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -357,63 +370,12 @@ impl BodyTableCommentEdit<'_> {
         Ok(self)
     }
 
-    /// Stage removal of the root comment and its reply thread.
+    /// Stage removal of a root comment with no replies.
+    ///
+    /// Reply-bearing roots are refused by this root-only route.
     pub fn clear(mut self) -> Result<Self, BodyTableCommentError> {
         self.operation = Some(Operation::Clear);
         Ok(self)
-    }
-
-    /// Stage appending one direct reply.
-    pub fn add_reply(mut self, text: impl AsRef<str>) -> Result<Self, BodyTableCommentError> {
-        if self.before.comment.is_none() {
-            return Err(BodyTableCommentError::CommentNotFound);
-        }
-        self.operation = Some(Operation::AddReply(copy_text(
-            text.as_ref(),
-            &mut self.budget,
-        )?));
-        Ok(self)
-    }
-
-    /// Stage replacement of one checked reply ordinal.
-    pub fn set_reply(
-        mut self,
-        selector: impl Into<ReplySelector>,
-        text: impl AsRef<str>,
-    ) -> Result<Self, BodyTableCommentError> {
-        let index = selector.into().as_index();
-        self.ensure_reply(index)?;
-        self.operation = Some(Operation::SetReply {
-            index,
-            text: copy_text(text.as_ref(), &mut self.budget)?,
-        });
-        Ok(self)
-    }
-
-    /// Stage removal of one checked reply ordinal.
-    pub fn remove_reply(
-        mut self,
-        selector: impl Into<ReplySelector>,
-    ) -> Result<Self, BodyTableCommentError> {
-        let index = selector.into().as_index();
-        self.ensure_reply(index)?;
-        self.operation = Some(Operation::RemoveReply { index });
-        Ok(self)
-    }
-
-    fn ensure_reply(&self, index: usize) -> Result<(), BodyTableCommentError> {
-        let Some(comment) = self.before.comment.as_ref() else {
-            return Err(BodyTableCommentError::CommentNotFound);
-        };
-        if comment
-            .replies()
-            .is_none_or(|replies| index >= replies.len())
-        {
-            return Err(BodyTableCommentError::ReplyPositionNotFound {
-                position: litchi_core::Position::new(index),
-            });
-        }
-        Ok(())
     }
 
     /// Validate and publish the staged operation.
@@ -687,7 +649,7 @@ impl Package {
             .commit()
     }
 
-    /// Convenience root-comment removal operation.
+    /// Convenience root-comment removal operation; reply-bearing roots are refused.
     pub fn clear_body_table_cell_comment<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
@@ -695,43 +657,6 @@ impl Package {
     ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
         self.edit_body_table_cell_comment(selector, cell)?
             .clear()?
-            .commit()
-    }
-
-    /// Convenience reply append operation.
-    pub fn add_body_table_cell_comment_reply<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-        cell: CellPosition,
-        text: impl AsRef<str>,
-    ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
-        self.edit_body_table_cell_comment(selector, cell)?
-            .add_reply(text)?
-            .commit()
-    }
-
-    /// Convenience reply replacement operation.
-    pub fn set_body_table_cell_comment_reply<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-        cell: CellPosition,
-        reply: impl Into<ReplySelector>,
-        text: impl AsRef<str>,
-    ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
-        self.edit_body_table_cell_comment(selector, cell)?
-            .set_reply(reply, text)?
-            .commit()
-    }
-
-    /// Convenience reply removal operation.
-    pub fn remove_body_table_cell_comment_reply<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-        cell: CellPosition,
-        reply: impl Into<ReplySelector>,
-    ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
-        self.edit_body_table_cell_comment(selector, cell)?
-            .remove_reply(reply)?
             .commit()
     }
 }
@@ -747,12 +672,22 @@ fn commit_edit(
     if operation_is_noop(&before, &operation) {
         return Ok(noop_commit(source, edit.table, edit.cell, before));
     }
+    if matches!(operation, Operation::Set(_))
+        && before
+            .comment
+            .as_ref()
+            .and_then(Comment::replies)
+            .is_some_and(|replies| !replies.is_empty())
+    {
+        // The first shared slice owns root-only threads.  Replacing the text
+        // of a reply-bearing root is deferred until reply metadata and
+        // topology transitions are lifted into the shared engine.
+        return Err(BodyTableCommentError::UnsupportedDependency);
+    }
     if matches!(operation, Operation::Set(_) | Operation::Clear) {
         return commit_shared_root(edit);
     }
-    // Direct replies remain host-only until their shared graph transition is
-    // lifted; do not route them through the former Pages-local writer.
-    return Err(BodyTableCommentError::UnsupportedDependency);
+    unreachable!("root-only operation set is exhaustive")
 }
 
 fn commit_shared_root(
@@ -764,9 +699,6 @@ fn commit_shared_root(
     let native_operation = match &operation {
         Operation::Set(text) => litchi_iwa_table::comments_native::RootOperation::Set(text.clone()),
         Operation::Clear => litchi_iwa_table::comments_native::RootOperation::Clear,
-        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
-            return Err(BodyTableCommentError::UnsupportedDependency);
-        },
     };
     let selection = litchi_iwa_table::comments_native::Selection {
         model_component: edit.selection.component.clone(),
@@ -801,9 +733,6 @@ fn commit_shared_root(
     let expected = match operation {
         Operation::Set(text) => Some(Comment::new(text.as_ref())),
         Operation::Clear => None,
-        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
-            return Err(BodyTableCommentError::UnsupportedDependency);
-        },
     };
     if !snapshot_matches(&after, &TableCommentSnapshot { comment: expected }) {
         return Err(BodyTableCommentError::Verification);
@@ -840,9 +769,15 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> BodyTabl
             maximum,
         } => BodyTableCommentError::Limit {
             kind: match kind {
+                LimitKind::InputBytes => BodyTableCommentLimitKind::InputBytes,
                 LimitKind::PackageBytes => BodyTableCommentLimitKind::PackageBytes,
                 LimitKind::PayloadBytes => BodyTableCommentLimitKind::PayloadBytes,
                 LimitKind::References => BodyTableCommentLimitKind::References,
+                LimitKind::Objects => BodyTableCommentLimitKind::PayloadObjects,
+                LimitKind::Messages => BodyTableCommentLimitKind::PayloadMessages,
+                LimitKind::MessagesPerObject => BodyTableCommentLimitKind::PayloadMessagesPerObject,
+                LimitKind::MetadataItems => BodyTableCommentLimitKind::PayloadMetadataItems,
+                LimitKind::SnappyFrames => BodyTableCommentLimitKind::PayloadSnappyFrames,
                 LimitKind::Replies => BodyTableCommentLimitKind::Replies,
                 LimitKind::TextBytes => BodyTableCommentLimitKind::TextBytes,
                 LimitKind::WireFields => BodyTableCommentLimitKind::WireFields,
@@ -850,6 +785,11 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> BodyTabl
                 LimitKind::WireOutputBytes => BodyTableCommentLimitKind::WireOutputBytes,
                 LimitKind::WireNesting => BodyTableCommentLimitKind::WireNesting,
                 LimitKind::WireWork => BodyTableCommentLimitKind::WireWork,
+                LimitKind::TableRows => BodyTableCommentLimitKind::WireTableRows,
+                LimitKind::TableColumns => BodyTableCommentLimitKind::WireTableColumns,
+                LimitKind::TableCells => BodyTableCommentLimitKind::WireTableCells,
+                LimitKind::MaterializedCells => BodyTableCommentLimitKind::WireMaterializedCells,
+                LimitKind::Items => BodyTableCommentLimitKind::WireItems,
                 LimitKind::Allocations => BodyTableCommentLimitKind::Allocations,
                 LimitKind::ScratchBytes => BodyTableCommentLimitKind::ScratchBytes,
                 LimitKind::RetainedBytes => BodyTableCommentLimitKind::RetainedBytes,
@@ -857,6 +797,71 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> BodyTabl
             observed,
             maximum,
         },
+    }
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error) -> BodyTableCommentError {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => BodyTableCommentError::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => BodyTableCommentLimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => BodyTableCommentLimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => {
+                    BodyTableCommentLimitKind::WireOutputBytes
+                },
+                litchi_iwa_common::LimitKind::Nesting => BodyTableCommentLimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => BodyTableCommentLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::TableRows => BodyTableCommentLimitKind::WireTableRows,
+                litchi_iwa_common::LimitKind::TableColumns => {
+                    BodyTableCommentLimitKind::WireTableColumns
+                },
+                litchi_iwa_common::LimitKind::TableCells => {
+                    BodyTableCommentLimitKind::WireTableCells
+                },
+                litchi_iwa_common::LimitKind::MaterializedCells => {
+                    BodyTableCommentLimitKind::WireMaterializedCells
+                },
+            },
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => {
+            BodyTableCommentError::Allocation { amount }
+        },
+        _ => BodyTableCommentError::InvalidSource,
+    }
+}
+
+fn map_bnc_error(error: litchi_numbers_wire::Error) -> BodyTableCommentError {
+    match error {
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => BodyTableCommentError::Limit {
+            kind: match kind {
+                litchi_numbers_wire::LimitKind::InputBytes => BodyTableCommentLimitKind::WireBytes,
+                litchi_numbers_wire::LimitKind::OutputBytes => {
+                    BodyTableCommentLimitKind::WireOutputBytes
+                },
+                litchi_numbers_wire::LimitKind::Fields => BodyTableCommentLimitKind::WireFields,
+                litchi_numbers_wire::LimitKind::TailBytes => {
+                    BodyTableCommentLimitKind::PayloadBytes
+                },
+                litchi_numbers_wire::LimitKind::Items => BodyTableCommentLimitKind::WireItems,
+                _ => return BodyTableCommentError::InvalidSource,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_numbers_wire::Error::Allocation { requested } => {
+            BodyTableCommentError::Allocation { amount: requested }
+        },
+        _ => BodyTableCommentError::InvalidSource,
     }
 }
 
@@ -886,11 +891,6 @@ fn operation_is_noop(before: &TableCommentSnapshot, operation: &Operation) -> bo
     match (before.comment.as_ref(), operation) {
         (None, Operation::Clear) => true,
         (Some(comment), Operation::Set(text)) => comment.text() == text.as_ref(),
-        (Some(_), Operation::AddReply(_)) => false,
-        (Some(comment), Operation::SetReply { index, text }) => comment
-            .replies()
-            .and_then(|replies| replies.get(*index))
-            .is_some_and(|reply| reply.text() == text.as_ref()),
         _ => false,
     }
 }
@@ -1071,8 +1071,8 @@ fn read_tile_comment_key(
     column: u32,
     table_columns: u32,
 ) -> Result<Option<u32>, BodyTableCommentError> {
-    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut found = None;
     for field in view
         .fields()
@@ -1082,7 +1082,7 @@ fn read_tile_comment_key(
             return Err(BodyTableCommentError::InvalidSource);
         }
         let row = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)
-            .map_err(|_| BodyTableCommentError::InvalidSource)?;
+            .map_err(map_wire_error)?;
         let row_value = unique_varint(&row, ROW_INDEX_FIELD)?;
         if row_value != u64::from(row_index) {
             continue;
@@ -1106,8 +1106,8 @@ fn read_tile_row_comment_key(
     column: u32,
     table_columns: u32,
 ) -> Result<Option<u32>, BodyTableCommentError> {
-    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let storage = unique_length(&view, ROW_STORAGE_FIELD)?;
     let offsets = unique_length(&view, ROW_OFFSETS_FIELD)?;
     let cell_count = usize::try_from(unique_varint(&view, ROW_CELL_COUNT_FIELD)?)
@@ -1131,7 +1131,20 @@ fn read_tile_row_comment_key(
     if !offsets.payload().len().is_multiple_of(2) || column >= table_columns {
         return Err(BodyTableCommentError::InvalidSource);
     }
+    let offset_count = offsets.payload().len() / 2;
+    if offset_count > litchi_iwa_common::WireLimits::MAX_FIELDS {
+        return Err(BodyTableCommentError::Limit {
+            kind: BodyTableCommentLimitKind::WireFields,
+            observed: offset_count as u64,
+            maximum: litchi_iwa_common::WireLimits::MAX_FIELDS as u64,
+        });
+    }
     let mut starts = Vec::new();
+    starts
+        .try_reserve_exact(offset_count)
+        .map_err(|_| BodyTableCommentError::Allocation {
+            amount: offset_count,
+        })?;
     for chunk in offsets.payload().chunks_exact(2) {
         let value = u16::from_le_bytes([chunk[0], chunk[1]]);
         starts.push(if value == u16::MAX {
@@ -1169,7 +1182,7 @@ fn read_tile_row_comment_key(
         &storage.payload()[start..end],
         &litchi_numbers_wire::Limits::DEFAULT,
     )
-    .map_err(|_| BodyTableCommentError::InvalidSource)?;
+    .map_err(map_bnc_error)?;
     Ok(cell.comment_identifier())
 }
 
@@ -1188,7 +1201,7 @@ fn read_list_entry(
         return Err(BodyTableCommentError::InvalidSource);
     }
     let view = WireView::parse(&messages[0].data, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| BodyTableCommentError::InvalidSource)?;
+        .map_err(map_wire_error)?;
     let list_type = unique_varint(&view, LIST_TYPE_FIELD)?;
     if list_type != COMMENT_LIST_TYPE {
         return Err(BodyTableCommentError::UnsupportedDependency);
@@ -1199,7 +1212,7 @@ fn read_list_entry(
         .filter(|field| field.number() == LIST_ENTRY_FIELD)
     {
         let entry = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)
-            .map_err(|_| BodyTableCommentError::InvalidSource)?;
+            .map_err(map_wire_error)?;
         if entry.fields().any(|entry_field| {
             !matches!(
                 entry_field.number(),
@@ -1223,7 +1236,7 @@ fn read_list_entry(
         let reference = unique_length(&entry, ENTRY_STORAGE_FIELD)?;
         result = Some(unique_varint(
             &WireView::parse(reference.payload(), litchi_iwa_common::WireLimits::DEFAULT)
-                .map_err(|_| BodyTableCommentError::InvalidSource)?,
+                .map_err(map_wire_error)?,
             REFERENCE_IDENTIFIER_FIELD,
         )?);
     }
@@ -1245,7 +1258,7 @@ fn validate_comment_list(package: &Package, identifier: u64) -> Result<(), BodyT
         return Err(BodyTableCommentError::InvalidSource);
     }
     let view = WireView::parse(&messages[0].data, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| BodyTableCommentError::InvalidSource)?;
+        .map_err(map_wire_error)?;
     for field in view.fields() {
         if !matches!(
             field.number(),
@@ -1367,17 +1380,31 @@ fn map_reopen_core_error(error: litchi_iwa_core::Error) -> BodyTableCommentError
         } => BodyTableCommentError::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => BodyTableCommentLimitKind::PayloadObjects,
-                litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    BodyTableCommentLimitKind::PayloadMessages
+                litchi_iwa_core::LimitKind::Messages => BodyTableCommentLimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::MessagesPerObject => {
+                    BodyTableCommentLimitKind::PayloadMessagesPerObject
                 },
-                litchi_iwa_core::LimitKind::HeaderFields
-                | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    BodyTableCommentLimitKind::PayloadItems
+                litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+                    BodyTableCommentLimitKind::PayloadBytes
                 },
+                litchi_iwa_core::LimitKind::ArchiveBytes => BodyTableCommentLimitKind::PackageBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => BodyTableCommentLimitKind::WireFields,
                 litchi_iwa_core::LimitKind::HeaderNesting => BodyTableCommentLimitKind::WireNesting,
-                _ => BodyTableCommentLimitKind::PayloadBytes,
+                litchi_iwa_core::LimitKind::HeaderMemoryBytes => {
+                    BodyTableCommentLimitKind::ScratchBytes
+                },
+                litchi_iwa_core::LimitKind::MetadataItems => {
+                    BodyTableCommentLimitKind::PayloadMetadataItems
+                },
+                litchi_iwa_core::LimitKind::SnappyFrames => {
+                    BodyTableCommentLimitKind::PayloadSnappyFrames
+                },
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1393,9 +1420,33 @@ fn map_reopen_package_error(error: PackageError) -> BodyTableCommentError {
     match error {
         PackageError::Archive(error) => map_reopen_archive_error(error),
         PackageError::Limit {
-            observed, maximum, ..
+            kind,
+            observed,
+            maximum,
         } => BodyTableCommentError::Limit {
-            kind: BodyTableCommentLimitKind::WireWork,
+            kind: match kind {
+                crate::LimitKind::Source(crate::SourceLimitKind::InputBytes) => {
+                    BodyTableCommentLimitKind::InputBytes
+                },
+                crate::LimitKind::Source(crate::SourceLimitKind::Members) => {
+                    BodyTableCommentLimitKind::Entries
+                },
+                crate::LimitKind::Source(crate::SourceLimitKind::EntryBytes) => {
+                    BodyTableCommentLimitKind::EntryBytes
+                },
+                crate::LimitKind::Source(crate::SourceLimitKind::AggregateBytes) => {
+                    BodyTableCommentLimitKind::TotalEntryBytes
+                },
+                crate::LimitKind::Source(crate::SourceLimitKind::ComponentBytes) => {
+                    BodyTableCommentLimitKind::PayloadBytes
+                },
+                crate::LimitKind::Semantic(crate::SemanticLimitKind::Sections) => {
+                    BodyTableCommentLimitKind::PayloadItems
+                },
+                crate::LimitKind::Semantic(crate::SemanticLimitKind::TextBytes) => {
+                    BodyTableCommentLimitKind::TextBytes
+                },
+            },
             observed,
             maximum,
         },

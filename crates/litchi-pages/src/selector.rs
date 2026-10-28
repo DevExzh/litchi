@@ -3,50 +3,6 @@
 use litchi_core::Position;
 use thiserror::Error;
 
-/// Selects a direct reply in a table-cell comment by its checked ordinal.
-///
-/// Reply storage identifiers never cross the Pages public boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ReplySelector(Position);
-
-impl ReplySelector {
-    /// Construct a selector from a checked source position.
-    #[must_use]
-    pub const fn position(position: Position) -> Self {
-        Self(position)
-    }
-
-    /// Construct a selector from a zero-based reply index.
-    #[must_use]
-    pub const fn index(index: usize) -> Self {
-        Self::position(Position::new(index))
-    }
-
-    /// Return the checked reply position.
-    #[must_use]
-    pub const fn as_position(self) -> Position {
-        self.0
-    }
-
-    /// Return the zero-based reply index.
-    #[must_use]
-    pub const fn as_index(self) -> usize {
-        self.0.get()
-    }
-}
-
-impl From<Position> for ReplySelector {
-    fn from(position: Position) -> Self {
-        Self::position(position)
-    }
-}
-
-impl From<usize> for ReplySelector {
-    fn from(index: usize) -> Self {
-        Self::index(index)
-    }
-}
-
 /// Selects one section by its exact semantic name or zero-based source
 /// position without retaining a native object identifier.
 #[allow(

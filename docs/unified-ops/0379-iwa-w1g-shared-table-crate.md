@@ -10,8 +10,8 @@
   `1544f10604`). Group 2 (table-cell comments) now has a root-only shared
   engine and three facade slices on the continuation branch; focused code,
   parity, fuzz-lock and documentation gates pass, while the current boundary
-  checker reports an unchanged pre-existing Keynote drawable-comment export
-  debt; final integrated performance and native verification remain pending
+  checker passes after removing the newly introduced root-level comment
+  exports; final integrated performance and native verification remain pending
   (§2b, §6). Groups 3–5 (rich text, topology, conditional highlights) are not
   started (§5).
 - Date: 2026-10-28 continuation; group 6 completed 2026-10-27.
@@ -350,9 +350,9 @@ The differential cases currently run are:
 
 | Format | Cases | Tier |
 |---|---|---|
-| Pages | `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity` | B, root-only |
-| Keynote | `keynote_slide_table_comment_set_parity`, `keynote_slide_table_comment_clear_parity`, `keynote_slide_table_comment_read_parity`, `keynote_slide_table_comment_replies_read_parity` | B for root writes; A for reads |
-| Numbers | `numbers_table_cell_comment_set_parity` (including reply projection readback) | B, root-only |
+| Pages | `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity`, `pages_body_table_comment_replies_read_parity` | B for root writes; A for populated root/reply read |
+| Keynote | `keynote_slide_table_comment_set_parity`, `keynote_slide_table_comment_clear_parity`, `keynote_slide_table_comment_replace_preserves_source_metadata`, `keynote_slide_table_comment_patch_rejects_unrelated_metadata_change`, `keynote_slide_table_comment_read_parity`, `keynote_slide_table_comment_replies_read_parity` | B for root writes; A for reads |
+| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity` | B for root write; A for populated root/reply read |
 
 The host remains the differential oracle. The 17 table-comment ledger rows
 were reviewed: five focused read rows are migrated with these tests, while
@@ -509,6 +509,16 @@ The capability and registry goldens and the OfficeCLI corpus pass unchanged
 inside the litchi-ops chunks; no `litchi-ops` dispatch changed (owner
 decision D7), so they were not re-blessed.
 
+The `parity` integration target remains enabled under the default feature set.
+Only the two Numbers mutation cases that need the independent legacy host
+oracle (`numbers_table_cell_comment_set_parity` and
+`numbers_table_cell_comment_host_oracle_control`) are compiled with the
+explicit `parity-host-oracle` feature. The root-read witness is a doc-hidden
+selector/position seam used only by the differential test; it is not a
+supported editor API. Re-run the independent oracle cases with
+`CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --features parity-host-oracle
+--test parity numbers_table_comment_cases:: -- --nocapture`.
+
 The table above is historical evidence from the earlier group-1 and group-6
 commits; it is not a complete gate for the current integrated tree.  The
 review follow-up was rerun on final source commit `86bd7f5e3a`, based on
@@ -531,22 +541,19 @@ merged candidate `4abb90f713` (code fixes `828d02cad9` and `86bd7f5e3a`, with th
   evidence, not the coordinator's final integrated-tree qualification.
 
 The current group-2 checks are separate from the historical rows above. On the
-continuation source tree, after the admission, codec-limit, typed-error and
-reply-boundary repairs, the following passed: `cargo fmt --all --check`, a
-four-crate library compile (`litchi-iwa-table`, `litchi-pages`,
-`litchi-keynote`, `litchi-numbers`), the Numbers table-cell comment suite
-(31/31), the host-vs-leaf table-comment parity target (7/7), both affected
-fuzz-lock checks (`litchi-numbers/fuzz` and `litchi-pages/fuzz`), and
-`python3 tools/iwa_exit_ledger.py --check`. The same source tree also passed
-the four-crate all-targets/all-features Clippy gate (`-D warnings`), focused
-rustdoc (`RUSTDOCFLAGS=-Dwarnings`), `check_api_glossary.py`, and the affected
-no-`3rdparty` test. The current `check_crate_boundaries.py` run is not green:
-it reports the unchanged pre-existing export at
-`crates/litchi-keynote/src/lib.rs:506`
-(`litchi_iwa_common::table::read` under a focused drawable-comment public
-surface). This slice did not modify that file or export. The parity cases are
-Tier B for root writes and Tier A for reads, all with `Evidence::Queued`;
-they are differential proof, not Apple acceptance. No performance
-qualification or native E3/E4 receipt is claimed. The coordinator must repeat
-the full gate and final performance on one integrated trunk commit after this
-branch is reviewed.
+continuation source tree before its final commit, the focused parity runs
+passed: Numbers default read (1/1), Numbers with `parity-host-oracle` (3/3),
+Pages comment cases (3/3), and Keynote comment cases (6/6). The Keynote cases
+include native D2 root read/clear, a host-authored populated reply read,
+source-metadata-preserving replacement, and an unrelated-properties
+patch-conflict control. The Numbers set case uses the explicit hidden legacy
+oracle seam and its control; its populated reply read source is host-authored
+before serialization. Pages uses a host-authored no-reply root for mutation
+and table 0 B2 from the populated native comment fixture for root/reply read.
+The three affected fuzz-lock manifests (`litchi-numbers`, `litchi-pages`, and
+`litchi-keynote`) also passed `cargo check --locked --offline --bins`.
+These are differential proofs, not Apple open/save evidence; all three routes
+remain `Evidence::Queued` and native verification/performance are still
+pending. The final commit must rerun formatting, focused compilation/Clippy,
+ledger, boundary, glossary and affected fuzz-lock gates; the coordinator must
+repeat the full gate and final performance on one integrated trunk commit.

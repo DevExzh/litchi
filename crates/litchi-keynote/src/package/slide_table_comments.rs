@@ -17,7 +17,6 @@ use thiserror::Error;
 use super::{
     Package, PayloadLimitKind, ReadError, SemanticLimitKind, slide_table_cells, slide_table_core,
 };
-use crate::ReplySelector;
 use crate::selector::SlideSelector;
 use crate::slide::table::TableSelector;
 use litchi_iwa_common::table::read::{Comment, CommentReply};
@@ -64,10 +63,22 @@ pub enum SlideTableCommentLimitKind {
     TotalPayloadBytes,
     /// Native payload objects inspected.
     PayloadObjects,
+    /// Slides inspected by the semantic reader.
+    Slides,
     /// Native payload messages inspected.
     PayloadMessages,
+    /// Native messages per object inspected.
+    PayloadMessagesPerObject,
     /// Native payload items inspected.
     PayloadItems,
+    /// Native metadata items inspected.
+    PayloadMetadataItems,
+    /// Text-storage objects inspected by the semantic reader.
+    TextStorages,
+    /// Rich-text fragments retained by the semantic reader.
+    TextFragments,
+    /// Snappy frames inspected.
+    PayloadSnappyFrames,
     /// Native object and data references inspected.
     PayloadReferences,
     /// Wire fields inspected.
@@ -80,6 +91,16 @@ pub enum SlideTableCommentLimitKind {
     WireNesting,
     /// Aggregate wire work.
     WireWork,
+    /// Addressable table rows inspected.
+    WireTableRows,
+    /// Addressable table columns inspected.
+    WireTableColumns,
+    /// Addressable table cells inspected.
+    WireTableCells,
+    /// Materialized sparse table cells inspected.
+    WireMaterializedCells,
+    /// Repeated Numbers-wire items inspected.
+    WireItems,
     /// Native references inspected.
     References,
     /// Replies inspected.
@@ -106,14 +127,25 @@ impl fmt::Display for SlideTableCommentLimitKind {
             Self::PayloadBytes => "payload bytes",
             Self::TotalPayloadBytes => "total payload bytes",
             Self::PayloadObjects => "payload objects",
+            Self::Slides => "slides",
             Self::PayloadMessages => "payload messages",
+            Self::PayloadMessagesPerObject => "payload messages per object",
             Self::PayloadItems => "payload items",
+            Self::PayloadMetadataItems => "payload metadata items",
+            Self::TextStorages => "text storages",
+            Self::TextFragments => "text fragments",
+            Self::PayloadSnappyFrames => "payload Snappy frames",
             Self::PayloadReferences => "payload references",
             Self::WireFields => "wire fields",
             Self::WireBytes => "wire bytes",
             Self::WireOutputBytes => "wire output bytes",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
+            Self::WireTableRows => "wire table rows",
+            Self::WireTableColumns => "wire table columns",
+            Self::WireTableCells => "wire table cells",
+            Self::WireMaterializedCells => "wire materialized cells",
+            Self::WireItems => "wire items",
             Self::References => "references",
             Self::Replies => "replies",
             Self::TextBytes => "text bytes",
@@ -146,9 +178,6 @@ pub enum SlideTableCommentError {
     /// No root comment is attached to the selected cell.
     #[error("the selected Keynote body-table cell has no comment")]
     CommentNotFound,
-    /// The checked reply ordinal is absent.
-    #[error("the Keynote body-table comment reply position {position:?} does not exist")]
-    ReplyPositionNotFound { position: litchi_core::Position },
     /// A valid graph dependency is outside the focused writer profile.
     #[error("the Keynote body-table comment graph has an unsupported dependency")]
     UnsupportedDependency,
@@ -214,17 +243,10 @@ struct TableCommentSnapshot {
     comment: Option<Comment>,
 }
 
-#[allow(
-    dead_code,
-    reason = "reply variants remain explicit host-only refusals in this slice"
-)]
 #[derive(Debug, Clone)]
 enum Operation {
     Set(Box<str>),
     Clear,
-    AddReply(Box<str>),
-    SetReply { index: usize, text: Box<str> },
-    RemoveReply { index: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -373,63 +395,12 @@ impl SlideTableCommentEdit<'_> {
         Ok(self)
     }
 
-    /// Stage removal of the root comment and its reply thread.
+    /// Stage removal of a root comment with no replies.
+    ///
+    /// Reply-bearing roots are refused by this root-only route.
     pub fn clear(mut self) -> Result<Self, SlideTableCommentError> {
         self.operation = Some(Operation::Clear);
         Ok(self)
-    }
-
-    /// Stage appending one direct reply.
-    pub fn add_reply(mut self, text: impl AsRef<str>) -> Result<Self, SlideTableCommentError> {
-        if self.before.comment.is_none() {
-            return Err(SlideTableCommentError::CommentNotFound);
-        }
-        self.operation = Some(Operation::AddReply(copy_text(
-            text.as_ref(),
-            &mut self.budget,
-        )?));
-        Ok(self)
-    }
-
-    /// Stage replacement of one checked reply ordinal.
-    pub fn set_reply(
-        mut self,
-        selector: impl Into<ReplySelector>,
-        text: impl AsRef<str>,
-    ) -> Result<Self, SlideTableCommentError> {
-        let index = selector.into().as_index();
-        self.ensure_reply(index)?;
-        self.operation = Some(Operation::SetReply {
-            index,
-            text: copy_text(text.as_ref(), &mut self.budget)?,
-        });
-        Ok(self)
-    }
-
-    /// Stage removal of one checked reply ordinal.
-    pub fn remove_reply(
-        mut self,
-        selector: impl Into<ReplySelector>,
-    ) -> Result<Self, SlideTableCommentError> {
-        let index = selector.into().as_index();
-        self.ensure_reply(index)?;
-        self.operation = Some(Operation::RemoveReply { index });
-        Ok(self)
-    }
-
-    fn ensure_reply(&self, index: usize) -> Result<(), SlideTableCommentError> {
-        let Some(comment) = self.before.comment.as_ref() else {
-            return Err(SlideTableCommentError::CommentNotFound);
-        };
-        if comment
-            .replies()
-            .is_none_or(|replies| index >= replies.len())
-        {
-            return Err(SlideTableCommentError::ReplyPositionNotFound {
-                position: litchi_core::Position::new(index),
-            });
-        }
-        Ok(())
     }
 
     /// Validate and publish the staged operation.
@@ -712,7 +683,7 @@ impl Package {
             .commit()
     }
 
-    /// Convenience root-comment removal operation.
+    /// Convenience root-comment removal operation; reply-bearing roots are refused.
     pub fn clear_slide_table_cell_comment<'table>(
         &self,
         slide: impl Into<SlideSelector<'table>>,
@@ -721,46 +692,6 @@ impl Package {
     ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
         self.edit_slide_table_cell_comment(slide, table, cell)?
             .clear()?
-            .commit()
-    }
-
-    /// Convenience reply append operation.
-    pub fn add_slide_table_cell_comment_reply<'table>(
-        &self,
-        slide: impl Into<SlideSelector<'table>>,
-        table: impl Into<TableSelector>,
-        cell: CellPosition,
-        text: impl AsRef<str>,
-    ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
-        self.edit_slide_table_cell_comment(slide, table, cell)?
-            .add_reply(text)?
-            .commit()
-    }
-
-    /// Convenience reply replacement operation.
-    pub fn set_slide_table_cell_comment_reply<'table>(
-        &self,
-        slide: impl Into<SlideSelector<'table>>,
-        table: impl Into<TableSelector>,
-        cell: CellPosition,
-        reply: impl Into<ReplySelector>,
-        text: impl AsRef<str>,
-    ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
-        self.edit_slide_table_cell_comment(slide, table, cell)?
-            .set_reply(reply, text)?
-            .commit()
-    }
-
-    /// Convenience reply removal operation.
-    pub fn remove_slide_table_cell_comment_reply<'table>(
-        &self,
-        slide: impl Into<SlideSelector<'table>>,
-        table: impl Into<TableSelector>,
-        cell: CellPosition,
-        reply: impl Into<ReplySelector>,
-    ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
-        self.edit_slide_table_cell_comment(slide, table, cell)?
-            .remove_reply(reply)?
             .commit()
     }
 }
@@ -780,10 +711,22 @@ fn commit_edit(
             source, edit.slide, edit.table, edit.cell, before,
         ));
     }
+    if matches!(operation, Operation::Set(_))
+        && before
+            .comment
+            .as_ref()
+            .and_then(Comment::replies)
+            .is_some_and(|replies| !replies.is_empty())
+    {
+        // The first shared slice owns root-only threads.  Replacing the text
+        // of a reply-bearing root is deferred until reply metadata and
+        // topology transitions are lifted into the shared engine.
+        return Err(SlideTableCommentError::UnsupportedDependency);
+    }
     if matches!(operation, Operation::Set(_) | Operation::Clear) {
         return commit_shared_root(edit);
     }
-    return Err(SlideTableCommentError::UnsupportedDependency);
+    unreachable!("root-only operation set is exhaustive")
 }
 
 fn commit_shared_root(
@@ -795,9 +738,6 @@ fn commit_shared_root(
     let native_operation = match &operation {
         Operation::Set(text) => litchi_iwa_table::comments_native::RootOperation::Set(text.clone()),
         Operation::Clear => litchi_iwa_table::comments_native::RootOperation::Clear,
-        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
-            return Err(SlideTableCommentError::UnsupportedDependency);
-        },
     };
     let selection = litchi_iwa_table::comments_native::Selection {
         model_component: edit.selection.component.clone(),
@@ -837,9 +777,6 @@ fn commit_shared_root(
     let expected = match operation {
         Operation::Set(text) => Some(Comment::new(text.as_ref())),
         Operation::Clear => None,
-        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
-            return Err(SlideTableCommentError::UnsupportedDependency);
-        },
     };
     if !snapshot_matches(&after, &TableCommentSnapshot { comment: expected }) {
         return Err(SlideTableCommentError::Verification);
@@ -877,9 +814,17 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> SlideTab
             maximum,
         } => SlideTableCommentError::Limit {
             kind: match kind {
+                LimitKind::InputBytes => SlideTableCommentLimitKind::InputBytes,
                 LimitKind::PackageBytes => SlideTableCommentLimitKind::PackageBytes,
                 LimitKind::PayloadBytes => SlideTableCommentLimitKind::PayloadBytes,
                 LimitKind::References => SlideTableCommentLimitKind::References,
+                LimitKind::Objects => SlideTableCommentLimitKind::PayloadObjects,
+                LimitKind::Messages => SlideTableCommentLimitKind::PayloadMessages,
+                LimitKind::MessagesPerObject => {
+                    SlideTableCommentLimitKind::PayloadMessagesPerObject
+                },
+                LimitKind::MetadataItems => SlideTableCommentLimitKind::PayloadMetadataItems,
+                LimitKind::SnappyFrames => SlideTableCommentLimitKind::PayloadSnappyFrames,
                 LimitKind::Replies => SlideTableCommentLimitKind::Replies,
                 LimitKind::TextBytes => SlideTableCommentLimitKind::TextBytes,
                 LimitKind::WireFields => SlideTableCommentLimitKind::WireFields,
@@ -887,6 +832,11 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> SlideTab
                 LimitKind::WireOutputBytes => SlideTableCommentLimitKind::WireOutputBytes,
                 LimitKind::WireNesting => SlideTableCommentLimitKind::WireNesting,
                 LimitKind::WireWork => SlideTableCommentLimitKind::WireWork,
+                LimitKind::TableRows => SlideTableCommentLimitKind::WireTableRows,
+                LimitKind::TableColumns => SlideTableCommentLimitKind::WireTableColumns,
+                LimitKind::TableCells => SlideTableCommentLimitKind::WireTableCells,
+                LimitKind::MaterializedCells => SlideTableCommentLimitKind::WireMaterializedCells,
+                LimitKind::Items => SlideTableCommentLimitKind::WireItems,
                 LimitKind::Allocations => SlideTableCommentLimitKind::Allocations,
                 LimitKind::ScratchBytes => SlideTableCommentLimitKind::ScratchBytes,
                 LimitKind::RetainedBytes => SlideTableCommentLimitKind::RetainedBytes,
@@ -894,6 +844,73 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> SlideTab
             observed,
             maximum,
         },
+    }
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error) -> SlideTableCommentError {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => SlideTableCommentError::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => SlideTableCommentLimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => SlideTableCommentLimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => {
+                    SlideTableCommentLimitKind::WireOutputBytes
+                },
+                litchi_iwa_common::LimitKind::Nesting => SlideTableCommentLimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => SlideTableCommentLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::TableRows => {
+                    SlideTableCommentLimitKind::WireTableRows
+                },
+                litchi_iwa_common::LimitKind::TableColumns => {
+                    SlideTableCommentLimitKind::WireTableColumns
+                },
+                litchi_iwa_common::LimitKind::TableCells => {
+                    SlideTableCommentLimitKind::WireTableCells
+                },
+                litchi_iwa_common::LimitKind::MaterializedCells => {
+                    SlideTableCommentLimitKind::WireMaterializedCells
+                },
+            },
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => {
+            SlideTableCommentError::Allocation { amount }
+        },
+        _ => SlideTableCommentError::InvalidSource,
+    }
+}
+
+fn map_bnc_error(error: litchi_numbers_wire::Error) -> SlideTableCommentError {
+    match error {
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => SlideTableCommentError::Limit {
+            kind: match kind {
+                litchi_numbers_wire::LimitKind::InputBytes => SlideTableCommentLimitKind::WireBytes,
+                litchi_numbers_wire::LimitKind::OutputBytes => {
+                    SlideTableCommentLimitKind::WireOutputBytes
+                },
+                litchi_numbers_wire::LimitKind::Fields => SlideTableCommentLimitKind::WireFields,
+                litchi_numbers_wire::LimitKind::TailBytes => {
+                    SlideTableCommentLimitKind::PayloadBytes
+                },
+                litchi_numbers_wire::LimitKind::Items => SlideTableCommentLimitKind::WireItems,
+                _ => return SlideTableCommentError::InvalidSource,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_numbers_wire::Error::Allocation { requested } => {
+            SlideTableCommentError::Allocation { amount: requested }
+        },
+        _ => SlideTableCommentError::InvalidSource,
     }
 }
 
@@ -924,11 +941,6 @@ fn operation_is_noop(before: &TableCommentSnapshot, operation: &Operation) -> bo
     match (before.comment.as_ref(), operation) {
         (None, Operation::Clear) => true,
         (Some(comment), Operation::Set(text)) => comment.text() == text.as_ref(),
-        (Some(_), Operation::AddReply(_)) => false,
-        (Some(comment), Operation::SetReply { index, text }) => comment
-            .replies()
-            .and_then(|replies| replies.get(*index))
-            .is_some_and(|reply| reply.text() == text.as_ref()),
         _ => false,
     }
 }
@@ -1096,8 +1108,8 @@ fn read_tile_comment_key(
     column: u32,
     table_columns: u32,
 ) -> Result<Option<u32>, SlideTableCommentError> {
-    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| SlideTableCommentError::InvalidSource)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut found = None;
     for field in view
         .fields()
@@ -1107,7 +1119,7 @@ fn read_tile_comment_key(
             return Err(SlideTableCommentError::InvalidSource);
         }
         let row = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)
-            .map_err(|_| SlideTableCommentError::InvalidSource)?;
+            .map_err(map_wire_error)?;
         let row_value = unique_varint(&row, ROW_INDEX_FIELD)?;
         if row_value != u64::from(row_index) {
             continue;
@@ -1131,8 +1143,8 @@ fn read_tile_row_comment_key(
     column: u32,
     table_columns: u32,
 ) -> Result<Option<u32>, SlideTableCommentError> {
-    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| SlideTableCommentError::InvalidSource)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let storage = unique_length(&view, ROW_STORAGE_FIELD)?;
     let offsets = unique_length(&view, ROW_OFFSETS_FIELD)?;
     let cell_count = usize::try_from(unique_varint(&view, ROW_CELL_COUNT_FIELD)?)
@@ -1156,7 +1168,20 @@ fn read_tile_row_comment_key(
     if !offsets.payload().len().is_multiple_of(2) || column >= table_columns {
         return Err(SlideTableCommentError::InvalidSource);
     }
+    let offset_count = offsets.payload().len() / 2;
+    if offset_count > litchi_iwa_common::WireLimits::MAX_FIELDS {
+        return Err(SlideTableCommentError::Limit {
+            kind: SlideTableCommentLimitKind::WireFields,
+            observed: offset_count as u64,
+            maximum: litchi_iwa_common::WireLimits::MAX_FIELDS as u64,
+        });
+    }
     let mut starts = Vec::new();
+    starts
+        .try_reserve_exact(offset_count)
+        .map_err(|_| SlideTableCommentError::Allocation {
+            amount: offset_count,
+        })?;
     for chunk in offsets.payload().chunks_exact(2) {
         let value = u16::from_le_bytes([chunk[0], chunk[1]]);
         starts.push(if value == u16::MAX {
@@ -1194,7 +1219,7 @@ fn read_tile_row_comment_key(
         &storage.payload()[start..end],
         &litchi_numbers_wire::Limits::DEFAULT,
     )
-    .map_err(|_| SlideTableCommentError::InvalidSource)?;
+    .map_err(map_bnc_error)?;
     Ok(cell.comment_identifier())
 }
 
@@ -1213,7 +1238,7 @@ fn read_list_entry(
         return Err(SlideTableCommentError::InvalidSource);
     }
     let view = WireView::parse(&messages[0].data, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| SlideTableCommentError::InvalidSource)?;
+        .map_err(map_wire_error)?;
     let list_type = unique_varint(&view, LIST_TYPE_FIELD)?;
     if list_type != COMMENT_LIST_TYPE {
         return Err(SlideTableCommentError::UnsupportedDependency);
@@ -1224,7 +1249,7 @@ fn read_list_entry(
         .filter(|field| field.number() == LIST_ENTRY_FIELD)
     {
         let entry = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)
-            .map_err(|_| SlideTableCommentError::InvalidSource)?;
+            .map_err(map_wire_error)?;
         if entry.fields().any(|entry_field| {
             !matches!(
                 entry_field.number(),
@@ -1248,7 +1273,7 @@ fn read_list_entry(
         let reference = unique_length(&entry, ENTRY_STORAGE_FIELD)?;
         result = Some(unique_varint(
             &WireView::parse(reference.payload(), litchi_iwa_common::WireLimits::DEFAULT)
-                .map_err(|_| SlideTableCommentError::InvalidSource)?,
+                .map_err(map_wire_error)?,
             REFERENCE_IDENTIFIER_FIELD,
         )?);
     }
@@ -1270,7 +1295,7 @@ fn validate_comment_list(package: &Package, identifier: u64) -> Result<(), Slide
         return Err(SlideTableCommentError::InvalidSource);
     }
     let view = WireView::parse(&messages[0].data, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_| SlideTableCommentError::InvalidSource)?;
+        .map_err(map_wire_error)?;
     for field in view.fields() {
         if !matches!(
             field.number(),
@@ -1366,7 +1391,11 @@ fn map_reopen_error(error: ReadError) -> SlideTableCommentError {
         } => SlideTableCommentError::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => SlideTableCommentLimitKind::PayloadObjects,
-                _ => SlideTableCommentLimitKind::WireWork,
+                SemanticLimitKind::Slides => SlideTableCommentLimitKind::Slides,
+                SemanticLimitKind::References => SlideTableCommentLimitKind::References,
+                SemanticLimitKind::TextStorages => SlideTableCommentLimitKind::TextStorages,
+                SemanticLimitKind::TextFragments => SlideTableCommentLimitKind::TextFragments,
+                SemanticLimitKind::TextBytes => SlideTableCommentLimitKind::TextBytes,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1428,19 +1457,35 @@ fn map_reopen_core_error(error: litchi_iwa_core::Error) -> SlideTableCommentErro
         } => SlideTableCommentError::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => SlideTableCommentLimitKind::PayloadObjects,
-                litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    SlideTableCommentLimitKind::PayloadMessages
+                litchi_iwa_core::LimitKind::Messages => SlideTableCommentLimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::MessagesPerObject => {
+                    SlideTableCommentLimitKind::PayloadMessagesPerObject
                 },
-                litchi_iwa_core::LimitKind::HeaderFields
-                | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SlideTableCommentLimitKind::PayloadItems
+                litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+                    SlideTableCommentLimitKind::PayloadBytes
                 },
+                litchi_iwa_core::LimitKind::ArchiveBytes => {
+                    SlideTableCommentLimitKind::PackageBytes
+                },
+                litchi_iwa_core::LimitKind::HeaderFields => SlideTableCommentLimitKind::WireFields,
                 litchi_iwa_core::LimitKind::HeaderNesting => {
                     SlideTableCommentLimitKind::WireNesting
                 },
-                _ => SlideTableCommentLimitKind::PayloadBytes,
+                litchi_iwa_core::LimitKind::HeaderMemoryBytes => {
+                    SlideTableCommentLimitKind::ScratchBytes
+                },
+                litchi_iwa_core::LimitKind::MetadataItems => {
+                    SlideTableCommentLimitKind::PayloadMetadataItems
+                },
+                litchi_iwa_core::LimitKind::SnappyFrames => {
+                    SlideTableCommentLimitKind::PayloadSnappyFrames
+                },
             },
             observed: observed as u64,
             maximum: maximum as u64,

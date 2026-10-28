@@ -2,12 +2,16 @@
 //! through the leaf `table::values` family and the cell reads.
 
 use litchi_iwa::pages::{self, CellValue, TableCellUpdate};
+use litchi_iwa_common::comment::AuthorId;
 use litchi_iwa_common::table::coordinate::At;
+use litchi_iwa_protos::tsk;
 use litchi_pages::Package;
 use litchi_pages::table::values::Value;
+use prost::Message as _;
 
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
 use crate::leaf_bytes;
+use crate::text_glue::Workspace;
 
 const CELLS: &str = "iwork/pages/body-table-cells-native.pages";
 /// Native two-table source without formulas (the values family refuses
@@ -17,6 +21,7 @@ const CATALOG: &str = "iwork/pages/body-table-catalog-native.pages";
 const TABLE: usize = 0;
 const COMMENT_ROW: usize = 1;
 const COMMENT_COLUMN: usize = 1;
+const AUTHOR_MESSAGE_TYPE: u32 = 212;
 
 fn comment_position() -> TestResult<At> {
     Ok(At::new(
@@ -60,16 +65,185 @@ fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
     ))
 }
 
+fn host_populated_comment_thread(bytes: &[u8]) -> TestResult<String> {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let comment = editor
+        .table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?
+        .ok_or("host read did not find the populated root comment")?;
+    if comment.comment.text.is_empty()
+        || comment.comment.creation_date_seconds.is_none()
+        || comment.comment.author_id.is_none()
+        || comment.comment.storage_uuid.is_none()
+    {
+        return Err("host root comment is missing text/date/author/storage metadata".into());
+    }
+    let replies = editor.table_cell_comment_replies(model, COMMENT_ROW, COMMENT_COLUMN)?;
+    if replies.is_empty() {
+        return Err("host read did not find a populated reply".into());
+    }
+    let reply_metadata = replies
+        .iter()
+        .map(|reply| {
+            if reply.comment.text.is_empty()
+                || reply.comment.creation_date_seconds.is_none()
+                || reply.comment.author_id.is_none()
+                || reply.comment.storage_uuid.is_none()
+            {
+                return Err::<String, Box<dyn std::error::Error>>(
+                    "host reply is missing text/date/author/storage metadata".into(),
+                );
+            }
+            Ok(format!(
+                "{}|{:?}|{}|{}",
+                reply.comment.text,
+                reply.comment.creation_date_seconds,
+                reply.comment.author_id.is_some(),
+                reply.comment.storage_uuid.is_some()
+            ))
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    Ok(format!(
+        "root={}|{:?}|{}|{};replies={reply_metadata:?}",
+        comment.comment.text,
+        comment.comment.creation_date_seconds,
+        comment.comment.author_id.is_some(),
+        comment.comment.storage_uuid.is_some()
+    ))
+}
+
+fn leaf_populated_comment_thread(bytes: &[u8]) -> TestResult<String> {
+    let package = Package::from_bytes(bytes)?;
+    let position = comment_position()?;
+    let comment = package
+        .body_table_cell_comment(TABLE, position)?
+        .ok_or("leaf read did not find the populated root comment")?;
+    if comment.text().is_empty() || comment.timestamp().is_none() || comment.author().is_none() {
+        return Err("leaf root comment is missing text/date/author metadata".into());
+    }
+    let replies = package.body_table_cell_comment_replies(TABLE, position)?;
+    if replies.is_empty() {
+        return Err("leaf read did not find a populated reply".into());
+    }
+    let reply_metadata = replies
+        .iter()
+        .map(|reply| {
+            if reply.text().is_empty() || reply.timestamp().is_none() || reply.author().is_none() {
+                return Err::<String, Box<dyn std::error::Error>>(
+                    "leaf reply is missing text/date/author metadata".into(),
+                );
+            }
+            Ok(format!(
+                "{}|{:?}|{}",
+                reply.text(),
+                reply.timestamp().map(|value| value.as_f64()),
+                reply.author().is_some()
+            ))
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    Ok(format!(
+        "root={}|{:?}|{};replies={reply_metadata:?}",
+        comment.text(),
+        comment.timestamp().map(|value| value.as_f64()),
+        comment.author().is_some()
+    ))
+}
+
+fn author_metadata(
+    bytes: &[u8],
+    author_id: Option<AuthorId>,
+) -> TestResult<(Option<String>, Option<String>)> {
+    let Some(author_id) = author_id else {
+        return Ok((None, None));
+    };
+    let located = Workspace::open(bytes)?.message(author_id.get(), AUTHOR_MESSAGE_TYPE)?;
+    let author = tsk::AnnotationAuthorArchive::decode(located.payload.as_slice())?;
+    Ok((author.name, author.public_id))
+}
+
+/// Compare both readers on the same host-authored source.  `Case::read`
+/// intentionally invokes each reader on its own host/leaf output, so that
+/// harness result is not enough to establish semantic reader parity.
+fn assert_populated_comment_semantics(bytes: &[u8]) -> TestResult {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let host = editor
+        .table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?
+        .ok_or("host read did not find the populated root comment")?;
+    let host_replies = editor.table_cell_comment_replies(model, COMMENT_ROW, COMMENT_COLUMN)?;
+    if host_replies.is_empty() {
+        return Err("host source must contain a non-empty reply list".into());
+    }
+
+    let package = Package::from_bytes(bytes)?;
+    let position = comment_position()?;
+    let leaf = package
+        .body_table_cell_comment(TABLE, position)?
+        .ok_or("leaf read did not find the populated root comment")?;
+    let leaf_replies = package.body_table_cell_comment_replies(TABLE, position)?;
+    if leaf_replies.is_empty() {
+        return Err("leaf source must contain a non-empty reply list".into());
+    }
+
+    assert_eq!(host.comment.text, leaf.text(), "root text");
+    assert_eq!(
+        host.comment.creation_date_seconds,
+        leaf.timestamp().map(|value| value.as_f64()),
+        "root timestamp"
+    );
+    assert_eq!(
+        author_metadata(bytes, host.comment.author_id)?,
+        {
+            let author = leaf.author().ok_or("leaf root author is missing")?;
+            (
+                author.display_name().map(str::to_owned),
+                author.public_id().map(str::to_owned),
+            )
+        },
+        "root author metadata"
+    );
+    assert_eq!(host_replies.len(), leaf_replies.len(), "reply count");
+    for (index, (host_reply, leaf_reply)) in
+        host_replies.iter().zip(leaf_replies.iter()).enumerate()
+    {
+        assert_eq!(
+            host_reply.comment.text,
+            leaf_reply.text(),
+            "reply {index} text"
+        );
+        assert_eq!(
+            host_reply.comment.creation_date_seconds,
+            leaf_reply.timestamp().map(|value| value.as_f64()),
+            "reply {index} timestamp"
+        );
+        assert_eq!(
+            author_metadata(bytes, host_reply.comment.author_id)?,
+            {
+                let author = leaf_reply
+                    .author()
+                    .ok_or_else(|| format!("leaf reply {index} author is missing"))?;
+                (
+                    author.display_name().map(str::to_owned),
+                    author.public_id().map(str::to_owned),
+                )
+            },
+            "reply {index} author metadata"
+        );
+    }
+    Ok(())
+}
+
 fn comment_case(
     name: &'static str,
     tier: Tier,
     evidence: Evidence,
+    input: &crate::harness::Fixture,
     input_path: &'static str,
     host: impl FnOnce(&mut pages::Draft, u64) -> TestResult + 'static,
     leaf: impl FnOnce(Package, At) -> TestResult<LeafRun> + 'static,
 ) -> TestResult {
-    let input = fixture(input_path)?;
-    Case::new(name, Format::Pages, tier, evidence, &input)
+    debug_assert_eq!(input.path, input_path);
+    Case::new(name, Format::Pages, tier, evidence, input)
         .host(move |source| {
             let mut editor = pages::Draft::from_bytes(source)?;
             let model = host_model(&editor)?;
@@ -306,12 +480,47 @@ fn pages_body_table_reads_parity() -> TestResult {
 }
 
 #[test]
+fn pages_body_table_comment_replies_read_parity() -> TestResult {
+    let input = fixture(COMMENTS)?;
+    assert_populated_comment_semantics(&input.bytes)?;
+    Case::new(
+        "pages_body_table_comment_replies_read_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        &input,
+    )
+    .read_only()
+    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read(
+        "host populated table comment thread",
+        host_populated_comment_thread,
+    )
+    .read(
+        "leaf populated table comment thread",
+        leaf_populated_comment_thread,
+    )
+    .run()?;
+    Ok(())
+}
+
+#[test]
 fn pages_body_table_comment_set_parity() -> TestResult {
+    let base = fixture(CELLS)?;
+    let mut authored = pages::Draft::from_bytes(&base.bytes)?;
+    let model = host_model(&authored)?;
+    authored.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G original")?;
+    let input = crate::harness::Fixture {
+        path: "generated:pages-table-comment-root-for-set",
+        bytes: authored.to_bytes()?,
+    };
     comment_case(
         "pages_body_table_comment_set_parity",
         Tier::B,
         Evidence::Queued,
-        "iwork/pages/body-table-comment-hidden-native-saved.pages",
+        &input,
+        "generated:pages-table-comment-root-for-set",
         |editor, model| {
             editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
             Ok(())
@@ -331,36 +540,64 @@ fn pages_body_table_comment_set_parity() -> TestResult {
 
 #[test]
 fn pages_body_table_comment_clear_parity() -> TestResult {
+    let base = fixture(CELLS)?;
+    let mut authored = pages::Draft::from_bytes(&base.bytes)?;
+    let model = host_model(&authored)?;
+    authored.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G clear root")?;
+    let input = crate::harness::Fixture {
+        path: "generated:pages-table-comment-root-for-clear",
+        bytes: authored.to_bytes()?,
+    };
     comment_case(
         "pages_body_table_comment_clear_parity",
         Tier::B,
         Evidence::Queued,
-        CELLS,
+        &input,
+        "generated:pages-table-comment-root-for-clear",
         |editor, model| {
-            editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
             editor.clear_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?;
             Ok(())
         },
         |package, position| {
-            let set = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
-            let clear = set
-                .package()
-                .clear_body_table_cell_comment(TABLE, position)?;
-            // The fixture is intentionally rootless so host clear can run
-            // without crossing the deferred reply-thread boundary. Compose
-            // both exact inverses to restore the original source: clear's
-            // inverse restores the set candidate, then set's inverse restores
-            // the rootless fixture.
-            let restored_set = clear
+            let clear = package.clear_body_table_cell_comment(TABLE, position)?;
+            let restored = clear
                 .package()
                 .apply_body_table_cell_comment(&clear.patch().inverse())?;
-            let restored = restored_set
-                .package()
-                .apply_body_table_cell_comment(&set.patch().inverse())?;
             Ok(LeafRun::with_inverse(
                 leaf_bytes!(clear.package()),
                 leaf_bytes!(restored.package()),
             ))
+        },
+    )
+}
+
+/// Full Pages facade cost probe for the root-comment rewrite.  The source is
+/// host-authored before ABBA, so the host and leaf both measure replacement of
+/// the same existing root rather than construction of different inputs.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn pages_body_table_comment_cost_abba() -> TestResult {
+    let base = fixture(CELLS)?;
+    let mut authored = pages::Draft::from_bytes(&base.bytes)?;
+    let model = host_model(&authored)?;
+    authored.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G original")?;
+    let input = authored.to_bytes()?;
+    let position = comment_position()?;
+    crate::pages_cost_probes::abba(
+        &crate::harness::Fixture {
+            path: "generated:pages-table-comment-root-cost",
+            bytes: input,
+        },
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G measured")?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G measured")?;
+            Ok(leaf_bytes!(commit.package()))
         },
     )
 }

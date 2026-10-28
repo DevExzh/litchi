@@ -39,12 +39,24 @@ use crate::structure::{self, Fault as StructureFault, TableLeaf, Working, metada
 /// payload-byte limit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LimitKind {
+    /// Source bytes inspected by a wire parser.
+    InputBytes,
     /// Complete source or candidate package bytes.
     PackageBytes,
     /// Decoded table/comment payload bytes.
     PayloadBytes,
     /// Native object references inspected.
     References,
+    /// Native objects inspected by the archive validator.
+    Objects,
+    /// Native messages inspected by the archive validator.
+    Messages,
+    /// Native messages per object inspected by the archive validator.
+    MessagesPerObject,
+    /// Native metadata items inspected by the archive validator.
+    MetadataItems,
+    /// Snappy frames inspected by the archive validator.
+    SnappyFrames,
     /// Reply records inspected.
     Replies,
     /// Comment or reply text bytes retained.
@@ -59,6 +71,16 @@ pub enum LimitKind {
     WireNesting,
     /// Wire work performed.
     WireWork,
+    /// Addressable table rows inspected.
+    TableRows,
+    /// Addressable table columns inspected.
+    TableColumns,
+    /// Addressable table cells inspected.
+    TableCells,
+    /// Materialized sparse table cells inspected.
+    MaterializedCells,
+    /// Repeated Numbers-wire items inspected.
+    Items,
     /// Bounded codec allocations requested.
     Allocations,
     /// Temporary rewrite scratch bytes retained.
@@ -118,6 +140,122 @@ impl From<StructureFault> for Fault {
             StructureFault::Allocation { amount } => Self::Allocation { amount },
             StructureFault::Verification => Self::Verification,
         }
+    }
+}
+
+fn map_wire_limit(kind: litchi_iwa_common::LimitKind) -> LimitKind {
+    match kind {
+        litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
+        litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+        litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+        litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+        litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+        litchi_iwa_common::LimitKind::TableRows => LimitKind::TableRows,
+        litchi_iwa_common::LimitKind::TableColumns => LimitKind::TableColumns,
+        litchi_iwa_common::LimitKind::TableCells => LimitKind::TableCells,
+        litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::MaterializedCells,
+    }
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error) -> Fault {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Fault::Limit {
+            kind: map_wire_limit(kind),
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+        _ => Fault::Invalid,
+    }
+}
+
+fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
+    match kind {
+        litchi_iwa_core::LimitKind::HeaderBytes => LimitKind::InputBytes,
+        litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+        litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+        litchi_iwa_core::LimitKind::HeaderMemoryBytes => LimitKind::ScratchBytes,
+        litchi_iwa_core::LimitKind::Messages => LimitKind::Messages,
+        litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::MessagesPerObject,
+        litchi_iwa_core::LimitKind::Objects => LimitKind::Objects,
+        litchi_iwa_core::LimitKind::MetadataItems => LimitKind::MetadataItems,
+        litchi_iwa_core::LimitKind::ObjectBytes | litchi_iwa_core::LimitKind::MessageBytes => {
+            LimitKind::PayloadBytes
+        },
+        litchi_iwa_core::LimitKind::ArchiveBytes
+        | litchi_iwa_core::LimitKind::SnappyChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyStreamBytes
+        | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::PackageBytes,
+        litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::SnappyFrames,
+    }
+}
+
+fn map_core_error(error: litchi_iwa_core::Error) -> Fault {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Fault::Limit {
+            kind: map_core_limit(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Fault::Allocation { amount: requested }
+        },
+        _ => Fault::Invalid,
+    }
+}
+
+fn map_bnc_error(error: litchi_numbers_wire::Error) -> Fault {
+    match error {
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Fault::Limit {
+            kind: match kind {
+                litchi_numbers_wire::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+                litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+                litchi_numbers_wire::LimitKind::TailBytes => LimitKind::PayloadBytes,
+                litchi_numbers_wire::LimitKind::Items => LimitKind::Items,
+                _ => return Fault::Invalid,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_numbers_wire::Error::Allocation { requested } => {
+            Fault::Allocation { amount: requested }
+        },
+        _ => Fault::Invalid,
+    }
+}
+
+#[derive(Debug)]
+struct WireCallbackError(Fault);
+
+impl From<litchi_iwa_common::Error> for WireCallbackError {
+    fn from(error: litchi_iwa_common::Error) -> Self {
+        Self(map_wire_error(error))
+    }
+}
+
+impl From<Fault> for WireCallbackError {
+    fn from(fault: Fault) -> Self {
+        Self(fault)
+    }
+}
+
+impl From<StructureFault> for WireCallbackError {
+    fn from(fault: StructureFault) -> Self {
+        Self(Fault::from(fault))
     }
 }
 
@@ -453,7 +591,7 @@ pub fn rewrite_root<P: TableLeaf>(
         RootOperation::Set(text) => {
             if text.len() > MAX_COMMENT_TEXT_BYTES {
                 return Err(Fault::Limit {
-                    kind: LimitKind::PayloadBytes,
+                    kind: LimitKind::TextBytes,
                     observed: text.len() as u64,
                     maximum: MAX_COMMENT_TEXT_BYTES as u64,
                 });
@@ -464,6 +602,7 @@ pub fn rewrite_root<P: TableLeaf>(
                     &working,
                     root,
                     selection.model_component.as_ref(),
+                    author_storage_component.as_deref(),
                 )?;
                 rewrite_existing_text(&mut working, root, text)?;
             } else {
@@ -477,6 +616,7 @@ pub fn rewrite_root<P: TableLeaf>(
                         &working,
                         list,
                         selection.model_component.as_ref(),
+                        author_storage_component.as_deref(),
                     )?;
                 }
                 let mut author =
@@ -723,11 +863,11 @@ fn ensure_empty_thread<P: TableLeaf>(
     working: &Working<'_, P>,
     root: u64,
 ) -> FaultResult<Option<u64>> {
-    let source = working
-        .object(root)?
+    let object = working.object(root)?;
+    let storage_index = comment_storage_message_index(object)?;
+    let source = object
         .messages
-        .iter()
-        .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+        .get(storage_index)
         .ok_or(Fault::Invalid)?
         .data
         .as_slice();
@@ -775,8 +915,7 @@ fn remove_generated_author_if_unshared<P: TableLeaf>(
     let Some(author_data) = author_data else {
         return Err(Fault::Dependency);
     };
-    let author_view =
-        WireView::parse(author_data, WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+    let author_view = WireView::parse(author_data, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let Some(name) = unique_field(&author_view, 1)? else {
         return Ok(());
     };
@@ -794,7 +933,8 @@ fn remove_generated_author_if_unshared<P: TableLeaf>(
             else {
                 continue;
             };
-            let references = author_storage_references(&message.data)?;
+            let references =
+                author_storage_references(&message.data, working.source().max_references())?;
             if references == [author] {
                 if storage
                     .replace((
@@ -836,8 +976,8 @@ fn list_entry<P: TableLeaf>(working: &Working<'_, P>, list: u64, key: u32) -> Fa
     let object = working.object(list)?;
     let message_index = comment_list_message_index(object, TABLE_DATA_LIST_MESSAGE_TYPE)?;
     let message = object.messages.get(message_index).ok_or(Fault::Invalid)?;
-    let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+    let view =
+        WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut found = None;
     for field in view
         .fields()
@@ -861,12 +1001,13 @@ fn validate_existing_comment_list<P: TableLeaf>(
     working: &Working<'_, P>,
     list: u64,
     model_component: &str,
+    author_storage_component: Option<&str>,
 ) -> FaultResult<()> {
     let object = working.object(list)?;
     let message_index = comment_list_message_index(object, TABLE_DATA_LIST_MESSAGE_TYPE)?;
     let message = object.messages.get(message_index).ok_or(Fault::Invalid)?;
-    let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+    let view =
+        WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut roots = Vec::new();
     for field in view
         .fields()
@@ -890,7 +1031,7 @@ fn validate_existing_comment_list<P: TableLeaf>(
         if root_component != model_component {
             return Err(Fault::Unsupported);
         }
-        validate_existing_comment_graph(working, root, model_component)?;
+        validate_existing_comment_graph(working, root, model_component, author_storage_component)?;
     }
     Ok(())
 }
@@ -902,7 +1043,7 @@ fn comment_list_message_index(object: &ArchiveObject, message_type: u32) -> Faul
             continue;
         }
         let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
-            .map_err(|_| Fault::Invalid)?;
+            .map_err(map_wire_error)?;
         let mut list_type = None;
         for field in view
             .fields()
@@ -920,7 +1061,7 @@ fn comment_list_message_index(object: &ArchiveObject, message_type: u32) -> Faul
 }
 
 fn decode_entry(data: &[u8]) -> FaultResult<Entry> {
-    let view = WireView::parse(data, WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+    let view = WireView::parse(data, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut key = None;
     let mut ref_count = None;
     let mut storage = None;
@@ -943,7 +1084,7 @@ fn decode_entry(data: &[u8]) -> FaultResult<Entry> {
                     return Err(Fault::Invalid);
                 }
                 let reference = WireView::parse(field.payload(), WireLimits::DEFAULT)
-                    .map_err(|_| Fault::Invalid)?;
+                    .map_err(map_wire_error)?;
                 let mut id = None;
                 for nested in reference.fields() {
                     if nested.number() != TABLE_REFERENCE_IDENTIFIER_FIELD
@@ -993,24 +1134,43 @@ fn unique_field<'a>(
     Ok(found)
 }
 
+/// Resolve the one comment-storage payload owned by a root object.
+///
+/// A root comment has one 3056 payload.  Taking the first matching message
+/// would make a malformed object ambiguous and could cause a rewrite to leave
+/// a second, untouched comment behind.  Keep this invariant at the shared
+/// graph boundary so every format facade gets the same refusal.
+fn comment_storage_message_index(object: &ArchiveObject) -> FaultResult<usize> {
+    let mut found = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+            continue;
+        }
+        if found.replace(index).is_some() {
+            return Err(Fault::Invalid);
+        }
+    }
+    found.ok_or(Fault::Invalid)
+}
+
 fn rewrite_existing_text<P: TableLeaf>(
     working: &mut Working<'_, P>,
     root: u64,
     text: &str,
 ) -> FaultResult<()> {
     let component = working.locate(root)?.ok_or(Fault::Invalid)?;
+    let storage_index = comment_storage_message_index(working.object(root)?)?;
     let source = working
         .object(root)?
         .messages
-        .iter()
-        .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+        .get(storage_index)
         .ok_or(Fault::Invalid)?
         .data
         .as_slice();
     let source = structure::copy_bytes(source)?;
     if text.len() > MAX_COMMENT_TEXT_BYTES {
         return Err(Fault::Limit {
-            kind: LimitKind::PayloadBytes,
+            kind: LimitKind::TextBytes,
             observed: text.len() as u64,
             maximum: MAX_COMMENT_TEXT_BYTES as u64,
         });
@@ -1025,8 +1185,7 @@ fn rewrite_existing_text<P: TableLeaf>(
     );
     comment_codec::decode_comment_storage_archive_with_report(&source, options)
         .map_err(map_comment_decode_error)?;
-    let view = WireView::parse(&source, WireLimits::DEFAULT)
-        .map_err(|error| structure::map_wire(&error))?;
+    let view = WireView::parse(&source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let Some(text_field) = unique_field(&view, 1)? else {
         return Err(Fault::Invalid);
     };
@@ -1035,27 +1194,22 @@ fn rewrite_existing_text<P: TableLeaf>(
     }
     text_field
         .validate_canonical_framing()
-        .map_err(|error| structure::map_wire(&error))?;
+        .map_err(map_wire_error)?;
     let output = wire::patch_length_delimited_field(&source, 1, true, Some(text.as_bytes()))
-        .map_err(|error| structure::map_wire(&error))?;
+        .map_err(map_wire_error)?;
     let limits = working.archive_limits();
     let archive = working.archive_mut(&component)?;
     let object = archive.object_mut(root).ok_or(Fault::Invalid)?;
-    let index = object
-        .messages
-        .iter()
-        .position(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-        .ok_or(Fault::Invalid)?;
     object
         .replace_message_preserving_header(
-            index,
+            storage_index,
             RawMessage {
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
                 data: output,
             },
             limits,
         )
-        .map_err(|_| Fault::Invalid)
+        .map_err(map_core_error)
         .map(|_| ())
 }
 
@@ -1109,7 +1263,7 @@ fn plan_author<P: TableLeaf>(
                 .filter(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE)
             {
                 let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
-                    .map_err(|_| Fault::Invalid)?;
+                    .map_err(map_wire_error)?;
                 let mut name = None;
                 for field in view.fields().filter(|field| field.number() == 1) {
                     if name.replace(field.payload()).is_some() {
@@ -1174,7 +1328,7 @@ fn plan_author<P: TableLeaf>(
             .ok_or(Fault::Invalid)?
             .data
             .as_slice();
-        let references = author_storage_references(source)?;
+        let references = author_storage_references(source, working.source().max_references())?;
         for author in &references {
             let author_object = working.object(*author)?;
             if author_object
@@ -1237,9 +1391,18 @@ fn validate_existing_comment_graph<P: TableLeaf>(
     working: &Working<'_, P>,
     root: u64,
     model_component: &str,
+    author_storage_component: Option<&str>,
 ) -> FaultResult<()> {
     let component = working.locate(root)?.ok_or(Fault::Invalid)?;
     let object = working.object(root)?;
+    let storage_count = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+        .count();
+    if storage_count != 1 {
+        return Err(Fault::Invalid);
+    }
     for message in object
         .messages
         .iter()
@@ -1295,7 +1458,10 @@ fn validate_existing_comment_graph<P: TableLeaf>(
             let author_component = working
                 .locate(author.identifier())?
                 .ok_or(Fault::Dependency)?;
-            if author_component != component && component == model_component {
+            if author_component != component
+                && component == model_component
+                && author_storage_component != Some(author_component.as_str())
+            {
                 return Err(Fault::Unsupported);
             }
         }
@@ -1357,7 +1523,7 @@ fn create_root<P: TableLeaf>(
         }],
         limits,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_core_error)?;
     let info = object
         .archive_info
         .message_infos
@@ -1366,7 +1532,7 @@ fn create_root<P: TableLeaf>(
     if let Some(author_identifier) = author_identifier {
         info.object_references.push(author_identifier);
         let mut field =
-            FieldInfo::new(FieldPath { path: vec![3] }, limits).map_err(|_| Fault::Invalid)?;
+            FieldInfo::new(FieldPath { path: vec![3] }, limits).map_err(map_core_error)?;
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(author_identifier);
         info.field_infos.push(field);
@@ -1391,17 +1557,17 @@ fn create_author<P: TableLeaf>(
         GENERATED_AUTHOR_NAME.as_bytes(),
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     let mut color = Vec::new();
-    wire::append_varint_field(&mut color, 1, 1).map_err(|_| Fault::Invalid)?;
+    wire::append_varint_field(&mut color, 1, 1).map_err(map_wire_error)?;
     append_fixed32_field(&mut color, 3, 0.368_627_46_f32.to_bits())?;
     append_fixed32_field(&mut color, 4, 0.568_627_5_f32.to_bits())?;
     append_fixed32_field(&mut color, 5, 0.937_254_9_f32.to_bits())?;
     append_fixed32_field(&mut color, 6, 1.0_f32.to_bits())?;
-    wire::append_varint_field(&mut color, 12, 1).map_err(|_| Fault::Invalid)?;
+    wire::append_varint_field(&mut color, 12, 1).map_err(map_wire_error)?;
     wire::append_length_delimited_field(&mut payload, 2, &color, WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
-    wire::append_varint_field(&mut payload, 4, 0).map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
+    wire::append_varint_field(&mut payload, 4, 0).map_err(map_wire_error)?;
     let limits = working.archive_limits();
     let mut object = ArchiveObject::new(
         identifier,
@@ -1411,14 +1577,14 @@ fn create_author<P: TableLeaf>(
         }],
         limits,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_core_error)?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or(Fault::Invalid)?;
     info.field_infos
-        .push(FieldInfo::new(FieldPath { path: vec![4] }, limits).map_err(|_| Fault::Invalid)?);
+        .push(FieldInfo::new(FieldPath { path: vec![4] }, limits).map_err(map_core_error)?);
     working.insert(&plan.storage_component, object)?;
     let component = registry.component_for_entry(&plan.storage_component)?;
     let seed = metadata::identity_seed(working, identifier)?;
@@ -1446,7 +1612,7 @@ fn create_author_storage<P: TableLeaf>(
     let reference = varint_field(1, author)?;
     let mut payload = Vec::new();
     wire::append_length_delimited_field(&mut payload, 1, &reference, WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     let limits = working.archive_limits();
     let mut object = ArchiveObject::new(
         identifier,
@@ -1456,15 +1622,14 @@ fn create_author_storage<P: TableLeaf>(
         }],
         limits,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_core_error)?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or(Fault::Invalid)?;
     info.object_references.push(author);
-    let mut field =
-        FieldInfo::new(FieldPath { path: vec![1] }, limits).map_err(|_| Fault::Invalid)?;
+    let mut field = FieldInfo::new(FieldPath { path: vec![1] }, limits).map_err(map_core_error)?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.push(author);
     info.field_infos.push(field);
@@ -1488,7 +1653,7 @@ fn rewrite_author_storage_payload<P: TableLeaf>(
     let reference = varint_field(1, author)?;
     let mut payload = Vec::new();
     wire::append_length_delimited_field(&mut payload, 1, &reference, WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     let component = plan.storage_component.clone();
     let limits = working.archive_limits();
     let archive = working.archive_mut(&component)?;
@@ -1507,7 +1672,7 @@ fn rewrite_author_storage_payload<P: TableLeaf>(
             },
             limits,
         )
-        .map_err(|_| Fault::Invalid)
+        .map_err(map_core_error)
         .map(|_| ())
 }
 
@@ -1518,15 +1683,15 @@ fn author_storage_message_index(object: &ArchiveObject) -> FaultResult<usize> {
     )?)
 }
 
-fn author_storage_references(data: &[u8]) -> FaultResult<Vec<u64>> {
-    let view = WireView::parse(data, WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+fn author_storage_references(data: &[u8], max_references: usize) -> FaultResult<Vec<u64>> {
+    let view = WireView::parse(data, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut references = Vec::new();
     for field in view.fields() {
         if field.number() != 1 || field.wire_type() != 2 {
             return Err(Fault::Unsupported);
         }
         let nested =
-            WireView::parse(field.payload(), WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+            WireView::parse(field.payload(), WireLimits::DEFAULT).map_err(map_wire_error)?;
         let mut identifier = None;
         for inner in nested.fields() {
             if inner.number() != 1 || inner.wire_type() != 0 || identifier.is_some() {
@@ -1537,6 +1702,13 @@ fn author_storage_references(data: &[u8]) -> FaultResult<Vec<u64>> {
         let identifier = identifier.ok_or(Fault::Invalid)?;
         if identifier == 0 || references.contains(&identifier) {
             return Err(Fault::Dependency);
+        }
+        if references.len() >= max_references {
+            return Err(Fault::Limit {
+                kind: LimitKind::References,
+                observed: references.len().saturating_add(1) as u64,
+                maximum: max_references as u64,
+            });
         }
         structure::reserve(&mut references, 1)?;
         references.push(identifier);
@@ -1559,14 +1731,14 @@ fn append_author_storage<P: TableLeaf>(
         .data
         .as_slice();
     let source = structure::copy_bytes(source)?;
-    let present = author_storage_references(&source)?;
+    let present = author_storage_references(&source, working.source().max_references())?;
     if present.contains(&author) {
         return Err(Fault::Dependency);
     }
     let reference = varint_field(1, author)?;
     let mut output = source;
     wire::append_length_delimited_field(&mut output, 1, &reference, WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     let limits = working.archive_limits();
     let archive = working.archive_mut(&storage.component)?;
     let object = archive
@@ -1595,7 +1767,7 @@ fn append_author_storage<P: TableLeaf>(
                 },
                 limits,
             )
-            .map_err(|_| Fault::Invalid)?;
+            .map_err(map_core_error)?;
         let info = object
             .archive_info
             .message_infos
@@ -1603,7 +1775,7 @@ fn append_author_storage<P: TableLeaf>(
             .ok_or(Fault::Invalid)?;
         info.object_references.push(author);
         let mut field =
-            FieldInfo::new(FieldPath { path: vec![1] }, limits).map_err(|_| Fault::Invalid)?;
+            FieldInfo::new(FieldPath { path: vec![1] }, limits).map_err(map_core_error)?;
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(author);
         info.field_infos.push(field);
@@ -1619,7 +1791,7 @@ fn append_author_storage<P: TableLeaf>(
                 },
                 limits,
             )
-            .map_err(|_| Fault::Invalid)
+            .map_err(map_core_error)
             .map(|_| ())?;
         return Ok(());
     }
@@ -1651,7 +1823,7 @@ fn append_author_storage<P: TableLeaf>(
             },
             limits,
         )
-        .map_err(|_| Fault::Invalid)
+        .map_err(map_core_error)
         .map(|_| ())
 }
 
@@ -1716,7 +1888,7 @@ fn append_list<P: TableLeaf>(
         .data
         .as_slice();
     let source = structure::copy_bytes(source)?;
-    let view = WireView::parse(&source, WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+    let view = WireView::parse(&source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let next = unique_field(&view, TABLE_LIST_NEXT_ID_FIELD)?
         .ok_or(Fault::Invalid)
         .and_then(|field| read_varint(field.payload()))?;
@@ -1734,16 +1906,15 @@ fn append_list<P: TableLeaf>(
     let reference = varint_field(TABLE_REFERENCE_IDENTIFIER_FIELD, root)?;
     let mut entry = Vec::new();
     wire::append_varint_field(&mut entry, TABLE_ENTRY_KEY_FIELD, u64::from(key))
-        .map_err(|_| Fault::Invalid)?;
-    wire::append_varint_field(&mut entry, TABLE_ENTRY_REFCOUNT_FIELD, 1)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
+    wire::append_varint_field(&mut entry, TABLE_ENTRY_REFCOUNT_FIELD, 1).map_err(map_wire_error)?;
     wire::append_length_delimited_field(
         &mut entry,
         TABLE_ENTRY_STORAGE_FIELD,
         &reference,
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     let mut output = source;
     wire::append_length_delimited_field(
         &mut output,
@@ -1751,10 +1922,10 @@ fn append_list<P: TableLeaf>(
         &entry,
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     let next_key = u64::from(key.checked_add(1).ok_or(Fault::Invalid)?);
     output = wire::patch_varint_field(&output, TABLE_LIST_NEXT_ID_FIELD, true, Some(next_key))
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     replace_message_at(working, list, message_index, output, component)?;
     update_list_metadata(working, list, key, root, true)?;
     Ok(key)
@@ -1780,7 +1951,7 @@ fn remove_list_entry<P: TableLeaf>(
     // The generic transform callback cannot express omission, so rebuild the
     // list while preserving every non-entry field and unknown entry fields
     // after strict validation.
-    let view = WireView::parse(&source, WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+    let view = WireView::parse(&source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut rebuilt = Vec::new();
     structure::reserve(&mut rebuilt, source.len())?;
     let mut remaining = false;
@@ -1805,7 +1976,7 @@ fn remove_list_entry<P: TableLeaf>(
     }
     if !remaining {
         rebuilt = wire::patch_varint_field(&rebuilt, TABLE_LIST_NEXT_ID_FIELD, true, Some(2))
-            .map_err(|_| Fault::Invalid)?;
+            .map_err(map_wire_error)?;
     }
     replace_message_at(working, list, message_index, rebuilt, component)?;
     update_list_metadata(working, list, key, root, false)
@@ -1841,12 +2012,32 @@ fn update_list_metadata<P: TableLeaf>(
             return Err(Fault::Dependency);
         }
     }
+    // Older host-authored table-list headers carry only the aggregate object
+    // references and no per-field inventory.  The wire list above is still
+    // unambiguous (the selected key/storage/refcount were checked), so keep
+    // that header shape losslessly instead of manufacturing a field path the
+    // source never had.
+    if info.field_infos.is_empty() {
+        if adding {
+            if occurrences != 0 {
+                return Err(Fault::Dependency);
+            }
+            info.object_references.push(root);
+        } else {
+            if occurrences != 1 {
+                return Err(Fault::Dependency);
+            }
+            info.object_references
+                .retain(|identifier| *identifier != root);
+        }
+        return Ok(());
+    }
     if adding {
         if occurrences != 0 || field_index.is_some() {
             return Err(Fault::Dependency);
         }
         info.object_references.push(root);
-        let mut field = FieldInfo::new(FieldPath { path }, limits).map_err(|_| Fault::Invalid)?;
+        let mut field = FieldInfo::new(FieldPath { path }, limits).map_err(map_core_error)?;
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(root);
         info.field_infos.push(field);
@@ -1879,28 +2070,26 @@ fn create_list<P: TableLeaf>(
         .ok_or(Fault::Invalid)?;
     let reference = varint_field(TABLE_REFERENCE_IDENTIFIER_FIELD, root)?;
     let mut entry = Vec::new();
-    wire::append_varint_field(&mut entry, TABLE_ENTRY_KEY_FIELD, 2).map_err(|_| Fault::Invalid)?;
-    wire::append_varint_field(&mut entry, TABLE_ENTRY_REFCOUNT_FIELD, 1)
-        .map_err(|_| Fault::Invalid)?;
+    wire::append_varint_field(&mut entry, TABLE_ENTRY_KEY_FIELD, 2).map_err(map_wire_error)?;
+    wire::append_varint_field(&mut entry, TABLE_ENTRY_REFCOUNT_FIELD, 1).map_err(map_wire_error)?;
     wire::append_length_delimited_field(
         &mut entry,
         TABLE_ENTRY_STORAGE_FIELD,
         &reference,
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     let mut payload = Vec::new();
     wire::append_varint_field(&mut payload, TABLE_LIST_TYPE_FIELD, COMMENT_LIST_TYPE)
-        .map_err(|_| Fault::Invalid)?;
-    wire::append_varint_field(&mut payload, TABLE_LIST_NEXT_ID_FIELD, 3)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
+    wire::append_varint_field(&mut payload, TABLE_LIST_NEXT_ID_FIELD, 3).map_err(map_wire_error)?;
     wire::append_length_delimited_field(
         &mut payload,
         TABLE_LIST_ENTRY_FIELD,
         &entry,
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     let limits = working.archive_limits();
     let mut object = ArchiveObject::new(
         identifier,
@@ -1910,7 +2099,7 @@ fn create_list<P: TableLeaf>(
         }],
         limits,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_core_error)?;
     let info = object
         .archive_info
         .message_infos
@@ -1923,7 +2112,7 @@ fn create_list<P: TableLeaf>(
         },
         limits,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_core_error)?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.push(root);
     info.field_infos.push(field);
@@ -2014,7 +2203,7 @@ fn create_list<P: TableLeaf>(
             },
             limits,
         )
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_core_error)?;
     let info = model
         .archive_info
         .message_infos
@@ -2026,7 +2215,7 @@ fn create_list<P: TableLeaf>(
         },
         limits,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_core_error)?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = vec![identifier];
     info.field_infos.push(field);
@@ -2090,7 +2279,7 @@ fn replace_message_at_inner(
             },
             limits,
         )
-        .map_err(|_| Fault::Invalid)
+        .map_err(map_core_error)
         .map(|_| ())
 }
 
@@ -2112,34 +2301,27 @@ fn rewrite_tile<P: TableLeaf>(
     let mut matched = false;
     let mut output =
         wire::transform_repeated_length_delimited_fields(&source, TABLE_TILE_ROWS_FIELD, |row| {
-            let view = WireView::parse(row, WireLimits::DEFAULT).map_err(|_| {
-                litchi_iwa_common::Error::InvalidFormat("invalid tile row".to_owned())
-            })?;
+            let view =
+                WireView::parse(row, WireLimits::DEFAULT).map_err(WireCallbackError::from)?;
             let mut index_field = None;
             for field in view
                 .fields()
                 .filter(|field| field.number() == TABLE_TILE_ROW_INDEX_FIELD)
             {
                 if index_field.replace(field).is_some() {
-                    return Err(litchi_iwa_common::Error::InvalidFormat(
-                        "duplicate row index".to_owned(),
-                    ));
+                    return Err(WireCallbackError::from(Fault::Invalid));
                 }
             }
             let Some(index_field) = index_field else {
-                return Ok(row.to_vec());
+                return structure::copy_bytes(row).map_err(WireCallbackError::from);
             };
-            if read_varint(index_field.payload()).map_err(|_| {
-                litchi_iwa_common::Error::InvalidFormat("invalid row index".to_owned())
-            })? as u32
+            if read_varint(index_field.payload()).map_err(WireCallbackError::from)? as u32
                 != selection.tile_row
             {
-                return Ok(row.to_vec());
+                return structure::copy_bytes(row).map_err(WireCallbackError::from);
             }
             if matched {
-                return Err(litchi_iwa_common::Error::InvalidFormat(
-                    "duplicate tile row".to_owned(),
-                ));
+                return Err(WireCallbackError::from(Fault::Invalid));
             }
             matched = true;
             rewrite_row(
@@ -2149,9 +2331,9 @@ fn rewrite_tile<P: TableLeaf>(
                 expected,
                 replacement,
             )
-            .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid tile row".to_owned()))
+            .map_err(WireCallbackError::from)
         })
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(|error: WireCallbackError| error.0)?;
     if !matched {
         if expected.is_some() || replacement.is_none() {
             return Err(Fault::Verification);
@@ -2164,14 +2346,14 @@ fn rewrite_tile<P: TableLeaf>(
         )?;
         output =
             wire::patch_varint_field(&source, 4, true, Some(u64::from(selection.tile_row + 1)))
-                .map_err(|_| Fault::Invalid)?;
+                .map_err(map_wire_error)?;
         wire::append_length_delimited_field(
             &mut output,
             TABLE_TILE_ROWS_FIELD,
             &row,
             WireLimits::DEFAULT,
         )
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     }
     replace_message(
         working,
@@ -2208,7 +2390,7 @@ fn new_row(row: u32, column: u32, columns: u32, replacement: u32) -> FaultResult
     cell.set_comment_identifier(Some(replacement));
     let cell = cell
         .encode(&litchi_numbers_wire::Limits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_bnc_error)?;
     let mut out = Vec::new();
     let output_capacity = offset_bytes
         .checked_add(cell.len())
@@ -2227,30 +2409,30 @@ fn new_row(row: u32, column: u32, columns: u32, replacement: u32) -> FaultResult
     }
     structure::reserve(&mut out, output_capacity)?;
     wire::append_varint_field(&mut out, TABLE_TILE_ROW_INDEX_FIELD, u64::from(row))
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     wire::append_varint_field(&mut out, TABLE_TILE_ROW_CELL_COUNT_FIELD, 1)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     wire::append_length_delimited_field(&mut out, 3, &[], WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     wire::append_length_delimited_field(&mut out, 4, &[], WireLimits::DEFAULT)
-        .map_err(|_| Fault::Invalid)?;
-    wire::append_varint_field(&mut out, 5, 5).map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
+    wire::append_varint_field(&mut out, 5, 5).map_err(map_wire_error)?;
     wire::append_length_delimited_field(
         &mut out,
         TABLE_TILE_ROW_CELL_STORAGE_FIELD,
         &cell,
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     wire::append_length_delimited_field(
         &mut out,
         TABLE_TILE_ROW_CELL_OFFSETS_FIELD,
         &offsets,
         WireLimits::DEFAULT,
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     wire::append_varint_field(&mut out, TABLE_TILE_ROW_WIDE_OFFSETS_FIELD, 0)
-        .map_err(|_| Fault::Invalid)?;
+        .map_err(map_wire_error)?;
     Ok(out)
 }
 
@@ -2261,7 +2443,7 @@ fn rewrite_row(
     expected: Option<u32>,
     replacement: Option<u32>,
 ) -> FaultResult<Vec<u8>> {
-    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(|_| Fault::Invalid)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let storage = unique_field(&view, TABLE_TILE_ROW_CELL_STORAGE_FIELD)?.ok_or(Fault::Invalid)?;
     let offsets = unique_field(&view, TABLE_TILE_ROW_CELL_OFFSETS_FIELD)?.ok_or(Fault::Invalid)?;
     if offsets.wire_type() != 2 || storage.wire_type() != 2 {
@@ -2288,19 +2470,16 @@ fn rewrite_row(
         return Err(Fault::Invalid);
     }
     let bytes = storage.payload();
-    if raw_offsets.len() / 2 > WireLimits::MAX_FIELDS {
+    let offset_count = raw_offsets.len() / 2;
+    if offset_count > WireLimits::MAX_FIELDS {
         return Err(Fault::Limit {
             kind: LimitKind::WireFields,
-            observed: (raw_offsets.len() / 2) as u64,
+            observed: offset_count as u64,
             maximum: WireLimits::MAX_FIELDS as u64,
         });
     }
     let mut starts = Vec::new();
-    starts
-        .try_reserve(raw_offsets.len() / 2)
-        .map_err(|_| Fault::Allocation {
-            amount: raw_offsets.len() / 2,
-        })?;
+    structure::reserve(&mut starts, offset_count)?;
     for chunk in raw_offsets.chunks_exact(2) {
         let value = u16::from_le_bytes([chunk[0], chunk[1]]);
         if value == u16::MAX {
@@ -2357,7 +2536,7 @@ fn rewrite_row(
     let previous = match cells.get(column).and_then(Option::as_deref) {
         Some(data) => {
             litchi_numbers_wire::BncCell::parse(data, &litchi_numbers_wire::Limits::DEFAULT)
-                .map_err(|_| Fault::Invalid)?
+                .map_err(map_bnc_error)?
                 .comment_identifier()
         },
         None => None,
@@ -2371,7 +2550,7 @@ fn rewrite_row(
             cell.set_comment_identifier(Some(id));
             cells[column] = Some(
                 cell.encode(&litchi_numbers_wire::Limits::DEFAULT)
-                    .map_err(|_| Fault::Invalid)?,
+                    .map_err(map_bnc_error)?,
             );
         },
         (Some(_), replacement) => {
@@ -2379,11 +2558,11 @@ fn rewrite_row(
                 cells[column].as_ref().ok_or(Fault::Invalid)?,
                 &litchi_numbers_wire::Limits::DEFAULT,
             )
-            .map_err(|_| Fault::Invalid)?;
+            .map_err(map_bnc_error)?;
             cell.set_comment_identifier(replacement);
             cells[column] = Some(
                 cell.encode(&litchi_numbers_wire::Limits::DEFAULT)
-                    .map_err(|_| Fault::Invalid)?,
+                    .map_err(map_bnc_error)?,
             );
         },
         (None, None) => return Err(Fault::Invalid),
@@ -2423,26 +2602,26 @@ fn rewrite_row(
         true,
         Some(&encoded),
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     output = wire::patch_length_delimited_field(
         &output,
         TABLE_TILE_ROW_CELL_OFFSETS_FIELD,
         true,
         Some(&encoded_offsets),
     )
-    .map_err(|_| Fault::Invalid)?;
+    .map_err(map_wire_error)?;
     wire::patch_varint_field(
         &output,
         TABLE_TILE_ROW_CELL_COUNT_FIELD,
         true,
         Some(count as u64),
     )
-    .map_err(|_| Fault::Invalid)
+    .map_err(map_wire_error)
 }
 
 fn varint_field(number: u32, value: u64) -> FaultResult<Vec<u8>> {
     let mut bytes = Vec::new();
-    wire::append_varint_field(&mut bytes, number, value).map_err(|_| Fault::Invalid)?;
+    wire::append_varint_field(&mut bytes, number, value).map_err(map_wire_error)?;
     Ok(bytes)
 }
 
@@ -2472,4 +2651,34 @@ fn register_insertions<P: TableLeaf>(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COMMENT_STORAGE_MESSAGE_TYPE, Fault, comment_storage_message_index};
+    use litchi_iwa_core::{ArchiveObject, RawMessage};
+
+    #[test]
+    fn duplicate_comment_storage_payload_is_rejected() {
+        let object = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                    data: vec![1],
+                },
+                RawMessage {
+                    type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                    data: vec![2],
+                },
+            ],
+            Default::default(),
+        )
+        .expect("bounded test object should construct");
+        assert_eq!(
+            comment_storage_message_index(&object),
+            Err(Fault::Invalid),
+            "ambiguous comment roots must not select the first payload"
+        );
+    }
 }
