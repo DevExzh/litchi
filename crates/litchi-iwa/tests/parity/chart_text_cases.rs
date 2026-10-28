@@ -66,6 +66,13 @@ enum Property {
     Axis(Axis),
 }
 
+fn expected_text(property: Property) -> &'static str {
+    match property {
+        Property::Title => "W1-E title",
+        Property::Axis(_) => "W1-E axis title",
+    }
+}
+
 fn pages_input() -> TestResult<(Fixture, u64)> {
     let mut editor = pages::Draft::create_with_text("W1-E chart text parity")?;
     let chart = editor
@@ -360,26 +367,62 @@ fn leaf_pages_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
 }
 
 fn run_numbers_reads(input: &Fixture, sheet: u64, chart: u64, property: Property) -> TestResult {
-    let source = input.bytes.clone();
-    let host_read = host_read_numbers(&source, sheet, chart, property)?;
-    let leaf_read = read_numbers(&source, property)?;
+    let seeded = Fixture {
+        path: input.path,
+        bytes: host_numbers(&input.bytes, sheet, chart, property)?,
+    };
+    let host_read = host_read_numbers(&seeded.bytes, sheet, chart, property)?;
+    let leaf_read = read_numbers(&seeded.bytes, property)?;
     assert_read_equal("Numbers direct chart-text read", &host_read, &leaf_read)?;
-    assert_eq!(
-        source, input.bytes,
-        "chart-text read changed the source bytes"
-    );
+    assert_eq!(host_read.as_deref(), Some(expected_text(property)));
+    Case::new(
+        "numbers_chart_title_and_axis_title_read_parity",
+        Format::Numbers,
+        Tier::A,
+        Evidence::Queued,
+        &seeded,
+    )
+    .read_only()
+    .host(|source| Ok(numbers::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| {
+        Ok(LeafRun::output(leaf_bytes!(NumbersPackage::from_bytes(
+            source
+        )?)))
+    })
+    .read("numbers chart text", move |source| {
+        read_numbers(source, property)
+    })
+    .run()?;
     Ok(())
 }
 
 fn run_pages_reads(input: &Fixture, chart: u64, property: Property) -> TestResult {
-    let source = input.bytes.clone();
-    let host_read = host_read_pages(&source, chart, property)?;
-    let leaf_read = read_pages(&source, property)?;
+    let seeded = Fixture {
+        path: input.path,
+        bytes: host_pages(&input.bytes, chart, property)?,
+    };
+    let host_read = host_read_pages(&seeded.bytes, chart, property)?;
+    let leaf_read = read_pages(&seeded.bytes, property)?;
     assert_read_equal("Pages direct chart-text read", &host_read, &leaf_read)?;
-    assert_eq!(
-        source, input.bytes,
-        "chart-text read changed the source bytes"
-    );
+    assert_eq!(host_read.as_deref(), Some(expected_text(property)));
+    Case::new(
+        "pages_chart_title_and_axis_title_read_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        &seeded,
+    )
+    .read_only()
+    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| {
+        Ok(LeafRun::output(leaf_bytes!(PagesPackage::from_bytes(
+            source
+        )?)))
+    })
+    .read("pages chart text", move |source| {
+        read_pages(source, property)
+    })
+    .run()?;
     Ok(())
 }
 
@@ -390,27 +433,54 @@ fn chart_text_read_negative_control_rejects_mismatched_values() -> TestResult {
     let values = vec![
         (
             "Numbers title",
-            host_read_numbers(&numbers.bytes, sheet, chart, Property::Title)?,
+            host_read_numbers(
+                &host_numbers(&numbers.bytes, sheet, chart, Property::Title)?,
+                sheet,
+                chart,
+                Property::Title,
+            )?,
         ),
         (
             "Numbers category axis",
-            host_read_numbers(&numbers.bytes, sheet, chart, Property::Axis(Axis::Category))?,
+            host_read_numbers(
+                &host_numbers(&numbers.bytes, sheet, chart, Property::Axis(Axis::Category))?,
+                sheet,
+                chart,
+                Property::Axis(Axis::Category),
+            )?,
         ),
         (
             "Numbers value axis",
-            host_read_numbers(&numbers.bytes, sheet, chart, Property::Axis(Axis::Value))?,
+            host_read_numbers(
+                &host_numbers(&numbers.bytes, sheet, chart, Property::Axis(Axis::Value))?,
+                sheet,
+                chart,
+                Property::Axis(Axis::Value),
+            )?,
         ),
         (
             "Pages title",
-            host_read_pages(&pages.bytes, pages_chart, Property::Title)?,
+            host_read_pages(
+                &host_pages(&pages.bytes, pages_chart, Property::Title)?,
+                pages_chart,
+                Property::Title,
+            )?,
         ),
         (
             "Pages category axis",
-            host_read_pages(&pages.bytes, pages_chart, Property::Axis(Axis::Category))?,
+            host_read_pages(
+                &host_pages(&pages.bytes, pages_chart, Property::Axis(Axis::Category))?,
+                pages_chart,
+                Property::Axis(Axis::Category),
+            )?,
         ),
         (
             "Pages value axis",
-            host_read_pages(&pages.bytes, pages_chart, Property::Axis(Axis::Value))?,
+            host_read_pages(
+                &host_pages(&pages.bytes, pages_chart, Property::Axis(Axis::Value))?,
+                pages_chart,
+                Property::Axis(Axis::Value),
+            )?,
         ),
         ("present value", Some("W1-E title".to_owned())),
     ];
@@ -474,7 +544,7 @@ fn numbers_chart_title_and_axis_title_remove_parity() -> TestResult {
         Case::new(
             "numbers_chart_text_title_axis_remove_parity",
             Format::Numbers,
-            Tier::B,
+            Tier::A,
             Evidence::Queued,
             &input,
         )
@@ -539,7 +609,7 @@ fn pages_chart_title_and_axis_title_remove_parity() -> TestResult {
         Case::new(
             "pages_chart_text_title_axis_remove_parity",
             Format::Pages,
-            Tier::B,
+            Tier::A,
             Evidence::Queued,
             &input,
         )

@@ -322,16 +322,20 @@ instead of proving a clear on the caller's common populated input.
 `chart_text_cases.rs` now closes those gaps without changing the runtime
 facades or the cost-probe routes:
 
-- `run_numbers_reads` and `run_pages_reads` call the host `Draft` reader and
-  leaf `Package` reader directly on the same host-authored, populated chart
-  input for title, category-axis and value-axis selections. They assert equal
-  values and byte-identical source preservation. The negative-control test
-  exercises every selected family plus a present value and must reject a
-  deliberately mismatched read.
+- `run_numbers_reads` and `run_pages_reads` first host-author a nonempty
+  selected title or axis title, then call the host `Draft` reader and leaf
+  `Package` reader directly on that same populated chart input for title,
+  category-axis and value-axis selections. They assert equal `Some(expected)`
+  values. A read-only `Case` roundtrips both the host and leaf packages and
+  requires exact source bytes; the negative-control test exercises every
+  selected family plus a present value and rejects a deliberately mismatched
+  read.
 - Each Numbers and Pages remove route now only clears the caller-provided
-  common input. The leaf route applies that clear commit's inverse, and the
-  removal cases use Tier B so the archive comparator checks untouched ZIP
-  members and IWA objects in addition to the exact inverse restoration.
+  common input. The leaf route applies that clear commit's inverse. The
+  removal cases retain their ledger's Tier A because the clear-only host and
+  leaf outputs are byte-identical; the harness still computes its archive
+  locality diff for the case, while Tier A additionally protects the complete
+  ZIP equality and the inverse restores the exact common source.
 
 This is a proof/test-only append. `chart_text_cost.rs` and the eighteen-route
 measurement are unchanged; `integrated-callgrind.json` remains bound to the
@@ -340,7 +344,8 @@ clean measured source commit
 no raw captures or binaries were added to the repository. Focused
 verification was rerun with rustfmt, the
 `chart_text_cases::` parity filter and the parity-test Clippy profile; logs
-remain outside the checkout under `/tmp/litchi-w1e-chart-text-proof-20261028/`.
+remain outside the checkout under
+`/tmp/litchi-w1e-chart-text-proof-correction-20261028/`.
 
 ## 5. Native evidence and verification
 
