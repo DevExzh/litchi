@@ -1,7 +1,7 @@
 # 0384 — frozen 177 gate test-module ordering repair
 
 - **Status:** source repair committed as
-  `1b66a078fc99a5d3f9cb7623c81c5c51ca22af50` on
+  `1b66a078fca43d923b38fde2c5ae6ac95b3319e4` on
   `uo2/iwa-gate-177-repair`; receipt follows as a separate commit.
 - **Base:** `177ef72ce063cb5d1b8a66a5e731ba03cc82eb25`.
 - **Scope:** repair only the row-28 Clippy `items_after_test_module` findings.
