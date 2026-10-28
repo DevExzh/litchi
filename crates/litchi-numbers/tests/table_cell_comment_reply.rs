@@ -978,8 +978,14 @@ fn retained_compressed_entry_limit_accepts_exact_reply_output() -> TestResult {
         )
         .expect_err("one byte below the encoded reply member must refuse");
     assert!(
-        format!("{error:?}").contains("CompressedBytes"),
-        "expected typed compressed-budget refusal, got {error:?}"
+        matches!(
+            &error,
+            transaction::Error::Limit {
+                kind: transaction::LimitKind::CompressedBytes,
+                ..
+            }
+        ),
+        "expected typed compressed-budget refusal through the public reply route, got {error:?}"
     );
     assert_eq!(exact_bytes(&one_under_package)?, before);
     Ok(())
