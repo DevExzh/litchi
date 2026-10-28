@@ -18,7 +18,7 @@ use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
-#[path = "../../litchi-numbers/tests/support/numbers_comment_fixture.rs"]
+#[path = "support/numbers_comment_fixture.rs"]
 mod fixture;
 use fixture::{Corruption, FixtureMode};
 use litchi_numbers::cell::comment::Error as TableCellCommentError;
@@ -649,7 +649,7 @@ fn focused_numbers_comment_reads_reject_malformed_graphs_atomically_and_keep_unk
 fn permanent_numbers_comment_fixture_preserves_metadata_and_source_on_read() -> TestResult {
     let source = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../litchi-numbers/tests/fixtures/comment-edit-root.numbers"
+        "/tests/fixtures/comment-edit-root.numbers"
     ))
     .as_slice();
     let package = Package::from_bytes(source)?;
