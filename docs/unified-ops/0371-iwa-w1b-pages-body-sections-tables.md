@@ -211,6 +211,56 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | body line endpoints read (`chart-data-native`) | 155,394,765 | — | 31,411,145 | −79.8% |
 | populated body-table duplicate (`body-table-cells-native`) | 4,215,551,178 | — | 138,534,970 | −96.7% |
 
+### 4.1 Resumed qualification on the final work-package candidate
+
+The boundedness and merge-owner repairs were remeasured after merging the
+current coordinator trunk. The source was `6bb1d58021` (branch
+`uo2/iwa-w1b`, coordinator parent `0944b7319f`). The release parity binary was
+built from that exact source with
+`CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 cargo test --release -p
+litchi-iwa --all-features --test parity --no-run`. The prescribed probe then
+used CPU 3, callgrind instruction counts, and the existing host/leaf ABBA
+probe pair:
+
+```sh
+bash /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b/cg.sh \
+  target/release/deps/parity-bf69cf43b955a09c \
+  pages_shape_style_cases::line_endpoints_set_cost_abba \
+  pages_shape_style_cases::line_endpoints_reset_cost_abba \
+  pages_shape_style_cases::line_endpoints_read_cost_abba \
+  pages_lifecycle_cases::table_duplicate_cost_abba
+```
+
+| Final-candidate route | Host Ir | Leaf Ir | Leaf delta |
+|---|---:|---:|---:|
+| line endpoints set | 423,509,798 | 143,612,630 | −66.09% |
+| line endpoints reset | 549,099,195 | 127,434,349 | −76.79% |
+| line endpoints read | 155,392,745 | 31,413,766 | −79.78% |
+| supported body-table duplicate | 4,220,277,802 | 139,246,763 | −96.70% |
+
+All supported routes remain below the host cost; the no-more-than-5%/20 µs
+bar is met. The merged-cell route is intentionally refused before candidate
+publication, so it has no mutation cost to qualify. These are full parity
+facade probes (not engine-only measurements).
+
+The raw callgrind outputs and binary remain outside the repository. This
+manifest makes the receipt reproducible without committing large evidence:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1b/target/release/deps/parity-bf69cf43b955a09c` | 198,830,136 | `66ede694ec732bb3150a34823d649a77e22dfddcee224094998ce9167ce15056` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b/cg_results.txt` | 3,298 | `0e805233b8b6f5372ebe01ecd348c2186b72da3394b5c3a643e0e711f6418daf` |
+| `cg/pages_shape_style_cases::line_endpoints_set_cost_abba.host.out` | 592,436 | `80cef034853a871d9e80caa9f86a3960fe4d5e52ac1a3b21668b6d04cbd04e0b` |
+| `cg/pages_shape_style_cases::line_endpoints_set_cost_abba.leaf.out` | 480,629 | `f5b0aa6c4b6e4d6a33ca0aca2f5ed47132ab32ff6620960bc73dbfe72b69facf` |
+| `cg/pages_shape_style_cases::line_endpoints_reset_cost_abba.host.out` | 565,209 | `f851d2587642a30ebe9d1325aa5c71ad5c6932937ace5c8aa68bf6547fc7eec4` |
+| `cg/pages_shape_style_cases::line_endpoints_reset_cost_abba.leaf.out` | 449,489 | `05460e47157c3cedb9c5d757f0e01f16ca263ba4efbe0bcb3e3e236dea280244` |
+| `cg/pages_shape_style_cases::line_endpoints_read_cost_abba.host.out` | 382,185 | `61cbfdc3c3c97201a6b585f151a58924be12058cd156ebd4a9ee0ee706dc40d6` |
+| `cg/pages_shape_style_cases::line_endpoints_read_cost_abba.leaf.out` | 297,556 | `298db18e0dec06a098f37d1ac0609643e4f4c42f09126ffdd6368df30804192e` |
+| `cg/pages_lifecycle_cases::table_duplicate_cost_abba.host.out` | 830,838 | `5ec3f079e18882862d2e97e78fc63c3795dfd3be0ad54e8ee8efebc5b8283cd` |
+| `cg/pages_lifecycle_cases::table_duplicate_cost_abba.leaf.out` | 780,391 | `b78d89938a5e8c7e42a3c91a75323be088b859bcb950e32688c89771560dfc8a` |
+
+The raw files are relative to `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b`.
+
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
 and reparsed the component it edits. `234929c79b` removes both (a unit test
