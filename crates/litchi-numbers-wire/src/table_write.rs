@@ -9,7 +9,7 @@
 //! publishes. The calculation-engine check refuses tables whose formula
 //! graph a value change would have to recalculate.
 
-use litchi_iwa_common::wire::WireView;
+use litchi_iwa_common::wire::{RawWireFields, RawWireLimits, WireView};
 
 use crate::{BncCell, LimitKind, Limits, ListKind};
 
@@ -870,6 +870,191 @@ fn header_is_bare(header: &[u8], limits: &Limits) -> Result<bool> {
     Ok(true)
 }
 
+/// The most bytes [`header_adjust_many`] adds to a bucket per changed
+/// header: a new header's key and length, and its index, size, hiding and
+/// count fields with their keys.
+pub const HEADER_BYTES: usize = 26;
+
+/// The facts of one `TST.HeaderStorageBucket.Header` a count change needs.
+struct HeaderFacts {
+    index: u64,
+    cells: Option<u64>,
+    /// Encoded length of the count field.
+    count_bytes: usize,
+    /// Only an index, a zero size, a visible hiding state and a count.
+    bare: bool,
+}
+
+fn header_facts(header: &[u8], limits: RawWireLimits) -> Result<HeaderFacts> {
+    let mut index = None;
+    let mut cells = None;
+    let mut count_bytes = 0;
+    let mut bare = true;
+    let mut fields = RawWireFields::new(header, limits);
+    while let Some(field) = fields.next().map_err(map_wire_error)? {
+        match (field.number(), field.wire_type()) {
+            (1, 0) => {
+                if index.replace(varint(field.payload())?).is_some() {
+                    return Err(WriteError::Invalid);
+                }
+            },
+            (4, 0) => {
+                if cells.replace(varint(field.payload())?).is_some() {
+                    return Err(WriteError::Invalid);
+                }
+                count_bytes = field.raw().len();
+            },
+            (1 | 4, _) => return Err(WriteError::Invalid),
+            (2, _) => bare &= field.payload().iter().all(|byte| *byte == 0),
+            (3, 0) => bare &= varint(field.payload())? == 0,
+            _ => bare = false,
+        }
+    }
+    Ok(HeaderFacts {
+        index: index.ok_or(WriteError::Unsupported)?,
+        cells,
+        count_bytes,
+        bare,
+    })
+}
+
+const fn varint_len(value: u64) -> usize {
+    (64 - (value | 1).leading_zeros() as usize).div_ceil(7)
+}
+
+/// Append a header field for column or row `index` counting `cells` cells
+/// (size 0, visible).
+fn push_new_header(output: &mut Vec<u8>, index: u32, cells: u64, limits: &Limits) -> Result<()> {
+    let length = varint_len(u64::from(index)) + varint_len(cells) + 9;
+    push_varint(output, (2 << 3) | 2, limits)?;
+    push_varint(output, length as u64, limits)?;
+    varint_field(output, 1, u64::from(index), limits)?;
+    fixed32_field(output, 2, 0, limits)?;
+    varint_field(output, 3, 0, limits)?;
+    varint_field(output, 4, cells, limits)
+}
+
+/// Append the header field `header` with its count replaced by `cells`.
+fn push_counted_header(
+    output: &mut Vec<u8>,
+    header: &[u8],
+    facts: &HeaderFacts,
+    cells: u64,
+    limits: &Limits,
+    raw_limits: RawWireLimits,
+) -> Result<()> {
+    let length = header.len() - facts.count_bytes + 1 + varint_len(cells);
+    push_varint(output, (2 << 3) | 2, limits)?;
+    push_varint(output, length as u64, limits)?;
+    let mut fields = RawWireFields::new(header, raw_limits);
+    while let Some(field) = fields.next().map_err(map_wire_error)? {
+        if field.number() == 4 {
+            varint_field(output, 4, cells, limits)?;
+        } else {
+            append(output, field.raw(), limits)?;
+        }
+    }
+    Ok(())
+}
+
+/// [`header_adjust`] of several headers in one pass over a bucket whose
+/// headers are in increasing index order, growing it by at most
+/// [`HEADER_BYTES`] per changed header. `deltas` holds `(index, delta)`
+/// pairs in increasing index order. A removal the bucket does not count is
+/// ignored, as the host ignores it, so no count drops below zero.
+///
+/// # Errors
+///
+/// [`WriteError::Invalid`] for unsorted `deltas`; [`WriteError::Unsupported`]
+/// for a bucket whose headers are out of index order.
+pub fn header_adjust_many(
+    bucket: &[u8],
+    deltas: &[(u32, i64)],
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    if deltas.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+        return Err(WriteError::Invalid);
+    }
+    limits.check_input(bucket.len()).map_err(map_limits)?;
+    let raw_limits = RawWireLimits::new(
+        bucket.len().max(1),
+        limits.max_fields(),
+        0,
+        limits
+            .wire()
+            .max_rewrite_work()
+            .min(RawWireLimits::MAX_WORK),
+    )
+    .map_err(map_wire_error)?;
+    let bound = deltas
+        .len()
+        .checked_mul(HEADER_BYTES)
+        .and_then(|growth| growth.checked_add(bucket.len()))
+        .ok_or(WriteError::Invalid)?;
+    let mut output = Vec::new();
+    reserve(&mut output, bound.min(limits.max_output_bytes()))?;
+    let mut pending = deltas
+        .iter()
+        .copied()
+        .filter(|(_, delta)| *delta != 0)
+        .peekable();
+    let mut previous = None;
+    let mut fields = RawWireFields::new(bucket, raw_limits);
+    while let Some(field) = fields.next().map_err(map_wire_error)? {
+        if field.number() == 2 {
+            if field.wire_type() != 2 {
+                return Err(WriteError::Invalid);
+            }
+            let facts = header_facts(field.payload(), raw_limits)?;
+            if previous.is_some_and(|previous| previous >= facts.index) {
+                return Err(WriteError::Unsupported);
+            }
+            previous = Some(facts.index);
+            while let Some((index, delta)) =
+                pending.next_if(|(index, _)| u64::from(*index) < facts.index)
+            {
+                if let Ok(cells) = u64::try_from(delta) {
+                    push_new_header(&mut output, index, cells, limits)?;
+                }
+            }
+            if let Some((_, delta)) = pending.next_if(|(index, _)| u64::from(*index) == facts.index)
+            {
+                let after = match facts.cells {
+                    Some(cells) if delta < 0 => cells.saturating_sub(delta.unsigned_abs()),
+                    Some(cells) => cells
+                        .checked_add(delta.unsigned_abs())
+                        .ok_or(WriteError::Invalid)?,
+                    None if delta < 0 => {
+                        append(&mut output, field.raw(), limits)?;
+                        continue;
+                    },
+                    None => return Err(WriteError::Invalid),
+                };
+                if facts.cells == Some(after) {
+                    append(&mut output, field.raw(), limits)?;
+                } else if after != 0 || !facts.bare {
+                    push_counted_header(
+                        &mut output,
+                        field.payload(),
+                        &facts,
+                        after,
+                        limits,
+                        raw_limits,
+                    )?;
+                }
+                continue;
+            }
+        }
+        append(&mut output, field.raw(), limits)?;
+    }
+    for (index, delta) in pending {
+        if let Ok(cells) = u64::try_from(delta) {
+            push_new_header(&mut output, index, cells, limits)?;
+        }
+    }
+    Ok(output)
+}
+
 /// Add `delta` to the cell count of header `index` in a header bucket,
 /// creating the header (size 0, visible) when it has none; a bare header
 /// left counting no cell goes.
@@ -1497,10 +1682,10 @@ pub fn table_formula_state<'a>(
 #[cfg(test)]
 mod tests {
     use super::{
-        CellInput, WriteError, cell_bytes, header_adjust, list_intern, list_release, tile_cell,
-        tile_set_cell,
+        CellInput, WriteError, cell_bytes, header_adjust, header_adjust_many, list_intern,
+        list_release, tile_cell, tile_set_cell,
     };
-    use super::{bytes_field, varint_field};
+    use super::{bytes_field, fixed32_field, varint_field};
     use crate::{BncCell, Limits};
 
     const TEST_LIMITS: Limits = Limits::DEFAULT;
@@ -1609,6 +1794,81 @@ mod tests {
         let lowered = header_adjust(&again, 4, -2, &TEST_LIMITS).unwrap();
         assert!(header_adjust(&lowered, 4, -1, &TEST_LIMITS).is_err());
         assert!(header_adjust(&bucket, 2, -1, &TEST_LIMITS).is_err());
+    }
+
+    #[test]
+    fn header_adjust_many_matches_one_header_at_a_time() {
+        let mut bucket = Vec::new();
+        varint_field(&mut bucket, 1, 1, &TEST_LIMITS).unwrap();
+        for (index, cells) in [(1, 2), (3, 1), (5, 1)] {
+            bucket = header_adjust(&bucket, index, cells, &TEST_LIMITS).unwrap();
+        }
+        let deltas = [(0, 1), (3, -1), (4, 2), (5, 1), (6, 0), (9, 1)];
+        let mut sequential = bucket.clone();
+        for (index, delta) in deltas {
+            sequential = header_adjust(&sequential, index, delta, &TEST_LIMITS).unwrap();
+        }
+        assert_eq!(
+            header_adjust_many(&bucket, &deltas, &TEST_LIMITS).unwrap(),
+            sequential
+        );
+        assert_eq!(
+            header_adjust_many(&bucket, &[(4, 1), (4, 1)], &TEST_LIMITS),
+            Err(WriteError::Invalid)
+        );
+    }
+
+    #[test]
+    fn header_adjust_many_ignores_removals_the_bucket_does_not_count() {
+        let mut bucket = Vec::new();
+        varint_field(&mut bucket, 1, 1, &TEST_LIMITS).unwrap();
+        bucket = header_adjust(&bucket, 3, 1, &TEST_LIMITS).unwrap();
+        // A header carrying a size stays when it counts no cell.
+        let mut sized = Vec::new();
+        varint_field(&mut sized, 1, 5, &TEST_LIMITS).unwrap();
+        fixed32_field(&mut sized, 2, 20.0f32.to_bits(), &TEST_LIMITS).unwrap();
+        varint_field(&mut sized, 3, 0, &TEST_LIMITS).unwrap();
+        varint_field(&mut sized, 4, 1, &TEST_LIMITS).unwrap();
+        bytes_field(&mut bucket, 2, &sized, &TEST_LIMITS).unwrap();
+
+        let unchanged = header_adjust_many(&bucket, &[(2, -1)], &TEST_LIMITS).unwrap();
+        assert_eq!(unchanged, bucket);
+        let lowered = header_adjust_many(&bucket, &[(3, -4), (5, -2)], &TEST_LIMITS).unwrap();
+        let mut expected = header_adjust(&bucket, 3, -1, &TEST_LIMITS).unwrap();
+        expected = header_adjust(&expected, 5, -1, &TEST_LIMITS).unwrap();
+        assert_eq!(lowered, expected);
+        assert_eq!(
+            header_adjust_many(&lowered, &[(5, -1)], &TEST_LIMITS).unwrap(),
+            lowered
+        );
+    }
+
+    #[test]
+    fn header_adjust_many_refuses_unordered_buckets_and_bounds_growth() {
+        let mut header = Vec::new();
+        varint_field(&mut header, 1, 4, &TEST_LIMITS).unwrap();
+        varint_field(&mut header, 4, 1, &TEST_LIMITS).unwrap();
+        let mut unordered = Vec::new();
+        bytes_field(&mut unordered, 2, &header, &TEST_LIMITS).unwrap();
+        let mut lower = Vec::new();
+        varint_field(&mut lower, 1, 2, &TEST_LIMITS).unwrap();
+        varint_field(&mut lower, 4, 1, &TEST_LIMITS).unwrap();
+        bytes_field(&mut unordered, 2, &lower, &TEST_LIMITS).unwrap();
+        assert_eq!(
+            header_adjust_many(&unordered, &[(3, 1)], &TEST_LIMITS),
+            Err(WriteError::Unsupported)
+        );
+
+        let deltas = [(1, 1), (4, i64::from(u32::MAX)), (u32::MAX, i64::MAX)];
+        let mut bucket = Vec::new();
+        bytes_field(&mut bucket, 2, &header, &TEST_LIMITS).unwrap();
+        let grown = header_adjust_many(&bucket, &deltas, &TEST_LIMITS).unwrap();
+        assert!(grown.len() <= bucket.len() + deltas.len() * super::HEADER_BYTES);
+        let mut sequential = bucket.clone();
+        for (index, delta) in deltas {
+            sequential = header_adjust(&sequential, index, delta, &TEST_LIMITS).unwrap();
+        }
+        assert_eq!(grown, sequential);
     }
 
     #[test]

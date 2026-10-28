@@ -468,7 +468,8 @@ fn native_mixed_scalar_batch_roundtrips_from_one_final_state() -> TestResult {
     assert_eq!(commit.patch().len(), 4);
     assert_eq!(commit.diagnostics().requested_cells(), 4);
     assert_eq!(commit.diagnostics().changed_cells(), 4);
-    assert_eq!(commit.diagnostics().touched_components(), 2);
+    // The tile and both header buckets: C3:E3 add cells to their columns.
+    assert_eq!(commit.diagnostics().touched_components(), 3);
     let states = commit
         .package()
         .table_cells(0usize, 0usize, Area::from_a1("B3:E3")?)?;
@@ -509,7 +510,8 @@ fn native_same_tile_mixed_equal_and_changed_counts_final_delta() -> TestResult {
     assert_eq!(commit.patch().len(), 2);
     assert_eq!(commit.diagnostics().requested_cells(), 2);
     assert_eq!(commit.diagnostics().changed_cells(), 1);
-    assert_eq!(commit.diagnostics().touched_components(), 2);
+    // The tile and both header buckets: C3 adds a cell to column C.
+    assert_eq!(commit.diagnostics().touched_components(), 3);
     assert!(matches!(
         commit
             .package()
@@ -531,6 +533,7 @@ fn native_same_tile_mixed_equal_and_changed_counts_final_delta() -> TestResult {
         &[
             "Index/Tables/Tile.iwa",
             "Index/Tables/HeaderStorageBucket-904855-2.iwa",
+            "Index/Tables/HeaderStorageBucket-904899-2.iwa",
         ],
     )?;
     assert_eq!(
