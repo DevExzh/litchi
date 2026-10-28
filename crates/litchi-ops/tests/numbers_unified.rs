@@ -43,6 +43,45 @@ fn leaf_bytes(package: &litchi_numbers::Package) -> Vec<u8> {
     bytes
 }
 
+/// The full unified single-operation route: open a source package, dispatch
+/// one selector-first write through `File`, and publish it.  The callgrind
+/// probe below toggles this function so dispatch, facade, leaf commit and
+/// serialization are all inside the measured region.
+#[inline(never)]
+fn unified_cached_formula_route(source: &[u8]) -> Vec<u8> {
+    litchi_ops::open_bytes(source.to_vec())
+        .expect("open unified source")
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! { "formula" => "=B3+1", "cachedValue" => 2.0 },
+        )
+        .expect("unified cached formula")
+        .to_bytes()
+        .expect("publish unified source")
+}
+
+/// The direct leaf comparison route for the same single operation and source.
+/// Its output is compared with the full `File` route before the ABBA loop.
+#[inline(never)]
+fn direct_cached_formula_route(source: &[u8]) -> Vec<u8> {
+    let expression =
+        litchi_numbers::formula::Expression::parse("=B3+1").expect("formula expression");
+    let cached = litchi_numbers::formula::CachedValue::number(2.0).expect("cached number");
+    let package = litchi_numbers::Package::from_bytes(source)
+        .expect("direct leaf source")
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )
+        .expect("direct leaf editor")
+        .set_formula_cached(litchi_numbers::At::new(2, 2), expression, cached)
+        .expect("direct leaf cached formula")
+        .commit()
+        .expect("direct leaf cached commit")
+        .into_package();
+    leaf_bytes(&package)
+}
+
 #[test]
 fn create_returns_a_deterministic_minimal_workbook() {
     let file = create(FileFormat::Numbers).expect("create");
@@ -302,6 +341,31 @@ fn writes_cached_formulas_through_the_unified_route() {
         .apply(transaction.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().expect("restored bytes"), source_bytes);
+}
+
+/// Full `File` versus direct-leaf release instruction probe for one cached
+/// formula write.  Run explicitly under pinned callgrind; no wall-clock
+/// timing is part of this probe.
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn cached_formula_full_file_cost_abba() {
+    let source = std::fs::read(fixture("formula-budget-native.numbers"))
+        .expect("read formula budget fixture");
+    let direct = direct_cached_formula_route(&source);
+    assert_eq!(
+        unified_cached_formula_route(&source),
+        direct,
+        "full unified output must equal direct leaf output"
+    );
+    for route in [0_u8, 1, 1, 0] {
+        let output = if route == 0 {
+            unified_cached_formula_route(&source)
+        } else {
+            direct_cached_formula_route(&source)
+        };
+        assert_eq!(output, direct, "cached formula ABBA output must be exact");
+        std::hint::black_box(output);
+    }
 }
 
 #[test]
