@@ -1549,7 +1549,7 @@ mod tests {
             budget.wire_limits(),
             Err(Error::Limit {
                 kind: LimitKind::InputBytes,
-                observed: 1,
+                observed: 2,
                 maximum: 1,
             })
         ));
