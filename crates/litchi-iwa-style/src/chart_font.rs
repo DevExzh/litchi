@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::mem::size_of;
 
-use litchi_iwa_common::wire;
+use litchi_iwa_common::wire::{self, WireField};
 use litchi_iwa_common::{LimitKind as WireLimitKind, WireLimits};
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::chart_style_codec::{self as codec, Limits as CodecLimits};
@@ -481,25 +481,27 @@ impl Budget {
     }
 
     fn wire_limits(self) -> Result<WireLimits, Error> {
-        let input = self
-            .limits
-            .max_input_bytes()
-            .saturating_sub(self.input_bytes)
-            .max(1);
-        let fields = self.limits.max_fields().saturating_sub(self.fields).max(1);
-        let output = self
-            .limits
-            .max_output_bytes()
-            .saturating_sub(self.output_bytes)
-            .max(1);
-        let nesting = (self.limits.max_nesting() as usize)
-            .saturating_sub(self.max_depth as usize)
-            .max(1);
-        let work = self
-            .limits
-            .max_work_bytes()
-            .saturating_sub(self.work_bytes)
-            .max(1);
+        let input = self.remaining(
+            LimitKind::InputBytes,
+            self.limits.max_input_bytes(),
+            self.input_bytes,
+        )?;
+        let fields = self.remaining(LimitKind::Fields, self.limits.max_fields(), self.fields)?;
+        let output = self.remaining(
+            LimitKind::OutputBytes,
+            self.limits.max_output_bytes(),
+            self.output_bytes,
+        )?;
+        let nesting = self.remaining(
+            LimitKind::Nesting,
+            self.limits.max_nesting() as usize,
+            self.max_depth as usize,
+        )?;
+        let work = self.remaining(
+            LimitKind::Work,
+            self.limits.max_work_bytes(),
+            self.work_bytes,
+        )?;
         WireLimits::DEFAULT
             .with_input_bytes(input)
             .and_then(|limits| limits.with_fields(fields))
@@ -510,16 +512,58 @@ impl Budget {
     }
 
     fn codec_limits(self) -> Result<CodecLimits, Error> {
-        let bytes = self
-            .limits
-            .max_output_bytes()
-            .saturating_sub(self.output_bytes)
-            .max(1);
-        let fields = self.limits.max_fields().saturating_sub(self.fields).max(1);
+        let bytes = self.remaining(
+            LimitKind::OutputBytes,
+            self.limits.max_output_bytes(),
+            self.output_bytes,
+        )?;
+        let fields = self.remaining(LimitKind::Fields, self.limits.max_fields(), self.fields)?;
         CodecLimits::DEFAULT
             .with_max_bytes(bytes)
             .and_then(|limits| limits.with_max_fields(fields))
             .map_err(map_codec_error)
+    }
+
+    fn remaining(self, kind: LimitKind, maximum: usize, used: usize) -> Result<usize, Error> {
+        let remaining = maximum.saturating_sub(used);
+        if remaining == 0 {
+            return Err(Self::limit(kind, 1, maximum));
+        }
+        Ok(remaining)
+    }
+
+    fn parse_fields<'source>(&mut self, source: &'source [u8]) -> Result<Vec<WireField>> {
+        self.fields_at_depth(source, 1)
+    }
+
+    fn fields_at_depth<'source>(
+        &mut self,
+        source: &'source [u8],
+        depth: u32,
+    ) -> Result<Vec<WireField>> {
+        if depth > self.limits.max_nesting() {
+            return Err(Self::limit(
+                LimitKind::Nesting,
+                depth as usize,
+                self.limits.max_nesting() as usize,
+            ));
+        }
+        // Admit the parser's source-bound scratch and one field-vector
+        // allocation before asking the wire layer to inspect untrusted bytes.
+        self.scratch(source.len())?;
+        self.allocation(1)?;
+        let limits = self.wire_limits()?;
+        let fields = wire::parse_wire_fields(source, limits).map_err(map_wire_error)?;
+        self.source(source.len())?;
+        self.fields(fields.len())?;
+        self.work(source.len().checked_add(fields.len()).ok_or_else(|| {
+            Self::limit(LimitKind::Work, usize::MAX, self.limits.max_work_bytes())
+        })?)?;
+        // `parse_wire_fields` validates one message. Nested paragraph-style
+        // messages are charged by their own call, so the observed depth is
+        // the message level (root = one).
+        self.max_depth = self.max_depth.max(depth);
+        Ok(fields)
     }
 
     fn report(self, changed: bool) -> Report {
@@ -547,11 +591,11 @@ struct ParagraphStyles<'w, 's> {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl<'w, 's> ParagraphStyles<'w, 's> {
-    fn new(workspace: &'w Workspace<'s>, limits: Limits) -> Self {
+    fn new(workspace: &'w Workspace<'s>, budget: Budget) -> Self {
         Self {
             workspace,
             error: std::cell::RefCell::new(None),
-            budget: std::cell::RefCell::new(Budget::new(limits)),
+            budget: std::cell::RefCell::new(budget),
         }
     }
 
@@ -569,9 +613,7 @@ impl<'w, 's> ParagraphStyles<'w, 's> {
 
     fn charge_style(&self, identifier: u64, payload: &[u8]) -> Result<()> {
         let mut budget = self.budget.borrow_mut();
-        budget.work(payload.len())?;
-        budget.source(payload.len())?;
-        budget.fields(payload.len().max(1))?;
+        let _ = budget.parse_fields(payload)?;
         let _ = identifier;
         Ok(())
     }
@@ -733,9 +775,9 @@ fn chart_message(
             "a chart must have exactly one chart payload",
         )
         .map_err(map_graph_error)?;
-    budget.source(payload.len())?;
-    budget.work(payload.len())?;
+    let _ = budget.parse_fields(payload)?;
     budget.scratch(payload.len())?;
+    budget.allocation(1)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(payload.len())
@@ -755,7 +797,6 @@ fn paragraph_styles(
     let limits = budget.codec_limits()?;
     let references = codec::references(&payload, limits).map_err(map_codec_error)?;
     let source = references.paragraph_styles();
-    budget.fields(source.len().max(1))?;
     budget.allocation(source.len().max(1))?;
     budget.scratch(source.len().saturating_mul(size_of::<u64>()))?;
     let mut styles = Vec::new();
@@ -805,7 +846,7 @@ fn effective_property(
     kind: PropertyKind,
     budget: &mut Budget,
 ) -> Result<Property> {
-    let styles = ParagraphStyles::new(workspace, budget.limits);
+    let styles = ParagraphStyles::new(workspace, *budget);
     let limits = styles.limits()?;
     let result = text_style::effective(&styles, style, kind, limits);
     let error = styles.take_error();
@@ -823,6 +864,9 @@ fn effective_font(workspace: &Workspace<'_>, style: u64, budget: &mut Budget) ->
     };
     let style = text_style_of(workspace, style, budget)?;
     budget.text(font_name_bytes(&font))?;
+    if matches!(&font, Font::Named(_)) {
+        budget.allocation(1)?;
+    }
     Ok(ChartFont {
         font,
         bold: style.bold,
@@ -867,6 +911,7 @@ fn uniform<T: PartialEq>(
 /// An invalid chart or paragraph style, or mixed fonts.
 pub fn font(workspace: &Workspace<'_>, chart: u64, limits: Limits) -> Result<(ChartFont, Report)> {
     let mut budget = Budget::new(limits);
+    budget.work(workspace.source_work())?;
     let value = uniform(workspace, chart, &mut budget, effective_font)?;
     Ok((value, budget.report(false)))
 }
@@ -882,6 +927,7 @@ pub fn size(
     limits: Limits,
 ) -> Result<(TextPointSize, Report)> {
     let mut budget = Budget::new(limits);
+    budget.work(workspace.source_work())?;
     let value = uniform(workspace, chart, &mut budget, |workspace, style, budget| {
         Ok(text_style_of(workspace, style, budget)?.point_size)
     })?;
@@ -890,32 +936,67 @@ pub fn size(
 
 /// `(parent, stylesheet)` of a paragraph-style payload.
 fn style_links(payload: &[u8], budget: &mut Budget) -> Result<(Option<u64>, Option<u64>)> {
-    budget.source(payload.len())?;
-    budget.work(payload.len())?;
-    budget.fields(payload.len().max(1))?;
-    let Some(base) = graph::repeated(payload, STYLE_SUPER_FIELD)
-        .map_err(map_graph_error)?
-        .first()
+    let fields = budget.parse_fields(payload)?;
+    let Some(base_field) = fields
+        .iter()
         .copied()
+        .find(|field| field.number() == STYLE_SUPER_FIELD && field.wire_type() == 2)
     else {
         return Err(Error::InvalidSource(
             "a paragraph style has no style parent",
         ));
     };
-    let link = |number| -> Result<Option<u64>> {
-        Ok(
-            match graph::repeated(base, number)
-                .map_err(map_graph_error)?
-                .last()
-            {
-                Some(reference) => {
-                    graph::varint(reference, REFERENCE_IDENTIFIER_FIELD).map_err(map_graph_error)?
-                },
-                None => None,
-            },
-        )
+    let base = base_field.payload(payload).map_err(map_wire_error)?;
+    let base_fields = budget.fields_at_depth(base, 2)?;
+    let mut link = |number| -> Result<Option<u64>> {
+        let Some(reference_field) = base_fields
+            .iter()
+            .copied()
+            .filter(|field| field.number() == number)
+            .next_back()
+        else {
+            return Ok(None);
+        };
+        if reference_field.wire_type() != 2 {
+            return Err(Error::InvalidSource(
+                "a paragraph-style link is not a reference",
+            ));
+        }
+        let reference = reference_field.payload(base).map_err(map_wire_error)?;
+        varint_field(reference, REFERENCE_IDENTIFIER_FIELD, budget, 3)
     };
     Ok((link(STYLE_PARENT_FIELD)?, link(STYLE_STYLESHEET_FIELD)?))
+}
+
+fn varint_field(
+    payload: &[u8],
+    number: u32,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<Option<u64>> {
+    let fields = budget.fields_at_depth(payload, depth)?;
+    let Some(field) = fields
+        .iter()
+        .copied()
+        .filter(|field| field.number() == number)
+        .next_back()
+    else {
+        return Ok(None);
+    };
+    if field.wire_type() != 0 {
+        return Err(Error::InvalidSource(
+            "a reference identifier is not a varint",
+        ));
+    }
+    let encoded = field.payload(payload).map_err(map_wire_error)?;
+    let (value, width) = litchi_iwa_common::decode_varint_from_bytes(encoded)
+        .map_err(|_| Error::InvalidSource("a reference identifier is malformed"))?;
+    if width != encoded.len() {
+        return Err(Error::InvalidSource(
+            "a reference identifier is noncanonical",
+        ));
+    }
+    Ok(Some(value))
 }
 
 fn style_payload<'w>(workspace: &'w Workspace<'_>, style: u64) -> Result<(usize, &'w [u8])> {
@@ -940,7 +1021,7 @@ fn font_only(
     style: u64,
     budget: &mut Budget,
 ) -> Result<Option<FontOverrides>> {
-    let styles = ParagraphStyles::new(workspace, budget.limits);
+    let styles = ParagraphStyles::new(workspace, *budget);
     let limits = styles.limits()?;
     let result = text_style::font_overrides(&styles, style, limits);
     let error = styles.take_error();
@@ -1001,6 +1082,11 @@ pub fn set(
     limits: Limits,
 ) -> Result<Report> {
     let mut budget = Budget::new(limits);
+    budget.work(workspace.source_work())?;
+    if let Change::Font(target) = change {
+        budget.text(font_name_bytes(&target.font))?;
+        budget.allocation(1)?;
+    }
     match change {
         Change::Font(target) => {
             let current = uniform(workspace, chart, &mut budget, effective_font)?;
@@ -1140,12 +1226,14 @@ fn repoint(
         .len()
         .saturating_add(replacements.len().saturating_mul(16));
     budget.reserve_output(projected)?;
-    budget.allocation(replacements.len().max(1))?;
+    budget.allocation(replacements.len().saturating_add(1))?;
+    budget.scratch(projected)?;
     let data = wire::transform_length_delimited_fields_at_path(
         &payload,
         &[CHART_EXTENSION_FIELD, CHART_PARAGRAPH_STYLES_FIELD],
         |reference| -> Result<Vec<u8>> {
-            let identifier = graph::varint(reference, REFERENCE_IDENTIFIER_FIELD)?.unwrap_or(0);
+            let identifier =
+                varint_field(reference, REFERENCE_IDENTIFIER_FIELD, budget, 3)?.unwrap_or(0);
             match replacements.get(&identifier) {
                 Some(replacement) => Ok(wire::patch_varint_field(
                     reference,
@@ -1155,6 +1243,8 @@ fn repoint(
                 )
                 .map_err(map_wire_error)?),
                 None => {
+                    budget.allocation(1)?;
+                    budget.scratch(reference.len())?;
                     let mut copy = Vec::new();
                     copy.try_reserve_exact(reference.len())
                         .map_err(|_| Error::Allocation {
@@ -1204,6 +1294,8 @@ fn insert(
             .saturating_add(addition.variation.payload().len())
             .saturating_add(64),
     )?;
+    budget.allocation(1)?;
+    budget.scratch(sheet.len().saturating_add(64))?;
     let data = shape::stylesheet_with_variation(sheet, addition.parent, addition.identifier)?;
     budget.finish_output(data.len());
     workspace.replace_payload(addition.stylesheet, message, data)?;
@@ -1231,6 +1323,8 @@ fn insert(
     references.extend_from_slice(addition.variation.references());
     let variation_payload = addition.variation.into_payload();
     budget.reserve_output(variation_payload.len().saturating_add(64))?;
+    budget.allocation(1)?;
+    budget.scratch(variation_payload.len().saturating_add(64))?;
     let mut object = ArchiveObject::new(
         addition.identifier,
         vec![RawMessage {
@@ -1362,6 +1456,8 @@ fn prune(
         budget.source(sheet.len())?;
         budget.work(sheet.len())?;
         budget.reserve_output(sheet.len().saturating_add(64))?;
+        budget.allocation(1)?;
+        budget.scratch(sheet.len().saturating_add(64))?;
         let data = shape::stylesheet_without_variation(sheet, parent, style)?;
         budget.finish_output(data.len());
         workspace.replace_payload(stylesheet, message, data)?;
@@ -1402,4 +1498,75 @@ fn prune(
         workspace.release_identifier_suffix(&removed)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Budget, Error, LimitKind, Limits, map_text_error};
+    use litchi_iwa_text_wire::paragraph_style::{Error as TextError, Refusal};
+
+    fn generous() -> Limits {
+        Limits::new(1024, 128, 1024, 8, 4096, 1024, 128, 4096, 4096)
+    }
+
+    #[test]
+    fn residual_zero_is_a_typed_refusal() {
+        let mut budget = Budget::new(Limits::new(1, 16, 16, 4, 64, 16, 16, 64, 64));
+        budget.source(1).expect("source admission");
+        assert!(matches!(
+            budget.wire_limits(),
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed: 1,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn fields_are_counted_as_fields_and_accumulate() {
+        let mut budget = Budget::new(generous());
+        let first = [0x08, 0x01];
+        let second = [0x10, 0x02, 0x18, 0x03];
+        budget.parse_fields(&first).expect("first wire message");
+        budget.parse_fields(&second).expect("second wire message");
+        assert_eq!(budget.report(false).fields(), 3);
+        assert_eq!(budget.report(false).input_bytes(), 6);
+    }
+
+    #[test]
+    fn nested_depth_is_retained_in_the_report() {
+        let mut budget = Budget::new(generous());
+        budget
+            .fields_at_depth(&[0x08, 0x01], 3)
+            .expect("bounded nested message");
+        assert_eq!(budget.report(false).max_depth(), 3);
+    }
+
+    #[test]
+    fn zero_scratch_and_allocation_ceilings_fail_before_wire_work() {
+        let mut scratch = Budget::new(Limits::new(32, 32, 32, 4, 128, 32, 32, 128, 0));
+        assert!(matches!(
+            scratch.parse_fields(&[0x08, 0x01]),
+            Err(Error::Limit {
+                kind: LimitKind::ScratchBytes,
+                ..
+            })
+        ));
+
+        let mut allocations = Budget::new(Limits::new(32, 32, 32, 4, 128, 32, 0, 128, 128));
+        assert!(matches!(
+            allocations.parse_fields(&[0x08, 0x01]),
+            Err(Error::Limit {
+                kind: LimitKind::Allocations,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn paragraph_style_refusals_remain_typed() {
+        let error = map_text_error(TextError::Refused(Refusal::NotNamed));
+        assert!(matches!(error, Error::Refused(Refusal::NotNamed)));
+    }
 }

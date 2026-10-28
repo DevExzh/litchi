@@ -20,6 +20,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
+use std::mem::size_of;
 
 use litchi_iwa_common::wire::{self, WireField};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
@@ -262,6 +263,46 @@ impl<'s> Workspace<'s> {
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// Estimate the bounded traversal and metadata work performed while the
+    /// workspace indexes its source components.  Format owners charge this
+    /// before invoking a style engine so the graph scan cannot escape the
+    /// engine's operation budget.
+    #[must_use]
+    pub(crate) fn source_work(&self) -> usize {
+        let mut work = 0usize;
+        for position in 0..self.source.count() {
+            let Some((name, archive)) = self.source.component(position) else {
+                continue;
+            };
+            work = work.saturating_add(name.len());
+            work = work.saturating_add(
+                archive
+                    .objects
+                    .len()
+                    .saturating_mul(size_of::<ArchiveObject>()),
+            );
+            for object in &archive.objects {
+                work = work.saturating_add(
+                    object
+                        .messages
+                        .len()
+                        .saturating_mul(size_of::<RawMessage>()),
+                );
+                for message in &object.messages {
+                    work = work.saturating_add(message.data.len());
+                }
+                work = work.saturating_add(
+                    object
+                        .archive_info
+                        .message_infos
+                        .len()
+                        .saturating_mul(size_of::<litchi_iwa_core::MessageInfo>()),
+                );
+            }
+        }
+        work
     }
 
     /// Finish the edit.
